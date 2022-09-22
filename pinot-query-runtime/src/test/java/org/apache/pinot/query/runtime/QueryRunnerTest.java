@@ -184,6 +184,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // Reverse the order of join condition and join table order.
         new Object[]{"SELECT * FROM a JOIN b on b.col1 = a.col1 AND b.col2 = a.col2"},
 
+        // LEFT JOIN
+        new Object[]{"SELECT * FROM a LEFT JOIN b on a.col1 = b.col2"},
+
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
         // thus the final JOIN result will be 1 x 3 x 1 = 3.

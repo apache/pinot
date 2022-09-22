@@ -138,11 +138,15 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       for (Object[] leftRow : container) {
         List<Object[]> hashCollection = _broadcastHashTable.getOrDefault(
             _leftKeySelector.computeHash(leftRow), Collections.emptyList());
-        for (Object[] rightRow : hashCollection) {
-          Object[] resultRow = joinRow(leftRow, rightRow);
-          if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
+        if (hashCollection.isEmpty() && _joinType == JoinRelType.LEFT) {
+          rows.add(joinRow(leftRow, null));
+        } else {
+          for (Object[] rightRow : hashCollection) {
+            Object[] resultRow = joinRow(leftRow, rightRow);
+            if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
               evaluator -> evaluator.apply(resultRow))) {
-            rows.add(resultRow);
+              rows.add(resultRow);
+            }
           }
         }
       }
@@ -155,13 +159,13 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
-  private Object[] joinRow(Object[] leftRow, Object[] rightRow) {
+  private Object[] joinRow(Object[] leftRow, @Nullable Object[] rightRow) {
     Object[] resultRow = new Object[_resultRowSize];
     int idx = 0;
     for (Object obj : leftRow) {
       resultRow[idx++] = obj;
     }
-    if (_joinType != JoinRelType.SEMI) {
+    if (_joinType != JoinRelType.SEMI && rightRow != null) {
       for (Object obj : rightRow) {
         resultRow[idx++] = obj;
       }
