@@ -28,8 +28,8 @@ import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.SortedRangeIntersection;
-import org.apache.pinot.spi.utils.CommonConstants.Query.OptimizationSwitches;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -58,8 +58,7 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
 
   public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets, Map<String, String> queryOptions) {
     _docIdSets = docIdSets;
-    _cardinalityBasedRankingForScan = queryOptions != null
-        && queryOptions.containsKey(OptimizationSwitches.AND_SCAN_CARDINALITY_BASED_REORDERING);
+    _cardinalityBasedRankingForScan = QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
   }
 
   @Override
@@ -94,7 +93,7 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
     // scanning from the beginning. Automatically place N/A cardinality column (-1) to the back as we want to
     // evaluate ExpressionScanDocIdIterator in the end.
     if (_cardinalityBasedRankingForScan) {
-      scanBasedDocIdIterators.sort(Comparator.comparing(ScanBasedDocIdIterator::getCardinality).reversed());
+      scanBasedDocIdIterators.sort(Comparator.comparing(x -> (-x.getEffectiveCardinality(true))));
     }
 
     int numSortedDocIdIterators = sortedDocIdIterators.size();

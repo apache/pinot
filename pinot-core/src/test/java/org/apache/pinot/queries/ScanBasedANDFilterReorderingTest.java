@@ -34,7 +34,7 @@ import static org.testng.Assert.assertTrue;
 public class ScanBasedANDFilterReorderingTest extends InnerSegmentSelectionSingleValueQueriesTest {
   private static final String SELECT_STAR_QUERY = "SELECT * FROM testTable";
   private static final String SET_AND_OPTIMIZATION = "SET "
-      + OptimizationSwitches.AND_SCAN_CARDINALITY_BASED_REORDERING + " = '';";
+      + OptimizationSwitches.AND_SCAN_REORDERING + " = '';";
 
   @Test
   public void testSelectStar() {
@@ -67,7 +67,7 @@ public class ScanBasedANDFilterReorderingTest extends InnerSegmentSelectionSingl
     resultsBlock = selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
-    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 35905L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 48241L);
     assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 110L);
     assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     selectionDataSchema = resultsBlock.getDataSchema();

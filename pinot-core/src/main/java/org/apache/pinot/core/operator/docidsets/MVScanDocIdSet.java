@@ -26,11 +26,9 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public final class MVScanDocIdSet implements FilterBlockDocIdSet {
   private final MVScanDocIdIterator _docIdIterator;
 
-  public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
-      int maxNumEntriesPerValue) {
+  public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
     _docIdIterator =
-        new MVScanDocIdIterator(predicateEvaluator, dataSource.getForwardIndex(), numDocs, maxNumEntriesPerValue,
-            dataSource.getDataSourceMetadata().getCardinality());
+        new MVScanDocIdIterator(predicateEvaluator, dataSource, numDocs);
   }
 
   @Override

@@ -20,12 +20,15 @@ package org.apache.pinot.core.operator.dociditerators;
 
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.utils.CommonConstants.Query.OptimizationConstants;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
 
 
 /**
@@ -46,15 +49,14 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
-      int maxNumValuesPerMVEntry, int cardinality) {
+  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
-    _reader = reader;
-    _readerContext = reader.createContext();
+    _reader = dataSource.getForwardIndex();
+    _readerContext = _reader.createContext();
     _numDocs = numDocs;
-    _maxNumValuesPerMVEntry = maxNumValuesPerMVEntry;
+    _maxNumValuesPerMVEntry = dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
     _valueMatcher = getValueMatcher();
-    _cardinality = cardinality;
+    _cardinality = dataSource.getDataSourceMetadata().getCardinality();
   }
 
   @Override
@@ -106,9 +108,26 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     return _numEntriesScanned;
   }
 
+  /**
+   * This is a crude version of
+   * org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
+   */
   @Override
-  public int getCardinality() {
-    return _cardinality;
+  public float getEffectiveCardinality(boolean isAndDocIdSet) {
+    float numMatchingItems = _predicateEvaluator.getNumMatchingItems();
+    if (Float.isNaN(numMatchingItems) || _cardinality < 0) {
+      return ScanBasedDocIdIterator.super.getEffectiveCardinality(isAndDocIdSet);
+    }
+    int avgNumValuesPerMVEntry = _maxNumValuesPerMVEntry < 0
+        ? OptimizationConstants.DEFAULT_AVG_MV_ENTRIES
+        : _maxNumValuesPerMVEntry / OptimizationConstants.DEFAULT_AVG_MV_ENTRIES_DENOMINATOR;
+
+    numMatchingItems = numMatchingItems > 0 ? numMatchingItems * avgNumValuesPerMVEntry
+        : (numMatchingItems * avgNumValuesPerMVEntry + _cardinality);
+
+    numMatchingItems = Math.max(Math.min(_cardinality, numMatchingItems), 0);
+
+    return _cardinality / numMatchingItems;
   }
 
   private ValueMatcher getValueMatcher() {

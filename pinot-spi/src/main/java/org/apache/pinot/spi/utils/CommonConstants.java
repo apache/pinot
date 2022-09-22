@@ -809,7 +809,12 @@ public class CommonConstants {
     }
 
     public static class OptimizationSwitches {
-      public static final String AND_SCAN_CARDINALITY_BASED_REORDERING = "andScanCardinalityBasedReordering";
+      public static final String AND_SCAN_REORDERING = "AndScanReordering";
+    }
+
+    public static class OptimizationConstants {
+      public static final int DEFAULT_AVG_MV_ENTRIES = 3;
+      public static final int DEFAULT_AVG_MV_ENTRIES_DENOMINATOR = 5;
     }
 
     public static class Range {

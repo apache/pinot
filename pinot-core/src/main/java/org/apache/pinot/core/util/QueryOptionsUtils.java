@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
@@ -43,6 +44,10 @@ public class QueryOptionsUtils {
     } else {
       return null;
     }
+  }
+
+  public static boolean isAndScanReorderingEnabled(Map<String, String> queryOptions) {
+    return queryOptions.containsKey(CommonConstants.Query.OptimizationSwitches.AND_SCAN_REORDERING);
   }
 
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {

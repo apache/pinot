@@ -95,7 +95,7 @@ public interface DataSourceMetadata {
   Set<Integer> getPartitions();
 
   /**
-   * Returns the cardinality of the column, -1 if not applicable
+   * Returns the cardinality of the column, {@code -1} if not applicable
    */
   int getCardinality();
 }

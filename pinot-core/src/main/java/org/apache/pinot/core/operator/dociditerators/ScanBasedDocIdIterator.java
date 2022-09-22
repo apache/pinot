@@ -46,7 +46,11 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
   long getNumEntriesScanned();
 
   /**
-   * Returns the cardinality of the underlying data source, -1 if not applicable.
+   * Returns the effective cardinality of the underlying data source
    */
-  int getCardinality();
+
+  default float getEffectiveCardinality(boolean isAndDocIdSet) {
+    //default N/A behavior so that it always get picked in the end
+    return isAndDocIdSet ? Float.NEGATIVE_INFINITY : Float.POSITIVE_INFINITY;
+  }
 }

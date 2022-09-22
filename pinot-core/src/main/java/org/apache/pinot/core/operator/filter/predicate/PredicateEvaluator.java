@@ -106,6 +106,15 @@ public interface PredicateEvaluator {
    */
 
   /**
+   * return the number of matching items specified by predicate
+   * negative number indicates exclusive (not eq, not in) match
+   * return {@code Float.NaN} for not applicable
+   */
+  default float getNumMatchingItems() {
+    return Float.NaN;
+  };
+
+  /**
    * Get the number of matching dictionary ids.
    */
   int getNumMatchingDictIds();
