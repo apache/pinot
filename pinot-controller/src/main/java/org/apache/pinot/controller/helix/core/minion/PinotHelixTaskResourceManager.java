@@ -463,7 +463,7 @@ public class PinotHelixTaskResourceManager {
     return taskConfigs;
   }
 
-  public synchronized Map<String, String> getSubtaskProgress(String taskName, @Nullable String subtaskNames,
+  public synchronized Map<String, Object> getSubtaskProgress(String taskName, @Nullable String subtaskNames,
       Executor executor, HttpConnectionManager connMgr, Map<String, String> workerEndpoints,
       Map<String, String> requestHeaders, int timeoutMs)
       throws Exception {
@@ -473,7 +473,7 @@ public class PinotHelixTaskResourceManager {
   }
 
   @VisibleForTesting
-  Map<String, String> getSubtaskProgress(String taskName, @Nullable String subtaskNames,
+  Map<String, Object> getSubtaskProgress(String taskName, @Nullable String subtaskNames,
       CompletionServiceHelper completionServiceHelper, Map<String, String> workerEndpoints,
       Map<String, String> requestHeaders, int timeoutMs)
       throws Exception {
@@ -504,7 +504,7 @@ public class PinotHelixTaskResourceManager {
             StringUtils.join(subtasksOnWorker, CommonConstants.Minion.TASK_LIST_SEPARATOR))));
     LOGGER.debug("Getting task progress with workerUrls: {}", workerUrls);
     // Scatter and gather progress from multiple workers.
-    Map<String, String> subtaskProgressMap = new HashMap<>();
+    Map<String, Object> subtaskProgressMap = new HashMap<>();
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs);
     for (Map.Entry<String, String> entry : serviceResponse._httpResponses.entrySet()) {
@@ -526,8 +526,8 @@ public class PinotHelixTaskResourceManager {
       } else {
         String taskWorker = taskWorkerAndHelixState[0];
         String helixState = taskWorkerAndHelixState[1];
-        subtaskProgressMap.put(subtaskName, String
-            .format("No progress status from worker: %s but find status: %s tracked by Helix", taskWorker, helixState));
+        subtaskProgressMap.put(subtaskName,
+            String.format("No status from worker: %s. Got status: %s from Helix", taskWorker, helixState));
       }
     }
     // Raise error if any worker failed to report progress, with partial result.

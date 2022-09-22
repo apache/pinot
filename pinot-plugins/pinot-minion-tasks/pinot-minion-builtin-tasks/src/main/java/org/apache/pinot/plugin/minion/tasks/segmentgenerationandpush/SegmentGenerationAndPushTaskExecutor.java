@@ -120,7 +120,6 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
         "tmp-" + UUID.randomUUID());
     _pinotTaskConfig = pinotTaskConfig;
     _eventObserver = MinionEventObservers.getInstance().getMinionEventObserver(pinotTaskConfig.getTaskId());
-    _eventObserver.notifyProgress(pinotTaskConfig, "Task running");
     try {
       SegmentGenerationTaskSpec taskSpec = generateTaskSpec(taskConfigs, localTempDir);
       return generateAndPushSegment(taskSpec, resultBuilder, taskConfigs);

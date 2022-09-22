@@ -410,8 +410,9 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/subtask/{taskName}/progress")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get progress of specified sub tasks for the given task tracked by worker in memory")
-  public Map<String, String> getSubtaskProgress(@Context HttpHeaders httpHeaders,
+  public String getSubtaskProgress(@Context HttpHeaders httpHeaders,
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") @Nullable
           String subtaskNames) {
@@ -429,9 +430,10 @@ public class PinotTaskRestletResource {
     });
     int timeoutMs = _controllerConf.getMinionAdminRequestTimeoutSeconds() * 1000;
     try {
-      return _pinotHelixTaskResourceManager
+      Map<String, Object> progress = _pinotHelixTaskResourceManager
           .getSubtaskProgress(taskName, subtaskNames, _executor, _connectionManager, workerEndpoints, requestHeaders,
               timeoutMs);
+      return JsonUtils.objectToString(progress);
     } catch (UnknownTaskTypeException | NoTaskScheduledException e) {
       throw new ControllerApplicationException(LOGGER, "Not task with name: " + taskName, Response.Status.NOT_FOUND, e);
     } catch (Exception e) {
