@@ -85,6 +85,7 @@ public class LiteralTransformFunction implements TransformFunction {
     _doubleLiteral = _bigDecimalLiteral.doubleValue();
   }
 
+  // TODO: Deprecate the usage case for this function.
   @VisibleForTesting
   static DataType inferLiteralDataType(String literal) {
     // Try to interpret the literal as number

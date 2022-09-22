@@ -113,19 +113,22 @@ public class ExpressionContext {
       return false;
     }
     ExpressionContext that = (ExpressionContext) o;
-    return _type.equals(that._type) && Objects.equals(_identifier, that._identifier) && Objects.equals(_function, that._function) && Objects.equals(_literal, that._literal);
+    return _type == that._type && Objects.equals(_identifier, that._identifier) && Objects.equals(_function, that._function) && Objects.equals(_literal, that._literal);
   }
 
   @Override
   public int hashCode() {
-    int hash = 31 * 31 * _type.hashCode();
-    if (_type == Type.FUNCTION) {
-      return hash + _function.hashCode();
+    int hash = 31 * _type.hashCode();
+    switch (_type) {
+      case LITERAL:
+        return hash + _literal.hashCode();
+      case IDENTIFIER:
+        return hash + _identifier.hashCode();
+      case FUNCTION:
+        return hash + _function.hashCode();
+      default:
+        throw new IllegalStateException();
     }
-    if (_type == Type.LITERAL) {
-      return hash + _literal.hashCode();
-    }
-    return hash + 31 * _identifier.hashCode();
   }
 
   @Override

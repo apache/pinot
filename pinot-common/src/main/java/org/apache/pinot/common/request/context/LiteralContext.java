@@ -39,9 +39,6 @@ public class LiteralContext {
 
   private static FieldSpec.DataType convertThriftTypeToDataType(Literal._Fields fields) {
     switch (fields) {
-      case SHORT_VALUE:
-      case INT_VALUE:
-        return FieldSpec.DataType.INT;
       case LONG_VALUE:
         return FieldSpec.DataType.LONG;
       case BOOL_VALUE:
@@ -121,6 +118,9 @@ public class LiteralContext {
       return '\'' + "" + '\'';
     }
     // TODO: print out the type.
-    return '\'' + _value.toString() + '\'';
+    if(_type == FieldSpec.DataType.STRING || _type == FieldSpec.DataType.BYTES) {
+      return '\'' + _value.toString() + '\'';
+    }
+    return _value.toString();
   }
 }
