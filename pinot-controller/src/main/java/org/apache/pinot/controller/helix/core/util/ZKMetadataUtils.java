@@ -26,6 +26,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
@@ -94,8 +95,11 @@ public class ZKMetadataUtils {
       segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
       segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
       segmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
-      segmentZKMetadata.setRawStartTime(segmentMetadata.getRawStartTime());
-      segmentZKMetadata.setRawEndTime(segmentMetadata.getRawEndTime());
+      if(segmentMetadata.getTimeColumn() != null) {
+        ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor(segmentMetadata.getTimeColumn());
+        segmentZKMetadata.setRawStartTime(timeColumnMetadata.getMinValue().toString());
+        segmentZKMetadata.setRawEndTime(timeColumnMetadata.getMaxValue().toString());
+      }
     } else {
       segmentZKMetadata.setStartTime(-1);
       segmentZKMetadata.setEndTime(-1);
