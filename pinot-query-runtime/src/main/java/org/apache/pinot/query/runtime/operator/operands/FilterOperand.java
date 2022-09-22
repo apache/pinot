@@ -43,48 +43,48 @@ public abstract class FilterOperand extends TransformOperand {
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
-                _lhs._resultType.convert(_rhs.apply(row))) == 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
+                _resultType.convert(_rhs.apply(row))) == 0;
           }
         };
       case "notEquals":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
-                _lhs._resultType.convert(_rhs.apply(row))) != 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
+                _resultType.convert(_rhs.apply(row))) != 0;
           }
         };
       case "greaterThan":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
-                _lhs._resultType.convert(_rhs.apply(row))) > 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
+                _resultType.convert(_rhs.apply(row))) > 0;
           }
         };
       case "greaterThanOrEqual":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
-                _lhs._resultType.convert(_rhs.apply(row))) >= 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
+                _resultType.convert(_rhs.apply(row))) >= 0;
           }
         };
       case "lessThan":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
-                _lhs._resultType.convert(_rhs.apply(row))) < 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
+                _resultType.convert(_rhs.apply(row))) < 0;
           }
         };
       case "lessThanOrEqual":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
-                _lhs._resultType.convert(_rhs.apply(row))) <= 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
+                _resultType.convert(_rhs.apply(row))) <= 0;
           }
         };
       default:
@@ -150,10 +150,19 @@ public abstract class FilterOperand extends TransformOperand {
   private static abstract class Predicate extends FilterOperand {
     protected final TransformOperand _lhs;
     protected final TransformOperand _rhs;
+    protected final DataSchema.ColumnDataType _resultType;
 
     public Predicate(List<RexExpression> functionOperands, DataSchema dataSchema) {
       _lhs = TransformOperand.toTransformOperand(functionOperands.get(0), dataSchema);
       _rhs = TransformOperand.toTransformOperand(functionOperands.get(1), dataSchema);
+      if (_lhs._resultType != DataSchema.ColumnDataType.OBJECT) {
+        _resultType = _lhs._resultType;
+      } else if (_rhs._resultType != DataSchema.ColumnDataType.OBJECT){
+        _resultType = _rhs._resultType;
+      } else {
+        throw new UnsupportedOperationException("Unsupported predicate comparison between: " + _lhs + " and: " + _rhs
+            + " neither LHS or RHS result are comparable data type!");
+      }
     }
   }
 }
