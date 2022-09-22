@@ -157,7 +157,7 @@ public abstract class FilterOperand extends TransformOperand {
       _rhs = TransformOperand.toTransformOperand(functionOperands.get(1), dataSchema);
       if (_lhs._resultType != DataSchema.ColumnDataType.OBJECT) {
         _resultType = _lhs._resultType;
-      } else if (_rhs._resultType != DataSchema.ColumnDataType.OBJECT){
+      } else if (_rhs._resultType != DataSchema.ColumnDataType.OBJECT) {
         _resultType = _rhs._resultType;
       } else {
         throw new UnsupportedOperationException("Unsupported predicate comparison between: " + _lhs + " and: " + _rhs
