@@ -273,13 +273,13 @@ public class FieldSpecTest {
     });
 
     entries.add(new Object[]{
-        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT", granularity, false, new DateTimeFieldSpec(name, dataType,
-        "1:DAYS:SIMPLE_DATE_FORMAT", granularity)
+        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT", granularity, false,
+        new DateTimeFieldSpec(name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT", granularity)
     });
 
     entries.add(new Object[]{
-        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity, false, new DateTimeFieldSpec(name, dataType,
-        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity)
+        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity, false,
+        new DateTimeFieldSpec(name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity)
     });
 
     return entries.toArray(new Object[entries.size()][]);
@@ -310,7 +310,7 @@ public class FieldSpecTest {
     // Multi-value dimension field with default null value.
     dimensionFields = new String[]{
         "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
-        "\"defaultNullValue" + "\":\"default\""
+        "\"defaultNullValue\":\"default\""
     };
     dimensionFieldSpec1 = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     dimensionFieldSpec2 = new DimensionFieldSpec("dimension", STRING, false, "default");
@@ -349,7 +349,7 @@ public class FieldSpecTest {
     // Multi-value dimension field with default null value.
     dimensionFields = new String[]{
         "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
-        "\"defaultNullValue" + "\":\"default\""
+        "\"defaultNullValue\":\"default\""
     };
     first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);
@@ -359,9 +359,8 @@ public class FieldSpecTest {
     String[] timeFields = {
         "\"incomingGranularitySpec\":{\"timeUnitSize\":1, \"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\","
             + "\"name\":\"incomingTime\"}",
-        "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\","
-            + "\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1",
-        "\"transformFunction\":\"toEpochDays" + "(millis)\""
+        "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\"," + "\"name\":\"outgoingTime\"}",
+        "\"defaultNullValue\":-1", "\"transformFunction\":\"toEpochDays" + "(millis)\""
     };
     first = JsonUtils.stringToObject(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), TimeFieldSpec.class);
