@@ -187,6 +187,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // LEFT JOIN
         new Object[]{"SELECT * FROM a LEFT JOIN b on a.col1 = b.col2"},
 
+        new Object[]{"SELECT a.col1, SUM(CASE WHEN b.col3 IS NULL THEN 0 ELSE b.col3 END) "
+            + " FROM a LEFT JOIN b on a.col1 = b.col2 GROUP BY a.col1"},
+
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
         // thus the final JOIN result will be 1 x 3 x 1 = 3.
