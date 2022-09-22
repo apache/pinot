@@ -268,8 +268,8 @@ public class FieldSpecTest {
     entries.add(new Object[]{name, dataType, "-1:HOURS:EPOCH", granularity, true, null});
     entries.add(new Object[]{name, dataType, "0.1:HOURS:EPOCH", granularity, true, null});
     entries.add(new Object[]{
-        name, dataType, "1:HOURS:EPOCH", granularity, false, new DateTimeFieldSpec(name, dataType, "1:HOURS:EPOCH",
-        granularity)
+        name, dataType, "1:HOURS:EPOCH", granularity, false,
+        new DateTimeFieldSpec(name, dataType, "1:HOURS:EPOCH", granularity)
     });
 
     entries.add(new Object[]{
