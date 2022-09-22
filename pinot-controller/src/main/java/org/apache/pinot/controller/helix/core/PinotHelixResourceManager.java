@@ -1291,10 +1291,11 @@ public class PinotHelixResourceManager {
 
     List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
     for (String tableNameWithType : tableNamesWithType) {
+      TableConfig tableConfig = getTableConfig(tableNameWithType);
       List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
       for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
         int version = segmentZKMetadata.toZNRecord().getVersion();
-        updateSegmentInterval(tableNameWithType, segmentZKMetadata, schema);
+        updateSegmentInterval(tableConfig, segmentZKMetadata, schema);
         updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
       }
     }
@@ -2288,14 +2289,16 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void updateSegmentInterval(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
+  public void updateSegmentInterval(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata,
       Schema newSchema) {
     String segmentName = segmentZKMetadata.getSegmentName();
-    TableConfig tableConfig = getTableConfig(tableNameWithType);
     if (tableConfig != null) {
       ZKMetadataUtils.updateSegmentZKMetadataInterval(tableConfig, segmentZKMetadata, newSchema);
+      LOGGER.info("Updated segment zookeeper metadata: {} of table: {}", segmentName, tableConfig.getTableName());
+    } else {
+      throw new RuntimeException(
+          String.format("No table config available for time interval update for segment: %s", segmentName));
     }
-    LOGGER.info("Updated segment zookeeper metadata: {} of table: {}", segmentName, tableNameWithType);
   }
 
   @VisibleForTesting

@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.util;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
@@ -71,12 +72,16 @@ public class ZKMetadataUtils {
       String startTimeString = segmentZKMetadata.getRawStartTime();
       if (StringUtils.isNotEmpty(startTimeString)) {
         long updatedStartTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(startTimeString);
+        updatedStartTime =
+            newDateTimeFieldSpec.getFormatSpec().getColumnUnit().convert(updatedStartTime, TimeUnit.MILLISECONDS);
         segmentZKMetadata.setStartTime(updatedStartTime);
       }
 
       String endTimeString = segmentZKMetadata.getRawEndTime();
       if (StringUtils.isNotEmpty(endTimeString)) {
         long updatedEndTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(endTimeString);
+        updatedEndTime =
+            newDateTimeFieldSpec.getFormatSpec().getColumnUnit().convert(updatedEndTime, TimeUnit.MILLISECONDS);
         segmentZKMetadata.setEndTime(updatedEndTime);
       }
     }
@@ -95,11 +100,9 @@ public class ZKMetadataUtils {
       segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
       segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
       segmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
-      if(segmentMetadata.getTimeColumn() != null) {
-        ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor(segmentMetadata.getTimeColumn());
-        segmentZKMetadata.setRawStartTime(timeColumnMetadata.getMinValue().toString());
-        segmentZKMetadata.setRawEndTime(timeColumnMetadata.getMaxValue().toString());
-      }
+      ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor(segmentMetadata.getTimeColumn());
+      segmentZKMetadata.setRawStartTime(timeColumnMetadata.getMinValue().toString());
+      segmentZKMetadata.setRawEndTime(timeColumnMetadata.getMaxValue().toString());
     } else {
       segmentZKMetadata.setStartTime(-1);
       segmentZKMetadata.setEndTime(-1);
