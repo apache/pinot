@@ -35,6 +35,8 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,6 +45,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * regular column for other record transformers.
  */
 public class ExpressionTransformer implements RecordTransformer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ExpressionTransformer.class);
 
   @VisibleForTesting
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
@@ -127,14 +130,15 @@ public class ExpressionTransformer implements RecordTransformer {
       // Skip transformation if column value already exist.
       // NOTE: column value might already exist for OFFLINE data
       if (record.getValue(column) == null) {
-        if (_continueOnError) {
-          try {
-            record.putValue(column, transformFunctionEvaluator.evaluate(record));
-          } catch (Exception e) {
-            record.putValue(column, null);
-          }
-        } else {
+        try {
           record.putValue(column, transformFunctionEvaluator.evaluate(record));
+        } catch (Exception e) {
+          if (!_continueOnError) {
+            throw new RuntimeException("Caught exception while evaluation transform function for column: " + column, e);
+          } else {
+            LOGGER.debug("Caught exception while evaluation transform function for column: {}", column, e);
+            record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+          }
         }
       }
     }

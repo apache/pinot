@@ -503,6 +503,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     PinotMeter realtimeRowsConsumedMeter = null;
     PinotMeter realtimeRowsDroppedMeter = null;
+    PinotMeter realtimeIncompleteRowsConsumedMeter = null;
 
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
@@ -566,6 +567,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           realtimeRowsDroppedMeter =
               _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED,
                   reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
+        }
+        if (reusedResult.getIncompleteRowCount() > 0) {
+          realtimeIncompleteRowsConsumedMeter =
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
+                  reusedResult.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
         }
         for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
           try {
