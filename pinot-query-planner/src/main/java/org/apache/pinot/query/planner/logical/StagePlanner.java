@@ -208,9 +208,9 @@ public class StagePlanner {
       Set<Integer> rightPartitionKeys = node.getInputs().get(1).getPartitionKeys();
       // TODO: currently JOIN criteria guarantee to only have one FieldSelectionKeySelector. Support more.
       FieldSelectionKeySelector leftJoinKeySelector =
-          (FieldSelectionKeySelector) ((JoinNode) node).getCriteria().get(0).getLeftJoinKeySelector();
+          (FieldSelectionKeySelector) ((JoinNode) node).getJoinKeys().getLeftJoinKeySelector();
       FieldSelectionKeySelector rightJoinKeySelector =
-          (FieldSelectionKeySelector) ((JoinNode) node).getCriteria().get(0).getRightJoinKeySelector();
+          (FieldSelectionKeySelector) ((JoinNode) node).getJoinKeys().getRightJoinKeySelector();
       Set<Integer> newPartitionKeys = new HashSet<>();
       for (int i = 0; i < leftJoinKeySelector.getColumnIndices().size(); i++) {
         int leftIndex = leftJoinKeySelector.getColumnIndices().get(i);

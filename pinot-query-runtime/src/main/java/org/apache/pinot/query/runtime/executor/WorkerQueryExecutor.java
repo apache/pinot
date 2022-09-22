@@ -125,8 +125,8 @@ public class WorkerQueryExecutor {
       BaseOperator<TransferableBlock> leftOperator = getOperator(requestId, joinNode.getInputs().get(0), metadataMap);
       BaseOperator<TransferableBlock> rightOperator = getOperator(requestId, joinNode.getInputs().get(1), metadataMap);
       return new HashJoinOperator(leftOperator, joinNode.getInputs().get(0).getDataSchema(), rightOperator,
-          joinNode.getInputs().get(1).getDataSchema(), joinNode.getDataSchema(), joinNode.getCriteria(),
-          joinNode.getJoinRelType());
+          joinNode.getInputs().get(1).getDataSchema(), joinNode.getDataSchema(), joinNode.getJoinKeys(),
+          joinNode.getJoinClauses(), joinNode.getJoinRelType());
     } else if (stageNode instanceof AggregateNode) {
       AggregateNode aggregateNode = (AggregateNode) stageNode;
       BaseOperator<TransferableBlock> inputOperator =
