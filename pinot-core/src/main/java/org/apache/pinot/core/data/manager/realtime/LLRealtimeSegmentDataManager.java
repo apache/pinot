@@ -262,7 +262,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final LLCSegmentName _llcSegmentName;
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
-  private StreamMetadataProvider _streamMetadataProvider = null;
+  private StreamMetadataProvider _partitionMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
   private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
@@ -1015,7 +1015,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private void closeStreamConsumers() {
     closePartitionGroupConsumer();
-    closeStreamMetadataProvider();
+    closePartitionMetadataProvider();
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
       _partitionGroupConsumerSemaphore.release();
     }
@@ -1029,10 +1029,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private void closeStreamMetadataProvider() {
-    if (_streamMetadataProvider != null) {
+  private void closePartitionMetadataProvider() {
+    if (_partitionMetadataProvider != null) {
       try {
-        _streamMetadataProvider.close();
+        _partitionMetadataProvider.close();
       } catch (Exception e) {
         _segmentLogger.warn("Could not close stream metadata provider", e);
       }
@@ -1428,11 +1428,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
-    if (_streamMetadataProvider == null) {
+    if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("Fetch latest stream offset");
     }
     try {
-      return _streamMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
+      return _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
     } catch (TimeoutException e) {
       _segmentLogger.warn(
           "Cannot fetch latest stream offset for clientId {} and partitionGroupId {} with maxWaitTime {}", _clientId,
@@ -1469,7 +1469,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
           //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
-          int numPartitionGroups = _streamMetadataProvider
+          int numPartitionGroups = _partitionMetadataProvider
               .computePartitionGroupMetadata(_clientId, _partitionLevelStreamConfig,
                   Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
 
@@ -1526,9 +1526,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * Creates a new stream metadata provider
    */
   private void createPartitionMetadataProvider(String reason) {
-    closeStreamMetadataProvider();
+    closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
-    _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
+    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....
