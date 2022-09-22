@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelNode;
