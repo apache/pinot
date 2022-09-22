@@ -201,8 +201,14 @@ public class SchemaUtils {
 
     Object sampleValue = dateTimeFieldSpec.getSampleValue();
     if (sampleValue != null) {
-      long sampleTimestampValue = (sampleValue instanceof String) ? formatSpec.fromFormatToMillis((String) sampleValue)
-          : formatSpec.fromFormatToMillis(String.valueOf(sampleValue));
+      long sampleTimestampValue;
+      try {
+        sampleTimestampValue = formatSpec.fromFormatToMillis(sampleValue.toString());
+      } catch (Exception e) {
+        throw new IllegalArgumentException(
+            String.format("Cannot format provided sample value: %s with provided date time spec: %s", sampleValue,
+                formatSpec));
+      }
       boolean isValidTimestamp = TimeUtils.timeValueInValidRange(sampleTimestampValue);
       Preconditions.checkArgument(isValidTimestamp,
           "Incorrect date time format. "
