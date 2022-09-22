@@ -214,8 +214,7 @@ public class PinotSchemaRestletResource {
   })
   public ConfigSuccessResponse fixDateTimeFormat(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
-      @ApiParam(value = "Whether to refresh the segments after updating metadata") @DefaultValue("false")
-      @QueryParam("refresh") boolean refresh, String schemaJsonString) {
+      String schemaJsonString) {
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps = null;
     try {
       schemaAndUnrecognizedProps = JsonUtils.stringToObjectAndUnrecognizedProperties(schemaJsonString, Schema.class);
@@ -224,7 +223,7 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     Schema schema = schemaAndUnrecognizedProps.getLeft();
-    SuccessResponse successResponse = fixSchemaDateTime(schemaName, schema, refresh);
+    SuccessResponse successResponse = fixSchemaDateTime(schemaName, schema);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
 
@@ -453,10 +452,9 @@ public class PinotSchemaRestletResource {
    * Internal method to update schema
    * @param schemaName  name of the schema to update
    * @param schema  schema
-   * @param refresh  set to true to refresh the table metadata using the schema
    * @return
    */
-  private SuccessResponse fixSchemaDateTime(String schemaName, Schema schema, boolean refresh) {
+  private SuccessResponse fixSchemaDateTime(String schemaName, Schema schema) {
     validateSchemaInternal(schema);
 
     if (schemaName != null && !schema.getSchemaName().equals(schemaName)) {
@@ -467,7 +465,7 @@ public class PinotSchemaRestletResource {
     }
 
     try {
-      _pinotHelixResourceManager.updateSchemaDateTime(schema, refresh);
+      _pinotHelixResourceManager.updateSchemaDateTime(schema);
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);

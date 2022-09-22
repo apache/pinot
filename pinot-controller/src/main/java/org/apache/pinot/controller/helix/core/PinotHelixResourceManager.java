@@ -1284,10 +1284,10 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void updateSchemaDateTime(Schema schema, boolean refresh)
+  public void updateSchemaDateTime(Schema schema)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     String schemaName = schema.getSchemaName();
-    LOGGER.info("Updating segment zookeeper metadata: {} with refresh: {}", schemaName, refresh);
+    LOGGER.info("Updating segment zookeeper metadata: {}", schemaName);
 
     List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
     for (String tableNameWithType : tableNamesWithType) {
@@ -1307,7 +1307,7 @@ public class PinotHelixResourceManager {
     updateSchema(schema, reload, false);
   }
 
-  public void updateSchema(Schema schema, boolean reload, boolean skipTimeColumn)
+  public void updateSchema(Schema schema, boolean reload, boolean force)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     String schemaName = schema.getSchemaName();
     LOGGER.info("Updating schema: {} with reload: {}", schemaName, reload);
@@ -1317,7 +1317,7 @@ public class PinotHelixResourceManager {
       throw new SchemaNotFoundException(String.format("Schema: %s does not exist", schemaName));
     }
 
-    updateSchema(schema, oldSchema, false);
+    updateSchema(schema, oldSchema, force);
 
     if (reload) {
       LOGGER.info("Reloading tables with name: {}", schemaName);
