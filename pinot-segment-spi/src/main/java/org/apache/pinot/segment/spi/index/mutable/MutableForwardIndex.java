@@ -489,6 +489,39 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
   }
 
   /**
+   * Reads the BYTES type multi-value at the given document id into the passed in value buffer (the buffer size must be
+   * enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
+   * entry.
+   *
+   * @param docId Document id
+   * @param valueBuffer Value buffer
+   * @return Number of values within the multi-value entry
+   */
+  default int getBytesMV(int docId, byte[][] valueBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads the BYTES type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @return A buffer containing the multi-value entries
+   */
+  default byte[][] getBytesMV(int docId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  default int getBytesMV(int docId, byte[][] valueBuffer, ForwardIndexReaderContext context) {
+    return getBytesMV(docId, valueBuffer);
+  }
+
+  @Override
+  default byte[][] getBytesMV(int docId, ForwardIndexReaderContext context) {
+    return getBytesMV(docId);
+  }
+
+  /**
    * Gets the number of multi-values at a given document id and returns it.
    *
    * @param docId Document id
@@ -552,40 +585,6 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
   default void setStringMV(int docId, String[] values) {
     throw new UnsupportedOperationException();
   }
-
-  /**
-   * Reads the BYTES type multi-value at the given document id into the passed in value buffer (the buffer size must be
-   * enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
-   * entry.
-   *
-   * @param docId Document id
-   * @param valueBuffer Value buffer
-   * @return Number of values within the multi-value entry
-   */
-  default int getBytesMV(int docId, byte[][] valueBuffer) {
-    throw new UnsupportedOperationException();
-  }
-
-  /**
-   * Reads the BYTES type multi-value at the given document id into a buffer and returns the buffer.
-   *
-   * @param docId Document id
-   * @return A buffer containing the multi-value entries
-   */
-  default byte[][] getBytesMV(int docId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  default int getBytesMV(int docId, byte[][] valueBuffer, ForwardIndexReaderContext context) {
-    return getBytesMV(docId, valueBuffer);
-  }
-
-  @Override
-  default byte[][] getBytesMV(int docId, ForwardIndexReaderContext context) {
-    return getBytesMV(docId);
-  }
-
 
   /**
    * Writes the BYTES type multi-value into the given document id.

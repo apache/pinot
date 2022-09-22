@@ -40,6 +40,15 @@ public interface ValueReader extends Closeable {
     return BigDecimalUtils.deserialize(getBytes(index, numBytesPerValue));
   }
 
+  /**
+   * Get un-padded bytes for string.
+   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
+   * @param index
+   * @param numBytesPerValue
+   * @param paddingByte
+   * @param buffer
+   * @return
+   */
   byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte paddingByte, byte[] buffer);
 
   /**

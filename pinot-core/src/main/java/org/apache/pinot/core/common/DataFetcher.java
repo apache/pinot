@@ -408,18 +408,6 @@ public class DataFetcher {
   }
 
   /**
-   * Fetch the number of values for a multi-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outNumValues Buffer for output
-   */
-  public void fetchNumValues(String column, int[] inDocIds, int length, int[] outNumValues) {
-    _columnValueReaderMap.get(column).readNumValuesMV(inDocIds, length, outNumValues);
-  }
-
-  /**
    * Fetch the bytes values for a multi-valued column.
    *
    * @param column Column name
@@ -429,6 +417,18 @@ public class DataFetcher {
    */
   public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][][] outValues) {
     _columnValueReaderMap.get(column).readBytesValuesMV(inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch the number of values for a multi-valued column.
+   *
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outNumValues Buffer for output
+   */
+  public void fetchNumValues(String column, int[] inDocIds, int length, int[] outNumValues) {
+    _columnValueReaderMap.get(column).readNumValuesMV(inDocIds, length, outNumValues);
   }
 
   /**
@@ -749,6 +749,21 @@ public class DataFetcher {
           valuesBuffer);
     }
 
+    void readBytesValuesMV(int[] docIds, int length, byte[][][] valuesBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        for (int i = 0; i < length; i++) {
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
+          byte[][] values = new byte[numValues][];
+          _dictionary.readBytesValues(_reusableMVDictIds, numValues, values);
+          valuesBuffer[i] = values;
+        }
+      } else {
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, readerContext);
+      }
+    }
+
     public void readNumValuesMV(int[] docIds, int length, int[] numValuesBuffer) {
       Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       for (int i = 0; i < length; i++) {
@@ -756,19 +771,6 @@ public class DataFetcher {
       }
     }
 
-    void readBytesValuesMV(int[] docIds, int length, byte[][][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
-      if (_dictionary != null) {
-        for (int i = 0; i < length; i++) {
-          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
-          byte[][] values = new byte[numValues][];
-          _dictionary.readBytesValues(_reusableMVDictIds, numValues, values);
-          valuesBuffer[i] = values;
-        }
-      } else {
-        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
-      }
-    }
 
     private int[] getSVDictIdsBuffer() {
       return _dictionary == null ? null : THREAD_LOCAL_DICT_IDS.get();

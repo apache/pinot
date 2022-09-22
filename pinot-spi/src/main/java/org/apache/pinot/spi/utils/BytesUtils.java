@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.utils;
 
-import java.nio.charset.StandardCharsets;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 
@@ -39,25 +38,6 @@ public class BytesUtils {
     } catch (DecoderException e) {
       throw new IllegalArgumentException("Value: " + stringValue + " is not Hex encoded", e);
     }
-  }
-
-  /**
-   * Convert a string to UTF8 byte array.
-   * @param stringValue
-   * @return UTF8 byte array.
-   */
-  public static byte[] toUTF8Bytes(String stringValue) {
-    return stringValue.getBytes(StandardCharsets.UTF_8);
-  }
-
-  /**
-   * Converts a string to a {@link ByteArray}.
-   *
-   * @param stringValue
-   * @return UTF8 {@link ByteArray}
-   */
-  public static ByteArray toUTF8ByeArray(String stringValue) {
-    return new ByteArray(toUTF8Bytes(stringValue));
   }
 
   /**

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.clearspring.analytics.util.Preconditions;
 import java.math.BigDecimal;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -607,7 +606,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _bytesValuesMV[i] = bytesValues;
       }
     } else {
-      Preconditions.checkState(getResultMetadata().getDataType().getStoredType() == DataType.STRING);
+      assert getResultMetadata().getDataType().getStoredType() == DataType.STRING;
       String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
       for (int i = 0; i < length; i++) {
         String[] stringValues = stringValuesMV[i];
