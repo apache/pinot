@@ -48,8 +48,8 @@ public class QueryOptionsUtils {
   }
 
   public static boolean isAndScanReorderingEnabled(Map<String, String> queryOptions) {
-    return !MapUtils.isEmpty(queryOptions) &&
-        queryOptions.containsKey(CommonConstants.Query.OptimizationSwitches.AND_SCAN_REORDERING);
+    return !MapUtils.isEmpty(queryOptions)
+        && queryOptions.containsKey(CommonConstants.Query.OptimizationSwitches.AND_SCAN_REORDERING);
   }
 
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
