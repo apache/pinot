@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
@@ -129,6 +130,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       SegmentConversionUtils.endSegmentReplace(context.getTableNameWithType(), context.getUploadURL(), lineageEntryId,
           _minionConf.getEndReplaceSegmentsTimeoutMs(), context.getAuthProvider());
     }
+  }
+
+  // For tests only.
+  @VisibleForTesting
+  public void setMinionEventObserver(MinionEventObserver observer) {
+    _eventObserver = observer;
   }
 
   @Override

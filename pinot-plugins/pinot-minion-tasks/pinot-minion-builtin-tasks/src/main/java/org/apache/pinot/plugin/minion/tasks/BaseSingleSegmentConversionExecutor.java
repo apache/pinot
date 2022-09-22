@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
@@ -187,5 +188,11 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     } finally {
       FileUtils.deleteQuietly(tempDataDir);
     }
+  }
+
+  // For tests only.
+  @VisibleForTesting
+  public void setMinionEventObserver(MinionEventObserver observer) {
+    _eventObserver = observer;
   }
 }

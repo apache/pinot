@@ -59,6 +59,12 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     super.notifyTaskStart(pinotTaskConfig);
   }
 
+  /**
+   * Invoked to update a minion task progress status.
+   *
+   * @param pinotTaskConfig Pinot task config
+   * @param progress progress status and its toString() returns sth meaningful.
+   */
   public synchronized void notifyProgress(PinotTaskConfig pinotTaskConfig, @Nullable Object progress) {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Update progress: {} for task: {}", progress, pinotTaskConfig.getTaskId());
