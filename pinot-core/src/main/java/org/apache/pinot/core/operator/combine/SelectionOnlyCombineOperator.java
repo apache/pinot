@@ -75,9 +75,9 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator<SelectionR
   }
 
   @Override
-  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
+  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock newBlock) {
     DataSchema mergedDataSchema = mergedBlock.getDataSchema();
-    DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
+    DataSchema dataSchemaToMerge = newBlock.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
       String errorMessage =
@@ -91,13 +91,8 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator<SelectionR
     }
 
     Collection<Object[]> mergedRows = mergedBlock.getRows();
-    Collection<Object[]> rowsToMerge = blockToMerge.getRows();
+    Collection<Object[]> rowsToMerge = newBlock.getRows();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithoutOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
-  }
-
-  @Override
-  protected SelectionResultsBlock createInitialResultBlock(BaseResultsBlock block) {
-    return (SelectionResultsBlock) block;
   }
 }

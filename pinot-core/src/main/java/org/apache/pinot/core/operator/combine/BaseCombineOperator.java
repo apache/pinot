@@ -162,7 +162,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
-        resultsBlock = createInitialResultBlock((T) operator.nextBlock());
+        resultsBlock = convertToMergeableBlock((BaseResultsBlock) operator.nextBlock());
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
@@ -216,9 +216,9 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = createInitialResultBlock((T) blockToMerge);
+        mergedBlock = convertToMergeableBlock(blockToMerge);
       } else {
-        mergeResultsBlocks(mergedBlock, (T) blockToMerge);
+        mergeResultsBlocks(mergedBlock, convertToAppendableBlock(blockToMerge));
       }
       numBlocksMerged++;
       if (isQuerySatisfied(mergedBlock)) {
@@ -244,23 +244,43 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   }
 
   /**
-   * Merge an IntermediateResultsBlock into the main IntermediateResultsBlock.
-   * <p>NOTE: {@code blockToMerge} should contain the result for a segment without any exception. The errored segment
+   * Merge an BaseResultsBlock into the main BaseResultsBlock.
+   * <p>NOTE: {@code newBlock} should contain the result for a segment without any exception. The errored segment
    * result is already handled.
+   *
+   * @param mergedBlock The block that accumulates previous results. It should be modified to add the information of the
+   *                    other block
+   * @param newBlock the new block that needs to be added into mergedBlock.
    */
-  protected abstract void mergeResultsBlocks(T mergedBlock, T blockToMerge);
+  protected abstract void mergeResultsBlocks(T mergedBlock, T newBlock);
 
   /**
-   * Converts the given generic IntermediateResultBlock into the specific type of IntermediateResultBlock that is
+   * Converts the given generic BaseResultsBlock into the specific type of BaseResultsBlock that is
    * supported by this combine operator.
    *
    * This operator may return the same object if the runtime type of the given block already matches which what it is
    * expected.
    *
    * The returned object will usually be the one received as first argument of
-   * {@link #mergeResultsBlocks(BaseResultsBlock, BaseResultsBlock)}.
+   * {@link #mergeResultsBlocks(T, T)}.
    */
-  protected abstract T createInitialResultBlock(BaseResultsBlock block);
+  protected T convertToMergeableBlock(BaseResultsBlock block) {
+    return (T) block;
+  }
+
+  /**
+   * Converts the given generic BaseResultsBlock into the specific type of BaseResultsBlock that is supported by this
+   * operator.
+   *
+   * This operator may return the same object if the runtime type of the given block already matches which what it is
+   * expected.
+   *
+   * The returned object will usually be the one received as second argument of
+   * {@link #mergeResultsBlocks(T, T)}
+   */
+  protected T convertToAppendableBlock(BaseResultsBlock block) {
+    return (T) block;
+  }
 
   @Override
   public List<Operator> getChildOperators() {

@@ -264,10 +264,10 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = createInitialResultBlock(blockToMerge);
+        mergedBlock = convertToMergeableBlock(blockToMerge);
       } else {
         if (blockToMerge != LAST_RESULTS_BLOCK) {
-          mergeResultsBlocks(mergedBlock, (SelectionResultsBlock) blockToMerge);
+          mergeResultsBlocks(mergedBlock, convertToAppendableBlock(blockToMerge));
         }
       }
       numBlocksMerged++;
@@ -283,9 +283,9 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   }
 
   @Override
-  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
+  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock newBlock) {
     DataSchema mergedDataSchema = mergedBlock.getDataSchema();
-    DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
+    DataSchema dataSchemaToMerge = newBlock.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
       String errorMessage =
@@ -299,13 +299,13 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     }
 
     PriorityQueue<Object[]> mergedRows = mergedBlock.getRowsAsPriorityQueue();
-    Collection<Object[]> rowsToMerge = blockToMerge.getRows();
+    Collection<Object[]> rowsToMerge = newBlock.getRows();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
   }
 
   @Override
-  protected SelectionResultsBlock createInitialResultBlock(BaseResultsBlock block) {
+  protected SelectionResultsBlock convertToMergeableBlock(BaseResultsBlock block) {
     // We need to create a new copy to be sure we are using a stable priority queue, because it is going to be modified.
     SelectionResultsBlock selectionBlock = (SelectionResultsBlock) block;
     return new SelectionResultsBlock(selectionBlock.getDataSchema(), selectionBlock.getRowsAsPriorityQueue());

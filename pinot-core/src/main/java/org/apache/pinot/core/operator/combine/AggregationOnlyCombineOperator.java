@@ -45,20 +45,15 @@ public class AggregationOnlyCombineOperator extends BaseCombineOperator<Aggregat
   }
 
   @Override
-  protected void mergeResultsBlocks(AggregationResultsBlock mergedBlock, AggregationResultsBlock blockToMerge) {
+  protected void mergeResultsBlocks(AggregationResultsBlock mergedBlock, AggregationResultsBlock newBlock) {
     AggregationFunction[] aggregationFunctions = mergedBlock.getAggregationFunctions();
     List<Object> mergedResults = mergedBlock.getResults();
-    List<Object> resultsToMerge = blockToMerge.getResults();
+    List<Object> resultsToMerge = newBlock.getResults();
     assert aggregationFunctions != null && mergedResults != null && resultsToMerge != null;
 
     int numAggregationFunctions = aggregationFunctions.length;
     for (int i = 0; i < numAggregationFunctions; i++) {
       mergedResults.set(i, aggregationFunctions[i].merge(mergedResults.get(i), resultsToMerge.get(i)));
     }
-  }
-
-  @Override
-  protected AggregationResultsBlock createInitialResultBlock(BaseResultsBlock block) {
-    return (AggregationResultsBlock) block;
   }
 }

@@ -136,11 +136,6 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
   }
 
   @Override
-  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
-  }
-
-  @Override
-  protected SelectionResultsBlock createInitialResultBlock(BaseResultsBlock block) {
-    return (SelectionResultsBlock) block;
+  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock newBlock) {
   }
 }

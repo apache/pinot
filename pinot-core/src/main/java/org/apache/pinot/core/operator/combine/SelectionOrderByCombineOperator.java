@@ -89,9 +89,9 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator<Selecti
   }
 
   @Override
-  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
+  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock newBlock) {
     DataSchema mergedDataSchema = mergedBlock.getDataSchema();
-    DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
+    DataSchema dataSchemaToMerge = newBlock.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
       String errorMessage =
@@ -105,13 +105,13 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator<Selecti
     }
 
     PriorityQueue<Object[]> mergedRows = mergedBlock.getRowsAsPriorityQueue();
-    Collection<Object[]> rowsToMerge = blockToMerge.getRows();
+    Collection<Object[]> rowsToMerge = newBlock.getRows();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
   }
 
   @Override
-  protected SelectionResultsBlock createInitialResultBlock(BaseResultsBlock block) {
+  protected SelectionResultsBlock convertToMergeableBlock(BaseResultsBlock block) {
     // We need to create a new copy to be sure we are using a stable priority queue, because it is going to be modified.
     SelectionResultsBlock selectionBlock = (SelectionResultsBlock) block;
     return new SelectionResultsBlock(selectionBlock.getDataSchema(), selectionBlock.getRowsAsPriorityQueue());
