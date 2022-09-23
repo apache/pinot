@@ -283,7 +283,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // Test CAST
         //   - implicit CAST
         new Object[]{"SELECT a.col1, a.col2, AVG(a.col3) FROM a GROUP BY a.col1, a.col2"},
-        new Object[]{"SELECT a.col1, SUM(a.col3) FROM a GROUP BY a.col1 HAVING MIN(a.col3) > 0.5"},
+        new Object[]{"SELECT a.col1 FROM a WHERE a.col3 >= 0.5 AND a.col3 < 0.7 OR a.col3 = 42.0"},
+        new Object[]{"SELECT a.col1, SUM(a.col3) FROM a GROUP BY a.col1 "
+            + " HAVING MIN(a.col3) > 0.5 AND MIN(a.col3) <> 0.7 OR MIN(a.col3) > 30"},
         //   - explicit CAST
         new Object[]{"SELECT a.col1, CAST(SUM(a.col3) AS BIGINT) FROM a GROUP BY a.col1"},
 
