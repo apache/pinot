@@ -44,7 +44,7 @@ public interface RowMetadataExtractor {
         }
       }
       Map<String, String> metadata = new HashMap<>();
-      metadata.put("offset", String.valueOf(record.offset()));
+      metadata.put(KafkaStreamMessageMetadata.OFFSET_KEY, String.valueOf(record.offset()));
       return new StreamMessageMetadata(record.timestamp(), headerGenericRow, metadata);
     };
   }

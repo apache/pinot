@@ -18,21 +18,17 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.stream.StreamMessage;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
-public class KafkaStreamMessage extends StreamMessage {
-  public KafkaStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
-    super(key, value, metadata);
-  }
+public class KafkaStreamMessageMetadata extends StreamMessageMetadata {
+  public static final String OFFSET_KEY = "offset";
 
-  public long getNextOffset() {
-    if (_metadata != null) {
-      long offset = Long.parseLong(_metadata.getRecordMetadata().get(KafkaStreamMessageMetadata.OFFSET_KEY));
-      return offset < 0 ? -1 : offset + 1;
-    }
-    return -1;
+  public KafkaStreamMessageMetadata(long recordTimestampMs, @Nullable GenericRow headers,
+      Map<String, String> metadata) {
+    super(recordTimestampMs, headers, metadata);
   }
 }

@@ -29,16 +29,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * timestamp derived from the incoming record (not the ingestion time).
  */
 public class StreamMessageMetadata implements RowMetadata {
-
   private final long _recordTimestampMs;
-
   private final GenericRow _headers;
-
   private final Map<String, String> _metadata;
 
   public StreamMessageMetadata(long recordTimestampMs, @Nullable GenericRow headers) {
     this(recordTimestampMs, headers, Collections.emptyMap());
   }
+
   /**
    * Construct the stream based message/row message metadata
    *
