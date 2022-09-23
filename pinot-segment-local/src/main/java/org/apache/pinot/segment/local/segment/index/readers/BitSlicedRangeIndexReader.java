@@ -37,10 +37,9 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
   private final long _offset;
   private final long _min;
   private final long _max;
-  private final long _numDocs;
+  private final int _numDocs;
 
-  public BitSlicedRangeIndexReader(PinotDataBuffer dataBuffer,
-      ColumnMetadata metadata) {
+  public BitSlicedRangeIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
     _dataBuffer = dataBuffer;
     long offset = 0;
     int version = dataBuffer.getInt(offset);
@@ -49,49 +48,85 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
     _min = dataBuffer.getLong(offset);
     offset += Long.BYTES;
     _offset = offset;
-    _max = metadata.hasDictionary()
-        ? metadata.getCardinality() - 1
-        : ((Number) metadata.getMaxValue()).longValue();
+    // TODO: Read max from header to prevent cases where max value is not available in the column metadata
+    if (metadata.hasDictionary()) {
+      _max = metadata.getCardinality() - 1;
+    } else {
+      Number maxValue = (Number) metadata.getMaxValue();
+      _max = maxValue != null ? maxValue.longValue() : Long.MAX_VALUE;
+    }
     _numDocs = metadata.getTotalDocs();
   }
 
   @Override
   public int getNumMatchingDocs(int min, int max) {
+    // TODO: Handle this before reading the range index
+    if (min > max || min > _max || max < _min) {
+      return 0;
+    }
     return queryRangeBitmapCardinality(Math.max(min, _min) - _min, max - _min, _max - _min);
   }
 
   @Override
   public int getNumMatchingDocs(long min, long max) {
+    // TODO: Handle this before reading the range index
+    if (min > max || min > _max || max < _min) {
+      return 0;
+    }
     return queryRangeBitmapCardinality(Math.max(min, _min) - _min, max - _min, _max - _min);
   }
 
   @Override
   public int getNumMatchingDocs(float min, float max) {
+    // TODO: Handle this before reading the range index
+    if (min > max) {
+      return 0;
+    }
     return queryRangeBitmapCardinality(FPOrdering.ordinalOf(min), FPOrdering.ordinalOf(max), 0xFFFFFFFFL);
   }
 
   @Override
   public int getNumMatchingDocs(double min, double max) {
+    // TODO: Handle this before reading the range index
+    if (min > max) {
+      return 0;
+    }
     return queryRangeBitmapCardinality(FPOrdering.ordinalOf(min), FPOrdering.ordinalOf(max), 0xFFFFFFFFFFFFFFFFL);
   }
 
   @Override
   public ImmutableRoaringBitmap getMatchingDocIds(int min, int max) {
+    // TODO: Handle this before reading the range index
+    if (min > max || min > _max || max < _min) {
+      return new MutableRoaringBitmap();
+    }
     return queryRangeBitmap(Math.max(min, _min) - _min, max - _min, _max - _min);
   }
 
   @Override
   public ImmutableRoaringBitmap getMatchingDocIds(long min, long max) {
+    // TODO: Handle this before reading the range index
+    if (min > max || min > _max || max < _min) {
+      return new MutableRoaringBitmap();
+    }
     return queryRangeBitmap(Math.max(min, _min) - _min, max - _min, _max - _min);
   }
 
   @Override
   public ImmutableRoaringBitmap getMatchingDocIds(float min, float max) {
+    // TODO: Handle this before reading the range index
+    if (min > max) {
+      return new MutableRoaringBitmap();
+    }
     return queryRangeBitmap(FPOrdering.ordinalOf(min), FPOrdering.ordinalOf(max), 0xFFFFFFFFL);
   }
 
   @Override
   public ImmutableRoaringBitmap getMatchingDocIds(double min, double max) {
+    // TODO: Handle this before reading the range index
+    if (min > max) {
+      return new MutableRoaringBitmap();
+    }
     return queryRangeBitmap(FPOrdering.ordinalOf(min), FPOrdering.ordinalOf(max), 0xFFFFFFFFFFFFFFFFL);
   }
 
@@ -122,34 +157,52 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
   }
 
   private ImmutableRoaringBitmap queryRangeBitmap(long min, long max, long columnMax) {
-    RangeBitmap rangeBitmap = mapRangeBitmap();
-    if (Long.compareUnsigned(max, columnMax) < 0) {
-      if (Long.compareUnsigned(min, 0) > 0) {
-        return rangeBitmap.between(min, max).toMutableRoaringBitmap();
-      }
-      return rangeBitmap.lte(max).toMutableRoaringBitmap();
-    } else {
-      if (Long.compareUnsigned(min, 0) > 0) {
-        return rangeBitmap.gte(min).toMutableRoaringBitmap();
-      }
+    // Compare unsigned
+    boolean lowerUnbounded = min + Long.MIN_VALUE <= Long.MIN_VALUE;
+    boolean upperUnbounded = max + Long.MIN_VALUE >= columnMax + Long.MIN_VALUE;
+    if (lowerUnbounded && upperUnbounded) {
       MutableRoaringBitmap all = new MutableRoaringBitmap();
-      all.add(0, _numDocs);
+      all.add(0L, _numDocs);
       return all;
+    }
+    RangeBitmap rangeBitmap = mapRangeBitmap();
+    if (lowerUnbounded) {
+      return rangeBitmap.lte(max).toMutableRoaringBitmap();
+    }
+    if (upperUnbounded) {
+      return rangeBitmap.gte(min).toMutableRoaringBitmap();
+    }
+    // TODO: RangeBitmap has a bug in version 0.9.28 which gives wrong result computing between for 2 numbers with
+    //       different sign. The bug is tracked here: https://github.com/RoaringBitmap/RoaringBitmap/issues/586.
+    //       This is a work-around for the bug.
+    if (columnMax > 0) {
+      return rangeBitmap.between(min, max).toMutableRoaringBitmap();
+    } else {
+      return rangeBitmap.gte(min, rangeBitmap.lte(max)).toMutableRoaringBitmap();
     }
   }
 
   private int queryRangeBitmapCardinality(long min, long max, long columnMax) {
+    // Compare unsigned
+    boolean lowerUnbounded = min + Long.MIN_VALUE <= Long.MIN_VALUE;
+    boolean upperUnbounded = max + Long.MIN_VALUE >= columnMax + Long.MIN_VALUE;
+    if (lowerUnbounded && upperUnbounded) {
+      return _numDocs;
+    }
     RangeBitmap rangeBitmap = mapRangeBitmap();
-    if (Long.compareUnsigned(max, columnMax) < 0) {
-      if (Long.compareUnsigned(min, 0) > 0) {
-        return (int) rangeBitmap.betweenCardinality(min, max);
-      }
+    if (lowerUnbounded) {
       return (int) rangeBitmap.lteCardinality(max);
+    }
+    if (upperUnbounded) {
+      return (int) rangeBitmap.gteCardinality(min);
+    }
+    // TODO: RangeBitmap has a bug in version 0.9.28 which gives wrong result computing between for 2 numbers with
+    //       different sign. The bug is tracked here: https://github.com/RoaringBitmap/RoaringBitmap/issues/586.
+    //       This is a work-around for the bug.
+    if (columnMax > 0) {
+      return (int) rangeBitmap.betweenCardinality(min, max);
     } else {
-      if (Long.compareUnsigned(min, 0) > 0) {
-        return (int) rangeBitmap.gteCardinality(min);
-      }
-      return (int) _numDocs;
+      return (int) rangeBitmap.gteCardinality(min, rangeBitmap.lte(max));
     }
   }
 
