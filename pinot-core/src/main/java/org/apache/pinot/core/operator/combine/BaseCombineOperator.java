@@ -29,7 +29,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -38,6 +37,8 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.spi.accounting.ExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
@@ -88,11 +89,15 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     // behavior (even JVM crash) when processing queries against it.
     Phaser phaser = new Phaser(1);
     Tracing.activeRecording().setNumTasks(_numTasks);
+    ExecutionContext parentContext = Tracing.getThreadAccountant().getExecutionContext();
     for (int i = 0; i < _numTasks; i++) {
+      int taskId = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          ThreadTimer executionThreadTimer = new ThreadTimer();
+          ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+
+          Tracing.ThreadAccountantOps.setupWorker(taskId, threadResourceUsageProvider, parentContext);
 
           // Register the task to the phaser
           // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
@@ -119,9 +124,10 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           } finally {
             onFinish();
             phaser.arriveAndDeregister();
+            Tracing.ThreadAccountantOps.clear();
           }
 
-          _totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.getThreadTimeNs());
+          _totalWorkerThreadCpuTimeNs.getAndAdd(threadResourceUsageProvider.getThreadTimeNs());
         }
       });
     }
@@ -130,7 +136,8 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     try {
       mergedBlock = mergeResults();
     } catch (InterruptedException e) {
-      throw new QueryCancelledException("Cancelled while merging results blocks", e);
+      String killedErrorMsg = Tracing.getThreadAccountant().getErrorMsg();
+      throw new QueryCancelledException("Cancelled while merging results blocks" + killedErrorMsg, e);
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
       mergedBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));

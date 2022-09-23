@@ -596,7 +596,10 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT =
         "pinot.server.instance.enableThreadCpuTimeMeasurement";
+    public static final String CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT =
+        "pinot.server.instance.enableThreadAllocatedBytesMeasurement";
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
+    public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
 
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
 
@@ -691,6 +694,54 @@ public class CommonConstants {
      * Segment reload job ZK props
      */
     public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "segmentName";
+  }
+
+  public static class Accounting {
+    public static final int INVALID_TASK_ID = -1;
+    public static final String CONFIG_OF_FACTORY_NAME = "accounting.factory.name";
+
+    public static final String CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = "accounting.enable.thread.cpu.sampling";
+    public static final Boolean DEFAULT_ENABLE_THREAD_CPU_SAMPLING = false;
+
+    public static final String CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING = "accounting.enable.thread.memory.sampling";
+    public static final Boolean DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING = false;
+
+    public static final String CONFIG_OF_OOM_PROTECTION_KILLING_QUERY = "accounting.oom.enable.killing.query";
+    public static final boolean DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY = false;
+
+    public static final String CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.panic.heap.usage.ratio";
+    public static final float DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
+
+    public static final String CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.critical.heap.usage.ratio";
+    public static final float DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO = 0.96f;
+
+    public static final String CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.alarming.usage.ratio";
+    public static final float DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO = 0.75f;
+
+    public static final String CONFIG_OF_KILL_SLEEP_TIME_AFTER_GC_MS = "accounting.oom.panic.sleep.after.gc.ms";
+    public static final int DEFAULT_CONFIG_OF_KILL_SLEEP_TIME_AFTER_GC_MS = 100;
+
+    public static final String CONFIG_OF_ENABLE_VERBOSE = "accounting.enable.verbose.mode";
+    public static final boolean DEFAULT_ENABLE_VERBOSE = false;
+
+    public static final String CONFIG_OF_HEAP_USAGE_PUBLISH_PERIOD = "accounting.heap.usage.publish.period";
+    public static final int DEFAULT_HEAP_USAGE_PUBLISH_PERIOD = 5000;
+
+    public static final int DEFAULT_SLEEP_TIME = 32;
+
+    public static final String CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO
+        = "accounting.min.memory.footprint.to.kill.ratio";
+    public static final double DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO = 0.025;
+
+    public static final String CONFIG_OF_GC_BACKOFF_COUNT = "accounting.gc.backoff.count";
+    public static final int DEFAULT_GC_BACKOFF_COUNT = 5;
+  }
+
+  public static class ExecutorService {
+    public static final String PINOT_QUERY_RUNNER_NAME_PREFIX = "pqr-";
+    public static final String PINOT_QUERY_RUNNER_NAME_FORMAT = PINOT_QUERY_RUNNER_NAME_PREFIX + "%d";
+    public static final String PINOT_QUERY_WORKER_NAME_PREFIX = "pqw-";
+    public static final String PINOT_QUERY_WORKER_NAME_FORMAT = PINOT_QUERY_WORKER_NAME_PREFIX + "%d";
   }
 
   public static class Segment {

@@ -43,6 +43,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,6 +144,9 @@ public abstract class QueryScheduler {
    */
   @Nullable
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
+
+    Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
+
     _latestQueryTime.accumulate(System.currentTimeMillis());
     InstanceResponseBlock instanceResponse;
     try {
@@ -154,6 +158,7 @@ public abstract class QueryScheduler {
       _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       instanceResponse = new InstanceResponseBlock();
       instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+      Tracing.ThreadAccountantOps.clear();
     }
     long requestId = queryRequest.getRequestId();
     Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
@@ -283,6 +288,8 @@ public abstract class QueryScheduler {
         numSegmentsPrunedByLimit);
     _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PRUNED_BY_VALUE,
         numSegmentsPrunedByValue);
+
+    Tracing.ThreadAccountantOps.clear();
 
     return responseBytes;
   }

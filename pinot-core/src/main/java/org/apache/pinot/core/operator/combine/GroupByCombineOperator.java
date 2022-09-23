@@ -48,6 +48,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -210,7 +211,8 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
 
   // Check for thread interruption, every time after merging 10_000 keys
   private void checkMergePhaseInterruption(int mergedKeys) {
-    if (mergedKeys % MAX_GROUP_BY_KEYS_MERGED_PER_INTERRUPTION_CHECK == 0 && Thread.interrupted()) {
+    if (mergedKeys % MAX_GROUP_BY_KEYS_MERGED_PER_INTERRUPTION_CHECK == 0
+        && (Thread.interrupted() || Tracing.ThreadAccountantOps.isRootThreadInterrupted())) {
       throw new EarlyTerminationException();
     }
   }

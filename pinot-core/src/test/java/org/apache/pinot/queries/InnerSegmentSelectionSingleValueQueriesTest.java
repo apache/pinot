@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -32,6 +31,7 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByAscOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -600,16 +600,16 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   public void testThreadCpuTime() {
     String query = "SELECT * FROM testTable";
 
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     // NOTE: Need to check whether thread CPU time measurement is enabled because some environments might not support
     //       ThreadMXBean.getCurrentThreadCpuTime()
-    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
+    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
       assertTrue(brokerResponse.getOfflineThreadCpuTimeNs() > 0);
       assertTrue(brokerResponse.getRealtimeThreadCpuTimeNs() > 0);
     }
 
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     assertEquals(brokerResponse.getOfflineThreadCpuTimeNs(), 0);
     assertEquals(brokerResponse.getRealtimeThreadCpuTimeNs(), 0);

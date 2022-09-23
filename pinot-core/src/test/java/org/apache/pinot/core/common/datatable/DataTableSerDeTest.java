@@ -35,10 +35,10 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
@@ -191,7 +191,7 @@ public class DataTableSerDeTest {
     DataTable dataTable = dataTableBuilder.build();
 
     // Disable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     // When ThreadCpuTimeMeasurement is disabled, no value for
     // threadCpuTimeNs/systemActivitiesCpuTimeNs/responseSerializationCpuTimeNs.
@@ -200,7 +200,7 @@ public class DataTableSerDeTest {
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
 
     // Enable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     // When ThreadCpuTimeMeasurement is enabled, value of responseSerializationCpuTimeNs is not 0.
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
@@ -226,7 +226,7 @@ public class DataTableSerDeTest {
     // TODO: see https://github.com/apache/pinot/pull/8874/files#r894806085
 
     // Verify V4 broker can deserialize data table (has data, but has no metadata) send by V3 server
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
     DataTableBuilder dataTableBuilderV3WithDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns);
@@ -262,7 +262,7 @@ public class DataTableSerDeTest {
 
     // Verify V4 broker can deserialize (has data, but has no metadata) send by V4 server(with ThreadCpuTimeMeasurement
     // disabled)
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     DataTableBuilder dataTableBuilderV4WithDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV4WithDataOnly, columnDataTypes, numColumns);
@@ -300,7 +300,7 @@ public class DataTableSerDeTest {
 
     // Verify V4 broker can deserialize (has data, but has no metadata) send by V4 server(with ThreadCpuTimeMeasurement
     // enabled)
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     dataTableV4 = dataTableBuilderV4WithDataOnly.build(); // create a V4 data table
     // Deserialize data table bytes as V4
@@ -321,7 +321,7 @@ public class DataTableSerDeTest {
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
     verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
-    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
+    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
       Assert.assertEquals(newDataTable.getMetadata().size(), EXPECTED_METADATA.keySet().size() + 1);
       newDataTable.getMetadata().remove(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
     }
@@ -336,7 +336,7 @@ public class DataTableSerDeTest {
     newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes()); // Broker deserialize data table bytes as V4
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
-    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
+    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
       Assert.assertEquals(newDataTable.getMetadata().size(), EXPECTED_METADATA.keySet().size() + 1);
       newDataTable.getMetadata().remove(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
     }
@@ -356,7 +356,7 @@ public class DataTableSerDeTest {
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     // Verify V3 broker can deserialize data table (has data, but has no metadata) send by V2 server
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_2);
     DataTableBuilder dataTableBuilderV2WithDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV2WithDataOnly, columnDataTypes, numColumns);
@@ -392,7 +392,7 @@ public class DataTableSerDeTest {
 
     // Verify V3 broker can deserialize (has data, but has no metadata) send by V3 server(with ThreadCpuTimeMeasurement
     // disabled)
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
     DataTableBuilder dataTableBuilderV3WithDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns);
@@ -430,7 +430,7 @@ public class DataTableSerDeTest {
 
     // Verify V3 broker can deserialize (has data, but has no metadata) send by V3 server(with ThreadCpuTimeMeasurement
     // enabled)
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
     dataTableV3 = dataTableBuilderV3WithDataOnly.build(); // create a V3 data table
     // Deserialize data table bytes as V3
@@ -451,7 +451,7 @@ public class DataTableSerDeTest {
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
     verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
-    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
+    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
       Assert.assertEquals(newDataTable.getMetadata().size(), EXPECTED_METADATA.keySet().size() + 1);
       newDataTable.getMetadata().remove(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
     }
@@ -466,7 +466,7 @@ public class DataTableSerDeTest {
     newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes()); // Broker deserialize data table bytes as V3
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), 0, 0);
-    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
+    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
       Assert.assertEquals(newDataTable.getMetadata().size(), EXPECTED_METADATA.keySet().size() + 1);
       newDataTable.getMetadata().remove(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
     }
@@ -483,7 +483,7 @@ public class DataTableSerDeTest {
       columnNames[i] = columnDataTypes[i].name();
     }
 
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
