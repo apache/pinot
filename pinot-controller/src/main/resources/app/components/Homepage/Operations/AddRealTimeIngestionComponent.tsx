@@ -93,7 +93,7 @@ export default function AddRealTimeIngestionComponent({
             "stream.kafka.decoder.class.name":"org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
             "realtime.segment.flush.threshold.rows": "0",
             "realtime.segment.flush.threshold.time": "24h",
-            "realtime.segment.flush.segment.size": "100M"
+            "realtime.segment.flush.threshold.segment.size": "100M"
         }
         setTableObj(newTableObj);
       }else if(newTableObj.tableType !== "REALTIME" && newTableObj.tableIndexConfig.streamConfigs){
