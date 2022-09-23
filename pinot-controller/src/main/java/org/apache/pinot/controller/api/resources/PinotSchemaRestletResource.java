@@ -200,33 +200,6 @@ public class PinotSchemaRestletResource {
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
 
-  @PUT
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.APPLICATION_JSON)
-  @Path("/schemas/fixDateTimeFormat/{schemaName}")
-  @Authenticate(AccessType.UPDATE)
-  @ApiOperation(value = "Update date time format in schema", notes = "Update date time format in schema")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully updated schema"),
-      @ApiResponse(code = 404, message = "Schema not found"),
-      @ApiResponse(code = 400, message = "Missing or invalid request body"),
-      @ApiResponse(code = 500, message = "Internal error")
-  })
-  public ConfigSuccessResponse fixDateTimeFormat(
-      @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
-      String schemaJsonString) {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps = null;
-    try {
-      schemaAndUnrecognizedProps = JsonUtils.stringToObjectAndUnrecognizedProperties(schemaJsonString, Schema.class);
-    } catch (Exception e) {
-      String msg = String.format("Invalid schema config json string: %s", schemaJsonString);
-      throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
-    }
-    Schema schema = schemaAndUnrecognizedProps.getLeft();
-    SuccessResponse successResponse = fixSchemaDateTime(schemaName, schema);
-    return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
-  }
-
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
@@ -424,48 +397,6 @@ public class PinotSchemaRestletResource {
 
     try {
       _pinotHelixResourceManager.updateSchema(schema, reload);
-      // Best effort notification. If controller fails at this point, no notification is given.
-      LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
-      _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
-      return new SuccessResponse(schema.getSchemaName() + " successfully added");
-    } catch (SchemaNotFoundException e) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String.format("Failed to find schema %s", schemaName),
-          Response.Status.NOT_FOUND, e);
-    } catch (SchemaBackwardIncompatibleException e) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Backward incompatible schema %s. Only allow adding new columns", schemaName),
-          Response.Status.BAD_REQUEST, e);
-    } catch (TableNotFoundException e) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String.format("Failed to find table %s to reload", schemaName),
-          Response.Status.NOT_FOUND, e);
-    } catch (Exception e) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String.format("Failed to update schema %s", schemaName),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
-  }
-
-  /**
-   * Internal method to update schema
-   * @param schemaName  name of the schema to update
-   * @param schema  schema
-   * @return
-   */
-  private SuccessResponse fixSchemaDateTime(String schemaName, Schema schema) {
-    validateSchemaInternal(schema);
-
-    if (schemaName != null && !schema.getSchemaName().equals(schemaName)) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String
-          .format("Schema name mismatch for uploaded schema, tried to add schema with name %s as %s",
-              schema.getSchemaName(), schema), Response.Status.BAD_REQUEST);
-    }
-
-    try {
-      _pinotHelixResourceManager.updateSchemaDateTime(schema);
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);

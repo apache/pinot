@@ -79,7 +79,9 @@ import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -1033,6 +1035,68 @@ public class PinotSegmentRestletResource {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to get consuming segments info for table %s. %s", realtimeTableName, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
+  @Path("/tables/{tableNameWithType}/updateTimeIntervalZK")
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update the start and end time of the segments based on latest schema",
+      notes = "Update the start and end time of the segments based on latest schema")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public SuccessResponse updateTimeIntervalZK(
+      @ApiParam(value = "Table name with type", required = true,
+          example = "myTable_REALTIME") @PathParam("tableNameWithType") String tableNameWithType) {
+    try {
+
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      if (tableType == null) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Table type not provided with table name %s", tableNameWithType),
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
+      return updateTimeIntervalZKInternal(tableNameWithType);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to get consuming segments info for table %s. %s", tableNameWithType, e.getMessage()),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  /**
+   * Internal method to update schema
+   * @param tableName  name of the table
+   * @return
+   */
+  private SuccessResponse updateTimeIntervalZKInternal(String tableName) {
+
+    try {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
+      if (tableConfig == null) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("No table config found for table %s", tableName), Response.Status.INTERNAL_SERVER_ERROR);
+      }
+
+      Schema tableSchema = _pinotHelixResourceManager.getTableSchema(tableName);
+      if (tableSchema == null) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("No schema found for table %s", tableName), Response.Status.INTERNAL_SERVER_ERROR);
+      }
+
+      String schemaName = tableSchema.getSchemaName();
+      _pinotHelixResourceManager.updateSchemaDateTime(tableConfig, tableSchema);
+      // Best effort notification. If controller fails at this point, no notification is given.
+      LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
+      return new SuccessResponse("Successfully updated time interval zk metadata for table: " + tableName);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to update time interval zk metadata for table %s, exception: %s",
+              tableName, e.getMessage()), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 }

@@ -1284,23 +1284,18 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void updateSchemaDateTime(Schema schema)
+  public void updateSchemaDateTime(TableConfig tableConfig, Schema schema)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     String schemaName = schema.getSchemaName();
-    LOGGER.info("Updating segment zookeeper metadata: {}", schemaName);
+    LOGGER.info("Updating segment zookeeper time interval metadata: {}", schemaName);
 
-    List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
-    for (String tableNameWithType : tableNamesWithType) {
-      TableConfig tableConfig = getTableConfig(tableNameWithType);
-      List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
-      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-        int version = segmentZKMetadata.toZNRecord().getVersion();
-        updateSegmentInterval(tableConfig, segmentZKMetadata, schema);
-        updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
-      }
+    String tableNameWithType = tableConfig.getTableName();
+    List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      int version = segmentZKMetadata.toZNRecord().getVersion();
+      updateSegmentInterval(tableConfig, segmentZKMetadata, schema);
+      updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
     }
-
-    updateSchema(schema, false, true);
   }
 
   public void updateSchema(Schema schema, boolean reload)
