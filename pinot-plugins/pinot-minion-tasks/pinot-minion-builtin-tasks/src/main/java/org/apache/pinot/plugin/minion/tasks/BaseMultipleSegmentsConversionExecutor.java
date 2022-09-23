@@ -233,7 +233,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
         String resultSegmentName = segmentConversionResult.getSegmentName();
         _eventObserver.notifyProgress(_pinotTaskConfig,
-            String.format("Uploading segment: %s, %d/%d", resultSegmentName, count++, numOutputSegments));
+            String.format("Uploading segment: %s, %d/%d", resultSegmentName, (i + 1), numOutputSegments));
 
         // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
         SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
