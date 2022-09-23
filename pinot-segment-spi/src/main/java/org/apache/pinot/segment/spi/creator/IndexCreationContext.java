@@ -102,7 +102,8 @@ public interface IndexCreationContext {
           .withTotalDocs(columnMetadata.getTotalDocs())
           .withDictionary(columnMetadata.hasDictionary())
           .withMinValue(columnMetadata.getMinValue())
-          .withMaxValue(columnMetadata.getMaxValue());
+          .withMaxValue(columnMetadata.getMaxValue())
+          .withMaxNumberOfMultiValueElements(columnMetadata.getMaxNumberOfMultiValues());
     }
 
     public Builder withLengthOfLongestEntry(int lengthOfLongestEntry) {
