@@ -157,52 +157,48 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
   }
 
   private ImmutableRoaringBitmap queryRangeBitmap(long min, long max, long columnMax) {
-    // Compare unsigned
-    boolean lowerUnbounded = min + Long.MIN_VALUE <= Long.MIN_VALUE;
-    boolean upperUnbounded = max + Long.MIN_VALUE >= columnMax + Long.MIN_VALUE;
-    if (lowerUnbounded && upperUnbounded) {
-      MutableRoaringBitmap all = new MutableRoaringBitmap();
-      all.add(0L, _numDocs);
-      return all;
-    }
     RangeBitmap rangeBitmap = mapRangeBitmap();
-    if (lowerUnbounded) {
+    if (Long.compareUnsigned(max, columnMax) < 0) {
+      if (Long.compareUnsigned(min, 0) > 0) {
+        // TODO: RangeBitmap has a bug in version 0.9.28 which gives wrong result computing between for 2 numbers with
+        //       different sign. The bug is tracked here: https://github.com/RoaringBitmap/RoaringBitmap/issues/586.
+        //       This is a work-around for the bug.
+        if (columnMax > 0) {
+          return rangeBitmap.between(min, max).toMutableRoaringBitmap();
+        } else {
+          return rangeBitmap.gte(min, rangeBitmap.lte(max)).toMutableRoaringBitmap();
+        }
+      }
       return rangeBitmap.lte(max).toMutableRoaringBitmap();
-    }
-    if (upperUnbounded) {
-      return rangeBitmap.gte(min).toMutableRoaringBitmap();
-    }
-    // TODO: RangeBitmap has a bug in version 0.9.28 which gives wrong result computing between for 2 numbers with
-    //       different sign. The bug is tracked here: https://github.com/RoaringBitmap/RoaringBitmap/issues/586.
-    //       This is a work-around for the bug.
-    if (columnMax > 0) {
-      return rangeBitmap.between(min, max).toMutableRoaringBitmap();
     } else {
-      return rangeBitmap.gte(min, rangeBitmap.lte(max)).toMutableRoaringBitmap();
+      if (Long.compareUnsigned(min, 0) > 0) {
+        return rangeBitmap.gte(min).toMutableRoaringBitmap();
+      }
+      MutableRoaringBitmap all = new MutableRoaringBitmap();
+      all.add(0, _numDocs);
+      return all;
     }
   }
 
   private int queryRangeBitmapCardinality(long min, long max, long columnMax) {
-    // Compare unsigned
-    boolean lowerUnbounded = min + Long.MIN_VALUE <= Long.MIN_VALUE;
-    boolean upperUnbounded = max + Long.MIN_VALUE >= columnMax + Long.MIN_VALUE;
-    if (lowerUnbounded && upperUnbounded) {
-      return _numDocs;
-    }
     RangeBitmap rangeBitmap = mapRangeBitmap();
-    if (lowerUnbounded) {
+    if (Long.compareUnsigned(max, columnMax) < 0) {
+      if (Long.compareUnsigned(min, 0) > 0) {
+        // TODO: RangeBitmap has a bug in version 0.9.28 which gives wrong result computing between for 2 numbers with
+        //       different sign. The bug is tracked here: https://github.com/RoaringBitmap/RoaringBitmap/issues/586.
+        //       This is a work-around for the bug.
+        if (columnMax > 0) {
+          return (int) rangeBitmap.betweenCardinality(min, max);
+        } else {
+          return (int) rangeBitmap.gteCardinality(min, rangeBitmap.lte(max));
+        }
+      }
       return (int) rangeBitmap.lteCardinality(max);
-    }
-    if (upperUnbounded) {
-      return (int) rangeBitmap.gteCardinality(min);
-    }
-    // TODO: RangeBitmap has a bug in version 0.9.28 which gives wrong result computing between for 2 numbers with
-    //       different sign. The bug is tracked here: https://github.com/RoaringBitmap/RoaringBitmap/issues/586.
-    //       This is a work-around for the bug.
-    if (columnMax > 0) {
-      return (int) rangeBitmap.betweenCardinality(min, max);
     } else {
-      return (int) rangeBitmap.gteCardinality(min, rangeBitmap.lte(max));
+      if (Long.compareUnsigned(min, 0) > 0) {
+        return (int) rangeBitmap.gteCardinality(min);
+      }
+      return _numDocs;
     }
   }
 
