@@ -101,6 +101,13 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Assert.assertEquals(resultRows.size(), expectedRows.size());
 
     Comparator<Object> valueComp = (l, r) -> {
+      if (l == null && r == null) {
+        return 0;
+      } else if (l == null) {
+        return -1;
+      } else if (r == null) {
+        return 1;
+      }
       if (l instanceof Integer) {
         return Integer.compare((Integer) l, ((Number) r).intValue());
       } else if (l instanceof Long) {
@@ -293,6 +300,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         //   - distinct value done via GROUP BY with empty expr aggregation list.
         new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
             + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3"},
+
+        // Test optimized constant literal.
+        new Object[]{"SELECT col1 FROM a WHERE col3 > 0 AND col3 < -5"},
+        new Object[]{"SELECT COALESCE(SUM(col3), 0) FROM a WHERE col1 = 'foo' AND col1 = 'bar'"},
+        new Object[]{"SELECT SUM(CAST(col3 AS INTEGER)) FROM a HAVING MIN(col3) BETWEEN 1 AND 0"},
+        new Object[]{"SELECT col1, COUNT(col3) FROM a GROUP BY col1 HAVING SUM(col3) > 40 AND SUM(col3) < 30"},
     };
   }
 
