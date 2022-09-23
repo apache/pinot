@@ -81,6 +81,8 @@ public final class StageNodeSerDeUtils {
         return new MailboxSendNode(stageId);
       case "MailboxReceiveNode":
         return new MailboxReceiveNode(stageId);
+      case "ValueNode":
+        return new ValueNode(stageId);
       default:
         throw new IllegalArgumentException("Unknown node name: " + nodeName);
     }

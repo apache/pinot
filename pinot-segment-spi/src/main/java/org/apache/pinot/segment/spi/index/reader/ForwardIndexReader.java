@@ -322,14 +322,14 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
           values[i] = BigDecimal.valueOf(getDouble(docIds[i], context));
         }
         break;
-      case STRING:
-        for (int i = 0; i < length; i++) {
-          values[i] = new BigDecimal(getString(docIds[i], context));
-        }
-        break;
       case BIG_DECIMAL:
         for (int i = 0; i < length; i++) {
           values[i] = getBigDecimal(docIds[i], context);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = new BigDecimal(getString(docIds[i], context));
         }
         break;
       case BYTES:

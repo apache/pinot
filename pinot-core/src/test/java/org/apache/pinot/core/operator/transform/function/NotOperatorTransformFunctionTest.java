@@ -18,57 +18,60 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.util.Arrays;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.testng.Assert;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest {
+
   // Test not true returns false.
   @Test
   public void testNotTrueOperatorTransformFunction() {
-    ExpressionContext expr =
-        RequestContextUtils.getExpression(String.format("Not (%d = %d)", _intSVValues[0], _intSVValues[0]));
-    TransformFunction func = TransformFunctionFactory.get(expr, _dataSourceMap);
-    Assert.assertEquals(func.getName(), "not");
-    int[] notTrueExpectedIntValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      notTrueExpectedIntValues[i] = 0;
-    }
-    testTransformFunction(func, notTrueExpectedIntValues);
+    String expression = String.format("Not (%d = %d)", _intSVValues[0], _intSVValues[0]);
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    Arrays.fill(expectedValues, false);
+    testTransformFunction(expression, expectedValues);
   }
 
   // Test not false returns true.
   @Test
   public void testNotFalseOperatorTransformFunction() {
-    ExpressionContext expr =
-        RequestContextUtils.getExpression(String.format("Not (%d != %d)", _intSVValues[0], _intSVValues[0]));
-    TransformFunction func = TransformFunctionFactory.get(expr, _dataSourceMap);
-    Assert.assertEquals(func.getName(), "not");
-    int[] notTrueExpectedIntValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      notTrueExpectedIntValues[i] = 1;
-    }
-    testTransformFunction(func, notTrueExpectedIntValues);
+    String expression = String.format("Not (%d != %d)", _intSVValues[0], _intSVValues[0]);
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    Arrays.fill(expectedValues, true);
+    testTransformFunction(expression, expectedValues);
   }
 
   // Test that not operator also works for not literal
   @Test
   public void testNonLiteralSupport() {
-    ExpressionContext expr =
-        RequestContextUtils.getExpression(String.format("Not (%s != %d)", INT_SV_COLUMN, _intSVValues[0]));
-    TransformFunction func = TransformFunctionFactory.get(expr, _dataSourceMap);
-    Assert.assertEquals(func.getName(), "not");
-    int[] expectedIntValues = new int[NUM_ROWS];
+    String expression = String.format("Not (%s != %d)", INT_SV_COLUMN, _intSVValues[0]);
+    boolean[] expectedValues = new boolean[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (_intSVValues[i] == _intSVValues[0]) {
-        expectedIntValues[i] = 1;
-      } else {
-        expectedIntValues[i] = 0;
-      }
+      expectedValues[i] = _intSVValues[i] == _intSVValues[0];
     }
-    testTransformFunction(func, expectedIntValues);
+    testTransformFunction(expression, expectedValues);
+  }
+
+  private void testTransformFunction(String expression, boolean[] expectedValues) {
+    TransformFunction transformFunction =
+        TransformFunctionFactory.get(RequestContextUtils.getExpression(expression), _dataSourceMap);
+    assertEquals(transformFunction.getName(), TransformFunctionType.NOT.getName());
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), FieldSpec.DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
+    testTransformFunction(transformFunction, expectedValues);
   }
 
   // Test illegal arguments for not transform.
@@ -76,13 +79,13 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
   public void testIllegalNotOperatorTransformFunction() {
     // Wrong argument type.
     ExpressionContext exprWrongType = RequestContextUtils.getExpression(String.format("Not(%s)", "test"));
-    Assert.assertThrows(RuntimeException.class, () -> {
+    assertThrows(RuntimeException.class, () -> {
       TransformFunctionFactory.get(exprWrongType, _dataSourceMap);
     });
     // Wrong number of arguments.
     ExpressionContext exprNumArg =
         RequestContextUtils.getExpression(String.format("Not(%d, %d)", _intSVValues[0], _intSVValues[1]));
-    Assert.assertThrows(RuntimeException.class, () -> {
+    assertThrows(RuntimeException.class, () -> {
       TransformFunctionFactory.get(exprNumArg, _dataSourceMap);
     });
   }

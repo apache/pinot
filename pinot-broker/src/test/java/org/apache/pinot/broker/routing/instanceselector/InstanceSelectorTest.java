@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
@@ -54,50 +55,53 @@ public class InstanceSelectorTest {
   public void testInstanceSelectorFactory() {
     TableConfig tableConfig = mock(TableConfig.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
+    AdaptiveServerSelector adaptiveServerSelector = null;
 
     // Routing config is missing
-    assertTrue(
-        InstanceSelectorFactory.getInstanceSelector(tableConfig, brokerMetrics) instanceof BalancedInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, brokerMetrics,
+        adaptiveServerSelector) instanceof BalancedInstanceSelector);
 
     // Instance selector type is not configured
     RoutingConfig routingConfig = mock(RoutingConfig.class);
     when(tableConfig.getRoutingConfig()).thenReturn(routingConfig);
-    assertTrue(
-        InstanceSelectorFactory.getInstanceSelector(tableConfig, brokerMetrics) instanceof BalancedInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, brokerMetrics,
+        adaptiveServerSelector) instanceof BalancedInstanceSelector);
 
     // Replica-group instance selector should be returned
     when(routingConfig.getInstanceSelectorType()).thenReturn(RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig,
-        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, brokerMetrics,
+        adaptiveServerSelector) instanceof ReplicaGroupInstanceSelector);
 
     // Strict replica-group instance selector should be returned
     when(routingConfig.getInstanceSelectorType()).thenReturn(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig,
-        brokerMetrics) instanceof StrictReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, brokerMetrics,
+        adaptiveServerSelector) instanceof StrictReplicaGroupInstanceSelector);
 
     // Should be backward-compatible with legacy config
     when(routingConfig.getInstanceSelectorType()).thenReturn(null);
     when(tableConfig.getTableType()).thenReturn(TableType.OFFLINE);
     when(routingConfig.getRoutingTableBuilderName()).thenReturn(
         InstanceSelectorFactory.LEGACY_REPLICA_GROUP_OFFLINE_ROUTING);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig,
-        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, brokerMetrics,
+        adaptiveServerSelector) instanceof ReplicaGroupInstanceSelector);
     when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(routingConfig.getRoutingTableBuilderName()).thenReturn(
         InstanceSelectorFactory.LEGACY_REPLICA_GROUP_REALTIME_ROUTING);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig,
-        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, brokerMetrics,
+        adaptiveServerSelector) instanceof ReplicaGroupInstanceSelector);
   }
 
   @Test
   public void testInstanceSelector() {
     String offlineTableName = "testTable_OFFLINE";
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
-    BalancedInstanceSelector balancedInstanceSelector = new BalancedInstanceSelector(offlineTableName, brokerMetrics);
+    AdaptiveServerSelector adaptiveServerSelector = null;
+    BalancedInstanceSelector balancedInstanceSelector = new BalancedInstanceSelector(offlineTableName, brokerMetrics,
+        adaptiveServerSelector);
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector);
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, brokerMetrics);
+        new StrictReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -598,9 +602,10 @@ public class InstanceSelectorTest {
     queryOptions.put("numReplicaGroupsToQuery", "2");
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
+    AdaptiveServerSelector adaptiveServerSelector = null;
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -677,12 +682,13 @@ public class InstanceSelectorTest {
     PinotQuery pinotQuery = mock(PinotQuery.class);
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("numReplicaGroupsToQuery", "4");
+    AdaptiveServerSelector adaptiveServerSelector = null;
 
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -758,12 +764,13 @@ public class InstanceSelectorTest {
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
     PinotQuery pinotQuery = mock(PinotQuery.class);
     Map<String, String> queryOptions = new HashMap<>();
+    AdaptiveServerSelector adaptiveServerSelector = null;
 
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics);
+        new ReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -821,10 +828,12 @@ public class InstanceSelectorTest {
   public void testUnavailableSegments() {
     String offlineTableName = "testTable_OFFLINE";
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
-    BalancedInstanceSelector balancedInstanceSelector = new BalancedInstanceSelector(offlineTableName, brokerMetrics);
+    AdaptiveServerSelector adaptiveServerSelector = null;
+    BalancedInstanceSelector balancedInstanceSelector = new BalancedInstanceSelector(offlineTableName, brokerMetrics,
+        adaptiveServerSelector);
     // ReplicaGroupInstanceSelector has the same behavior as BalancedInstanceSelector for the unavailable segments
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, brokerMetrics);
+        new StrictReplicaGroupInstanceSelector(offlineTableName, brokerMetrics, adaptiveServerSelector);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);

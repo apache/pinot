@@ -90,7 +90,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
 
     ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
-        _minionTaskZkMetadataManager.getRealtimeToOfflineSegmentsTaskZNRecord(realtimeTableName);
+        _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName,
+            RealtimeToOfflineSegmentsTask.TASK_TYPE);
     Preconditions.checkState(realtimeToOfflineSegmentsTaskZNRecord != null,
         "RealtimeToOfflineSegmentsTaskMetadata ZNRecord for table: %s should not be null. Exiting task.",
         realtimeTableName);
@@ -191,7 +192,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     long waterMarkMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
     RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata =
         new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, waterMarkMs);
-    _minionTaskZkMetadataManager.setRealtimeToOfflineSegmentsTaskMetadata(newMinionMetadata, _expectedVersion);
+    _minionTaskZkMetadataManager.setTaskMetadataZNRecord(newMinionMetadata, RealtimeToOfflineSegmentsTask.TASK_TYPE,
+        _expectedVersion);
   }
 
   @Override

@@ -257,8 +257,6 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a", "'a.col1' is not being grouped"},
         // empty IN clause fails compilation
         new Object[]{"SELECT a.col1 FROM a WHERE a.col1 IN ()", "Encountered \"\" at line"},
-        // range filter queries are not supported right now
-        new Object[]{"SELECT a.col1 FROM a WHERE a.col1 > 'x' AND a.col1 < 'y'", "Range is not implemented yet"}
     };
   }
 

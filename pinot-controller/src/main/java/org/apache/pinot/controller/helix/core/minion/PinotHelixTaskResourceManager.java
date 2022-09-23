@@ -21,7 +21,9 @@ package org.apache.pinot.controller.helix.core.minion;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,9 +35,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
@@ -50,9 +54,12 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
 import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
+import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -456,6 +463,83 @@ public class PinotHelixTaskResourceManager {
     return taskConfigs;
   }
 
+  public synchronized Map<String, String> getSubtaskProgress(String taskName, @Nullable String subtaskNames,
+      Executor executor, HttpConnectionManager connMgr, Map<String, String> workerEndpoints,
+      Map<String, String> requestHeaders, int timeoutMs)
+      throws Exception {
+    return getSubtaskProgress(taskName, subtaskNames,
+        new CompletionServiceHelper(executor, connMgr, HashBiMap.create(0)), workerEndpoints, requestHeaders,
+        timeoutMs);
+  }
+
+  @VisibleForTesting
+  Map<String, String> getSubtaskProgress(String taskName, @Nullable String subtaskNames,
+      CompletionServiceHelper completionServiceHelper, Map<String, String> workerEndpoints,
+      Map<String, String> requestHeaders, int timeoutMs)
+      throws Exception {
+    String helixJobName = getHelixJobName(taskName);
+    JobContext jobContext = _taskDriver.getJobContext(helixJobName);
+    if (jobContext == null) {
+      throw new NoTaskScheduledException("No task scheduled with name: " + helixJobName);
+    }
+    Set<String> selectedSubtasks = new HashSet<>();
+    if (StringUtils.isNotEmpty(subtaskNames)) {
+      Collections.addAll(selectedSubtasks, StringUtils.split(subtaskNames, ','));
+    }
+    // The worker running the subtask and task state as tracked by helix.
+    Map<String, String[]> allSubtasks = new HashMap<>();
+    Map<String, Set<String>> workerSelectedSubtasksMap = new HashMap<>();
+    for (int partition : jobContext.getPartitionSet()) {
+      String subtaskName = jobContext.getTaskIdForPartition(partition);
+      String worker = jobContext.getAssignedParticipant(partition);
+      allSubtasks.put(subtaskName, new String[]{worker, jobContext.getPartitionState(partition).name()});
+      if (selectedSubtasks.isEmpty() || selectedSubtasks.contains(subtaskName)) {
+        workerSelectedSubtasksMap.computeIfAbsent(worker, k -> new HashSet<>()).add(subtaskName);
+      }
+    }
+    LOGGER.debug("Found subtasks on workers: {}", workerSelectedSubtasksMap);
+    List<String> workerUrls = new ArrayList<>();
+    workerSelectedSubtasksMap.forEach((workerId, subtasksOnWorker) -> workerUrls.add(String
+        .format("%s/tasks/subtask/progress?subtaskNames=%s", workerEndpoints.get(workerId),
+            StringUtils.join(subtasksOnWorker, CommonConstants.Minion.TASK_LIST_SEPARATOR))));
+    LOGGER.debug("Getting task progress with workerUrls: {}", workerUrls);
+    // Scatter and gather progress from multiple workers.
+    Map<String, String> subtaskProgressMap = new HashMap<>();
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs);
+    for (Map.Entry<String, String> entry : serviceResponse._httpResponses.entrySet()) {
+      String worker = entry.getKey();
+      String resp = entry.getValue();
+      LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
+      if (StringUtils.isNotEmpty(resp)) {
+        subtaskProgressMap.putAll(JsonUtils.stringToObject(resp, Map.class));
+      }
+    }
+    // Check if any subtask missed their progress from the worker.
+    for (String subtaskName : selectedSubtasks) {
+      if (subtaskProgressMap.containsKey(subtaskName)) {
+        continue;
+      }
+      String[] taskWorkerAndHelixState = allSubtasks.get(subtaskName);
+      if (taskWorkerAndHelixState == null) {
+        subtaskProgressMap.put(subtaskName, "No worker has run this subtask");
+      } else {
+        String taskWorker = taskWorkerAndHelixState[0];
+        String helixState = taskWorkerAndHelixState[1];
+        subtaskProgressMap.put(subtaskName, String
+            .format("No progress status from worker: %s but find status: %s tracked by Helix", taskWorker, helixState));
+      }
+    }
+    // Raise error if any worker failed to report progress, with partial result.
+    if (serviceResponse._failedResponseCount > 0) {
+      // TODO: track detailed worker failure via CompletionServiceHelper and send them back in response.
+      throw new RuntimeException(String
+          .format("There were %d workers failed to report task progress. Got partial progress info: %s",
+              serviceResponse._failedResponseCount, subtaskProgressMap));
+    }
+    return subtaskProgressMap;
+  }
+
   /**
    * Helper method to return a map of task names to corresponding task state
    * where the task corresponds to the given Pinot table name. This is used to
@@ -542,8 +626,8 @@ public class PinotHelixTaskResourceManager {
    *                  If verbosity > 0, shows details for all tasks.
    * @return Map of Pinot Task Name to TaskDebugInfo. TaskDebugInfo contains details for subtasks.
    */
-  public synchronized Map<String, TaskDebugInfo> getTasksDebugInfoByTable(
-      String taskType, String tableNameWithType, int verbosity) {
+  public synchronized Map<String, TaskDebugInfo> getTasksDebugInfoByTable(String taskType, String tableNameWithType,
+      int verbosity) {
     Map<String, TaskDebugInfo> taskDebugInfos = new TreeMap<>();
     WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
     if (workflowContext == null) {

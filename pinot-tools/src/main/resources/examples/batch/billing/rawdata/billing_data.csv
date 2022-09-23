@@ -1,0 +1,696 @@
+customerId,overdueBalance,baseUsage,creditHistory,alternateUsage,standingCharge,baseCharge,alternateCharge,levy,tax,totalNet,totalToPay,firstName,lastName,isCarOwner,city,maritalStatus,buildingType,missedPayment,billingMonth
+341,0,457.56,A,112.62,7.49,67.44,10.16,2.55,17.18,87.65,104.82,Rebecca,Effertz,0,Palo Alto,U,Condominium,Paid,201904
+374,0,1161.67,A,0,5.62,150.32,0,4.68,31.48,160.62,192.1,Reba,OKeefe,1,Mountain View,S,Condominium,Paid,201903
+398,0,449.21,A,0,5.62,58.13,0,1.91,12.87,65.66,78.53,Sydnee,Farrell,0,Palo Alto,S,Condominium,Paid,201904
+427,0,888.02,A,0,5.62,114.91,0,3.62,24.33,124.15,148.48,Susanna,Schaefer,0,Cupertino,S,Apartment,Paid,201901
+435,0,670.17,B,0,14.87,86.72,0,3.05,20.51,104.64,125.15,Stephen,Conn,1,Cupertino,M,Apartment,Paid,201808
+441,0,894.34,A,0,5.62,115.73,0,3.64,24.5,124.99,149.49,Rickey,Smitham,0,Palo Alto,M,Apartment,Paid,201808
+465,0,1427.99,A,0,14.87,184.78,0,5.99,40.31,205.64,245.95,Kristina,Towne,1,Cupertino,U,Apartment,Paid,201808
+499,0,445.09,A,0,7.35,57.59,0,1.95,13.11,66.89,80,Alexane,Weber,0,Mountain View,M,Apartment,Paid,201904
+503,0,738.44,A - Excellent,0,14.87,95.55,0,3.31,22.29,113.74,136.03,Elouise,Hickle,1,Santa Clara,U,Apartment,Paid,201810
+533,0,995.82,A - Excellent,0,5.62,128.86,0,4.03,27.15,138.51,165.66,Ansley,Bogisich,1,Mountain View,M,Apartment,Paid,201906
+549,0,1059.26,A,0,14.87,137.07,0,4.56,30.67,156.5,187.17,Trent,Pouros,1,Cupertino,M,Apartment,Paid,201812
+585,0,559.46,A,0,8.73,72.39,0,2.43,16.38,83.56,99.94,Nels,Ratke,1,Mountain View,M,Apartment,Paid,201808
+619,0,472.89,B,0,7.35,61.19,0,2.06,13.84,70.6,84.44,Monty,Thompson,0,Santa Clara,S,Apartment,Paid,201904
+622,0,369.97,A,0,14.87,47.87,0,1.88,12.67,64.63,77.29,Valentina,Stokes,1,Palo Alto,S,Apartment,Paid,201807
+648,0,291.34,A,282.97,7.49,42.94,25.52,2.28,15.33,78.24,93.57,Terence,Boyer,1,Palo Alto,U,Apartment,Paid,201903
+688,0,501.93,A,474.82,8.95,73.98,42.83,3.77,25.39,129.54,154.93,Lee,Fritsch,1,Santa Clara,S,Apartment,Paid,201901
+705,0,1067.32,A - Excellent,0,14.87,138.11,0,4.59,30.88,157.57,188.45,Hassan,OReilly,1,Mountain View,S,Apartment,Paid,201811
+707,0,388.73,A,378.97,7.49,57.3,34.18,2.97,19.98,101.94,121.92,Lucile,Roob,0,Mountain View,S,Apartment,Paid,201902
+709,0,416.82,A,0,8.73,53.94,0,1.88,12.65,64.55,77.2,Joelle,Cummerata,0,Mountain View,U,Apartment,Paid,201906
+728,0,1502.2,A,0,20.02,194.38,0,6.43,43.28,220.84,264.12,Bessie,Waelchi,1,Santa Clara,M,Apartment,Paid,201904
+787,0,326.32,A,0,14.87,42.23,0,1.71,11.53,58.81,70.34,Linnea,Gleichner,1,Mountain View,S,Apartment,Paid,201807
+815,0,89.54,A,0,5.62,11.59,0,0.52,3.47,17.72,21.2,Delia,Brekke,0,Sunnyvale,U,Apartment,Paid,201807
+830,0,1929.78,A,0,34.93,249.71,0,8.54,57.46,293.18,350.65,Karson,Pollich,1,Palo Alto,S,Apartment,Paid,201810
+858,0,925.53,A,0,17.45,119.76,0,4.12,27.7,141.33,169.03,Dale,Kertzmann,1,Mountain View,S,Apartment,Paid,201810
+888,0,693.63,A,509,8.95,102.24,45.91,4.71,31.72,161.82,193.53,Garret,Raynor,0,Santa Clara,S,Apartment,Paid,201906
+893,0,1727.75,A,0,20.02,223.57,0,7.31,49.18,250.9,300.07,Amie,Guªann,0,Mountain View,M,Apartment,Paid,201905
+918,0,880.8,A,0,5.62,113.98,0,3.59,24.14,123.18,147.33,Cristian,Hane,0,Palo Alto,U,Dormitory,Paid,201905
+919,0,426.11,A,0,7.35,55.14,0,1.87,12.62,64.36,76.98,Jeanne,Lang,1,Santa Clara,S,Dormitory,Paid,201902
+943,0,529.58,A,0,5.62,68.53,0,2.22,14.97,76.37,91.34,Nola,Zboncak,0,Sunnyvale,S,Dormitory,Paid,201809
+995,0,301.85,A,226.3,8.95,44.49,20.41,2.22,14.91,76.07,90.98,Jaden,Kling,0,Sunnyvale,U,Villa,Paid,201905
+26,0,481.77,A,0,8.73,62.34,0,2.13,14.35,73.2,87.55,Jonatan,Frami,1,Cupertino,U,Townhouse,Paid,201904
+53,0,670.68,A,0,5.62,86.79,0,2.77,18.65,95.18,113.83,Dorris,Wisoky,1,Cupertino,S,Townhouse,Paid,201906
+69,0,750.59,A,0,8.73,97.13,0,3.18,21.37,109.03,130.4,Emmy,Reichel,1,Santa Clara,S,Townhouse,Paid,201906
+114,0,792.68,A,0,14.87,102.57,0,3.52,23.71,120.97,144.68,Norris,Connelly,1,Santa Clara,U,Townhouse,Paid,201810
+187,0,1022.18,A,0,5.62,132.27,0,4.14,27.84,142.03,169.86,Desiree,Anderson,1,Mountain View,M,Townhouse,Paid,201902
+189,0,937.68,A,679.29,7.49,138.21,61.27,6.21,41.78,213.19,254.97,Fredrick,Hamill,0,Palo Alto,M,Townhouse,Paid,201906
+213,0,615.27,A,0,8.73,79.62,0,2.65,17.84,91,108.83,Flossie,Towne,0,Palo Alto,M,Condominium,Paid,201904
+223,0,951.61,A,0,5.62,123.14,0,3.86,25.99,132.62,158.61,Glenna,Christiansen,0,Mountain View,S,Condominium,Paid,201901
+253,0,821.75,A,175.72,7.49,121.13,15.85,4.33,29.16,148.8,177.96,Omer,Botsford,0,Sunnyvale,S,Condominium,Paid,201811
+258,0,609.6,A,0,5.62,78.88,0,2.54,17.06,87.04,104.1,Cathrine,Nienow,1,Santa Clara,S,Condominium,Paid,201902
+277,0,539.21,A,0,8.73,69.77,0,2.36,15.85,80.86,96.71,Elton,Hegmann,0,Mountain View,S,Condominium,Paid,201903
+388,0,555.45,A,0,8.73,71.88,0,2.42,16.27,83.02,99.3,Ezra,Leffler,1,Mountain View,M,Condominium,Paid,201808
+424,0,1503.42,A - Excellent,0,20.02,194.54,0,6.44,43.32,221,264.32,Adah,Marks,1,Santa Clara,S,Apartment,Paid,201811
+437,0,607.7,A,145.37,8.95,89.57,13.11,3.35,22.54,114.99,137.52,Brennan,Gusikowski,1,Mountain View,M,Apartment,Paid,201812
+448,0,460.62,A,0,8.73,59.6,0,2.05,13.8,70.38,84.18,Ralph,Simonis,1,Mountain View,M,Apartment,Paid,201809
+471,0,450.15,A - Excellent,0,8.73,58.25,0,2.01,13.52,68.99,82.51,Estevan,Stracke,1,Santa Clara,S,Apartment,Paid,201901
+485,0,855.14,A,199.46,18.18,126.05,17.99,4.87,32.75,167.09,199.83,Savanna,Hand,0,Sunnyvale,U,Apartment,Paid,201905
+497,0,692.71,A,0,14.87,89.64,0,3.14,21.1,107.64,128.74,Herbert,Bashirian,0,Santa Clara,M,Apartment,Paid,201905
+517,0,241.83,D,244.43,8.95,35.65,22.05,2,13.45,68.64,82.1,June,Durgan,0,Palo Alto,U,Apartment,Paid,201905
+592,0,1057.4,A,980.61,7.49,155.86,88.45,7.55,50.83,259.36,310.19,Hortense,Kuvalis,1,Palo Alto,M,Apartment,Paid,201812
+612,0,1844.56,A,0,5.62,238.69,0,7.33,49.32,251.64,300.96,Elroy,Farrell,1,Mountain View,U,Apartment,Paid,201808
+636,0,305.33,A,306.62,7.49,45.01,27.66,2.4,16.18,82.56,98.74,Kellen,Nolan,0,Palo Alto,M,Apartment,Paid,201809
+672,0,1310.23,A,0,17.45,169.54,0,5.61,37.75,192.6,230.35,Weston,Beahan,1,Sunnyvale,M,Apartment,Paid,201905
+715,0,424.26,A,0,5.62,54.9,0,1.82,12.22,62.33,74.55,Cordelia,Pfeffer,1,Santa Clara,M,Apartment,Paid,201807
+733,0,1210.49,A,0,14.87,156.64,0,5.15,34.62,176.65,211.28,Lilly,Thiel,1,Santa Clara,U,Apartment,Paid,201902
+735,0,531.17,A,0,5.62,68.73,0,2.23,15.01,76.58,91.59,Theron,Thompson,1,Palo Alto,U,Apartment,Paid,201809
+748,0,558.55,A,142.38,8.95,82.33,12.84,3.12,21.02,107.25,128.27,Amira,Rice,0,Santa Clara,S,Apartment,Paid,201901
+830,0,1873.72,A,0,34.93,242.46,0,8.32,56,285.71,341.71,Karson,Pollich,1,Palo Alto,S,Apartment,Paid,201808
+835,0,616.98,A,0,5.62,79.84,0,2.56,17.25,88.02,105.27,Maggie,Lehner,0,Palo Alto,S,Apartment,Paid,201902
+875,0,865.68,A - Excellent,0,14.87,112.02,0,3.81,25.62,130.7,156.31,Nico,Gibson,1,Santa Clara,S,Apartment,Paid,201809
+45,0,396.16,A - Excellent,285.04,15.46,58.39,25.71,2.99,20.1,102.55,122.65,Willie,Stroman,1,Sunnyvale,U,Townhouse,Paid,201807
+69,0,497.73,A,0,8.73,64.41,0,2.19,14.76,75.33,90.1,Emmy,Reichel,1,Santa Clara,S,Townhouse,Paid,201807
+72,0,1383.95,A,0,34.93,179.08,0,6.42,43.2,220.43,263.64,Demario,Huels,1,Santa Clara,U,Townhouse,Paid,201807
+72,0,1767.73,A,0,34.93,228.74,0,7.91,53.23,271.58,324.82,Demario,Huels,1,Santa Clara,U,Townhouse,Paid,201904
+102,0,191.66,A,136.41,8.95,28.25,12.3,1.49,9.99,50.99,60.98,Amos,VonRueden,1,Sunnyvale,S,Townhouse,Paid,201807
+104,0,591.7,A,446.55,7.49,87.22,40.28,4.05,27.25,139.03,166.29,Melisa,Labadie,1,Mountain View,M,Townhouse,Paid,201810
+152,0,452.45,A,276.92,8.95,66.69,24.98,3.02,20.31,103.64,123.95,Alana,Harvey,0,Cupertino,S,Townhouse,Paid,201903
+166,0,359.4,A,318.8,8.95,52.98,28.76,2.72,18.31,93.4,111.71,Joe,Tromp,1,Mountain View,M,Townhouse,Paid,201901
+205,0,757.55,B,156.36,7.49,111.66,14.1,4,26.9,137.25,164.16,Markus,Waters,0,Santa Clara,M,Townhouse,Paid,201901
+223,0,868.05,A,0,5.62,112.33,0,3.54,23.81,121.48,145.29,Glenna,Christiansen,0,Mountain View,S,Condominium,Paid,201808
+246,0,699.36,A,0,8.73,90.5,0,2.98,20.03,102.2,122.24,Brigitte,Cronin,0,Mountain View,M,Condominium,Paid,201808
+253,0,793.7,A,182.32,7.49,116.99,16.45,4.23,28.45,145.15,173.6,Omer,Botsford,0,Sunnyvale,S,Condominium,Paid,201906
+299,0,1017.61,A,0,5.62,131.68,0,4.12,27.72,141.42,169.14,Sydni,Rosenbaum,0,Sunnyvale,S,Condominium,Paid,201902
+342,0,777.66,A,183.11,8.95,114.63,16.52,4.2,28.28,144.3,172.58,Alexys,Steuber,0,Santa Clara,M,Condominium,Paid,201812
+396,0,756.72,A - Excellent,0,14.87,97.92,0,3.38,22.77,116.17,138.94,Maegan,Wiza,1,Mountain View,S,Condominium,Paid,201906
+405,0,1176.34,A,299.58,20.9,173.39,27.02,6.64,44.68,227.95,272.63,Viviane,Klocko,0,Cupertino,S,Condominium,Paid,201809
+415,0,585,A,0,7.35,75.7,0,2.49,16.77,85.54,102.31,Henri,Hermiston,1,Sunnyvale,S,Apartment,Paid,201812
+439,0,1023.98,A - Excellent,213.68,18.18,150.93,19.27,5.65,38.03,194.04,232.07,Drew,Keebler,0,Santa Clara,S,Apartment,Paid,201901
+468,0,445.48,A,0,7.35,57.65,0,1.95,13.12,66.94,80.07,Carmela,Stiedemann,1,Mountain View,M,Apartment,Paid,201904
+575,0,160.66,A,171.41,8.95,23.68,15.46,1.44,9.71,49.54,59.24,Kyle,Mueller,0,Santa Clara,U,Apartment,Paid,201807
+577,0,570,A,0,8.73,73.76,0,2.47,16.65,84.96,101.62,Katrina,Schamberger,1,Santa Clara,S,Apartment,Paid,201810
+584,0,648.49,A - Excellent,562.4,18.18,95.59,50.73,4.93,33.21,169.43,202.64,Fredy,Walter,1,Mountain View,S,Apartment,Paid,201904
+605,0,614.69,A - Excellent,449.45,18.18,90.61,40.54,4.48,30.15,153.81,183.95,Marlee,Rice,1,Cupertino,S,Apartment,Paid,201808
+616,0,1112.52,A,0,14.87,143.96,0,4.76,32.06,163.59,195.66,Colby,Wyman,0,Santa Clara,S,Apartment,Paid,201903
+623,0,534.94,B,0,8.73,69.22,0,2.34,15.74,80.29,96.03,Lucious,Kerluke,1,Cupertino,S,Apartment,Paid,201809
+648,0,323.84,A,312.04,7.49,47.73,28.15,2.5,16.83,85.87,102.7,Terence,Boyer,1,Palo Alto,U,Apartment,Paid,201902
+695,0,746.01,A,0,5.62,96.53,0,3.06,20.62,105.22,125.84,Marilie,Ernser,1,Cupertino,M,Apartment,Paid,201812
+728,0,1708.45,A - Excellent,0,20.02,221.07,0,7.23,48.67,248.33,297,Bessie,Waelchi,1,Santa Clara,M,Apartment,Paid,201903
+732,0,482.49,B,431.28,15.46,71.12,38.9,3.76,25.33,129.24,154.58,Karine,Mosciski,1,Palo Alto,S,Apartment,Paid,201812
+735,0,560.16,A - Excellent,0,5.62,72.48,0,2.34,15.77,80.45,96.22,Theron,Thompson,1,Palo Alto,U,Apartment,Paid,201904
+741,0,1065.61,A - Excellent,0,5.62,137.89,0,4.31,28.97,147.82,176.79,Ashley,Littel,1,Mountain View,S,Apartment,Paid,201904
+750,0,724.94,A,0,8.73,93.81,0,3.08,20.7,105.61,126.31,Mitchell,Lubowitz,1,Sunnyvale,S,Apartment,Paid,201902
+757,0,1558.37,A,0,34.93,201.65,0,7.1,47.76,243.68,291.44,Junior,Feeney,1,Santa Clara,M,Apartment,Paid,201808
+767,0,855.69,A,0,8.73,110.73,0,3.58,24.12,123.04,147.16,Zoila,Kozey,0,Sunnyvale,M,Apartment,Paid,201902
+801,0,824.39,A,0,14.87,106.68,0,3.65,24.54,125.19,149.73,Elenor,Skiles,1,Sunnyvale,U,Apartment,Paid,201906
+820,0,1297.68,A,0,17.45,167.92,0,5.56,37.42,190.93,228.35,Aniya,Lebsack,1,Sunnyvale,S,Apartment,Paid,201812
+824,0,1165.39,A,872.42,18.18,171.78,78.69,8.06,54.24,276.71,330.95,Don,Grimes,1,Santa Clara,M,Apartment,Paid,201809
+845,0,649.42,A,0,8.73,84.03,0,2.78,18.73,95.55,114.28,Keegan,Lubowitz,0,Mountain View,S,Apartment,Paid,201812
+861,0,408.21,A,0,5.62,52.82,0,1.75,11.8,60.2,71.99,Roberta,DuBuque,0,Santa Clara,U,Apartment,Paid,201906
+866,0,560.87,A,0,5.62,72.58,0,2.35,15.79,80.54,96.33,Orin,Guªann,1,Cupertino,S,Apartment,Paid,201903
+872,0,679.02,A,494.33,7.49,100.09,44.59,4.56,30.72,156.73,187.45,Loyal,Altenwerth,1,Sunnyvale,U,Apartment,Paid,201906
+943,0,559.52,A,0,5.62,72.4,0,2.34,15.75,80.36,96.11,Nola,Zboncak,0,Sunnyvale,S,Dormitory,Paid,201902
+945,0,438.46,A,0,5.62,56.74,0,1.87,12.59,64.23,76.82,Estella,Hilll,1,Santa Clara,M,Dormitory,Paid,201808
+964,0,1060.18,A,0,5.62,137.19,0,4.28,28.83,147.09,175.92,Breana,Stracke,0,Santa Clara,U,Dormitory,Paid,201809
+992,0,305.85,A,188.98,8.95,45.08,17.05,2.13,14.35,73.21,87.56,Keven,Lowe,0,Sunnyvale,S,Bungalow,Paid,201901
+28,0,996.65,A,708.25,35,146.91,63.88,7.37,49.62,253.16,302.78,Forrest,Lakin,1,Mountain View,S,Townhouse,Paid,201812
+42,0,465.3,A,0,8.73,60.21,0,2.07,13.92,71.01,84.93,Helen,Kilback,1,Cupertino,U,Townhouse,Paid,201808
+64,0,966.89,A,0,17.45,125.12,0,4.28,28.78,146.84,175.62,Maxine,Kirlin,1,Mountain View,M,Townhouse,Paid,201905
+89,0,1102.09,A,0,5.62,142.61,0,4.45,29.92,152.68,182.6,Curtis,Breitenberg,1,Sunnyvale,U,Townhouse,Paid,201902
+103,0,457.01,A,330.88,8.95,67.36,29.85,3.18,21.43,109.34,130.77,Noah,Block,1,Palo Alto,U,Townhouse,Paid,201905
+150,0,1274.68,A - Excellent,0,17.45,164.94,0,5.47,36.82,187.87,224.69,Effie,Howell,1,Cupertino,U,Townhouse,Paid,201901
+190,0,467.56,A,0,5.62,60.5,0,1.98,13.35,68.11,81.45,Dorothy,Stracke,1,Santa Clara,M,Townhouse,Paid,201808
+199,0,270.46,A,201.75,7.49,39.87,18.2,1.97,13.23,67.52,80.75,Catharine,Kozey,0,Cupertino,S,Townhouse,Paid,201808
+202,0,1179.09,A - Excellent,0,17.45,152.57,0,5.1,34.32,175.12,209.45,Zoey,Zulauf,1,Santa Clara,U,Townhouse,Paid,201905
+210,0,552.51,A,0,8.73,71.49,0,2.41,16.2,82.63,98.83,Bobby,Wolf,0,Santa Clara,U,Townhouse,Paid,201903
+241,0,783.97,A,181.26,15.46,115.56,16.35,4.42,29.75,151.79,181.54,Chandler,Price,0,Mountain View,M,Condominium,Paid,201809
+268,0,434.18,A,0,8.73,56.18,0,1.95,13.1,66.86,79.96,Kaley,Vandervort,0,Mountain View,U,Condominium,Paid,201808
+276,0,900.96,A,0,17.45,116.58,0,4.02,27.06,138.06,165.11,Aliza,Champlin,0,Mountain View,U,Condominium,Paid,201808
+312,0,626.69,A,0,8.73,81.09,0,2.69,18.13,92.52,110.65,Virgie,Grant,0,Sunnyvale,M,Condominium,Paid,201906
+315,0,350.21,A,81.81,8.95,51.62,7.38,2.04,13.72,69.99,83.71,Salma,Wolf,0,Palo Alto,U,Condominium,Paid,201809
+345,0,451.2,A,0,7.35,58.39,0,1.97,13.27,67.71,80.98,Trenton,Johns,1,Palo Alto,S,Condominium,Paid,201810
+355,0,967.98,A,0,8.73,125.26,0,4.02,27.05,138.01,165.06,Branson,Crist,0,Palo Alto,M,Condominium,Paid,201808
+389,0,658.98,D,0,8.73,85.27,0,2.82,18.98,96.82,115.8,Ben,Deckow,1,Santa Clara,M,Condominium,Paid,201901
+476,0,845.81,A,0,14.87,109.45,0,3.73,25.1,128.05,153.14,Janice,Carter,1,Mountain View,U,Apartment,Paid,201810
+498,0,386.19,A,0,7.35,49.97,0,1.72,11.57,59.04,70.62,Newton,Zboncak,0,Cupertino,S,Apartment,Paid,201901
+533,0,1010.98,A,0,5.62,130.82,0,4.09,27.54,140.53,168.08,Ansley,Bogisich,1,Mountain View,M,Apartment,Paid,201812
+559,0,727.34,A,0,8.73,94.12,0,3.09,20.76,105.93,126.7,Ross,Schuster,1,Santa Clara,M,Apartment,Paid,201904
+593,0,549.61,A,0,5.62,71.12,0,2.3,15.49,79.04,94.53,Abbey,Beahan,0,Cupertino,M,Apartment,Paid,201902
+636,0,303.45,A,295.45,7.49,44.73,26.65,2.37,15.92,81.23,97.16,Kellen,Nolan,0,Palo Alto,M,Apartment,Paid,201905
+647,0,677.82,A,0,5.62,87.71,0,2.8,18.84,96.13,114.97,Marcelino,Langworth,1,Cupertino,U,Apartment,Paid,201811
+661,0,503.68,A,0,5.62,65.18,0,2.12,14.29,72.92,87.21,Bryce,Auer,0,Palo Alto,U,Apartment,Paid,201810
+672,0,1108.5,A,0,17.45,143.44,0,4.83,32.48,165.72,198.2,Weston,Beahan,1,Sunnyvale,M,Apartment,Paid,201810
+682,0,447.43,A,0,8.73,57.9,0,2,13.45,68.63,82.08,Jadon,Watsica,0,Sunnyvale,M,Apartment,Paid,201904
+716,0,247.53,A,239.23,7.49,36.49,21.58,1.97,13.23,67.52,80.76,Edgardo,Schiller,1,Cupertino,M,Apartment,Paid,201903
+735,0,517.1,A,0,5.62,66.91,0,2.18,14.64,74.71,89.35,Theron,Thompson,1,Palo Alto,U,Apartment,Paid,201905
+741,0,1291.32,A,0,5.62,167.1,0,5.18,34.87,177.9,212.77,Ashley,Littel,1,Mountain View,S,Apartment,Paid,201811
+796,0,426.35,A,0,8.73,55.17,0,1.92,12.9,65.82,78.72,Nora,Wuckert,1,Sunnyvale,S,Apartment,Paid,201810
+801,0,976.98,A - Excellent,0,14.87,126.42,0,4.24,28.52,145.53,174.05,Elenor,Skiles,1,Sunnyvale,U,Apartment,Paid,201901
+811,0,216.64,A,205.26,8.95,31.93,18.51,1.78,11.99,61.18,73.17,Moshe,Gutkowski,1,Santa Clara,M,Apartment,Paid,201901
+869,0,1224.16,A,0,17.45,158.41,0,5.28,35.5,181.13,216.63,Elnora,Harªann,1,Sunnyvale,S,Apartment,Paid,201904
+879,0,336.91,A,234.67,8.95,49.66,21.17,2.39,16.11,82.17,98.28,Keira,Hand,1,Mountain View,U,Apartment,Paid,201811
+915,0,528.95,A,0,8.73,68.45,0,2.32,15.58,79.49,95.07,Sam,Considine,0,Cupertino,U,Dormitory,Paid,201808
+927,0,711.8,A,0,14.87,92.11,0,3.21,21.6,110.19,131.78,Austyn,Veum,1,Santa Clara,M,Dormitory,Paid,201811
+938,0,825.4,A,0,5.62,106.81,0,3.37,22.7,115.8,138.5,Wyman,Abbott,1,Sunnyvale,M,Dormitory,Paid,201905
+939,0,312.36,A,225.72,7.49,46.04,20.36,2.22,14.92,76.11,91.03,Newell,Abshire,0,Santa Clara,S,Dormitory,Paid,201903
+947,0,998.86,A,0,5.62,129.25,0,4.05,27.23,138.92,166.15,Kade,Bayer,1,Cupertino,U,Dormitory,Paid,201809
+976,0,509.83,A,0,8.73,65.97,0,2.24,15.08,76.94,92.02,Lue,Ferry,1,Sunnyvale,U,Dormitory,Paid,201808
+983,0,233.9,A,172.66,7.49,34.48,15.57,1.73,11.62,59.27,70.88,Jordi,Heidenreich,1,Palo Alto,U,Bungalow,Paid,201808
+986,0,529.6,A,386.13,15.46,78.06,34.83,3.85,25.91,132.2,158.11,Bernita,Bradtke,1,Palo Alto,M,Bungalow,Paid,201811
+998,0,552.98,A,0,8.73,71.56,0,2.41,16.21,82.69,98.9,Dustin,Volkman,1,Santa Clara,U,Villa,Paid,201811
+23,0,282.59,A,216.33,7.49,41.65,19.51,2.06,13.86,70.72,84.58,Jules,Flatley,1,Sunnyvale,S,Townhouse,Paid,201810
+29,0,827.89,A,0,14.87,107.13,0,3.66,24.63,125.66,150.29,Terrill,Dicki,1,Palo Alto,S,Townhouse,Paid,201810
+42,0,556.23,A,0,8.73,71.98,0,2.42,16.29,83.13,99.42,Helen,Kilback,1,Cupertino,U,Townhouse,Paid,201809
+57,0,583.01,A,0,8.73,75.44,0,2.53,16.99,86.7,103.69,Hilario,Zulauf,0,Sunnyvale,M,Townhouse,Paid,201906
+79,0,556.18,A - Excellent,404.04,7.49,81.98,36.44,3.78,25.42,129.69,155.11,Eliane,Shields,0,Santa Clara,M,Townhouse,Paid,201809
+146,0,454.61,A,0,5.62,58.83,0,1.93,13.01,66.38,79.39,Claudia,Beier,1,Santa Clara,M,Townhouse,Paid,201903
+160,0,277.57,A - Excellent,199.35,7.49,40.91,17.98,1.99,13.4,68.38,81.78,Deron,Schaden,0,Palo Alto,M,Townhouse,Paid,201902
+188,0,545.14,A,0,5.62,70.54,0,2.28,15.38,78.45,93.82,Adah,Gaylord,0,Cupertino,U,Townhouse,Paid,201903
+251,0,487.02,A,117.7,7.49,71.79,10.62,2.7,18.15,92.59,110.74,Maida,Collins,1,Santa Clara,U,Condominium,Paid,201808
+251,0,499.32,A,117.58,7.49,73.6,10.61,2.75,18.51,94.45,112.96,Maida,Collins,1,Santa Clara,U,Condominium,Paid,201905
+260,0,666.81,A,153.25,7.49,98.29,13.82,3.59,24.15,123.19,147.33,Alphonso,Gusikowski,0,Sunnyvale,U,Condominium,Paid,201811
+263,0,911.59,A,220.05,7.49,134.37,19.85,4.85,32.65,166.56,199.2,Milo,Bernhard,0,Santa Clara,S,Condominium,Paid,201905
+324,0,789.61,A,0,14.87,102.18,0,3.51,23.63,120.56,144.19,Lessie,Stanton,0,Mountain View,S,Condominium,Paid,201810
+365,0,836.49,A,0,14.87,108.24,0,3.69,24.85,126.81,151.66,Dayana,Considine,1,Sunnyvale,S,Condominium,Paid,201810
+442,0,531.38,A,0,8.73,68.76,0,2.32,15.64,79.82,95.46,Ophelia,Weimann,1,Palo Alto,M,Apartment,Paid,201906
+540,0,879.21,A,0,5.62,113.77,0,3.58,24.1,122.97,147.07,Leilani,Dooley,1,Sunnyvale,S,Apartment,Paid,201810
+574,0,467.8,A,330.3,15.46,68.95,29.79,3.43,23.06,117.63,140.69,Morgan,Hahn,0,Santa Clara,S,Apartment,Paid,201906
+581,0,804.75,A,0,14.87,104.13,0,3.57,24.02,122.57,146.6,Cloyd,Runolfsson,0,Palo Alto,U,Apartment,Paid,201903
+598,0,59.8,E,62.12,8.95,8.81,5.6,0.7,4.72,24.07,28.79,Bernadette,Yost,1,Santa Clara,S,Apartment,Paid,201807
+613,0,395,A,0,8.73,51.11,0,1.8,12.08,61.64,73.72,Ashleigh,Emard,0,Santa Clara,S,Apartment,Paid,201905
+621,0,700.72,A,0,8.73,90.67,0,2.98,20.07,102.39,122.45,Keith,Daniel,1,Cupertino,M,Apartment,Paid,201811
+651,0,225.54,A,221.66,7.49,33.24,19.99,1.82,12.26,62.55,74.81,Deon,Blanda,0,Cupertino,M,Apartment,Paid,201904
+736,0,834.26,A,0,14.87,107.95,0,3.68,24.8,126.51,151.3,Tracy,Hermann,1,Cupertino,U,Apartment,Paid,201809
+753,0,505.55,A,311.6,7.49,74.52,28.11,3.3,22.23,113.42,135.65,Camren,Hessel,1,Santa Clara,S,Apartment,Paid,201901
+758,0,1794.79,A,0,34.93,232.25,0,8.02,53.94,275.19,329.13,Gayle,Gorczany,1,Cupertino,M,Apartment,Paid,201810
+763,0,934.92,A,0,5.62,120.98,0,3.8,25.56,130.4,155.95,Diamond,Durgan,1,Mountain View,U,Apartment,Paid,201901
+823,0,448.85,A,0,8.73,58.08,0,2,13.49,68.82,82.3,Josefa,Kuphal,1,Santa Clara,M,Apartment,Paid,201902
+886,0,66.76,A - Excellent,0,8.73,8.64,0,0.52,3.51,17.89,21.4,Nico,Hackett,1,Santa Clara,M,Apartment,Paid,201807
+887,0,514.95,A,0,8.73,66.63,0,2.26,15.21,77.63,92.84,Maynard,Frami,1,Mountain View,M,Apartment,Paid,201901
+930,0,1195.67,A,0,8.73,154.72,0,4.9,33,168.35,201.35,Max,McKenzie,1,Santa Clara,M,Dormitory,Paid,201906
+967,0,1053.05,D,0,17.45,136.26,0,4.61,31.03,158.33,189.36,Toy,Dickinson,1,Mountain View,U,Dormitory,Paid,201903
+992,0,278.05,A,209.26,8.95,40.98,18.88,2.06,13.89,70.87,84.77,Keven,Lowe,0,Sunnyvale,S,Bungalow,Paid,201906
+2,0,406.28,A,290.57,15.46,59.89,26.21,3.05,20.5,104.6,125.1,Ima,Labadie,1,Mountain View,U,Single Family,Paid,201906
+55,0,683.77,A - Excellent,0,14.87,88.48,0,3.1,20.86,106.45,127.31,Jordi,Jast,1,Santa Clara,S,Townhouse,Paid,201904
+91,0,374.61,A,230.59,8.95,55.22,20.8,2.55,17.15,87.52,104.67,Grayce,Ortiz,1,Palo Alto,S,Townhouse,Paid,201904
+95,0,657.69,A,389.53,15.46,96.94,35.14,4.43,29.79,151.97,181.75,Porter,Walker,1,Sunnyvale,M,Townhouse,Paid,201901
+103,0,271.79,A,197.17,8.95,40.06,17.78,2,13.48,68.8,82.29,Noah,Block,1,Palo Alto,U,Townhouse,Paid,201807
+105,0,255.42,B,187.95,8.95,37.65,16.95,1.91,12.83,65.46,78.29,Hank,Kling,1,Mountain View,M,Townhouse,Paid,201810
+151,0,767.8,A,0,8.73,99.35,0,3.24,21.82,111.33,133.15,Gia,Hintz,0,Palo Alto,S,Townhouse,Paid,201812
+159,0,1513.13,A,0,20.02,195.8,0,6.47,43.57,222.29,265.86,Sabrina,Herzog,1,Palo Alto,U,Townhouse,Paid,201809
+187,0,958.16,A,0,5.62,123.99,0,3.89,26.16,133.49,159.66,Desiree,Anderson,1,Mountain View,M,Townhouse,Paid,201812
+199,0,345.96,A,211.36,7.49,50.99,19.06,2.33,15.66,79.88,95.53,Catharine,Kozey,0,Cupertino,S,Townhouse,Paid,201901
+220,0,414.92,A - Excellent,101.14,8.95,61.16,9.12,2.38,16,81.61,97.6,Christopher,Crona,0,Santa Clara,M,Condominium,Paid,201811
+240,0,433.42,A,0,5.62,56.08,0,1.85,12.46,63.56,76.01,Norris,Collins,1,Sunnyvale,M,Condominium,Paid,201811
+257,0,914.68,A,0,5.62,118.36,0,3.72,25.03,127.7,152.73,Reta,Wintheiser,1,Palo Alto,M,Condominium,Paid,201809
+262,0,624.23,A,0,8.73,80.78,0,2.69,18.07,92.19,110.26,Marcelino,White,1,Santa Clara,M,Condominium,Paid,201809
+268,0,315.13,A,0,8.73,40.78,0,1.49,9.99,50.99,60.99,Kaley,Vandervort,0,Mountain View,U,Condominium,Paid,201807
+271,0,956.5,A,0,34.93,123.77,0,4.76,32.04,163.46,195.5,Freeda,Bailey,0,Cupertino,U,Condominium,Paid,201807
+305,0,1546.3,A,325.9,20.9,227.92,29.4,8.35,56.17,286.57,342.73,Wendy,Runolfsdottir,1,Sunnyvale,M,Condominium,Paid,201902
+325,0,375.38,A,92.58,7.49,55.33,8.35,2.14,14.37,73.31,87.68,Helmer,Douglas,1,Santa Clara,M,Condominium,Paid,201808
+433,0,911.85,A,0,17.45,117.99,0,4.06,27.34,139.51,166.85,Chance,Adams,1,Santa Clara,U,Apartment,Paid,201807
+434,0,923.85,A,0,8.73,119.55,0,3.85,25.9,132.12,158.02,Alexane,Jacobs,1,Cupertino,M,Apartment,Paid,201901
+481,0,684.77,A - Excellent,0,5.62,88.61,0,2.83,19.02,97.06,116.08,Hortense,Kuhlman,1,Sunnyvale,S,Apartment,Paid,201809
+521,0,671.55,A,571.64,18.18,98.99,51.56,5.06,34.06,173.79,207.85,Donnie,Murazik,1,Santa Clara,M,Apartment,Paid,201904
+532,0,2048.01,A - Excellent,0,34.93,265.01,0,9,60.55,308.94,369.49,Meredith,Farrell,1,Sunnyvale,M,Apartment,Paid,201902
+553,0,573.37,A,0,8.73,74.19,0,2.49,16.74,85.41,102.15,Darrin,Grady,1,Palo Alto,S,Apartment,Paid,201811
+561,0,901.65,A,0,8.73,116.67,0,3.76,25.32,129.17,154.48,Hollis,Spinka,0,Sunnyvale,S,Apartment,Paid,201906
+570,0,329.96,A,0,5.62,42.7,0,1.45,9.75,49.77,59.52,Sydnie,Fisher,1,Mountain View,S,Apartment,Paid,201807
+580,0,479.9,A,0,8.73,62.1,0,2.12,14.3,72.95,87.25,Myrtie,Dickens,0,Santa Clara,U,Apartment,Paid,201901
+598,0,266.1,E,255.31,8.95,39.22,23.03,2.14,14.37,73.34,87.71,Bernadette,Yost,1,Santa Clara,S,Apartment,Paid,201808
+619,0,519.02,B,0,7.35,67.16,0,2.24,15.04,76.75,91.79,Monty,Thompson,0,Santa Clara,S,Apartment,Paid,201812
+665,0,1110.68,A,0,17.45,143.72,0,4.84,32.54,166.01,198.54,Cordell,Fay,1,Santa Clara,S,Apartment,Paid,201903
+681,0,855.35,A,0,14.87,110.68,0,3.77,25.35,129.32,154.67,Shawn,Thompson,0,Santa Clara,U,Apartment,Paid,201906
+713,0,333.91,E,302.88,7.49,49.22,27.32,2.52,16.96,86.55,103.51,Matteo,Yundt,1,Santa Clara,U,Apartment,Paid,201902
+743,0,808.07,A,0,5.62,104.56,0,3.31,22.24,113.49,135.73,Marjory,Christiansen,0,Sunnyvale,M,Apartment,Paid,201901
+786,0,410.02,A,85.48,8.95,60.44,7.71,2.31,15.56,79.41,94.97,Madonna,Huel,1,Sunnyvale,M,Apartment,Paid,201809
+856,0,531.06,A - Excellent,0,8.73,68.72,0,2.32,15.64,79.77,95.41,Angel,Kemmer,1,Cupertino,S,Apartment,Paid,201906
+867,0,710.08,A - Excellent,0,8.73,91.88,0,3.02,20.31,103.63,123.94,Romaine,Rowe,1,Sunnyvale,M,Apartment,Paid,201903
+880,0,240.18,A,0,8.73,31.08,0,1.19,8.04,41,49.04,Rosella,Halvorson,1,Mountain View,U,Apartment,Paid,201807
+992,0,281.07,A,183.36,8.95,41.43,16.54,2.01,13.51,68.93,82.44,Keven,Lowe,0,Sunnyvale,S,Bungalow,Paid,201904
+17,0,242.47,A,170.39,7.49,35.74,15.37,1.76,11.83,60.36,72.19,Zetta,Borer,1,Santa Clara,M,Townhouse,Paid,201812
+74,0,654.69,A,0,8.73,84.72,0,2.8,18.87,96.25,115.12,Elizabeth,Ankunding,1,Palo Alto,S,Townhouse,Paid,201905
+80,0,407.69,A,0,5.62,52.76,0,1.75,11.78,60.13,71.91,Benjamin,Reynolds,1,Mountain View,S,Townhouse,Paid,201808
+110,0,621.9,A,0,8.73,80.47,0,2.68,18.01,91.88,109.89,Zachariah,Powlowski,1,Sunnyvale,U,Townhouse,Paid,201812
+112,0,818.78,A,0,14.87,105.95,0,3.62,24.39,124.44,148.84,Jeromy,Baumbach,1,Cupertino,U,Townhouse,Paid,201903
+116,0,364.91,A,223.34,8.95,53.79,20.15,2.49,16.73,85.37,102.1,Consuelo,Watsica,1,Sunnyvale,U,Townhouse,Paid,201903
+129,0,1045.09,A,0,17.45,135.23,0,4.58,30.82,157.27,188.09,Kellen,Bartoletti,0,Sunnyvale,U,Townhouse,Paid,201812
+134,0,630.91,A,0,8.73,81.64,0,2.71,18.24,93.08,111.32,Nakia,Schoen,1,Palo Alto,M,Townhouse,Paid,201904
+151,0,701.01,A,0,8.73,90.71,0,2.98,20.08,102.42,122.5,Gia,Hintz,0,Palo Alto,S,Townhouse,Paid,201901
+166,0,289.4,A,258.36,8.95,42.66,23.3,2.25,15.12,77.16,92.28,Joe,Tromp,1,Mountain View,M,Townhouse,Paid,201905
+203,0,1405.69,A,0,20.02,181.9,0,6.06,40.76,207.97,248.74,Lou,Leannon,0,Santa Clara,M,Townhouse,Paid,201808
+233,0,887.79,A,0,8.73,114.88,0,3.71,24.95,127.32,152.27,Issac,Kirlin,1,Santa Clara,S,Condominium,Paid,201812
+236,0,508,E,0,8.73,65.74,0,2.23,15.03,76.7,91.73,Evangeline,Koelpin,1,Santa Clara,M,Condominium,Paid,201809
+248,0,993.33,A,0,14.87,128.54,0,4.3,28.95,147.71,176.66,Casper,Reilly,1,Santa Clara,M,Condominium,Paid,201809
+253,0,575.21,A - Excellent,136.53,7.49,84.79,12.32,3.14,21.11,107.73,128.84,Omer,Botsford,0,Sunnyvale,S,Condominium,Paid,201807
+264,0,930.74,A,0,5.62,120.44,0,3.78,25.45,129.84,155.29,Mariano,Marquardt,1,Cupertino,S,Condominium,Paid,201811
+345,0,480.92,A - Excellent,0,7.35,62.23,0,2.09,14.05,71.67,85.72,Trenton,Johns,1,Palo Alto,S,Condominium,Paid,201901
+362,0,1937.75,A,0,34.93,250.74,0,8.57,57.67,294.25,351.92,Jamison,Emmerich,1,Cupertino,S,Condominium,Paid,201906
+371,0,707.94,C,0,8.73,91.61,0,3.01,20.26,103.35,123.6,Reese,Wunsch,1,Palo Alto,U,Condominium,Paid,201812
+442,0,551.75,A,0,8.73,71.4,0,2.4,16.18,82.53,98.71,Ophelia,Weimann,1,Palo Alto,M,Apartment,Paid,201811
+488,0,495.01,A,0,8.73,64.05,0,2.18,14.69,74.97,89.66,Israel,Schmitt,0,Mountain View,S,Apartment,Paid,201810
+490,0,718.19,A,0,8.73,92.93,0,3.05,20.52,104.71,125.24,Carlee,Dare,0,Santa Clara,M,Apartment,Paid,201901
+497,0,597.91,A,0,14.87,77.37,0,2.77,18.62,95.01,113.63,Herbert,Bashirian,0,Santa Clara,M,Apartment,Paid,201810
+501,0,493.54,A,0,8.73,63.86,0,2.18,14.66,74.77,89.43,Aida,Dicki,1,Mountain View,U,Apartment,Paid,201807
+507,0,272.33,A,231.46,7.49,40.14,20.88,2.06,13.83,70.56,84.4,Erna,Cruickshank,1,Santa Clara,M,Apartment,Paid,201901
+560,0,201.23,C,0,8.73,26.04,0,1.04,7.02,35.81,42.83,Janae,Lubowitz,1,Sunnyvale,U,Apartment,Paid,201807
+561,0,874.13,A,0,8.73,113.11,0,3.66,24.6,125.5,150.1,Hollis,Spinka,0,Sunnyvale,S,Apartment,Paid,201904
+641,0,574.17,E,0,8.73,74.3,0,2.49,16.76,85.52,102.28,Otho,Daniel,0,Cupertino,M,Apartment,Paid,201905
+643,0,294.73,A,276.24,8.95,43.44,24.92,2.32,15.61,79.63,95.24,Giuseppe,Leannon,0,Palo Alto,S,Apartment,Paid,201811
+657,0,481.79,A,480.01,7.49,71.02,43.3,3.65,24.59,125.46,150.05,Nathan,Wisozk,1,Palo Alto,M,Apartment,Paid,201809
+705,0,846.63,A,0,14.87,109.55,0,3.73,25.12,128.16,153.28,Hassan,OReilly,1,Mountain View,S,Apartment,Paid,201808
+731,0,522.22,A,498.27,18.18,76.98,44.94,4.2,28.28,144.3,172.59,Eino,OHara,1,Cupertino,M,Apartment,Paid,201901
+757,0,1841.71,A,0,34.93,238.32,0,8.2,55.16,281.44,336.61,Junior,Feeney,1,Santa Clara,M,Apartment,Paid,201903
+783,0,798.78,A - Excellent,510.41,18.18,117.74,46.04,5.46,36.73,187.42,224.15,Torey,Lubowitz,1,Mountain View,M,Apartment,Paid,201901
+796,0,607.12,A,0,8.73,78.56,0,2.62,17.62,89.91,107.53,Nora,Wuckert,1,Sunnyvale,S,Apartment,Paid,201901
+808,0,331.69,A - Excellent,233.81,8.95,48.89,21.09,2.37,15.93,81.3,97.23,Boris,Beatty,0,Sunnyvale,M,Apartment,Paid,201904
+827,0,1098.82,A - Excellent,0,14.87,142.19,0,4.71,31.71,161.77,193.48,Jacey,Wilderman,1,Sunnyvale,S,Apartment,Paid,201904
+855,0,234.63,A,0,5.62,30.36,0,1.08,7.26,37.06,44.32,May,Stracke,1,Cupertino,M,Apartment,Paid,201807
+863,0,446.15,A - Excellent,353.47,7.49,65.76,31.88,3.15,21.22,108.29,129.51,Enoch,Grant,1,Santa Clara,S,Apartment,Paid,201810
+933,0,322.08,A - Excellent,243.59,8.95,47.47,21.97,2.35,15.83,80.75,96.57,Mary,Feil,0,Sunnyvale,S,Dormitory,Paid,201808
+942,0,964.07,A,0,8.73,124.75,0,4,26.95,137.49,164.43,Diego,Gutkowski,1,Sunnyvale,M,Dormitory,Paid,201906
+961,0,298.7,B,206.26,7.49,44.03,18.6,2.1,14.16,72.23,86.38,Alvina,Kautzer,0,Santa Clara,M,Dormitory,Paid,201904
+975,0,675.38,A,0,8.73,87.39,0,2.88,19.41,99.01,118.41,Alfonzo,Heller,0,Santa Clara,U,Dormitory,Paid,201902
+9,0,1065.83,A,0,14.87,137.92,0,4.58,30.84,157.37,188.22,Delfina,Gutkowski,0,Santa Clara,M,Townhouse,Paid,201906
+25,0,1001.7,A,0,17.45,129.62,0,4.41,29.69,151.48,181.17,Gonzalo,Kulas,1,Mountain View,U,Townhouse,Paid,201807
+65,0,505.47,A,0,8.73,65.41,0,2.22,14.97,76.36,91.33,Hilda,Reichert,1,Sunnyvale,M,Townhouse,Paid,201809
+83,0,914.15,A,0,14.87,118.29,0,3.99,26.88,137.16,164.04,Merl,Littel,1,Mountain View,M,Townhouse,Paid,201906
+114,0,892.06,A,0,14.87,115.43,0,3.91,26.31,134.21,160.52,Norris,Connelly,1,Santa Clara,U,Townhouse,Paid,201904
+138,0,492.18,A,0,7.35,63.69,0,2.13,14.34,73.17,87.51,Isadore,Okuneva,1,Palo Alto,U,Townhouse,Paid,201808
+154,0,518.16,A,0,5.62,67.05,0,2.18,14.67,74.85,89.52,Rosa,Nitzsche,0,Palo Alto,U,Townhouse,Paid,201902
+194,0,992.63,A,0,14.87,128.45,0,4.3,28.93,147.62,176.55,Sven,Waelchi,0,Palo Alto,S,Townhouse,Paid,201809
+207,0,516.54,A,0,8.73,66.84,0,2.27,15.26,77.84,93.09,Marion,Wisoky,0,Palo Alto,M,Townhouse,Paid,201906
+238,0,546.98,A,0,5.62,70.78,0,2.29,15.42,78.69,94.11,Saige,OKon,0,Sunnyvale,S,Condominium,Paid,201901
+274,0,528.94,A,111.63,8.95,77.97,10.07,2.91,19.58,99.89,119.47,Rodrigo,Mayert,0,Sunnyvale,S,Condominium,Paid,201812
+278,0,1525.49,A,420.46,35,224.86,37.93,8.93,60.12,306.71,366.83,Heidi,Willms,0,Mountain View,U,Condominium,Paid,201906
+306,0,320.92,A,0,17.45,41.53,0,1.77,11.91,60.75,72.65,Lelia,Friesen,1,Mountain View,S,Condominium,Paid,201807
+477,0,891.97,B,213.29,7.49,131.48,19.24,4.75,31.94,162.95,194.89,Mable,Hirthe,1,Mountain View,U,Apartment,Paid,201811
+496,0,556.12,A,0,8.73,71.96,0,2.42,16.29,83.11,99.4,Bertram,Batz,0,Cupertino,S,Apartment,Paid,201905
+513,0,1099.83,A,0,17.45,142.32,0,4.79,32.25,164.56,196.82,Tiana,Dibbert,0,Mountain View,U,Apartment,Paid,201902
+529,0,426.34,A,0,8.73,55.17,0,1.92,12.9,65.82,78.72,Tabitha,Runte,1,Sunnyvale,M,Apartment,Paid,201810
+535,0,258.2,A,270.61,8.95,38.06,24.41,2.14,14.42,73.56,87.98,Jamil,Nader,1,Mountain View,S,Apartment,Paid,201810
+615,0,1667.02,A,0,14.87,215.71,0,6.92,46.55,237.5,284.05,Audie,Reynolds,1,Santa Clara,S,Apartment,Paid,201902
+714,0,369.66,A,365.35,8.95,54.49,32.95,2.89,19.46,99.28,118.74,Scarlett,Swaniawski,1,Mountain View,S,Apartment,Paid,201904
+757,0,273.14,A,0,34.93,35.34,0,2.11,14.19,72.38,86.57,Junior,Feeney,1,Santa Clara,M,Apartment,Paid,201807
+818,0,1732.42,A,0,17.45,224.18,0,7.25,48.78,248.87,297.65,Julie,Bruen,1,Cupertino,M,Apartment,Paid,201811
+840,0,971.88,A,0,5.62,125.76,0,3.94,26.52,135.32,161.85,Meggie,OConnell,1,Sunnyvale,S,Apartment,Paid,201902
+845,0,565.92,A,0,8.73,73.23,0,2.46,16.55,84.42,100.96,Keegan,Lubowitz,0,Mountain View,S,Apartment,Paid,201905
+882,0,1380.17,A,0,17.45,178.59,0,5.88,39.58,201.93,241.5,Okey,Hills,0,Sunnyvale,M,Apartment,Paid,201901
+972,0,305.61,A - Excellent,220.95,7.49,45.05,19.93,2.17,14.63,74.64,89.27,Carmela,Gislason,1,Palo Alto,S,Dormitory,Paid,201812
+73,0,458.61,A - Excellent,0,8.73,59.34,0,2.04,13.74,70.12,83.86,Jane,Brakus,1,Santa Clara,U,Townhouse,Paid,201810
+90,0,955.95,A,0,14.87,123.7,0,4.16,27.97,142.73,170.7,Clemmie,Bartoletti,1,Santa Clara,U,Townhouse,Paid,201901
+119,0,451.78,A - Excellent,336.36,15.46,66.59,30.34,3.37,22.69,115.76,138.45,Minerva,Rau,1,Santa Clara,S,Townhouse,Paid,201808
+150,0,1128.22,A,0,17.45,145.99,0,4.9,33,168.34,201.34,Effie,Howell,1,Cupertino,U,Townhouse,Paid,201906
+153,0,605.36,A,0,5.62,78.33,0,2.52,16.95,86.47,103.42,Elisabeth,Collins,1,Cupertino,S,Townhouse,Paid,201906
+166,0,239.3,A,241.68,8.95,35.27,21.8,1.98,13.33,68,81.33,Joe,Tromp,1,Mountain View,M,Townhouse,Paid,201810
+177,0,557.65,A - Excellent,0,8.73,72.16,0,2.43,16.33,83.32,99.65,Samara,Kemmer,0,Sunnyvale,M,Townhouse,Paid,201905
+220,0,444.73,A,104.29,8.95,65.55,9.41,2.52,16.94,86.43,103.37,Christopher,Crona,0,Santa Clara,M,Condominium,Paid,201902
+272,0,202.63,A,0,5.62,26.22,0,0.96,6.43,32.8,39.22,Prudence,Baumbach,1,Sunnyvale,U,Condominium,Paid,201807
+274,0,423.88,A,95.42,8.95,62.48,8.61,2.4,16.16,82.44,98.6,Rodrigo,Mayert,0,Sunnyvale,S,Condominium,Paid,201904
+275,0,1394.4,A,0,17.45,180.44,0,5.94,39.95,203.82,243.77,Gus,Fisher,0,Palo Alto,M,Condominium,Paid,201901
+300,0,402.48,B,94.47,8.95,59.33,8.52,2.3,15.5,79.1,94.6,Kirsten,Gulgowski,0,Mountain View,S,Condominium,Paid,201808
+317,0,662.08,A,0,8.73,85.67,0,2.83,19.06,97.24,116.29,Jonathan,Moore,1,Santa Clara,S,Condominium,Paid,201902
+318,0,761.41,A,178.04,8.95,112.23,16.06,4.12,27.71,141.36,169.06,Loy,Durgan,1,Palo Alto,U,Condominium,Paid,201902
+321,0,428.92,A,0,5.62,55.5,0,1.83,12.34,62.96,75.3,Amely,Baumbach,0,Santa Clara,U,Condominium,Paid,201902
+355,0,530.5,A,0,8.73,68.65,0,2.32,15.62,79.7,95.32,Branson,Crist,0,Palo Alto,M,Condominium,Paid,201807
+375,0,1492.34,A,0,17.45,193.11,0,6.32,42.51,216.88,259.38,Darlene,Mraz,1,Santa Clara,U,Condominium,Paid,201811
+464,0,226.94,A,0,17.45,29.37,0,1.4,9.45,48.22,57.67,Taylor,Herman,0,Cupertino,M,Apartment,Paid,201807
+467,0,952.41,A,0,8.73,123.24,0,3.96,26.64,135.93,162.57,Leanna,Schmeler,1,Palo Alto,S,Apartment,Paid,201904
+471,0,513.58,A,0,8.73,66.46,0,2.26,15.18,77.44,92.62,Estevan,Stracke,1,Santa Clara,S,Apartment,Paid,201902
+472,0,869.33,A,0,8.73,112.49,0,3.64,24.47,124.86,149.33,Luciano,Braun,0,Palo Alto,S,Apartment,Paid,201811
+473,0,401.38,A - Excellent,96.85,7.49,59.16,8.74,2.26,15.22,77.65,92.87,Eli,Stiedemann,0,Santa Clara,M,Apartment,Paid,201808
+532,0,1837.2,A,0,34.93,237.73,0,8.18,55.05,280.84,335.89,Meredith,Farrell,1,Sunnyvale,M,Apartment,Paid,201905
+545,0,902.53,D,0,14.87,116.79,0,3.95,26.58,135.61,162.19,Elmer,Morissette,1,Palo Alto,U,Apartment,Paid,201905
+593,0,547.94,A,0,5.62,70.9,0,2.3,15.45,78.82,94.27,Abbey,Beahan,0,Cupertino,M,Apartment,Paid,201904
+622,0,1168.72,A,0,14.87,151.23,0,4.98,33.53,171.09,204.62,Valentina,Stokes,1,Palo Alto,S,Apartment,Paid,201906
+643,0,410.3,A,366.69,8.95,60.48,33.08,3.08,20.69,105.58,126.27,Giuseppe,Leannon,0,Palo Alto,S,Apartment,Paid,201901
+690,0,1034.08,A,0,14.87,133.81,0,4.46,30.02,153.14,183.16,Kaley,Yost,1,Mountain View,M,Apartment,Paid,201903
+700,0,396.57,A,358.95,8.95,58.45,32.38,2.99,20.14,102.78,122.92,Maxwell,Glover,1,Palo Alto,M,Apartment,Paid,201901
+727,0,335.38,D,322.61,8.95,49.44,29.1,2.62,17.66,90.11,107.77,Logan,Volkman,0,Cupertino,M,Apartment,Paid,201903
+729,0,722.14,A,0,14.87,93.44,0,3.25,21.87,111.56,133.43,Virginia,Abbott,1,Sunnyvale,S,Apartment,Paid,201906
+755,0,441.13,A,297.73,15.46,65.02,26.86,3.22,21.67,110.56,132.23,Creola,Hayes,1,Mountain View,S,Apartment,Paid,201811
+757,0,2192.4,A,0,34.93,283.7,0,9.56,64.32,328.19,392.51,Junior,Feeney,1,Santa Clara,M,Apartment,Paid,201902
+804,0,708.33,A,458.2,18.18,104.41,41.33,4.92,33.09,168.84,201.93,Nannie,Batz,1,Sunnyvale,S,Apartment,Paid,201903
+876,0,1304.29,A,0,5.62,168.78,0,5.23,35.21,179.63,214.83,Kris,Bernier,1,Santa Clara,S,Apartment,Paid,201901
+880,0,584.7,A,0,8.73,75.66,0,2.53,17.04,86.92,103.96,Rosella,Halvorson,1,Mountain View,U,Apartment,Paid,201810
+899,0,369.57,A,276.58,15.46,54.47,24.95,2.85,19.15,97.73,116.88,Lorenzo,Hahn,0,Palo Alto,U,Apartment,Paid,201810
+902,0,469.27,A,346.32,15.46,69.17,31.24,3.48,23.39,119.34,142.74,Demarcus,Berge,1,Palo Alto,M,Apartment,Paid,201810
+932,0,437.1,B,0,5.62,56.56,0,1.87,12.55,64.05,76.6,August,Reichert,1,Palo Alto,M,Dormitory,Paid,201807
+938,0,529.03,A - Excellent,0,5.62,68.46,0,2.22,14.95,76.3,91.25,Wyman,Abbott,1,Sunnyvale,M,Dormitory,Paid,201807
+959,0,570.13,A,429.59,7.49,84.04,38.75,3.91,26.3,134.18,160.48,Darion,Satterfield,1,Santa Clara,S,Dormitory,Paid,201906
+990,0,834.05,A,0,14.87,107.93,0,3.68,24.79,126.48,151.27,Walter,Hilll,1,Palo Alto,U,Bungalow,Paid,201904
+311,0,1239.03,E,0,5.62,160.33,0,4.98,33.5,170.93,204.43,Jed,DuBuque,1,Santa Clara,S,Condominium,Missed Payment,201812
+330,0,530.26,C,122.8,7.49,78.16,11.08,2.9,19.53,99.63,119.16,Benedict,Turcotte,0,Mountain View,M,Condominium,Missed Payment,201812
+406,0,822.03,B,0,14.87,106.37,0,3.64,24.48,124.88,149.35,Milford,Schaden,1,Mountain View,U,Condominium,Missed Payment,201810
+413,0,1051.05,C,223.14,7.49,154.92,20.13,5.48,36.85,188.02,224.87,Ayla,Gusikowski,1,Santa Clara,U,Apartment,Missed Payment,201904
+435,0,820.86,B,0,14.87,106.22,0,3.63,24.45,124.72,149.17,Stephen,Conn,1,Cupertino,M,Apartment,Missed Payment,201905
+444,0,442.5,E,0,8.73,57.26,0,1.98,13.32,67.97,81.29,Hank,Weber,0,Santa Clara,U,Apartment,Missed Payment,201808
+524,0,759.91,A,0,5.62,98.33,0,3.12,20.99,107.07,128.06,Kyle,Bartell,1,Cupertino,U,Apartment,Missed Payment,201809
+598,0,256.7,E,250.04,8.95,37.84,22.55,2.08,14,71.42,85.42,Bernadette,Yost,1,Santa Clara,S,Apartment,Missed Payment,201809
+627,0,528.18,E,0,8.73,68.35,0,2.31,15.56,79.39,94.95,Lorna,Oberbrunner,1,Mountain View,S,Apartment,Missed Payment,201901
+678,0,455.98,C,0,8.73,59,0,2.03,13.67,69.77,83.44,Chadd,Considine,0,Palo Alto,S,Apartment,Missed Payment,201904
+710,0,693,B,0,8.73,89.67,0,2.95,19.87,101.36,121.22,Gunner,Kuhic,1,Sunnyvale,S,Apartment,Missed Payment,201903
+747,0,806.05,E,0,14.87,104.3,0,3.58,24.06,122.75,146.81,Noemi,Bogisich,0,Sunnyvale,M,Apartment,Missed Payment,201812
+831,0,348.42,A,0,17.45,45.09,0,1.88,12.62,64.41,77.04,Newell,Wunsch,1,Palo Alto,S,Apartment,Missed Payment,201807
+865,0,42.41,A,0,8.73,5.49,0,0.43,2.87,14.64,17.51,Ashlee,Adams,0,Palo Alto,M,Apartment,Missed Payment,201807
+967,0,1141.36,D,0,17.45,147.69,0,4.95,33.34,170.1,203.44,Toy,Dickinson,1,Mountain View,U,Dormitory,Missed Payment,201811
+226,0,834.4,C,192.9,15.46,122.99,17.4,4.68,31.46,160.53,191.99,Bennett,Funk,0,Mountain View,S,Condominium,Missed Payment,201901
+267,0,627.32,D,136.53,7.49,92.47,12.32,3.37,22.67,115.64,138.31,Libby,Greenfelder,1,Cupertino,M,Condominium,Missed Payment,201903
+300,0,403.43,B,95.1,8.95,59.47,8.58,2.31,15.54,79.3,94.85,Kirsten,Gulgowski,0,Mountain View,S,Condominium,Missed Payment,201810
+310,0,604.71,B,147.64,18.18,89.13,13.32,3.62,24.35,124.25,148.6,Kaelyn,Schroeder,1,Santa Clara,S,Condominium,Missed Payment,201807
+311,0,807.7,E,0,5.62,104.52,0,3.3,22.23,113.44,135.67,Jed,DuBuque,1,Santa Clara,S,Condominium,Missed Payment,201807
+318,0,77.51,A - Excellent,18.39,8.95,11.42,1.66,0.66,4.45,22.69,27.14,Loy,Durgan,1,Palo Alto,U,Condominium,Missed Payment,201807
+548,0,558.94,D,0,7.35,72.33,0,2.39,16.09,82.07,98.15,Hayley,Considine,1,Santa Clara,S,Apartment,Missed Payment,201901
+713,0,175.45,E,194.44,7.49,25.86,17.54,1.53,10.27,52.42,62.69,Matteo,Yundt,1,Santa Clara,U,Apartment,Missed Payment,201807
+727,0,379.76,D,369.02,8.95,55.98,33.29,2.95,19.83,101.16,120.99,Logan,Volkman,0,Cupertino,M,Apartment,Missed Payment,201811
+732,0,381.45,B,349.6,15.46,56.23,31.53,3.1,20.84,106.32,127.15,Karine,Mosciski,1,Palo Alto,S,Apartment,Missed Payment,201905
+747,0,630.59,E,0,14.87,81.6,0,2.89,19.48,99.36,118.84,Noemi,Bogisich,0,Sunnyvale,M,Apartment,Missed Payment,201810
+805,0,496.23,C,0,7.35,64.21,0,2.15,14.45,73.71,88.16,Frederik,Leannon,0,Palo Alto,S,Apartment,Missed Payment,201808
+838,0,1901.11,B,0,20.02,246,0,7.98,53.7,274,327.71,Blaze,Kuhic,1,Sunnyvale,U,Apartment,Missed Payment,201902
+862,0,730.28,B,0,5.62,94.5,0,3,20.21,103.12,123.33,Andreanne,Kutch,0,Cupertino,M,Apartment,Missed Payment,201902
+910,0,600.68,A,0,5.62,77.73,0,2.5,16.83,85.85,102.67,Annabel,Corwin,1,Cupertino,M,Dormitory,Missed Payment,201809
+984,0,536.47,A,403.99,15.46,79.08,36.44,3.93,26.44,134.9,161.35,Arno,Nicolas,1,Sunnyvale,M,Bungalow,Missed Payment,201809
+54,0,330.8,A,235.49,7.49,48.76,21.24,2.32,15.64,79.82,95.46,Carol,Bernier,1,Palo Alto,U,Townhouse,Missed Payment,201807
+105,0,265.57,B,183.86,8.95,39.15,16.58,1.94,13.06,66.62,79.68,Hank,Kling,1,Mountain View,M,Townhouse,Missed Payment,201904
+235,0,913.52,E,0,14.87,118.21,0,3.99,26.87,137.07,163.94,Carmine,Durgan,0,Palo Alto,U,Condominium,Missed Payment,201811
+280,0,972.57,E,0,5.62,125.85,0,3.94,26.54,135.41,161.96,Angeline,Nicolas,1,Palo Alto,S,Condominium,Missed Payment,201810
+502,0,928.41,E,0,8.73,120.14,0,3.87,26.02,132.73,158.75,Doris,Wuckert,1,Palo Alto,M,Apartment,Missed Payment,201812
+517,0,241.23,D,235.23,8.95,35.56,21.22,1.97,13.27,67.7,80.97,June,Durgan,0,Palo Alto,U,Apartment,Missed Payment,201903
+702,0,965.65,A,0,17.45,124.96,0,4.27,28.75,146.68,175.43,Zachary,Boyer,1,Sunnyvale,S,Apartment,Missed Payment,201810
+744,0,320.27,A,323.35,8.95,47.21,29.17,2.56,17.23,87.88,105.11,Annabell,Erdman,1,Sunnyvale,S,Apartment,Missed Payment,201807
+752,0,509.78,C,0,5.62,65.97,0,2.15,14.45,73.73,88.18,Reva,Haag,0,Mountain View,M,Apartment,Missed Payment,201811
+794,0,669.53,E,0,8.73,86.64,0,2.86,19.25,98.23,117.48,Cesar,Schaefer,1,Sunnyvale,U,Apartment,Missed Payment,201809
+870,0,903.81,E,0,14.87,116.95,0,3.95,26.61,135.78,162.39,Lois,Eichmann,0,Santa Clara,S,Apartment,Missed Payment,201812
+980,0,364.32,B,0,5.62,47.14,0,1.58,10.65,54.35,65,Lorna,Weissnat,0,Sunnyvale,S,Bungalow,Missed Payment,201807
+142,0,389.91,C,0,7.35,50.45,0,1.73,11.67,59.54,71.21,Alanna,Ortiz,1,Santa Clara,M,Townhouse,Missed Payment,201904
+209,0,344.48,B,86.04,8.95,50.78,7.76,2.02,13.62,69.51,83.14,Matt,Jaskolski,0,Cupertino,U,Townhouse,Missed Payment,201905
+252,0,195.99,A,52.92,8.95,28.89,4.77,1.28,8.6,43.89,52.49,Julianne,Corwin,1,Santa Clara,M,Condominium,Missed Payment,201807
+261,0,295.01,A,71.13,8.95,43.48,6.42,1.77,11.88,60.62,72.5,Tod,Armstrong,0,Mountain View,M,Condominium,Missed Payment,201807
+264,0,902.14,A,0,5.62,116.74,0,3.67,24.7,126.03,150.73,Mariano,Marquardt,1,Cupertino,S,Condominium,Missed Payment,201808
+314,0,935.56,B,0,14.87,121.06,0,4.08,27.44,140.01,167.45,Ola,Deckow,0,Cupertino,U,Condominium,Missed Payment,201812
+349,0,121.82,A,29.77,15.46,17.96,2.69,1.08,7.29,37.18,44.47,Roosevelt,Walter,1,Mountain View,S,Condominium,Missed Payment,201807
+392,0,142.01,D,34.16,7.49,20.93,3.08,0.95,6.36,32.45,38.81,Ian,OHara,0,Mountain View,U,Condominium,Missed Payment,201807
+460,0,609.19,B,151.88,7.49,89.79,13.7,3.33,22.41,114.31,136.72,Nicholaus,Rempel,0,Palo Alto,S,Apartment,Missed Payment,201905
+556,0,201.3,A - Excellent,0,8.73,26.05,0,1.04,7.02,35.82,42.84,Alexane,Gleason,1,Santa Clara,U,Apartment,Missed Payment,201807
+563,0,52.1,B,0,7.35,6.74,0,0.42,2.84,14.51,17.36,Wilburn,Zboncak,0,Sunnyvale,M,Apartment,Missed Payment,201807
+588,0,944.52,D,270.29,18.18,139.22,24.38,5.45,36.7,187.24,223.93,Susan,Rutherford,0,Mountain View,U,Apartment,Missed Payment,201811
+610,0,529.63,B,0,5.62,68.53,0,2.22,14.97,76.38,91.35,Ila,West,1,Sunnyvale,M,Apartment,Missed Payment,201810
+623,0,672.97,B,0,8.73,87.08,0,2.87,19.34,98.69,118.03,Lucious,Kerluke,1,Cupertino,S,Apartment,Missed Payment,201904
+627,0,456.66,E,0,8.73,59.09,0,2.03,13.69,69.86,83.55,Lorna,Oberbrunner,1,Mountain View,S,Apartment,Missed Payment,201904
+641,0,555.3,E,0,8.73,71.86,0,2.42,16.27,83,99.27,Otho,Daniel,0,Cupertino,M,Apartment,Missed Payment,201811
+652,0,683.62,D,0,5.62,88.46,0,2.82,18.99,96.9,115.9,Ophelia,Beatty,0,Sunnyvale,M,Apartment,Missed Payment,201903
+659,0,702.96,E,0,8.73,90.96,0,2.99,20.13,102.68,122.81,Sydnie,Huels,1,Sunnyvale,M,Apartment,Missed Payment,201901
+720,0,865.57,B,0,8.73,112,0,3.62,24.37,124.36,148.73,Dario,Sanford,1,Cupertino,M,Apartment,Missed Payment,201901
+778,0,364.53,E,230,8.95,53.73,20.75,2.5,16.84,85.93,102.77,Jade,Grimes,1,Sunnyvale,U,Apartment,Missed Payment,201901
+798,0,668.68,B,0,5.62,86.53,0,2.76,18.6,94.91,113.51,Ivah,Davis,0,Cupertino,S,Apartment,Missed Payment,201901
+916,0,1123.98,D,0,17.45,145.44,0,4.89,32.88,167.78,200.66,Nichole,Johnston,0,Palo Alto,U,Dormitory,Missed Payment,201902
+985,0,374.55,B,229.2,8.95,55.21,20.67,2.54,17.13,87.38,104.5,Sunny,Robel,1,Santa Clara,S,Bungalow,Missed Payment,201902
+168,0,1031.96,A,0,17.45,133.54,0,4.53,30.48,155.52,186,Turner,Towne,0,Cupertino,S,Townhouse,Missed Payment,201809
+217,0,360.9,E,0,34.93,46.7,0,2.45,16.48,84.08,100.56,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201807
+236,0,454.63,E,0,8.73,58.83,0,2.03,13.64,69.59,83.22,Evangeline,Koelpin,1,Santa Clara,M,Condominium,Missed Payment,201810
+302,0,232.66,A,0,14.87,30.11,0,1.35,9.08,46.33,55.41,Noemie,Boyle,0,Mountain View,M,Condominium,Missed Payment,201807
+330,0,427.9,C,102.93,7.49,63.07,9.28,2.4,16.12,82.24,98.36,Benedict,Turcotte,0,Mountain View,M,Condominium,Missed Payment,201810
+348,0,1024.98,E,0,17.45,132.63,0,4.5,30.3,154.58,184.88,Meda,Vandervort,0,Mountain View,M,Condominium,Missed Payment,201808
+411,0,679.24,E,0,8.73,87.89,0,2.9,19.51,99.52,119.03,Broderick,Hauck,1,Santa Clara,S,Apartment,Missed Payment,201811
+416,0,421.25,C,97.55,8.95,62.09,8.8,2.4,16.12,82.24,98.35,Julian,White,1,Palo Alto,M,Apartment,Missed Payment,201902
+449,0,452.3,E,0,5.62,58.53,0,1.92,12.95,66.07,79.02,Bailey,McLaughlin,1,Santa Clara,U,Apartment,Missed Payment,201903
+502,0,856.38,E,0,8.73,110.82,0,3.59,24.13,123.13,147.27,Doris,Wuckert,1,Palo Alto,M,Apartment,Missed Payment,201905
+545,0,1078.49,D,0,14.87,139.56,0,4.63,31.18,159.06,190.24,Elmer,Morissette,1,Palo Alto,U,Apartment,Missed Payment,201901
+619,0,528.15,B,0,7.35,68.34,0,2.27,15.28,77.96,93.24,Monty,Thompson,0,Santa Clara,S,Apartment,Missed Payment,201905
+687,0,497.49,A,0,8.73,64.38,0,2.19,14.76,75.3,90.06,Brian,Treutel,0,Palo Alto,S,Apartment,Missed Payment,201808
+805,0,520.17,C,0,7.35,67.31,0,2.24,15.07,76.9,91.97,Frederik,Leannon,0,Palo Alto,S,Apartment,Missed Payment,201811
+961,0,286.92,B,213.97,7.49,42.29,19.3,2.07,13.95,71.15,85.1,Alvina,Kautzer,0,Santa Clara,M,Dormitory,Missed Payment,201905
+115,0,611.71,B,418.97,15.46,90.17,37.79,4.3,28.95,147.72,176.67,Murphy,Krajcik,1,Sunnyvale,M,Townhouse,Missed Payment,201905
+296,0,401.86,B,0,8.73,52,0,1.82,12.26,62.55,74.81,Schuyler,Rohan,0,Palo Alto,S,Condominium,Missed Payment,201905
+343,0,1631.7,D,392.77,7.49,240.51,35.43,8.5,57.22,291.93,349.15,Cyril,Kreiger,1,Palo Alto,U,Condominium,Missed Payment,201812
+347,0,976.48,E,0,14.87,126.36,0,4.24,28.51,145.46,173.97,Hillary,Murphy,1,Mountain View,S,Condominium,Missed Payment,201903
+367,0,858.34,E,202.67,8.95,126.52,18.28,4.61,31.04,158.36,189.4,Kennedi,Nitzsche,0,Palo Alto,S,Condominium,Missed Payment,201902
+370,0,399.72,B,97.38,7.49,58.92,8.78,2.26,15.18,77.45,92.63,Roosevelt,Bergstrom,1,Mountain View,S,Condominium,Missed Payment,201905
+380,0,1124.63,E,0,17.45,145.53,0,4.89,32.9,167.87,200.77,Yvonne,Hodkiewicz,0,Palo Alto,U,Condominium,Missed Payment,201811
+409,0,845.89,B,186.91,7.49,124.68,16.86,4.47,30.09,153.5,183.59,Tate,Murazik,1,Santa Clara,U,Apartment,Missed Payment,201812
+551,0,1038.29,A - Excellent,0,17.45,134.35,0,4.55,30.65,156.36,187.01,Jovan,Wolf,1,Sunnyvale,S,Apartment,Missed Payment,201808
+560,0,773.85,C,0,8.73,100.14,0,3.27,21.98,112.13,134.11,Janae,Lubowitz,1,Sunnyvale,U,Apartment,Missed Payment,201812
+595,0,481.57,A,0,5.62,62.32,0,2.04,13.71,69.97,83.69,Margaret,Kris,1,Santa Clara,M,Apartment,Missed Payment,201807
+645,0,489.58,E,0,8.73,63.35,0,2.16,14.55,74.24,88.8,Ewell,Kerluke,1,Mountain View,U,Apartment,Missed Payment,201901
+659,0,493.1,E,0,8.73,63.81,0,2.18,14.64,74.71,89.36,Sydnie,Huels,1,Sunnyvale,M,Apartment,Missed Payment,201809
+667,0,1179.21,D,0,14.87,152.59,0,5.02,33.81,172.48,206.29,Orion,Fisher,1,Santa Clara,M,Apartment,Missed Payment,201812
+737,0,265.6,B,254.57,8.95,39.15,22.96,2.13,14.35,73.19,87.54,Brooke,White,0,Cupertino,M,Apartment,Missed Payment,201901
+747,0,932.08,E,0,14.87,120.61,0,4.06,27.35,139.55,166.9,Noemi,Bogisich,0,Sunnyvale,M,Apartment,Missed Payment,201902
+752,0,585.46,C,0,5.62,75.76,0,2.44,16.43,83.82,100.25,Reva,Haag,0,Mountain View,M,Apartment,Missed Payment,201902
+784,0,566.39,B,0,8.73,73.29,0,2.46,16.56,84.48,101.04,Shanel,Reynolds,1,Palo Alto,S,Apartment,Missed Payment,201903
+794,0,721.14,E,0,8.73,93.32,0,3.06,20.6,105.11,125.71,Cesar,Schaefer,1,Sunnyvale,U,Apartment,Missed Payment,201903
+834,0,700.88,A,541.12,7.49,103.31,48.81,4.79,32.22,164.4,196.62,Magdalena,Haley,1,Sunnyvale,M,Apartment,Missed Payment,201809
+893,0,1001.54,A - Excellent,0,20.02,129.6,0,4.49,30.21,154.11,184.31,Amie,Guªann,0,Mountain View,M,Apartment,Missed Payment,201807
+967,0,1048.83,D,0,17.45,135.72,0,4.6,30.92,157.76,188.69,Toy,Dickinson,1,Mountain View,U,Dormitory,Missed Payment,201901
+142,0,373.33,C,0,7.35,48.31,0,1.67,11.24,57.33,68.57,Alanna,Ortiz,1,Santa Clara,M,Townhouse,Missed Payment,201810
+156,0,839.68,C,0,5.62,108.65,0,3.43,23.07,117.7,140.77,Alena,Fisher,0,Mountain View,U,Townhouse,Missed Payment,201904
+262,0,225.82,A - Excellent,0,8.73,29.22,0,1.14,7.66,39.09,46.75,Marcelino,White,1,Santa Clara,M,Condominium,Missed Payment,201807
+273,0,588.59,E,0,8.73,76.16,0,2.55,17.14,87.44,104.58,Penelope,Kerluke,1,Cupertino,M,Condominium,Missed Payment,201808
+310,0,893.34,B,221.47,18.18,131.68,19.98,5.1,34.29,174.93,209.22,Kaelyn,Schroeder,1,Santa Clara,S,Condominium,Missed Payment,201809
+382,0,427.64,E,92.94,7.49,63.03,8.38,2.37,15.93,81.27,97.2,Clemmie,McDermott,1,Santa Clara,S,Condominium,Missed Payment,201812
+390,0,516.11,C,0,7.35,66.78,0,2.22,14.97,76.36,91.32,Casandra,Schaefer,0,Cupertino,M,Condominium,Missed Payment,201904
+449,0,382.65,E,0,5.62,49.51,0,1.65,11.13,56.79,67.92,Bailey,McLaughlin,1,Santa Clara,U,Apartment,Missed Payment,201808
+568,0,518.87,B,0,8.73,67.14,0,2.28,15.32,78.15,93.46,Andrew,Terry,1,Palo Alto,S,Apartment,Missed Payment,201808
+588,0,1151.5,D,331.06,18.18,169.73,29.86,6.53,43.96,224.31,268.27,Susan,Rutherford,0,Mountain View,U,Apartment,Missed Payment,201902
+668,0,442.8,A,0,7.35,57.3,0,1.94,13.05,66.59,79.64,Terrell,Stark,1,Palo Alto,U,Apartment,Missed Payment,201807
+686,0,436.97,A,439.52,7.49,64.41,39.64,3.35,22.52,114.89,137.41,Raegan,Deckow,1,Mountain View,S,Apartment,Missed Payment,201807
+697,0,907.03,A,0,14.87,117.37,0,3.97,26.7,136.21,162.9,Lorna,Corwin,1,Santa Clara,M,Apartment,Missed Payment,201810
+967,0,1016.92,D,0,17.45,131.59,0,4.47,30.09,153.51,183.6,Toy,Dickinson,1,Mountain View,U,Dormitory,Missed Payment,201808
+235,0,1075.52,E,0,14.87,139.17,0,4.62,31.1,158.66,189.76,Carmine,Durgan,0,Palo Alto,U,Condominium,Missed Payment,201901
+249,0,388.08,C,381.61,7.49,57.2,34.42,2.97,20.01,102.09,122.1,Aleen,Hansen,1,Mountain View,M,Condominium,Missed Payment,201904
+259,0,481.48,B,109.44,8.95,70.97,9.87,2.69,18.13,92.49,110.61,Ross,Farrell,0,Mountain View,U,Condominium,Missed Payment,201905
+280,0,964.68,E,0,5.62,124.83,0,3.91,26.34,134.36,160.7,Angeline,Nicolas,1,Palo Alto,S,Condominium,Missed Payment,201903
+339,0,661.73,E,0,14.87,85.63,0,3.01,20.29,103.51,123.8,Darius,Dooley,1,Santa Clara,M,Condominium,Missed Payment,201808
+347,0,857.87,E,0,14.87,111.01,0,3.78,25.41,129.65,155.07,Hillary,Murphy,1,Mountain View,S,Condominium,Missed Payment,201811
+371,0,409.02,C,0,8.73,52.93,0,1.85,12.45,63.51,75.95,Reese,Wunsch,1,Palo Alto,U,Condominium,Missed Payment,201807
+410,0,942.66,B,0,14.87,121.98,0,4.11,27.63,140.96,168.58,Lionel,Morar,0,Mountain View,S,Apartment,Missed Payment,201905
+420,0,482.11,D,111.96,8.95,71.06,10.1,2.7,18.19,92.82,111.01,Hyman,Kozey,1,Palo Alto,M,Apartment,Missed Payment,201902
+484,0,850.87,B,0,14.87,110.1,0,3.75,25.23,128.72,153.95,Alisa,Lind,0,Mountain View,U,Apartment,Missed Payment,201905
+502,0,815.6,E,0,8.73,105.54,0,3.43,23.07,117.7,140.77,Doris,Wuckert,1,Palo Alto,M,Apartment,Missed Payment,201808
+617,0,605.59,A,0,5.62,78.36,0,2.52,16.95,86.5,103.46,Garrick,Runolfsson,1,Palo Alto,M,Apartment,Missed Payment,201808
+626,0,1115.16,C,0,14.87,144.3,0,4.78,32.13,163.95,196.08,Gilda,Botsford,1,Mountain View,S,Apartment,Missed Payment,201811
+656,0,887.31,A,0,17.45,114.82,0,3.97,26.7,136.24,162.94,Larue,Stiedemann,0,Palo Alto,U,Apartment,Missed Payment,201807
+667,0,842.15,D,0,14.87,108.97,0,3.72,25,127.56,152.56,Orion,Fisher,1,Santa Clara,M,Apartment,Missed Payment,201808
+751,0,358.22,D,249.71,8.95,52.8,22.52,2.53,17.01,86.8,103.82,Glenda,Ryan,0,Cupertino,S,Apartment,Missed Payment,201810
+163,0,448.81,A,0,8.73,58.08,0,2,13.49,68.81,82.3,Eleanora,Krajcik,1,Palo Alto,S,Townhouse,Missed Payment,201810
+205,0,130.59,B,31.79,7.49,19.25,2.87,0.89,5.98,30.49,36.47,Markus,Waters,0,Santa Clara,M,Townhouse,Missed Payment,201807
+211,0,608.23,A,0,8.73,78.7,0,2.62,17.65,90.06,107.71,Malika,Carroll,0,Mountain View,U,Townhouse,Missed Payment,201811
+226,0,742.78,C,181.32,15.46,109.49,16.36,4.24,28.53,145.54,174.07,Bennett,Funk,0,Mountain View,S,Condominium,Missed Payment,201905
+270,0,571.3,C,0,5.62,73.93,0,2.39,16.06,81.93,97.99,Jamarcus,Kihn,1,Palo Alto,M,Condominium,Missed Payment,201901
+282,0,61.12,A,0,8.73,7.91,0,0.5,3.36,17.14,20.5,Zion,Nicolas,1,Palo Alto,M,Condominium,Missed Payment,201807
+288,0,865.7,E,0,17.45,112.02,0,3.88,26.14,133.36,159.49,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201807
+316,0,414.99,B,95.71,8.95,61.17,8.63,2.36,15.9,81.12,97.01,Cassandra,Purdy,1,Palo Alto,U,Condominium,Missed Payment,201905
+329,0,684.6,B,0,8.73,88.59,0,2.92,19.65,100.24,119.88,Lucie,Beier,1,Sunnyvale,M,Condominium,Missed Payment,201905
+389,0,573.48,D,0,8.73,74.21,0,2.49,16.74,85.43,102.17,Ben,Deckow,1,Santa Clara,M,Condominium,Missed Payment,201903
+422,0,725.15,E,0,5.62,93.83,0,2.98,20.08,102.44,122.52,Sydnee,Jacobs,1,Santa Clara,M,Apartment,Missed Payment,201812
+466,0,916.05,B,225.46,7.49,135.03,20.34,4.89,32.88,167.74,200.61,Sandy,Dicki,0,Mountain View,U,Apartment,Missed Payment,201810
+477,0,827.84,B,197.97,7.49,122.02,17.86,4.42,29.75,151.79,181.54,Mable,Hirthe,1,Mountain View,U,Apartment,Missed Payment,201903
+487,0,783.79,B,174.61,15.46,115.53,15.75,4.4,29.62,151.14,180.77,Justyn,Hessel,1,Cupertino,M,Apartment,Missed Payment,201903
+517,0,257.39,D,250.01,8.95,37.94,22.55,2.08,14.02,71.52,85.54,June,Durgan,0,Palo Alto,U,Apartment,Missed Payment,201812
+754,0,861.92,E,0,14.87,111.53,0,3.79,25.52,130.19,155.71,Leola,Mueller,1,Mountain View,S,Apartment,Missed Payment,201811
+822,0,693.77,C,0,8.73,89.77,0,2.96,19.89,101.46,121.34,Brendan,Pagac,1,Sunnyvale,M,Apartment,Missed Payment,201812
+932,0,892.94,B,0,5.62,115.55,0,3.63,24.46,124.8,149.26,August,Reichert,1,Palo Alto,M,Dormitory,Missed Payment,201904
+217,2811.04,1709.03,E,0,34.93,221.15,0,7.68,51.7,263.76,3126.5,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201905
+217,2516.01,1580.9,E,0,34.93,204.57,0,7.18,48.35,246.68,2811.04,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201904
+217,2224.25,1560.36,E,0,34.93,201.91,0,7.11,47.81,243.95,2516.01,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201903
+288,1976.43,1099.68,E,0,17.45,142.3,0,4.79,32.25,164.54,2173.22,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201905
+217,1894.66,1797.66,E,0,34.93,232.62,0,8.03,54.01,275.57,2224.25,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201902
+288,1786.86,1054.37,E,0,17.45,136.44,0,4.62,31.07,158.5,1976.43,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201904
+217,1601.5,1569.13,E,0,34.93,203.05,0,7.14,48.04,245.11,1894.66,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201901
+288,1581.4,1154.04,E,0,17.45,149.33,0,5,33.67,171.79,1786.86,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201903
+288,1351.6,1306.78,E,0,17.45,169.1,0,5.6,37.66,192.14,1581.4,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201902
+217,1302.93,1603.1,E,0,34.93,207.44,0,7.27,48.93,249.64,1601.5,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201812
+288,1138.88,1199.59,E,0,17.45,155.23,0,5.18,34.86,177.86,1351.6,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201901
+339,1032.32,871.98,E,0,14.87,112.83,0,3.83,25.78,131.54,1189.64,Darius,Dooley,1,Santa Clara,M,Condominium,Missed Payment,201903
+217,994.47,1665.11,E,0,34.93,215.47,0,7.51,50.55,257.91,1302.93,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201811
+311,925.93,972.62,E,0,5.62,125.86,0,3.94,26.54,135.42,1087.89,Jed,DuBuque,1,Santa Clara,S,Condominium,Missed Payment,201905
+288,905.99,1326.15,E,0,17.45,171.6,0,5.67,38.17,194.73,1138.88,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201812
+339,859.08,971.88,E,0,14.87,125.76,0,4.22,28.39,144.85,1032.32,Darius,Dooley,1,Santa Clara,M,Condominium,Missed Payment,201902
+348,779.97,1357.93,E,0,17.45,175.72,0,5.79,39,198.96,1017.93,Meda,Vandervort,0,Mountain View,M,Condominium,Missed Payment,201812
+444,765.35,468.35,E,0,8.73,60.6,0,2.08,14,71.41,850.76,Hank,Weber,0,Santa Clara,U,Apartment,Missed Payment,201905
+311,758.67,1005.84,E,0,5.62,130.16,0,4.07,27.41,139.85,925.93,Jed,DuBuque,1,Santa Clara,S,Condominium,Missed Payment,201904
+236,717.14,532.35,E,0,8.73,68.89,0,2.33,15.67,79.94,812.75,Evangeline,Koelpin,1,Santa Clara,M,Condominium,Missed Payment,201905
+217,703.71,1554.11,E,0,34.93,201.1,0,7.08,47.65,243.11,994.47,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201810
+288,694.89,1189.46,E,0,17.45,153.92,0,5.14,34.6,176.51,905.99,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201811
+339,684.7,979,E,0,14.87,126.68,0,4.25,28.58,145.8,859.08,Darius,Dooley,1,Santa Clara,M,Condominium,Missed Payment,201901
+444,678.24,479,E,0,8.73,61.98,0,2.12,14.28,72.83,765.35,Hank,Weber,0,Santa Clara,U,Apartment,Missed Payment,201904
+343,672.37,1739.66,D,417.55,7.49,256.43,37.66,9.05,60.88,310.63,1043.88,Cyril,Kreiger,1,Palo Alto,U,Condominium,Missed Payment,201902
+411,671.72,732.82,E,0,8.73,94.83,0,3.11,20.91,106.66,799.29,Broderick,Hauck,1,Santa Clara,S,Apartment,Missed Payment,201904
+236,622.38,526.97,E,0,8.73,68.19,0,2.31,15.53,79.23,717.14,Evangeline,Koelpin,1,Santa Clara,M,Condominium,Missed Payment,201904
+444,595.68,450.45,E,0,8.73,58.29,0,2.01,13.53,69.03,678.24,Hank,Weber,0,Santa Clara,U,Apartment,Missed Payment,201903
+380,583.6,1181.57,E,0,17.45,152.9,0,5.11,34.39,175.46,793.44,Yvonne,Hodkiewicz,0,Palo Alto,U,Condominium,Missed Payment,201902
+311,578.9,1084.3,E,0,5.62,140.31,0,4.38,29.46,150.31,758.67,Jed,DuBuque,1,Santa Clara,S,Condominium,Missed Payment,201903
+348,573.71,1159.08,E,0,17.45,149.98,0,5.02,33.8,172.46,779.97,Meda,Vandervort,0,Mountain View,M,Condominium,Missed Payment,201811
+367,553.28,821.23,E,194.43,8.95,121.05,17.54,4.43,29.78,151.96,735.03,Kennedi,Nitzsche,0,Palo Alto,S,Condominium,Missed Payment,201905
+411,538.82,766.29,E,0,8.73,99.16,0,3.24,21.78,111.12,671.72,Broderick,Hauck,1,Santa Clara,S,Apartment,Missed Payment,201903
+339,524.04,892.95,E,0,14.87,115.55,0,3.91,26.33,134.33,684.7,Darius,Dooley,1,Santa Clara,M,Condominium,Missed Payment,201812
+288,520.97,956.18,E,0,17.45,123.73,0,4.24,28.5,145.42,694.89,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201810
+236,519.48,578.06,E,0,8.73,74.8,0,2.51,16.86,86.04,622.38,Evangeline,Koelpin,1,Santa Clara,M,Condominium,Missed Payment,201903
+444,506.77,490.27,E,0,8.73,63.44,0,2.17,14.57,74.34,595.68,Hank,Weber,0,Santa Clara,U,Apartment,Missed Payment,201902
+754,505.63,1013.92,E,0,14.87,131.2,0,4.38,29.49,150.45,685.57,Leola,Mueller,1,Mountain View,S,Apartment,Missed Payment,201902
+598,498.41,431.15,E,343.77,8.95,63.55,31.01,3.11,20.9,106.61,625.92,Bernadette,Yost,1,Santa Clara,S,Apartment,Missed Payment,201902
+280,493.21,986.9,E,0,5.62,127.7,0,4,26.92,137.32,657.45,Angeline,Nicolas,1,Palo Alto,S,Condominium,Missed Payment,201901
+870,489.74,858.26,E,0,14.87,111.06,0,3.78,25.42,129.71,644.87,Lois,Eichmann,0,Santa Clara,S,Apartment,Missed Payment,201903
+382,480.7,378.74,E,86.21,7.49,55.83,7.78,2.13,14.35,73.23,568.28,Clemmie,McDermott,1,Santa Clara,S,Condominium,Missed Payment,201905
+392,467.5,708.69,D,165.19,7.49,104.46,14.9,3.81,25.61,130.66,623.77,Ian,OHara,0,Mountain View,U,Condominium,Missed Payment,201811
+794,458.83,730.48,E,0,8.73,94.52,0,3.1,20.84,106.35,586.03,Cesar,Schaefer,1,Sunnyvale,U,Apartment,Missed Payment,201901
+273,444.48,807.95,E,0,8.73,104.55,0,3.4,22.87,116.68,584.03,Penelope,Kerluke,1,Cupertino,M,Condominium,Missed Payment,201812
+444,420.26,475.27,E,0,8.73,61.5,0,2.11,14.18,72.34,506.77,Hank,Weber,0,Santa Clara,U,Apartment,Missed Payment,201901
+713,420.09,315.08,E,279.02,7.49,46.44,25.17,2.37,15.97,81.47,517.53,Matteo,Yundt,1,Santa Clara,U,Apartment,Missed Payment,201812
+236,407.2,636.89,E,0,8.73,82.41,0,2.73,18.4,93.88,519.48,Evangeline,Koelpin,1,Santa Clara,M,Condominium,Missed Payment,201902
+217,400.18,1634.23,E,0,34.93,211.47,0,7.39,49.74,253.79,703.71,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201809
+411,398.82,810.81,E,0,8.73,104.92,0,3.41,22.94,117.06,538.82,Broderick,Hauck,1,Santa Clara,S,Apartment,Missed Payment,201902
+380,395.71,1043.87,E,0,17.45,135.08,0,4.58,30.79,157.1,583.6,Yvonne,Hodkiewicz,0,Palo Alto,U,Condominium,Missed Payment,201901
+382,390.43,394,E,85.51,7.49,58.08,7.71,2.2,14.79,75.48,480.7,Clemmie,McDermott,1,Santa Clara,S,Condominium,Missed Payment,201904
+916,390.31,1121.01,D,0,17.45,145.06,0,4.88,32.81,167.38,590.5,Nichole,Johnston,0,Palo Alto,U,Dormitory,Missed Payment,201904
+348,387.74,1031.77,E,0,17.45,133.51,0,4.53,30.48,155.49,573.71,Meda,Vandervort,0,Mountain View,M,Condominium,Missed Payment,201810
+311,386.31,1164.75,E,0,5.62,150.72,0,4.69,31.56,161.03,578.9,Jed,DuBuque,1,Santa Clara,S,Condominium,Missed Payment,201902
+339,385.38,754.94,E,0,14.87,97.69,0,3.38,22.72,115.94,524.04,Darius,Dooley,1,Santa Clara,M,Condominium,Missed Payment,201811
+545,384.4,923.49,D,0,14.87,119.5,0,4.03,27.13,138.4,549.93,Elmer,Morissette,1,Palo Alto,U,Apartment,Missed Payment,201903
+598,378.77,400.22,E,323.43,8.95,58.99,29.17,2.91,19.61,100.03,498.41,Bernadette,Yost,1,Santa Clara,S,Apartment,Missed Payment,201901
+235,376.57,954.31,E,0,14.87,123.49,0,4.15,27.93,142.51,547.01,Carmine,Durgan,0,Palo Alto,U,Condominium,Missed Payment,201903
+367,367.62,840.8,E,197.68,8.95,123.93,17.83,4.52,30.43,155.24,553.28,Kennedi,Nitzsche,0,Palo Alto,S,Condominium,Missed Payment,201904
+343,349.15,1509.49,D,359.06,7.49,222.5,32.39,7.87,52.97,270.25,672.37,Cyril,Kreiger,1,Palo Alto,U,Condominium,Missed Payment,201901
+422,342.99,665.61,E,0,5.62,86.13,0,2.75,18.52,94.5,456.01,Sydnee,Jacobs,1,Santa Clara,M,Apartment,Missed Payment,201903
+645,341.92,401.07,E,0,8.73,51.9,0,1.82,12.24,62.45,416.61,Ewell,Kerluke,1,Mountain View,U,Apartment,Missed Payment,201905
+347,339.01,906.17,E,0,14.87,117.26,0,3.96,26.67,136.09,501.78,Hillary,Murphy,1,Mountain View,S,Condominium,Missed Payment,201905
+754,337.18,941.8,E,0,14.87,121.87,0,4.1,27.6,140.84,505.63,Leola,Mueller,1,Mountain View,S,Apartment,Missed Payment,201901
+444,335.95,461.46,E,0,8.73,59.71,0,2.05,13.82,70.5,420.26,Hank,Weber,0,Santa Clara,U,Apartment,Missed Payment,201812
+641,335.86,680.86,E,0,8.73,88.1,0,2.9,19.55,99.74,455.15,Otho,Daniel,0,Cupertino,M,Apartment,Missed Payment,201902
+794,331.46,731.59,E,0,8.73,94.67,0,3.1,20.87,106.5,458.83,Cesar,Schaefer,1,Sunnyvale,U,Apartment,Missed Payment,201812
+288,330.72,1058.62,E,0,17.45,136.99,0,4.63,31.18,159.07,520.97,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201809
+392,330,615.66,D,148.34,7.49,90.75,13.38,3.35,22.53,114.97,467.5,Ian,OHara,0,Mountain View,U,Condominium,Missed Payment,201810
+280,326.81,1000.45,E,0,5.62,129.46,0,4.05,27.27,139.13,493.21,Angeline,Nicolas,1,Palo Alto,S,Condominium,Missed Payment,201812
+273,325.56,678.57,E,0,8.73,87.81,0,2.9,19.49,99.43,444.48,Penelope,Kerluke,1,Cupertino,M,Condominium,Missed Payment,201811
+713,323.23,305.08,E,290.09,7.49,44.97,26.17,2.36,15.87,80.98,420.09,Matteo,Yundt,1,Santa Clara,U,Apartment,Missed Payment,201811
+870,316.82,969.86,E,0,14.87,125.5,0,4.21,28.34,144.58,489.74,Lois,Eichmann,0,Santa Clara,S,Apartment,Missed Payment,201902
+778,313.64,322.87,E,223.07,8.95,47.59,20.12,2.3,15.48,78.96,408.08,Jade,Grimes,1,Sunnyvale,U,Apartment,Missed Payment,201904
+747,308.08,752.08,E,0,14.87,97.32,0,3.37,22.65,115.55,446.28,Noemi,Bogisich,0,Sunnyvale,M,Apartment,Missed Payment,201904
+236,302.12,591.71,E,0,8.73,76.57,0,2.56,17.22,87.86,407.2,Evangeline,Koelpin,1,Santa Clara,M,Condominium,Missed Payment,201901
+382,299.66,396.02,E,86.72,7.49,58.37,7.82,2.21,14.88,75.9,390.43,Clemmie,McDermott,1,Santa Clara,S,Condominium,Missed Payment,201903
+502,299.08,817.46,E,0,8.73,105.78,0,3.44,23.12,117.94,440.14,Doris,Wuckert,1,Palo Alto,M,Apartment,Missed Payment,201810
+311,287.41,1027.79,E,0,5.62,133,0,4.16,27.98,142.77,458.17,Jed,DuBuque,1,Santa Clara,S,Condominium,Missed Payment,201809
+267,266.98,589.44,D,137.08,7.49,86.88,12.36,3.2,21.55,109.94,398.47,Libby,Greenfelder,1,Cupertino,M,Condominium,Missed Payment,201905
+598,266.83,368.38,E,306.25,8.95,54.3,27.62,2.73,18.35,93.6,378.77,Bernadette,Yost,1,Santa Clara,S,Apartment,Missed Payment,201812
+411,264.56,774.77,E,0,8.73,100.26,0,3.27,22,112.25,398.82,Broderick,Hauck,1,Santa Clara,S,Apartment,Missed Payment,201901
+645,263.24,426.11,E,0,8.73,55.14,0,1.92,12.89,65.78,341.92,Ewell,Kerluke,1,Mountain View,U,Apartment,Missed Payment,201904
+339,253.03,715.34,E,0,14.87,92.56,0,3.22,21.69,110.66,385.38,Darius,Dooley,1,Santa Clara,M,Condominium,Missed Payment,201810
+444,252.28,457.44,E,0,8.73,59.19,0,2.04,13.71,69.96,335.95,Hank,Weber,0,Santa Clara,U,Apartment,Missed Payment,201811
+371,247.1,461.63,C,0,8.73,59.73,0,2.05,13.82,70.52,331.44,Reese,Wunsch,1,Palo Alto,U,Condominium,Missed Payment,201810
+659,243.54,596.16,E,0,8.73,77.14,0,2.58,17.34,88.45,349.33,Sydnie,Huels,1,Sunnyvale,M,Apartment,Missed Payment,201903
+713,239.87,248.49,E,261.07,7.49,36.63,23.55,2.03,13.66,69.7,323.23,Matteo,Yundt,1,Santa Clara,U,Apartment,Missed Payment,201810
+727,235.34,363.49,D,342.62,8.95,53.58,30.9,2.8,18.86,96.24,350.44,Logan,Volkman,0,Cupertino,M,Apartment,Missed Payment,201901
+652,233.37,748.9,D,0,5.62,96.91,0,3.08,20.7,105.6,359.67,Ophelia,Beatty,0,Sunnyvale,M,Apartment,Missed Payment,201905
+422,231.26,657.5,E,0,5.62,85.08,0,2.72,18.31,93.42,342.99,Sydnee,Jacobs,1,Santa Clara,M,Apartment,Missed Payment,201902
+413,224.87,970.71,C,225.55,7.49,143.08,20.34,5.13,34.5,176.04,435.42,Ayla,Gusikowski,1,Santa Clara,U,Apartment,Missed Payment,201905
+588,223.93,1058.87,D,304.2,18.18,156.08,27.44,6.05,40.72,207.75,472.4,Susan,Rutherford,0,Mountain View,U,Apartment,Missed Payment,201812
+794,223.33,610.84,E,0,8.73,79.04,0,2.63,17.72,90.41,331.46,Cesar,Schaefer,1,Sunnyvale,U,Apartment,Missed Payment,201811
+273,220.92,588.98,E,0,8.73,76.21,0,2.55,17.15,87.49,325.56,Penelope,Kerluke,1,Cupertino,M,Condominium,Missed Payment,201810
+420,214.4,450.81,D,103.24,8.95,66.45,9.31,2.54,17.1,87.25,318.75,Hyman,Kozey,1,Palo Alto,M,Apartment,Missed Payment,201904
+751,214.06,505.31,D,306.26,8.95,74.48,27.62,3.33,22.42,114.39,350.87,Glenda,Ryan,0,Cupertino,S,Apartment,Missed Payment,201812
+778,213.64,349.29,E,229.94,8.95,51.49,20.74,2.44,16.39,83.61,313.64,Jade,Grimes,1,Sunnyvale,U,Apartment,Missed Payment,201903
+449,211.66,434.5,E,0,5.62,56.22,0,1.86,12.49,63.7,287.84,Bailey,McLaughlin,1,Santa Clara,U,Apartment,Missed Payment,201811
+641,210.64,718.06,E,0,8.73,92.92,0,3.05,20.52,104.7,335.86,Otho,Daniel,0,Cupertino,M,Apartment,Missed Payment,201901
+310,209.22,869.47,B,201.04,18.18,128.16,18.13,4.93,33.2,169.41,411.83,Kaelyn,Schroeder,1,Santa Clara,S,Condominium,Missed Payment,201810
+389,208.19,548.39,D,0,8.73,70.96,0,2.39,16.09,82.08,306.36,Ben,Deckow,1,Santa Clara,M,Condominium,Missed Payment,201905
+311,204.43,1097.59,E,0,5.62,142.03,0,4.43,29.81,152.08,386.31,Jed,DuBuque,1,Santa Clara,S,Condominium,Missed Payment,201901
+380,200.77,1088.06,E,0,17.45,140.79,0,4.75,31.95,162.99,395.71,Yvonne,Hodkiewicz,0,Palo Alto,U,Condominium,Missed Payment,201812
+916,200.66,1054.88,D,0,17.45,136.5,0,4.62,31.08,158.57,390.31,Nichole,Johnston,0,Palo Alto,U,Dormitory,Missed Payment,201903
+466,200.61,953.95,B,227.66,7.49,140.61,20.53,5.06,34.04,173.7,408.35,Sandy,Dicki,0,Mountain View,U,Apartment,Missed Payment,201811
+626,196.08,1223.65,C,0,14.87,158.34,0,5.2,34.97,178.41,409.45,Gilda,Botsford,1,Mountain View,S,Apartment,Missed Payment,201812
+382,194.24,469.56,E,98.39,7.49,69.21,8.87,2.57,17.28,88.15,299.66,Clemmie,McDermott,1,Santa Clara,S,Condominium,Missed Payment,201902
+548,190.79,492.56,D,0,7.35,63.74,0,2.13,14.35,73.22,278.36,Hayley,Considine,1,Santa Clara,S,Apartment,Missed Payment,201903
+545,190.24,1103.09,D,0,14.87,142.74,0,4.73,31.82,162.34,384.4,Elmer,Morissette,1,Palo Alto,U,Apartment,Missed Payment,201902
+235,189.76,1056.98,E,0,14.87,136.77,0,4.55,30.61,156.19,376.57,Carmine,Durgan,0,Palo Alto,U,Condominium,Missed Payment,201902
+367,189.4,804.52,E,189.99,8.95,118.59,17.14,4.34,29.21,149.01,367.62,Kennedi,Nitzsche,0,Palo Alto,S,Condominium,Missed Payment,201903
+236,188.09,647.89,E,0,8.73,83.84,0,2.78,18.69,95.34,302.12,Evangeline,Koelpin,1,Santa Clara,M,Condominium,Missed Payment,201812
+392,185.15,651.16,D,156.48,7.49,95.98,14.11,3.53,23.74,121.11,330,Ian,OHara,0,Mountain View,U,Condominium,Missed Payment,201809
+348,184.88,1137.74,E,0,17.45,147.22,0,4.94,33.24,169.61,387.74,Meda,Vandervort,0,Mountain View,M,Condominium,Missed Payment,201809
+893,184.31,1434.23,A - Excellent,0,20.02,185.59,0,6.17,41.51,211.78,437.6,Amie,Guªann,0,Mountain View,M,Apartment,Missed Payment,201808
+568,182,488.33,B,0,8.73,63.19,0,2.16,14.52,74.08,270.6,Andrew,Terry,1,Palo Alto,S,Apartment,Missed Payment,201810
+659,178.05,542.47,E,0,8.73,70.2,0,2.37,15.93,81.29,275.28,Sydnie,Huels,1,Sunnyvale,M,Apartment,Missed Payment,201811
+205,175.36,627.86,B,148.86,7.49,92.55,13.43,3.4,22.91,116.87,315.13,Markus,Waters,0,Santa Clara,M,Townhouse,Missed Payment,201809
+645,175.25,484.51,E,0,8.73,62.7,0,2.14,14.42,73.57,263.24,Ewell,Kerluke,1,Mountain View,U,Apartment,Missed Payment,201903
+347,173.97,920.41,E,0,14.87,119.1,0,4.02,27.05,137.99,339.01,Hillary,Murphy,1,Mountain View,S,Condominium,Missed Payment,201904
+747,166.9,770.77,E,0,14.87,99.74,0,3.44,23.14,118.05,308.08,Noemi,Bogisich,0,Sunnyvale,M,Apartment,Missed Payment,201903
+598,166.59,319.22,E,281.23,8.95,47.05,25.37,2.44,16.43,83.81,266.83,Bernadette,Yost,1,Santa Clara,S,Apartment,Missed Payment,201811
+444,166.38,471.41,E,0,8.73,61,0,2.09,14.08,71.82,252.28,Hank,Weber,0,Santa Clara,U,Apartment,Missed Payment,201810
+656,162.94,1001.13,A,0,17.45,129.55,0,4.41,29.68,151.41,344.02,Larue,Stiedemann,0,Palo Alto,U,Apartment,Missed Payment,201808
+870,162.39,853.89,E,0,14.87,110.49,0,3.76,25.31,129.12,316.82,Lois,Eichmann,0,Santa Clara,S,Apartment,Missed Payment,201901
+280,161.96,990.75,E,0,5.62,128.2,0,4.01,27.02,137.84,326.81,Angeline,Nicolas,1,Palo Alto,S,Condominium,Missed Payment,201811
+984,161.35,528.89,A,432.15,15.46,77.96,38.98,3.97,26.73,136.37,324.45,Arno,Nicolas,1,Sunnyvale,M,Bungalow,Missed Payment,201810
+288,159.49,939.31,E,0,17.45,121.55,0,4.17,28.06,143.17,330.72,Dedrick,Maggio,0,Mountain View,U,Condominium,Missed Payment,201808
+371,157.18,496.64,C,0,8.73,64.27,0,2.19,14.74,75.19,247.1,Reese,Wunsch,1,Palo Alto,U,Condominium,Missed Payment,201809
+449,156.91,412.93,E,0,5.62,53.43,0,1.77,11.92,60.82,229.66,Bailey,McLaughlin,1,Santa Clara,U,Apartment,Missed Payment,201905
+754,155.71,1023.51,E,0,14.87,132.44,0,4.42,29.74,151.73,337.18,Leola,Mueller,1,Mountain View,S,Apartment,Missed Payment,201812
+667,152.56,993.98,D,0,14.87,128.62,0,4.3,28.97,147.8,329.32,Orion,Fisher,1,Santa Clara,M,Apartment,Missed Payment,201809
+264,150.73,907.17,A,0,5.62,117.39,0,3.69,24.83,126.7,302.26,Mariano,Marquardt,1,Cupertino,S,Condominium,Missed Payment,201809
+406,149.35,984.74,B,0,14.87,127.43,0,4.27,28.73,146.56,324.64,Milford,Schaden,1,Mountain View,U,Condominium,Missed Payment,201811
+713,144,287.22,E,310.36,7.49,42.34,27.99,2.33,15.71,80.16,239.87,Matteo,Yundt,1,Santa Clara,U,Apartment,Missed Payment,201809
+449,143.43,384.6,E,0,5.62,49.77,0,1.66,11.18,57.05,211.66,Bailey,McLaughlin,1,Santa Clara,U,Apartment,Missed Payment,201810
+502,140.77,925.67,E,0,8.73,119.78,0,3.86,25.94,132.37,299.08,Doris,Wuckert,1,Palo Alto,M,Apartment,Missed Payment,201809
+156,140.77,917.52,C,0,5.62,118.73,0,3.73,25.1,128.08,293.95,Alena,Fisher,0,Mountain View,U,Townhouse,Missed Payment,201905
+267,138.31,578.77,D,129.18,7.49,85.31,11.65,3.13,21.09,107.59,266.98,Libby,Greenfelder,1,Cupertino,M,Condominium,Missed Payment,201904
+980,136.53,461.31,B,0,5.62,59.69,0,1.96,13.19,67.27,216.99,Lorna,Weissnat,0,Sunnyvale,S,Bungalow,Missed Payment,201809
+311,135.67,908.47,E,0,5.62,117.56,0,3.7,24.87,126.87,287.41,Jed,DuBuque,1,Santa Clara,S,Condominium,Missed Payment,201808
+560,134.11,732.53,C,0,8.73,94.79,0,3.11,20.9,106.62,261.63,Janae,Lubowitz,1,Sunnyvale,U,Apartment,Missed Payment,201901
+524,128.06,729.42,A - Excellent,0,5.62,94.39,0,3,20.19,103.01,251.26,Kyle,Bartell,1,Cupertino,U,Apartment,Missed Payment,201810
+339,123.8,695.77,E,0,14.87,90.03,0,3.15,21.18,108.05,253.03,Darius,Dooley,1,Santa Clara,M,Condominium,Missed Payment,201809
+659,122.81,689.94,E,0,8.73,89.28,0,2.94,19.79,100.95,243.54,Sydnie,Huels,1,Sunnyvale,M,Apartment,Missed Payment,201902
+422,122.52,638.73,E,0,5.62,82.65,0,2.65,17.82,90.92,231.26,Sydnee,Jacobs,1,Santa Clara,M,Apartment,Missed Payment,201901
+249,122.1,417.32,C,428.36,7.49,61.51,38.64,3.23,21.73,110.87,254.7,Aleen,Hansen,1,Mountain View,M,Condominium,Missed Payment,201905
+822,121.34,721.96,C,0,8.73,93.42,0,3.06,20.62,105.22,247.18,Brendan,Pagac,1,Sunnyvale,M,Apartment,Missed Payment,201901
+727,120.99,359.49,D,342.42,8.95,52.99,30.89,2.78,18.74,95.61,235.34,Logan,Volkman,0,Cupertino,M,Apartment,Missed Payment,201812
+411,119.03,845.47,E,0,8.73,109.4,0,3.54,23.85,121.68,264.56,Broderick,Hauck,1,Santa Clara,S,Apartment,Missed Payment,201812
+794,117.48,596.54,E,0,8.73,77.19,0,2.58,17.35,88.5,223.33,Cesar,Schaefer,1,Sunnyvale,U,Apartment,Missed Payment,201810
+652,115.9,693.5,D,0,5.62,89.74,0,2.86,19.25,98.22,233.37,Ophelia,Beatty,0,Sunnyvale,M,Apartment,Missed Payment,201904
+420,111.01,445.53,D,103.2,8.95,65.67,9.31,2.52,16.94,86.45,214.4,Hyman,Kozey,1,Palo Alto,M,Apartment,Missed Payment,201903
+563,105.54,530.14,B,0,7.35,68.6,0,2.28,15.33,78.23,199.1,Wilburn,Zboncak,0,Sunnyvale,M,Apartment,Missed Payment,201809
+273,104.58,662.4,E,0,8.73,85.71,0,2.83,19.07,97.28,220.92,Penelope,Kerluke,1,Cupertino,M,Condominium,Missed Payment,201809
+751,103.82,391.52,D,253.13,8.95,57.71,22.83,2.68,18.07,92.18,214.06,Glenda,Ryan,0,Cupertino,S,Apartment,Missed Payment,201811
+778,102.77,392.54,E,257.14,8.95,57.86,23.19,2.7,18.17,92.7,213.64,Jade,Grimes,1,Sunnyvale,U,Apartment,Missed Payment,201902
+389,102.17,597.64,D,0,8.73,77.33,0,2.58,17.37,88.65,208.19,Ben,Deckow,1,Santa Clara,M,Condominium,Missed Payment,201904
+217,100.56,1609.69,E,0,34.93,208.29,0,7.3,49.1,250.52,400.18,Jermey,Mohr,1,Santa Clara,M,Condominium,Missed Payment,201808
+641,99.27,631.21,E,0,8.73,81.68,0,2.71,18.25,93.12,210.64,Otho,Daniel,0,Cupertino,M,Apartment,Missed Payment,201812
+416,98.35,379.81,C,88.47,8.95,55.98,7.98,2.19,14.72,75.1,188.17,Julian,White,1,Palo Alto,M,Apartment,Missed Payment,201903
+548,98.15,524.38,D,0,7.35,67.85,0,2.26,15.18,77.46,190.79,Hayley,Considine,1,Santa Clara,S,Apartment,Missed Payment,201902
+270,97.99,607.92,C,0,5.62,78.66,0,2.53,17.02,86.81,201.82,Jamarcus,Kihn,1,Palo Alto,M,Condominium,Missed Payment,201902
+382,97.2,428.48,E,90.08,7.49,63.16,8.13,2.36,15.9,81.14,194.24,Clemmie,McDermott,1,Santa Clara,S,Condominium,Missed Payment,201901
+627,94.95,561.12,E,0,8.73,72.61,0,2.44,16.42,83.78,195.15,Lorna,Oberbrunner,1,Mountain View,S,Apartment,Missed Payment,201902
+300,94.85,476.83,B,107.96,8.95,70.28,9.74,2.67,17.96,91.64,204.45,Kirsten,Gulgowski,0,Mountain View,S,Condominium,Missed Payment,201811
+568,93.46,487.96,B,0,8.73,63.14,0,2.16,14.51,74.03,182,Andrew,Terry,1,Palo Alto,S,Apartment,Missed Payment,201809
+610,91.35,528.07,B,0,5.62,68.33,0,2.22,14.93,76.17,182.45,Ila,West,1,Sunnyvale,M,Apartment,Missed Payment,201811
+390,91.32,554.48,C,0,7.35,71.75,0,2.37,15.97,81.47,188.76,Casandra,Schaefer,0,Cupertino,M,Condominium,Missed Payment,201905
+659,89.36,488.9,E,0,8.73,63.26,0,2.16,14.53,74.15,178.05,Sydnie,Huels,1,Sunnyvale,M,Apartment,Missed Payment,201810
+645,88.8,474.87,E,0,8.73,61.45,0,2.11,14.17,72.28,175.25,Ewell,Kerluke,1,Mountain View,U,Apartment,Missed Payment,201902
+805,88.16,520.85,C,0,7.35,67.4,0,2.24,15.09,76.99,180.24,Frederik,Leannon,0,Palo Alto,S,Apartment,Missed Payment,201809
+517,85.54,283.1,D,274.81,8.95,41.73,24.79,2.26,15.24,77.73,178.51,June,Durgan,0,Palo Alto,U,Apartment,Missed Payment,201901
+598,85.42,242.13,E,235.61,8.95,35.69,21.25,1.98,13.3,67.87,166.59,Bernadette,Yost,1,Santa Clara,S,Apartment,Missed Payment,201810
+627,83.55,482.27,E,0,8.73,62.41,0,2.13,14.36,73.27,171.18,Lorna,Oberbrunner,1,Mountain View,S,Apartment,Missed Payment,201905
+678,83.44,438.5,C,0,8.73,56.74,0,1.96,13.22,67.44,164.09,Chadd,Considine,0,Palo Alto,S,Apartment,Missed Payment,201905
+236,83.22,590.41,E,0,8.73,76.4,0,2.55,17.19,87.68,188.09,Evangeline,Koelpin,1,Santa Clara,M,Condominium,Missed Payment,201811
+444,81.29,466.36,E,0,8.73,60.35,0,2.07,13.95,71.15,166.38,Hank,Weber,0,Santa Clara,U,Apartment,Missed Payment,201809
+449,79.02,445.22,E,0,5.62,57.61,0,1.9,12.77,65.13,156.91,Bailey,McLaughlin,1,Santa Clara,U,Apartment,Missed Payment,201904
+371,75.95,442.09,C,0,8.73,57.21,0,1.98,13.31,67.91,157.18,Reese,Wunsch,1,Palo Alto,U,Condominium,Missed Payment,201808
+261,72.5,330.22,A - Excellent,80.12,8.95,48.67,7.23,1.95,13.09,66.8,152.39,Tod,Armstrong,0,Mountain View,M,Condominium,Missed Payment,201808
+449,67.92,430.24,E,0,5.62,55.67,0,1.84,12.37,63.13,143.43,Bailey,McLaughlin,1,Santa Clara,U,Apartment,Missed Payment,201809
+980,65,405.32,B,0,5.62,52.45,0,1.74,11.72,59.81,136.53,Lorna,Weissnat,0,Sunnyvale,S,Bungalow,Missed Payment,201808
+713,62.69,243.3,E,251.12,7.49,35.86,22.65,1.98,13.32,67.98,144,Matteo,Yundt,1,Santa Clara,U,Apartment,Missed Payment,201808
+349,44.47,597.65,A,138.89,15.46,88.09,12.53,3.48,23.43,119.56,187.47,Roosevelt,Walter,1,Mountain View,S,Condominium,Missed Payment,201808
+556,42.84,430.21,A,0,8.73,55.67,0,1.93,13,66.33,122.17,Alexane,Gleason,1,Santa Clara,U,Apartment,Missed Payment,201808
+392,38.81,658.89,D,157.23,7.49,97.12,14.18,3.56,23.98,122.36,185.15,Ian,OHara,0,Mountain View,U,Condominium,Missed Payment,201808
+205,36.47,623.78,B,147.59,7.49,91.95,13.31,3.38,22.76,116.13,175.36,Markus,Waters,0,Santa Clara,M,Townhouse,Missed Payment,201808
+282,20.5,530.38,A,0,8.73,68.63,0,2.32,15.62,79.68,115.8,Zion,Nicolas,1,Palo Alto,M,Condominium,Missed Payment,201808
+563,17.36,496.36,B,0,7.35,64.23,0,2.15,14.45,73.73,105.54,Wilburn,Zboncak,0,Sunnyvale,M,Apartment,Missed Payment,201808
+60,0,508.41,A,144.09,15.46,74.94,13,3.1,20.87,106.5,127.37,Glen,OConner,1,Sunnyvale,S,Townhouse,Missed Payment,201808
+235,0,894.61,E,0,14.87,115.76,0,3.92,26.37,134.55,160.92,Carmine,Durgan,0,Palo Alto,U,Condominium,Missed Payment,201809
+367,735.03,861.42,E,204.95,8.95,126.97,18.49,4.63,31.17,159.04,925.24,Kennedi,Nitzsche,0,Palo Alto,S,Condominium,Paid,201906
+156,293.95,872.44,C,0,5.62,112.89,0,3.56,23.93,122.07,439.94,Alena,Fisher,0,Mountain View,U,Townhouse,Paid,201906
+477,181.54,823.58,B,196.17,7.49,121.4,17.69,4.4,29.59,150.98,362.11,Mable,Hirthe,1,Mountain View,U,Apartment,Paid,201904
+784,101.04,508.67,B,0,8.73,65.82,0,2.24,15.05,76.79,192.88,Shanel,Reynolds,1,Palo Alto,S,Apartment,Paid,201904
+517,80.97,263.03,D,260.96,8.95,38.77,23.54,2.14,14.39,73.4,168.75,June,Durgan,0,Palo Alto,U,Apartment,Paid,201904
+7,0,302.4,A,199.3,8.95,44.57,17.98,2.15,14.43,73.65,88.08,Elissa,Corkery,1,Santa Clara,S,Townhouse,Paid,201905
+21,0,803.76,A,515.58,7.49,118.47,46.51,5.17,34.82,177.64,212.46,Karl,Abshire,1,Sunnyvale,S,Townhouse,Paid,201812
+27,0,1268.37,A,0,5.62,164.13,0,5.09,34.27,174.84,209.11,Gillian,Frami,1,Mountain View,U,Townhouse,Paid,201812
+41,0,813.61,A,0,5.62,105.28,0,3.33,22.39,114.23,136.62,Sunny,Kutch,1,Santa Clara,S,Townhouse,Paid,201905
+57,0,479.79,A,0,8.73,62.08,0,2.12,14.3,72.94,87.24,Hilario,Zulauf,0,Sunnyvale,M,Townhouse,Paid,201808
+74,0,589.02,A,0,8.73,76.22,0,2.55,17.15,87.5,104.65,Elizabeth,Ankunding,1,Palo Alto,S,Townhouse,Paid,201811
+115,0,583,B,450.32,15.46,85.93,40.62,4.26,28.67,146.27,174.94,Murphy,Krajcik,1,Sunnyvale,M,Townhouse,Paid,201809
+170,0,329.3,A,233.04,8.95,48.54,21.02,2.36,15.85,80.86,96.71,Shyanne,McGlynn,1,Mountain View,U,Townhouse,Paid,201808
+231,0,1248.19,A,0,17.45,161.52,0,5.37,36.13,184.33,220.46,Bessie,Kuhn,0,Santa Clara,U,Condominium,Paid,201812
+254,0,629.84,A,0,8.73,81.5,0,2.71,18.22,92.94,111.15,Trudie,Beier,0,Mountain View,S,Condominium,Paid,201904
+255,0,974.22,A,0,17.45,126.06,0,4.31,28.97,147.82,176.79,Jeremie,DuBuque,0,Palo Alto,U,Condominium,Paid,201901
+294,0,618.55,A,0,8.73,80.04,0,2.66,17.92,91.43,109.35,Dana,Bartell,0,Cupertino,U,Condominium,Paid,201906
+299,0,915.89,A,0,5.62,118.52,0,3.72,25.06,127.86,152.92,Sydni,Rosenbaum,0,Sunnyvale,S,Condominium,Paid,201903
+

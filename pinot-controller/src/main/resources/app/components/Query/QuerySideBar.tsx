@@ -98,8 +98,6 @@ const Sidebar = ({ tableList, fetchSQLData, tableSchema, selectedTable, queryLoa
             <CustomizedTables
               title="Tables"
               data={tableList}
-              isPagination={false}
-              noOfRows={tableList.records.length}
               cellClickCallback={fetchSQLData}
               isCellClickable
               showSearchBox={false}
@@ -109,8 +107,6 @@ const Sidebar = ({ tableList, fetchSQLData, tableSchema, selectedTable, queryLoa
               <CustomizedTables
                 title={`${selectedTable} schema`}
                 data={tableSchema}
-                isPagination={false}
-                noOfRows={tableSchema.records.length}
                 highlightBackground
                 showSearchBox={false}
               />

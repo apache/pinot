@@ -43,7 +43,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ValueInTransformFunction extends BaseTransformFunction {
@@ -132,7 +132,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.INT) {
+    if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesMV(projectionBlock);
     }
 
@@ -155,7 +155,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.LONG) {
+    if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesMV(projectionBlock);
     }
 
@@ -178,7 +178,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.FLOAT) {
+    if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesMV(projectionBlock);
     }
 
@@ -201,7 +201,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.DOUBLE) {
+    if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(projectionBlock);
     }
 
@@ -224,7 +224,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.STRING) {
+    if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesMV(projectionBlock);
     }
 

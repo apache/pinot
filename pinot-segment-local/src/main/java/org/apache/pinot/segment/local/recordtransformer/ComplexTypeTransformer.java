@@ -30,6 +30,8 @@ import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -83,6 +85,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *
  */
 public class ComplexTypeTransformer implements RecordTransformer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ComplexTypeTransformer.class);
+
   public static final String DEFAULT_DELIMITER = ".";
   public static final ComplexTypeConfig.CollectionNotUnnestedToJson DEFAULT_COLLECTION_TO_JSON_MODE =
       ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE;
@@ -90,20 +94,22 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final String _delimiter;
   private final ComplexTypeConfig.CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
   private final Map<String, String> _prefixesToRename;
+  private final boolean _continueOnError;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
     this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig),
-            parseCollectionNotUnnestedToJson(tableConfig), parsePrefixesToRename(tableConfig));
+            parseCollectionNotUnnestedToJson(tableConfig), parsePrefixesToRename(tableConfig), tableConfig);
   }
 
   @VisibleForTesting
   ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter) {
-    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE, Collections.emptyMap());
+    this(fieldsToUnnest, delimiter, DEFAULT_COLLECTION_TO_JSON_MODE, Collections.emptyMap(), null);
   }
 
   @VisibleForTesting
   ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter,
-      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson, Map<String, String> prefixesToRename) {
+      ComplexTypeConfig.CollectionNotUnnestedToJson collectionNotUnnestedToJson, Map<String, String> prefixesToRename,
+      TableConfig tableConfig) {
     _fieldsToUnnest = new ArrayList<>(fieldsToUnnest);
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
@@ -111,6 +117,9 @@ public class ComplexTypeTransformer implements RecordTransformer {
     // (e.g. foo) is unnested before the child collection (e.g. foo.bar)
     Collections.sort(_fieldsToUnnest);
     _prefixesToRename = prefixesToRename;
+    _continueOnError =
+        tableConfig != null && tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig()
+            .isContinueOnError();
   }
 
   private static List<String> parseFieldsToUnnest(TableConfig tableConfig) {
@@ -163,11 +172,20 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   @Override
   public GenericRow transform(GenericRow record) {
-    flattenMap(record, new ArrayList<>(record.getFieldToValueMap().keySet()));
-    for (String collection : _fieldsToUnnest) {
-      unnestCollection(record, collection);
+    try {
+      flattenMap(record, new ArrayList<>(record.getFieldToValueMap().keySet()));
+      for (String collection : _fieldsToUnnest) {
+        unnestCollection(record, collection);
+      }
+      renamePrefixes(record);
+    } catch (Exception e) {
+      if (!_continueOnError) {
+        throw new RuntimeException("Caught exception while transforming complex types", e);
+      } else {
+        LOGGER.debug("Caught exception while transforming complex types for record: {}", record.toString(), e);
+        record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+      }
     }
-    renamePrefixes(record);
     return record;
   }
 

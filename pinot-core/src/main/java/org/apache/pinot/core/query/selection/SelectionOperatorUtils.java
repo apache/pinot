@@ -43,7 +43,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.NullValueUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -244,21 +243,17 @@ public class SelectionOperatorUtils {
     RoaringBitmap[] nullBitmaps = null;
     if (nullHandlingEnabled) {
       nullBitmaps = new RoaringBitmap[numColumns];
-      Object[] colDefaultNullValues = new Object[numColumns];
+      Object[] nullPlaceholders = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
-        if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT && !storedColumnDataTypes[colId].isArray()) {
-          colDefaultNullValues[colId] =
-              NullValueUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
-        }
         nullBitmaps[colId] = new RoaringBitmap();
+        nullPlaceholders[colId] = storedColumnDataTypes[colId].getNullPlaceholder();
       }
-
       int rowId = 0;
       for (Object[] row : rows) {
         for (int i = 0; i < numColumns; i++) {
           Object columnValue = row[i];
           if (columnValue == null) {
-            row[i] = colDefaultNullValues[i];
+            row[i] = nullPlaceholders[i];
             nullBitmaps[i].add(rowId);
           }
         }
@@ -434,7 +429,7 @@ public class SelectionOperatorUtils {
       int numColumns = dataTable.getDataSchema().size();
       int numRows = dataTable.getNumberOfRows();
       if (nullHandlingEnabled) {
-        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];;
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
         for (int coldId = 0; coldId < numColumns; coldId++) {
           nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
         }

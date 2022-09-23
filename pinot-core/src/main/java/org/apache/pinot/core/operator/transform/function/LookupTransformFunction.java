@@ -227,8 +227,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.INT) {
+      return super.transformToIntValuesSV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_intValuesSV == null || _intValuesSV.length < numDocs) {
+    if (_intValuesSV == null) {
       _intValuesSV = new int[numDocs];
     }
     lookup(projectionBlock, this::setIntSV);
@@ -237,8 +240,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.LONG) {
+      return super.transformToLongValuesSV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_longValuesSV == null || _longValuesSV.length < numDocs) {
+    if (_longValuesSV == null) {
       _longValuesSV = new long[numDocs];
     }
     lookup(projectionBlock, this::setLongSV);
@@ -247,8 +253,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.FLOAT) {
+      return super.transformToFloatValuesSV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_floatValuesSV == null || _floatValuesSV.length < numDocs) {
+    if (_floatValuesSV == null) {
       _floatValuesSV = new float[numDocs];
     }
     lookup(projectionBlock, this::setFloatSV);
@@ -257,8 +266,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.DOUBLE) {
+      return super.transformToDoubleValuesSV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_doubleValuesSV == null || _doubleValuesSV.length < numDocs) {
+    if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[numDocs];
     }
     lookup(projectionBlock, this::setDoubleSV);
@@ -267,8 +279,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.STRING) {
+      return super.transformToStringValuesSV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_stringValuesSV == null || _stringValuesSV.length < numDocs) {
+    if (_stringValuesSV == null) {
       _stringValuesSV = new String[numDocs];
     }
     lookup(projectionBlock, this::setStringSV);
@@ -277,18 +292,24 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.BYTES) {
+      return super.transformToBytesValuesSV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_byteValuesSV == null || _byteValuesSV.length < numDocs) {
-      _byteValuesSV = new byte[numDocs][];
+    if (_bytesValuesSV == null) {
+      _bytesValuesSV = new byte[numDocs][];
     }
     lookup(projectionBlock, this::setBytesSV);
-    return _byteValuesSV;
+    return _bytesValuesSV;
   }
 
   @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.INT) {
+      return super.transformToIntValuesMV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_intValuesMV == null || _intValuesMV.length < numDocs) {
+    if (_intValuesMV == null) {
       _intValuesMV = new int[numDocs][];
     }
     lookup(projectionBlock, this::setIntMV);
@@ -297,8 +318,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.LONG) {
+      return super.transformToLongValuesMV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_longValuesMV == null || _longValuesMV.length < numDocs) {
+    if (_longValuesMV == null) {
       _longValuesMV = new long[numDocs][];
     }
     lookup(projectionBlock, this::setLongMV);
@@ -307,8 +331,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.FLOAT) {
+      return super.transformToFloatValuesMV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_floatValuesMV == null || _floatValuesMV.length < numDocs) {
+    if (_floatValuesMV == null) {
       _floatValuesMV = new float[numDocs][];
     }
     lookup(projectionBlock, this::setFloatMV);
@@ -317,8 +344,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.DOUBLE) {
+      return super.transformToDoubleValuesMV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_doubleValuesMV == null || _doubleValuesMV.length < numDocs) {
+    if (_doubleValuesMV == null) {
       _doubleValuesMV = new double[numDocs][];
     }
     lookup(projectionBlock, this::setDoubleMV);
@@ -327,8 +357,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.STRING) {
+      return super.transformToStringValuesMV(projectionBlock);
+    }
     int numDocs = projectionBlock.getNumDocs();
-    if (_stringValuesMV == null || _stringValuesMV.length < numDocs) {
+    if (_stringValuesMV == null) {
       _stringValuesMV = new String[numDocs][];
     }
     lookup(projectionBlock, this::setStringMV);
@@ -377,9 +410,9 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   private void setBytesSV(int index, Object value) {
     if (value instanceof byte[]) {
-      _byteValuesSV[index] = (byte[]) value;
+      _bytesValuesSV[index] = (byte[]) value;
     } else {
-      _byteValuesSV[index] = EMPTY_BYTES;
+      _bytesValuesSV[index] = EMPTY_BYTES;
     }
   }
 

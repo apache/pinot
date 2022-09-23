@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
@@ -191,8 +192,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
-    List<String> missingSegments = new ArrayList<>();
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, missingSegments);
+    List<String> notAcquiredSegments = new ArrayList<>();
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(
+        segmentsToQuery, notAcquiredSegments);
     int numSegmentsAcquired = segmentDataManagers.size();
     List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsAcquired);
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -291,12 +293,18 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     //
     // After step 2 but before step 4, segment will be missing on server side
     // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
-    int numMissingSegments = missingSegments.size();
-    if (numMissingSegments != 0) {
-      dataTable.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
-          String.format("%d segments %s missing on server: %s", numMissingSegments, missingSegments,
-              _instanceDataManager.getInstanceId())));
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, numMissingSegments);
+    if (notAcquiredSegments.size() > 0) {
+      List<String> missingSegments =
+          notAcquiredSegments.stream()
+              .filter(segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName))
+              .collect(Collectors.toList());
+      int numMissingSegments = missingSegments.size();
+      if (numMissingSegments > 0) {
+        dataTable.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
+            String.format("%d segments %s missing on server: %s", numMissingSegments, missingSegments,
+                _instanceDataManager.getInstanceId())));
+        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, numMissingSegments);
+      }
     }
 
     if (tableDataManager instanceof RealtimeTableDataManager) {

@@ -28,7 +28,9 @@ import com.google.common.collect.HashBiMap;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,7 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -182,7 +183,8 @@ public class PinotHelixResourceManager {
   public static final long SEGMENT_CLEANUP_TIMEOUT_MS = 20 * 60_000L; // 20 minutes
   public static final long SEGMENT_CLEANUP_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
-  private static final SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'");
+  private static final DateTimeFormatter SIMPLE_DATE_FORMAT =
+      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
@@ -231,7 +233,6 @@ public class PinotHelixResourceManager {
     for (int i = 0; i < _tableUpdaterLocks.length; i++) {
       _tableUpdaterLocks[i] = new Object();
     }
-    SIMPLE_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -401,6 +402,11 @@ public class PinotHelixResourceManager {
   public List<InstanceConfig> getAllControllerInstanceConfigs() {
     return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
         .filter(instance -> InstanceTypeUtils.isController(instance.getId())).collect(Collectors.toList());
+  }
+
+  public List<InstanceConfig> getAllMinionInstanceConfigs() {
+    return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
+        .filter(instance -> InstanceTypeUtils.isMinion(instance.getId())).collect(Collectors.toList());
   }
 
   /**
@@ -814,7 +820,7 @@ public class PinotHelixResourceManager {
   public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
       @Nullable String retentionPeriod) {
     try {
-      LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
+        LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
       HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
@@ -3603,7 +3609,7 @@ public class PinotHelixResourceManager {
     String zkPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType);
     Stat stat = _propertyStore.getStat(zkPath, AccessOption.PERSISTENT);
     Preconditions.checkState(stat != null, "Failed to read ZK stats for table: %s", tableNameWithType);
-    String creationTime = SIMPLE_DATE_FORMAT.format(stat.getCtime());
+    String creationTime = SIMPLE_DATE_FORMAT.format(Instant.ofEpochMilli(stat.getCtime()));
     return new TableStats(creationTime);
   }
 

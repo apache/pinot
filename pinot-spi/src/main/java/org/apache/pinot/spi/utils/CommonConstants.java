@@ -240,7 +240,6 @@ public class CommonConstants {
     public static final String MULTI_STAGE_BROKER_REQUEST_HANDLER_TYPE = "multistage";
     public static final String DEFAULT_BROKER_REQUEST_HANDLER_TYPE = NETTY_BROKER_REQUEST_HANDLER_TYPE;
 
-
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
     public static final String BROKER_NETTY_PREFIX = "pinot.broker.netty";
     public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
@@ -326,6 +325,92 @@ public class CommonConstants {
       public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
       public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
       public static final int DEFAULT_MAX_RETIRES = 10;
+    }
+
+    // Configs related to AdaptiveServerSelection.
+    public static class AdaptiveServerSelector {
+      /**
+       * Adaptive Server Selection feature has 2 parts:
+       * 1. Stats Collection
+       * 2. Routing Strategy
+       *
+       * Stats Collection is controlled by the config CONFIG_OF_ENABLE_STATS_COLLECTION.
+       * Routing Strategy is controlled by the config CONFIG_OF_TYPE.
+       *
+       *
+       *
+       * Stats Collection: Enabling/Disabling stats collection will dictate whether stats (like latency, # of inflight
+       *                   requests) will be collected when queries are routed to/received from servers. It does not
+       *                   have any impact on the Server Selection Strategy used.
+       *
+       * Routing Strategy: Decides what strategy should be used to pick a server. Note that this
+       *                   routing strategy complements the existing Balanced/ReplicaGroup/StrictReplicaGroup
+       *                   strategies and is not a replacement.The available strategies are as follows:
+       *                   1. NO_OP: Uses the default behavior offered by Balanced/ReplicaGroup/StrictReplicaGroup
+       *                   instance selectors. Does NOT require Stats Collection to be enabled.
+       *                   2. NUM_INFLIGHT_REQ: Picks the best server based on the number of inflight requests for
+       *                   each server. Requires Stats Collection to be enabled.
+       *                   3. LATENCY: Picks the best server based on the Exponential Weighted Moving Averge of Latency
+       *                   for each server. Requires Stats Collection to be enabled.
+       *                   4. HYBRID: Picks the best server by computing a custom hybrid score based on both latency
+       *                   and # inflight requests. This is based on the approach described in the paper
+       *                   https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf. Requires Stats
+       *                   Collection to be enabled.
+       */
+
+      public enum Type {
+        NO_OP,
+
+        NUM_INFLIGHT_REQ,
+
+        LATENCY,
+
+        HYBRID
+      }
+
+      private static final String CONFIG_PREFIX = "pinot.broker.adaptive.server.selector";
+
+      // Determines the type of AdaptiveServerSelector to use.
+      public static final String CONFIG_OF_TYPE = CONFIG_PREFIX + ".type";
+      public static final String DEFAULT_TYPE = Type.NO_OP.name();
+
+      // Determines whether stats collection is enabled. This can be enabled independent of CONFIG_OF_TYPE. This is
+      // so that users have an option to just enable stats collection and analyze them before deciding and enabling
+      // adaptive server selection.
+      public static final String CONFIG_OF_ENABLE_STATS_COLLECTION = CONFIG_PREFIX + ".enable.stats.collection";
+      public static final boolean DEFAULT_ENABLE_STATS_COLLECTION = false;
+
+      // Parameters to tune exponential moving average.
+
+      // The weightage to be given for a new incoming value. For example, alpha=0.30 will give 30% weightage to the
+      // new value and 70% weightage to the existing value in the Exponential Weighted Moving Average calculation.
+      public static final String CONFIG_OF_EWMA_ALPHA = CONFIG_PREFIX + ".ewma.alpha";
+      public static final double DEFAULT_EWMA_ALPHA = 0.666;
+
+      // If the EMA average has not been updated during a specified time window (defined by this property), the
+      // EMA average value is automatically decayed by an incoming value of zero. This is required to bring a server
+      // back to healthy state gracefully after it has experienced some form of slowness.
+      public static final String CONFIG_OF_AUTODECAY_WINDOW_MS = CONFIG_PREFIX + ".autodecay.window.ms";
+      public static final long DEFAULT_AUTODECAY_WINDOW_MS = 10 * 1000;
+
+      // Determines the initial duration during which incoming values are skipped in the Exponential Moving Average
+      // calculation. Until this duration has elapsed, average returned will be equal to AVG_INITIALIZATION_VAL.
+      public static final String CONFIG_OF_WARMUP_DURATION_MS = CONFIG_PREFIX + ".warmup.duration";
+      public static final long DEFAULT_WARMUP_DURATION_MS = 0;
+
+      // Determines the initialization value for Exponential Moving Average.
+      public static final String CONFIG_OF_AVG_INITIALIZATION_VAL = CONFIG_PREFIX + ".avg.initialization.val";
+      public static final double DEFAULT_AVG_INITIALIZATION_VAL = 1.0;
+
+      // Parameters related to Hybrid score.
+      public static final String CONFIG_OF_HYBRID_SCORE_EXPONENT = CONFIG_PREFIX + ".hybrid.score.exponent";
+      public static final int DEFAULT_HYBRID_SCORE_EXPONENT = 3;
+
+      // Threadpool size of ServerRoutingStatsManager. This controls the number of threads available to update routing
+      // stats for servers upon query submission and response arrival.
+      public static final String CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE =
+          CONFIG_PREFIX + ".stats.manager.threadpool.size";
+      public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
     }
   }
 
@@ -583,6 +668,9 @@ public class CommonConstants {
     public static final String MINION_TLS_PREFIX = "pinot.minion.tls";
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.minion.logger.root.dir";
+    public static final String CONFIG_OF_EVENT_OBSERVER_CLEANUP_DELAY_IN_SEC =
+        "pinot.minion.event.observer.cleanupDelayInSec";
+    public static final char TASK_LIST_SEPARATOR = ',';
   }
 
   public static class ControllerJob {

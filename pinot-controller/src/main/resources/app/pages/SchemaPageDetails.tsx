@@ -258,8 +258,6 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
             <CustomizedTables
               title="Table Schema"
               data={tableSchema}
-              isPagination={false}
-              noOfRows={tableSchema.records.length}
               showSearchBox={true}
             />
           :

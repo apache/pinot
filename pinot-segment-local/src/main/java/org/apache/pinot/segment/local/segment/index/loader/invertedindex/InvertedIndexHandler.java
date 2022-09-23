@@ -47,27 +47,28 @@ public class InvertedIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(InvertedIndexHandler.class);
 
   private final SegmentMetadata _segmentMetadata;
-  private final HashSet<String> _columnsToAddIdx;
+  private final Set<String> _columnsToAddIdx;
 
   public InvertedIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
-    _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getInvertedIndexColumns());
+    _columnsToAddIdx = indexLoadingConfig.getInvertedIndexColumns();
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentMetadata.getName();
+    Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns =
         segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
-      if (!_columnsToAddIdx.remove(column)) {
+      if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing inverted index from segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
     // Check if any new index need to be added.
-    for (String column : _columnsToAddIdx) {
+    for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateInvertedIndex(columnMetadata)) {
         LOGGER.info("Need to create new inverted index for segment: {}, column: {}", segmentName, column);
@@ -82,16 +83,17 @@ public class InvertedIndexHandler implements IndexHandler {
       throws IOException {
     // Remove indices not set in table config any more.
     String segmentName = _segmentMetadata.getName();
+    Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns =
         segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.INVERTED_INDEX);
     for (String column : existingColumns) {
-      if (!_columnsToAddIdx.remove(column)) {
+      if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing inverted index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, ColumnIndexType.INVERTED_INDEX);
         LOGGER.info("Removed existing inverted index from segment: {}, column: {}", segmentName, column);
       }
     }
-    for (String column : _columnsToAddIdx) {
+    for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateInvertedIndex(columnMetadata)) {
         createInvertedIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);

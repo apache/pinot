@@ -153,9 +153,8 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
   @Override
   public DoubleArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     DoubleArrayList aggregationResultHolderResult = aggregationResultHolder.getResult();
-    int count = aggregationResultHolderResult.size();
-    if (count < 1) {
-      throw new IllegalStateException("histogram result shouldn't be empty!");
+    if (aggregationResultHolderResult == null) {
+      return DoubleVectorOpUtils.createAndInitialize(getNumBins());
     } else {
       return aggregationResultHolderResult;
     }

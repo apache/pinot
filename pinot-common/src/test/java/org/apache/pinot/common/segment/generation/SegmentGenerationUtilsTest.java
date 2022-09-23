@@ -48,6 +48,13 @@ public class SegmentGenerationUtilsTest {
         "input.data");
     Assert.assertEquals(SegmentGenerationUtils.getFileName(URI.create("hdfs://var/data/myTable/2020/04/06/input.data")),
         "input.data");
+
+    Assert.assertEquals(SegmentGenerationUtils.getFileName(
+            URI.create(SegmentGenerationUtils.sanitizeURIString("hdfs://var/data/my Table/2020/04/06/input.data"))),
+        "input.data");
+    Assert.assertEquals(SegmentGenerationUtils.getFileName(
+            URI.create(SegmentGenerationUtils.sanitizeURIString("hdfs://var/data/my Table/2020/04/06/input 2.data"))),
+        "input 2.data");
   }
 
   // Confirm output path generation works with URIs that have authority/userInfo.

@@ -36,6 +36,7 @@ import org.apache.pinot.common.utils.LoggerFileServer;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -58,11 +59,13 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
   private final boolean _useHttps;
   private final boolean _swaggerBrokerEnabled;
+  private final ExecutorService _executorService;
 
   private HttpServer _httpServer;
 
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
-      BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor) {
+      BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
+      ServerRoutingStatsManager serverRoutingStatsManager) {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, brokerConf);
     _useHttps = Boolean.parseBoolean(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_USE_HTTPS));
@@ -71,7 +74,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     if (brokerConf.getProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, false)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
-    ExecutorService executor =
+    _executorService =
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     MultiThreadedHttpConnectionManager connMgr = new MultiThreadedHttpConnectionManager();
     connMgr.getParams().setConnectionTimeout((int) brokerConf
@@ -81,7 +84,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
       @Override
       protected void configure() {
         bind(connMgr).to(HttpConnectionManager.class);
-        bind(executor).to(Executor.class);
+        bind(_executorService).to(Executor.class);
         bind(sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(routingManager).to(BrokerRoutingManager.class);
         bind(brokerRequestHandler).to(BrokerRequestHandler.class);
@@ -91,6 +94,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
           bind(new LoggerFileServer(loggerRootDir)).to(LoggerFileServer.class);
         }
         bind(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID)).named(BROKER_INSTANCE_ID);
+        bind(serverRoutingStatsManager).to(ServerRoutingStatsManager.class);
       }
     });
     register(JacksonFeature.class);
@@ -142,7 +146,10 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
   public void stop() {
     if (_httpServer != null) {
+      LOGGER.info("Shutting down http server");
       _httpServer.shutdownNow();
     }
+    LOGGER.info("Shutting down executor service");
+    _executorService.shutdownNow();
   }
 }

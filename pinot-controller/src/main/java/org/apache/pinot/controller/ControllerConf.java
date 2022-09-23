@@ -213,6 +213,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
+  private static final String MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = "minion.request.timeoutSeconds";
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
   private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
@@ -240,6 +241,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
 
   private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
+  private static final int DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   private static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   private static final boolean DEFAULT_ENABLE_SPLIT_COMMIT = true;
@@ -647,6 +649,14 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getServerAdminRequestTimeoutSeconds() {
     return getProperty(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS);
+  }
+
+  public void setMinionAdminRequestTimeoutSeconds(int timeoutSeconds) {
+    setProperty(MINION_ADMIN_REQUEST_TIMEOUT_SECONDS, timeoutSeconds);
+  }
+
+  public int getMinionAdminRequestTimeoutSeconds() {
+    return getProperty(MINION_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS);
   }
 
   public int getDeletedSegmentsRetentionInDays() {

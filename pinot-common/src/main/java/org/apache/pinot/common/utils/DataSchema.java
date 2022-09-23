@@ -51,9 +51,9 @@ public class DataSchema {
 
   /** Used by both Broker and Server to generate results for EXPLAIN PLAN queries. */
   public static final DataSchema EXPLAIN_RESULT_SCHEMA =
-      new DataSchema(new String[]{"Operator", "Operator_Id", "Parent_Id"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-              DataSchema.ColumnDataType.INT});
+      new DataSchema(new String[]{"Operator", "Operator_Id", "Parent_Id"}, new ColumnDataType[]{
+          ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT
+      });
 
   @JsonCreator
   public DataSchema(@JsonProperty("columnNames") String[] columnNames,
@@ -228,8 +228,8 @@ public class DataSchema {
     }
     if (anObject instanceof DataSchema) {
       DataSchema anotherDataSchema = (DataSchema) anObject;
-      return Arrays.equals(_columnNames, anotherDataSchema._columnNames) && Arrays
-          .equals(_columnDataTypes, anotherDataSchema._columnDataTypes);
+      return Arrays.equals(_columnNames, anotherDataSchema._columnNames) && Arrays.equals(_columnDataTypes,
+          anotherDataSchema._columnDataTypes);
     }
     return false;
   }
@@ -240,33 +240,46 @@ public class DataSchema {
   }
 
   public enum ColumnDataType {
-    INT,
-    LONG,
-    FLOAT,
-    DOUBLE,
-    BIG_DECIMAL,
-    BOOLEAN /* Stored as INT */,
-    TIMESTAMP /* Stored as LONG */,
-    STRING,
-    JSON /* Stored as STRING */,
-    BYTES,
-    OBJECT,
-    INT_ARRAY,
-    LONG_ARRAY,
-    FLOAT_ARRAY,
-    DOUBLE_ARRAY,
-    BOOLEAN_ARRAY /* Stored as INT_ARRAY */,
-    TIMESTAMP_ARRAY /* Stored as LONG_ARRAY */,
-    STRING_ARRAY,
-    BYTES_ARRAY;
+    INT(0),
+    LONG(0L),
+    FLOAT(0f),
+    DOUBLE(0d),
+    BIG_DECIMAL(BigDecimal.ZERO),
+    BOOLEAN(0) /* Stored as INT */,
+    TIMESTAMP(0L) /* Stored as LONG */,
+    STRING(""),
+    JSON("") /* Stored as STRING */,
+    BYTES(new ByteArray(new byte[0])),
+    OBJECT(null),
+    INT_ARRAY(new int[0]),
+    LONG_ARRAY(new long[0]),
+    FLOAT_ARRAY(new float[0]),
+    DOUBLE_ARRAY(new double[0]),
+    BOOLEAN_ARRAY(new int[0]) /* Stored as INT_ARRAY */,
+    TIMESTAMP_ARRAY(new long[0]) /* Stored as LONG_ARRAY */,
+    STRING_ARRAY(new String[0]),
+    BYTES_ARRAY(new byte[0][]);
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
-    private static final EnumSet<ColumnDataType> ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY,
-        DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY);
-    private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY,
-        DOUBLE_ARRAY);
+    private static final EnumSet<ColumnDataType> ARRAY_TYPES =
+        EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY,
+            BYTES_ARRAY);
+    private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES =
+        EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
+
+    // Placeholder for null. We need a placeholder for null so that it can be serialized in the data table
+    private final Object _nullPlaceholder;
+
+    ColumnDataType(Object nullPlaceHolder) {
+      _nullPlaceholder = nullPlaceHolder;
+    }
+
+    public Object getNullPlaceholder() {
+      return _nullPlaceholder;
+    }
+
     /**
      * Returns the data type stored in Pinot.
      */

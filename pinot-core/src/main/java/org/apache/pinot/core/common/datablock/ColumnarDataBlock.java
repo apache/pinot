@@ -48,6 +48,7 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   protected void computeBlockObjectConstants() {
+    _fixDataSize = 0;
     if (_dataSchema != null) {
       _cumulativeColumnOffsetSizeInBytes = new int[_numColumns];
       _columnSizeInBytes = new int[_numColumns];
@@ -57,6 +58,7 @@ public class ColumnarDataBlock extends BaseDataBlock {
         _cumulativeColumnOffsetSizeInBytes[i] = cumulativeColumnOffset;
         cumulativeColumnOffset += _columnSizeInBytes[i] * _numRows;
       }
+      _fixDataSize = cumulativeColumnOffset;
     }
   }
 

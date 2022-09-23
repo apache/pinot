@@ -62,12 +62,23 @@ public class QueryEnvironmentTestUtils {
       ImmutableMap.of("a", Lists.newArrayList("a3"), "c", Lists.newArrayList("c2", "c3"),
           "d_R", Lists.newArrayList("d2"), "d_O", Lists.newArrayList("d3"));
 
+  public static final Map<String, String> TABLE_NAME_MAP;
+  public static final Map<String, Schema> SCHEMA_NAME_MAP;
+
   static {
-    SCHEMA_BUILDER = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
+    SCHEMA_BUILDER = new Schema.SchemaBuilder()
+        .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
         .addMetric("col3", FieldSpec.DataType.INT, 0)
         .setSchemaName("defaultSchemaName");
+    SCHEMA_NAME_MAP = ImmutableMap.of(
+        "a", SCHEMA_BUILDER.setSchemaName("a").build(),
+        "b", SCHEMA_BUILDER.setSchemaName("b").build(),
+        "c", SCHEMA_BUILDER.setSchemaName("c").build(),
+        "d", SCHEMA_BUILDER.setSchemaName("d").build());
+    TABLE_NAME_MAP = ImmutableMap.of("a_REALTIME", "a", "b_REALTIME", "b", "c_OFFLINE", "c",
+        "d_OFFLINE", "d", "d_REALTIME", "d");
   }
 
   private QueryEnvironmentTestUtils() {
@@ -76,12 +87,11 @@ public class QueryEnvironmentTestUtils {
 
   public static TableCache mockTableCache() {
     TableCache mock = mock(TableCache.class);
-    when(mock.getTableNameMap()).thenReturn(ImmutableMap.of("a_REALTIME", "a", "b_REALTIME", "b", "c_OFFLINE", "c",
-        "d_OFFLINE", "d", "d_REALTIME", "d"));
-    when(mock.getSchema("a")).thenReturn(SCHEMA_BUILDER.setSchemaName("a").build());
-    when(mock.getSchema("b")).thenReturn(SCHEMA_BUILDER.setSchemaName("b").build());
-    when(mock.getSchema("c")).thenReturn(SCHEMA_BUILDER.setSchemaName("c").build());
-    when(mock.getSchema("d")).thenReturn(SCHEMA_BUILDER.setSchemaName("d").build());
+    when(mock.getTableNameMap()).thenReturn(TABLE_NAME_MAP);
+    when(mock.getSchema(anyString())).thenAnswer(invocationOnMock -> {
+      String schemaName = invocationOnMock.getArgument(0);
+      return SCHEMA_NAME_MAP.get(schemaName);
+    });
     return mock;
   }
 

@@ -122,7 +122,6 @@ const TablesListingPage = () => {
       <CustomizedTables
         title="Tables"
         data={tableData}
-        isPagination
         addLinks
         baseURL="/tenants/table/"
         showSearchBox={true}
@@ -132,7 +131,6 @@ const TablesListingPage = () => {
       <CustomizedTables
           title="Schemas"
           data={schemaDetails}
-          isPagination
           showSearchBox={true}
           inAccordionFormat={true}
           addLinks

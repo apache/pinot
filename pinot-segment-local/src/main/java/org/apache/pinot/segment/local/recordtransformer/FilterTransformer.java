@@ -22,6 +22,8 @@ import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -29,23 +31,40 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * If record should be skipped, puts a special key in the record.
  */
 public class FilterTransformer implements RecordTransformer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FilterTransformer.class);
 
+  private String _filterFunction;
   private final FunctionEvaluator _evaluator;
+  private final boolean _continueOnError;
 
   public FilterTransformer(TableConfig tableConfig) {
-    String filterFunction = null;
+    _filterFunction = null;
+    _continueOnError = tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().isContinueOnError();
+
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getFilterConfig() != null) {
-      filterFunction = tableConfig.getIngestionConfig().getFilterConfig().getFilterFunction();
+      _filterFunction = tableConfig.getIngestionConfig().getFilterConfig().getFilterFunction();
     }
-    _evaluator = (filterFunction != null) ? FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction) : null;
+    _evaluator = (_filterFunction != null) ? FunctionEvaluatorFactory.getExpressionEvaluator(_filterFunction) : null;
   }
 
   @Override
   public GenericRow transform(GenericRow record) {
     if (_evaluator != null) {
-      Object result = _evaluator.evaluate(record);
-      if (Boolean.TRUE.equals(result)) {
-        record.putValue(GenericRow.SKIP_RECORD_KEY, true);
+      try {
+        Object result = _evaluator.evaluate(record);
+        if (Boolean.TRUE.equals(result)) {
+          record.putValue(GenericRow.SKIP_RECORD_KEY, true);
+        }
+      } catch (Exception e) {
+        if (!_continueOnError) {
+          throw new RuntimeException(
+              String.format("Caught exception while executing filter function: %s for record: %s", _filterFunction,
+                  record.toString()), e);
+        } else {
+          LOGGER.debug("Caught exception while executing filter function: {} for record: {}", _filterFunction,
+              record.toString(), e);
+          record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+        }
       }
     }
     return record;

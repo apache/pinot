@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -35,77 +39,67 @@ import org.testng.annotations.Test;
  */
 public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformFunctionTest {
 
-  abstract int getExpectedValue(int value, int toCompare);
+  abstract boolean getExpectedValue(int compareResult);
 
-  abstract int getExpectedValue(long value, long toCompare);
-
-  abstract int getExpectedValue(float value, float toCompare);
-
-  abstract int getExpectedValue(double value, double toCompare);
-
-  abstract int getExpectedValue(BigDecimal value, BigDecimal toCompare);
-
-  abstract int getExpectedValue(String value, String toCompare);
-
-  abstract String getFuncName();
+  abstract String getFunctionName();
 
   @Test
   public void testBinaryOperatorTransformFunction() {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("%s(%s, %d)", getFuncName(), INT_SV_COLUMN, _intSVValues[0]));
+    String functionName = getFunctionName();
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, %d)", functionName, INT_SV_COLUMN, _intSVValues[0]));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertEquals(transformFunction.getName(), getFuncName().toLowerCase());
-    int[] expectedIntValues = new int[NUM_ROWS];
+    assertEquals(transformFunction.getName(), functionName);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
+    boolean[] expectedValues = new boolean[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedIntValues[i] = getExpectedValue(_intSVValues[i], _intSVValues[0]);
+      expectedValues[i] = getExpectedValue(Integer.compare(_intSVValues[i], _intSVValues[0]));
     }
-    testTransformFunction(transformFunction, expectedIntValues);
-
-    expression =
-        RequestContextUtils.getExpression(String.format("%s(%s, %d)", getFuncName(), LONG_SV_COLUMN, _longSVValues[0]));
-    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    int[] expectedLongValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedLongValues[i] = getExpectedValue(_longSVValues[i], _longSVValues[0]);
-    }
-    testTransformFunction(transformFunction, expectedLongValues);
+    testTransformFunction(transformFunction, expectedValues);
 
     expression = RequestContextUtils.getExpression(
-        String.format("%s(%s, %f)", getFuncName(), FLOAT_SV_COLUMN, _floatSVValues[0]));
+        String.format("%s(%s, %d)", functionName, LONG_SV_COLUMN, _longSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    int[] expectedFloatValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedFloatValues[i] = getExpectedValue(_floatSVValues[i], _floatSVValues[0]);
+      expectedValues[i] = getExpectedValue(Long.compare(_longSVValues[i], _longSVValues[0]));
     }
-    testTransformFunction(transformFunction, expectedFloatValues);
+    testTransformFunction(transformFunction, expectedValues);
 
     expression = RequestContextUtils.getExpression(
-        String.format("%s(%s, %.20f)", getFuncName(), DOUBLE_SV_COLUMN, _doubleSVValues[0]));
+        String.format("%s(%s, %f)", functionName, FLOAT_SV_COLUMN, _floatSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    int[] expectedDoubleValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedDoubleValues[i] = getExpectedValue(_doubleSVValues[i], _doubleSVValues[0]);
+      expectedValues[i] = getExpectedValue(Float.compare(_floatSVValues[i], _floatSVValues[0]));
     }
-    testTransformFunction(transformFunction, expectedDoubleValues);
+    testTransformFunction(transformFunction, expectedValues);
 
     expression = RequestContextUtils.getExpression(
-        String.format("%s(%s, '%s')", getFuncName(), STRING_SV_COLUMN, _stringSVValues[0]));
+        String.format("%s(%s, %.20f)", functionName, DOUBLE_SV_COLUMN, _doubleSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    int[] expectedStringValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedStringValues[i] = getExpectedValue(_stringSVValues[i], _stringSVValues[0]);
+      expectedValues[i] = getExpectedValue(Double.compare(_doubleSVValues[i], _doubleSVValues[0]));
     }
-    testTransformFunction(transformFunction, expectedStringValues);
+    testTransformFunction(transformFunction, expectedValues);
 
     // Note: defining decimal literals within quotes ('%s') preserves precision.
     expression = RequestContextUtils.getExpression(
-        String.format("%s(%s, '%s')", getFuncName(), BIG_DECIMAL_SV_COLUMN, _bigDecimalSVValues[0]));
+        String.format("%s(%s, '%s')", functionName, BIG_DECIMAL_SV_COLUMN, _bigDecimalSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    int[] expectedBigDecimalValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedBigDecimalValues[i] = getExpectedValue(_bigDecimalSVValues[i], _bigDecimalSVValues[0]);
+      expectedValues[i] = getExpectedValue(_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[0]));
     }
-    testTransformFunction(transformFunction, expectedBigDecimalValues);
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, '%s')", functionName, STRING_SV_COLUMN, _stringSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(_stringSVValues[i].compareTo(_stringSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
@@ -118,9 +112,9 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
   public Object[][] testIllegalArguments() {
     return new Object[][]{
         new Object[]{
-            String.format("%s(%s)", getFuncName(), INT_SV_COLUMN)
+            String.format("%s(%s)", getFunctionName(), INT_SV_COLUMN)
         }, new Object[]{
-        String.format("%s(%s, %s, %s)", getFuncName(), LONG_SV_COLUMN, INT_SV_COLUMN, STRING_SV_COLUMN)
+        String.format("%s(%s, %s, %s)", getFunctionName(), LONG_SV_COLUMN, INT_SV_COLUMN, STRING_SV_COLUMN)
     }
     };
   }

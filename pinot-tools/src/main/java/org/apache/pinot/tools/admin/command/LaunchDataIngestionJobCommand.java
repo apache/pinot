@@ -159,6 +159,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
 
   public static void main(String[] args) {
     PluginManager.get().init();
-    new CommandLine(new LaunchDataIngestionJobCommand()).execute(args);
+    int exitCode = new CommandLine(new LaunchDataIngestionJobCommand()).execute(args);
+    System.exit(exitCode);
   }
 }

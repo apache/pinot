@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.query.runtime.utils;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
@@ -32,6 +36,7 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
@@ -44,7 +49,9 @@ import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
@@ -65,6 +72,7 @@ public class ServerRequestUtils {
       ImmutableList.of(PredicateComparisonRewriter.class.getName());
   private static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(
       QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
+  private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
 
   private ServerRequestUtils() {
     // do not instantiate.
@@ -72,18 +80,32 @@ public class ServerRequestUtils {
 
   // TODO: This is a hack, make an actual ServerQueryRequest converter.
   public static List<ServerQueryRequest> constructServerQueryRequest(DistributedStagePlan distributedStagePlan,
-      Map<String, String> requestMetadataMap) {
+      Map<String, String> requestMetadataMap, ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
     StageMetadata stageMetadata = distributedStagePlan.getMetadataMap().get(distributedStagePlan.getStageId());
+    Preconditions.checkState(stageMetadata.getScannedTables().size() == 1,
+        "Server request for V2 engine should only have 1 scan table per request.");
+    String rawTableName = stageMetadata.getScannedTables().get(0);
     Map<String, List<String>> tableToSegmentListMap = stageMetadata.getServerInstanceToSegmentsMap()
         .get(distributedStagePlan.getServerInstance());
     List<ServerQueryRequest> requests = new ArrayList<>();
     for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
       String tableType = tableEntry.getKey();
+      // ZkHelixPropertyStore extends from ZkCacheBaseDataAccessor so it should not cause too much out-of-the-box
+      // network traffic. but there's chance to improve this:
+      // TODO: use TableDataManager: it is already getting tableConfig and Schema when processing segments.
       if (TableType.OFFLINE.name().equals(tableType)) {
-        requests.add(constructServerQueryRequest(distributedStagePlan, requestMetadataMap,
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
+            TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
+        Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
+            TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
+        requests.add(constructServerQueryRequest(distributedStagePlan, requestMetadataMap, tableConfig, schema,
             stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, tableEntry.getValue()));
       } else if (TableType.REALTIME.name().equals(tableType)) {
-        requests.add(constructServerQueryRequest(distributedStagePlan, requestMetadataMap,
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
+            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
+        Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
+            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
+        requests.add(constructServerQueryRequest(distributedStagePlan, requestMetadataMap, tableConfig, schema,
             stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, tableEntry.getValue()));
       } else {
         throw new IllegalArgumentException("Unsupported table type key: " + tableType);
@@ -93,14 +115,15 @@ public class ServerRequestUtils {
   }
 
   public static ServerQueryRequest constructServerQueryRequest(DistributedStagePlan distributedStagePlan,
-      Map<String, String> requestMetadataMap, TimeBoundaryInfo timeBoundaryInfo, TableType tableType,
-      List<String> segmentList) {
+      Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema,
+      TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList) {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(Long.parseLong(requestMetadataMap.get("REQUEST_ID")));
     instanceRequest.setBrokerId("unknown");
     instanceRequest.setEnableTrace(false);
     instanceRequest.setSearchSegments(segmentList);
-    instanceRequest.setQuery(constructBrokerRequest(distributedStagePlan, tableType, timeBoundaryInfo));
+    instanceRequest.setQuery(constructBrokerRequest(distributedStagePlan, tableType, tableConfig, schema,
+        timeBoundaryInfo));
     return new ServerQueryRequest(instanceRequest, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
         System.currentTimeMillis());
   }
@@ -108,8 +131,8 @@ public class ServerRequestUtils {
   // TODO: this is a hack, create a broker request object should not be needed because we rewrite the entire
   // query into stages already.
   public static BrokerRequest constructBrokerRequest(DistributedStagePlan distributedStagePlan, TableType tableType,
-      TimeBoundaryInfo timeBoundaryInfo) {
-    PinotQuery pinotQuery = constructPinotQuery(distributedStagePlan, tableType, timeBoundaryInfo);
+      TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo) {
+    PinotQuery pinotQuery = constructPinotQuery(distributedStagePlan, tableType, tableConfig, schema, timeBoundaryInfo);
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setPinotQuery(pinotQuery);
     // Set table name in broker request because it is used for access control, query routing etc.
@@ -123,7 +146,7 @@ public class ServerRequestUtils {
   }
 
   public static PinotQuery constructPinotQuery(DistributedStagePlan distributedStagePlan, TableType tableType,
-      TimeBoundaryInfo timeBoundaryInfo) {
+      TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo) {
     PinotQuery pinotQuery = new PinotQuery();
     pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
     pinotQuery.setExplain(false);
@@ -134,6 +157,7 @@ public class ServerRequestUtils {
     for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
       pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
+    QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
     return pinotQuery;
   }
 

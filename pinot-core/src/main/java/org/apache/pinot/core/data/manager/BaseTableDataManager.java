@@ -20,6 +20,8 @@ package org.apache.pinot.core.data.manager;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
 import java.io.File;
 import java.io.IOException;
@@ -30,6 +32,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -100,6 +103,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
   // errors as the value.
   protected LoadingCache<Pair<String, String>, SegmentErrorInfo> _errorCache;
+  // Cache used for identifying segments which could not be acquired since they were recently deleted.
+  protected Cache<String, String> _recentlyDeletedSegments;
 
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
@@ -137,6 +142,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _resourceTmpDir);
     }
     _errorCache = errorCache;
+    _recentlyDeletedSegments =
+        CacheBuilder.newBuilder()
+            .maximumSize(tableDataManagerConfig.getTableDeletedSegmentsCacheSize())
+            .expireAfterWrite(tableDataManagerConfig.getTableDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
+            .build();
     _streamSegmentDownloadUntarRateLimitBytesPerSec =
         tableDataManagerParams.getStreamSegmentDownloadUntarRateLimitBytesPerSec();
     _isStreamSegmentDownloadUntar = tableDataManagerParams.isStreamSegmentDownloadUntar();
@@ -200,7 +210,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
 
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
-    SegmentDataManager oldSegmentManager = _segmentDataManagerMap.put(segmentName, newSegmentManager);
+    SegmentDataManager oldSegmentManager = registerSegment(segmentName, newSegmentManager);
     if (oldSegmentManager == null) {
       _logger.info("Added new immutable segment: {} to table: {}", segmentName, _tableNameWithType);
     } else {
@@ -231,13 +241,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void removeSegment(String segmentName) {
     _logger.info("Removing segment: {} from table: {}", segmentName, _tableNameWithType);
-    SegmentDataManager segmentDataManager = _segmentDataManagerMap.remove(segmentName);
+    SegmentDataManager segmentDataManager = unregisterSegment(segmentName);
     if (segmentDataManager != null) {
       releaseSegment(segmentDataManager);
       _logger.info("Removed segment: {} from table: {}", segmentName, _tableNameWithType);
     } else {
       _logger.info("Failed to find segment: {} in table: {}", segmentName, _tableNameWithType);
     }
+  }
+
+  /**
+   * Returns true if the given segment has been deleted recently. The time range is determined by
+   * {@link org.apache.pinot.spi.config.instance.InstanceDataManagerConfig#getDeletedSegmentsCacheTtlMinutes()}.
+   */
+  @Override
+  public boolean isSegmentDeletedRecently(String segmentName) {
+    return _recentlyDeletedSegments.getIfPresent(segmentName) != null;
   }
 
   @Override
@@ -409,6 +428,31 @@ public abstract class BaseTableDataManager implements TableDataManager {
     addSegment(indexDir, indexLoadingConfig);
     LOGGER.info("Downloaded and loaded segment: {} of table: {} with crc: {}", segmentName, _tableNameWithType,
         zkMetadata.getCrc());
+  }
+
+  /**
+   * _segmentDataManagerMap is used for fetching segments that need to be queried. If a new segment is created,
+   * calling this method ensures that all queries in the future can use the new segment. This method may replace an
+   * existing segment with the same name.
+   */
+  @Nullable
+  protected SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
+    SegmentDataManager oldSegmentDataManager = _segmentDataManagerMap.put(segmentName, segmentDataManager);
+    _recentlyDeletedSegments.invalidate(segmentName);
+    return oldSegmentDataManager;
+  }
+
+  /**
+   * De-registering a segment ensures that no query uses the given segment until a segment with that name is
+   * re-registered. There may be scenarios where the broker thinks that a segment is available even though it has
+   * been de-registered in the servers (either due to manual deletion or retention). In such cases, acquireSegments
+   * will mark those segments as missingSegments. The caller can use {@link #isSegmentDeletedRecently(String)} to
+   * identify this scenario.
+   */
+  @Nullable
+  protected SegmentDataManager unregisterSegment(String segmentName) {
+    _recentlyDeletedSegments.put(segmentName, segmentName);
+    return _segmentDataManagerMap.remove(segmentName);
   }
 
   protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {

@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -48,20 +46,33 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.TIMESTAMP, true, false);
   protected static final TransformResultMetadata STRING_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.STRING, true, false);
-  protected static final TransformResultMetadata STRING_MV_NO_DICTIONARY_METADATA =
-      new TransformResultMetadata(DataType.STRING, false, false);
   protected static final TransformResultMetadata JSON_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.JSON, true, false);
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, true, false);
-  protected static final TransformResultMetadata LONG_MV_NO_DICTIONARY_METADATA =
-      new TransformResultMetadata(DataType.LONG, false, false);
-  protected static final TransformResultMetadata DOUBLE_MV_NO_DICTIONARY_METADATA =
-      new TransformResultMetadata(DataType.DOUBLE, false, false);
+
   protected static final TransformResultMetadata INT_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.INT, false, false);
+  protected static final TransformResultMetadata LONG_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.LONG, false, false);
   protected static final TransformResultMetadata FLOAT_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.FLOAT, false, false);
+  protected static final TransformResultMetadata DOUBLE_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.DOUBLE, false, false);
+  // TODO: Support MV BIG_DECIMAL
+  protected static final TransformResultMetadata BIG_DECIMAL_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.BIG_DECIMAL, false, false);
+  protected static final TransformResultMetadata BOOLEAN_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.BOOLEAN, false, false);
+  protected static final TransformResultMetadata TIMESTAMP_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.TIMESTAMP, false, false);
+  protected static final TransformResultMetadata STRING_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.STRING, false, false);
+  protected static final TransformResultMetadata JSON_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.JSON, false, false);
+  // TODO: Support MV BYTES
+  protected static final TransformResultMetadata BYTES_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.BYTES, false, false);
 
   protected int[] _intValuesSV;
   protected long[] _longValuesSV;
@@ -69,12 +80,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected double[] _doubleValuesSV;
   protected BigDecimal[] _bigDecimalValuesSV;
   protected String[] _stringValuesSV;
-  protected byte[][] _byteValuesSV;
+  protected byte[][] _bytesValuesSV;
   protected int[][] _intValuesMV;
   protected long[][] _longValuesMV;
   protected float[][] _floatValuesMV;
   protected double[][] _doubleValuesMV;
   protected String[][] _stringValuesMV;
+  protected byte[][][] _bytesValuesMV;
 
   @Override
   public Dictionary getDictionary() {
@@ -102,7 +114,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readIntValues(dictIds, length, _intValuesSV);
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
         case LONG:
           long[] longValues = transformToLongValuesSV(projectionBlock);
           ArrayCopyUtils.copy(longValues, _intValuesSV, length);
@@ -124,7 +137,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(stringValues, _intValuesSV, length);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read SV %s as INT", resultDataType));
       }
     }
     return _intValuesSV;
@@ -141,7 +154,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readLongValues(dictIds, length, _longValuesSV);
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _longValuesSV, length);
@@ -163,7 +177,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(stringValues, _longValuesSV, length);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read SV %s as LONG", resultDataType));
       }
     }
     return _longValuesSV;
@@ -180,7 +194,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readFloatValues(dictIds, length, _floatValuesSV);
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _floatValuesSV, length);
@@ -202,7 +217,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(stringValues, _floatValuesSV, length);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read SV %s as FLOAT", resultDataType));
       }
     }
     return _floatValuesSV;
@@ -219,7 +234,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readDoubleValues(dictIds, length, _doubleValuesSV);
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _doubleValuesSV, length);
@@ -241,7 +257,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(stringValues, _doubleValuesSV, length);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read SV %s as DOUBLE", resultDataType));
       }
     }
     return _doubleValuesSV;
@@ -258,7 +274,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readBigDecimalValues(dictIds, length, _bigDecimalValuesSV);
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _bigDecimalValuesSV, length);
@@ -284,7 +301,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(bytesValues, _bigDecimalValuesSV, length);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read SV %s as BIG_DECIMAL", resultDataType));
       }
     }
     return _bigDecimalValuesSV;
@@ -296,23 +313,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
     if (_stringValuesSV == null) {
       _stringValuesSV = new String[length];
     }
-    DataType dataType = getResultMetadata().getDataType();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
-      if (dataType == DataType.BOOLEAN) {
-        for (int i = 0; i < length; i++) {
-          _stringValuesSV[i] = Boolean.toString(dictionary.getIntValue(dictIds[i]) == 1);
-        }
-      } else if (dataType == DataType.TIMESTAMP) {
-        for (int i = 0; i < length; i++) {
-          _stringValuesSV[i] = new Timestamp(dictionary.getLongValue(dictIds[i])).toString();
-        }
-      } else {
-        dictionary.readStringValues(dictIds, length, _stringValuesSV);
-      }
+      dictionary.readStringValues(dictIds, length, _stringValuesSV);
     } else {
-      switch (dataType) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _stringValuesSV, length);
@@ -333,20 +340,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
           BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
           ArrayCopyUtils.copy(bigDecimalValues, _stringValuesSV, length);
           break;
-        case BOOLEAN:
-          intValues = transformToIntValuesSV(projectionBlock);
-          ArrayCopyUtils.copyBoolean(intValues, _stringValuesSV, length);
-          break;
-        case TIMESTAMP:
-          longValues = transformToLongValuesSV(projectionBlock);
-          ArrayCopyUtils.copyTimestamp(longValues, _stringValuesSV, length);
-          break;
         case BYTES:
           byte[][] bytesValues = transformToBytesValuesSV(projectionBlock);
           ArrayCopyUtils.copy(bytesValues, _stringValuesSV, length);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read SV %s as STRING", resultDataType));
       }
     }
     return _stringValuesSV;
@@ -355,24 +354,29 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    if (_byteValuesSV == null) {
-      _byteValuesSV = new byte[length][];
+    if (_bytesValuesSV == null) {
+      _bytesValuesSV = new byte[length][];
     }
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
-      dictionary.readBytesValues(dictIds, length, _byteValuesSV);
+      dictionary.readBytesValues(dictIds, length, _bytesValuesSV);
     } else {
-      if (getResultMetadata().getDataType().getStoredType() == DataType.BIG_DECIMAL) {
-        BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
-        ArrayCopyUtils.copy(bigDecimalValues, _byteValuesSV, length);
-      } else {
-        Preconditions.checkState(getResultMetadata().getDataType().getStoredType() == DataType.STRING);
-        String[] stringValues = transformToStringValuesSV(projectionBlock);
-        ArrayCopyUtils.copy(stringValues, _byteValuesSV, length);
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
+        case BIG_DECIMAL:
+          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(bigDecimalValues, _bytesValuesSV, length);
+          break;
+        case STRING:
+          String[] stringValues = transformToStringValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(stringValues, _bytesValuesSV, length);
+          break;
+        default:
+          throw new IllegalStateException(String.format("Cannot read SV %s as BYTES", resultDataType));
       }
     }
-    return _byteValuesSV;
+    return _bytesValuesSV;
   }
 
   @Override
@@ -392,7 +396,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _intValuesMV[i] = intValues;
       }
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
         case LONG:
           long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
           ArrayCopyUtils.copy(longValuesMV, _intValuesMV, length);
@@ -410,7 +415,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(stringValuesMV, _intValuesMV, length);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read MV %s as INT", resultDataType));
       }
     }
     return _intValuesMV;
@@ -433,7 +438,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _longValuesMV[i] = longValues;
       }
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           ArrayCopyUtils.copy(intValuesMV, _longValuesMV, length);
@@ -451,7 +457,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(stringValuesMV, _longValuesMV, length);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read MV %s as LONG", resultDataType));
       }
     }
     return _longValuesMV;
@@ -474,7 +480,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _floatValuesMV[i] = floatValues;
       }
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           ArrayCopyUtils.copy(intValuesMV, _floatValuesMV, length);
@@ -492,7 +499,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(stringValuesMV, _floatValuesMV, length);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read MV %s as FLOAT", resultDataType));
       }
     }
     return _floatValuesMV;
@@ -515,7 +522,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
         _doubleValuesMV[i] = doubleValues;
       }
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           ArrayCopyUtils.copy(intValuesMV, _doubleValuesMV, length);
@@ -533,7 +541,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
           ArrayCopyUtils.copy(stringValuesMV, _doubleValuesMV, length);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read MV %s as DOUBLE", resultDataType));
       }
     }
     return _doubleValuesMV;
@@ -545,41 +553,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
     if (_stringValuesMV == null) {
       _stringValuesMV = new String[length][];
     }
-    DataType dataType = getResultMetadata().getDataType();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
-      if (dataType == DataType.BOOLEAN) {
-        for (int i = 0; i < length; i++) {
-          int[] dictIds = dictIdsMV[i];
-          int numValues = dictIds.length;
-          String[] stringValues = new String[numValues];
-          for (int j = 0; j < numValues; j++) {
-            stringValues[j] = Boolean.toString(dictionary.getIntValue(dictIds[i]) == 1);
-          }
-          _stringValuesMV[i] = stringValues;
-        }
-      } else if (dataType == DataType.TIMESTAMP) {
-        for (int i = 0; i < length; i++) {
-          int[] dictIds = dictIdsMV[i];
-          int numValues = dictIds.length;
-          String[] stringValues = new String[numValues];
-          for (int j = 0; j < numValues; j++) {
-            stringValues[j] = new Timestamp(dictionary.getLongValue(dictIds[i])).toString();
-          }
-          _stringValuesMV[i] = stringValues;
-        }
-      } else {
-        for (int i = 0; i < length; i++) {
-          int[] dictIds = dictIdsMV[i];
-          int numValues = dictIds.length;
-          String[] stringValues = new String[numValues];
-          dictionary.readStringValues(dictIds, numValues, stringValues);
-          _stringValuesMV[i] = stringValues;
-        }
+      for (int i = 0; i < length; i++) {
+        int[] dictIds = dictIdsMV[i];
+        int numValues = dictIds.length;
+        String[] stringValues = new String[numValues];
+        dictionary.readStringValues(dictIds, numValues, stringValues);
+        _stringValuesMV[i] = stringValues;
       }
     } else {
-      switch (dataType) {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           ArrayCopyUtils.copy(intValuesMV, _stringValuesMV, length);
@@ -596,16 +582,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
           double[][] doubleValuesMV = transformToDoubleValuesMV(projectionBlock);
           ArrayCopyUtils.copy(doubleValuesMV, _stringValuesMV, length);
           break;
-        case BOOLEAN:
-          intValuesMV = transformToIntValuesMV(projectionBlock);
-          ArrayCopyUtils.copyBoolean(intValuesMV, _stringValuesMV, length);
-          break;
-        case TIMESTAMP:
-          longValuesMV = transformToLongValuesMV(projectionBlock);
-          ArrayCopyUtils.copyTimestamp(longValuesMV, _stringValuesMV, length);
-          break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException(String.format("Cannot read MV %s as STRING", resultDataType));
       }
     }
     return _stringValuesMV;
