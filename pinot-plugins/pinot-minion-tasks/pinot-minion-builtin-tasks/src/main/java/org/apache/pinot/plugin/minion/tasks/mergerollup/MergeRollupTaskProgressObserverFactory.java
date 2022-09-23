@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
+package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.event.BaseMinionProgressObserverFactory;
@@ -24,10 +24,10 @@ import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
 
 
 @EventObserverFactory
-public class SegmentGenerationAndPushTaskProgressObserverFactory extends BaseMinionProgressObserverFactory {
+public class MergeRollupTaskProgressObserverFactory extends BaseMinionProgressObserverFactory {
 
   @Override
   public String getTaskType() {
-    return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
+    return MinionConstants.MergeRollupTask.TASK_TYPE;
   }
 }

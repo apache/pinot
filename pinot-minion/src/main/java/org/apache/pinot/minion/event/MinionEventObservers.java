@@ -58,8 +58,8 @@ public class MinionEventObservers {
   }
 
   private void startCleanup() {
-    if (_cleanupExecutor == null) {
-      LOGGER.info("No executor to cleanup task event observer");
+    if (_cleanupExecutor == null || _eventObserverCleanupDelayMs == 0) {
+      LOGGER.info("Configured to clean up task event observers immediately");
       return;
     }
     _cleanupExecutor.submit(() -> {

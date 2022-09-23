@@ -39,6 +39,7 @@ public class ConvertToRawIndexTaskExecutor extends BaseSingleSegmentConversionEx
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    _eventObserver.notifyProgress(pinotTaskConfig, "Converting segment: " + indexDir);
     new RawIndexConverter(rawTableName, indexDir, workingDir,
         configs.get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY),
         IndexingOverrides.getIndexCreatorProvider()).convert();

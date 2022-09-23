@@ -60,7 +60,7 @@ public class PinotHelixTaskResourceManagerTest {
     for (int i = 0; i < 3; i++) {
       subtaskNames[i] = taskName + "_" + i;
     }
-    Map<String, String> progress =
+    Map<String, Object> progress =
         mgr.getSubtaskProgress(taskName, StringUtils.join(subtaskNames, ','), httpHelper, workerEndpoints,
             Collections.emptyMap(), 1000);
     for (String subtaskName : subtaskNames) {
@@ -99,11 +99,11 @@ public class PinotHelixTaskResourceManagerTest {
     when(jobContext.getAssignedParticipant(anyInt())).thenReturn(workers[0], workers[1], workers[2]);
     when(jobContext.getPartitionState(anyInt())).thenReturn(helixStates[0], helixStates[1], helixStates[2]);
     when(jobContext.getPartitionSet()).thenReturn(subtaskIds);
-    Map<String, String> progress =
+    Map<String, Object> progress =
         mgr.getSubtaskProgress(taskName, StringUtils.join(subtaskNames, ','), httpHelper, workerEndpoints,
             Collections.emptyMap(), 1000);
     for (int i = 0; i < 3; i++) {
-      String taskProgress = progress.get(subtaskNames[i]);
+      String taskProgress = (String) progress.get(subtaskNames[i]);
       assertTrue(taskProgress.contains(helixStates[i].name()), subtaskNames[i] + ":" + taskProgress);
     }
   }

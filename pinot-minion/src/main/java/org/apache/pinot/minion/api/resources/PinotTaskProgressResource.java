@@ -31,14 +31,17 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,15 +60,15 @@ public class PinotTaskProgressResource {
 
   @GET
   @Path("/tasks/subtask/progress")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get finer grained task progress tracked in memory for the given subtasks")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Object getSubtaskProgress(
+  public String getSubtaskProgress(
       @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") String subtaskNames) {
-
     try {
-      LOGGER.debug("Get progress for subtasks: {}", subtaskNames);
+      LOGGER.debug("Getting progress for subtasks: {}", subtaskNames);
       Map<String, Object> progress = new HashMap<>();
       for (String subtaskName : StringUtils.split(subtaskNames, CommonConstants.Minion.TASK_LIST_SEPARATOR)) {
         MinionEventObserver observer = MinionEventObservers.getInstance().getMinionEventObserver(subtaskName);
@@ -73,7 +76,8 @@ public class PinotTaskProgressResource {
           progress.put(subtaskName, observer.getProgress());
         }
       }
-      return progress;
+      LOGGER.debug("Got subtasks progress: {}", progress);
+      return JsonUtils.objectToString(progress);
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
           String.format("Failed to get task progress for subtasks: %s due to error: %s", subtaskNames, e.getMessage()))

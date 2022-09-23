@@ -16,18 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
+package org.apache.pinot.minion.event;
 
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.event.BaseMinionProgressObserverFactory;
-import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
+import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 
 
-@EventObserverFactory
-public class SegmentGenerationAndPushTaskProgressObserverFactory extends BaseMinionProgressObserverFactory {
+/**
+ * Base factory for {@link MinionEventObserver}.
+ */
+public abstract class BaseMinionProgressObserverFactory implements MinionEventObserverFactory {
 
-  @Override
-  public String getTaskType() {
-    return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
+  /**
+   * Initializes the task executor factory.
+   */
+  public void init(MinionTaskZkMetadataManager zkMetadataManager) {
+  }
+
+  /**
+   * Returns the task type of the event observer.
+   */
+  public abstract String getTaskType();
+
+  /**
+   * Creates a new task event observer.
+   */
+  public MinionEventObserver create() {
+    return new MinionProgressObserver();
   }
 }
