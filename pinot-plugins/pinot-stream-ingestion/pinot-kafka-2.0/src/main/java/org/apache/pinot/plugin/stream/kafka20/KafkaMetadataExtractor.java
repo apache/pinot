@@ -25,12 +25,11 @@ import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.RowMetadata;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
 @FunctionalInterface
-public interface RowMetadataExtractor {
-  static RowMetadataExtractor build(boolean populateMetadata) {
+public interface KafkaMetadataExtractor {
+  static KafkaMetadataExtractor build(boolean populateMetadata) {
     return record -> {
       if (!populateMetadata) {
         return null;
@@ -44,8 +43,8 @@ public interface RowMetadataExtractor {
         }
       }
       Map<String, String> metadata = new HashMap<>();
-      metadata.put(KafkaStreamMessageMetadata.OFFSET_KEY, String.valueOf(record.offset()));
-      return new StreamMessageMetadata(record.timestamp(), headerGenericRow, metadata);
+      metadata.put(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(record.offset()));
+      return new KafkaStreamMessageMetadata(record.timestamp(), headerGenericRow, metadata);
     };
   }
 

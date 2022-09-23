@@ -72,7 +72,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         if (message != null) {
           StreamMessageMetadata rowMetadata = null;
           if (_config.isPopulateMetadata()) {
-            rowMetadata = (StreamMessageMetadata) _rowMetadataExtractor.extract(messageAndOffset);
+            rowMetadata = (StreamMessageMetadata) _kafkaMetadataExtractor.extract(messageAndOffset);
           }
           filtered.add(
               new KafkaStreamMessage(keyBytes, message.get(), rowMetadata));

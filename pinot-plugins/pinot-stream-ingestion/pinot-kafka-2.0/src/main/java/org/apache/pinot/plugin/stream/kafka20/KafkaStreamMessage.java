@@ -30,7 +30,7 @@ public class KafkaStreamMessage extends StreamMessage {
 
   public long getNextOffset() {
     if (_metadata != null) {
-      long offset = Long.parseLong(_metadata.getRecordMetadata().get(KafkaStreamMessageMetadata.OFFSET_KEY));
+      long offset = Long.parseLong(_metadata.getRecordMetadata().get(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY));
       return offset < 0 ? -1 : offset + 1;
     }
     return -1;
