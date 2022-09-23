@@ -43,6 +43,7 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
     assert message.getValue() != null;
 
     try {
+      _reuse.clear();
       GenericRow row = _valueDecoder.decode(message.getValue(), 0, message.getValue().length, _reuse);
       if (row != null) {
         if (message.getKey() != null) {
