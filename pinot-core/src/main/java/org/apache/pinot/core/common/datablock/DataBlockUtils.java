@@ -38,10 +38,11 @@ public final class DataBlockUtils {
   }
 
   public static MetadataBlock getErrorDataBlock(Exception e) {
+    String errorMessage = e.getMessage() == null ? e.toString() : e.getMessage();
     if (e instanceof ProcessingException) {
-      return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), e.getMessage()));
+      return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), errorMessage));
     } else {
-      return getErrorDataBlock(Collections.singletonMap(QueryException.UNKNOWN_ERROR_CODE, e.getMessage()));
+      return getErrorDataBlock(Collections.singletonMap(QueryException.UNKNOWN_ERROR_CODE, errorMessage));
     }
   }
 
