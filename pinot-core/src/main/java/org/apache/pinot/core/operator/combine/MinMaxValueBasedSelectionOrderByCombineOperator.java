@@ -328,8 +328,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   @Override
   protected SelectionResultsBlock convertToMergeableBlock(BaseResultsBlock block) {
     // We need to create a new copy to be sure we are using a stable priority queue, because it is going to be modified.
-    SelectionResultsBlock selectionBlock = (SelectionResultsBlock) block;
-    return new SelectionResultsBlock(selectionBlock.getDataSchema(), selectionBlock.getRowsAsPriorityQueue());
+    return ((SelectionResultsBlock) block).cloneWithInnerPriorityQueue();
   }
 
   private static class MinMaxValueContext {

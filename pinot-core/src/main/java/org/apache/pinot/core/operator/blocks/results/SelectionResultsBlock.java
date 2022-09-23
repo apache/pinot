@@ -56,16 +56,24 @@ public class SelectionResultsBlock extends BaseResultsBlock {
     return _rows;
   }
 
-  public PriorityQueue<Object[]> getRowsAsPriorityQueue() {
+  public SelectionResultsBlock cloneWithInnerPriorityQueue() {
     if (_rows instanceof PriorityQueue) {
-      return ((PriorityQueue<Object[]>) _rows);
+      return new SelectionResultsBlock(_dataSchema, new PriorityQueue<>(_rows));
     }
     if (_comparator == null) {
       throw new IllegalStateException("This instance doesn't define an order on which be sorted");
     }
     PriorityQueue<Object[]> result = new PriorityQueue<>(_comparator);
     result.addAll(_rows);
-    return result;
+    return new SelectionResultsBlock(_dataSchema, result);
+  }
+
+  public PriorityQueue<Object[]> getRowsAsPriorityQueue() {
+    if (!(_rows instanceof PriorityQueue)) {
+      throw new IllegalStateException("This instance doesn't define a priority queue. "
+          + "Call cloneWithInnerPriorityQueue before");
+    }
+    return ((PriorityQueue<Object[]>) _rows);
   }
 
   @Override
