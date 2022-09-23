@@ -205,28 +205,49 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-      PriorityQueue<Object[]> selectionResult = resultsBlock.getRowsAsPriorityQueue();
-      if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
-        // Segment result has enough rows, update the boundary value
-        assert selectionResult.peek() != null;
-        Comparable segmentBoundaryValue = (Comparable) selectionResult.peek()[0];
-        if (boundaryValue == null) {
-          boundaryValue = segmentBoundaryValue;
-        } else {
-          if (asc) {
-            if (segmentBoundaryValue.compareTo(boundaryValue) < 0) {
-              boundaryValue = segmentBoundaryValue;
-            }
-          } else {
-            if (segmentBoundaryValue.compareTo(boundaryValue) > 0) {
-              boundaryValue = segmentBoundaryValue;
-            }
-          }
-        }
+      Collection<Object[]> rows = resultsBlock.getRows();
+      if (rows != null && rows.size() >= _numRowsToKeep) {
+        boundaryValue = updateBoundaryValue(boundaryValue, extractBoundaryValue(rows), asc);
       }
       threadBoundaryValue = boundaryValue;
       _blockingQueue.offer(resultsBlock);
     }
+  }
+
+  private Comparable extractBoundaryValue(Collection<Object[]> rows) {
+    if (rows instanceof PriorityQueue) {
+      PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) rows;
+      assert selectionResult.peek() != null;
+      // at this point, priority queues are sorted in the inverse order
+      return (Comparable) selectionResult.peek()[0];
+    }
+    List<Object[]> selectionResult;
+    if (rows instanceof List) {
+      selectionResult = (List<Object[]>) rows;
+    } else {
+      LOGGER.warn("Selection result stored in an unexpected data structure of type {}. A copy is needed",
+          rows.getClass());
+      selectionResult = new ArrayList<>(rows);
+    }
+    int index = selectionResult.size() - 1;
+    return (Comparable) selectionResult.get(index)[0];
+  }
+
+  private Comparable updateBoundaryValue(Comparable oldBoundary, Comparable newBoundary, boolean asc) {
+    if (oldBoundary == null) {
+      return newBoundary;
+    } else {
+      if (asc) {
+        if (newBoundary.compareTo(oldBoundary) < 0) {
+          return newBoundary;
+        }
+      } else {
+        if (newBoundary.compareTo(oldBoundary) > 0) {
+          return newBoundary;
+        }
+      }
+    }
+    return oldBoundary;
   }
 
   /**
