@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.minion.event;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedList;
@@ -27,6 +25,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +94,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   @Override
   public synchronized void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception e) {
     long endTs = System.currentTimeMillis();
-    addStatus(endTs, "Task failed in " + (endTs - _startTs) + "ms with error: " + makeStringFromException(e));
+    addStatus(endTs, "Task failed in " + (endTs - _startTs) + "ms with error: " + StringUtil.getStackTraceAsString(e));
     super.notifyTaskError(pinotTaskConfig, e);
   }
 
@@ -104,14 +103,6 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     if (_lastStatus.size() > _maxNumStatusToTrack) {
       _lastStatus.pollFirst();
     }
-  }
-
-  private static String makeStringFromException(Exception exp) {
-    StringWriter expStr = new StringWriter();
-    try (PrintWriter pw = new PrintWriter(expStr)) {
-      exp.printStackTrace(pw);
-    }
-    return expStr.toString();
   }
 
   public static class StatusEntry {

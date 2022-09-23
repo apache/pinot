@@ -152,6 +152,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     // Segment config
     segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));
 
+    // Progress observer
+    segmentProcessorConfigBuilder.setProgressObserver(p -> _eventObserver.notifyProgress(_pinotTaskConfig, p));
+
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
 
     List<RecordReader> recordReaders = new ArrayList<>(numInputSegments);
