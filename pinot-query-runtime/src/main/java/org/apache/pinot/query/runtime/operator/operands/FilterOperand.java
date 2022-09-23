@@ -155,13 +155,14 @@ public abstract class FilterOperand extends TransformOperand {
     public Predicate(List<RexExpression> functionOperands, DataSchema dataSchema) {
       _lhs = TransformOperand.toTransformOperand(functionOperands.get(0), dataSchema);
       _rhs = TransformOperand.toTransformOperand(functionOperands.get(1), dataSchema);
-      if (_lhs._resultType != DataSchema.ColumnDataType.OBJECT) {
+      if (_lhs._resultType != null && _lhs._resultType != DataSchema.ColumnDataType.OBJECT) {
         _resultType = _lhs._resultType;
-      } else if (_rhs._resultType != DataSchema.ColumnDataType.OBJECT) {
+      } else if (_rhs._resultType != null && _rhs._resultType != DataSchema.ColumnDataType.OBJECT) {
         _resultType = _rhs._resultType;
       } else {
-        throw new UnsupportedOperationException("Unsupported predicate comparison between: " + _lhs + " and: " + _rhs
-            + " neither LHS or RHS result are comparable data type!");
+        // TODO: we should correctly throw exception here. Currently exception thrown during constructor is not
+        // piped back to query dispatcher, thus we set it to null and deliberately make the processing throw exception.
+        _resultType = null;
       }
     }
   }

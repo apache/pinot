@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
@@ -26,6 +27,7 @@ public class LiteralOperand extends TransformOperand {
 
   public LiteralOperand(RexExpression.Literal rexExpression) {
     _value = rexExpression.getValue();
+    _resultType = DataSchema.ColumnDataType.fromDataType(rexExpression.getDataType(), true);
   }
 
   @Override
