@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.TimeUtils;
 
 
 /**
@@ -196,6 +197,23 @@ public class SchemaUtils {
                 sdfPattern));
         maxIndexes[idx + 1] = Math.max(maxIndexes[idx + 1], maxIndexes[idx]);
       }
+    }
+
+    Object sampleValue = dateTimeFieldSpec.getSampleValue();
+    if (sampleValue != null) {
+      long sampleTimestampValue;
+      try {
+        sampleTimestampValue = formatSpec.fromFormatToMillis(sampleValue.toString());
+      } catch (Exception e) {
+        throw new IllegalArgumentException(
+            String.format("Cannot format provided sample value: %s with provided date time spec: %s", sampleValue,
+                formatSpec));
+      }
+      boolean isValidTimestamp = TimeUtils.timeValueInValidRange(sampleTimestampValue);
+      Preconditions.checkArgument(isValidTimestamp,
+          "Incorrect date time format. "
+              + "Converted sample value %s for date-time field spec is not in valid time-range: %s and %s",
+          sampleTimestampValue, TimeUtils.VALID_MIN_TIME_MILLIS, TimeUtils.VALID_MAX_TIME_MILLIS);
     }
 
     DateTimeGranularitySpec granularitySpec;
