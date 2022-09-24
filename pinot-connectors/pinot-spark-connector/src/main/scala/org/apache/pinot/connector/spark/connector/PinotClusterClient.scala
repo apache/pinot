@@ -19,8 +19,7 @@
 package org.apache.pinot.connector.spark.connector
 
 import java.net.{URI, URLEncoder}
-import java.util.regex.Pattern
-
+import io.circe.Decoder
 import io.circe.generic.auto._
 import org.apache.pinot.connector.spark.connector.query.GeneratedSQLs
 import org.apache.pinot.connector.spark.decodeTo
@@ -37,7 +36,7 @@ import scala.util.{Failure, Success, Try}
  */
 private[pinot] object PinotClusterClient extends Logging {
   private val TABLE_SCHEMA_TEMPLATE = "http://%s/tables/%s/schema"
-  private val TABLE_BROKER_INSTANCES_TEMPLATE = "http://%s//brokers/tables/%s"
+  private val TABLE_BROKER_INSTANCES_TEMPLATE = "http://%s/v2/brokers/tables/%s"
   private val TIME_BOUNDARY_TEMPLATE = "http://%s/debug/timeBoundary/%s"
   private val ROUTING_TABLE_TEMPLATE = "http://%s/debug/routingTable/sql?query=%s"
   private val INSTANCES_API_TEMPLATE = "http://%s/instances/%s"
@@ -65,18 +64,17 @@ private[pinot] object PinotClusterClient extends Logging {
    * This method is used when if broker instances not defined in the datasource options.
    */
   def getBrokerInstances(controllerUrl: String, tableName: String): List[String] = {
-    val brokerPattern = Pattern.compile("Broker_(.*)_(\\d+)")
     Try {
       val uri = new URI(String.format(TABLE_BROKER_INSTANCES_TEMPLATE, controllerUrl, tableName))
       val response = HttpUtils.sendGetRequest(uri)
-      val brokerUrls = decodeTo[List[String]](response)
-        .map(brokerPattern.matcher)
-        .filter(matcher => matcher.matches() && matcher.groupCount() == 2)
-        .map { matcher =>
-          val host = matcher.group(1)
-          val port = matcher.group(2)
+      implicit val decodeIntOrString: Decoder[Either[Int, String]] =
+        Decoder[Int].map(Left(_)).or(Decoder[String].map(Right(_)))
+      val brokerUrls = decodeTo[List[Map[String, Either[Int, String]]]](response).map {
+        brokerEntry =>
+          val host = brokerEntry.get("host").get.right.get
+          val port = brokerEntry.get("port").get.left.get
           s"$host:$port"
-        }
+      }
 
       if (brokerUrls.isEmpty) {
         throw new IllegalStateException(s"Not found broker instance for table '$tableName'")
