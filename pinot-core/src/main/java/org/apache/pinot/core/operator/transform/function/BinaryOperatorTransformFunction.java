@@ -526,17 +526,17 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private int compare(long left, double right) {
     if (Math.abs(left) <= 1L << 53) {
-      return getIntResult(Double.compare(left, right));
+      return Double.compare(left, right);
     } else {
-      return getIntResult(BigDecimal.valueOf(left).compareTo(BigDecimal.valueOf(right)));
+      return BigDecimal.valueOf(left).compareTo(BigDecimal.valueOf(right));
     }
   }
 
   private int compare(double left, long right) {
     if (Math.abs(right) <= 1L << 53) {
-      return getIntResult(Double.compare(left, right));
+      return Double.compare(left, right);
     } else {
-      return getIntResult(BigDecimal.valueOf(left).compareTo(BigDecimal.valueOf(right)));
+      return BigDecimal.valueOf(left).compareTo(BigDecimal.valueOf(right));
     }
   }
 
