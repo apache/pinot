@@ -154,7 +154,7 @@ public class QueryRouter {
     LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
         serverRoutingInstance, e);
     _serverRoutingStatsManager.recordStatsUponResponseArrival(requestId, serverRoutingInstance.getInstanceId(),
-        (int) asyncQueryResponse.getTimeOutMs());
+        (int) asyncQueryResponse.getTimeoutMs());
     asyncQueryResponse.markQueryFailed(serverRoutingInstance, e);
   }
 
@@ -201,7 +201,7 @@ public class QueryRouter {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
       asyncQueryResponse.markServerDown(serverRoutingInstance, exception);
       _serverRoutingStatsManager.recordStatsUponResponseArrival(asyncQueryResponse.getRequestId(),
-          serverRoutingInstance.getInstanceId(), (int) asyncQueryResponse.getTimeOutMs());
+          serverRoutingInstance.getInstanceId(), (int) asyncQueryResponse.getTimeoutMs());
     }
   }
 
