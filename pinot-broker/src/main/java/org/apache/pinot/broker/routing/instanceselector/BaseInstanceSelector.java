@@ -55,7 +55,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   private final AtomicLong _requestId = new AtomicLong();
   private final String _tableNameWithType;
   private final BrokerMetrics _brokerMetrics;
-  private final AdaptiveServerSelector _adaptiveServerSelector;
+  protected final AdaptiveServerSelector _adaptiveServerSelector;
 
   // These 4 variables are the cached states to help accelerate the change processing
   private Set<String> _enabledInstances;
@@ -274,7 +274,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         ? brokerRequest.getPinotQuery().getQueryOptions()
         : Collections.emptyMap();
     Map<String, String> segmentToInstanceMap = select(segments, requestId, _segmentToEnabledInstancesMap,
-        queryOptions, _adaptiveServerSelector);
+        queryOptions);
     Set<String> unavailableSegments = _unavailableSegments;
     if (unavailableSegments.isEmpty()) {
       return new SelectionResult(segmentToInstanceMap, Collections.emptyList());
@@ -296,6 +296,5 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * ONLINE/CONSUMING instances). If enabled instances are not {@code null}, they are sorted in alphabetical order.
    */
   abstract Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions,
-      AdaptiveServerSelector adaptiveServerSelector);
+      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions);
 }

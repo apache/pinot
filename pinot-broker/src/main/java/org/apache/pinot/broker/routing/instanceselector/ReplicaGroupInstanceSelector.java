@@ -59,30 +59,31 @@ import org.apache.pinot.core.util.QueryOptionsUtils;
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   public ReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
-      AdaptiveServerSelector adaptiveServerSelector) {
+      @Nullable AdaptiveServerSelector adaptiveServerSelector) {
     super(tableNameWithType, brokerMetrics, adaptiveServerSelector);
   }
 
   @Override
   Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions,
-      @Nullable AdaptiveServerSelector adaptiveServerSelector) {
+      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
 
-    List<String> serverRankList = new ArrayList<>();
-    if (adaptiveServerSelector != null) {
+
+    if (_adaptiveServerSelector != null) {
+      // Adaptive Server Selection is enabled.
+      List<String> serverRankList = new ArrayList<>();
+
       // Fetch serverRankList before looping through all the segments. This is important to make sure that we pick
       // the least amount of instances for a query by referring to a single snapshot of the rankings.
-      List<Pair<String, Double>> serverRankListWithScores = adaptiveServerSelector.fetchAllServerRankingsWithScores();
+      List<Pair<String, Double>> serverRankListWithScores = _adaptiveServerSelector.fetchAllServerRankingsWithScores();
       for (Pair<String, Double> entry : serverRankListWithScores) {
         serverRankList.add(entry.getLeft());
       }
-    }
 
-    if (serverRankList.size() > 0) {
       selectServersUsingAdaptiverServerSelector(segments, requestId, segmentToSelectedInstanceMap,
           segmentToEnabledInstancesMap, queryOptions, serverRankList);
     } else {
+      // Adaptive Server Selection is NOT enabled.
       selectServersUsingRoundRobin(segments, requestId, segmentToSelectedInstanceMap, segmentToEnabledInstancesMap,
           queryOptions);
     }

@@ -51,8 +51,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   @Override
   Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions,
-      @Nullable AdaptiveServerSelector adaptiveServerSelector) {
+      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     for (String segment : segments) {
       List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
@@ -62,9 +61,11 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         continue;
       }
 
-      String selectedServer = enabledInstances.get(requestId++ % enabledInstances.size());
-      if (adaptiveServerSelector != null) {
-        selectedServer = adaptiveServerSelector.select(enabledInstances);
+      String selectedServer;
+      if (_adaptiveServerSelector != null) {
+        selectedServer = _adaptiveServerSelector.select(enabledInstances);
+      } else {
+        selectedServer = enabledInstances.get(requestId++ % enabledInstances.size());
       }
 
       segmentToSelectedInstanceMap.put(segment, selectedServer);

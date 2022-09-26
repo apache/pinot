@@ -83,7 +83,7 @@ public interface QueryResponse {
   /**
    * Returns the query timeout in milliseconds.
    */
-  long getTimeOutMs();
+  long getTimeoutMs();
 
   /**
    * Returns the exception if the query fails.
