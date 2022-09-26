@@ -157,23 +157,31 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     int operatorId;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator operator = _operators.get(operatorId);
-      T resultsBlock;
+      BaseResultsBlock operatorBlock;
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
-        resultsBlock = convertToMergeableBlock((BaseResultsBlock) operator.nextBlock());
+        operatorBlock = (BaseResultsBlock) operator.nextBlock();
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-      if (isQuerySatisfied(resultsBlock)) {
+
+      T resultBlock;
+      try {
+        resultBlock = ((T) operatorBlock);
+      } catch (ClassCastException ex) {
+        resultBlock = convertToMergeableBlock(operatorBlock);
+      }
+
+      if (isQuerySatisfied(resultBlock)) {
         // Query is satisfied, skip processing the remaining segments
-        _blockingQueue.offer(resultsBlock);
+        _blockingQueue.offer(resultBlock);
         return;
       } else {
-        _blockingQueue.offer(resultsBlock);
+        _blockingQueue.offer(resultBlock);
       }
     }
   }
