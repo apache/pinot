@@ -18,21 +18,16 @@
  */
 package org.apache.pinot.spi.filesystem;
 
-import com.google.common.base.Preconditions;
-import java.util.Optional;
-import org.apache.commons.lang3.StringUtils;
-
-
 /**
  * FileInfo contains the file path and many optional file attributes like mtime, length etc.
  */
 public class FileInfo {
   private final String _filePath;
-  private final Long _lastModifiedTime;
-  private final Long _length;
-  private final Boolean _isDirectory;
+  private final long _lastModifiedTime;
+  private final long _length;
+  private final boolean _isDirectory;
 
-  private FileInfo(String filePath, Long lastModifiedTime, Long length, Boolean isDirectory) {
+  private FileInfo(String filePath, long lastModifiedTime, long length, boolean isDirectory) {
     _filePath = filePath;
     _lastModifiedTime = lastModifiedTime;
     _length = length;
@@ -43,16 +38,16 @@ public class FileInfo {
     return _filePath;
   }
 
-  public Optional<Long> getLastModifiedTime() {
-    return Optional.ofNullable(_lastModifiedTime);
+  public long getLastModifiedTime() {
+    return _lastModifiedTime;
   }
 
-  public Optional<Long> getLength() {
-    return Optional.ofNullable(_length);
+  public long getLength() {
+    return _length;
   }
 
-  public Optional<Boolean> isDirectory() {
-    return Optional.ofNullable(_isDirectory);
+  public boolean isDirectory() {
+    return _isDirectory;
   }
 
   @Override
@@ -63,9 +58,9 @@ public class FileInfo {
 
   public static class Builder {
     private String _filePath;
-    private Long _lastModifiedTime;
-    private Long _length;
-    private Boolean _isDirectory;
+    private long _lastModifiedTime;
+    private long _length;
+    private boolean _isDirectory;
 
     public Builder setFilePath(String filePath) {
       _filePath = filePath;
@@ -88,7 +83,6 @@ public class FileInfo {
     }
 
     public FileInfo build() {
-      Preconditions.checkArgument(StringUtils.isNotEmpty(_filePath), "The filePath is required");
       return new FileInfo(_filePath, _lastModifiedTime, _length, _isDirectory);
     }
   }
