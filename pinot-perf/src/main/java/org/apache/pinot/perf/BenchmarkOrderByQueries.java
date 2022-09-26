@@ -97,8 +97,8 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
 
   @Param("1500000")
   private int _numRows;
-  @Param({"true", "false"})
-  private boolean _skipOptimization;
+  @Param({"naive", "null"})
+  private String _skipOptimization;
   @Param({"EXP(0.5)"})
   String _scenario;
   @Param({"1", "1000"})
@@ -207,7 +207,7 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
             + "FROM MyTable "
             + "ORDER BY SORTED_COL ASC "
             + "LIMIT 1052 "
-            + "option(skip-order-by=" + _skipOptimization + ")");
+            + "option(order-by-algorithm=" + _skipOptimization + ")");
   }
   @Benchmark
   public BrokerResponseNative sortedAscPartially() {
@@ -216,7 +216,7 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
             + "FROM MyTable "
             + "ORDER BY SORTED_COL ASC, LOW_CARDINALITY_STRING_COL "
             + "LIMIT 1052 "
-            + "option(skip-order-by=" + _skipOptimization + ")");
+            + "option(order-by-algorithm=" + _skipOptimization + ")");
   }
 
   @Benchmark
@@ -226,7 +226,7 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
             + "FROM MyTable "
             + "ORDER BY SORTED_COL DESC "
             + "LIMIT 1052 "
-            + "option(skip-order-by=" + _skipOptimization + ")");
+            + "option(order-by-algorithm=" + _skipOptimization + ")");
   }
 
   @Benchmark
@@ -236,7 +236,7 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
             + "FROM MyTable "
             + "ORDER BY SORTED_COL DESC, LOW_CARDINALITY_STRING_COL "
             + "LIMIT 1052 "
-            + "option(skip-order-by=" + _skipOptimization + ")");
+            + "option(order-by-algorithm=" + _skipOptimization + ")");
   }
 
   @Override

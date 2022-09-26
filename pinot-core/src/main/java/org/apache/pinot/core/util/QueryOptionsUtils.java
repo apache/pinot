@@ -103,7 +103,7 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT));
   }
 
-  public static boolean isSkipOrderByOptimization(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault("skip-order-by", "false"));
+  public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
+    return queryOptions.getOrDefault(QueryOptionKey.ORDER_BY_ALGORITHM, null);
   }
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.Operator;
@@ -74,7 +75,8 @@ public class SelectionPlanNode implements PlanNode {
     // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
     // expression the operator will return a block whose selection result is a priority queue.
     int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions, _queryContext.isNullHandlingEnabled());
-    if (sortedColumnsPrefixSize > 0 && !isSkipOrderByOptimization()) {
+    OrderByAlgorithm orderByAlgorithm = OrderByAlgorithm.fromQueryContext(_queryContext);
+    if (sortedColumnsPrefixSize > 0 && orderByAlgorithm != OrderByAlgorithm.NAIVE) {
       // The first order by expressions are sorted (either asc or desc).
       // ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
       // or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
@@ -167,7 +169,37 @@ public class SelectionPlanNode implements PlanNode {
     }
   }
 
-  private boolean isSkipOrderByOptimization() {
-    return QueryOptionsUtils.isSkipOrderByOptimization(_queryContext.getQueryOptions());
+  public enum OrderByAlgorithm {
+    NAIVE("naive");
+
+    /**
+     * The public name of the algorithm. This name can be used by users to specify the algorithm to use. Therefore any
+     * change here must be backward compatible.
+     *
+     * @see #findByPublicName(String)
+     */
+    private final String _publicName;
+
+    OrderByAlgorithm(String publicName) {
+      _publicName = publicName;
+    }
+
+    @Nullable
+    public static OrderByAlgorithm findByPublicName(@Nullable String publicName) {
+      if (publicName == null || publicName.equals("null") || publicName.isEmpty()) {
+        return null;
+      }
+      for (OrderByAlgorithm value : OrderByAlgorithm.values()) {
+        if (value._publicName.equals(publicName)) {
+          return value;
+        }
+      }
+      throw new IllegalArgumentException("Order by algorithm " + publicName + " is not supported");
+    }
+
+    @Nullable
+    public static OrderByAlgorithm fromQueryContext(QueryContext queryContext) {
+      return OrderByAlgorithm.findByPublicName(QueryOptionsUtils.getOrderByAlgorithm(queryContext.getQueryOptions()));
+    }
   }
 }
