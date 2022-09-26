@@ -400,7 +400,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillLongResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
     long[] rightValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _results[i] = compare(leftValues[i], rightValues[i]);
+      _results[i] = getIntResult(compare(leftValues[i], rightValues[i]));
     }
   }
 
@@ -446,7 +446,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillLongResultArray(ProjectionBlock projectionBlock, double[] leftValues, int length) {
     long[] rightValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _results[i] = compare(leftValues[i], rightValues[i]);
+      _results[i] = getIntResult(compare(leftValues[i], rightValues[i]));
     }
   }
 
