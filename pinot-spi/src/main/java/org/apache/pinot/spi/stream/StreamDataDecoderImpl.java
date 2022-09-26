@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.nio.charset.StandardCharsets;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,14 +27,13 @@ import org.slf4j.LoggerFactory;
 public class StreamDataDecoderImpl implements StreamDataDecoder {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamDataDecoderImpl.class);
 
-  private static final String KEY = "__key";
-  private static final String HEADER_KEY_PREFIX = "__header$";
-  private static final String METADATA_KEY_PREFIX = "__metadata$";
+  public static final String KEY = "__key";
+  public static final String HEADER_KEY_PREFIX = "__header$";
+  public static final String METADATA_KEY_PREFIX = "__metadata$";
 
   private final StreamMessageDecoder _valueDecoder;
   private final GenericRow _reuse = new GenericRow();
 
-  // Maybe simplify by allowing only string keys ?
   public StreamDataDecoderImpl(StreamMessageDecoder valueDecoder) {
     _valueDecoder = valueDecoder;
   }
@@ -47,7 +47,7 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
       GenericRow row = _valueDecoder.decode(message.getValue(), 0, message.getValue().length, _reuse);
       if (row != null) {
         if (message.getKey() != null) {
-          row.putValue(KEY, new String(message.getKey()));
+          row.putValue(KEY, new String(message.getKey(), StandardCharsets.UTF_8));
         }
         RowMetadata metadata = message.getMetadata();
         if (metadata != null) {
@@ -63,7 +63,7 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
             new RuntimeException("Encountered unknown exception when decoding a Stream message"));
       }
     } catch (Exception e) {
-      LOGGER.error("Failed to decode message", e);
+      LOGGER.error("Failed to decode StreamMessage", e);
       return new StreamDataDecoderResult(null, e);
     }
   }

@@ -18,18 +18,26 @@
  */
 package org.apache.pinot.spi.stream;
 
-/**
- * A decoder for {@link StreamMessage}
- */
-public interface StreamDataDecoder {
-  /**
-   * Decodes a {@link StreamMessage}
-   *
-   * Please note that the expectation is that the implementations of this class should never throw an exception.
-   * Instead, it should encapsulate the exception within the {@link StreamDataDecoderResult} object.
-   *
-   * @param message {@link StreamMessage} that contains the data payload and optionally, a key and row metadata
-   * @return {@link StreamDataDecoderResult} that either contains the decoded row or the exception
-   */
-  StreamDataDecoderResult decode(StreamMessage message);
+import java.nio.charset.StandardCharsets;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
+
+public class StreamMessageTest {
+
+  @Test
+  public void testAllowNullKeyAndMetadata() {
+    StreamMessage msg = new StreamMessage("hello".getBytes(StandardCharsets.UTF_8));
+    Assert.assertNull(msg.getKey());
+    Assert.assertNull(msg.getMetadata());
+    Assert.assertEquals(new String(msg.getValue()), "hello");
+
+    StreamMessage msg1 = new StreamMessage("key".getBytes(StandardCharsets.UTF_8),
+        "value".getBytes(StandardCharsets.UTF_8), null);
+    Assert.assertNotNull(msg1.getKey());
+    Assert.assertEquals(new String(msg1.getKey()), "key");
+    Assert.assertNotNull(msg1.getValue());
+    Assert.assertEquals(new String(msg1.getValue()), "value");
+    Assert.assertNull(msg1.getMetadata());
+  }
 }
