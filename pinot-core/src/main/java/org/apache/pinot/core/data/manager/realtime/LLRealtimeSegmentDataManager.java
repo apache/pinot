@@ -1432,7 +1432,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       createPartitionMetadataProvider("Fetch latest stream offset");
     }
     try {
-      return _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
+      return _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA,
+          maxWaitTimeMs);
     } catch (TimeoutException e) {
       _segmentLogger.warn(
           "Cannot fetch latest stream offset for clientId {} and partitionGroupId {} with maxWaitTime {}", _clientId,
