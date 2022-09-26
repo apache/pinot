@@ -632,7 +632,7 @@ public class ClusterIntegrationTestUtils {
             return;
           }
 
-          if (brokerResponseRows.size() == 0 && resultTableResultSet.getRowCount() == 0) {
+          if (brokerResponseRows.size() == 0 || resultTableResultSet.getRowCount() == 0) {
             // Skip comparison if agg results returns 0 row, this is difference in treating
             // always-false literal predicate.
             return;
