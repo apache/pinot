@@ -46,7 +46,7 @@ public class KinesisConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
-    throw new UnsupportedOperationException();
+    return new KinesisStreamMetadataProvider(clientId, _streamConfig);
   }
 
   @Override
