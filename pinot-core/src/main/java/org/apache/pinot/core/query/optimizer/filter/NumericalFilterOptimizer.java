@@ -450,7 +450,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
   }
 
   /** @return field data type extracted from the expression. null if we can't determine the type. */
-  private static @Nullable FieldSpec.DataType getDataType(Expression expression, Schema schema) {
+  @Nullable
+  private static FieldSpec.DataType getDataType(Expression expression, Schema schema) {
     if (expression.getType() == ExpressionType.IDENTIFIER) {
       String column = expression.getIdentifier().getName();
       FieldSpec fieldSpec = schema.getFieldSpecFor(column);

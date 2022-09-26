@@ -52,7 +52,7 @@ public class OperatorUtils {
    * @return Canonicalize form of the input function name
    */
   public static String canonicalizeFunctionName(String functionName) {
-    functionName = StringUtils.replace(functionName, " ", "_");
+    functionName = StringUtils.remove(functionName, " ");
     functionName = OPERATOR_TOKEN_MAPPING.getOrDefault(functionName, functionName);
     return functionName;
   }
