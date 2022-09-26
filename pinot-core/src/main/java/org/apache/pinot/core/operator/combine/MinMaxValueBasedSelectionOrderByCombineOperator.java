@@ -220,7 +220,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     }
   }
 
-  private Comparable extractBoundaryValue(Collection<Object[]> rows) {
+  private static Comparable extractBoundaryValue(Collection<Object[]> rows) {
     if (rows instanceof PriorityQueue) {
       PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) rows;
       assert selectionResult.peek() != null;
