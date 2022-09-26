@@ -71,7 +71,6 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
       segmentToSelectedInstanceMap.put(segment, selectedServer);
     }
 
-
     return segmentToSelectedInstanceMap;
   }
 }
