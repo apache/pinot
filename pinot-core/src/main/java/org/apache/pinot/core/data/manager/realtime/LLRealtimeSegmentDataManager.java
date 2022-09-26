@@ -547,7 +547,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(messagesAndOffsets.getStreamMessage(index));
       RowMetadata msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
       if (decodedRow.getException() != null) {
-        // TODO: handle exception as we do today - do we silently drop the record or throw exception?
+        // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
+        // decode error
         realtimeRowsDroppedMeter =
             _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
                 realtimeRowsDroppedMeter);
