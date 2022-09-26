@@ -43,9 +43,11 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
+import org.apache.pinot.spi.filesystem.FileInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,7 +161,42 @@ public class GcsPinotFS extends BasePinotFS {
   @Override
   public String[] listFiles(URI fileUri, boolean recursive)
       throws IOException {
-    return listFiles(new GcsUri(fileUri), recursive);
+    return listFilesFromGcsUri(new GcsUri(fileUri), recursive);
+  }
+
+  private String[] listFilesFromGcsUri(GcsUri gcsFileUri, boolean recursive)
+      throws IOException {
+    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    String prefix = gcsFileUri.getPrefix();
+    String bucketName = gcsFileUri.getBucketName();
+    visitFiles(gcsFileUri, recursive, blob -> {
+      if (!blob.getName().equals(prefix)) {
+        builder.add(GcsUri.createGcsUri(bucketName, blob.getName()).toString());
+      }
+    });
+    String[] listedFiles = builder.build().toArray(new String[0]);
+    LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, gcsFileUri, recursive);
+    return listedFiles;
+  }
+
+  @Override
+  public List<FileInfo> listFilesWithInfo(URI fileUri, boolean recursive)
+      throws IOException {
+    ImmutableList.Builder<FileInfo> listBuilder = ImmutableList.builder();
+    GcsUri gcsFileUri = new GcsUri(fileUri);
+    String prefix = gcsFileUri.getPrefix();
+    String bucketName = gcsFileUri.getBucketName();
+    visitFiles(gcsFileUri, recursive, blob -> {
+      if (!blob.getName().equals(prefix)) {
+        FileInfo.Builder fileBuilder = new FileInfo.Builder();
+        fileBuilder.setFilePath(GcsUri.createGcsUri(bucketName, blob.getName()).toString())
+            .setLastModifiedTime(blob.getUpdateTime()).setLength(blob.getSize()).setIsDirectory(blob.isDirectory());
+        listBuilder.add(fileBuilder.build());
+      }
+    });
+    ImmutableList<FileInfo> listedFiles = listBuilder.build();
+    LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), gcsFileUri, recursive);
+    return listedFiles;
   }
 
   @Override
@@ -299,10 +336,9 @@ public class GcsPinotFS extends BasePinotFS {
     return isEmpty;
   }
 
-  private String[] listFiles(GcsUri fileUri, boolean recursive)
+  private void visitFiles(GcsUri fileUri, boolean recursive, Consumer<Blob> visitor)
       throws IOException {
     try {
-      ImmutableList.Builder<String> builder = ImmutableList.builder();
       String prefix = fileUri.getPrefix();
       Page<Blob> page;
       if (recursive) {
@@ -311,14 +347,7 @@ public class GcsPinotFS extends BasePinotFS {
         page = _storage.list(fileUri.getBucketName(), Storage.BlobListOption.prefix(prefix),
             Storage.BlobListOption.currentDirectory());
       }
-      page.iterateAll().forEach(blob -> {
-        if (!blob.getName().equals(prefix)) {
-          builder.add(GcsUri.createGcsUri(fileUri.getBucketName(), blob.getName()).toString());
-        }
-      });
-      String[] listedFiles = builder.build().toArray(new String[0]);
-      LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
-      return listedFiles;
+      page.iterateAll().forEach(visitor);
     } catch (Exception t) {
       throw new IOException(t);
     }
@@ -423,7 +452,7 @@ public class GcsPinotFS extends BasePinotFS {
       mkdir(dstUri.getUri());
     }
     boolean copySucceeded = true;
-    for (String directoryEntry : listFiles(srcUri, true)) {
+    for (String directoryEntry : listFilesFromGcsUri(srcUri, true)) {
       GcsUri srcFile = new GcsUri(URI.create(directoryEntry));
       String relativeSrcPath = srcUri.relativize(srcFile);
       GcsUri dstFile = dstUri.resolve(relativeSrcPath);
