@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
@@ -118,22 +119,22 @@ public abstract class BaseDataTable implements DataTable {
    */
   protected Map<String, Map<Integer, String>> deserializeDictionaryMap(ByteBuffer buffer)
       throws IOException {
-      int numDictionaries = buffer.getInt();
-      Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(numDictionaries);
+    int numDictionaries = buffer.getInt();
+    Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(numDictionaries);
 
-      for (int i = 0; i < numDictionaries; i++) {
-        String column = DataTableUtils.decodeString(buffer);
-        int dictionarySize = buffer.getInt();
-        Map<Integer, String> dictionary = new HashMap<>(dictionarySize);
-        for (int j = 0; j < dictionarySize; j++) {
-          int key = buffer.getInt();
-          String value = DataTableUtils.decodeString(buffer);
-          dictionary.put(key, value);
-        }
-        dictionaryMap.put(column, dictionary);
+    for (int i = 0; i < numDictionaries; i++) {
+      String column = DataTableUtils.decodeString(buffer);
+      int dictionarySize = buffer.getInt();
+      Map<Integer, String> dictionary = new HashMap<>(dictionarySize);
+      for (int j = 0; j < dictionarySize; j++) {
+        int key = buffer.getInt();
+        String value = DataTableUtils.decodeString(buffer);
+        dictionary.put(key, value);
       }
+      dictionaryMap.put(column, dictionary);
+    }
 
-      return dictionaryMap;
+    return dictionaryMap;
   }
 
   @Override
@@ -192,19 +193,6 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   @Override
-  public <T> T getObject(int rowId, int colId) {
-    int size = positionCursorInVariableBuffer(rowId, colId);
-    int objectTypeValue = _variableSizeData.getInt();
-    if (size == 0) {
-      assert objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue();
-      return null;
-    }
-    ByteBuffer byteBuffer = _variableSizeData.slice();
-    byteBuffer.limit(size);
-    return ObjectSerDeUtils.deserialize(byteBuffer, objectTypeValue);
-  }
-
-  @Override
   public int[] getIntArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
     int[] ints = new int[length];
@@ -255,6 +243,21 @@ public abstract class BaseDataTable implements DataTable {
     return strings;
   }
 
+  @Nullable
+  @Override
+  public CustomObject getCustomObject(int rowId, int colId) {
+    int size = positionCursorInVariableBuffer(rowId, colId);
+    int type = _variableSizeData.getInt();
+    if (size == 0) {
+      assert type == ObjectSerDeUtils.NULL_TYPE_VALUE;
+      return null;
+    }
+    ByteBuffer buffer = _variableSizeData.slice();
+    buffer.limit(size);
+    return new CustomObject(type, buffer);
+  }
+
+  @Nullable
   @Override
   public RoaringBitmap getNullRowIds(int colId) {
     return null;
@@ -273,7 +276,7 @@ public abstract class BaseDataTable implements DataTable {
     }
 
     StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append(_dataSchema.toString()).append('\n');
+    stringBuilder.append(_dataSchema).append('\n');
     stringBuilder.append("numRows: ").append(_numRows).append('\n');
 
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();

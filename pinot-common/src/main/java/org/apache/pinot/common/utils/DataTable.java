@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -67,8 +68,6 @@ public interface DataTable {
 
   ByteArray getBytes(int rowId, int colId);
 
-  <T> T getObject(int rowId, int colId);
-
   int[] getIntArray(int rowId, int colId);
 
   long[] getLongArray(int rowId, int colId);
@@ -80,11 +79,32 @@ public interface DataTable {
   String[] getStringArray(int rowId, int colId);
 
   @Nullable
+  CustomObject getCustomObject(int rowId, int colId);
+
+  @Nullable
   RoaringBitmap getNullRowIds(int colId);
 
   DataTable toMetadataOnlyDataTable();
 
   DataTable toDataOnlyDataTable();
+
+  class CustomObject {
+    private final int _type;
+    private final ByteBuffer _buffer;
+
+    public CustomObject(int type, ByteBuffer buffer) {
+      _type = type;
+      _buffer = buffer;
+    }
+
+    public int getType() {
+      return _type;
+    }
+
+    public ByteBuffer getBuffer() {
+      return _buffer;
+    }
+  }
 
   enum MetadataValueType {
     INT, LONG, STRING

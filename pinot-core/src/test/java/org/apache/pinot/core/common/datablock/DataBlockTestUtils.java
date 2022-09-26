@@ -144,7 +144,7 @@ public class DataBlockTestUtils {
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
       case OBJECT:
-        return dataBlock.getObject(rowId, colId);
+        return dataBlock.getCustomObject(rowId, colId);
       case BOOLEAN_ARRAY:
       case INT_ARRAY:
         return dataBlock.getIntArray(rowId, colId);

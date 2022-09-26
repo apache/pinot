@@ -443,14 +443,15 @@ public class DataBlockBuilder {
     builder._variableSizeDataByteArrayOutputStream.write(bytes);
   }
 
-  private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, Object value)
+  // TODO: Move ser/de into AggregationFunction interface
+  private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, @Nullable Object value)
       throws IOException {
     byteBuffer.putInt(builder._variableSizeDataByteArrayOutputStream.size());
-    int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
-    if (objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue()) {
+    if (value == null) {
       byteBuffer.putInt(0);
-      builder._variableSizeDataOutputStream.writeInt(objectTypeValue);
+      builder._variableSizeDataOutputStream.writeInt(ObjectSerDeUtils.NULL_TYPE_VALUE);
     } else {
+      int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
       byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
       byteBuffer.putInt(bytes.length);
       builder._variableSizeDataOutputStream.writeInt(objectTypeValue);
