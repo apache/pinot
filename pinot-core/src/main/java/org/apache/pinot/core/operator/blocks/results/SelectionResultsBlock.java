@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.blocks.results;
 
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -37,11 +38,22 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   @Nullable
   private final Comparator<? super Object[]> _comparator;
 
-  public SelectionResultsBlock(DataSchema dataSchema, Collection<Object[]> rows) {
-    this(dataSchema, rows, rows instanceof PriorityQueue ? ((PriorityQueue<Object[]>) rows).comparator() : null);
+  public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows) {
+    this(dataSchema, rows, null);
   }
 
-  public SelectionResultsBlock(DataSchema dataSchema, Collection<Object[]> rows,
+  public SelectionResultsBlock(DataSchema dataSchema, PriorityQueue<Object[]> rows) {
+    this(dataSchema, rows, rows.comparator());
+  }
+
+  public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows,
+      @Nullable Comparator<? super Object[]> comparator) {
+    _dataSchema = dataSchema;
+    _rows = rows;
+    _comparator = comparator;
+  }
+
+  public SelectionResultsBlock(DataSchema dataSchema, PriorityQueue<Object[]> rows,
       @Nullable Comparator<? super Object[]> comparator) {
     _dataSchema = dataSchema;
     _rows = rows;
