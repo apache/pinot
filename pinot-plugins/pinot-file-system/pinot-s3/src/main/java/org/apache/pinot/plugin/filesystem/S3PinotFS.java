@@ -34,9 +34,11 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
+import org.apache.pinot.spi.filesystem.FileInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -435,8 +437,48 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public String[] listFiles(URI fileUri, boolean recursive)
       throws IOException {
+    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    visitFiles(fileUri, recursive, s3Object -> {
+      // TODO: Looks like S3PinotFS filters out directories, inconsistent with the other implementations.
+      // Only add files and not directories
+      if (!s3Object.key().equals(fileUri.getPath()) && !s3Object.key().endsWith(DELIMITER)) {
+        builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object));
+      }
+    });
+    String[] listedFiles = builder.build().toArray(new String[0]);
+    LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
+    return listedFiles;
+  }
+
+  @Override
+  public List<FileInfo> listFilesWithInfo(URI fileUri, boolean recursive)
+      throws IOException {
+    ImmutableList.Builder<FileInfo> listBuilder = ImmutableList.builder();
+    visitFiles(fileUri, recursive, s3Object -> {
+      if (!s3Object.key().equals(fileUri.getPath())) {
+        FileInfo.Builder fileBuilder = new FileInfo.Builder();
+        fileBuilder.setFilePath(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object))
+            .setLastModifiedTime(s3Object.lastModified().toEpochMilli()).setLength(s3Object.size())
+            .setIsDirectory(s3Object.key().endsWith(DELIMITER));
+        listBuilder.add(fileBuilder.build());
+      }
+    });
+    ImmutableList<FileInfo> listedFiles = listBuilder.build();
+    LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), fileUri, recursive);
+    return listedFiles;
+  }
+
+  private static String getNormalizedFileKey(S3Object s3Object) {
+    String fileKey = s3Object.key();
+    if (fileKey.startsWith(DELIMITER)) {
+      fileKey = fileKey.substring(1);
+    }
+    return fileKey;
+  }
+
+  private void visitFiles(URI fileUri, boolean recursive, Consumer<S3Object> visitor)
+      throws IOException {
     try {
-      ImmutableList.Builder<String> builder = ImmutableList.builder();
       String continuationToken = null;
       boolean isDone = false;
       String prefix = normalizeToDirectoryPrefix(fileUri);
@@ -457,22 +499,10 @@ public class S3PinotFS extends BasePinotFS {
         ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
         LOGGER.debug("Getting ListObjectsV2Response: {}", listObjectsV2Response);
         List<S3Object> filesReturned = listObjectsV2Response.contents();
-        filesReturned.stream().forEach(object -> {
-          //Only add files and not directories
-          if (!object.key().equals(fileUri.getPath()) && !object.key().endsWith(DELIMITER)) {
-            String fileKey = object.key();
-            if (fileKey.startsWith(DELIMITER)) {
-              fileKey = fileKey.substring(1);
-            }
-            builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + fileKey);
-          }
-        });
+        filesReturned.forEach(visitor);
         isDone = !listObjectsV2Response.isTruncated();
         continuationToken = listObjectsV2Response.nextContinuationToken();
       }
-      String[] listedFiles = builder.build().toArray(new String[0]);
-      LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
-      return listedFiles;
     } catch (Throwable t) {
       throw new IOException(t);
     }
