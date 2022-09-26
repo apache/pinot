@@ -83,8 +83,6 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
 
-  private final boolean _queryHasMVSelectionOrderBy;
-
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
@@ -104,9 +102,6 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         getComparator(false));
-
-    _queryHasMVSelectionOrderBy = OrderByComparatorFactory.hasMVSelectionOrderBy(_orderByExpressionMetadata, 0,
-        _orderByExpressionMetadata.length);
   }
 
   @Override
