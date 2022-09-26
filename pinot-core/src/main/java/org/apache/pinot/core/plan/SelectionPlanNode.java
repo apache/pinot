@@ -77,18 +77,20 @@ public class SelectionPlanNode implements PlanNode {
     int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions, _queryContext.isNullHandlingEnabled());
     OrderByAlgorithm orderByAlgorithm = OrderByAlgorithm.fromQueryContext(_queryContext);
     if (sortedColumnsPrefixSize > 0 && orderByAlgorithm != OrderByAlgorithm.NAIVE) {
+      int maxDocsPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
       // The first order by expressions are sorted (either asc or desc).
       // ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
       // or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
       // but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
       if (orderByExpressions.get(0).isAsc()) {
-        int maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
+        if (sortedColumnsPrefixSize == orderByExpressions.size()) {
+          maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
+        }
         TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
         TransformOperator transformOperator = planNode.run();
         return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions,
             transformOperator, sortedColumnsPrefixSize);
       } else {
-        int maxDocsPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
         TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
         TransformOperator transformOperator = planNode.run();
         return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions,
