@@ -161,7 +161,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     int count = 1;
     for (File segmentDir : segmentDirs) {
       _eventObserver.notifyProgress(_pinotTaskConfig,
-          String.format("Creating RecordReader for: %s, %d/%d", segmentDir, count++, numInputSegments));
+          String.format("Creating RecordReader for: %s (%d out of %d)", segmentDir, count++, numInputSegments));
       PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
       // NOTE: Do not fill null field with default value to be consistent with other record readers
       recordReader.init(segmentDir, null, null, true);

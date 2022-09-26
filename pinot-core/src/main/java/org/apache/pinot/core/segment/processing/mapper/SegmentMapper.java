@@ -113,7 +113,7 @@ public class SegmentMapper {
     int count = 1;
     GenericRow reuse = new GenericRow();
     for (RecordReader recordReader : _recordReaders) {
-      observer.accept(String.format("Doing map phase on data from RecordReader: %d/%d", count++, totalCount));
+      observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count++, totalCount));
       while (recordReader.hasNext()) {
         reuse = recordReader.next(reuse);
 

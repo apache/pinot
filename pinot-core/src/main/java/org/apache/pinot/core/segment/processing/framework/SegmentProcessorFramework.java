@@ -109,8 +109,8 @@ public class SegmentProcessorFramework {
     int count = 1;
     for (Map.Entry<String, GenericRowFileManager> entry : partitionToFileManagerMap.entrySet()) {
       String partitionId = entry.getKey();
-      observer.accept(
-          String.format("Doing reduce phase on data from partition: %s, %d/%d", partitionId, count++, totalCount));
+      observer.accept(String
+          .format("Doing reduce phase on data from partition: %s (%d out of %d)", partitionId, count++, totalCount));
       GenericRowFileManager fileManager = entry.getValue();
       Reducer reducer = ReducerFactory.getReducer(partitionId, fileManager, _segmentProcessorConfig, _reducerOutputDir);
       entry.setValue(reducer.reduce());
@@ -152,9 +152,9 @@ public class SegmentProcessorFramework {
         int endRowId = Math.min(startRowId + maxNumRecordsPerSegment, numRows);
         LOGGER.info("Start creating segment of sequenceId: {} with row range: {} to {}", sequenceId, startRowId,
             endRowId);
-        observer.accept(String
-            .format("Creating segment of sequentId: %d with data from partition: %s in row range: [%d, %d)/%d",
-                sequenceId, partitionId, startRowId, endRowId, numRows));
+        observer.accept(String.format(
+            "Creating segment of sequentId: %d with data from partition: %s and row range: [%d, %d) out of [0, %d)",
+            sequenceId, partitionId, startRowId, endRowId, numRows));
         generatorConfig.setSequenceId(sequenceId);
         GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
         SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
