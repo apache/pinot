@@ -49,11 +49,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class MultiValueRawQueriesTest extends BaseQueriesTest {
@@ -100,16 +96,20 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       .addMultiValueDimension(MV_RAW_STRING_COL_2, FieldSpec.DataType.STRING)
       .build();
 
-  private static final DataSchema DATA_SCHEMA = new DataSchema(new String[]{"mvDoubleCol", "mvFloatCol", "mvIntCol",
+  private static final DataSchema DATA_SCHEMA = new DataSchema(new String[]{
+      "mvDoubleCol", "mvFloatCol", "mvIntCol",
       "mvLongCol", "mvRawDoubleCol", "mvRawFloatCol", "mvRawIntCol", "mvRawLongCol", "mvRawStringCol",
-      "mvRawStringCol2", "mvStringCol", "mvStringCol2", "svIntCol"},
-      new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY,
+      "mvRawStringCol2", "mvStringCol", "mvStringCol2", "svIntCol"
+  },
+      new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY,
           DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.LONG_ARRAY,
           DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY,
           DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.LONG_ARRAY,
           DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY,
           DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY,
-          DataSchema.ColumnDataType.INT});
+          DataSchema.ColumnDataType.INT
+      });
 
   private static final TableConfig TABLE = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
@@ -501,10 +501,14 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       assertEquals(recordRows.size(), 20);
 
       int[] expectedIntValues = new int[]{0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4};
-      double[] expectedDoubleValues = new double[]{0.0, 0.0, 100.0, 100.0, 1.0, 1.0, 101.0, 101.0, 2.0, 2.0, 102.0,
-          102.0, 3.0, 3.0, 103.0, 103.0, 4.0, 4.0, 104.0, 104.0};
-      String[] expectedStringValues = new String[]{"0", "100", "0", "100", "1", "101", "1", "101", "102", "2", "102",
-          "2", "103", "3", "103", "3", "104", "4", "104", "4"};
+      double[] expectedDoubleValues = new double[]{
+          0.0, 0.0, 100.0, 100.0, 1.0, 1.0, 101.0, 101.0, 2.0, 2.0, 102.0,
+          102.0, 3.0, 3.0, 103.0, 103.0, 4.0, 4.0, 104.0, 104.0
+      };
+      String[] expectedStringValues = new String[]{
+          "0", "100", "0", "100", "1", "101", "1", "101", "102", "2", "102",
+          "2", "103", "3", "103", "3", "104", "4", "104", "4"
+      };
 
       for (int i = 0; i < 20; i++) {
         Object[] values = recordRows.get(i);
@@ -618,10 +622,14 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
           + "CARDINALITY(mvRawLongCol), CARDINALITY(mvLongCol) LIMIT 10";
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
       assertNotNull(resultTable);
-      DataSchema dataSchema = new DataSchema(new String[]{"arraylength(mvRawLongCol)", "arraylength(mvLongCol)",
-          "cardinality(mvRawLongCol)", "cardinality(mvLongCol)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
-              DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
+      DataSchema dataSchema = new DataSchema(new String[]{
+          "arraylength(mvRawLongCol)", "arraylength(mvLongCol)",
+          "cardinality(mvRawLongCol)", "cardinality(mvLongCol)"
+      },
+          new DataSchema.ColumnDataType[]{
+              DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+              DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT
+          });
       assertEquals(resultTable.getDataSchema(), dataSchema);
       List<Object[]> recordRows = resultTable.getRows();
       assertEquals(recordRows.size(), 1);
@@ -1933,14 +1941,22 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       List<Object[]> recordRows = resultTable.getRows();
       assertEquals(recordRows.size(), 10);
 
-      double[] expectedSumValues = new double[]{8472.0, 8464.0, 8456.0, 8448.0, 8440.0, 8432.0, 8424.0, 8416.0, 8408.0,
-          8400.0};
-      double[] expectedMinValues = new double[]{1009.0, 1008.0, 1007.0, 1006.0, 1005.0, 1004.0, 1003.0, 1002.0, 1001.0,
-          1000.0};
-      double[] expectedMaxValues = new double[]{1109.0, 1108.0, 1107.0, 1106.0, 1105.0, 1104.0, 1103.0, 1102.0, 1101.0,
-          1100.0};
-      double[] expectedAvgValues = new double[]{1059.0, 1058.0, 1057.0, 1056.0, 1055.0, 1054.0, 1053.0, 1052.0, 1051.0,
-          1050.0};
+      double[] expectedSumValues = new double[]{
+          8472.0, 8464.0, 8456.0, 8448.0, 8440.0, 8432.0, 8424.0, 8416.0, 8408.0,
+          8400.0
+      };
+      double[] expectedMinValues = new double[]{
+          1009.0, 1008.0, 1007.0, 1006.0, 1005.0, 1004.0, 1003.0, 1002.0, 1001.0,
+          1000.0
+      };
+      double[] expectedMaxValues = new double[]{
+          1109.0, 1108.0, 1107.0, 1106.0, 1105.0, 1104.0, 1103.0, 1102.0, 1101.0,
+          1100.0
+      };
+      double[] expectedAvgValues = new double[]{
+          1059.0, 1058.0, 1057.0, 1056.0, 1055.0, 1054.0, 1053.0, 1052.0, 1051.0,
+          1050.0
+      };
 
       for (int i = 0; i < 10; i++) {
         Object[] values = recordRows.get(i);
@@ -2103,8 +2119,10 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
           + "WHERE mvRawStringCol2 IN ('" + val1 + "', '" + val2 + "')";
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
 
-      DataSchema dataSchema = new DataSchema(new String[]{"countmv(valuein(mvRawStringCol2,'" + val1 + "','" + val2
-          + "'))"},
+      DataSchema dataSchema = new DataSchema(new String[]{
+          "countmv(valuein(mvRawStringCol2,'" + val1 + "','" + val2
+              + "'))"
+      },
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
       assertEquals(resultTable.getDataSchema(), dataSchema);
 

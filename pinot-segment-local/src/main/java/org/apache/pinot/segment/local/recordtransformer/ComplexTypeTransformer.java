@@ -98,7 +98,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
     this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig),
-            parseCollectionNotUnnestedToJson(tableConfig), parsePrefixesToRename(tableConfig), tableConfig);
+        parseCollectionNotUnnestedToJson(tableConfig), parsePrefixesToRename(tableConfig), tableConfig);
   }
 
   @VisibleForTesting
@@ -163,7 +163,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   private static Map<String, String> parsePrefixesToRename(TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
-            && tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToRename() != null) {
+        && tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToRename() != null) {
       return tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToRename();
     } else {
       return Collections.emptyMap();
@@ -329,7 +329,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
           String newName = replacementPrefix + remainingColumnName;
           if (newName.isEmpty() || record.getValue(newName) != null) {
             throw new RuntimeException(
-                    String.format("Name conflict after attempting to rename field %s to %s", field, newName));
+                String.format("Name conflict after attempting to rename field %s to %s", field, newName));
           }
           record.putValue(newName, value);
         }

@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.distinct.raw;
 
 import it.unimi.dsi.fastutil.doubles.DoubleHeapPriorityQueue;
 import it.unimi.dsi.fastutil.doubles.DoublePriorityQueue;
+import org.apache.pinot.common.data.distinct.DistinctTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -41,7 +42,7 @@ public class RawDoubleSingleColumnDistinctOrderByExecutor extends BaseRawDoubleS
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
-    _priorityQueue = new DoubleHeapPriorityQueue(Math.min(limit, MAX_INITIAL_CAPACITY),
+    _priorityQueue = new DoubleHeapPriorityQueue(Math.min(limit, DistinctTable.MAX_INITIAL_CAPACITY),
         (d1, d2) -> Double.compare(d1, d2) * comparisonFactor);
   }
 

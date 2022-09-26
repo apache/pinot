@@ -225,12 +225,14 @@ public class ColumnValueSegmentPrunerTest {
 
   private static class BloomFilterReaderBuilder {
     private BloomFilter<String> _bloomfilter = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100, 0.01);
+
     public BloomFilterReaderBuilder put(String value) {
       _bloomfilter.put(value);
       return this;
     }
 
-    public BloomFilterReader build() throws IOException {
+    public BloomFilterReader build()
+        throws IOException {
       File file = Files.createTempFile("test", ".bloom").toFile();
       try (FileOutputStream fos = new FileOutputStream(file)) {
         _bloomfilter.writeTo(fos);

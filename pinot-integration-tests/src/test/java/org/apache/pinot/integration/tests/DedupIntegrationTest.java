@@ -120,9 +120,9 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
     // Validate the older value persist
     for (int i = 0; i < getCountStarResult(); i++) {
       Assert.assertEquals(getPinotConnection()
-          .execute("SELECT name FROM " + getTableName() + " WHERE id = " + i)
-          .getResultSet(0)
-          .getString(0),
+              .execute("SELECT name FROM " + getTableName() + " WHERE id = " + i)
+              .getResultSet(0)
+              .getString(0),
           "" + i);
     }
   }

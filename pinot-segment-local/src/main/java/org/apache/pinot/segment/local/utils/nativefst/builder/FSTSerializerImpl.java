@@ -309,7 +309,7 @@ public final class FSTSerializerImpl implements FSTSerializer {
 
         int bytes = emitArc(bb, os, gtl, flags, fst.getArcLabel(arc), targetOffset);
         if (bytes < 0) {
-        // gtl too small. interrupt eagerly
+          // gtl too small. interrupt eagerly
           return false;
         }
 

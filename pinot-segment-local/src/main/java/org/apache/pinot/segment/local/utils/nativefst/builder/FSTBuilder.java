@@ -220,7 +220,7 @@ public final class FSTBuilder {
     assert _previous == null || len == 0
         || ByteArray.compare(_previous, 0, _previousLength, sequence, start, start + len) <= 0
         : "Input must be sorted: " + Arrays.toString(Arrays.copyOf(_previous, _previousLength)) + " >= "
-            + Arrays.toString(Arrays.copyOfRange(sequence, start, len));
+        + Arrays.toString(Arrays.copyOfRange(sequence, start, len));
     assert setPrevious(sequence, start, len);
 
     // Determine common prefix length.

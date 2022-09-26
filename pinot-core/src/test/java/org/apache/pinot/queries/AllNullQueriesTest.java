@@ -26,11 +26,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.data.datatable.DataTableFactory;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -63,7 +63,6 @@ public class AllNullQueriesTest extends BaseQueriesTest {
   private static List<GenericRow> _records;
 
   private static final String COLUMN_NAME = "column";
-
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -420,10 +419,10 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         ResultTable resultTable = brokerResponse.getResultTable();
         DataSchema dataSchema = resultTable.getDataSchema();
         assertEquals(dataSchema, new DataSchema(new String[]{"count", "min", "max", "avg", "sum"},
-            new ColumnDataType[] {
+            new ColumnDataType[]{
                 ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
                 ColumnDataType.DOUBLE
-        }));
+            }));
         List<Object[]> rows = resultTable.getRows();
         assertEquals(rows.size(), 1);
         assertEquals((long) rows.get(0)[0], 0);

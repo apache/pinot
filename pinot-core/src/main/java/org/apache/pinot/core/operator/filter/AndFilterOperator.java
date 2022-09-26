@@ -70,7 +70,6 @@ public class AndFilterOperator extends BaseFilterOperator {
     return BufferFastAggregation.andCardinality(bitmaps);
   }
 
-
   @Override
   public List<Operator> getChildOperators() {
     return new ArrayList<>(_filterOperators);

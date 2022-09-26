@@ -325,7 +325,8 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testCommitAfterCatchupWithPeriodOffset() throws Exception {
+  public void testCommitAfterCatchupWithPeriodOffset()
+      throws Exception {
     TableConfig tableConfig = createTableConfig();
     tableConfig.getIndexingConfig().getStreamConfigs()
         .put(StreamConfigProperties.constructStreamProperty(
@@ -372,7 +373,8 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testCommitAfterCatchupWithTimestampOffset() throws Exception {
+  public void testCommitAfterCatchupWithTimestampOffset()
+      throws Exception {
     TableConfig tableConfig = createTableConfig();
     tableConfig.getIndexingConfig().getStreamConfigs()
         .put(StreamConfigProperties.constructStreamProperty(

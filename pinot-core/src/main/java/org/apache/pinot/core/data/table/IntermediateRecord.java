@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.data.table;
 
+import org.apache.pinot.common.data.table.Record;
+
+
 /**
  * Helper class to store the values to be ordered. It also wraps the Key and Record of the record.
  * - When ordering on an aggregation, stores the final result of the aggregation

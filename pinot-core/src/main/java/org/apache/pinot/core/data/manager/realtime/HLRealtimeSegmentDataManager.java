@@ -193,9 +193,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation()).setMemoryManager(
-            getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentName,
-                indexLoadingConfig.isRealtimeOffHeapAllocation(),
-                indexLoadingConfig.isDirectRealtimeOffHeapAllocation(), serverMetrics))
+                getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentName,
+                    indexLoadingConfig.isRealtimeOffHeapAllocation(),
+                    indexLoadingConfig.isDirectRealtimeOffHeapAllocation(), serverMetrics))
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setNullHandlingEnabled(indexingConfig.isNullHandlingEnabled()).build();
     _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics);

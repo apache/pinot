@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+
 /**
  * Class to hold all the rows for a given Explain Plan
  */

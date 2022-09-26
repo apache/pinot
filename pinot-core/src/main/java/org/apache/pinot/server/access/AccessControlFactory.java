@@ -29,7 +29,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public interface AccessControlFactory {
 
   default void init(PinotConfiguration configuration) {
-  };
+  }
 
   /**
    * Extend the original init method to support Zookeeper BasicAuthAccessControlFactory.

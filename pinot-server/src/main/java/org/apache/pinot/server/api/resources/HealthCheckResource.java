@@ -95,7 +95,8 @@ public class HealthCheckResource {
     return getReadinessStatus();
   }
 
-  private String getReadinessStatus() throws WebApplicationException {
+  private String getReadinessStatus()
+      throws WebApplicationException {
     Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == Status.GOOD) {
       _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);

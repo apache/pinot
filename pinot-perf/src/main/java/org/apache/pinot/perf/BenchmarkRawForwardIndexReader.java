@@ -185,7 +185,7 @@ public class BenchmarkRawForwardIndexReader {
       throws IOException {
     try (PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(state._file);
         VarByteChunkSVForwardIndexReaderV4 reader =
-        new VarByteChunkSVForwardIndexReaderV4(buffer, FieldSpec.DataType.BYTES);
+            new VarByteChunkSVForwardIndexReaderV4(buffer, FieldSpec.DataType.BYTES);
         VarByteChunkSVForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
       for (int i = 0; i < state._records; i++) {
         bh.consume(reader.getBytes(i, context));

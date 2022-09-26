@@ -30,6 +30,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 /* NOTE: These test cases are inactive since {@link JsonStatementOptimizer} is currently disabled. */
 @Test(enabled = false)
 public class JsonPathQueriesTest extends BaseJsonQueryTest {
@@ -99,17 +100,25 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
   public void testJsonFilter() {
     // Comparing json path expression with a string value.
     Object[][] expecteds1 =
-        {{1, "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}",
-            "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L,
-            "daffy duck"}};
+        {
+            {
+                1, "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}",
+                "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L,
+                "daffy duck"
+            }
+        };
     checkResult("SELECT * FROM testTable WHERE jsonColumn.name.first = 'daffy' LIMIT 1", expecteds1);
     checkResult("SELECT * FROM testTable WHERE jsonColumnWithoutIndex.name.first = 'daffy' LIMIT 1", expecteds1);
 
     // Comparing json path expression with a numerical value.
     Object[][] expecteds2 =
-        {{1, "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}",
-            "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L,
-            "daffy duck"}};
+        {
+            {
+                1, "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}",
+                "{\"name\":{\"first\":\"daffy\",\"last\":\"duck\"},\"id\":101,\"data\":[\"a\",\"b\",\"c\",\"d\"]}", 1L,
+                "daffy duck"
+            }
+        };
     checkResult("SELECT * FROM testTable WHERE JSON_MATCH(jsonColumn, '\"$.id\" = 101') LIMIT 1", expecteds2);
     try {
       checkResult("SELECT * FROM testTable WHERE JSON_MATCH(jsonColumnWithoutIndex, '\"$.id\" = 101') LIMIT 1",
@@ -130,8 +139,10 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
   @Test(enabled = false)
   public void testJsonGroupBy() {
     Object[][] expecteds1 =
-        {{"111", 20L}, {"101", 4L}, {"null", 8L}, {"181", 4L}, {"161.5", 4L}, {"171", 4L}, {"161", 4L}, {"141", 4L},
-            {"131", 4L}, {"121", 4L}};
+        {
+            {"111", 20L}, {"101", 4L}, {"null", 8L}, {"181", 4L}, {"161.5", 4L}, {"171", 4L}, {"161", 4L}, {"141", 4L},
+            {"131", 4L}, {"121", 4L}
+        };
     checkResult("SELECT jsonColumn.id, count(*) FROM testTable GROUP BY jsonColumn.id", expecteds1);
     checkResult("SELECT jsonColumnWithoutIndex.id, count(*) FROM testTable GROUP BY jsonColumnWithoutIndex.id",
         expecteds1);
@@ -221,8 +232,12 @@ public class JsonPathQueriesTest extends BaseJsonQueryTest {
   @Test(enabled = false)
   public void testTopLevelArrayPathExpressions() {
     // SELECT using json path expressions that refers to second element of a top-level array.
-    Object[][] expecteds1 = {{"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,"
-        + "\"i2\":4}"}};
+    Object[][] expecteds1 = {
+        {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {"{\"i1\":3,\"i2\":4}"}, {
+        "{\"i1\":3,"
+            + "\"i2\":4}"
+    }
+    };
     checkResult("SELECT jsonColumn[1] FROM testTable WHERE intColumn=14", expecteds1);
 
     // SELECT using json path expressions that refers to item within second element of a top-level array.

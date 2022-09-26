@@ -43,6 +43,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class SegmentColumnarIndexCreatorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentColumnarIndexCreatorTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");

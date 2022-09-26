@@ -31,10 +31,6 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.*;
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.MetricEmitter;
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.NOOP_RATE_LIMITER;
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.RateLimiterImpl;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -83,7 +79,8 @@ public class RealtimeConsumptionRateManagerTest {
   }
 
   @Test
-  public void testBuildCache() throws Exception {
+  public void testBuildCache()
+      throws Exception {
     PartitionCountFetcher partitionCountFetcher = mock(PartitionCountFetcher.class);
     LoadingCache<StreamConfig, Integer> cache = buildCache(partitionCountFetcher, 500, TimeUnit.MILLISECONDS);
     when(partitionCountFetcher.fetch(STREAM_CONFIG_A)).thenReturn(10);
@@ -150,21 +147,21 @@ public class RealtimeConsumptionRateManagerTest {
     now = Clock.fixed(Instant.parse("2022-08-10T12:01:05Z"), ZoneOffset.UTC).instant();
     int sumOfMsgsInPrevMinute = sum(numMsgs);
     int expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
-    numMsgs = new int[] {35};
+    numMsgs = new int[]{35};
     assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
 
     // 3rd minute
     now = Clock.fixed(Instant.parse("2022-08-10T12:02:25Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
-    numMsgs = new int[] {0};
+    numMsgs = new int[]{0};
     assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
 
     // 4th minute
     now = Clock.fixed(Instant.parse("2022-08-10T12:03:15Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
-    numMsgs = new int[] {10, 20};
+    numMsgs = new int[]{10, 20};
     assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
     now = Clock.fixed(Instant.parse("2022-08-10T12:03:20Z"), ZoneOffset.UTC).instant();
     assertEquals(metricEmitter.emitMetric(numMsgs[1], rateLimit, now), expectedRatio);
@@ -173,7 +170,7 @@ public class RealtimeConsumptionRateManagerTest {
     now = Clock.fixed(Instant.parse("2022-08-10T12:04:30Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
-    numMsgs = new int[] {5};
+    numMsgs = new int[]{5};
     assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
   }
 

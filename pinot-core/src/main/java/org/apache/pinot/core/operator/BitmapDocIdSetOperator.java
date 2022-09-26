@@ -71,7 +71,6 @@ public class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
     }
   }
 
-
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;

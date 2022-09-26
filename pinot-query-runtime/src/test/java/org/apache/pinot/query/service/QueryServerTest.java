@@ -128,12 +128,14 @@ public class QueryServerTest {
 
   @DataProvider(name = "testDataWithSqlToCompiledAsWorkerRequest")
   private Object[][] provideTestSqlToCompiledToWorkerRequest() {
-    return new Object[][] {
+    return new Object[][]{
         new Object[]{"SELECT * FROM b"},
         new Object[]{"SELECT * FROM a"},
         new Object[]{"SELECT * FROM a JOIN b ON a.col3 = b.col3"},
-        new Object[]{"SELECT a.col1, a.ts, c.col2, c.col3 FROM a JOIN c ON a.col1 = c.col2 "
-            + " WHERE (a.col3 >= 0 OR a.col2 = 'foo') AND c.col3 >= 0"},
+        new Object[]{
+            "SELECT a.col1, a.ts, c.col2, c.col3 FROM a JOIN c ON a.col1 = c.col2 "
+                + " WHERE (a.col3 >= 0 OR a.col2 = 'foo') AND c.col3 >= 0"
+        },
     };
   }
 

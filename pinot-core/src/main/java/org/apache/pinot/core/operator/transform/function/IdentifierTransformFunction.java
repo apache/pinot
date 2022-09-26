@@ -100,7 +100,6 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
     return projectionBlock.getBlockValueSet(_columnName).getDoubleValuesSV();
   }
 
-
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getBigDecimalValuesSV();

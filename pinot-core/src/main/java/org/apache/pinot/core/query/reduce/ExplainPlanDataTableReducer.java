@@ -84,13 +84,17 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
     for (ExplainPlanRows explainPlanRows : explainPlanRowsList) {
       String numSegmentsExplainString = String.format(ExplainPlanRows.PLAN_START_FORMAT,
           explainPlanRows.getNumSegmentsMatchingThisPlan());
-      Object[] numSegmentsRow = {numSegmentsExplainString, ExplainPlanRows.PLAN_START_IDS,
-          ExplainPlanRows.PLAN_START_IDS};
+      Object[] numSegmentsRow = {
+          numSegmentsExplainString, ExplainPlanRows.PLAN_START_IDS,
+          ExplainPlanRows.PLAN_START_IDS
+      };
       reducedRows.add(numSegmentsRow);
 
       for (ExplainPlanRowData explainPlanRowData : explainPlanRows.getExplainPlanRowData()) {
-        Object[] row = {explainPlanRowData.getExplainPlanString(), explainPlanRowData.getOperatorId(),
-            explainPlanRowData.getParentId()};
+        Object[] row = {
+            explainPlanRowData.getExplainPlanString(), explainPlanRowData.getOperatorId(),
+            explainPlanRowData.getParentId()
+        };
         reducedRows.add(row);
       }
     }

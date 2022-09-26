@@ -61,8 +61,10 @@ public class MutableFSTSanityTest {
   @Test
   public void testRegex()
       throws IOException {
-    for (String regex : new String[]{"q.[aeiou]c.*", "a.*", "b.*", ".*", ".*landau", "landau.*", ".*ated", ".*ed",
-        ".*pot.*", ".*a"}) {
+    for (String regex : new String[]{
+        "q.[aeiou]c.*", "a.*", "b.*", ".*", ".*landau", "landau.*", ".*ated", ".*ed",
+        ".*pot.*", ".*a"
+    }) {
       testRegex(regex);
     }
   }

@@ -27,6 +27,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 /**
  * Integration test that starts one broker with auto-discovered echo service and test it
  */
@@ -63,7 +64,7 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
 
   @AfterClass
   public void tearDown()
-          throws Exception {
+      throws Exception {
 
     // Brokers and servers has been stopped
     stopBroker();

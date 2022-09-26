@@ -24,12 +24,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.data.customobject.AvgPair;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.segment.local.customobject.AvgPair;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;

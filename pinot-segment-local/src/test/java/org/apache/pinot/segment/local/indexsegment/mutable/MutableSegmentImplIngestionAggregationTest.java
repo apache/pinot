@@ -200,7 +200,6 @@ public class MutableSegmentImplIngestionAggregationTest {
     List<List<Metric>> metrics = new ArrayList<>();
     Set<String> keys = new HashSet<>();
 
-
     Random random = new Random(seed);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
 

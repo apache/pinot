@@ -19,9 +19,9 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
+import org.apache.pinot.common.data.customobject.AvgPair;
 import org.apache.pinot.segment.local.aggregator.AvgValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;

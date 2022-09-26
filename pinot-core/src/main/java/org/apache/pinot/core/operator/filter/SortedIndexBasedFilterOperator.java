@@ -218,7 +218,6 @@ public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
     return new BitmapCollection(_numDocs, exclusive, bitmap);
   }
 
-
   @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();

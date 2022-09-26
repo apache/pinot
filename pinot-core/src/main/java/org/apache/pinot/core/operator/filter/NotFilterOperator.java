@@ -37,7 +37,6 @@ public class NotFilterOperator extends BaseFilterOperator {
     _numDocs = numDocs;
   }
 
-
   @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_filterOperator);

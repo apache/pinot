@@ -116,11 +116,11 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
     }
   }
 
-
   @Override
   public String toExplainString() {
     return toExplainString(EXPLAIN_NAME);
   }
+
   public String toExplainString(String explainName) {
     ExpressionContext[] functions = _transformFunctionMap.keySet().toArray(new ExpressionContext[0]);
 

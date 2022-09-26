@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.common.data.customobject.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;

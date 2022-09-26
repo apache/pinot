@@ -149,159 +149,259 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     int max = NUM_RECORDS - 20;
     String allBuckets = Arrays.toString(IntStream.range(0, BUCKET_SIZE).toArray())
         .replace('[', '(').replace(']', ')');
-    String twoBuckets = Arrays.toString(new int[] {0, 7})
+    String twoBuckets = Arrays.toString(new int[]{0, 7})
         .replace('[', '(').replace(']', ')');
-    return new Object[][] {
+    return new Object[][]{
         {"select count(*) from " + RAW_TABLE_NAME, NUM_RECORDS},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + CLASSIFICATION_COLUMN + " = 1", bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')", bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where NOT JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')", bucketCountComplement},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text1')", bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where NOT TEXT_MATCH(" + TEXT_COLUMN + ", 'text1')", bucketCountComplement},
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + CLASSIFICATION_COLUMN + " = 1", bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')", bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where NOT JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')", bucketCountComplement
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text1')", bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where NOT TEXT_MATCH(" + TEXT_COLUMN + ", 'text1')", bucketCountComplement
+        },
         {"select count(*) from " + RAW_TABLE_NAME + " where " + SORTED_COLUMN + " = 1", 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " between " + min + " and " + max, max - min + 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " not between " + min + " and " + max, NUM_RECORDS - (max - min + 1)},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " in " + allBuckets, BUCKET_SIZE},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " in " + allBuckets
-            + " and " + CLASSIFICATION_COLUMN + " in " + allBuckets, BUCKET_SIZE},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + CLASSIFICATION_COLUMN + " <> 1", bucketCountComplement},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + CLASSIFICATION_COLUMN + " in " + twoBuckets, 2 * bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + CLASSIFICATION_COLUMN + " not in " + twoBuckets, NUM_RECORDS - 2 * bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + CLASSIFICATION_COLUMN + " in " + twoBuckets
-            + " and " + SORTED_COLUMN + " < " + (NUM_RECORDS / 2), bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " = 1"
-            + " and " + CLASSIFICATION_COLUMN + " = 1", 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " = 1"
-            + " and " + CLASSIFICATION_COLUMN + " <> 1", 0},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " = 1"
-            + " and " + CLASSIFICATION_COLUMN + " <> 0", 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " and " + CLASSIFICATION_COLUMN + " <> 1", bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or " + CLASSIFICATION_COLUMN + " <> 1", bucketCountComplement},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or " + CLASSIFICATION_COLUMN + " = 1", 2 * bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or " + CLASSIFICATION_COLUMN + " = 1", bucketCountComplement},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')"
-            + " or " + CLASSIFICATION_COLUMN + " = 2", 3 * bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or not JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=0')"
-            + " or " + CLASSIFICATION_COLUMN + " <> 0", bucketCountComplement},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')"
-            + " or " + CLASSIFICATION_COLUMN + " <> 2", bucketCountComplement},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or not JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')"
-            + " or " + CLASSIFICATION_COLUMN + " <> 2", NUM_RECORDS},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')"
-            + " or " + CLASSIFICATION_COLUMN + " <> 2", NUM_RECORDS},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')"
-            + " or " + CLASSIFICATION_COLUMN + " = 0", NUM_RECORDS},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " <> 1"
-            + " and " + CLASSIFICATION_COLUMN + " = 1", bucketCount - 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= 0"
-            + " and " + CLASSIFICATION_COLUMN + " = 1", bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " > 1"
-            + " and " + CLASSIFICATION_COLUMN + " = 1", bucketCount - 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= 0"
-            + " and " + CLASSIFICATION_COLUMN + " <> 1", bucketCountComplement},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " and " + CLASSIFICATION_COLUMN + " <> 1", NUM_RECORDS - 2 * bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or " + CLASSIFICATION_COLUMN + " <> 1", NUM_RECORDS},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
-            + " or " + CLASSIFICATION_COLUMN + " <> 0", bucketCountComplement},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= 0"
-            + " or " + CLASSIFICATION_COLUMN + " <> 0", NUM_RECORDS},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where TEXT_MATCH(" + TEXT_COLUMN + ",  'text0')"
-            + " and " + SORTED_COLUMN + " <> 1", bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where TEXT_MATCH(" + TEXT_COLUMN + ",  'text1')"
-            + " and " + SORTED_COLUMN + " <> 1", bucketCount - 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where TEXT_MATCH(" + TEXT_COLUMN + ",  'text0')"
-            + " and " + CLASSIFICATION_COLUMN + " <> 1", bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= 500"
-            + " and " + CLASSIFICATION_COLUMN + " <> 0"
-            + " and not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')", bucketCountComplement / 2 + 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= 500"
-            + " and " + CLASSIFICATION_COLUMN + " <> 0"
-            + " and TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')", 0},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " < " + bucketCount
-            + " and " + CLASSIFICATION_COLUMN + " <> 0", bucketCount - bucketCount / BUCKET_SIZE - 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= " + bucketCount
-            + " and " + CLASSIFICATION_COLUMN + " <> 0", bucketCountComplement - bucketCountComplement / BUCKET_SIZE},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " < " + (BUCKET_SIZE - 1)
-            + " and " + CLASSIFICATION_COLUMN + " = " + (BUCKET_SIZE - 1), 0},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= " + (BUCKET_SIZE - 2)
-            + " and " + CLASSIFICATION_COLUMN + " = " + (BUCKET_SIZE - 2), bucketCount},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= " + min
-            + " and " + SORTED_COLUMN + " < " + max
-            + " and " + CLASSIFICATION_COLUMN + " = 0", bucketCount - (min + NUM_RECORDS - max) / BUCKET_SIZE},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= 500"
-            + " and " + CLASSIFICATION_COLUMN + " <> 0"
-            + " and not JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=0')"
-            + " and not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')", bucketCountComplement / 2 + 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + INT_RANGE_COLUMN + " >= " + min
-            + " and " + INT_RANGE_COLUMN + " < " + max, max - min},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + INT_RANGE_COLUMN + " < " + max, max - 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + INT_RANGE_COLUMN + " not between " + min + " and " + max, NUM_RECORDS - max + min - 1},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + INT_RANGE_COLUMN + " between " + min + " and " + max
-            + " and " + CLASSIFICATION_COLUMN + " = 0", bucketCount - (min + NUM_RECORDS - max) / BUCKET_SIZE},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + INT_RANGE_COLUMN + " not between " + min + " and " + max
-            + " and " + CLASSIFICATION_COLUMN + " = 0", (min + NUM_RECORDS - max) / BUCKET_SIZE}
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " between " + min + " and " + max, max - min + 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " not between " + min + " and " + max, NUM_RECORDS - (max - min + 1)
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " in " + allBuckets, BUCKET_SIZE
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " in " + allBuckets
+                + " and " + CLASSIFICATION_COLUMN + " in " + allBuckets, BUCKET_SIZE
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + CLASSIFICATION_COLUMN + " <> 1", bucketCountComplement
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + CLASSIFICATION_COLUMN + " in " + twoBuckets, 2 * bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + CLASSIFICATION_COLUMN + " not in " + twoBuckets, NUM_RECORDS - 2 * bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + CLASSIFICATION_COLUMN + " in " + twoBuckets
+                + " and " + SORTED_COLUMN + " < " + (NUM_RECORDS / 2), bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " = 1"
+                + " and " + CLASSIFICATION_COLUMN + " = 1", 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " = 1"
+                + " and " + CLASSIFICATION_COLUMN + " <> 1", 0
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " = 1"
+                + " and " + CLASSIFICATION_COLUMN + " <> 0", 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " and " + CLASSIFICATION_COLUMN + " <> 1", bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or " + CLASSIFICATION_COLUMN + " <> 1", bucketCountComplement
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or " + CLASSIFICATION_COLUMN + " = 1", 2 * bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or " + CLASSIFICATION_COLUMN + " = 1", bucketCountComplement
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')"
+                + " or " + CLASSIFICATION_COLUMN + " = 2", 3 * bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or not JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=0')"
+                + " or " + CLASSIFICATION_COLUMN + " <> 0", bucketCountComplement
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')"
+                + " or " + CLASSIFICATION_COLUMN + " <> 2", bucketCountComplement
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or not JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')"
+                + " or " + CLASSIFICATION_COLUMN + " <> 2", NUM_RECORDS
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')"
+                + " or " + CLASSIFICATION_COLUMN + " <> 2", NUM_RECORDS
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=1')"
+                + " or " + CLASSIFICATION_COLUMN + " = 0", NUM_RECORDS
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " <> 1"
+                + " and " + CLASSIFICATION_COLUMN + " = 1", bucketCount - 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " >= 0"
+                + " and " + CLASSIFICATION_COLUMN + " = 1", bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " > 1"
+                + " and " + CLASSIFICATION_COLUMN + " = 1", bucketCount - 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " >= 0"
+                + " and " + CLASSIFICATION_COLUMN + " <> 1", bucketCountComplement
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " and " + CLASSIFICATION_COLUMN + " <> 1", NUM_RECORDS - 2 * bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or " + CLASSIFICATION_COLUMN + " <> 1", NUM_RECORDS
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
+                + " or " + CLASSIFICATION_COLUMN + " <> 0", bucketCountComplement
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " >= 0"
+                + " or " + CLASSIFICATION_COLUMN + " <> 0", NUM_RECORDS
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where TEXT_MATCH(" + TEXT_COLUMN + ",  'text0')"
+                + " and " + SORTED_COLUMN + " <> 1", bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where TEXT_MATCH(" + TEXT_COLUMN + ",  'text1')"
+                + " and " + SORTED_COLUMN + " <> 1", bucketCount - 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where TEXT_MATCH(" + TEXT_COLUMN + ",  'text0')"
+                + " and " + CLASSIFICATION_COLUMN + " <> 1", bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " >= 500"
+                + " and " + CLASSIFICATION_COLUMN + " <> 0"
+                + " and not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')", bucketCountComplement / 2 + 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " >= 500"
+                + " and " + CLASSIFICATION_COLUMN + " <> 0"
+                + " and TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')", 0
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " < " + bucketCount
+                + " and " + CLASSIFICATION_COLUMN + " <> 0", bucketCount - bucketCount / BUCKET_SIZE - 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " >= " + bucketCount
+                + " and " + CLASSIFICATION_COLUMN + " <> 0", bucketCountComplement - bucketCountComplement / BUCKET_SIZE
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " < " + (BUCKET_SIZE - 1)
+                + " and " + CLASSIFICATION_COLUMN + " = " + (BUCKET_SIZE - 1), 0
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " >= " + (BUCKET_SIZE - 2)
+                + " and " + CLASSIFICATION_COLUMN + " = " + (BUCKET_SIZE - 2), bucketCount
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " >= " + min
+                + " and " + SORTED_COLUMN + " < " + max
+                + " and " + CLASSIFICATION_COLUMN + " = 0", bucketCount - (min + NUM_RECORDS - max) / BUCKET_SIZE
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + SORTED_COLUMN + " >= 500"
+                + " and " + CLASSIFICATION_COLUMN + " <> 0"
+                + " and not JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=0')"
+                + " and not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')", bucketCountComplement / 2 + 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + INT_RANGE_COLUMN + " >= " + min
+                + " and " + INT_RANGE_COLUMN + " < " + max, max - min
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + INT_RANGE_COLUMN + " < " + max, max - 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + INT_RANGE_COLUMN + " not between " + min + " and " + max, NUM_RECORDS - max + min - 1
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + INT_RANGE_COLUMN + " between " + min + " and " + max
+                + " and " + CLASSIFICATION_COLUMN + " = 0", bucketCount - (min + NUM_RECORDS - max) / BUCKET_SIZE
+        },
+        {
+            "select count(*) from " + RAW_TABLE_NAME
+                + " where " + INT_RANGE_COLUMN + " not between " + min + " and " + max
+                + " and " + CLASSIFICATION_COLUMN + " = 0", (min + NUM_RECORDS - max) / BUCKET_SIZE
+        }
     };
   }
 

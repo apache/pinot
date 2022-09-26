@@ -70,25 +70,25 @@ import org.slf4j.LoggerFactory;
  * </code>
  */
 public class ServiceAutoDiscoveryFeature implements Feature {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ServiceAutoDiscoveryFeature.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServiceAutoDiscoveryFeature.class);
 
-    @Inject
-    ServiceLocator _serviceLocator;
+  @Inject
+  ServiceLocator _serviceLocator;
 
-    @Override
-    public boolean configure(FeatureContext context) {
-        DynamicConfigurationService dcs =
-                _serviceLocator.getService(DynamicConfigurationService.class);
-        Populator populator = dcs.getPopulator();
-        try {
-            // Populator - populate HK2 service locators from inhabitants files
-            // ClasspathDescriptorFileFinder - find files from META-INF/hk2-locator/default
-            populator.populate(
-                    new ClasspathDescriptorFileFinder(this.getClass().getClassLoader()),
-                    new DuplicatePostProcessor());
-        } catch (IOException | MultiException ex) {
-            LOGGER.error("Failed to register service locator. Auto-discovery will fail, but app will continue", ex);
-        }
-        return true;
+  @Override
+  public boolean configure(FeatureContext context) {
+    DynamicConfigurationService dcs =
+        _serviceLocator.getService(DynamicConfigurationService.class);
+    Populator populator = dcs.getPopulator();
+    try {
+      // Populator - populate HK2 service locators from inhabitants files
+      // ClasspathDescriptorFileFinder - find files from META-INF/hk2-locator/default
+      populator.populate(
+          new ClasspathDescriptorFileFinder(this.getClass().getClassLoader()),
+          new DuplicatePostProcessor());
+    } catch (IOException | MultiException ex) {
+      LOGGER.error("Failed to register service locator. Auto-discovery will fail, but app will continue", ex);
     }
+    return true;
+  }
 }

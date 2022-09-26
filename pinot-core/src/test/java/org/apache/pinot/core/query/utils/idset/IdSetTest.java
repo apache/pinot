@@ -22,6 +22,8 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.io.IOException;
 import java.util.Random;
+import org.apache.pinot.common.data.idset.IdSet;
+import org.apache.pinot.common.data.idset.IdSets;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

@@ -97,6 +97,7 @@ public abstract class FilterOperand extends TransformOperand {
 
   private static class And extends FilterOperand {
     List<FilterOperand> _childOperands;
+
     public And(List<RexExpression> childExprs, DataSchema dataSchema) {
       _childOperands = new ArrayList<>(childExprs.size());
       for (RexExpression childExpr : childExprs) {
@@ -117,6 +118,7 @@ public abstract class FilterOperand extends TransformOperand {
 
   private static class Or extends FilterOperand {
     List<FilterOperand> _childOperands;
+
     public Or(List<RexExpression> childExprs, DataSchema dataSchema) {
       _childOperands = new ArrayList<>(childExprs.size());
       for (RexExpression childExpr : childExprs) {
@@ -137,6 +139,7 @@ public abstract class FilterOperand extends TransformOperand {
 
   private static class Not extends FilterOperand {
     FilterOperand _childOperand;
+
     public Not(FilterOperand childOperand) {
       _childOperand = childOperand;
     }

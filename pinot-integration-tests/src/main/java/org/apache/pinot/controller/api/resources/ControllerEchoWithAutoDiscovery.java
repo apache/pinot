@@ -37,12 +37,13 @@ import org.apache.pinot.core.api.AutoLoadedServiceForTest;
 @Api(tags = "Test")
 @Path("/test")
 public class ControllerEchoWithAutoDiscovery {
-    @Inject
-    public AutoLoadedServiceForTest _injectedService;
-    @GET
-    @Path("/echo/{table}")
-    @Produces(MediaType.TEXT_PLAIN)
-    public String echo(@PathParam("table") String table) {
-        return _injectedService.echo(table);
-    }
+  @Inject
+  public AutoLoadedServiceForTest _injectedService;
+
+  @GET
+  @Path("/echo/{table}")
+  @Produces(MediaType.TEXT_PLAIN)
+  public String echo(@PathParam("table") String table) {
+    return _injectedService.echo(table);
+  }
 }

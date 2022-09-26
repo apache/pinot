@@ -1,22 +1,22 @@
 [
   {
     "event_id": "aa",
-    "description" : "first",
+    "description": "first",
     "secondsSinceEpoch": 1567205394
   },
   {
     "event_id": "bb",
-    "description" : "first",
+    "description": "first",
     "secondsSinceEpoch": 1567205396
   },
   {
     "event_id": "aa",
-    "description" : "second",
+    "description": "second",
     "secondsSinceEpoch": 1567205397
   },
   {
     "event_id": "bb",
-    "description" : "second",
+    "description": "second",
     "secondsSinceEpoch": 1567205392
   }
 ]

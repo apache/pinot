@@ -117,8 +117,10 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         new Object[]{"jsonExtractScalar(json,'$.bigDecimalSV','BIG_DECIMAL')", FieldSpec.DataType.BIG_DECIMAL, true},
         // Test operating on the output of another transform (trim) to avoid passing the evaluation down to the
         // storage in order to test transformTransformedValuesToXXXValuesSV() methods.
-        new Object[]{"jsonExtractScalar(trim(json),'$.bigDecimalSV','BIG_DECIMAL')",
-            FieldSpec.DataType.BIG_DECIMAL, true},
+        new Object[]{
+            "jsonExtractScalar(trim(json),'$.bigDecimalSV','BIG_DECIMAL')",
+            FieldSpec.DataType.BIG_DECIMAL, true
+        },
         new Object[]{"jsonExtractScalar(json,'$.stringSV','STRING')", FieldSpec.DataType.STRING, true},
         new Object[]{"json_extract_scalar(json,'$.intSV','INT', '0')", FieldSpec.DataType.INT, true},
         new Object[]{"json_extract_scalar(json,'$.intMV','INT_ARRAY', '0')", FieldSpec.DataType.INT, false},
@@ -126,8 +128,10 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         new Object[]{"json_extract_scalar(json,'$.floatSV','FLOAT', '0.0')", FieldSpec.DataType.FLOAT, true},
         new Object[]{"json_extract_scalar(json,'$.doubleSV','DOUBLE', '0.0')", FieldSpec.DataType.DOUBLE, true},
         new Object[]{"json_extract_scalar(json,'$.stringSV','STRING', 'null')", FieldSpec.DataType.STRING, true},
-        new Object[]{"jsonExtractScalar(json,'$.bigDecimalSV','BIG_DECIMAL', '0.0')",
-            FieldSpec.DataType.BIG_DECIMAL, true},
+        new Object[]{
+            "jsonExtractScalar(json,'$.bigDecimalSV','BIG_DECIMAL', '0.0')",
+            FieldSpec.DataType.BIG_DECIMAL, true
+        },
     };
     //@formatter:on
   }
@@ -289,10 +293,14 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     //@formatter:off
     return new Object[][]{
         new Object[]{"jsonExtractScalar(5,'$.store.book[0].author','$.store.book[0].author')"},
-        new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author','$.store.book[0].author')",
-            INT_SV_COLUMN)},
-        new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author','$.store.book[0].author')",
-            INT_MV_COLUMN)},
+        new Object[]{
+            String.format("jsonExtractScalar(%s,'$.store.book[0].author','$.store.book[0].author')",
+                INT_SV_COLUMN)
+        },
+        new Object[]{
+            String.format("jsonExtractScalar(%s,'$.store.book[0].author','$.store.book[0].author')",
+                INT_MV_COLUMN)
+        },
         new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author', 'STRINGARRAY')", STRING_SV_COLUMN)}
     };
     //@formatter:on
@@ -304,13 +312,16 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     return new Object[][]{
         new Object[]{String.format("jsonExtractScalar(%s)", JSON_COLUMN)},
         new Object[]{String.format("jsonExtractScalar(%s,'$.store.book[0].author')", JSON_COLUMN)},
-        new Object[]{String.format("jsonExtractScalar(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN,
-            INT_SV_COLUMN)},
+        new Object[]{
+            String.format("jsonExtractScalar(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN,
+                INT_SV_COLUMN)
+        },
         new Object[]{String.format("jsonExtractScalar(%s, \"$.store.book[0].author\", 'String')", JSON_COLUMN)},
         new Object[]{String.format("jsonExtractScalar(%s, '$.store.book[0].author', \"String\")", JSON_COLUMN)},
         new Object[]{String.format("json_extract_scalar(%s, \"$.store.book[0].author\", 'String','abc')", JSON_COLUMN)},
         new Object[]{String.format("jsonExtractKey(%s, \"$.*\")", JSON_COLUMN)},
-        new Object[]{String.format("json_extract_key(%s, \"$.*\")", JSON_COLUMN)}};
+        new Object[]{String.format("json_extract_key(%s, \"$.*\")", JSON_COLUMN)}
+    };
     //@formatter:on
   }
 }

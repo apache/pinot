@@ -69,7 +69,6 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
     }
   }
 
-
   @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_docIdSetOperator);

@@ -67,8 +67,10 @@ public class FSTSanityTest {
   @Test
   public void testRegex()
       throws IOException {
-    for (String regex : new String[]{"q.[aeiou]c.*", "a.*", "b.*", ".*", ".*tion", "abai.*", ".*ated", ".*ed",
-        ".*pot.*", ".*a"}) {
+    for (String regex : new String[]{
+        "q.[aeiou]c.*", "a.*", "b.*", ".*", ".*tion", "abai.*", ".*ated", ".*ed",
+        ".*pot.*", ".*a"
+    }) {
       testRegex(regex);
     }
   }

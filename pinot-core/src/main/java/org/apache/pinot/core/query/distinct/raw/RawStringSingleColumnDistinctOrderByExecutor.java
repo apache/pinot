@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.distinct.raw;
 
 import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
+import org.apache.pinot.common.data.distinct.DistinctTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -42,10 +43,10 @@ public class RawStringSingleColumnDistinctOrderByExecutor extends BaseRawStringS
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
     if (nullHandlingEnabled) {
-      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
+      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, DistinctTable.MAX_INITIAL_CAPACITY),
           (s1, s2) -> s1 == null ? (s2 == null ? 0 : 1) : (s2 == null ? -1 : s1.compareTo(s2)) * comparisonFactor);
     } else {
-      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
+      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, DistinctTable.MAX_INITIAL_CAPACITY),
           (s1, s2) -> s1.compareTo(s2) * comparisonFactor);
     }
   }

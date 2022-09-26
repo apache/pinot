@@ -108,7 +108,7 @@ public final class IngestionUtils {
       BatchIngestionConfig batchIngestionConfig)
       throws ClassNotFoundException, IOException {
     Preconditions.checkState(batchIngestionConfig != null && batchIngestionConfig.getBatchConfigMaps() != null
-        && batchIngestionConfig.getBatchConfigMaps().size() == 1,
+            && batchIngestionConfig.getBatchConfigMaps().size() == 1,
         "Must provide batchIngestionConfig and contains exactly 1 batchConfigMap for table: %s, "
             + "for generating SegmentGeneratorConfig",
         tableConfig.getTableName());

@@ -58,7 +58,8 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
     int numColumns = dataTable.getDataSchema().size();
     int numRows = dataTable.getNumberOfRows();
     if (nullHandlingEnabled) {
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];;
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+      ;
       for (int coldId = 0; coldId < numColumns; coldId++) {
         nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
       }

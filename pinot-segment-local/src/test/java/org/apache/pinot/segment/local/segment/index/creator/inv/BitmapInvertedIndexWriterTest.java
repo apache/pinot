@@ -56,7 +56,7 @@ public class BitmapInvertedIndexWriterTest {
     RoaringBitmap huge = huge();
     RoaringBitmap small = small();
     RoaringBitmap empty = empty();
-    _bitmaps = new RoaringBitmap[] { huge, small, empty };
+    _bitmaps = new RoaringBitmap[]{huge, small, empty};
   }
 
   @AfterClass
@@ -92,7 +92,7 @@ public class BitmapInvertedIndexWriterTest {
       for (Integer boxed : permutation) {
         ints[j++] = boxed % _bitmaps.length;
       }
-      testCases[i++] = new Object[] { ints };
+      testCases[i++] = new Object[]{ints};
     }
     return testCases;
   }
@@ -117,7 +117,7 @@ public class BitmapInvertedIndexWriterTest {
   private void verifyReadable(RoaringBitmap[] bitmaps)
       throws IOException {
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(_file);
-         BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(buffer, bitmaps.length)) {
+        BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(buffer, bitmaps.length)) {
       int dictId = 0;
       for (RoaringBitmap bitmap : bitmaps) {
         ImmutableRoaringBitmap persisted = reader.getDocIds(dictId++);

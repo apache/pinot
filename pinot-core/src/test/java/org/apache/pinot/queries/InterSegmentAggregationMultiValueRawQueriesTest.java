@@ -22,10 +22,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
+import org.apache.pinot.common.data.ObjectSerDeUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
@@ -89,8 +89,10 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
         + " GROUP BY key ORDER BY value";
     brokerResponse = getBrokerResponse(query);
     expectedDataSchema =
-        new DataSchema(new String[]{"key", "value"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.LONG});
+        new DataSchema(new String[]{"key", "value"}, new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.LONG
+        });
     expectedResultTable = new ResultTable(expectedDataSchema,
         Arrays.asList(new Object[]{246, 24300L}, new Object[]{469, 33576L}, new Object[]{363, 35436L}));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable);

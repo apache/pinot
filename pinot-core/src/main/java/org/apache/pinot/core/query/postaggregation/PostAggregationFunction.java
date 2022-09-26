@@ -41,10 +41,10 @@ public class PostAggregationFunction {
     if (functionInfo == null) {
       if (FunctionRegistry.containsFunction(functionName)) {
         throw new IllegalArgumentException(
-          String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+            String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
       } else {
         throw new IllegalArgumentException(
-          String.format("Unsupported function: %s not found", functionName));
+            String.format("Unsupported function: %s not found", functionName));
       }
     }
     _functionInvoker = new FunctionInvoker(functionInfo);

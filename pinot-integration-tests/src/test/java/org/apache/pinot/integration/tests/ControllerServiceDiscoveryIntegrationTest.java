@@ -70,9 +70,10 @@ public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegr
     startBrokers(1);
     startServers(1);
   }
+
   @AfterClass
   public void tearDown()
-          throws Exception {
+      throws Exception {
 
     // Brokers and servers has been stopped
     stopBroker();

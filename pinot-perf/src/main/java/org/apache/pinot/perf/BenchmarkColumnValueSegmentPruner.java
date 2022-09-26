@@ -114,7 +114,6 @@ public class BenchmarkColumnValueSegmentPruner {
   private static final String NO_INDEX_STRING_COL = "NO_INDEX_STRING_COL";
   private static final String LOW_CARDINALITY_STRING_COL = "LOW_CARDINALITY_STRING_COL";
 
-
   @Setup
   public void setUp()
       throws Exception {
@@ -189,7 +188,7 @@ public class BenchmarkColumnValueSegmentPruner {
         .setBloomFilterColumns(Collections.singletonList(SORTED_COL_NAME))
         .setStarTreeIndexConfigs(Collections.singletonList(new StarTreeIndexConfig(
             Arrays.asList(SORTED_COL_NAME, INT_COL_NAME), null, Collections.singletonList(
-                new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
+            new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
             Integer.MAX_VALUE)))
         .build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)

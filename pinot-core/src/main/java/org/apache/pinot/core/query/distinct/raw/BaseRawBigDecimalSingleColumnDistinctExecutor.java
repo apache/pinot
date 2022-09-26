@@ -23,12 +23,12 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.data.distinct.DistinctTable;
+import org.apache.pinot.common.data.table.Record;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
-import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -50,7 +50,7 @@ public abstract class BaseRawBigDecimalSingleColumnDistinctExecutor implements D
     _limit = limit;
     _nullHandlingEnabled = nullHandlingEnabled;
 
-    _valueSet = new ObjectOpenHashSet<>(Math.min(limit, MAX_INITIAL_CAPACITY));
+    _valueSet = new ObjectOpenHashSet<>(Math.min(limit, DistinctTable.MAX_INITIAL_CAPACITY));
   }
 
   @Override

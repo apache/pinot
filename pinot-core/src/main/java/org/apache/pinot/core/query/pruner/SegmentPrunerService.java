@@ -62,7 +62,8 @@ public class SegmentPrunerService {
             _prunerStatsUpdaters.put(pruner, SegmentPrunerStatistics::setValuePruned);
             break;
           default:
-            _prunerStatsUpdaters.put(pruner, (stats, value) -> { });
+            _prunerStatsUpdaters.put(pruner, (stats, value) -> {
+            });
             break;
         }
       } else {

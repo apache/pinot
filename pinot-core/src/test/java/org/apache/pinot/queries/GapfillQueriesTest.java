@@ -3395,22 +3395,22 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     String gapfillQuery2 =
         "SELECT "
-        + "GapFill(time_col, "
-        + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+            + "GapFill(time_col, "
+            + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
             + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
             + "    FILL(occupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)), levelId, lotId, occupied "
             + "FROM ("
-        + "  SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+            + "  SELECT DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
             + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS') AS time_col,"
             + "     lastWithTime(isOccupied, eventTime, 'INT') as occupied, lotId, levelId"
-        + "  FROM parkingData "
+            + "  FROM parkingData "
             + "  WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
             + "  GROUP BY time_col, levelId, lotId "
-        + "  ORDER BY time_col, levelId "
-        + "  LIMIT 200 "
-        + ") "
+            + "  ORDER BY time_col, levelId "
+            + "  LIMIT 200 "
+            + ") "
             + " WHERE occupied = 1 "
-        + " LIMIT 200 ";
+            + " LIMIT 200 ";
 
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
@@ -3637,7 +3637,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
-    long [] expectedOccupiedSlotsCounts1 = new long[]{16, 36, 60, 79, 88, 60, 33, 21};
+    long[] expectedOccupiedSlotsCounts1 = new long[]{16, 36, 60, 79, 88, 60, 33, 21};
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);

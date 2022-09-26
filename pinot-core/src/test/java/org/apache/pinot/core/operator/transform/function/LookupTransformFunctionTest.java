@@ -130,7 +130,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     // Wrong number of join keys
     Assert.assertThrows(BadQueryRequestException.class, () -> {
       TransformFunctionFactory.get(RequestContextUtils.getExpression(
-          String.format("lookup('baseballTeams','teamName','teamID', %s, 'danglingKey')", STRING_SV_COLUMN)),
+              String.format("lookup('baseballTeams','teamName','teamID', %s, 'danglingKey')", STRING_SV_COLUMN)),
           _dataSourceMap);
     });
 
@@ -176,7 +176,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
   }
 
   @Test
-  public void dimensionTableNotPopulated() throws Exception {
+  public void dimensionTableNotPopulated()
+      throws Exception {
     DimensionTableDataManager tableManager = mock(DimensionTableDataManager.class);
     when(tableManager.isPopulated()).thenReturn(false);
     when(tableManager.getPrimaryKeyColumns()).thenReturn(Arrays.asList("leagueID"));
@@ -199,7 +200,8 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
   }
 
   @Test
-  public void dimensionTableIsPopulated() throws Exception {
+  public void dimensionTableIsPopulated()
+      throws Exception {
     DimensionTableDataManager tableManager = mock(DimensionTableDataManager.class);
     when(tableManager.isPopulated()).thenReturn(true);
     when(tableManager.getPrimaryKeyColumns()).thenReturn(Arrays.asList("playerID"));
@@ -210,12 +212,11 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
 
     DimensionTableDataManager.registerDimensionTable("baseballPlayers_OFFLINE", tableManager);
 
-      ExpressionContext expression = RequestContextUtils
-          .getExpression(String.format("lookup('baseballPlayers','playerName','playerID',%s)",
-              STRING_SV_COLUMN));
-      TransformFunctionFactory.get(expression, _dataSourceMap);
+    ExpressionContext expression = RequestContextUtils
+        .getExpression(String.format("lookup('baseballPlayers','playerName','playerID',%s)",
+            STRING_SV_COLUMN));
+    TransformFunctionFactory.get(expression, _dataSourceMap);
   }
-
 
   @Test
   public void basicLookupTests()

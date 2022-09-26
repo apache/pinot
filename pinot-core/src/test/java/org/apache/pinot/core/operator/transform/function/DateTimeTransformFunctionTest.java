@@ -49,8 +49,10 @@ public class DateTimeTransformFunctionTest extends BaseTransformFunctionTest {
         {"day", (LongToIntFunction) DateTimeFunctions::dayOfMonth, DateTimeTransformFunction.DayOfMonth.class},
         {"hour", (LongToIntFunction) DateTimeFunctions::hour, DateTimeTransformFunction.Hour.class},
         {"minute", (LongToIntFunction) DateTimeFunctions::minute, DateTimeTransformFunction.Minute.class},
-        {"millisecond", (LongToIntFunction) DateTimeFunctions::millisecond,
-            DateTimeTransformFunction.Millisecond.class},
+        {
+            "millisecond", (LongToIntFunction) DateTimeFunctions::millisecond,
+            DateTimeTransformFunction.Millisecond.class
+        },
     };
   }
 
@@ -72,8 +74,10 @@ public class DateTimeTransformFunctionTest extends BaseTransformFunctionTest {
         {"day", (ZonedTimeFunction) DateTimeFunctions::dayOfMonth, DateTimeTransformFunction.DayOfMonth.class},
         {"hour", (ZonedTimeFunction) DateTimeFunctions::hour, DateTimeTransformFunction.Hour.class},
         {"minute", (ZonedTimeFunction) DateTimeFunctions::minute, DateTimeTransformFunction.Minute.class},
-        {"millisecond", (ZonedTimeFunction) DateTimeFunctions::millisecond,
-            DateTimeTransformFunction.Millisecond.class},
+        {
+            "millisecond", (ZonedTimeFunction) DateTimeFunctions::millisecond,
+            DateTimeTransformFunction.Millisecond.class
+        },
     };
   }
 

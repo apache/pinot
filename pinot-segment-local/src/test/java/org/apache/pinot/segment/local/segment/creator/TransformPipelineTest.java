@@ -26,7 +26,6 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-
 public class TransformPipelineTest {
 
   private static TableConfig createTestTableConfig()

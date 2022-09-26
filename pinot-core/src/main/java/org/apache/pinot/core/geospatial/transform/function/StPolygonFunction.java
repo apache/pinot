@@ -19,10 +19,10 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
+import org.apache.pinot.common.data.geometry.GeometrySerializer;
+import org.apache.pinot.common.data.geometry.GeometryUtils;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.io.ParseException;

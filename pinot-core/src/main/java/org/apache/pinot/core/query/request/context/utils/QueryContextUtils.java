@@ -96,7 +96,6 @@ public class QueryContextUtils {
     }
   }
 
-
   /** Collect aggregation functions from an ExpressionContext. */
   public static void collectPostAggregations(ExpressionContext expression, Set<String> postAggregations) {
     FunctionContext function = expression.getFunction();

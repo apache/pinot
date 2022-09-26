@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
+import org.apache.pinot.common.data.datablock.BaseDataBlock;
+import org.apache.pinot.common.data.datablock.DataBlockUtils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
@@ -35,8 +37,6 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datablock.BaseDataBlock;
-import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -134,8 +134,8 @@ public class QueryDispatcher {
       if (TransferableBlockUtils.isEndOfStream(transferableBlock) && transferableBlock.isErrorBlock()) {
         // TODO: we only received bubble up error from the execution stage tree.
         // TODO: query dispatch should also send cancel signal to the rest of the execution stage tree.
-          throw new RuntimeException("Received error query execution result block: "
-              + transferableBlock.getDataBlock().getExceptions());
+        throw new RuntimeException("Received error query execution result block: "
+            + transferableBlock.getDataBlock().getExceptions());
       }
       if (transferableBlock.getDataBlock() != null) {
         BaseDataBlock dataTable = transferableBlock.getDataBlock();

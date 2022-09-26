@@ -149,7 +149,7 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
         return new NativeTextIndexCreator(context.getFieldSpec().getName(), context.getIndexDir());
       } else {
         return new LuceneTextIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(),
-                context.isCommitOnClose());
+            context.isCommitOnClose());
       }
     }
   }

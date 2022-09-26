@@ -26,6 +26,7 @@ import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
 
+
 /**
  * GRPC implementation of the {@link SendingMailbox}.
  */

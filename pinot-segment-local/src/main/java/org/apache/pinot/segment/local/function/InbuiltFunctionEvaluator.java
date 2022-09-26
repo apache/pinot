@@ -144,7 +144,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(GenericRow row) {
-      for (ExecutableNode executableNode :_argumentNodes) {
+      for (ExecutableNode executableNode : _argumentNodes) {
         Boolean res = (Boolean) executableNode.execute(row);
         if (res) {
           return true;
@@ -155,7 +155,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(Object[] values) {
-      for (ExecutableNode executableNode :_argumentNodes) {
+      for (ExecutableNode executableNode : _argumentNodes) {
         Boolean res = (Boolean) executableNode.execute(values);
         if (res) {
           return true;
@@ -174,7 +174,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(GenericRow row) {
-      for (ExecutableNode executableNode :_argumentNodes) {
+      for (ExecutableNode executableNode : _argumentNodes) {
         Boolean res = (Boolean) executableNode.execute(row);
         if (!res) {
           return false;
@@ -185,7 +185,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(Object[] values) {
-      for (ExecutableNode executableNode :_argumentNodes) {
+      for (ExecutableNode executableNode : _argumentNodes) {
         Boolean res = (Boolean) executableNode.execute(values);
         if (!res) {
           return false;

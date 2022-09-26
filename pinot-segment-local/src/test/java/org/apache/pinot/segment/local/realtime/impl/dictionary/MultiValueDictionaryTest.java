@@ -89,8 +89,8 @@ public class MultiValueDictionaryTest {
   public void testMultiValueIndexingWithRawInt() {
     long seed = System.nanoTime();
     try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
-            NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer",
-            false, FieldSpec.DataType.INT)) {
+        NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer",
+        false, FieldSpec.DataType.INT)) {
       // Insert rows into the indexer
       Random random = new Random(seed);
       for (int row = 0; row < NROWS; row++) {

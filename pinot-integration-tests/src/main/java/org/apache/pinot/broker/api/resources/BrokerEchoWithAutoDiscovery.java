@@ -28,6 +28,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.core.api.AutoLoadedServiceForTest;
 
+
 /**
  * This class is a typical "echo" service that will return whatever string you call GET with a path.
  * It is both an integration test and a demonstration of how to dynamically add an endpoint to broker,
@@ -36,12 +37,13 @@ import org.apache.pinot.core.api.AutoLoadedServiceForTest;
 @Api(tags = "Test")
 @Path("/test")
 public class BrokerEchoWithAutoDiscovery {
-    @Inject
-    public AutoLoadedServiceForTest _injectedService;
-    @GET
-    @Path("/echo/{table}")
-    @Produces(MediaType.TEXT_PLAIN)
-    public String echo(@PathParam("table") String table) {
-        return _injectedService.echo(table);
-    }
+  @Inject
+  public AutoLoadedServiceForTest _injectedService;
+
+  @GET
+  @Path("/echo/{table}")
+  @Produces(MediaType.TEXT_PLAIN)
+  public String echo(@PathParam("table") String table) {
+    return _injectedService.echo(table);
+  }
 }

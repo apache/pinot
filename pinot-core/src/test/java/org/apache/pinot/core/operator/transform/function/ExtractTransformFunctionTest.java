@@ -44,7 +44,7 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
         // TODO: Need to add timezone_hour and timezone_minute
 //      "timezone_hour",
 //      "timezone_minute",
-      //@formatter:on
+        //@formatter:on
     };
   }
 

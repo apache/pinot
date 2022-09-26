@@ -26,13 +26,14 @@ import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatche
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+
 public class MutableFSTUtils {
 
   private MutableFSTUtils() {
   }
 
   public static boolean fstEquals(Object thisFstObj,
-                                  Object thatFstObj) {
+      Object thatFstObj) {
     if (thisFstObj == thatFstObj) {
       return true;
     }

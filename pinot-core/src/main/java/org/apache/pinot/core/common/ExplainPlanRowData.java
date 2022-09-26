@@ -20,6 +20,7 @@ package org.apache.pinot.core.common;
 
 import java.util.Objects;
 
+
 /**
  * Class to hold the data for a single Explain plan row
  */

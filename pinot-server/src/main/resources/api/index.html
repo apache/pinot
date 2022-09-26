@@ -25,12 +25,11 @@
 <head>
   <meta charset="UTF-8">
   <title>Swagger UI</title>
-  <link rel="stylesheet" type="text/css" href="swaggerui-dist/swagger-ui.css" >
-  <link rel="icon" type="image/png" href="swaggerui-dist/favicon-32x32.png" sizes="32x32" />
-  <link rel="icon" type="image/png" href="swaggerui-dist/favicon-16x16.png" sizes="16x16" />
+  <link rel="stylesheet" type="text/css" href="swaggerui-dist/swagger-ui.css">
+  <link rel="icon" type="image/png" href="swaggerui-dist/favicon-32x32.png" sizes="32x32"/>
+  <link rel="icon" type="image/png" href="swaggerui-dist/favicon-16x16.png" sizes="16x16"/>
   <style>
-    html
-    {
+    html {
       box-sizing: border-box;
       overflow: -moz-scrollbars-vertical;
       overflow-y: scroll;
@@ -38,14 +37,12 @@
 
     *,
     *:before,
-    *:after
-    {
+    *:after {
       box-sizing: inherit;
     }
 
-    body
-    {
-      margin:0;
+    body {
+      margin: 0;
       background: #fafafa;
     }
   </style>
@@ -54,8 +51,8 @@
 <body>
 <div id="swagger-ui"></div>
 
-<script src="swaggerui-dist/swagger-ui-bundle.js"> </script>
-<script src="swaggerui-dist/swagger-ui-standalone-preset.js"> </script>
+<script src="swaggerui-dist/swagger-ui-bundle.js"></script>
+<script src="swaggerui-dist/swagger-ui-standalone-preset.js"></script>
 <script>
   window.onload = function() {
     var url = window.location.search.match(/url=([^&]+)/);
@@ -82,6 +79,7 @@
 
     window.ui = ui
   }
+
 </script>
 </body>
 </html>

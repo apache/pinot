@@ -50,7 +50,6 @@ public class OrFilterOperator extends BaseFilterOperator {
     return new FilterBlock(new OrDocIdSet(filterBlockDocIdSets, _numDocs));
   }
 
-
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;

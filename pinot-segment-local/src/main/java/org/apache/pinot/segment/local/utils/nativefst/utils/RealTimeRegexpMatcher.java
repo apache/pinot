@@ -33,6 +33,7 @@ import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableState;
 import org.roaringbitmap.IntConsumer;
 
+
 public class RealTimeRegexpMatcher {
   private final String _regexQuery;
   private final MutableFST _fst;

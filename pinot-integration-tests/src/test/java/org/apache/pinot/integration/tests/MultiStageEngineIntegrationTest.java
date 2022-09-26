@@ -22,7 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.common.data.datatable.DataTableFactory;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;

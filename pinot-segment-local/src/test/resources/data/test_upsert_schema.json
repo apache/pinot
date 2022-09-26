@@ -17,5 +17,7 @@
       "timeType": "SECONDS"
     }
   },
-  "primaryKeyColumns": ["event_id"]
+  "primaryKeyColumns": [
+    "event_id"
+  ]
 }

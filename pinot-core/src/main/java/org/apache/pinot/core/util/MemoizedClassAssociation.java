@@ -21,6 +21,7 @@ package org.apache.pinot.core.util;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+
 /**
  * Creates a function which associates generic values with a class and memoizes this association atomically.
  * @param <T>

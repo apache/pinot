@@ -21,14 +21,14 @@ package org.apache.pinot.core.geospatial.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.data.geometry.GeometrySerializer;
+import org.apache.pinot.common.data.geometry.GeometryUtils;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
@@ -64,7 +64,7 @@ public class StAreaFunction extends BaseTransformFunction {
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Argument must be single-valued for transform function: %s", getName());
     Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
-        || transformFunction instanceof LiteralTransformFunction,
+            || transformFunction instanceof LiteralTransformFunction,
         "The first argument must be of type BYTES, but was %s",
         transformFunction.getResultMetadata().getDataType());
     _transformFunction = transformFunction;

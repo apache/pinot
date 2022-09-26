@@ -28,11 +28,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.data.datatable.DataTableFactory;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -218,7 +218,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     queryOptions.put("enableNullHandling", "true");
     {
       String query = String.format("SELECT SUM(%s) as sum, MIN(%s) AS min, MAX(%s) AS max, COUNT(%s) AS count, %s "
-          + "FROM testTable GROUP BY %s ORDER BY sum",
+              + "FROM testTable GROUP BY %s ORDER BY sum",
           COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, KEY_COLUMN, KEY_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
@@ -270,7 +270,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count1", "count2", "min", "max"}, new ColumnDataType[]{
-          ColumnDataType.LONG, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE}));
+          ColumnDataType.LONG, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+      }));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 1);
       Object[] row = rows.get(0);
@@ -410,7 +411,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count", "min", "max", "avg", "sum"}, new ColumnDataType[]{
           ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
-          ColumnDataType.DOUBLE}));
+          ColumnDataType.DOUBLE
+      }));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 1);
       int count = 4 * 500;

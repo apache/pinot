@@ -108,20 +108,26 @@ public class GroovyFunctionEvaluatorTest {
     GenericRow genericRow9 = new GenericRow();
     genericRow9.putValue("ArrTime", 101);
     genericRow9.putValue("ArrTimeV2", null);
-    entries.add(new Object[]{"Groovy({ArrTimeV2 != null ? ArrTimeV2: ArrTime }, ArrTime, ArrTimeV2)",
-        Lists.newArrayList("ArrTime", "ArrTimeV2"), genericRow9, 101});
+    entries.add(new Object[]{
+        "Groovy({ArrTimeV2 != null ? ArrTimeV2: ArrTime }, ArrTime, ArrTimeV2)",
+        Lists.newArrayList("ArrTime", "ArrTimeV2"), genericRow9, 101
+    });
 
     GenericRow genericRow10 = new GenericRow();
     String jello = "Jello";
     genericRow10.putValue("jello", jello);
-    entries.add(new Object[]{"Groovy({jello != null ? jello.length() : \"Jello\" }, jello)",
-        Lists.newArrayList("jello"), genericRow10, 5});
+    entries.add(new Object[]{
+        "Groovy({jello != null ? jello.length() : \"Jello\" }, jello)",
+        Lists.newArrayList("jello"), genericRow10, 5
+    });
 
     //Invalid groovy script
     GenericRow genericRow11 = new GenericRow();
     genericRow11.putValue("nullValue", null);
-    entries.add(new Object[]{"Groovy({nullValue == null ? nullValue.length() : \"Jello\" }, nullValue)",
-        Lists.newArrayList("nullValue"), genericRow11, null});
+    entries.add(new Object[]{
+        "Groovy({nullValue == null ? nullValue.length() : \"Jello\" }, nullValue)",
+        Lists.newArrayList("nullValue"), genericRow11, null
+    });
     return entries.toArray(new Object[entries.size()][]);
   }
 }

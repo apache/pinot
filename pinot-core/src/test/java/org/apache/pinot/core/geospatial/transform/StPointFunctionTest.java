@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.geospatial.transform;
 
+import org.apache.pinot.common.data.geometry.GeometrySerializer;
+import org.apache.pinot.common.data.geometry.GeometryUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunctionTest;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Point;

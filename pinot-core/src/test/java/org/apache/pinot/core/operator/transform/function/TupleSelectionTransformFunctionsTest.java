@@ -35,7 +35,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
 
   @DataProvider
   public static Object[][] rejectedParameters() {
-    return new Object[][] {
+    return new Object[][]{
         {"()"},
         {String.format("(%s)", INT_MV_COLUMN)},
         {String.format("(%s)", LONG_MV_COLUMN)},

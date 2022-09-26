@@ -141,8 +141,10 @@ public class DateTimeFunctionsTest {
     // fromEpochDays w/ bucketing
     GenericRow row51 = new GenericRow();
     row51.putValue("sevenDaysSinceEpoch", 2000);
-    inputs.add(new Object[]{"fromEpochDaysBucket(sevenDaysSinceEpoch, 7)", Lists.newArrayList(
-        "sevenDaysSinceEpoch"), row51, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochDaysBucket(sevenDaysSinceEpoch, 7)", Lists.newArrayList(
+        "sevenDaysSinceEpoch"), row51, 1209600000000L
+    });
 
     // fromEpochHours
     GenericRow row60 = new GenericRow();
@@ -153,44 +155,58 @@ public class DateTimeFunctionsTest {
     // fromEpochHours w/ bucketing
     GenericRow row61 = new GenericRow();
     row61.putValue("twoHoursSinceEpoch", 168000);
-    inputs.add(new Object[]{"fromEpochHoursBucket(twoHoursSinceEpoch, 2)", Lists.newArrayList(
-        "twoHoursSinceEpoch"), row61, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochHoursBucket(twoHoursSinceEpoch, 2)", Lists.newArrayList(
+        "twoHoursSinceEpoch"), row61, 1209600000000L
+    });
 
     // fromEpochMinutes
     GenericRow row70 = new GenericRow();
     row70.putValue("minutesSinceEpoch", 20160000);
-    inputs.add(new Object[]{"fromEpochMinutes(minutesSinceEpoch)", Lists.newArrayList(
-        "minutesSinceEpoch"), row70, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochMinutes(minutesSinceEpoch)", Lists.newArrayList(
+        "minutesSinceEpoch"), row70, 1209600000000L
+    });
 
     // fromEpochMinutes w/ bucketing
     GenericRow row71 = new GenericRow();
     row71.putValue("fifteenMinutesSinceEpoch", 1344000);
-    inputs.add(new Object[]{"fromEpochMinutesBucket(fifteenMinutesSinceEpoch, 15)", Lists.newArrayList(
-        "fifteenMinutesSinceEpoch"), row71, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochMinutesBucket(fifteenMinutesSinceEpoch, 15)", Lists.newArrayList(
+        "fifteenMinutesSinceEpoch"), row71, 1209600000000L
+    });
 
     // fromEpochSeconds
     GenericRow row80 = new GenericRow();
     row80.putValue("secondsSinceEpoch", 1209600000L);
-    inputs.add(new Object[]{"fromEpochSeconds(secondsSinceEpoch)", Lists.newArrayList(
-        "secondsSinceEpoch"), row80, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochSeconds(secondsSinceEpoch)", Lists.newArrayList(
+        "secondsSinceEpoch"), row80, 1209600000000L
+    });
 
     // fromEpochSeconds w/ bucketing
     GenericRow row81 = new GenericRow();
     row81.putValue("tenSecondsSinceEpoch", 120960000L);
-    inputs.add(new Object[]{"fromEpochSecondsBucket(tenSecondsSinceEpoch, 10)", Lists.newArrayList(
-        "tenSecondsSinceEpoch"), row81, 1209600000000L});
+    inputs.add(new Object[]{
+        "fromEpochSecondsBucket(tenSecondsSinceEpoch, 10)", Lists.newArrayList(
+        "tenSecondsSinceEpoch"), row81, 1209600000000L
+    });
 
     // nested
     GenericRow row90 = new GenericRow();
     row90.putValue("hoursSinceEpoch", 336000);
-    inputs.add(new Object[]{"toEpochDays(fromEpochHours(hoursSinceEpoch))", Lists.newArrayList(
-        "hoursSinceEpoch"), row90, 14000L});
+    inputs.add(new Object[]{
+        "toEpochDays(fromEpochHours(hoursSinceEpoch))", Lists.newArrayList(
+        "hoursSinceEpoch"), row90, 14000L
+    });
 
     GenericRow row91 = new GenericRow();
     row91.putValue("fifteenSecondsSinceEpoch", 80640000L);
     inputs.add(
-        new Object[]{"toEpochMinutesBucket(fromEpochSecondsBucket(fifteenSecondsSinceEpoch, 15), 10)",
-            Lists.newArrayList("fifteenSecondsSinceEpoch"), row91, 2016000L});
+        new Object[]{
+            "toEpochMinutesBucket(fromEpochSecondsBucket(fifteenSecondsSinceEpoch, 15), 10)",
+            Lists.newArrayList("fifteenSecondsSinceEpoch"), row91, 2016000L
+        });
 
     // toDateTime simple
     GenericRow row100 = new GenericRow();
@@ -200,21 +216,27 @@ public class DateTimeFunctionsTest {
     // toDateTime complex
     GenericRow row101 = new GenericRow();
     row101.putValue("dateTime", 1234567890000L);
-    inputs.add(new Object[]{"toDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList(
-        "dateTime"), row101, "02/2009/13 23:31:30"});
+    inputs.add(new Object[]{
+        "toDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList(
+        "dateTime"), row101, "02/2009/13 23:31:30"
+    });
 
     // toDateTime with timezone
     GenericRow row102 = new GenericRow();
     row102.putValue("dateTime", 7897897890000L);
-    inputs.add(new Object[]{"toDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
-        "dateTime"), row102, "Mon Apr 10 20:31:30 UTC 2220"});
+    inputs.add(new Object[]{
+        "toDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
+        "dateTime"), row102, "Mon Apr 10 20:31:30 UTC 2220"
+    });
 
     // toDateTime with timezone conversion
     GenericRow row103 = new GenericRow();
     row103.putValue("dateTime", 1633740369000L);
     row103.putValue("tz", "America/Los_Angeles");
-    inputs.add(new Object[]{"toDateTime(dateTime, 'yyyy-MM-dd ZZZ', tz)", Lists.newArrayList("dateTime",
-        "tz"), row103, "2021-10-08 America/Los_Angeles"});
+    inputs.add(new Object[]{
+        "toDateTime(dateTime, 'yyyy-MM-dd ZZZ', tz)", Lists.newArrayList("dateTime",
+        "tz"), row103, "2021-10-08 America/Los_Angeles"
+    });
 
     // fromDateTime simple
     GenericRow row110 = new GenericRow();
@@ -225,14 +247,18 @@ public class DateTimeFunctionsTest {
     // fromDateTime complex
     GenericRow row111 = new GenericRow();
     row111.putValue("dateTime", "02/2009/13 15:31:30");
-    inputs.add(new Object[]{"fromDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList(
-        "dateTime"), row111, 1234539090000L});
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'MM/yyyy/dd HH:mm:ss')", Lists.newArrayList(
+        "dateTime"), row111, 1234539090000L
+    });
 
     // fromDateTime with timezone
     GenericRow row112 = new GenericRow();
     row112.putValue("dateTime", "Mon Aug 24 12:36:46 America/Los_Angeles 2009");
-    inputs.add(new Object[]{"fromDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
-        "dateTime"), row112, 1251142606000L});
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
+        "dateTime"), row112, 1251142606000L
+    });
 
     // fromDateTime with null
     GenericRow row113 = new GenericRow();

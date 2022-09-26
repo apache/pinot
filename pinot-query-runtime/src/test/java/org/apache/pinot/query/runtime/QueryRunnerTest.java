@@ -180,35 +180,49 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
         // thus the final JOIN result will be 1 x 3 x 1 = 3.
-        new Object[]{"SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-            + " WHERE a.col3 >= 0 AND a.col2 = 'alice' AND b.col3 >= 0"},
+        new Object[]{
+            "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
+                + " WHERE a.col3 >= 0 AND a.col2 = 'alice' AND b.col3 >= 0"
+        },
 
         // Join query with IN and Not-IN clause. Table A's side of join will return 9 rows and Table B's side will
         // return 2 rows. Join will be only on col1=bar and since A will return 3 rows with that value and B will return
         // 1 row, the final output will have 3 rows.
-        new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE a.col1 IN ('foo', 'bar', 'alice') AND b.col2 NOT IN ('foo', 'alice')"},
+        new Object[]{
+            "SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
+                + " WHERE a.col1 IN ('foo', 'bar', 'alice') AND b.col2 NOT IN ('foo', 'alice')"
+        },
 
         // Same query as above but written using OR/AND instead of IN.
-        new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE (a.col1 = 'foo' OR a.col1 = 'bar' OR a.col1 = 'alice') AND b.col2 != 'foo'"
-            + " AND b.col2 != 'alice'"},
+        new Object[]{
+            "SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
+                + " WHERE (a.col1 = 'foo' OR a.col1 = 'bar' OR a.col1 = 'alice') AND b.col2 != 'foo'"
+                + " AND b.col2 != 'alice'"
+        },
 
         // Same as above but with single argument IN clauses. Left side of the join returns 3 rows, and the right side
         // returns 5 rows. Only key where join succeeds is col1=foo, and since table B has only 1 row with that value,
         // the number of rows should be 3.
-        new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE a.col1 IN ('foo') AND b.col2 NOT IN ('')"},
+        new Object[]{
+            "SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
+                + " WHERE a.col1 IN ('foo') AND b.col2 NOT IN ('')"
+        },
 
         // Range conditions with continuous and non-continuous range.
-        new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE a.col3 IN (1, 2, 3) OR (a.col3 > 10 AND a.col3 < 50)"},
+        new Object[]{
+            "SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
+                + " WHERE a.col3 IN (1, 2, 3) OR (a.col3 > 10 AND a.col3 < 50)"
+        },
 
-        new Object[]{"SELECT col1, SUM(col3) FROM a WHERE a.col3 BETWEEN 23 AND 36 "
-            + " GROUP BY col1 HAVING SUM(col3) > 10.0 AND MIN(col3) <> 123 AND MAX(col3) BETWEEN 10 AND 20"},
+        new Object[]{
+            "SELECT col1, SUM(col3) FROM a WHERE a.col3 BETWEEN 23 AND 36 "
+                + " GROUP BY col1 HAVING SUM(col3) > 10.0 AND MIN(col3) <> 123 AND MAX(col3) BETWEEN 10 AND 20"
+        },
 
-        new Object[]{"SELECT col1, SUM(col3) FROM a WHERE (col3 > 0 AND col3 < 45) AND (col3 > 15 AND col3 < 50) "
-            + " GROUP BY col1 HAVING (SUM(col3) > 10 AND SUM(col3) < 20) AND (SUM(col3) > 30 AND SUM(col3) < 40)"},
+        new Object[]{
+            "SELECT col1, SUM(col3) FROM a WHERE (col3 > 0 AND col3 < 45) AND (col3 > 15 AND col3 < 50) "
+                + " GROUP BY col1 HAVING (SUM(col3) > 10 AND SUM(col3) < 20) AND (SUM(col3) > 30 AND SUM(col3) < 40)"
+        },
 
         // Projection pushdown
         new Object[]{"SELECT a.col1, a.col3 + a.col3 FROM a WHERE a.col3 >= 0 AND a.col2 = 'alice'"},
@@ -234,35 +248,49 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // col2 on both are "foo", "bar", "alice", "foo", "bar",
         //   filtered at :    ^                      ^
         // thus the final JOIN result will have 6 rows: 3 "foo" <-> "foo"; and 3 "bob" <-> "bob"
-        new Object[]{"SELECT a.col1, a.col2, a.ts, b.col1, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-            + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0"},
+        new Object[]{
+            "SELECT a.col1, a.col2, a.ts, b.col1, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
+                + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0"
+        },
 
         // Making transform after JOIN, number of rows should be the same as JOIN result.
-        new Object[]{"SELECT a.col1, a.ts, a.col3 - b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-            + " WHERE a.col3 >= 0 AND b.col3 >= 0"},
+        new Object[]{
+            "SELECT a.col1, a.ts, a.col3 - b.col3 FROM a JOIN b ON a.col1 = b.col2 "
+                + " WHERE a.col3 >= 0 AND b.col3 >= 0"
+        },
 
         // Making transform after GROUP-BY, number of rows should be the same as GROUP-BY result.
-        new Object[]{"SELECT a.col1, a.col2, SUM(a.col3) - MIN(a.col3) FROM a"
-            + " WHERE a.col3 >= 0 GROUP BY a.col1, a.col2"},
+        new Object[]{
+            "SELECT a.col1, a.col2, SUM(a.col3) - MIN(a.col3) FROM a"
+                + " WHERE a.col3 >= 0 GROUP BY a.col1, a.col2"
+        },
 
         // GROUP BY after JOIN
         //   - optimizable transport for GROUP BY key after JOIN, using SINGLETON exchange
         //     only 3 GROUP BY key exist because b.col2 cycles between "foo", "bar", "alice".
-        new Object[]{"SELECT a.col1, SUM(b.col3), COUNT(*), SUM(2) FROM a JOIN b ON a.col1 = b.col2 "
-            + " WHERE a.col3 >= 0 GROUP BY a.col1"},
+        new Object[]{
+            "SELECT a.col1, SUM(b.col3), COUNT(*), SUM(2) FROM a JOIN b ON a.col1 = b.col2 "
+                + " WHERE a.col3 >= 0 GROUP BY a.col1"
+        },
         //   - non-optimizable transport for GROUP BY key after JOIN, using HASH exchange
         //     only 2 GROUP BY key exist for b.col3.
-        new Object[]{"SELECT b.col3, SUM(a.col3) FROM a JOIN b"
-            + " on a.col1 = b.col1 AND a.col2 = b.col2 GROUP BY b.col3"},
+        new Object[]{
+            "SELECT b.col3, SUM(a.col3) FROM a JOIN b"
+                + " on a.col1 = b.col1 AND a.col2 = b.col2 GROUP BY b.col3"
+        },
 
         // Sub-query
-        new Object[]{"SELECT b.col1, b.col3, i.maxVal FROM b JOIN "
-            + "  (SELECT a.col2 AS joinKey, MAX(a.col3) AS maxVal FROM a GROUP BY a.col2) AS i "
-            + "  ON b.col1 = i.joinKey"},
+        new Object[]{
+            "SELECT b.col1, b.col3, i.maxVal FROM b JOIN "
+                + "  (SELECT a.col2 AS joinKey, MAX(a.col3) AS maxVal FROM a GROUP BY a.col2) AS i "
+                + "  ON b.col1 = i.joinKey"
+        },
 
         // Sub-query with IN clause to SEMI JOIN.
-        new Object[]{"SELECT b.col1, b.col2, SUM(b.col3) * 100 / COUNT(b.col3) FROM b WHERE b.col1 IN "
-            + "(SELECT a.col2 FROM a WHERE a.col2 != 'foo') GROUP BY b.col1, b.col2"},
+        new Object[]{
+            "SELECT b.col1, b.col2, SUM(b.col3) * 100 / COUNT(b.col3) FROM b WHERE b.col1 IN "
+                + "(SELECT a.col2 FROM a WHERE a.col2 != 'foo') GROUP BY b.col1, b.col2"
+        },
 
         // Aggregate query with HAVING clause, "foo" and "bar" occurred 6/2 times each and "alice" occurred 3/1 times
         // numbers are cycle in (1, 42, 1, 42, 1), and (foo, bar, alice, foo, bar)
@@ -270,11 +298,15 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // - COUNT(*) > 5 matches "foo" and "bar" (6 times); so both will be selected out SUM(a.col3) = (1 + 42) * 3
         // - last condition doesn't match anything.
         // total to 3 rows.
-        new Object[]{"SELECT a.col2, COUNT(*), MAX(a.col3), MIN(a.col3), SUM(a.col3) FROM a GROUP BY a.col2 "
-            + "HAVING COUNT(*) < 5 OR (COUNT(*) > 5 AND SUM(a.col3) >= 10)"
-            + "OR (MIN(a.col3) != 20 AND SUM(a.col3) = 100)"},
-        new Object[]{"SELECT COUNT(*) AS Count, MAX(a.col3) AS \"max\" FROM a GROUP BY a.col2 "
-            + "HAVING Count > 1 AND \"max\" < 50"},
+        new Object[]{
+            "SELECT a.col2, COUNT(*), MAX(a.col3), MIN(a.col3), SUM(a.col3) FROM a GROUP BY a.col2 "
+                + "HAVING COUNT(*) < 5 OR (COUNT(*) > 5 AND SUM(a.col3) >= 10)"
+                + "OR (MIN(a.col3) != 20 AND SUM(a.col3) = 100)"
+        },
+        new Object[]{
+            "SELECT COUNT(*) AS Count, MAX(a.col3) AS \"max\" FROM a GROUP BY a.col2 "
+                + "HAVING Count > 1 AND \"max\" < 50"
+        },
 
         // Order-by
         new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON a.col1 = b.col1 ORDER BY a.col3, b.col3 DESC"},
@@ -289,14 +321,16 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // Test DISTINCT
         //   - distinct value done via GROUP BY with empty expr aggregation list.
-        new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3"},
+        new Object[]{
+            "SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
+                + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3"
+        },
     };
   }
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
   private Object[][] provideTestSqlAndRowCount() {
-    return new Object[][] {
+    return new Object[][]{
         // using join clause
         new Object[]{"SELECT * FROM a JOIN b USING (col1)", 15},
 
@@ -304,8 +338,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         //   - on leaf stage
         new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 15},
         //   - on intermediate stage
-        new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
-            + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+        new Object[]{
+            "SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
+                + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15
+        },
     };
   }
 }

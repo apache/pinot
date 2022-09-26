@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
+import org.apache.pinot.common.data.datatable.DataTableFactory;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 

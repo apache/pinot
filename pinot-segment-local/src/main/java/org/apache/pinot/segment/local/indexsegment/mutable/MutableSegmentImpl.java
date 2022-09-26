@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.data.geometry.GeometrySerializer;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -64,7 +65,6 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvide
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.IdMap;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;

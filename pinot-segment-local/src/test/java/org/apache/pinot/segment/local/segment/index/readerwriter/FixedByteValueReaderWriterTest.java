@@ -37,7 +37,7 @@ public class FixedByteValueReaderWriterTest {
 
   @DataProvider
   public static Object[][] params() {
-    return new Object[][] {
+    return new Object[][]{
         {10, 10, ByteOrder.LITTLE_ENDIAN},
         {10, 10, ByteOrder.BIG_ENDIAN},
         {10, 20, ByteOrder.LITTLE_ENDIAN},

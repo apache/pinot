@@ -538,7 +538,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertFalse(httpsComponentUrls.isEmpty());
   }
 
-  private java.sql.Connection getValidJDBCConnection(int controllerPort) throws Exception {
+  private java.sql.Connection getValidJDBCConnection(int controllerPort)
+      throws Exception {
     SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
     sslContextBuilder.setKeyStoreType(PKCS_12);
     sslContextBuilder.loadKeyMaterial(_tlsStorePKCS12, PASSWORD_CHAR, PASSWORD_CHAR);
@@ -551,7 +552,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
   }
 
-  private java.sql.Connection getInValidJDBCConnection(int controllerPort) throws Exception {
+  private java.sql.Connection getInValidJDBCConnection(int controllerPort)
+      throws Exception {
     SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
     sslContextBuilder.setKeyStoreType(PKCS_12);
     sslContextBuilder.loadKeyMaterial(_tlsStoreEmptyPKCS12, PASSWORD_CHAR, PASSWORD_CHAR);

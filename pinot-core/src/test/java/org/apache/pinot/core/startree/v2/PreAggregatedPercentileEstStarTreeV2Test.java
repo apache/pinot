@@ -19,10 +19,10 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.common.data.ObjectSerDeUtils;
+import org.apache.pinot.common.data.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.aggregator.PercentileEstValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;

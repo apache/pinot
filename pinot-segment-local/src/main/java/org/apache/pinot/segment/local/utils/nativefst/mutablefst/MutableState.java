@@ -108,8 +108,8 @@ public class MutableState {
 
   // adds an arc but should only be used by MutableFst
   void addArc(MutableArc arc) {
-      _arcs.add(arc);
-    }
+    _arcs.add(arc);
+  }
 
   void addIncomingState(MutableState inState) {
     if (inState == this) {

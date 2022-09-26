@@ -68,7 +68,6 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
         new ExpressionFilterDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs));
   }
 
-
   @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();

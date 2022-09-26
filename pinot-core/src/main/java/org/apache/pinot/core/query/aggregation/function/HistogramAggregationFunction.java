@@ -130,7 +130,7 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
           i = mid;
         }
       }
-     id = i;
+      id = i;
     }
     return id;
   }

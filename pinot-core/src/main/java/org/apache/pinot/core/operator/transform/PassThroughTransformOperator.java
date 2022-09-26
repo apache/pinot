@@ -53,7 +53,6 @@ public class PassThroughTransformOperator extends TransformOperator {
     }
   }
 
-
   @Override
   public String toExplainString() {
     return toExplainString(EXPLAIN_NAME);

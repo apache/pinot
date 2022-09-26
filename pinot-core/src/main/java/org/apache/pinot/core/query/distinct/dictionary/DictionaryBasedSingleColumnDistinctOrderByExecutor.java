@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.distinct.dictionary;
 
 import it.unimi.dsi.fastutil.ints.IntHeapPriorityQueue;
 import it.unimi.dsi.fastutil.ints.IntPriorityQueue;
+import org.apache.pinot.common.data.distinct.DistinctTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -43,7 +44,8 @@ public class DictionaryBasedSingleColumnDistinctOrderByExecutor
     assert orderByExpressionContext.getExpression().equals(expression);
     int comparisonFactor = orderByExpressionContext.isAsc() ? -1 : 1;
     _priorityQueue =
-        new IntHeapPriorityQueue(Math.min(limit, MAX_INITIAL_CAPACITY), (i1, i2) -> (i1 - i2) * comparisonFactor);
+        new IntHeapPriorityQueue(Math.min(limit, DistinctTable.MAX_INITIAL_CAPACITY),
+            (i1, i2) -> (i1 - i2) * comparisonFactor);
   }
 
   @Override

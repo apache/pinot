@@ -19,10 +19,11 @@
 package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
+import org.apache.pinot.common.data.distinct.DistinctTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.common.DataTableUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.Test;

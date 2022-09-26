@@ -45,14 +45,14 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
   public Object[][] params() {
     return Stream.of(INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN)
         .flatMap(col -> Stream.of(
-            new int[] {3, 2, 1},
-            new int[] {1, 2, 3},
-            new int[] {Integer.MAX_VALUE / 2, Integer.MAX_VALUE / 4, 0},
-            new int[] {0, Integer.MAX_VALUE / 4, Integer.MAX_VALUE / 2},
-            new int[] {0, Integer.MIN_VALUE / 4, Integer.MIN_VALUE},
-            new int[] {Integer.MIN_VALUE, 0, 1},
-            new int[] {Integer.MAX_VALUE, Integer.MIN_VALUE, 1},
-            new int[] {Integer.MAX_VALUE, Integer.MAX_VALUE - 1, Integer.MAX_VALUE - 2}
+            new int[]{3, 2, 1},
+            new int[]{1, 2, 3},
+            new int[]{Integer.MAX_VALUE / 2, Integer.MAX_VALUE / 4, 0},
+            new int[]{0, Integer.MAX_VALUE / 4, Integer.MAX_VALUE / 2},
+            new int[]{0, Integer.MIN_VALUE / 4, Integer.MIN_VALUE},
+            new int[]{Integer.MIN_VALUE, 0, 1},
+            new int[]{Integer.MAX_VALUE, Integer.MIN_VALUE, 1},
+            new int[]{Integer.MAX_VALUE, Integer.MAX_VALUE - 1, Integer.MAX_VALUE - 2}
         ).map(thresholds -> new Object[]{col, thresholds[0], thresholds[1], thresholds[2]}))
         .toArray(Object[][]::new);
   }

@@ -156,18 +156,6 @@
       <artifactId>commons-math</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.clearspring.analytics</groupId>
-      <artifactId>stream</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.datasketches</groupId>
-      <artifactId>datasketches-java</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.tdunning</groupId>
-      <artifactId>t-digest</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.xerial.larray</groupId>
       <artifactId>larray-mmap</artifactId>
     </dependency>

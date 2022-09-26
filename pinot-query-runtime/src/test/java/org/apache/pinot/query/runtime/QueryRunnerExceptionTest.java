@@ -67,10 +67,12 @@ public class QueryRunnerExceptionTest extends QueryRunnerTestBase {
 
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
-    return new Object[][] {
+    return new Object[][]{
         // Function with incorrect argument signature should throw runtime exception
-        new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
-            "ArithmeticFunctions.least(double,double) with arguments"},
+        new Object[]{
+            "SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
+            "ArithmeticFunctions.least(double,double) with arguments"
+        },
         // Function that tries to cast String to Number should throw runtime exception
         new Object[]{"SELECT a.col2, b.col1 FROM a JOIN b ON a.col1 = b.col3", "transform function: cast"},
     };

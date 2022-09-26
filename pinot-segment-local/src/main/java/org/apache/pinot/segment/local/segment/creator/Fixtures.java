@@ -30,6 +30,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class Fixtures {
   private Fixtures() {
   }
+
   public static final int MAX_ROWS_IN_SEGMENT = 250000;
   public static final long MAX_TIME_FOR_SEGMENT_CLOSE_MS = 64368000L;
   public static final String TOPIC_NAME = "someTopic";
@@ -37,67 +38,68 @@ public class Fixtures {
   //@formatter:off
   public static final String TABLE_CONFIG_JSON_TEMPLATE =
       "{"
-    + "  \"metadata\":{},"
-    + "  \"segmentsConfig\":{"
-    + "    \"replicasPerPartition\":\"3\","
-    + "    \"replication\":\"3\","
-    + "    \"replicationNumber\":3,"
-    + "    \"retentionTimeUnit\":\"DAYS\","
-    + "    \"retentionTimeValue\":\"3\","
-    + "    \"schemaName\":\"testSchema\","
-    + "    \"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\","
-    + "    \"segmentPushFrequency\":\"daily\","
-    + "    \"segmentPushType\":\"APPEND\","
-    + "    \"timeColumnName\":\"minutesSinceEpoch\","
-    + "    \"timeType\":\"MINUTES\""
-    + "  },"
-    + "  \"tableIndexConfig\":{"
-    + "    \"invertedIndexColumns\":[],"
-    + "    \"lazyLoad\":\"false\","
-    + "    \"loadMode\":\"HEAP\","
-    + "    \"segmentFormatVersion\":null,"
-    + "    \"sortedColumn\":[],"
-    + "    \"streamConfigs\":{"
-    + "      \"realtime.segment.flush.threshold.rows\":\"" + MAX_ROWS_IN_SEGMENT + "\","
-    + "      \"realtime.segment.flush.threshold.time\":\"" + MAX_TIME_FOR_SEGMENT_CLOSE_MS + "\","
-    + "      \"stream.fakeStream.broker.list\":\"broker:7777\","
-    + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\":\"smallest\","
-    + "      \"stream.fakeStream.consumer.type\":\"simple\","
-    + "      \"stream.fakeStream.consumer.factory.class.name\":\"%s\","
-    + "      \"stream.fakeStream.decoder.class.name\":\"%s\","
-    + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\":\"http://1.2.3.4:1766/schemas\","
-    + "      \"stream.fakeStream.decoder.prop.schema.registry.schema.name\":\"UnknownSchema\","
-    + "      \"stream.fakeStream.hlc.zk.connect.string\":\"zoo:2181/kafka-queuing\","
-    + "      \"stream.fakeStream.topic.name\":\"" + TOPIC_NAME + "\","
-    + "      \"stream.fakeStream.zk.broker.url\":\"kafka-broker:2181/kafka-queuing\","
-    + "      \"streamType\":\"fakeStream\""
-    + "    }"
-    + "  },"
-    + "  \"tableName\":\"Coffee_REALTIME\","
-    + "  \"tableType\":\"realtime\","
-    + "  \"tenants\":{"
-    + "    \"broker\":\"shared\","
-    + "    \"server\":\"server-1\""
-    + "  },"
-    + "  \"upsertConfig\":{"
-    + "    \"mode\":\"FULL\""
-    + "  }"
-    + "}";
+          + "  \"metadata\":{},"
+          + "  \"segmentsConfig\":{"
+          + "    \"replicasPerPartition\":\"3\","
+          + "    \"replication\":\"3\","
+          + "    \"replicationNumber\":3,"
+          + "    \"retentionTimeUnit\":\"DAYS\","
+          + "    \"retentionTimeValue\":\"3\","
+          + "    \"schemaName\":\"testSchema\","
+          + "    \"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\","
+          + "    \"segmentPushFrequency\":\"daily\","
+          + "    \"segmentPushType\":\"APPEND\","
+          + "    \"timeColumnName\":\"minutesSinceEpoch\","
+          + "    \"timeType\":\"MINUTES\""
+          + "  },"
+          + "  \"tableIndexConfig\":{"
+          + "    \"invertedIndexColumns\":[],"
+          + "    \"lazyLoad\":\"false\","
+          + "    \"loadMode\":\"HEAP\","
+          + "    \"segmentFormatVersion\":null,"
+          + "    \"sortedColumn\":[],"
+          + "    \"streamConfigs\":{"
+          + "      \"realtime.segment.flush.threshold.rows\":\"" + MAX_ROWS_IN_SEGMENT + "\","
+          + "      \"realtime.segment.flush.threshold.time\":\"" + MAX_TIME_FOR_SEGMENT_CLOSE_MS + "\","
+          + "      \"stream.fakeStream.broker.list\":\"broker:7777\","
+          + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\":\"smallest\","
+          + "      \"stream.fakeStream.consumer.type\":\"simple\","
+          + "      \"stream.fakeStream.consumer.factory.class.name\":\"%s\","
+          + "      \"stream.fakeStream.decoder.class.name\":\"%s\","
+          + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\":\"http://1.2.3.4:1766/schemas\","
+          + "      \"stream.fakeStream.decoder.prop.schema.registry.schema.name\":\"UnknownSchema\","
+          + "      \"stream.fakeStream.hlc.zk.connect.string\":\"zoo:2181/kafka-queuing\","
+          + "      \"stream.fakeStream.topic.name\":\"" + TOPIC_NAME + "\","
+          + "      \"stream.fakeStream.zk.broker.url\":\"kafka-broker:2181/kafka-queuing\","
+          + "      \"streamType\":\"fakeStream\""
+          + "    }"
+          + "  },"
+          + "  \"tableName\":\"Coffee_REALTIME\","
+          + "  \"tableType\":\"realtime\","
+          + "  \"tenants\":{"
+          + "    \"broker\":\"shared\","
+          + "    \"server\":\"server-1\""
+          + "  },"
+          + "  \"upsertConfig\":{"
+          + "    \"mode\":\"FULL\""
+          + "  }"
+          + "}";
   public static final String SCHEMA_JSON =
       "{"
-    + "  \"schemaName\":\"testSchema\","
-    + "  \"metricFieldSpecs\":[{\"name\":\"m\",\"dataType\":\"LONG\"}],"
-    + "  \"dimensionFieldSpecs\":[{\"name\":\"d\",\"dataType\":\"STRING\",\"singleValueField\":true}],"
-    + "  \"timeFieldSpec\":{"
-    + "    \"incomingGranularitySpec\":{"
-    + "      \"dataType\":\"LONG\","
-    + "      \"timeType\":\"MINUTES\","
-    + "      \"name\":\"minutesSinceEpoch\""
-    + "    },"
-    + "    \"defaultNullValue\":12345"
-    + "  },"
-    + "  \"primaryKeyColumns\": [\"event_id\"]"
-    + "}";
+          + "  \"schemaName\":\"testSchema\","
+          + "  \"metricFieldSpecs\":[{\"name\":\"m\",\"dataType\":\"LONG\"}],"
+          + "  \"dimensionFieldSpecs\":[{\"name\":\"d\",\"dataType\":\"STRING\",\"singleValueField\":true}],"
+          + "  \"timeFieldSpec\":{"
+          + "    \"incomingGranularitySpec\":{"
+          + "      \"dataType\":\"LONG\","
+          + "      \"timeType\":\"MINUTES\","
+          + "      \"name\":\"minutesSinceEpoch\""
+          + "    },"
+          + "    \"defaultNullValue\":12345"
+          + "  },"
+          + "  \"primaryKeyColumns\": [\"event_id\"]"
+          + "}";
+
   //@formatter:on
   public static TableConfig createTableConfig(String consumerFactoryClass, String decoderFactoryClass)
       throws Exception {
@@ -105,7 +107,8 @@ public class Fixtures {
         decoderFactoryClass), TableConfig.class);
   }
 
-  public static Schema createSchema() throws Exception {
+  public static Schema createSchema()
+      throws Exception {
     return Schema.fromString(SCHEMA_JSON);
   }
 

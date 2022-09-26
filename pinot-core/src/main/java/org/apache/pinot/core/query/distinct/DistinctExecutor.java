@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.distinct;
 
+import org.apache.pinot.common.data.distinct.DistinctTable;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 
 
@@ -25,8 +26,6 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
  * Interface class for executing the distinct queries.
  */
 public interface DistinctExecutor {
-  // TODO: Tune the initial capacity
-  int MAX_INITIAL_CAPACITY = 10000;
 
   /**
    * Processes the given transform block, returns {@code true} if the query is already satisfied, {@code false}

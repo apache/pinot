@@ -82,7 +82,6 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
     }
   }
 
-
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;

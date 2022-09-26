@@ -60,8 +60,10 @@ public class MultiValueVarByteRawIndexCreatorTest {
         .flatMap(chunkCompressionType -> IntStream.of(10, 15, 20, 1000).boxed()
             .flatMap(useFullSize -> Stream.of(true, false)
                 .flatMap(maxLength -> IntStream.range(1, 20).map(i -> i * 2 - 1).boxed()
-                    .map(maxNumEntries -> new Object[]{chunkCompressionType, useFullSize, maxLength,
-                        maxNumEntries}))))
+                    .map(maxNumEntries -> new Object[]{
+                        chunkCompressionType, useFullSize, maxLength,
+                        maxNumEntries
+                    }))))
         .toArray(Object[][]::new);
   }
 

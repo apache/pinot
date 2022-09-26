@@ -28,6 +28,7 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
 
+
 /**
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  *
@@ -39,9 +40,9 @@ import org.apache.pinot.core.util.GapfillUtils;
  * the aggregated sum and/or avg counters as necessary.
  */
 class SumAvgGapfillProcessor extends BaseGapfillProcessor {
-  private final double [] _sumes;
-  private final int [] _columnTypes;
-  private final int [] _sumArgIndexes;
+  private final double[] _sumes;
+  private final int[] _columnTypes;
+  private final int[] _sumArgIndexes;
   private final static int COLUMN_TYPE_SUM = 1;
   private final static int COLUMN_TYPE_AVG = 2;
   protected Map<Integer, Integer> _filteredMap;
@@ -93,7 +94,7 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
   @Override
   protected List<Object[]> gapFillAndAggregate(
       List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
-    int [] timeBucketedRawRows = new int[_numOfTimeBuckets + 1];
+    int[] timeBucketedRawRows = new int[_numOfTimeBuckets + 1];
     int timeBucketedRawRowsIndex = 0;
     for (int i = 0; i < rows.size(); i++) {
       Object[] row = rows.get(i);
@@ -143,7 +144,7 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
 
     List<Object[]> result = new ArrayList<>();
 
-    double [] aggregatedSum = new double[_columnTypes.length];
+    double[] aggregatedSum = new double[_columnTypes.length];
     long aggregatedCount = 0;
     for (long time = _startMs; time < _endMs; time += _gapfillTimeBucketSize) {
       int timeBucketIndex = findGapfillBucketIndex(time);

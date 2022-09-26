@@ -81,7 +81,6 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
     _indexSegment.release(_fetchContext);
   }
 
-
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;

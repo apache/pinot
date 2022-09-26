@@ -20,7 +20,7 @@ package org.apache.pinot.core.startree.v2;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.util.Random;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.common.data.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.DistinctCountHLLValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;

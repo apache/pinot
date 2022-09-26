@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.queries;
 
+import org.apache.pinot.common.data.distinct.DistinctTable;
+import org.apache.pinot.common.data.table.Record;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
-import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

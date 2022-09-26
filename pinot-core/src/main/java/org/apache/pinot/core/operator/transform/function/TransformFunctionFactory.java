@@ -71,6 +71,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
+
 /**
  * Factory class for transformation functions.
  */

@@ -108,7 +108,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
     for (int i = 0; i < 15; i++) {
       for (int j = 0; j < NUM_LOTS; j++) {
         for (int k = 0; k < 4; k++) {
-            records.add(createRow(start + i * 3600_000, k, i * NUM_LOTS + j, true));
+          records.add(createRow(start + i * 3600_000, k, i * NUM_LOTS + j, true));
         }
       }
     }
@@ -154,7 +154,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
   @Test
   public void datetimeconvertGapfillTestAggregateAggregateScalabilityTestCountWithLongTimeColumn() {
     DateTimeFormatSpec dateTimeFormatter =
-          new DateTimeFormatSpec("1:MILLISECONDS:EPOCH");
+        new DateTimeFormatSpec("1:MILLISECONDS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("15:MINUTES");
     long start;
 
@@ -184,8 +184,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
-
-    long [] expectedOccupiedSlotsCounts1 = new long []{
+    long[] expectedOccupiedSlotsCounts1 = new long[]{
         1600, 1600, 1600, 1600,
         3200, 3200, 3200, 3200,
         4800, 4800, 4800, 4800,
@@ -231,7 +230,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         6400, 6400, 6400, 6400,
         4800, 4800, 4800, 4800,
         3200, 3200, 3200, 3200,
-        1600, 1600, 1600, 1600};
+        1600, 1600, 1600, 1600
+    };
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -256,7 +256,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
   @Test
   public void datetimeconvertGapfillTestAggregateAggregateScalabilityTestCountWithStringTimeColumn() {
     DateTimeFormatSpec dateTimeFormatter =
-          new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
+        new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("15:MINUTES");
     long start;
 
@@ -286,7 +286,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
-    long [] expectedOccupiedSlotsCounts1 = new long []{
+    long[] expectedOccupiedSlotsCounts1 = new long[]{
         1600, 1600, 1600, 1600,
         3200, 3200, 3200, 3200,
         4800, 4800, 4800, 4800,
@@ -332,7 +332,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         6400, 6400, 6400, 6400,
         4800, 4800, 4800, 4800,
         3200, 3200, 3200, 3200,
-        1600, 1600, 1600, 1600};
+        1600, 1600, 1600, 1600
+    };
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -388,7 +389,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCounts1 = new double []{
+    double[] expectedOccupiedSlotsCounts1 = new double[]{
         1600, 1600, 1600, 1600,
         3200, 3200, 3200, 3200,
         4800, 4800, 4800, 4800,
@@ -434,7 +435,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         6400, 6400, 6400, 6400,
         4800, 4800, 4800, 4800,
         3200, 3200, 3200, 3200,
-        1600, 1600, 1600, 1600};
+        1600, 1600, 1600, 1600
+    };
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -491,7 +493,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCounts1 = new double []{
+    double[] expectedOccupiedSlotsCounts1 = new double[]{
         1600, 1600, 1600, 1600,
         3200, 3200, 3200, 3200,
         4800, 4800, 4800, 4800,
@@ -537,7 +539,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         6400, 6400, 6400, 6400,
         4800, 4800, 4800, 4800,
         3200, 3200, 3200, 3200,
-        1600, 1600, 1600, 1600};
+        1600, 1600, 1600, 1600
+    };
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -595,14 +598,14 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
-
-    long [] expectedOccupiedSlotsCounts1 = new long []{
+    long[] expectedOccupiedSlotsCounts1 = new long[]{
         6400, 12800, 19200, 25600, 32000, 38400, 44800, 51200,
         57600, 57600, 57600, 57600, 57600, 57600, 57600, 51200,
         44800, 38400, 32000, 25600, 19200, 12800, 6400, 6400,
         12800, 19200, 25600, 32000, 38400, 44800, 51200, 57600,
         57600, 57600, 57600, 57600, 57600, 57600, 51200, 44800,
-        38400, 32000, 25600, 19200, 12800, 6400};
+        38400, 32000, 25600, 19200, 12800, 6400
+    };
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -657,13 +660,14 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
-    long [] expectedOccupiedSlotsCounts1 = new long []{
+    long[] expectedOccupiedSlotsCounts1 = new long[]{
         6400, 12800, 19200, 25600, 32000, 38400, 44800, 51200,
         57600, 57600, 57600, 57600, 57600, 57600, 57600, 51200,
         44800, 38400, 32000, 25600, 19200, 12800, 6400, 6400,
         12800, 19200, 25600, 32000, 38400, 44800, 51200, 57600,
         57600, 57600, 57600, 57600, 57600, 57600, 51200, 44800,
-        38400, 32000, 25600, 19200, 12800, 6400};
+        38400, 32000, 25600, 19200, 12800, 6400
+    };
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -719,13 +723,14 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCounts1 = new double []{
+    double[] expectedOccupiedSlotsCounts1 = new double[]{
         6400, 12800, 19200, 25600, 32000, 38400, 44800, 51200,
         57600, 57600, 57600, 57600, 57600, 57600, 57600, 51200,
         44800, 38400, 32000, 25600, 19200, 12800, 6400, 6400,
         12800, 19200, 25600, 32000, 38400, 44800, 51200, 57600,
         57600, 57600, 57600, 57600, 57600, 57600, 51200, 44800,
-        38400, 32000, 25600, 19200, 12800, 6400};
+        38400, 32000, 25600, 19200, 12800, 6400
+    };
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
@@ -782,13 +787,14 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
 
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
-    double [] expectedOccupiedSlotsCounts1 = new double []{
+    double[] expectedOccupiedSlotsCounts1 = new double[]{
         6400, 12800, 19200, 25600, 32000, 38400, 44800, 51200,
         57600, 57600, 57600, 57600, 57600, 57600, 57600, 51200,
         44800, 38400, 32000, 25600, 19200, 12800, 6400, 6400,
         12800, 19200, 25600, 32000, 38400, 44800, 51200, 57600,
         57600, 57600, 57600, 57600, 57600, 57600, 51200, 44800,
-        38400, 32000, 25600, 19200, 12800, 6400};
+        38400, 32000, 25600, 19200, 12800, 6400
+    };
     ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
     List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);

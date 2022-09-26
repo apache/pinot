@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.common.data.datatable.DataTableFactory;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
@@ -47,7 +47,6 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-
 
 
 public class QueryRunnerTestBase {

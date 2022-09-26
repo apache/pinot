@@ -29,7 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.common.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;

@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
-
 /**
  * A mutable FST represents a FST which can have arbitrary inputs added to it at
  * any given point of time. Unlike a normal FST which is build once read many, mutable

@@ -75,6 +75,7 @@ public class RegExp {
   String _inputString;
   int _flags;
   int _pos;
+
   RegExp() {
   }
 

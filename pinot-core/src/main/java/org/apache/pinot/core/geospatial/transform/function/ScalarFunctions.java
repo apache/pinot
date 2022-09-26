@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.geospatial.transform.function;
 
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.local.utils.GeometryUtils;
+import org.apache.pinot.common.data.geometry.GeometrySerializer;
+import org.apache.pinot.common.data.geometry.GeometryUtils;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.locationtech.jts.geom.Coordinate;

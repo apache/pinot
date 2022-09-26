@@ -170,7 +170,6 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     }
   }
 
-
   @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();

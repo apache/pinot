@@ -19,8 +19,8 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import java.util.Map;
+import org.apache.pinot.common.data.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.datablock.DataBlockUtils;
 
 
 public final class TransferableBlockUtils {

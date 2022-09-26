@@ -83,8 +83,10 @@ public class BenchmarkNativeAndLuceneBasedLike {
 
   @Param({"LUCENE", "NATIVE"})
   private FSTType _fstType;
-  @Param({"SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE '%domain%'",
-      "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.domain%'"})
+  @Param({
+      "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE '%domain%'",
+      "SELECT INT_COL, URL_COL FROM MyTable WHERE DOMAIN_NAMES LIKE 'www.domain%'"
+  })
   String _query;
   @Param("2500000")
   int _numRows;
@@ -126,7 +128,7 @@ public class BenchmarkNativeAndLuceneBasedLike {
         "www.sd.domain1.co.cd", "www.domain2.com", "www.domain2.co.ab", "www.domain2.co.bc", "www.domain2.co.cd",
         "www.sd.domain2.com", "www.sd.domain2.co.ab", "www.sd.domain2.co.bc", "www.sd.domain2.co.cd"
     };
-    String[] urlSuffixes = new String[] {"/a", "/b", "/c", "/d"};
+    String[] urlSuffixes = new String[]{"/a", "/b", "/c", "/d"};
     String[] noIndexData = new String[]{"test1", "test2", "test3", "test4", "test5"};
     for (int i = 0; i < numRows; i++) {
       String domain = domainNames[i % domainNames.length];

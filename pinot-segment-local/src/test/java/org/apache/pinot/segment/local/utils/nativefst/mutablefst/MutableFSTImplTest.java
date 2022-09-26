@@ -64,7 +64,6 @@ public class MutableFSTImplTest {
     assertEquals(Lists.newArrayList(1), listBad);
   }
 
-
   @Test
   public void testRegexMatcherPrefix() {
     MutableFST fst = new MutableFSTImpl();

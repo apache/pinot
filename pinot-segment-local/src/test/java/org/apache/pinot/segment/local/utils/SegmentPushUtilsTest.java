@@ -25,16 +25,18 @@ import java.util.Map;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentPushUtilsTest {
 
   @Test
-  public void testGetSegmentUriToTarPathMap() throws IOException {
+  public void testGetSegmentUriToTarPathMap()
+      throws IOException {
     URI outputDirURI = Files.createTempDirectory("test").toUri();
 
-    String[] segmentFiles = new String[] {
+    String[] segmentFiles = new String[]{
         outputDirURI.resolve("segment.tar.gz").toString(),
         outputDirURI.resolve("stats_202201.tar.gz").toString(),
         outputDirURI.resolve("/2022/segment.tar.gz").toString(),

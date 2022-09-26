@@ -19,12 +19,12 @@
 package org.apache.pinot.connector.spark.connector
 
 import io.grpc.ManagedChannelBuilder
+import org.apache.pinot.common.data.datatable.DataTableFactory
 import org.apache.pinot.common.proto.PinotQueryServerGrpc
 import org.apache.pinot.common.proto.Server.ServerRequest
 import org.apache.pinot.common.utils.DataTable
 import org.apache.pinot.connector.spark.exceptions.PinotException
 import org.apache.pinot.connector.spark.utils.Logging
-import org.apache.pinot.core.common.datatable.DataTableFactory
 import org.apache.pinot.spi.config.table.TableType
 
 import scala.collection.JavaConverters._

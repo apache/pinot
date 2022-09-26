@@ -64,21 +64,21 @@ public final class BasicAuthUtils {
    * @return list of BasicAuthPrincipals
    */
   public static List<BasicAuthPrincipal> extractBasicAuthPrincipals(PinotConfiguration configuration, String prefix) {
-      String principalNames = configuration.getProperty(prefix);
-      Preconditions.checkArgument(StringUtils.isNotBlank(principalNames), "must provide principals");
+    String principalNames = configuration.getProperty(prefix);
+    Preconditions.checkArgument(StringUtils.isNotBlank(principalNames), "must provide principals");
 
-      return Arrays.stream(principalNames.split(",")).map(rawName -> {
-          String name = rawName.trim();
-          Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid name", name);
+    return Arrays.stream(principalNames.split(",")).map(rawName -> {
+      String name = rawName.trim();
+      Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid name", name);
 
-          String password = configuration.getProperty(String.format("%s.%s.%s", prefix, name, PASSWORD));
-          Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
+      String password = configuration.getProperty(String.format("%s.%s.%s", prefix, name, PASSWORD));
+      Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
 
-          Set<String> tables = extractSet(configuration, String.format("%s.%s.%s", prefix, name, TABLES));
-          Set<String> permissions = extractSet(configuration, String.format("%s.%s.%s", prefix, name, PERMISSIONS));
+      Set<String> tables = extractSet(configuration, String.format("%s.%s.%s", prefix, name, TABLES));
+      Set<String> permissions = extractSet(configuration, String.format("%s.%s.%s", prefix, name, PERMISSIONS));
 
-          return new BasicAuthPrincipal(name, toBasicAuthToken(name, password), tables, permissions);
-      }).collect(Collectors.toList());
+      return new BasicAuthPrincipal(name, toBasicAuthToken(name, password), tables, permissions);
+    }).collect(Collectors.toList());
   }
 
   public static List<ZkBasicAuthPrincipal> extractBasicAuthPrincipals(List<UserConfig> userConfigList) {

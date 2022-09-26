@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.distinct.dictionary;
 import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import java.util.List;
+import org.apache.pinot.common.data.distinct.DistinctTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -52,7 +53,7 @@ public class DictionaryBasedMultiColumnDistinctOrderByExecutor extends BaseDicti
       orderByExpressionIndices[i] = expressions.indexOf(orderByExpression.getExpression());
       comparisonFactors[i] = orderByExpression.isAsc() ? -1 : 1;
     }
-    _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY), (o1, o2) -> {
+    _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, DistinctTable.MAX_INITIAL_CAPACITY), (o1, o2) -> {
       int[] dictIds1 = o1._dictIds;
       int[] dictIds2 = o2._dictIds;
       for (int i = 0; i < numOrderByExpressions; i++) {

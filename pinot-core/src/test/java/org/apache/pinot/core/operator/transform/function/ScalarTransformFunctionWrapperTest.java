@@ -261,7 +261,6 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     testTransformFunction(transformFunction, expectedValues);
   }
 
-
   @Test
   public void testStringContainsTransformFunction() {
     ExpressionContext expression =

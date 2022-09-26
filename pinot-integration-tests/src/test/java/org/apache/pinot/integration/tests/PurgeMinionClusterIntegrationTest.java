@@ -44,7 +44,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+
 
 /**
  * Integration test for minion task of type "PurgeTask"
@@ -196,7 +198,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE);
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
-      // Will not schedule task if there's incomplete task
+    // Will not schedule task if there's incomplete task
     assertNull(
         _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));
     waitForTaskToComplete();
@@ -242,7 +244,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_DELTA_PASSED_TABLE);
     _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE);
     assertTrue(_helixTaskResourceManager.getTaskQueues()
-          .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
+        .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
     // Will not schedule task if there's incomplete task
     assertNull(
         _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));

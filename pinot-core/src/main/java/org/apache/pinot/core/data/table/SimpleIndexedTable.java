@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.table;
 
 import java.util.HashMap;
 import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.pinot.common.data.table.Record;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 

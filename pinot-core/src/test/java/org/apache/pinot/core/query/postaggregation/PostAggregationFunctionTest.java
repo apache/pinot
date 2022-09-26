@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.postaggregation;
 
+import org.apache.pinot.common.data.geometry.GeometrySerializer;
+import org.apache.pinot.common.data.geometry.GeometryUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.testng.annotations.Test;
 
@@ -58,7 +58,8 @@ public class PostAggregationFunctionTest {
     function = new PostAggregationFunction("ST_AsText", new ColumnDataType[]{ColumnDataType.BYTES});
     assertEquals(function.getResultType(), ColumnDataType.STRING);
     assertEquals(function.invoke(
-        new Object[]{GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20)))}),
+            new Object[]{GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10,
+                20)))}),
         "POINT (10 20)");
 
     // Cast

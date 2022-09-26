@@ -112,6 +112,7 @@ public class ServerInstance {
   public int getGrpcPort() {
     return _grpcPort;
   }
+
   public int getQueryServicePort() {
     return _queryServicePort;
   }
