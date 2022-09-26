@@ -87,6 +87,14 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     super.testHardcodedQueriesMultiStage();
   }
 
+  @Test(enabled = false)
+  @Override
+  public void testGeneratedQueries()
+      throws Exception {
+    // test multistage engine, currently we don't support MV columns.
+    super.testGeneratedQueries(false, true);
+  }
+
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);

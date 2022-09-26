@@ -79,6 +79,8 @@ public class QueryGenerator {
 
   private static final List<String> AGGREGATION_FUNCTIONS =
       Arrays.asList("SUM", "MIN", "MAX", "AVG", "COUNT", "DISTINCTCOUNT");
+  private static final List<String> MULTI_STAGE_AGGREGATION_FUNCTIONS =
+      Arrays.asList("SUM", "MIN", "MAX", "AVG", "COUNT");
   private static final Random RANDOM = new Random();
 
   private final Map<String, Set<String>> _columnToValueSet = new HashMap<>();
@@ -93,6 +95,9 @@ public class QueryGenerator {
   private final List<PredicateGenerator> _singleValuePredicateGenerators =
       Arrays.asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
           new SingleValueBetweenPredicateGenerator(), new SingleValueRegexPredicateGenerator());
+  private final List<PredicateGenerator> _multistageSingleValuePredicateGenerators =
+      Arrays.asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
+          new SingleValueBetweenPredicateGenerator());
   private final List<PredicateGenerator> _multiValuePredicateGenerators =
       Arrays.asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
           new MultiValueBetweenPredicateGenerator());
@@ -100,6 +105,7 @@ public class QueryGenerator {
   private final String _pinotTableName;
   private final String _h2TableName;
   private boolean _skipMultiValuePredicates = false;
+  private boolean _useMultistageEngine = false;
 
   /**
    * Constructor for <code>QueryGenerator</code>.
@@ -301,6 +307,10 @@ public class QueryGenerator {
     _skipMultiValuePredicates = skipMultiValuePredicates;
   }
 
+  public void setUseMultistageEngine(boolean useMultistageEngine) {
+    _useMultistageEngine = useMultistageEngine;
+  }
+
   /**
    * Helper method to pick a random value from the values list.
    *
@@ -310,6 +320,10 @@ public class QueryGenerator {
    */
   private <T> T pickRandom(List<T> list) {
     return list.get(RANDOM.nextInt(list.size()));
+  }
+
+  private List<PredicateGenerator> getSingleValuePredicateGenerators() {
+    return _useMultistageEngine ? _multistageSingleValuePredicateGenerators : _singleValuePredicateGenerators;
   }
 
   /**
@@ -336,7 +350,7 @@ public class QueryGenerator {
       if (!_columnToValueList.get(columnName).isEmpty()) {
         if (!_multiValueColumnMaxNumElements.containsKey(columnName)) {
           // Single-value column.
-          predicates.add(pickRandom(_singleValuePredicateGenerators).generatePredicate(columnName));
+          predicates.add(pickRandom(getSingleValuePredicateGenerators()).generatePredicate(columnName));
         } else if (!_skipMultiValuePredicates) {
           // Multi-value column.
           predicates.add(pickRandom(_multiValuePredicateGenerators).generatePredicate(columnName));
@@ -493,12 +507,17 @@ public class QueryGenerator {
       List<String> h2AggregateColumnAndFunctions = new ArrayList<>();
       for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
         String h2AggregateColumnAndFunction;
-        // Make 'AVG' and 'DISTINCTCOUNT' compatible with H2 SQL query.
-        if (aggregateColumnAndFunction.startsWith("AVG(")) {
-          h2AggregateColumnAndFunction =
-              aggregateColumnAndFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
-        } else if (aggregateColumnAndFunction.startsWith("DISTINCTCOUNT(")) {
+        // Make 'AVG' and
+        if (aggregateColumnAndFunction.startsWith("DISTINCTCOUNT(")) {
+          // make 'DISTINCTCOUNT(..)' compatible with H2 SQL query using 'COUNT(DISTINCT(..)'
           h2AggregateColumnAndFunction = aggregateColumnAndFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+        } else if (AGGREGATION_FUNCTIONS.contains(aggregateColumnAndFunction.substring(0, 3))) {
+          // make AGG functions (SUM, MIN, MAX, AVG) compatible with H2 SQL query.
+          // this is because Pinot queries casts all to double before doing aggregation
+          String aggFunctionName = aggregateColumnAndFunction.substring(0, 3);
+          h2AggregateColumnAndFunction = aggregateColumnAndFunction
+              .replace(aggFunctionName + "(", aggFunctionName + "(CAST(")
+              .replace(")", " AS DOUBLE))");
         } else {
           h2AggregateColumnAndFunction = aggregateColumnAndFunction;
         }
@@ -712,9 +731,12 @@ public class QueryGenerator {
     public Query generateQuery() {
       // Select at most MAX_NUM_SELECTION_COLUMNS columns.
       int projectionColumnCount = Math.min(RANDOM.nextInt(MAX_NUM_SELECTION_COLUMNS) + 1, _columnNames.size());
+      if (_useMultistageEngine) {
+        projectionColumnCount = Math.min(projectionColumnCount, _singleValueColumnNames.size());
+      }
       Set<String> projectionColumns = new HashSet<>();
       while (projectionColumns.size() < projectionColumnCount) {
-        projectionColumns.add(pickRandom(_columnNames));
+        projectionColumns.add(pickRandom(_useMultistageEngine ? _singleValueColumnNames : _columnNames));
       }
 
       // Select at most MAX_NUM_ORDER_BY_COLUMNS columns for ORDER BY clause.
@@ -813,7 +835,8 @@ public class QueryGenerator {
     }
 
     private String createRandomAggregationFunction() {
-      String aggregationFunction = pickRandom(AGGREGATION_FUNCTIONS);
+      String aggregationFunction = pickRandom(_useMultistageEngine ? MULTI_STAGE_AGGREGATION_FUNCTIONS
+          : AGGREGATION_FUNCTIONS);
       String aggregationColumn;
       switch (aggregationFunction) {
         // "COUNT" and "DISTINCTCOUNT" support all single-value columns.

@@ -237,9 +237,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   @Override
-  public void testGeneratedQueriesWithMultiValues()
+  public void testGeneratedQueries()
       throws Exception {
-    super.testGeneratedQueriesWithMultiValues();
+    super.testGeneratedQueries();
   }
 
   @Test
