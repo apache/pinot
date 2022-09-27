@@ -52,7 +52,8 @@ public class PinotControllerTransport {
 
 
   public PinotControllerTransport(Map<String, String> headers, String scheme,
-    @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols) {
+                                  @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
+                                  TlsProtocols tlsProtocols, String appId) {
     _headers = headers;
     _scheme = scheme;
 
@@ -64,13 +65,13 @@ public class PinotControllerTransport {
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
             .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
             .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-            .setUserAgent(getUserAgentVersionFromClassPath())
+            .setUserAgent(getUserAgentVersionFromClassPath(appId))
             .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
 
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
-  private String getUserAgentVersionFromClassPath() {
+  private String getUserAgentVersionFromClassPath(String appId) {
     Properties userAgentProperties = new Properties();
     try {
       userAgentProperties.load(PinotControllerTransport.class.getClassLoader()
@@ -78,7 +79,11 @@ public class PinotControllerTransport {
     } catch (IOException e) {
       LOGGER.warn("Unable to set user agent version");
     }
-    return userAgentProperties.getProperty("ua", "unknown");
+    String userAgentFromProperties = userAgentProperties.getProperty("ua", "unknown");
+    if (appId != null && appId.length() > 0) {
+      return appId + "-" + userAgentFromProperties;
+    }
+    return userAgentFromProperties;
   }
 
   public TableResponse getAllTables(String controllerAddress) {

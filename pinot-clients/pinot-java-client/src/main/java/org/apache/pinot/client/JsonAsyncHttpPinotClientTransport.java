@@ -66,7 +66,8 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
-    @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols) {
+                                           @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
+                                           TlsProtocols tlsProtocols, String appId) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
@@ -79,13 +80,14 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
             .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
             .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-            .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua"))
+            .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId))
             .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
-    @Nullable SslContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols) {
+                                           @Nullable SslContext sslContext, ConnectionTimeouts connectionTimeouts,
+                                           TlsProtocols tlsProtocols, String appId) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
@@ -98,7 +100,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
             .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
             .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-            .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua"))
+            .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId))
             .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }

@@ -43,13 +43,15 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
   private int _readTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
   private int _connectTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
   private int _handshakeTimeoutMs = Integer.parseInt(DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS);
+  private String _appId = "";
 
   @Override
   public PinotClientTransport buildTransport() {
     ConnectionTimeouts connectionTimeouts = ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs,
             _handshakeTimeoutMs);
     TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
-    return new JsonAsyncHttpPinotClientTransport(_headers, _scheme, _sslContext, connectionTimeouts, tlsProtocols);
+    return new JsonAsyncHttpPinotClientTransport(_headers, _scheme, _sslContext,
+            connectionTimeouts, tlsProtocols, _appId);
   }
   public Map<String, String> getHeaders() {
     return _headers;
@@ -94,6 +96,7 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
             DEFAULT_BROKER_CONNECT_TIMEOUT_MS));
     _handshakeTimeoutMs = Integer.parseInt(properties.getProperty("brokerHandshakeTimeoutMs",
             DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS));
+    _appId = properties.getProperty("appId", "");
     _tlsV10Enabled = Boolean.parseBoolean(properties.getProperty("brokerTlsV10Enabled",
             DEFAULT_BROKER_TLS_V10_ENABLED))
             || Boolean.parseBoolean(System.getProperties().getProperty("broker.tlsV10Enabled",
