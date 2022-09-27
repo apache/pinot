@@ -39,6 +39,7 @@ private[pinot] class PinotGrpcServerDataFetcher(pinotSplit: PinotSplit)
   private val channel = ManagedChannelBuilder
     .forAddress(pinotSplit.serverAndSegments.serverHost, pinotSplit.serverAndSegments.serverGrpcPort)
     .usePlaintext()
+    .maxInboundMessageSize(Int.MaxValue)
     .asInstanceOf[ManagedChannelBuilder[_]].build()
   private val pinotServerBlockingStub = PinotQueryServerGrpc.newBlockingStub(channel)
 
