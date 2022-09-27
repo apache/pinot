@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
+import java.util.List;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -155,6 +156,19 @@ public interface PinotFS extends Closeable, Serializable {
    */
   String[] listFiles(URI fileUri, boolean recursive)
       throws IOException;
+
+  /**
+   * Like listFiles but also return some file metadata so no need to call length(), isDirectory(), and
+   * lastModified() separately, which can be slow and costly for remote file system.
+   * @param fileUri location of file
+   * @param recursive if we want to list files recursively
+   * @return a list of FileMetadata that contains file path, and a few file metadata.
+   * @throws IOException on IO failure. See specific implementation
+   */
+  default List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
+      throws IOException {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Copies a file from a remote filesystem to the local one. Keeps the original file.

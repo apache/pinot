@@ -27,7 +27,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-public class TestGcsUri {
+public class GcsUriTest {
   @Test
   public void testCreateGcsUriUsingADifferentScheme() {
     URI uri = URI.create("file://bucket/file");

@@ -32,9 +32,12 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.testng.Assert;
 import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -69,7 +72,7 @@ import static org.testng.Assert.assertTrue;
  * If credentials are not supplied then all tests are skipped.
  */
 @Test(singleThreaded = true)
-public class TestGcsPinotFS {
+public class GcsPinotFSTest {
   private static final String DATA_DIR_PREFIX = "testing-data";
 
   private GcsPinotFS _pinotFS;
@@ -223,8 +226,8 @@ public class TestGcsPinotFS {
     String directoryName = Paths.get(gcsDirectoryUri.getPath()).getFileName().toString();
     String directoryCopyName = Paths.get(gcsDirectoryUriCopy.getPath()).getFileName().toString();
     for (GcsUri element : ImmutableList.copyOf(expectedElements)) {
-      expectedElementsCopy.add(
-          createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
+      expectedElementsCopy
+          .add(createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
     }
     expectedElementsCopy.addAll(expectedElements);
     assertEquals(listFilesToStream(_dataDir).collect(toSet()), expectedElementsCopy);
@@ -242,5 +245,65 @@ public class TestGcsPinotFS {
     assertTrue(listFilesToStream(gcsDirectoryUri).allMatch(uri -> !uri.equals(nonEmptyFileGcsUri)));
     _pinotFS.move(movedFileGcsUri.getUri(), nonEmptyFileGcsUri.getUri(), false);
     assertTrue(listFilesToStream(gcsDirectoryUri).anyMatch(uri -> uri.equals(nonEmptyFileGcsUri)));
+  }
+
+  @Test
+  public void testListFilesWithMetadata()
+      throws Exception {
+    skipIfNotConfigured();
+
+    // Create empty file
+    Path localTmpDir = createLocalTempDirectory();
+    Path emptyFile = localTmpDir.resolve("empty");
+    emptyFile.toFile().createNewFile();
+
+    // Create 5 subfolders with files inside.
+    int count = 5;
+    Set<String> expectedNonRecursive = new HashSet<>();
+    Set<String> expectedRecursive = new HashSet<>();
+    for (int i = 0; i < count; i++) {
+      GcsUri testDir = _dataDir.resolve("testDir" + i);
+      _pinotFS.mkdir(testDir.getUri());
+      expectedNonRecursive.add(appendSlash(testDir).toString());
+
+      GcsUri testFile = testDir.resolve("testFile" + i);
+      // Create the file by copying an empty file there.
+      _pinotFS.copyFromLocalFile(emptyFile.toFile(), testFile.getUri());
+      expectedRecursive.add(appendSlash(testDir).toString());
+      expectedRecursive.add(testFile.toString());
+    }
+    GcsUri testDirEmpty = _dataDir.resolve("testDirEmpty");
+    _pinotFS.mkdir(testDirEmpty.getUri());
+    expectedNonRecursive.add(appendSlash(testDirEmpty).toString());
+    expectedRecursive.add(appendSlash(testDirEmpty).toString());
+
+    GcsUri testRootFile = _dataDir.resolve("testRootFile");
+    _pinotFS.copyFromLocalFile(emptyFile.toFile(), testRootFile.getUri());
+    expectedNonRecursive.add(testRootFile.toString());
+    expectedRecursive.add(testRootFile.toString());
+
+    // Assert that recursive list files and nonrecursive list files are as expected
+    String[] files = _pinotFS.listFiles(_dataDir.getUri(), false);
+    Assert.assertEquals(files.length, count + 2);
+    Assert.assertTrue(expectedNonRecursive.containsAll(Arrays.asList(files)), Arrays.toString(files));
+    files = _pinotFS.listFiles(_dataDir.getUri(), true);
+    Assert.assertEquals(files.length, count * 2 + 2);
+    Assert.assertTrue(expectedRecursive.containsAll(Arrays.asList(files)), Arrays.toString(files));
+
+    // Assert that recursive list files and nonrecursive list files with file info are as expected
+    List<FileMetadata> fileMetadata = _pinotFS.listFilesWithMetadata(_dataDir.getUri(), false);
+    Assert.assertEquals(fileMetadata.size(), count + 2);
+    Assert.assertEquals(fileMetadata.stream().filter(FileMetadata::isDirectory).count(), count + 1);
+    Assert.assertEquals(fileMetadata.stream().filter(f -> !f.isDirectory()).count(), 1);
+    Assert.assertTrue(expectedNonRecursive
+            .containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
+        fileMetadata.toString());
+    fileMetadata = _pinotFS.listFilesWithMetadata(_dataDir.getUri(), true);
+    Assert.assertEquals(fileMetadata.size(), count * 2 + 2);
+    Assert.assertEquals(fileMetadata.stream().filter(FileMetadata::isDirectory).count(), count + 1);
+    Assert.assertEquals(fileMetadata.stream().filter(f -> !f.isDirectory()).count(), count + 1);
+    Assert.assertTrue(
+        expectedRecursive.containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
+        fileMetadata.toString());
   }
 }
