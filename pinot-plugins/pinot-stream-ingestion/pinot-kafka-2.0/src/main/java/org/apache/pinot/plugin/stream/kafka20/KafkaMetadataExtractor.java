@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -34,7 +33,8 @@ public interface KafkaMetadataExtractor {
     return record -> {
       if (!populateMetadata) {
         return new KafkaStreamMessageMetadata(record.timestamp(), RowMetadata.EMPTY_ROW,
-            Collections.singletonMap(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(record.offset())));
+            Map.of(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(record.offset()),
+                KafkaStreamMessageMetadata.RECORD_TIMESTAMP_KEY, String.valueOf(record.timestamp())));
       }
       GenericRow headerGenericRow = new GenericRow();
       Headers headers = record.headers();
@@ -46,6 +46,7 @@ public interface KafkaMetadataExtractor {
       }
       Map<String, String> metadata = new HashMap<>();
       metadata.put(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(record.offset()));
+      metadata.put(KafkaStreamMessageMetadata.RECORD_TIMESTAMP_KEY, String.valueOf(record.timestamp()));
       return new KafkaStreamMessageMetadata(record.timestamp(), headerGenericRow, metadata);
     };
   }
