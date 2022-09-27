@@ -52,8 +52,8 @@ public class FileMetadata {
 
   @Override
   public String toString() {
-    return "FileInfo{" + "_filePath='" + _filePath + '\'' + ", _lastModifiedTime=" + _lastModifiedTime + ", _length="
-        + _length + ", _isDirectory=" + _isDirectory + '}';
+    return "FileMetadata{" + "_filePath='" + _filePath + '\'' + ", _lastModifiedTime=" + _lastModifiedTime
+        + ", _length=" + _length + ", _isDirectory=" + _isDirectory + '}';
   }
 
   public static class Builder {
