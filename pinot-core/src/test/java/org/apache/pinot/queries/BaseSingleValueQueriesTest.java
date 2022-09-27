@@ -23,7 +23,6 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -134,7 +133,8 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
       throws Exception {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig
-        .setInvertedIndexColumns(new HashSet<>(Arrays.asList("column6", "column7", "column11", "column17", "column18")));
+        .setInvertedIndexColumns(
+            new HashSet<>(Arrays.asList("column6", "column7", "column11", "column17", "column18")));
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
