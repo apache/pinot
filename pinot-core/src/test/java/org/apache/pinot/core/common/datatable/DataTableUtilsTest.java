@@ -22,13 +22,14 @@ import java.io.IOException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertNotNull;
 
 
 public class DataTableUtilsTest {
@@ -75,9 +76,9 @@ public class DataTableUtilsTest {
     assertEquals(dataSchema.getColumnNames(), new String[]{"distinct_a:b"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.OBJECT});
     assertEquals(dataTable.getNumberOfRows(), 1);
-    Object firstObject = dataTable.getObject(0, 0);
-    assertTrue(firstObject instanceof DistinctTable);
-    DistinctTable distinctTable = (DistinctTable) firstObject;
+    DataTable.CustomObject customObject = dataTable.getCustomObject(0, 0);
+    assertNotNull(customObject);
+    DistinctTable distinctTable = ObjectSerDeUtils.deserialize(customObject);
     assertEquals(distinctTable.size(), 0);
     assertEquals(distinctTable.getDataSchema().getColumnNames(), new String[]{"a", "b"});
     assertEquals(distinctTable.getDataSchema().getColumnDataTypes(),

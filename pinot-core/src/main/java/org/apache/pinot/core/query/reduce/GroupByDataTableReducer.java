@@ -42,6 +42,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
@@ -313,7 +314,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       values[colId] = dataTable.getBytes(rowId, colId);
                       break;
                     case OBJECT:
-                      values[colId] = dataTable.getObject(rowId, colId);
+                      // TODO: Move ser/de into AggregationFunction interface
+                      DataTable.CustomObject customObject = dataTable.getCustomObject(rowId, colId);
+                      if (customObject != null) {
+                        values[colId] = ObjectSerDeUtils.deserialize(customObject);
+                      }
                       break;
                     // Add other aggregation intermediate result / group-by column type supports here
                     default:

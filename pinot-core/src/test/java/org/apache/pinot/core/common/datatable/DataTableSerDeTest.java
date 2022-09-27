@@ -36,6 +36,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -85,15 +86,15 @@ public class DataTableSerDeTest {
           .put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(200L))
           .put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true")
           .put(MetadataKey.TIME_USED_MS.getName(), String.valueOf(20000L)).put(MetadataKey.TRACE_INFO.getName(),
-          "StudentException: Error finding students\n"
-              + "        at StudentManager.findStudents(StudentManager.java:13)\n"
-              + "        at StudentProgram.main(StudentProgram.java:9)\n"
-              + "Caused by: DAOException: Error querying students from database\n"
-              + "        at StudentDAO.list(StudentDAO.java:11)\n"
-              + "        at StudentManager.findStudents(StudentManager.java:11)\n" + "        ... 1 more\n"
-              + "Caused by: java.sql.SQLException: Syntax Error\n"
-              + "        at DatabaseUtils.executeQuery(DatabaseUtils.java:5)\n"
-              + "        at StudentDAO.list(StudentDAO.java:8)\n" + "        ... 2 more")
+              "StudentException: Error finding students\n"
+                  + "        at StudentManager.findStudents(StudentManager.java:13)\n"
+                  + "        at StudentProgram.main(StudentProgram.java:9)\n"
+                  + "Caused by: DAOException: Error querying students from database\n"
+                  + "        at StudentDAO.list(StudentDAO.java:11)\n"
+                  + "        at StudentManager.findStudents(StudentManager.java:11)\n" + "        ... 1 more\n"
+                  + "Caused by: java.sql.SQLException: Syntax Error\n"
+                  + "        at DatabaseUtils.executeQuery(DatabaseUtils.java:5)\n"
+                  + "        at StudentDAO.list(StudentDAO.java:8)\n" + "        ... 2 more")
           .put(MetadataKey.REQUEST_ID.getName(), String.valueOf(90181881818L))
           .put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(900L))
           .put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(1919199L)).build();
@@ -703,8 +704,8 @@ public class DataTableSerDeTest {
             Assert.assertEquals(newDataTable.getDouble(rowId, colId), isNull ? 0.0 : DOUBLES[rowId], ERROR_MESSAGE);
             break;
           case BIG_DECIMAL:
-            Assert.assertEquals(newDataTable.getBigDecimal(rowId, colId), isNull ? BigDecimal.ZERO
-                : BIG_DECIMALS[rowId], ERROR_MESSAGE);
+            Assert.assertEquals(newDataTable.getBigDecimal(rowId, colId),
+                isNull ? BigDecimal.ZERO : BIG_DECIMALS[rowId], ERROR_MESSAGE);
             break;
           case BOOLEAN:
             Assert.assertEquals(newDataTable.getInt(rowId, colId), isNull ? 0 : BOOLEANS[rowId], ERROR_MESSAGE);
@@ -723,7 +724,13 @@ public class DataTableSerDeTest {
                 ERROR_MESSAGE);
             break;
           case OBJECT:
-            Assert.assertEquals(newDataTable.getObject(rowId, colId), isNull ? null : OBJECTS[rowId], ERROR_MESSAGE);
+            DataTable.CustomObject customObject = newDataTable.getCustomObject(rowId, colId);
+            if (isNull) {
+              Assert.assertNull(customObject, ERROR_MESSAGE);
+            } else {
+              Assert.assertNotNull(customObject);
+              Assert.assertEquals(ObjectSerDeUtils.deserialize(customObject), OBJECTS[rowId], ERROR_MESSAGE);
+            }
             break;
           case INT_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), INT_ARRAYS[rowId]), ERROR_MESSAGE);

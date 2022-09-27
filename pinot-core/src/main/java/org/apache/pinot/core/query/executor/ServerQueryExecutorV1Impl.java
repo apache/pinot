@@ -21,7 +21,9 @@ package org.apache.pinot.core.query.executor;
 import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,6 +48,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.ExplainPlanRowData;
 import org.apache.pinot.core.common.ExplainPlanRows;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
@@ -65,7 +68,6 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -193,8 +195,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
     List<String> notAcquiredSegments = new ArrayList<>();
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(
-        segmentsToQuery, notAcquiredSegments);
+    List<SegmentDataManager> segmentDataManagers =
+        tableDataManager.acquireSegments(segmentsToQuery, notAcquiredSegments);
     int numSegmentsAcquired = segmentDataManagers.size();
     List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsAcquired);
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -295,8 +297,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
     if (notAcquiredSegments.size() > 0) {
       List<String> missingSegments =
-          notAcquiredSegments.stream()
-              .filter(segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName))
+          notAcquiredSegments.stream().filter(segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName))
               .collect(Collectors.toList());
       int numMissingSegments = missingSegments.size();
       if (numMissingSegments > 0) {
@@ -374,8 +375,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
       Plan queryPlan =
           enableStreaming ? _planMaker.makeStreamingInstancePlan(selectedSegments, queryContext, executorService,
-              responseObserver, _serverMetrics) : _planMaker.makeInstancePlan(selectedSegments, queryContext,
-              executorService, _serverMetrics);
+              responseObserver, _serverMetrics)
+              : _planMaker.makeInstancePlan(selectedSegments, queryContext, executorService, _serverMetrics);
       planBuildTimer.stopAndRecord();
 
       TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
@@ -400,8 +401,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
     try {
       dataTableBuilder.startRow();
-      dataTableBuilder.setColumn(0, String.format(ExplainPlanRows.PLAN_START_FORMAT,
-          totalNumSegments));
+      dataTableBuilder.setColumn(0, String.format(ExplainPlanRows.PLAN_START_FORMAT, totalNumSegments));
       dataTableBuilder.setColumn(1, ExplainPlanRows.PLAN_START_IDS);
       dataTableBuilder.setColumn(2, ExplainPlanRows.PLAN_START_IDS);
       dataTableBuilder.finishRow();
@@ -522,14 +522,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
       // Walk through all the explain plans and create the entries in the explain plan output for each plan
       for (ExplainPlanRows explainPlanRows : listOfExplainPlans) {
-        numEmptyFilterSegments += explainPlanRows.isHasEmptyFilter()
-            ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
-        numMatchAllFilterSegments += explainPlanRows.isHasMatchAllFilter()
-            ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
+        numEmptyFilterSegments +=
+            explainPlanRows.isHasEmptyFilter() ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
+        numMatchAllFilterSegments +=
+            explainPlanRows.isHasMatchAllFilter() ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
         setValueInDataTableBuilder(dataTableBuilder,
-            String.format(ExplainPlanRows.PLAN_START_FORMAT,
-                explainPlanRows.getNumSegmentsMatchingThisPlan()), ExplainPlanRows.PLAN_START_IDS,
-            ExplainPlanRows.PLAN_START_IDS);
+            String.format(ExplainPlanRows.PLAN_START_FORMAT, explainPlanRows.getNumSegmentsMatchingThisPlan()),
+            ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS);
         for (ExplainPlanRowData explainPlanRowData : explainPlanRows.getExplainPlanRowData()) {
           setValueInDataTableBuilder(dataTableBuilder, explainPlanRowData.getExplainPlanString(),
               explainPlanRowData.getOperatorId(), explainPlanRowData.getParentId());
@@ -540,8 +539,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     DataTable dataTable = dataTableBuilder.build();
-    dataTable.getMetadata().put(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
-        String.valueOf(numEmptyFilterSegments));
+    dataTable.getMetadata()
+        .put(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(), String.valueOf(numEmptyFilterSegments));
     dataTable.getMetadata().put(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
         String.valueOf(numMatchAllFilterSegments));
     return dataTable;
@@ -609,16 +608,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     List<ExpressionContext> arguments = function.getArguments();
     if (StringUtils.remove(function.getFunctionName(), '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
-      Preconditions.checkState(arguments.size() == 2,
+      Preconditions.checkArgument(arguments.size() == 2,
           "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);
-      Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
+      Preconditions.checkArgument(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");
       QueryContext subquery = QueryContextConverterUtils.getQueryContext(subqueryExpression.getLiteral());
       // Subquery should be an ID_SET aggregation only query
       //noinspection rawtypes
       AggregationFunction[] aggregationFunctions = subquery.getAggregationFunctions();
-      Preconditions.checkState(aggregationFunctions != null && aggregationFunctions.length == 1
+      Preconditions.checkArgument(aggregationFunctions != null && aggregationFunctions.length == 1
               && aggregationFunctions[0].getType() == AggregationFunctionType.IDSET
               && subquery.getGroupByExpressions() == null,
           "Subquery in IN_PARTITIONED_SUBQUERY should be an ID_SET aggregation only query, found: %s",
@@ -628,8 +627,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // Make a clone of indexSegments because the method might modify the list
       DataTable dataTable =
           processQuery(new ArrayList<>(indexSegments), subquery, timerContext, executorService, null, false);
-      IdSet idSet = dataTable.getObject(0, 0);
-      String serializedIdSet = idSet.toBase64String();
+      DataTable.CustomObject idSet = dataTable.getCustomObject(0, 0);
+      Preconditions.checkState(idSet != null && idSet.getType() == ObjectSerDeUtils.ObjectType.IdSet.getValue(),
+          "Result is not an IdSet");
+      String serializedIdSet =
+          new String(Base64.getEncoder().encode(idSet.getBuffer()).array(), StandardCharsets.ISO_8859_1);
       // Rewrite the expression
       function.setFunctionName(TransformFunctionType.INIDSET.name());
       arguments.set(1, ExpressionContext.forLiteral(serializedIdSet));

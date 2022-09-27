@@ -62,7 +62,8 @@ public interface DataTableBuilder {
   void setColumn(int colId, ByteArray value)
       throws IOException;
 
-  void setColumn(int colId, Object value)
+  // TODO: Move ser/de into AggregationFunction interface
+  void setColumn(int colId, @Nullable Object value)
       throws IOException;
 
   void setColumn(int colId, int[] values)
