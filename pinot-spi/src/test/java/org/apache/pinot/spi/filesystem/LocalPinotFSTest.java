@@ -299,8 +299,8 @@ public class LocalPinotFSTest {
     Assert.assertEquals(fileMetadata.size(), count + 2);
     Assert.assertEquals(fileMetadata.stream().filter(FileMetadata::isDirectory).count(), count + 1);
     Assert.assertEquals(fileMetadata.stream().filter(f -> !f.isDirectory()).count(), 1);
-    Assert.assertTrue(
-        expectedNonRecursive.containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
+    Assert.assertTrue(expectedNonRecursive
+            .containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
         fileMetadata.toString());
     fileMetadata = localPinotFS.listFilesWithMetadata(tempDirPath.toURI(), true);
     Assert.assertEquals(fileMetadata.size(), count * 2 + 2);

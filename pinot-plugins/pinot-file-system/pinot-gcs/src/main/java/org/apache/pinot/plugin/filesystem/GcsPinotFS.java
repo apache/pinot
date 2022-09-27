@@ -188,9 +188,17 @@ public class GcsPinotFS extends BasePinotFS {
     String bucketName = gcsFileUri.getBucketName();
     visitFiles(gcsFileUri, recursive, blob -> {
       if (!blob.getName().equals(prefix)) {
-        FileMetadata.Builder fileBuilder = new FileMetadata.Builder();
-        fileBuilder.setFilePath(GcsUri.createGcsUri(bucketName, blob.getName()).toString())
-            .setLastModifiedTime(blob.getUpdateTime()).setLength(blob.getSize()).setIsDirectory(blob.isDirectory());
+        // Note: isDirectory flag is only set when listing with BlobListOption.currentDirectory() i.e non-recursively.
+        // For simplicity, we check if a path is directory by checking if it ends with '/', as done in S3PinotFS.
+        boolean isDirectory = blob.getName().endsWith(GcsUri.DELIMITER);
+        FileMetadata.Builder fileBuilder =
+            new FileMetadata.Builder().setFilePath(GcsUri.createGcsUri(bucketName, blob.getName()).toString())
+                .setLength(blob.getSize()).setIsDirectory(isDirectory);
+        if (!isDirectory) {
+          // Note: if it's a directory, updateTime is set to null, and calling this getter leads to NPE.
+          // public Long getUpdateTime() { return updateTime; }. So skip this for directory.
+          fileBuilder.setLastModifiedTime(blob.getUpdateTime());
+        }
         listBuilder.add(fileBuilder.build());
       }
     });

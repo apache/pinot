@@ -456,8 +456,8 @@ public class S3PinotFS extends BasePinotFS {
     ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
     visitFiles(fileUri, recursive, s3Object -> {
       if (!s3Object.key().equals(fileUri.getPath())) {
-        FileMetadata.Builder fileBuilder = new FileMetadata.Builder();
-        fileBuilder.setFilePath(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object))
+        FileMetadata.Builder fileBuilder = new FileMetadata.Builder()
+            .setFilePath(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object))
             .setLastModifiedTime(s3Object.lastModified().toEpochMilli()).setLength(s3Object.size())
             .setIsDirectory(s3Object.key().endsWith(DELIMITER));
         listBuilder.add(fileBuilder.build());
