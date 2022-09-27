@@ -170,7 +170,7 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -_numNonMatchingDictIds;
     }
 
@@ -230,7 +230,7 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -_nonMatchingValues.size();
     }
 
@@ -267,7 +267,7 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -_nonMatchingValues.size();
     }
 
@@ -304,7 +304,7 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -_nonMatchingValues.size();
     }
 
@@ -341,7 +341,7 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -_nonMatchingValues.size();
     }
 
@@ -381,7 +381,7 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -_nonMatchingValues.size();
     }
 
@@ -405,7 +405,7 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -_nonMatchingValues.size();
     }
 
@@ -429,7 +429,7 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -_nonMatchingValues.size();
     }
 

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
@@ -58,7 +59,8 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
 
   public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets, Map<String, String> queryOptions) {
     _docIdSets = docIdSets;
-    _cardinalityBasedRankingForScan = QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
+    _cardinalityBasedRankingForScan =
+        !MapUtils.isEmpty(queryOptions) && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
   }
 
   @Override
@@ -93,7 +95,7 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
     // scanning from the beginning. Automatically place N/A cardinality column (-1) to the back as we want to
     // evaluate ExpressionScanDocIdIterator in the end.
     if (_cardinalityBasedRankingForScan) {
-      scanBasedDocIdIterators.sort(Comparator.comparing(x -> (-x.getEffectiveCardinality(true))));
+      scanBasedDocIdIterators.sort(Comparator.comparing(x -> (-x.getEstimatedCardinality(true))));
     }
 
     int numSortedDocIdIterators = sortedDocIdIterators.size();

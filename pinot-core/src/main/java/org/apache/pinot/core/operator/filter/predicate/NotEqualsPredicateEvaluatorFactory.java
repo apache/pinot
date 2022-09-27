@@ -105,7 +105,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -1;
     }
 
@@ -164,7 +164,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -1;
     }
 
@@ -201,7 +201,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -1;
     }
 
@@ -238,7 +238,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -1;
     }
 
@@ -275,7 +275,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -1;
     }
 
@@ -312,7 +312,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -1;
     }
 
@@ -336,7 +336,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -1;
     }
 
@@ -360,7 +360,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return -1;
     }
 

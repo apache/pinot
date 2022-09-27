@@ -286,6 +286,8 @@ public class CommonConstants {
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
+        // Reorder scan based predicates based on cardinality and number of selected values
+        public static final String AND_SCAN_REORDERING = "AndScanReordering";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
@@ -808,12 +810,7 @@ public class CommonConstants {
       }
     }
 
-    public static class OptimizationSwitches {
-      public static final String AND_SCAN_REORDERING = "AndScanReordering";
-    }
-
     public static class OptimizationConstants {
-      public static final int DEFAULT_AVG_MV_ENTRIES = 3;
       public static final int DEFAULT_AVG_MV_ENTRIES_DENOMINATOR = 5;
     }
 

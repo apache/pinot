@@ -102,7 +102,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return 1;
     }
 
@@ -139,7 +139,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return 1;
     }
 
@@ -176,7 +176,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return 1;
     }
 
@@ -213,7 +213,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return 1;
     }
 
@@ -250,7 +250,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return 1;
     }
 
@@ -287,7 +287,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return 1;
     }
 
@@ -311,7 +311,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return 1;
     }
 
@@ -335,7 +335,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public float getNumMatchingItems() {
+    public int getNumMatchingItems() {
       return 1;
     }
 

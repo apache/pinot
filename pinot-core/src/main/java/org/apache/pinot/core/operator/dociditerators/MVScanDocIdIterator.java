@@ -30,7 +30,6 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-
 /**
  * The {@code MVScanDocIdIterator} is the scan-based iterator for MVScanDocIdSet to scan a multi-value column for the
  * matching document ids.
@@ -113,21 +112,19 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
    * org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
    */
   @Override
-  public float getEffectiveCardinality(boolean isAndDocIdSet) {
-    float numMatchingItems = _predicateEvaluator.getNumMatchingItems();
-    if (Float.isNaN(numMatchingItems) || _cardinality < 0) {
-      return ScanBasedDocIdIterator.super.getEffectiveCardinality(isAndDocIdSet);
+  public float getEstimatedCardinality(boolean isAndDocIdSet) {
+    int numMatchingItems = _predicateEvaluator.getNumMatchingItems();
+    if (numMatchingItems == Integer.MIN_VALUE || _cardinality < 0) {
+      return ScanBasedDocIdIterator.super.getEstimatedCardinality(isAndDocIdSet);
     }
-    int avgNumValuesPerMVEntry = _maxNumValuesPerMVEntry < 0
-        ? OptimizationConstants.DEFAULT_AVG_MV_ENTRIES
-        : _maxNumValuesPerMVEntry / OptimizationConstants.DEFAULT_AVG_MV_ENTRIES_DENOMINATOR;
+    int avgNumValuesPerMVEntry = _maxNumValuesPerMVEntry / OptimizationConstants.DEFAULT_AVG_MV_ENTRIES_DENOMINATOR;
 
     numMatchingItems = numMatchingItems > 0 ? numMatchingItems * avgNumValuesPerMVEntry
         : (numMatchingItems * avgNumValuesPerMVEntry + _cardinality);
 
     numMatchingItems = Math.max(Math.min(_cardinality, numMatchingItems), 0);
 
-    return _cardinality / numMatchingItems;
+    return ((float) _cardinality) / numMatchingItems;
   }
 
   private ValueMatcher getValueMatcher() {

@@ -27,8 +27,7 @@ public final class MVScanDocIdSet implements FilterBlockDocIdSet {
   private final MVScanDocIdIterator _docIdIterator;
 
   public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
-    _docIdIterator =
-        new MVScanDocIdIterator(predicateEvaluator, dataSource, numDocs);
+    _docIdIterator = new MVScanDocIdIterator(predicateEvaluator, dataSource, numDocs);
   }
 
   @Override

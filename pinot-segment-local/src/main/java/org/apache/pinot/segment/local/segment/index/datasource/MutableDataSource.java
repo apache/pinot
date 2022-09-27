@@ -65,9 +65,8 @@ public class MutableDataSource extends BaseDataSource {
     final Comparable _maxValue;
 
     MutableDataSourceMetadata(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
-        int cardinality,
-        @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
-        @Nullable Comparable maxValue) {
+        int cardinality, @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions,
+        @Nullable Comparable minValue, @Nullable Comparable maxValue) {
       _fieldSpec = fieldSpec;
       _numDocs = numDocs;
       _numValues = numValues;

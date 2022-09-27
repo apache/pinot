@@ -24,7 +24,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.spi.utils.CommonConstants.Query.OptimizationSwitches;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -34,7 +34,7 @@ import static org.testng.Assert.assertTrue;
 public class ScanBasedANDFilterReorderingTest extends InnerSegmentSelectionSingleValueQueriesTest {
   private static final String SELECT_STAR_QUERY = "SELECT * FROM testTable";
   private static final String SET_AND_OPTIMIZATION = "SET "
-      + OptimizationSwitches.AND_SCAN_REORDERING + " = '';";
+      + CommonConstants.Broker.Request.QueryOptionKey.AND_SCAN_REORDERING + " = 'True';";
 
   @Test
   public void testSelectStar() {

@@ -152,13 +152,13 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
    * org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
    */
   @Override
-  public float getEffectiveCardinality(boolean isAndDocIdSet) {
-    float numMatchingItems = _predicateEvaluator.getNumMatchingItems();
-    if (Float.isNaN(numMatchingItems) || _cardinality < 0) {
-      return ScanBasedDocIdIterator.super.getEffectiveCardinality(isAndDocIdSet);
+  public float getEstimatedCardinality(boolean isAndDocIdSet) {
+    int numMatchingItems = _predicateEvaluator.getNumMatchingItems();
+    if (numMatchingItems == Integer.MIN_VALUE || _cardinality < 0) {
+      return ScanBasedDocIdIterator.super.getEstimatedCardinality(isAndDocIdSet);
     }
     numMatchingItems = numMatchingItems > 0 ? numMatchingItems : (numMatchingItems + _cardinality);
-    return _cardinality / numMatchingItems;
+    return ((float) _cardinality) / numMatchingItems;
   }
 
   private ValueMatcher getValueMatcher(@Nullable ImmutableRoaringBitmap nullBitmap) {
