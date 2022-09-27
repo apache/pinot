@@ -46,6 +46,7 @@ import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -107,9 +108,8 @@ public class TaskFactoryRegistry {
             private TaskResult runInternal() {
               PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(_taskConfig);
               if (StringUtils.isBlank(pinotTaskConfig.getConfigs().get(MinionConstants.AUTH_TOKEN))) {
-                pinotTaskConfig.getConfigs()
-                    .put(MinionConstants.AUTH_TOKEN,
-                        AuthProviderUtils.toStaticToken(MinionContext.getInstance().getTaskAuthProvider()));
+                pinotTaskConfig.getConfigs().put(MinionConstants.AUTH_TOKEN,
+                    AuthProviderUtils.toStaticToken(MinionContext.getInstance().getTaskAuthProvider()));
               }
 
               _eventObserver.notifyTaskStart(pinotTaskConfig);
@@ -127,17 +127,17 @@ public class TaskFactoryRegistry {
                 _eventObserver.notifyTaskCancelled(pinotTaskConfig);
                 _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_CANCELLED, 1L);
                 LOGGER.info("Task: {} got cancelled", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.CANCELED, e.toString());
+                return new TaskResult(TaskResult.Status.CANCELED, StringUtil.getStackTraceAsString(e));
               } catch (FatalException e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
                 _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
                 LOGGER.error("Caught fatal exception while executing task: {}", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.FATAL_FAILED, e.toString());
+                return new TaskResult(TaskResult.Status.FATAL_FAILED, StringUtil.getStackTraceAsString(e));
               } catch (Exception e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
                 _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FAILED, 1L);
                 LOGGER.error("Caught exception while executing task: {}", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.FAILED, e.toString());
+                return new TaskResult(TaskResult.Status.FAILED, StringUtil.getStackTraceAsString(e));
               }
             }
 

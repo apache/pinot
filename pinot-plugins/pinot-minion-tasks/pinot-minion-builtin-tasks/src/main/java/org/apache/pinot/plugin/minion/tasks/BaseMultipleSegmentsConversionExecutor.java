@@ -164,15 +164,15 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       List<File> inputSegmentDirs = new ArrayList<>();
       for (int i = 0; i < downloadURLs.length; i++) {
         // Download the segment file
-        _eventObserver.notifyProgress(_pinotTaskConfig,
-            String.format("Downloading segment from: %s, %d/%d", downloadURLs[i], (i + 1), downloadURLs.length));
+        _eventObserver.notifyProgress(_pinotTaskConfig, String
+            .format("Downloading segment from: %s (%d out of %d)", downloadURLs[i], (i + 1), downloadURLs.length));
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
         LOGGER.info("Downloading segment from {} to {}", downloadURLs[i], tarredSegmentFile.getAbsolutePath());
         SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadURLs[i], tarredSegmentFile, crypterName);
 
         // Un-tar the segment file
-        _eventObserver.notifyProgress(_pinotTaskConfig,
-            String.format("Decompressing segment from: %s, %d/%d", downloadURLs[i], (i + 1), downloadURLs.length));
+        _eventObserver.notifyProgress(_pinotTaskConfig, String
+            .format("Decompressing segment from: %s (%d out of %d)", downloadURLs[i], (i + 1), downloadURLs.length));
         File segmentDir = new File(tempDataDir, "segmentDir_" + i);
         File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
         inputSegmentDirs.add(indexDir);
@@ -196,7 +196,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       for (SegmentConversionResult segmentConversionResult : segmentConversionResults) {
         // Tar the converted segment
         _eventObserver.notifyProgress(_pinotTaskConfig, String
-            .format("Compressing segment: %s, %d/%d", segmentConversionResult.getSegmentName(), count++,
+            .format("Compressing segment: %s (%d out of %d)", segmentConversionResult.getSegmentName(), count++,
                 numOutputSegments));
         File convertedSegmentDir = segmentConversionResult.getFile();
         File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
@@ -233,7 +233,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
         String resultSegmentName = segmentConversionResult.getSegmentName();
         _eventObserver.notifyProgress(_pinotTaskConfig,
-            String.format("Uploading segment: %s, %d/%d", resultSegmentName, (i + 1), numOutputSegments));
+            String.format("Uploading segment: %s (%d out of %d)", resultSegmentName, (i + 1), numOutputSegments));
 
         // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
         SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
