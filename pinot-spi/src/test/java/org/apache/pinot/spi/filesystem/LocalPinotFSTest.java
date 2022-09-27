@@ -256,10 +256,10 @@ public class LocalPinotFSTest {
   }
 
   @Test
-  public void testListFilesWithInfo()
+  public void testListFilesWithMetadata()
       throws IOException {
     LocalPinotFS localPinotFS = new LocalPinotFS();
-    File tempDirPath = new File(_absoluteTmpDirPath, "test-list-files-with-info");
+    File tempDirPath = new File(_absoluteTmpDirPath, "test-list-files-with-md");
     Assert.assertTrue(tempDirPath.mkdir());
 
     // Create a testDir and file underneath directory
@@ -295,19 +295,19 @@ public class LocalPinotFSTest {
     Assert.assertTrue(expectedRecursive.containsAll(Arrays.asList(files)), Arrays.toString(files));
 
     // Assert that recursive list files and nonrecursive list files with file info are as expected
-    List<FileInfo> fileInfos = localPinotFS.listFilesWithInfo(tempDirPath.toURI(), false);
-    Assert.assertEquals(fileInfos.size(), count + 2);
-    Assert.assertEquals(fileInfos.stream().filter(FileInfo::isDirectory).count(), count + 1);
-    Assert.assertEquals(fileInfos.stream().filter(f -> !f.isDirectory()).count(), 1);
+    List<FileMetadata> fileMetadata = localPinotFS.listFilesWithMetadata(tempDirPath.toURI(), false);
+    Assert.assertEquals(fileMetadata.size(), count + 2);
+    Assert.assertEquals(fileMetadata.stream().filter(FileMetadata::isDirectory).count(), count + 1);
+    Assert.assertEquals(fileMetadata.stream().filter(f -> !f.isDirectory()).count(), 1);
     Assert.assertTrue(
-        expectedNonRecursive.containsAll(fileInfos.stream().map(FileInfo::getFilePath).collect(Collectors.toSet())),
-        fileInfos.toString());
-    fileInfos = localPinotFS.listFilesWithInfo(tempDirPath.toURI(), true);
-    Assert.assertEquals(fileInfos.size(), count * 2 + 2);
-    Assert.assertEquals(fileInfos.stream().filter(FileInfo::isDirectory).count(), count + 1);
-    Assert.assertEquals(fileInfos.stream().filter(f -> !f.isDirectory()).count(), count + 1);
+        expectedNonRecursive.containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
+        fileMetadata.toString());
+    fileMetadata = localPinotFS.listFilesWithMetadata(tempDirPath.toURI(), true);
+    Assert.assertEquals(fileMetadata.size(), count * 2 + 2);
+    Assert.assertEquals(fileMetadata.stream().filter(FileMetadata::isDirectory).count(), count + 1);
+    Assert.assertEquals(fileMetadata.stream().filter(f -> !f.isDirectory()).count(), count + 1);
     Assert.assertTrue(
-        expectedRecursive.containsAll(fileInfos.stream().map(FileInfo::getFilePath).collect(Collectors.toSet())),
-        fileInfos.toString());
+        expectedRecursive.containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
+        fileMetadata.toString());
   }
 }

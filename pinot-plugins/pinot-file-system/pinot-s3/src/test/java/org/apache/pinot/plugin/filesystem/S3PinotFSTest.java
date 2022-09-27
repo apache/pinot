@@ -29,7 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
-import org.apache.pinot.spi.filesystem.FileInfo;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -183,9 +183,9 @@ public class S3PinotFSTest {
   }
 
   @Test
-  public void testListFilesWithInfoInFolderNonRecursive()
+  public void testListFilesWithMetadataInFolderNonRecursive()
       throws Exception {
-    String folder = "list-files-with-info";
+    String folder = "list-files-with-md";
     String[] originalFiles = new String[]{"a-list-2.txt", "b-list-2.txt", "c-list-2.txt"};
     for (String fileName : originalFiles) {
       createEmptyFile(folder, fileName);
@@ -193,11 +193,12 @@ public class S3PinotFSTest {
     // Files in sub folders should be skipped.
     createEmptyFile(folder + DELIMITER + "subfolder1", "a-sub-file.txt");
     createEmptyFile(folder + DELIMITER + "subfolder2", "a-sub-file.txt");
-    List<FileInfo> actualFiles =
-        _s3PinotFS.listFilesWithInfo(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), false);
+    List<FileMetadata> actualFiles =
+        _s3PinotFS.listFilesWithMetadata(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), false);
     Assert.assertEquals(actualFiles.size(), originalFiles.length);
-    List<String> actualFilePaths = actualFiles.stream().map(FileInfo::getFilePath).filter(fp -> fp.contains("list-2"))
-        .collect(Collectors.toList());
+    List<String> actualFilePaths =
+        actualFiles.stream().map(FileMetadata::getFilePath).filter(fp -> fp.contains("list-2"))
+            .collect(Collectors.toList());
     Assert.assertEquals(actualFilePaths.size(), originalFiles.length);
     Assert.assertEquals(Arrays.stream(originalFiles)
         .map(fileName -> String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName))
@@ -205,9 +206,9 @@ public class S3PinotFSTest {
   }
 
   @Test
-  public void testListFilesWithInfoInFolderRecursive()
+  public void testListFilesWithMetadataInFolderRecursive()
       throws Exception {
-    String folder = "list-files-rec-with-info";
+    String folder = "list-files-rec-with-md";
     String[] nestedFolders = new String[]{"", "list-files-child-1", "list-files-child-2"};
     String[] originalFiles = new String[]{"a-list-3.txt", "b-list-3.txt", "c-list-3.txt"};
 
@@ -219,11 +220,12 @@ public class S3PinotFSTest {
         expectedResultList.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName + DELIMITER + fileName));
       }
     }
-    List<FileInfo> actualFiles =
-        _s3PinotFS.listFilesWithInfo(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), true);
+    List<FileMetadata> actualFiles =
+        _s3PinotFS.listFilesWithMetadata(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), true);
     Assert.assertEquals(actualFiles.size(), expectedResultList.size());
-    List<String> actualFilePaths = actualFiles.stream().map(FileInfo::getFilePath).filter(fp -> fp.contains("list-3"))
-        .collect(Collectors.toList());
+    List<String> actualFilePaths =
+        actualFiles.stream().map(FileMetadata::getFilePath).filter(fp -> fp.contains("list-3"))
+            .collect(Collectors.toList());
     Assert.assertEquals(actualFilePaths.size(), expectedResultList.size());
     Assert.assertEquals(expectedResultList, actualFilePaths);
   }

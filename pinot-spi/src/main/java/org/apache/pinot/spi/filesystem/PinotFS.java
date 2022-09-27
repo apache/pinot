@@ -165,7 +165,7 @@ public interface PinotFS extends Closeable, Serializable {
    * @return a list of FileMetadata that contains file path, and a few file metadata.
    * @throws IOException on IO failure. See specific implementation
    */
-  default List<FileInfo> listFilesWithInfo(URI fileUri, boolean recursive)
+  default List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
     throw new UnsupportedOperationException();
   }

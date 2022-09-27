@@ -118,7 +118,7 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   @Override
-  public List<FileInfo> listFilesWithInfo(URI fileUri, boolean recursive)
+  public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
     File file = toFile(fileUri);
     if (!recursive) {
@@ -129,8 +129,8 @@ public class LocalPinotFS extends BasePinotFS {
     }
   }
 
-  private static FileInfo getFileInfo(File file) {
-    return new FileInfo.Builder().setFilePath(file.getAbsolutePath()).setLastModifiedTime(file.lastModified())
+  private static FileMetadata getFileInfo(File file) {
+    return new FileMetadata.Builder().setFilePath(file.getAbsolutePath()).setLastModifiedTime(file.lastModified())
         .setLength(file.length()).setIsDirectory(file.isDirectory()).build();
   }
 

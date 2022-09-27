@@ -47,7 +47,7 @@ import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
-import org.apache.pinot.spi.filesystem.FileInfo;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,21 +180,21 @@ public class GcsPinotFS extends BasePinotFS {
   }
 
   @Override
-  public List<FileInfo> listFilesWithInfo(URI fileUri, boolean recursive)
+  public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<FileInfo> listBuilder = ImmutableList.builder();
+    ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
     GcsUri gcsFileUri = new GcsUri(fileUri);
     String prefix = gcsFileUri.getPrefix();
     String bucketName = gcsFileUri.getBucketName();
     visitFiles(gcsFileUri, recursive, blob -> {
       if (!blob.getName().equals(prefix)) {
-        FileInfo.Builder fileBuilder = new FileInfo.Builder();
+        FileMetadata.Builder fileBuilder = new FileMetadata.Builder();
         fileBuilder.setFilePath(GcsUri.createGcsUri(bucketName, blob.getName()).toString())
             .setLastModifiedTime(blob.getUpdateTime()).setLength(blob.getSize()).setIsDirectory(blob.isDirectory());
         listBuilder.add(fileBuilder.build());
       }
     });
-    ImmutableList<FileInfo> listedFiles = listBuilder.build();
+    ImmutableList<FileMetadata> listedFiles = listBuilder.build();
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), gcsFileUri, recursive);
     return listedFiles;
   }

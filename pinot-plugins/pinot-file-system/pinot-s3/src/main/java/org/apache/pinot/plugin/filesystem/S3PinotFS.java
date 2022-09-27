@@ -38,7 +38,7 @@ import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
-import org.apache.pinot.spi.filesystem.FileInfo;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -451,19 +451,19 @@ public class S3PinotFS extends BasePinotFS {
   }
 
   @Override
-  public List<FileInfo> listFilesWithInfo(URI fileUri, boolean recursive)
+  public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
-    ImmutableList.Builder<FileInfo> listBuilder = ImmutableList.builder();
+    ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
     visitFiles(fileUri, recursive, s3Object -> {
       if (!s3Object.key().equals(fileUri.getPath())) {
-        FileInfo.Builder fileBuilder = new FileInfo.Builder();
+        FileMetadata.Builder fileBuilder = new FileMetadata.Builder();
         fileBuilder.setFilePath(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object))
             .setLastModifiedTime(s3Object.lastModified().toEpochMilli()).setLength(s3Object.size())
             .setIsDirectory(s3Object.key().endsWith(DELIMITER));
         listBuilder.add(fileBuilder.build());
       }
     });
-    ImmutableList<FileInfo> listedFiles = listBuilder.build();
+    ImmutableList<FileMetadata> listedFiles = listBuilder.build();
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), fileUri, recursive);
     return listedFiles;
   }

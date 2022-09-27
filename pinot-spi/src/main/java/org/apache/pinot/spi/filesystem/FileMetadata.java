@@ -19,15 +19,15 @@
 package org.apache.pinot.spi.filesystem;
 
 /**
- * FileInfo contains the file path and many optional file attributes like mtime, length etc.
+ * FileMetadata contains the file path and many optional file attributes like mtime, length etc.
  */
-public class FileInfo {
+public class FileMetadata {
   private final String _filePath;
   private final long _lastModifiedTime;
   private final long _length;
   private final boolean _isDirectory;
 
-  private FileInfo(String filePath, long lastModifiedTime, long length, boolean isDirectory) {
+  private FileMetadata(String filePath, long lastModifiedTime, long length, boolean isDirectory) {
     _filePath = filePath;
     _lastModifiedTime = lastModifiedTime;
     _length = length;
@@ -82,8 +82,8 @@ public class FileInfo {
       return this;
     }
 
-    public FileInfo build() {
-      return new FileInfo(_filePath, _lastModifiedTime, _length, _isDirectory);
+    public FileMetadata build() {
+      return new FileMetadata(_filePath, _lastModifiedTime, _length, _isDirectory);
     }
   }
 }
