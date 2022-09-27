@@ -132,8 +132,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   public void loadSegment()
       throws Exception {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig
-        .setInvertedIndexColumns(
+    indexLoadingConfig.setInvertedIndexColumns(
             new HashSet<>(Arrays.asList("column6", "column7", "column11", "column17", "column18")));
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);

@@ -112,7 +112,7 @@ public class InnerSegmentSelectionMultiValueRawQueriesTest extends BaseMultiValu
     resultsBlock = selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
-    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 79L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 76054L);
     assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 100L);
     assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     selectionDataSchema = resultsBlock.getDataSchema();
@@ -163,7 +163,7 @@ public class InnerSegmentSelectionMultiValueRawQueriesTest extends BaseMultiValu
     resultsBlock = selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
-    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 79L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 76054L);
     assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30L);
     assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     selectionDataSchema = resultsBlock.getDataSchema();
@@ -215,7 +215,7 @@ public class InnerSegmentSelectionMultiValueRawQueriesTest extends BaseMultiValu
     resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
-    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 275416L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 129757L);
     // 15620 * (2 order-by columns) + 10 * (2 non-order-by columns)
     assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 31260L);
     assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
