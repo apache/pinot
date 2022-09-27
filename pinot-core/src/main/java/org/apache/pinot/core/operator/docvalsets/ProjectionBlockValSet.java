@@ -211,6 +211,14 @@ public class ProjectionBlockValSet implements BlockValSet {
   }
 
   @Override
+  public byte[][][] getBytesValuesMV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
+      recordReadValues(scope, DataType.BYTES, false);
+      return _dataBlockCache.getBytesValuesForMVColumn(_column);
+    }
+  }
+
+  @Override
   public int[] getNumMVEntries() {
     return _dataBlockCache.getNumValuesForMVColumn(_column);
   }

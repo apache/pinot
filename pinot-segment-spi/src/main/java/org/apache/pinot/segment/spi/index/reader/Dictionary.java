@@ -189,7 +189,7 @@ public interface Dictionary extends Closeable {
   String getStringValue(int dictId);
 
   /**
-   * NOTE: Should be overridden for STRING and BYTES dictionary.
+   * NOTE: Should be overridden for STRING, BIG_DECIMAL and BYTES dictionary.
    */
   default byte[] getBytesValue(int dictId) {
     throw new UnsupportedOperationException();

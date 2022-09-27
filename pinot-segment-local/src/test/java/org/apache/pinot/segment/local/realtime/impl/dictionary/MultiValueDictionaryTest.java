@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.dictionary;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
@@ -241,6 +242,36 @@ public class MultiValueDictionaryTest {
       for (int row = 0; row < NROWS; row++) {
         final int curRow = row;
         assertThrows(UnsupportedOperationException.class, () -> indexer.getStringMV(curRow, stringValues));
+      }
+    } catch (Throwable t) {
+      fail("Failed with random seed: " + seed, t);
+    }
+  }
+
+  @Test
+  public void testMultiValueIndexingWithRawByte() {
+    long seed = System.nanoTime();
+    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+        NROWS / 3, 24, new DirectMemoryManager("test"), "indexer",
+        false, FieldSpec.DataType.BYTES)) {
+      // Insert rows into the indexer
+      Random random = new Random(seed);
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
+        byte[][] values = new byte[numValues][];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = "random1".getBytes(StandardCharsets.UTF_8);
+        }
+        final int curRow = row;
+        assertThrows(UnsupportedOperationException.class, () -> indexer.setBytesMV(curRow, values));
+      }
+
+      // Read back rows and make sure that the values are good.
+      random = new Random(seed);
+      byte[][] byteValues = new byte[MAX_N_VALUES][];
+      for (int row = 0; row < NROWS; row++) {
+        final int curRow = row;
+        assertThrows(UnsupportedOperationException.class, () -> indexer.getBytesMV(curRow, byteValues));
       }
     } catch (Throwable t) {
       fail("Failed with random seed: " + seed, t);

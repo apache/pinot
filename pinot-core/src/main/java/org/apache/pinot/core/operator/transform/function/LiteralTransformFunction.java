@@ -276,4 +276,9 @@ public class LiteralTransformFunction implements TransformFunction {
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException();
+  }
 }
