@@ -28,7 +28,6 @@ import java.util.List;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LoggerFileServer;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -59,7 +58,7 @@ public class AdminApiApplication extends ResourceConfig {
   private HttpServer _httpServer;
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
-      PinotConfiguration serverConf, HelixManager helixManager) {
+      PinotConfiguration serverConf) {
     _serverInstance = instance;
     _accessControlFactory = accessControlFactory;
     packages(RESOURCE_PACKAGE);
@@ -72,7 +71,6 @@ public class AdminApiApplication extends ResourceConfig {
         bind(_serverInstance.getServerMetrics()).to(ServerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
         bind(serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID)).named(SERVER_INSTANCE_ID);
-        bind(helixManager).to(HelixManager.class);
         String loggerRootDir = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
           bind(new LoggerFileServer(loggerRootDir)).to(LoggerFileServer.class);

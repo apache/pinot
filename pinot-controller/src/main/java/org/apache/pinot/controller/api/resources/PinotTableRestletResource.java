@@ -850,11 +850,12 @@ public class PinotTableRestletResource {
   }
 
   @POST
-  @Path("table/{tableName}/enforceQueryTimeBoundary")
+  @Path("table/{tableName}/timeBoundary")
   @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata",
       notes = "Set hybrid table query time boundary based on offline segments' metadata")
   public SuccessResponse setEnforcedQueryTimeBoundary(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName)
+      @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
+          String tableName)
       throws Exception {
     // Validate its a hybrid table
     if (!_pinotHelixResourceManager.hasRealtimeTable(tableName) || !_pinotHelixResourceManager.hasOfflineTable(
@@ -873,7 +874,7 @@ public class PinotTableRestletResource {
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String reloadTaskStatusEndpoint = endpoint + "/tables/" + offlineTableName + "/validate";
+      String reloadTaskStatusEndpoint = endpoint + "/tables/" + offlineTableName + "/allSegmentsLoaded";
       serverUrls.add(reloadTaskStatusEndpoint);
     }
 
@@ -921,10 +922,11 @@ public class PinotTableRestletResource {
   }
 
   @DELETE
-  @Path("table/{tableName}/enforceQueryTimeBoundary")
+  @Path("table/{tableName}/timeBoundary")
   @ApiOperation(value = "Delete hybrid table query time boundary", notes = "Delete hybrid table query time boundary")
   public SuccessResponse deleteEnforcedQueryTimeBoundary(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName)
+      @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
+          String tableName)
       throws Exception {
     // Validate its a hybrid table
     if (!_pinotHelixResourceManager.hasRealtimeTable(tableName) || !_pinotHelixResourceManager.hasOfflineTable(

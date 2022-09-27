@@ -57,7 +57,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -88,6 +87,7 @@ import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,9 +109,6 @@ public class TablesResource {
 
   @Inject
   private AccessControlFactory _accessControlFactory;
-
-  @Inject
-  private HelixManager _helixManager;
 
   @Inject
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
@@ -531,15 +528,15 @@ public class TablesResource {
   }
 
   @GET
-  @Path("tables/{tableNameWithType}/validate")
+  @Path("tables/{tableNameWithType}/allSegmentsLoaded")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Validates if the ideal state matches with the segmentstate on this server", notes =
       "Validates if the ideal state matches with the segmentstate on this server")
-  public TableSegmentValidationInfo validateTableIdealState(
+  public TableSegmentValidationInfo validateTableSegmentState(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableNameWithType")
           String tableNameWithType) {
     // Get table current ideal state
-    IdealState tableIdealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
+    IdealState tableIdealState = HelixHelper.getTableIdealState(_serverInstance.getHelixManager(), tableNameWithType);
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
 
@@ -551,22 +548,34 @@ public class TablesResource {
       if (kv.getValue().containsKey(_instanceId)) {
         // Segment hosted by this server. Validate segment state
         SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-        if (segmentDataManager == null) {
-          // Segment not hosted by server
-          return new TableSegmentValidationInfo(false, -1);
-        }
         try {
-          // Validate segment CRC
-          SegmentZKMetadata zkMetadata =
-              ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType,
-                  segmentName);
-          if (!segmentDataManager.getSegment().getSegmentMetadata().getCrc()
-              .equals(String.valueOf(zkMetadata.getCrc()))) {
-            return new TableSegmentValidationInfo(false, -1);
+          String segmentState = kv.getValue().get(_instanceId);
+
+          switch (segmentState) {
+            case CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING:
+              // Only validate presence of segment
+              if (segmentDataManager == null) {
+                return new TableSegmentValidationInfo(false, -1);
+              }
+              break;
+            case CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE:
+              // Validate segment CRC
+              SegmentZKMetadata zkMetadata =
+                  ZKMetadataProvider.getSegmentZKMetadata(_serverInstance.getHelixManager().getHelixPropertyStore(),
+                      tableNameWithType, segmentName);
+              if ((segmentDataManager == null) || !segmentDataManager.getSegment().getSegmentMetadata().getCrc()
+                  .equals(String.valueOf(zkMetadata.getCrc()))) {
+                return new TableSegmentValidationInfo(false, -1);
+              }
+              maxEndTime = Math.max(maxEndTime, zkMetadata.getEndTimeMs());
+              break;
+            default:
+              break;
           }
-          maxEndTime = Math.max(maxEndTime, zkMetadata.getEndTimeMs());
         } finally {
-          tableDataManager.releaseSegment(segmentDataManager);
+          if (segmentDataManager != null) {
+            tableDataManager.releaseSegment(segmentDataManager);
+          }
         }
       }
     }

@@ -30,7 +30,6 @@ import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.auth.BasicAuthUtils;
@@ -84,8 +83,7 @@ public class AccessControlTest {
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,
         CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port);
-    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(), serverConf, mock(
-        HelixManager.class));
+    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(), serverConf);
 
     int adminApiApplicationPort = getAvailablePort();
     _adminApiApplication.start(Collections.singletonList(
