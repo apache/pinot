@@ -220,7 +220,9 @@ public class IndexLoadingConfig {
 
   /**
    * Extracts compressionType for each column. Populates a map containing column name as key and compression type as
-   * value. Note that only RAW forward index columns will be populated in this map.
+   * value. This map will only contain the compressionType overrides, and it does not correspond to the default value
+   * of compressionType (derived using SegmentColumnarIndexCreator.getColumnCompressionType())  used for a column.
+   * Note that only RAW forward index columns will be populated in this map.
    * @param tableConfig table config
    */
   private void extractCompressionConfigs(TableConfig tableConfig) {
@@ -396,6 +398,24 @@ public class IndexLoadingConfig {
 
   /**
    * For tests only.
+   * Used by segmentPreProcessorTest to set raw columns.
+   */
+  @VisibleForTesting
+  public void setNoDictionaryColumns(Set<String> noDictionaryColumns) {
+    _noDictionaryColumns = noDictionaryColumns;
+  }
+
+  /**
+   * For tests only.
+   * Used by segmentPreProcessorTest to set compression configs.
+   */
+  @VisibleForTesting
+  public void setCompressionConfigs(Map<String, ChunkCompressionType> compressionConfigs) {
+    _compressionConfigs = compressionConfigs;
+  }
+
+  /**
+   * For tests only.
    */
   @VisibleForTesting
   public void setRangeIndexColumns(Set<String> rangeIndexColumns) {
@@ -448,7 +468,9 @@ public class IndexLoadingConfig {
   }
 
   /**
-   * Populates a map containing column name as key and compression type as value. Note that only RAW forward index
+   * Populates a map containing column name as key and compression type as value. This map will only contain the
+   * compressionType overrides, and it does not correspond to the default value of compressionType (derived using
+   * SegmentColumnarIndexCreator.getColumnCompressionType())  used for a column. Note that only RAW forward index
    * columns will be populated in this map.
    *
    * @return a map containing column name as key and compressionType as value.

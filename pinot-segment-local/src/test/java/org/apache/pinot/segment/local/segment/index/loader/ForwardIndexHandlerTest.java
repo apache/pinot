@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,6 +34,7 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -60,7 +62,7 @@ public class ForwardIndexHandlerTest {
   private static final String TABLE_NAME = "myTable";
   private static final String SEGMENT_NAME = "testSegment";
 
-  // TODOs:
+  // TODO:
   // 1. Add other datatypes (double, float, bigdecimal, bytes). Also add MV columns.
   // 2. Add text index and other index types for raw columns.
   private static final String SNAPPY_STRING = "SNAPPY_STRING";
@@ -93,12 +95,13 @@ public class ForwardIndexHandlerTest {
 
   private static final List<String> RAW_LZ4_INDEX_COLUMNS = Arrays.asList(LZ4_STRING, LZ4_LONG, LZ4_INTEGER);
 
-  private List<String> _noDictionaryColumns = new ArrayList<>();
+  private final List<String> _noDictionaryColumns = new ArrayList<>();
   TableConfig _tableConfig;
   Schema _schema;
   private SegmentMetadataImpl _existingSegmentMetadata;
   private SegmentDirectory.Writer _writer;
-  private List<GenericRow> _rows;
+  private List<FieldConfig.CompressionCodec> _allCompressionTypes =
+      Arrays.asList(FieldConfig.CompressionCodec.values());
 
   @BeforeClass
   public void setUp()
@@ -111,7 +114,7 @@ public class ForwardIndexHandlerTest {
 
   private void buildSegment()
       throws Exception {
-    _rows = createTestData();
+    List<GenericRow> rows = createTestData();
 
     List<FieldConfig> fieldConfigs = new ArrayList<>(
         RAW_SNAPPY_INDEX_COLUMNS.size() + RAW_ZSTANDARD_INDEX_COLUMNS.size() + RAW_PASS_THROUGH_INDEX_COLUMNS.size()
@@ -167,7 +170,7 @@ public class ForwardIndexHandlerTest {
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (RecordReader recordReader = new GenericRowRecordReader(_rows)) {
+    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
     }
@@ -232,7 +235,7 @@ public class ForwardIndexHandlerTest {
   }
 
   @Test
-  public void testComputeOperation() {
+  public void testComputeOperation() throws Exception {
     // TEST1 : Validate with zero changes.
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
     ForwardIndexHandler fwdIndexHandler =
@@ -282,39 +285,44 @@ public class ForwardIndexHandlerTest {
     assertEquals(operationMap.size(), 1);
     assertEquals(operationMap.get(config.getName()), ForwardIndexHandler.Operation.CHANGE_RAW_COMPRESSION_TYPE);
 
-    // TEST6: Change compression and add index
+    // TEST6: Change compression and add index. Change compressionType for more than 1 column.
     fieldConfigs = new ArrayList<>(_tableConfig.getFieldConfigList());
-    config = fieldConfigs.remove(0);
-    newConfig = new FieldConfig(config.getName(), FieldConfig.EncodingType.RAW, Collections.emptyList(),
+    FieldConfig config1 = fieldConfigs.remove(0);
+    FieldConfig config2 = fieldConfigs.remove(1);
+
+    FieldConfig newConfig1 = new FieldConfig(config1.getName(), FieldConfig.EncodingType.RAW, Collections.emptyList(),
         FieldConfig.CompressionCodec.ZSTANDARD, null);
-    fieldConfigs.add(newConfig);
+    fieldConfigs.add(newConfig1);
+    FieldConfig newConfig2 = new FieldConfig(config2.getName(), FieldConfig.EncodingType.RAW, Collections.emptyList(),
+        FieldConfig.CompressionCodec.ZSTANDARD, null);
+    fieldConfigs.add(newConfig2);
+
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(_noDictionaryColumns)
             .setFieldConfigList(fieldConfigs).build();
     tableConfig.setFieldConfigList(fieldConfigs);
 
     indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
-    indexLoadingConfig.getTextIndexColumns().add(config.getName());
-    indexLoadingConfig.getInvertedIndexColumns().add(config.getName());
+    indexLoadingConfig.getTextIndexColumns().add(config1.getName());
+    indexLoadingConfig.getInvertedIndexColumns().add(config1.getName());
     fwdIndexHandler = new ForwardIndexHandler(_existingSegmentMetadata, indexLoadingConfig);
     operationMap = fwdIndexHandler.computeOperation(_writer);
-    assertEquals(operationMap.size(), 1);
-    assertEquals(operationMap.get(config.getName()), ForwardIndexHandler.Operation.CHANGE_RAW_COMPRESSION_TYPE);
+    assertEquals(operationMap.size(), 2);
+    assertEquals(operationMap.get(config1.getName()), ForwardIndexHandler.Operation.CHANGE_RAW_COMPRESSION_TYPE);
+    assertEquals(operationMap.get(config2.getName()), ForwardIndexHandler.Operation.CHANGE_RAW_COMPRESSION_TYPE);
   }
 
   @Test
-  public void testRewriteRawForwardIndex()
+  public void testRewriteRawForwardIndexForSingleColumn()
       throws Exception {
-    List<String> allCompressionTypes = Arrays.asList("PASS_THROUGH", "ZSTANDARD", "LZ4", "SNAPPY");
-
     for (int i = 0; i < _noDictionaryColumns.size(); i++) {
 
       // For every noDictionaryColumn, change the compressionType to all available types, one by one.
-      for (String compressionType : allCompressionTypes) {
+      for (FieldConfig.CompressionCodec compressionType : _allCompressionTypes) {
         List<FieldConfig> fieldConfigs = new ArrayList<>(_tableConfig.getFieldConfigList());
         FieldConfig config = fieldConfigs.remove(i);
         String columnName = config.getName();
-        FieldConfig.CompressionCodec newCompressionType = FieldConfig.CompressionCodec.valueOf(compressionType);
+        FieldConfig.CompressionCodec newCompressionType = compressionType;
         if (config.getCompressionCodec().equals(newCompressionType)) {
           // Compression types match. No need to invoke forward index handler.
           continue;
@@ -342,6 +350,50 @@ public class ForwardIndexHandlerTest {
     }
   }
 
+  @Test
+  public void testRewriteRawForwardIndexForMultipleColumns()
+      throws Exception {
+    List<FieldConfig> fieldConfigs = new ArrayList<>(_tableConfig.getFieldConfigList());
+    Random rand = new Random();
+    int randomIdx = rand.nextInt(_allCompressionTypes.size());
+    FieldConfig.CompressionCodec newCompressionType = _allCompressionTypes.get(randomIdx);
+
+    // Column 1
+    randomIdx = rand.nextInt(fieldConfigs.size());
+    FieldConfig config1 = fieldConfigs.remove(randomIdx);
+    String column1 = config1.getName();
+    FieldConfig newConfig1 =
+        new FieldConfig(column1, FieldConfig.EncodingType.RAW, Collections.emptyList(), newCompressionType, null);
+    fieldConfigs.add(newConfig1);
+
+    // Column 2
+    randomIdx = rand.nextInt(fieldConfigs.size());
+    FieldConfig config2 = fieldConfigs.remove(randomIdx);
+    String column2 = config2.getName();
+    FieldConfig newConfig2 =
+        new FieldConfig(column2, FieldConfig.EncodingType.RAW, Collections.emptyList(), newCompressionType, null);
+    fieldConfigs.add(newConfig2);
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(_noDictionaryColumns)
+            .setFieldConfigList(fieldConfigs).build();
+    tableConfig.setFieldConfigList(fieldConfigs);
+
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+    IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
+    ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(_existingSegmentMetadata, indexLoadingConfig);
+    fwdIndexHandler.updateIndices(_writer, indexCreatorProvider);
+
+    // Validate column 1
+    ColumnMetadata columnMetadata = _existingSegmentMetadata.getColumnMetadataFor(column1);
+    validateForwardIndex(columnMetadata, newCompressionType);
+
+    // Validate column 2
+    columnMetadata = _existingSegmentMetadata.getColumnMetadataFor(column2);
+    validateForwardIndex(columnMetadata, newCompressionType);
+  }
+
+
   private void validateForwardIndex(ColumnMetadata columnMetadata, FieldConfig.CompressionCodec expectedCompressionType)
       throws IOException {
     String columnName = columnMetadata.getColumnName();
@@ -350,6 +402,12 @@ public class ForwardIndexHandlerTest {
     ForwardIndexReader fwdIndexReader = LoaderUtils.getForwardIndexReader(_writer, columnMetadata);
     ChunkCompressionType fwdIndexCompressionType = fwdIndexReader.getCompressionType();
     assertEquals(fwdIndexCompressionType.name(), expectedCompressionType.name());
+
+    // Check index map if the forward index offsets are present.
+    String segmentDir = INDEX_DIR + "/" + SEGMENT_NAME + "/v3";
+    File idxMapFile = new File(segmentDir, V1Constants.INDEX_MAP_FILE_NAME);
+    FileUtils.readFileToString(idxMapFile, StandardCharsets.UTF_8).contains(columnName + ".forward_index.startOffset");
+    FileUtils.readFileToString(idxMapFile, StandardCharsets.UTF_8).contains(columnName + ".forward_index.size");
 
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(_writer, columnMetadata)) {
       PinotSegmentColumnReader columnReader =

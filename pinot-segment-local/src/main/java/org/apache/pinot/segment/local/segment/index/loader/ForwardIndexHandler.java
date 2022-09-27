@@ -45,7 +45,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Helper class used by {@link SegmentPreProcessor} to make changes to forward index and dictionary configs. Note
- * that this handler only works if segment versions >= 3.0. The currently supported operations are:
+ * that this handler only works for segment versions >= 3.0. Support for segment version < 3.0 is not added because
+ * majority of the usecases are in versions >= 3.0 and this avoids adding tech debt. The currently supported
+ * operations are:
  * 1. Change compression on raw SV columns.
  *
  *  TODO: Add support for the following:
@@ -71,7 +73,8 @@ public class ForwardIndexHandler implements IndexHandler {
   }
 
   @Override
-  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
+      throws Exception {
     Map<String, Operation> columnOperationMap = computeOperation(segmentReader);
     return !columnOperationMap.isEmpty();
   }
@@ -94,17 +97,18 @@ public class ForwardIndexHandler implements IndexHandler {
           break;
         // TODO: Add other operations here.
         default:
-          break;
+          throw new IllegalStateException("Unsupported operation for column " + column);
       }
     }
   }
 
   @VisibleForTesting
-  Map<String, Operation> computeOperation(SegmentDirectory.Reader segmentReader) {
+  Map<String, Operation> computeOperation(SegmentDirectory.Reader segmentReader)
+      throws Exception {
     Map<String, Operation> columnOperationMap = new HashMap<>();
 
-    // Works only if the existing segment is V3.
-    if (_segmentMetadata.getVersion() != SegmentVersion.v3) {
+    // Does not work for segment versions < V3
+    if (_segmentMetadata.getVersion().compareTo(SegmentVersion.v3) < 0) {
       return columnOperationMap;
     }
 
@@ -128,19 +132,13 @@ public class ForwardIndexHandler implements IndexHandler {
         if (shouldChangeCompressionType(column, segmentReader)) {
           columnOperationMap.put(column, Operation.CHANGE_RAW_COMPRESSION_TYPE);
         }
-      } else if (existingNoDictColumns.contains(column) && !newNoDictColumns.contains(column)) {
-        // TODO: Enable dictionary
-      } else if (!existingNoDictColumns.contains(column) && newNoDictColumns.contains(column)) {
-        // TODO: Disable dictionary.
-      } else {
-        // No changes necessary.
       }
     }
 
     return columnOperationMap;
   }
 
-  private boolean shouldChangeCompressionType(String column, SegmentDirectory.Reader segmentReader) {
+  private boolean shouldChangeCompressionType(String column, SegmentDirectory.Reader segmentReader) throws Exception {
     ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
 
     // TODO: Remove this MV column limitation.
@@ -149,8 +147,7 @@ public class ForwardIndexHandler implements IndexHandler {
     }
 
     // The compression type for an existing segment can only be determined by reading the forward index header.
-    try {
-      ForwardIndexReader fwdIndexReader = LoaderUtils.getForwardIndexReader(segmentReader, existingColMetadata);
+    try (ForwardIndexReader fwdIndexReader = LoaderUtils.getForwardIndexReader(segmentReader, existingColMetadata)) {
       ChunkCompressionType existingCompressionType = fwdIndexReader.getCompressionType();
       Preconditions.checkState(existingCompressionType != null,
           "Existing compressionType cannot be null for raw forward index column=" + column);
@@ -170,9 +167,6 @@ public class ForwardIndexHandler implements IndexHandler {
       }
 
       return true;
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while changing compression for column: {}", column, e);
-      return false;
     }
   }
 
@@ -192,9 +186,8 @@ public class ForwardIndexHandler implements IndexHandler {
       // Create a marker file.
       FileUtils.touch(inProgress);
     } else {
-      // Marker file exists, which means last run gets interrupted.
-      // Remove inverted index if exists.
-      // For v1 and v2, it's the actual inverted index. For v3, it's the temporary inverted index.
+      // Marker file exists, which means last run was interrupted.
+      // Remove forward index if exists.
       FileUtils.deleteQuietly(fwdIndexFile);
     }
 
@@ -202,7 +195,9 @@ public class ForwardIndexHandler implements IndexHandler {
 
     Map<String, ChunkCompressionType> compressionConfigs = _indexLoadingConfig.getCompressionConfigs();
     Preconditions.checkState(compressionConfigs.containsKey(column));
-    // At this point, compressionConfigs is guaranteed to contain the column.
+    // At this point, compressionConfigs is guaranteed to contain the column. If there's no entry in the map, we
+    // wouldn't have computed the CHANGE_RAW_COMPRESSION_TYPE operation for this column as compressionType changes
+    // are processed only if a valid compressionType is specified in fieldConfig.
     ChunkCompressionType newCompressionType = compressionConfigs.get(column);
 
     int numDocs = existingColMetadata.getTotalDocs();
@@ -218,14 +213,23 @@ public class ForwardIndexHandler implements IndexHandler {
               .forForwardIndex(newCompressionType, _indexLoadingConfig.getColumnProperties());
 
       try (ForwardIndexCreator creator = indexCreatorProvider.newForwardIndexCreator(context)) {
+        // If creator stored type and the reader stored type do not match, throw an exception.
+        if (!reader.getStoredType().equals(creator.getValueType())) {
+          String failureMsg =
+              "Unsupported operation to change datatype for column=" + column + " from " + reader.getStoredType()
+                  .toString() + " to " + creator.getValueType().toString();
+          throw new UnsupportedOperationException(failureMsg);
+        }
+
         PinotSegmentColumnReader columnReader =
             new PinotSegmentColumnReader(reader, null, null, existingColMetadata.getMaxNumberOfMultiValues());
 
         for (int i = 0; i < numDocs; i++) {
           Object val = columnReader.getValue(i);
 
-          // JSON fields are either stored as string or bytes. No special handling is needed.
-          switch (creator.getValueType()) {
+          // JSON fields are either stored as string or bytes. No special handling is needed because we make this
+          // decision based on the storedType of the reader.
+          switch (reader.getStoredType()) {
             case INT:
               creator.putInt((int) val);
               break;
@@ -254,10 +258,11 @@ public class ForwardIndexHandler implements IndexHandler {
       }
     }
 
-    // We used the existing forward index to generate a new forward index. Existing forward index is not needed
-    // anymore. Remove it.
-    // Note that the stale entries corresponding to old forward index in columns.psf file will be removed when
-    // segmentWriter.close() is called.
+    // We used the existing forward index to generate a new forward index. The existing forward index will be in V3
+    // format and the new forward index will be in V1 format. Remove the existing forward index as it is not needed
+    // anymore. Note that removeIndex() will only mark an index for removal and remove the in-memory state. The
+    // actual cleanup from columns.psf file will happen when singleFileIndexDirectory.cleanupRemovedIndices() is
+    // called during segmentWriter.close().
     segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, ColumnIndexType.FORWARD_INDEX);
 
