@@ -100,6 +100,24 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
       expectedValues[i] = getExpectedValue(_stringSVValues[i].compareTo(_stringSVValues[0]));
     }
     testTransformFunction(transformFunction, expectedValues);
+
+    // Test with heterogeneous arguments (long on left-side, double on right-side)
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, '%s')", functionName, LONG_SV_COLUMN, _doubleSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(Double.compare(_longSVValues[i], _doubleSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    // Test with heterogeneous arguments (double on left-side, long on right-side)
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, '%s')", functionName, DOUBLE_SV_COLUMN, _longSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(Double.compare(_doubleSVValues[i], _longSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
