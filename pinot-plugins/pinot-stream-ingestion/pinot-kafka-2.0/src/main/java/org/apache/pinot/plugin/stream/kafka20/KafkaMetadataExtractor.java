@@ -32,9 +32,11 @@ public interface KafkaMetadataExtractor {
   static KafkaMetadataExtractor build(boolean populateMetadata) {
     return record -> {
       if (!populateMetadata) {
-        return new KafkaStreamMessageMetadata(record.timestamp(), RowMetadata.EMPTY_ROW,
-            Map.of(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(record.offset()),
-                KafkaStreamMessageMetadata.RECORD_TIMESTAMP_KEY, String.valueOf(record.timestamp())));
+        long recordTimestamp = record.timestamp();
+        Map<String, String> metadataMap = new HashMap<>();
+        metadataMap.put(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(record.offset()));
+        metadataMap.put(KafkaStreamMessageMetadata.RECORD_TIMESTAMP_KEY, String.valueOf(recordTimestamp));
+        return new KafkaStreamMessageMetadata(recordTimestamp, RowMetadata.EMPTY_ROW, metadataMap);
       }
       GenericRow headerGenericRow = new GenericRow();
       Headers headers = record.headers();
