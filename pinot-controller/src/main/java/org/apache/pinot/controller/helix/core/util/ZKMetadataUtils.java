@@ -31,9 +31,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -62,28 +60,21 @@ public class ZKMetadataUtils {
         segmentSizeInBytes, false);
   }
 
-  public static void updateSegmentZKMetadataInterval(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata,
-      Schema newSchema) {
-    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    if (StringUtils.isNotEmpty(timeColumnName)) {
-      DateTimeFieldSpec newDateTimeFieldSpec = newSchema.getDateTimeSpec(timeColumnName);
+  public static void updateSegmentZKMetadataInterval(SegmentZKMetadata segmentZKMetadata,
+      DateTimeFieldSpec dateTimeFieldSpec) {
+    String startTimeString = segmentZKMetadata.getRawStartTime();
+    if (StringUtils.isNotEmpty(startTimeString)) {
+      long updatedStartTime = dateTimeFieldSpec.getFormatSpec().fromFormatToMillis(startTimeString);
+      updatedStartTime =
+          dateTimeFieldSpec.getFormatSpec().getColumnUnit().convert(updatedStartTime, TimeUnit.MILLISECONDS);
+      segmentZKMetadata.setStartTime(updatedStartTime);
+    }
 
-      assert newDateTimeFieldSpec != null;
-      String startTimeString = segmentZKMetadata.getRawStartTime();
-      if (StringUtils.isNotEmpty(startTimeString)) {
-        long updatedStartTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(startTimeString);
-        updatedStartTime =
-            newDateTimeFieldSpec.getFormatSpec().getColumnUnit().convert(updatedStartTime, TimeUnit.MILLISECONDS);
-        segmentZKMetadata.setStartTime(updatedStartTime);
-      }
-
-      String endTimeString = segmentZKMetadata.getRawEndTime();
-      if (StringUtils.isNotEmpty(endTimeString)) {
-        long updatedEndTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(endTimeString);
-        updatedEndTime =
-            newDateTimeFieldSpec.getFormatSpec().getColumnUnit().convert(updatedEndTime, TimeUnit.MILLISECONDS);
-        segmentZKMetadata.setEndTime(updatedEndTime);
-      }
+    String endTimeString = segmentZKMetadata.getRawEndTime();
+    if (StringUtils.isNotEmpty(endTimeString)) {
+      long updatedEndTime = dateTimeFieldSpec.getFormatSpec().fromFormatToMillis(endTimeString);
+      updatedEndTime = dateTimeFieldSpec.getFormatSpec().getColumnUnit().convert(updatedEndTime, TimeUnit.MILLISECONDS);
+      segmentZKMetadata.setEndTime(updatedEndTime);
     }
   }
 
@@ -100,12 +91,10 @@ public class ZKMetadataUtils {
       segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
       segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
       segmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
-      if (segmentMetadata.getTimeColumn() != null) {
-        ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor(segmentMetadata.getTimeColumn());
-        if (isValidTimeMetadata(timeColumnMetadata)) {
-          segmentZKMetadata.setRawStartTime(timeColumnMetadata.getMinValue().toString());
-          segmentZKMetadata.setRawEndTime(timeColumnMetadata.getMaxValue().toString());
-        }
+      ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor(segmentMetadata.getTimeColumn());
+      if (isValidTimeMetadata(timeColumnMetadata)) {
+        segmentZKMetadata.setRawStartTime(timeColumnMetadata.getMinValue().toString());
+        segmentZKMetadata.setRawEndTime(timeColumnMetadata.getMaxValue().toString());
       }
     } else {
       segmentZKMetadata.setStartTime(-1);

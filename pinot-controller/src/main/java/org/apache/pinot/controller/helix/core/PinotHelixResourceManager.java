@@ -152,6 +152,7 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -1300,11 +1301,6 @@ public class PinotHelixResourceManager {
 
   public void updateSchema(Schema schema, boolean reload)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
-    updateSchema(schema, reload, false);
-  }
-
-  public void updateSchema(Schema schema, boolean reload, boolean force)
-      throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     String schemaName = schema.getSchemaName();
     LOGGER.info("Updating schema: {} with reload: {}", schemaName, reload);
 
@@ -1313,7 +1309,7 @@ public class PinotHelixResourceManager {
       throw new SchemaNotFoundException(String.format("Schema: %s does not exist", schemaName));
     }
 
-    updateSchema(schema, oldSchema, force);
+    updateSchema(schema, oldSchema, false);
 
     if (reload) {
       LOGGER.info("Reloading tables with name: {}", schemaName);
@@ -2287,12 +2283,12 @@ public class PinotHelixResourceManager {
   public void updateSegmentInterval(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata,
       Schema newSchema) {
     String segmentName = segmentZKMetadata.getSegmentName();
-    if (tableConfig != null) {
-      ZKMetadataUtils.updateSegmentZKMetadataInterval(tableConfig, segmentZKMetadata, newSchema);
+
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    if (StringUtils.isNotEmpty(timeColumnName)) {
+      DateTimeFieldSpec dateTimeFieldSpec = newSchema.getDateTimeSpec(timeColumnName);
+      ZKMetadataUtils.updateSegmentZKMetadataInterval(segmentZKMetadata, dateTimeFieldSpec);
       LOGGER.info("Updated segment zookeeper metadata: {} of table: {}", segmentName, tableConfig.getTableName());
-    } else {
-      throw new RuntimeException(
-          String.format("No table config available for time interval update for segment: %s", segmentName));
     }
   }
 

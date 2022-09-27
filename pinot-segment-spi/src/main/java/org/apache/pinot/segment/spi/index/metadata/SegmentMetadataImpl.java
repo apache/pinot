@@ -77,7 +77,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private Duration _timeGranularity;
   private long _segmentStartTime = Long.MAX_VALUE;
   private long _segmentEndTime = Long.MIN_VALUE;
-
   private Interval _timeInterval;
 
   private SegmentVersion _segmentVersion;
@@ -182,7 +181,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _timeGranularity = new Duration(_timeUnit.toMillis(1));
         String startTimeString = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_START_TIME);
         String endTimeString = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_END_TIME);
-
         _segmentStartTime = Long.parseLong(startTimeString);
         _segmentEndTime = Long.parseLong(endTimeString);
         _timeInterval =

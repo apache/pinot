@@ -746,7 +746,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           } else {
             // No records in segment. Use current time as start/end
             long now = System.currentTimeMillis();
-
             if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
               startTime = now;
               endTime = now;

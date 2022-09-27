@@ -1039,7 +1039,7 @@ public class PinotSegmentRestletResource {
   }
 
   @POST
-  @Path("/tables/{tableNameWithType}/updateTimeIntervalZK")
+  @Path("/segment/{tableNameWithType}/updateZKTimeInterval")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the start and end time of the segments based on latest schema",
@@ -1052,20 +1052,13 @@ public class PinotSegmentRestletResource {
   public SuccessResponse updateTimeIntervalZK(
       @ApiParam(value = "Table name with type", required = true,
           example = "myTable_REALTIME") @PathParam("tableNameWithType") String tableNameWithType) {
-    try {
-
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       if (tableType == null) {
         throw new ControllerApplicationException(LOGGER,
             String.format("Table type not provided with table name %s", tableNameWithType),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
-      return updateTimeIntervalZKInternal(tableNameWithType);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to get consuming segments info for table %s. %s", tableNameWithType, e.getMessage()),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
+      return updateZKTimeIntervalInternal(tableNameWithType);
   }
 
   /**
@@ -1073,7 +1066,7 @@ public class PinotSegmentRestletResource {
    * @param tableName  name of the table
    * @return
    */
-  private SuccessResponse updateTimeIntervalZKInternal(String tableName) {
+  private SuccessResponse updateZKTimeIntervalInternal(String tableName) {
 
     try {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
