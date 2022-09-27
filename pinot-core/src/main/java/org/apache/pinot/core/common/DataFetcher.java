@@ -622,15 +622,8 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readBytesValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_storedType) {
-          case BYTES:
-          case STRING:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getBytes(docIds[i], readerContext);
-            }
-            break;
-          default:
-            throw new IllegalStateException();
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getBytes(docIds[i], readerContext);
         }
       }
     }
@@ -770,7 +763,6 @@ public class DataFetcher {
         numValuesBuffer[i] = _reader.getNumValuesMV(docIds[i], getReaderContext());
       }
     }
-
 
     private int[] getSVDictIdsBuffer() {
       return _dictionary == null ? null : THREAD_LOCAL_DICT_IDS.get();

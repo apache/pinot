@@ -278,6 +278,16 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copy(String[][] src, byte[][][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      String[] stringValues = src[i];
+      int numValues = stringValues.length;
+      byte[][] bytesValues = new byte[numValues][];
+      ArrayCopyUtils.copy(stringValues, bytesValues, numValues);
+      dest[i] = bytesValues;
+    }
+  }
+
   public static void copy(byte[][] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BigDecimalUtils.deserialize(src[i]);

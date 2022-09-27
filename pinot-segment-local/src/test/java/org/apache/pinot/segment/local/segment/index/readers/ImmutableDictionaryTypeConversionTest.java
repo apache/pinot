@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.readers;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.File;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -40,6 +39,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 
 
@@ -59,13 +59,6 @@ public class ImmutableDictionaryTypeConversionTest {
   private static final int MAX_VALUE = 1000000;
   private static final int STRING_LENGTH = 6;
   private static final int BYTES_LENGTH = STRING_LENGTH / 2;
-
-  private static byte[] toUTF8Bytes(String stringValue) {
-    return stringValue.getBytes(StandardCharsets.UTF_8);
-  }
-  private static ByteArray toUTF8ByeArray(String stringValue) {
-    return new ByteArray(toUTF8Bytes(stringValue));
-  }
 
   private int[] _intValues;
   private long[] _longValues;
@@ -120,7 +113,7 @@ public class ImmutableDictionaryTypeConversionTest {
     _utf8BytesValues = new ByteArray[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       _bytesValues[i] = BytesUtils.toByteArray(_stringValues[i]);
-      _utf8BytesValues[i] = toUTF8ByeArray(_stringValues[i]);
+      _utf8BytesValues[i] = new ByteArray(_stringValues[i].getBytes(UTF_8));
     }
 
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(

@@ -608,13 +608,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
     } else {
       assert getResultMetadata().getDataType().getStoredType() == DataType.STRING;
       String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
-      for (int i = 0; i < length; i++) {
-        String[] stringValues = stringValuesMV[i];
-        int numValues = stringValues.length;
-        byte[][] bytesValues = new byte[numValues][];
-        ArrayCopyUtils.copy(stringValues, bytesValues, numValues);
-        _bytesValuesMV[i] = bytesValues;
-      }
+      ArrayCopyUtils.copy(stringValuesMV, _bytesValuesMV, length);
     }
     return _bytesValuesMV;
   }

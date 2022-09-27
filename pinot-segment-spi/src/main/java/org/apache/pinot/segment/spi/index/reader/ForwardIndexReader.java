@@ -732,15 +732,8 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesMV(int[] docIds, int length, int maxNumValuesPerMVEntry, byte[][][] values, T context) {
-    switch (getStoredType()) {
-      case STRING:
-      case BYTES:
-        for (int i = 0; i < length; i++) {
-          values[i] = getBytesMV(docIds[i], context);
-        }
-        break;
-      default:
-        throw new IllegalArgumentException("readValuesMV not supported for type " + getStoredType());
+    for (int i = 0; i < length; i++) {
+      values[i] = getBytesMV(docIds[i], context);
     }
   }
 

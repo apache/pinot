@@ -25,6 +25,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 
 /**
  * Implementation of String dictionary that cache all values on-heap.
@@ -55,10 +57,9 @@ public class OnHeapStringDictionary extends BaseImmutableDictionary {
     _unPaddedStringToIdMap.defaultReturnValue(Dictionary.NULL_VALUE_INDEX);
 
     for (int i = 0; i < length; i++) {
-      String unpaddedString = getUnpaddedString(i, buffer);
-      _unpaddedStrings[i] = unpaddedString;
-      _unPaddedStringToIdMap.put(unpaddedString, i);
       _unpaddedBytes[i] = getUnpaddedBytes(i, buffer);
+      _unpaddedStrings[i] = new String(_unpaddedBytes[i], UTF_8);
+      _unPaddedStringToIdMap.put(_unpaddedStrings[i], i);
     }
 
     if (paddingByte == 0) {

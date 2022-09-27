@@ -250,6 +250,8 @@ public class DataFetcherTest {
   public void testFetchBytesValues() {
     testFetchBytesValues(BYTES_COLUMN);
     testFetchBytesValues(NO_DICT_BYTES_COLUMN);
+    testFetchBytesValues(STRING_COLUMN);
+    testFetchBytesValues(NO_DICT_STRING_COLUMN);
   }
 
   @Test
@@ -361,8 +363,7 @@ public class DataFetcherTest {
     _dataFetcher.fetchBytesValues(column, docIds, length, bytesValues);
 
     for (int i = 0; i < length; i++) {
-      String stringValue = Integer.toString(_values[docIds[i]]);
-        Assert.assertEquals(new String(bytesValues[i], UTF_8), stringValue, ERROR_MESSAGE);
+      Assert.assertEquals(new String(bytesValues[i], UTF_8), Integer.toString(_values[docIds[i]]), ERROR_MESSAGE);
     }
   }
 

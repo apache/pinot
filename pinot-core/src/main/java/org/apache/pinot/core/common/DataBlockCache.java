@@ -511,7 +511,6 @@ public class DataBlockCache {
     return numValues;
   }
 
-
   private boolean markLoaded(FieldSpec.DataType dataType, String column) {
     return _columnValueLoaded.computeIfAbsent(dataType, k -> new HashSet<>()).add(column);
   }
