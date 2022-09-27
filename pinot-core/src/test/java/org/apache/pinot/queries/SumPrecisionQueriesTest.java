@@ -283,7 +283,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     DataSchema expectedDataSchema =
-        new DataSchema(new String[]{"times(sumprecision(intColumn),'2')"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
+        new DataSchema(new String[]{"times(sumprecision(intColumn),2)"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
     assertEquals(resultTable.getDataSchema(), expectedDataSchema);
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);

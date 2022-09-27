@@ -113,7 +113,7 @@ public class PostAggregationHandlerTest {
       DataSchema resultDataSchema = handler.getResultDataSchema();
       assertEquals(resultDataSchema.size(), 2);
       assertEquals(resultDataSchema.getColumnNames(),
-          new String[]{"divide(minus(plus(sum(m1),max(m2)),d1),'2')", "d2"});
+          new String[]{"divide(minus(plus(sum(m1),max(m2)),d1),2)", "d2"});
       assertEquals(resultDataSchema.getColumnDataTypes(),
           new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.LONG});
       assertEquals(handler.getResult(new Object[]{1, 2L, 3.0, 4.0, 5.0}), new Object[]{3.0, 2L});
