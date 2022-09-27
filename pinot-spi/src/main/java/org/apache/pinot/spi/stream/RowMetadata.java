@@ -38,13 +38,16 @@ public interface RowMetadata {
   Map<String, String> EMPTY_COLLECTION = Collections.emptyMap();
 
   /**
-   * Return the timestamp associated with when the row was ingested upstream.
-   * Expected to be mainly used for stream-based sources.
+   * Returns the timestamp associated with the record. This typically refers to the time it was ingested into the
+   * upstream source. In some cases, it may be the time at which the record was created, aka event time (eg. in kafka,
+   * a topic may be configured to use record `CreateTime` instead of `LogAppendTime`).
+   *
+   * Expected to be used for stream-based sources.
    *
    * @return timestamp (epoch in milliseconds) when the row was ingested upstream
    *         Long.MIN_VALUE if not available
    */
-  long getRecordTimestampMs();
+  long getRecordIngestionTimeMs();
 
   /**
    * Returns the stream message headers

@@ -27,8 +27,8 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 public class KafkaStreamMessageMetadata extends StreamMessageMetadata {
   public static final String METADATA_OFFSET_KEY = "offset";
 
-  public KafkaStreamMessageMetadata(long recordTimestampMs, @Nullable GenericRow headers,
+  public KafkaStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
       Map<String, String> metadata) {
-    super(recordTimestampMs, headers, metadata);
+    super(recordIngestionTimeMs, headers, metadata);
   }
 }

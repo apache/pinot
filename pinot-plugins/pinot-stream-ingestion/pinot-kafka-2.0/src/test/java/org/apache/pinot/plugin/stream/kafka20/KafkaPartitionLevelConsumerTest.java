@@ -283,7 +283,7 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < batch1.getMessageCount(); i++) {
         final byte[] msg = batch1.getStreamMessage(i).getValue();
         Assert.assertEquals(new String(msg), "sample_msg_" + i);
-        Assert.assertNull(batch1.getMetadataAtIndex(i));
+        Assert.assertNotNull(batch1.getMetadataAtIndex(i));
       }
       // Test second half batch
       final MessageBatch batch2 =
@@ -292,7 +292,7 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < batch2.getMessageCount(); i++) {
         final byte[] msg = batch2.getStreamMessage(i).getValue();
         Assert.assertEquals(new String(msg), "sample_msg_" + (500 + i));
-        Assert.assertNull(batch1.getMetadataAtIndex(i));
+        Assert.assertNotNull(batch1.getMetadataAtIndex(i));
       }
       // Some random range
       final MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(35), 10000);
@@ -300,7 +300,7 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < batch3.getMessageCount(); i++) {
         final byte[] msg = batch3.getStreamMessage(i).getValue();
         Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
-        Assert.assertNull(batch1.getMetadataAtIndex(i));
+        Assert.assertNotNull(batch1.getMetadataAtIndex(i));
       }
     }
   }
@@ -342,7 +342,7 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < batch1.getMessageCount(); i++) {
         final RowMetadata metadata = batch1.getMetadataAtIndex(i);
         Assert.assertNotNull(metadata);
-        Assert.assertEquals(metadata.getRecordTimestampMs(), TIMESTAMP + i);
+        Assert.assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + i);
       }
       // Test second half batch
       final MessageBatch batch2 =
@@ -351,7 +351,7 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < batch2.getMessageCount(); i++) {
         final RowMetadata metadata = batch2.getMetadataAtIndex(i);
         Assert.assertNotNull(metadata);
-        Assert.assertEquals(metadata.getRecordTimestampMs(), TIMESTAMP + (500 + i));
+        Assert.assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + (500 + i));
       }
       // Some random range
       final MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(35), 10000);
@@ -359,7 +359,7 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < batch3.getMessageCount(); i++) {
         final RowMetadata metadata = batch3.getMetadataAtIndex(i);
         Assert.assertNotNull(metadata);
-        Assert.assertEquals(metadata.getRecordTimestampMs(), TIMESTAMP + (10 + i));
+        Assert.assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + (10 + i));
       }
     }
   }
