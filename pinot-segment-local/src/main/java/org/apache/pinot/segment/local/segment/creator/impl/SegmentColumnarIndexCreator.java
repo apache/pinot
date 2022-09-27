@@ -720,9 +720,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
         // Use start/end time in config if defined
         if (_config.getStartTime() != null) {
-          startTime = Long.parseLong(_config.getStartTime());
-          endTime = Long.parseLong(_config.getEndTime());
-          timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
+          TimeUnit segmentTimeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
+          startTime = TimeUnit.MILLISECONDS.convert(Long.parseLong(_config.getStartTime()), segmentTimeUnit);
+          endTime = TimeUnit.MILLISECONDS.convert(Long.parseLong(_config.getEndTime()), segmentTimeUnit);
+          timeUnit = TimeUnit.MILLISECONDS;
         } else {
           if (_totalDocs > 0) {
             String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
@@ -739,9 +740,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               timeUnit = TimeUnit.MILLISECONDS;
             } else {
               // by default, time column type is TimeColumnType.EPOCH
-              startTime = Long.parseLong(startTimeStr);
-              endTime = Long.parseLong(endTimeStr);
-              timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
+              TimeUnit segmentTimeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
+              startTime = TimeUnit.MILLISECONDS.convert(Long.parseLong(startTimeStr), segmentTimeUnit);
+              endTime = TimeUnit.MILLISECONDS.convert(Long.parseLong(endTimeStr), segmentTimeUnit);
+              timeUnit = TimeUnit.MILLISECONDS;
             }
           } else {
             // No records in segment. Use current time as start/end
@@ -751,9 +753,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               endTime = now;
               timeUnit = TimeUnit.MILLISECONDS;
             } else {
-              timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
-              startTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
-              endTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
+              Preconditions.checkNotNull(_config.getSegmentTimeUnit());
+              startTime = now;
+              endTime = now;
+              timeUnit = TimeUnit.MILLISECONDS;
             }
           }
         }
