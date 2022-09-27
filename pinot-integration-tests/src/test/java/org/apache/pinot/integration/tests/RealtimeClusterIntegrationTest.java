@@ -157,9 +157,9 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
   @Test
   @Override
-  public void testGeneratedQueriesWithMultiValues()
+  public void testGeneratedQueries()
       throws Exception {
-    super.testGeneratedQueriesWithMultiValues();
+    testGeneratedQueries(true, false);
   }
 
   @Test
