@@ -20,6 +20,7 @@ package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -192,7 +193,7 @@ public class SelectionPlanNode implements PlanNode {
         return null;
       }
       for (OrderByAlgorithm value : OrderByAlgorithm.values()) {
-        if (value._publicName.equals(publicName)) {
+        if (value._publicName.toLowerCase(Locale.US).equals(publicName)) {
           return value;
         }
       }
