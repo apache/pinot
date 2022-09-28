@@ -88,10 +88,9 @@ public class ScanBasedANDFilterReorderingTest {
         + " AND column6 = 2147483647"
         + " AND column3 <> 'L'";
 
-    protected static final String FILTER2 = " WHERE column1 > 100000000"
-        + " AND column2 BETWEEN 20000000 AND 1000000000"
-        + " AND column3 <> 'w'"
-        + " AND daysSinceEpoch = 1756015683";
+    protected static final String FILTER2 = " WHERE column7 IN (2147483647, 211, 336, 363, 469, 565)"
+        + " AND column6 = 3267"
+        + " AND column3 <> 'L'";
 
     protected static final String FILTER3 = " WHERE column1 > 100000000"
         + " AND column2 BETWEEN 20000000 AND 1000000000"
@@ -193,13 +192,29 @@ public class ScanBasedANDFilterReorderingTest {
           46649L, 100000L);
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 44224075056091L);
 
-      // Test query with optimization
+      // Test query without optimization
       aggregationOperator = getOperator(COUNT_STAR_QUERY + FILTER1);
       resultsBlock = aggregationOperator.nextBlock();
       executionStatistics = aggregationOperator.getExecutionStatistics();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 46649L, 189513L,
           46649L, 100000L);
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 44224075056091L);
+
+      // Test query with optimization
+      aggregationOperator = getOperator(SET_AND_OPTIMIZATION + COUNT_STAR_QUERY + FILTER2);
+      resultsBlock = aggregationOperator.nextBlock();
+      executionStatistics = aggregationOperator.getExecutionStatistics();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 0, 97458,
+          0, 100000L);
+      Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 0);
+
+      // Test query without optimization
+      aggregationOperator = getOperator(COUNT_STAR_QUERY + FILTER2);
+      resultsBlock = aggregationOperator.nextBlock();
+      executionStatistics = aggregationOperator.getExecutionStatistics();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 0, 189513L,
+          0, 100000L);
+      Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 0);
     }
   }
 }

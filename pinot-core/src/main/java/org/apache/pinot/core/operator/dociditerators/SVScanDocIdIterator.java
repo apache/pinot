@@ -148,7 +148,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   /**
-   * This is a crude version of
+   * This is an approximation of probability calculation in
    * org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
    */
   @Override
