@@ -94,11 +94,11 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
     // Evaluate the scan based operator with the highest cardinality coming first, this potentially reduce the range of
     // scanning from the beginning. Automatically place N/A cardinality column (-1) to the back as we want to evaluate
     // ExpressionScanDocIdIterator in the end.
-    // TODO: 1. remainingDocIdIterators currently doesn't report cardinality; therefore, right now it cannot be
+    // TODO: 1. remainingDocIdIterators currently doesn't report cardinality; therefore, it cannot be
     //          prioritized even if it provides high effective cardinality, one way to do this is to let AND/OR
-    //          DocIdIterators bubble up cardinality for the sort to happen recursively for nested AND OR predicates
+    //          DocIdIterators bubble up cardinality for the sort to happen recursively for nested AND-OR predicates
     //       2. range eval currently doesn't report effective cardinality but theoretically it can at least for the
-    //          dictionary backed column
+    //          dictionary backed columns
     if (_cardinalityBasedRankingForScan) {
       scanBasedDocIdIterators.sort(Comparator.comparing(x -> (-x.getEstimatedCardinality(true))));
     }

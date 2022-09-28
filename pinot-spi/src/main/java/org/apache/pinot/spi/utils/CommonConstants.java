@@ -811,7 +811,7 @@ public class CommonConstants {
     }
 
     public static class OptimizationConstants {
-      public static final int DEFAULT_AVG_MV_ENTRIES_DENOMINATOR = 5;
+      public static final int DEFAULT_AVG_MV_ENTRIES_DENOMINATOR = 2;
     }
 
     public static class Range {

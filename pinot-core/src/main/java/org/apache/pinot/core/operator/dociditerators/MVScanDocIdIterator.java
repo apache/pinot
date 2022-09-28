@@ -117,7 +117,8 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     if (numMatchingItems == Integer.MIN_VALUE || _cardinality < 0) {
       return ScanBasedDocIdIterator.super.getEstimatedCardinality(isAndDocIdSet);
     }
-    int avgNumValuesPerMVEntry = _maxNumValuesPerMVEntry / OptimizationConstants.DEFAULT_AVG_MV_ENTRIES_DENOMINATOR;
+    int avgNumValuesPerMVEntry =
+        Math.max(_maxNumValuesPerMVEntry / OptimizationConstants.DEFAULT_AVG_MV_ENTRIES_DENOMINATOR, 1);
 
     numMatchingItems = numMatchingItems > 0 ? numMatchingItems * avgNumValuesPerMVEntry
         : (numMatchingItems * avgNumValuesPerMVEntry + _cardinality);
