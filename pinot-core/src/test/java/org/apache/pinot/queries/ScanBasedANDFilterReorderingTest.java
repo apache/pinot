@@ -92,10 +92,7 @@ public class ScanBasedANDFilterReorderingTest {
         + " AND column6 = 3267"
         + " AND column3 <> 'L'";
 
-    protected static final String FILTER3 = " WHERE column1 > 100000000"
-        + " AND column2 BETWEEN 20000000 AND 1000000000"
-        + " AND column3 <> 'w'"
-        + " AND daysSinceEpoch = 1756015683";
+    protected static final String FILTER3 = FILTER1 + " AND column1 > '50000000'";
 
     private IndexSegment _indexSegment;
     // Contains 2 identical index segments.
@@ -184,7 +181,7 @@ public class ScanBasedANDFilterReorderingTest {
     }
 
     public void testScanBasedANDFilterReorderingOptimization1() {
-      // Test query with optimization
+      // Test query with optimization, bitmap + scan
       AggregationOperator aggregationOperator = getOperator(SET_AND_OPTIMIZATION + COUNT_STAR_QUERY + FILTER1);
       AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
@@ -192,7 +189,7 @@ public class ScanBasedANDFilterReorderingTest {
           46649L, 100000L);
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 44224075056091L);
 
-      // Test query without optimization
+      // Test query without optimization, bitmap + scan
       aggregationOperator = getOperator(COUNT_STAR_QUERY + FILTER1);
       resultsBlock = aggregationOperator.nextBlock();
       executionStatistics = aggregationOperator.getExecutionStatistics();
@@ -200,21 +197,37 @@ public class ScanBasedANDFilterReorderingTest {
           46649L, 100000L);
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 44224075056091L);
 
-      // Test query with optimization
+      // Test query with optimization, another bitmap + scan
       aggregationOperator = getOperator(SET_AND_OPTIMIZATION + COUNT_STAR_QUERY + FILTER2);
       resultsBlock = aggregationOperator.nextBlock();
       executionStatistics = aggregationOperator.getExecutionStatistics();
-      QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 0, 97458,
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 0, 97458L,
           0, 100000L);
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 0);
 
-      // Test query without optimization
+      // Test query without optimization, another bitmap + scan
       aggregationOperator = getOperator(COUNT_STAR_QUERY + FILTER2);
       resultsBlock = aggregationOperator.nextBlock();
       executionStatistics = aggregationOperator.getExecutionStatistics();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 0, 189513L,
           0, 100000L);
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 0);
+
+      // Test query with optimization, bitmap + scan + range
+      aggregationOperator = getOperator(  SET_AND_OPTIMIZATION + COUNT_STAR_QUERY + FILTER3);
+      resultsBlock = aggregationOperator.nextBlock();
+      executionStatistics = aggregationOperator.getExecutionStatistics();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 45681L, 201648L,
+          45681L, 100000L);
+      Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 44199078145668L);
+
+      // Test query without optimization, bitmap + scan + range
+      aggregationOperator = getOperator( COUNT_STAR_QUERY + FILTER3);
+      resultsBlock = aggregationOperator.nextBlock();
+      executionStatistics = aggregationOperator.getExecutionStatistics();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 45681L, 276352L,
+          45681L, 100000L);
+      Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 44199078145668L);
     }
   }
 }
