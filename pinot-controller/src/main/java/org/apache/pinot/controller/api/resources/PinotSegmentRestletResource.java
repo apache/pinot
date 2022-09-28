@@ -1039,7 +1039,7 @@ public class PinotSegmentRestletResource {
   }
 
   @POST
-  @Path("/segment/{tableNameWithType}/updateZKTimeInterval")
+  @Path("/segments/{tableNameWithType}/updateZKTimeInterval")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the start and end time of the segments based on latest schema",

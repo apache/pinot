@@ -88,9 +88,11 @@ public class ZKMetadataUtils {
     }
 
     if (segmentMetadata.getTimeInterval() != null) {
-      segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
-      segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
-      segmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
+      long startTimeMs = TimeUnit.MILLISECONDS.convert(segmentMetadata.getStartTime(), segmentMetadata.getTimeUnit());
+      long endTimeMs = TimeUnit.MILLISECONDS.convert(segmentMetadata.getEndTime(), segmentMetadata.getTimeUnit());
+      segmentZKMetadata.setStartTime(startTimeMs);
+      segmentZKMetadata.setEndTime(endTimeMs);
+      segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
       ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor(segmentMetadata.getTimeColumn());
       if (isValidTimeMetadata(timeColumnMetadata)) {
         segmentZKMetadata.setRawStartTime(timeColumnMetadata.getMinValue().toString());
