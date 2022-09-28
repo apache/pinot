@@ -324,6 +324,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         //   - on intermediate stage
         new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
             + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+
+       // H2 doesn't support AT TIME ZONE
+        new Object[]{"SELECT ts AT TIME ZONE 'UTC', ts AT TIME ZONE 'PST' FROM a", 15},
     };
   }
 }

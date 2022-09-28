@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.function;
 
 import com.google.common.collect.Lists;
+import java.sql.Timestamp;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -594,5 +595,33 @@ public class DateTimeFunctionsTest {
     }
     testMultipleInvocations(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr), rows, expectedResults);
+  }
+
+  @Test
+  public void shouldConvertUTCtoDifferentTimeZone() {
+    // Given:
+    final long tsUTC = 1664384229000L; // 2022-09-28T16:57:09Z
+    GenericRow row = new GenericRow();
+    row.putValue("epochMillis", tsUTC);
+    List<String> arguments = Lists.newArrayList("epochMillis");
+
+    // Then:
+    Timestamp tsPST = Timestamp.valueOf("2022-09-28 09:57:09.0");
+    testFunction("atTimeZone(epochMillis, 'PST')", arguments, row, tsPST);
+    testFunction("atTimeZone(epochMillis, 'America/Los_Angeles')", arguments, row, tsPST);
+  }
+
+  @Test
+  public void shouldConvertUTCtoSameTimeZone() {
+    // Given:
+    final long tsUTC = 1664384229000L; // 2022-09-28T16:57:09Z
+    GenericRow row = new GenericRow();
+    row.putValue("epochMillis", tsUTC);
+    List<String> arguments = Lists.newArrayList("epochMillis");
+
+    // Then:
+    Timestamp tsPST = Timestamp.valueOf("2022-09-28 16:57:09.0");
+    testFunction("atTimeZone(epochMillis, 'UTC')", arguments, row, tsPST);
+    testFunction("atTimeZone(epochMillis, 'Greenwich')", arguments, row, tsPST);
   }
 }

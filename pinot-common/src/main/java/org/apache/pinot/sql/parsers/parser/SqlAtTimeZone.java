@@ -18,25 +18,27 @@
  */
 package org.apache.pinot.sql.parsers.parser;
 
-import java.util.Arrays;
+import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlSpecialOperator;
-import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.SqlOperandCountRange;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 
-import static java.util.Objects.requireNonNull;
 
-
-public class SqlAtTimeZone extends SqlSpecialOperator {
+public class SqlAtTimeZone extends SqlBinaryOperator {
 
   public static final SqlAtTimeZone INSTANCE = new SqlAtTimeZone();
 
+  static {
+    SqlStdOperatorTable.instance().register(INSTANCE);
+  }
+
   private SqlAtTimeZone() {
     super(
-        "AT_TIME_ZONE",
+        "atTimeZone",
         SqlKind.OTHER_FUNCTION,
         32, // put this at the same precedence as LIKE (see SqlLikeOperator)
         false,
@@ -46,18 +48,7 @@ public class SqlAtTimeZone extends SqlSpecialOperator {
     );
   }
 
-  @Override
-  public ReduceResult reduceExpr(int ordinal, TokenSequence list) {
-    SqlNode left = list.node(ordinal - 1);
-    SqlNode right = list.node(ordinal + 1);
-    return new ReduceResult(ordinal - 1,
-        ordinal + 2,
-        createCall(
-            SqlParserPos.sum(
-                Arrays.asList(requireNonNull(left, "left").getParserPosition(),
-                    requireNonNull(right, "right").getParserPosition(),
-                    list.pos(ordinal))),
-            left,
-            right));
+  @Override public SqlOperandCountRange getOperandCountRange() {
+    return SqlOperandCountRanges.of(2);
   }
 }

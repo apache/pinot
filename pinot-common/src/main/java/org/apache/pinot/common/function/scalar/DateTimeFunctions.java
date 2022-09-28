@@ -20,6 +20,9 @@ package org.apache.pinot.common.function.scalar;
 
 import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
@@ -703,5 +706,25 @@ public class DateTimeFunctions {
   public static long timestampDiff(String unit, long timestamp1, long timestamp2) {
     ISOChronology chronology = ISOChronology.getInstanceUTC();
     return DateTimeUtils.getTimestampField(chronology, unit).getDifferenceAsLong(timestamp2, timestamp1);
+  }
+
+  /**
+   * For timestamp with time zone, the internally stored value is always in UTC (Universal Coordinated Time,
+   * traditionally known as Greenwich Mean Time, GMT). This method will transform that timestamp to a timestamp
+   * that represents the millis since epoch in the specified time zone.
+   *
+   * @return a timestamp that corresponds to the {@code timestampInUTC} at {@code timeZone}
+   */
+  @ScalarFunction
+  public static Timestamp atTimeZone(long timestampInUTC, String timeZone) {
+    final ZoneId zoneId;
+    if (ZoneId.SHORT_IDS.containsKey(timeZone)) {
+      zoneId = ZoneId.of(timeZone, ZoneId.SHORT_IDS);
+    } else {
+      zoneId = ZoneId.of(timeZone);
+    }
+
+    ZonedDateTime zonedDateTime = Instant.ofEpochMilli(timestampInUTC).atZone(zoneId);
+    return Timestamp.valueOf(zonedDateTime.toLocalDateTime());
   }
 }

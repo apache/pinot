@@ -63,6 +63,7 @@ public class FunctionRegistry {
     Set<Method> methods = PinotReflectionUtils.getMethodsThroughReflection(".*\\.function\\..*", ScalarFunction.class);
     for (Method method : methods) {
       if (!Modifier.isPublic(method.getModifiers())) {
+        LOGGER.warn("Not cataloging non-public method {}.", method.getName());
         continue;
       }
       ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);

@@ -21,6 +21,10 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.io.IOException;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -223,15 +227,35 @@ public class TimestampQueriesTest extends BaseQueriesTest {
     }
   }
 
-  @Test(
-      expectedExceptions = BadQueryRequestException.class,
-      expectedExceptionsMessageRegExp = ".*attimezone not found.*"
-  )
-  public void shouldThrowOnAtTimeZone() {
-    // this isn't yet implemented but the syntax is supported, make sure the
-    // degradation experience is clean
-    String query = "SELECT timestampColumn AT TIME ZONE 'pst' FROM testTable";
-    getBrokerResponse(query);
+  @Test()
+  public void shouldSupportAtTimeZoneCustomSyntax() {
+    // Given:
+    String query =
+        "SELECT timestampColumn AT TIME ZONE 'PST' AS tsPst, "
+            + "timestampColumn AT TIME ZONE 'UTC' as tsUtc FROM testTable";
+
+    // When:
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+
+    // Then:
+    ResultTable resultTable = brokerResponse.getResultTable();
+    DataSchema dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema,
+        new DataSchema(
+            new String[]{"tsPst", "tsUtc"},
+            new ColumnDataType[]{ColumnDataType.TIMESTAMP, ColumnDataType.TIMESTAMP}));
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 5; i++) {
+      Object[] row = rows.get(i);
+      assertEquals(row.length, 2);
+
+      ZonedDateTime zonedDateTime = Instant.ofEpochMilli(BASE_TIMESTAMP + i).atZone(ZoneId.of("PST", ZoneId.SHORT_IDS));
+      assertEquals(row[0], Timestamp.valueOf(zonedDateTime.toLocalDateTime()).toString());
+
+      zonedDateTime = Instant.ofEpochMilli(BASE_TIMESTAMP + i).atZone(ZoneId.of("UTC", ZoneId.SHORT_IDS));
+      assertEquals(row[1], Timestamp.valueOf(zonedDateTime.toLocalDateTime()).toString());
+    }
   }
 
   @AfterClass
