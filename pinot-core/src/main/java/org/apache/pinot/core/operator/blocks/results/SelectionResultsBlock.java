@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.blocks.results;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -95,5 +96,34 @@ public class SelectionResultsBlock extends BaseResultsBlock {
         SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, queryContext.isNullHandlingEnabled());
     attachMetadataToDataTable(dataTable);
     return dataTable;
+  }
+
+  public boolean isSorted() {
+    return _comparator != null;
+  }
+
+  /**
+   * If this block is sorted, returns the highest row according to the comparator defined at construction time.
+   * @throws IllegalStateException if the block is not sorted
+   * @throws NoSuchElementException if the block is empty
+   * @see #isSorted()
+   */
+  public Object[] getHighestRow() {
+    if (_comparator == null) {
+      throw new IllegalStateException("Cannot extract boundary from a not sorted block");
+    }
+    if (_rows instanceof PriorityQueue) {
+      PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) _rows;
+      assert selectionResult.peek() != null;
+      // at this point, priority queues are sorted in the inverse order
+      return selectionResult.peek();
+    }
+    if (_rows instanceof List) {
+      List<Object[]> selectionResult = (List<Object[]>) _rows;
+      int index = selectionResult.size() - 1;
+      return selectionResult.get(index);
+    } else {
+      return _rows.stream().max(_comparator).orElseThrow(NoSuchElementException::new);
+    }
   }
 }

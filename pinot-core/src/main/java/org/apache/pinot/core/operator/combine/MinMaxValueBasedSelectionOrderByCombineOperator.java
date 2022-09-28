@@ -213,30 +213,15 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       }
       Collection<Object[]> rows = resultsBlock.getRows();
       if (rows != null && rows.size() >= _numRowsToKeep) {
-        boundaryValue = updateBoundaryValue(boundaryValue, extractBoundaryValue(rows), asc);
+        boundaryValue = updateBoundaryValue(boundaryValue, extractBoundaryValue(resultsBlock), asc);
       }
       threadBoundaryValue = boundaryValue;
       _blockingQueue.offer(resultsBlock);
     }
   }
 
-  private static Comparable extractBoundaryValue(Collection<Object[]> rows) {
-    if (rows instanceof PriorityQueue) {
-      PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) rows;
-      assert selectionResult.peek() != null;
-      // at this point, priority queues are sorted in the inverse order
-      return (Comparable) selectionResult.peek()[0];
-    }
-    List<Object[]> selectionResult;
-    if (rows instanceof List) {
-      selectionResult = (List<Object[]>) rows;
-    } else {
-      LOGGER.warn("Selection result stored in an unexpected data structure of type {}. A copy is needed",
-          rows.getClass());
-      selectionResult = new ArrayList<>(rows);
-    }
-    int index = selectionResult.size() - 1;
-    return (Comparable) selectionResult.get(index)[0];
+  private static Comparable extractBoundaryValue(SelectionResultsBlock block) {
+    return (Comparable) block.getHighestRow()[0];
   }
 
   private Comparable updateBoundaryValue(Comparable oldBoundary, Comparable newBoundary, boolean asc) {
