@@ -56,14 +56,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Timestamp;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -182,9 +183,9 @@ public class ADLSGen2PinotFS extends BasePinotFS {
         Preconditions.checkNotNull(proxyPassword, "Proxy Password cannot be null");
 
         NettyAsyncHttpClientBuilder builder = new NettyAsyncHttpClientBuilder();
-        builder.proxy(new ProxyOptions(ProxyOptions.Type.HTTP,
-            new InetSocketAddress(proxyHost, Integer.parseInt(proxyPort))).setCredentials(proxyUsername,
-            proxyPassword));
+        builder.proxy(
+            new ProxyOptions(ProxyOptions.Type.HTTP, new InetSocketAddress(proxyHost, Integer.parseInt(proxyPort)))
+                .setCredentials(proxyUsername, proxyPassword));
         ClientSecretCredentialBuilder clientSecretCredentialBuilder =
             new ClientSecretCredentialBuilder().clientId(clientId).clientSecret(clientSecret).tenantId(tenantId);
         clientSecretCredentialBuilder.httpClient(builder.build());
@@ -245,8 +246,9 @@ public class ADLSGen2PinotFS extends BasePinotFS {
       // By default, create directory call will overwrite if the path already exists. Setting IfNoneMatch = "*" to
       // prevent overwrite. https://docs.microsoft.com/en-us/rest/api/storageservices/datalakestoragegen2/path/create
       DataLakeRequestConditions requestConditions = new DataLakeRequestConditions().setIfNoneMatch("*");
-      _fileSystemClient.createDirectoryWithResponse(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri), null,
-          null, null, null, requestConditions, null, null);
+      _fileSystemClient
+          .createDirectoryWithResponse(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri), null, null, null,
+              null, requestConditions, null, null);
       return true;
     } catch (DataLakeStorageException e) {
       // If the path already exists, doing nothing and return true
@@ -414,17 +416,40 @@ public class ADLSGen2PinotFS extends BasePinotFS {
       throws IOException {
     LOGGER.debug("listFiles is called with fileUri='{}', recursive='{}'", fileUri, recursive);
     try {
-      // Unlike other Azure SDK APIs that takes url encoded path, ListPathsOptions takes decoded url
-      // e.g) 'path/segment' instead of 'path%2Fsegment'
-      String pathForListPathsOptions =
-          Utility.urlDecode(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(fileUri));
-      ListPathsOptions options = new ListPathsOptions().setPath(pathForListPathsOptions).setRecursive(recursive);
-      PagedIterable<PathItem> iter = _fileSystemClient.listPaths(options, null);
+      PagedIterable<PathItem> iter = listPathItems(fileUri, recursive);
       return iter.stream().map(p -> AzurePinotFSUtil.convertAzureStylePathToUriStylePath(p.getName()))
           .toArray(String[]::new);
     } catch (DataLakeStorageException e) {
       throw new IOException(e);
     }
+  }
+
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
+      throws IOException {
+    LOGGER.debug("listFilesWithMetadata is called with fileUri='{}', recursive='{}'", fileUri, recursive);
+    try {
+      PagedIterable<PathItem> iter = listPathItems(fileUri, recursive);
+      return iter.stream().map(ADLSGen2PinotFS::getFileMetadata).collect(Collectors.toList());
+    } catch (DataLakeStorageException e) {
+      throw new IOException(e);
+    }
+  }
+
+  private PagedIterable<PathItem> listPathItems(URI fileUri, boolean recursive)
+      throws IOException {
+    // Unlike other Azure SDK APIs that takes url encoded path, ListPathsOptions takes decoded url
+    // e.g) 'path/segment' instead of 'path%2Fsegment'
+    String pathForListPathsOptions = Utility.urlDecode(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(fileUri));
+    ListPathsOptions options = new ListPathsOptions().setPath(pathForListPathsOptions).setRecursive(recursive);
+    return _fileSystemClient.listPaths(options, null);
+  }
+
+  private static FileMetadata getFileMetadata(PathItem file) {
+    String path = AzurePinotFSUtil.convertAzureStylePathToUriStylePath(file.getName());
+    return new FileMetadata.Builder().setFilePath(path)
+        .setLastModifiedTime(file.getLastModified().toInstant().toEpochMilli()).setLength(file.getContentLength())
+        .setIsDirectory(file.isDirectory()).build();
   }
 
   /**
@@ -520,8 +545,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     try {
       PathProperties pathProperties = getPathProperties(uri);
       OffsetDateTime offsetDateTime = pathProperties.getLastModified();
-      Timestamp timestamp = Timestamp.valueOf(offsetDateTime.atZoneSameInstant(ZoneOffset.UTC).toLocalDateTime());
-      return timestamp.getTime();
+      return offsetDateTime.toInstant().toEpochMilli();
     } catch (DataLakeStorageException e) {
       throw new IOException("Failed while checking lastModified time for : " + uri, e);
     }

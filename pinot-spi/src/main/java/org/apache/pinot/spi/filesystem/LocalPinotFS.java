@@ -122,14 +122,14 @@ public class LocalPinotFS extends BasePinotFS {
       throws IOException {
     File file = toFile(fileUri);
     if (!recursive) {
-      return Arrays.stream(file.list()).map(s -> getFileInfo(new File(file, s))).collect(Collectors.toList());
+      return Arrays.stream(file.list()).map(s -> getFileMetadata(new File(file, s))).collect(Collectors.toList());
     } else {
-      return Files.walk(Paths.get(fileUri)).filter(s -> !s.equals(file.toPath())).map(p -> getFileInfo(p.toFile()))
+      return Files.walk(Paths.get(fileUri)).filter(s -> !s.equals(file.toPath())).map(p -> getFileMetadata(p.toFile()))
           .collect(Collectors.toList());
     }
   }
 
-  private static FileMetadata getFileInfo(File file) {
+  private static FileMetadata getFileMetadata(File file) {
     return new FileMetadata.Builder().setFilePath(file.getAbsolutePath()).setLastModifiedTime(file.lastModified())
         .setLength(file.length()).setIsDirectory(file.isDirectory()).build();
   }

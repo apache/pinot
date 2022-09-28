@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.filesystem;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.DirectoryEntry;
 import com.microsoft.azure.datalake.store.DirectoryEntryType;
@@ -35,13 +36,15 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -158,36 +161,54 @@ public class AzurePinotFS extends BasePinotFS {
     if (rootDir == null) {
       return EMPTY_ARR;
     }
-
-    if (!recursive) {
-      List<DirectoryEntry> shallowDirectoryEntries = _adlStoreClient.enumerateDirectory(rootDir.fullName);
-      List<String> shallowDirPaths = new ArrayList<>(shallowDirectoryEntries.size());
-      for (DirectoryEntry directoryEntry : shallowDirectoryEntries) {
-        shallowDirPaths.add(directoryEntry.fullName);
-      }
-      return shallowDirPaths.toArray(new String[shallowDirPaths.size()]);
-    }
-
-    List<DirectoryEntry> directoryEntries = listFiles(rootDir);
-    List<String> fullFilePaths = new ArrayList<>(directoryEntries.size());
-    for (DirectoryEntry directoryEntry : directoryEntries) {
-      fullFilePaths.add(directoryEntry.fullName);
-    }
-    return fullFilePaths.toArray(new String[fullFilePaths.size()]);
+    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    visitFiles(fileUri, recursive, f -> builder.add(f.fullName));
+    String[] listedFiles = builder.build().toArray(new String[0]);
+    LOGGER.debug("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
+    return listedFiles;
   }
 
-  private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry)
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
-    List<DirectoryEntry> fileList = new ArrayList<>();
-    if (origDirEntry.type.equals(DirectoryEntryType.DIRECTORY)) {
-      for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(origDirEntry.fullName)) {
-        fileList.add(directoryEntry);
-        fileList.addAll(listFiles(directoryEntry));
-      }
-    } else {
-      fileList.add(origDirEntry);
+    DirectoryEntry rootDir = _adlStoreClient.getDirectoryEntry(fileUri.getPath());
+    if (rootDir == null) {
+      return Collections.emptyList();
     }
-    return fileList;
+    ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
+    visitFiles(fileUri, recursive, f -> {
+      FileMetadata.Builder fileBuilder =
+          new FileMetadata.Builder().setFilePath(f.fullName).setLastModifiedTime(f.lastModifiedTime.getTime())
+              .setLength(f.length).setIsDirectory(f.type.equals(DirectoryEntryType.DIRECTORY));
+      listBuilder.add(fileBuilder.build());
+    });
+    ImmutableList<FileMetadata> listedFiles = listBuilder.build();
+    LOGGER.debug("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), fileUri, recursive);
+    return listedFiles;
+  }
+
+  private void visitFiles(URI fileUri, boolean recursive, Consumer<DirectoryEntry> visitor)
+      throws IOException {
+    DirectoryEntry rootDir = _adlStoreClient.getDirectoryEntry(fileUri.getPath());
+    if (rootDir == null) {
+      throw new IllegalArgumentException("fileUri does not exist: " + fileUri);
+    }
+    if (!recursive) {
+      _adlStoreClient.enumerateDirectory(rootDir.fullName).forEach(visitor);
+    } else {
+      visitFilesRecursively(rootDir, visitor);
+    }
+  }
+
+  private void visitFilesRecursively(DirectoryEntry origDirEntry, Consumer<DirectoryEntry> visitor)
+      throws IOException {
+    for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(origDirEntry.fullName)) {
+      System.out.println("directoryEntry:" + directoryEntry.fullName);
+      visitor.accept(directoryEntry);
+      if (directoryEntry.type.equals(DirectoryEntryType.DIRECTORY)) {
+        visitFilesRecursively(directoryEntry, visitor);
+      }
+    }
   }
 
   @Override
