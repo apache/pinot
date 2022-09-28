@@ -69,9 +69,9 @@ public class SelectionResultsBlock extends BaseResultsBlock {
     return _rows;
   }
 
-  public SelectionResultsBlock cloneWithInnerPriorityQueue() {
+  public SelectionResultsBlock convertToPriorityQueueBased() {
     if (_rows instanceof PriorityQueue) {
-      return new SelectionResultsBlock(_dataSchema, new PriorityQueue<>(_rows));
+      return this;
     }
     if (_comparator == null) {
       throw new IllegalStateException("This instance doesn't define an order on which be sorted");
