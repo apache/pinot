@@ -16,44 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.mailbox;
+package org.apache.pinot.query.mailbox.channel;
 
-/**
- * {@link MailboxIdentifier} uniquely identify the mailbox that pairs a sender and a receiver.
- *
- * <p>It consists of the job_id and the partition key. as well as the component for a channelID.
- */
-public interface MailboxIdentifier {
+import java.util.concurrent.ArrayBlockingQueue;
 
-  /**
-   * get the job identifier.
-   * @return job identifier.
-   */
-  String getJobId();
 
-  /**
-   * get the sender host.
-   * @return sender host
-   */
-  String getFromHost();
+public class InMemoryChannel<T> {
+  private final ArrayBlockingQueue<T> _channel;
+  private final String _hostname;
+  private final int _port;
+  private boolean _completed = false;
 
-  /**
-   * get the sender port.
-   * @return sender port
-   */
-  int getFromPort();
+  public InMemoryChannel(ArrayBlockingQueue<T> channel, String hostname, int port) {
+    _channel = channel;
+    _hostname = hostname;
+    _port = port;
+  }
 
-  /**
-   * get the receiver host.
-   * @return receiver host
-   */
-  String getToHost();
+  public ArrayBlockingQueue<T> getChannel() {
+    return _channel;
+  }
 
-  /**
-   * get the receiver port.
-   * @return receiver port
-   */
-  int getToPort();
+  public void complete() {
+    _completed = true;
+  }
 
-  boolean isLocal();
+  public boolean isCompleted() {
+    return _completed;
+  }
 }

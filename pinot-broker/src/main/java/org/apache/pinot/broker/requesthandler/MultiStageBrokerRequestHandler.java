@@ -34,7 +34,6 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -45,9 +44,12 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.mailbox.InMemoryMailboxService;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
@@ -67,7 +69,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final String _reducerHostname;
   private final int _reducerPort;
 
-  private final MailboxService<Mailbox.MailboxContent> _mailboxService;
+  private final MailboxService<TransferableBlock> _mailboxService;
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
 
@@ -91,7 +93,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager(_reducerHostname, _reducerPort, routingManager));
     _queryDispatcher = new QueryDispatcher();
-    _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerPort, config);
+    _mailboxService = new MultiplexingMailboxService(new GrpcMailboxService(_reducerHostname, _reducerPort, config),
+        new InMemoryMailboxService(_reducerHostname, _reducerPort));
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
