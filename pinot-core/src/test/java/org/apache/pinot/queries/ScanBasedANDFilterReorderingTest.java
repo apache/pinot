@@ -76,24 +76,19 @@ public class ScanBasedANDFilterReorderingTest {
 
   @Test
   public static class Test1 extends BaseQueriesTest {
+    protected static final String COUNT_STAR_QUERY = "SELECT SUM(column1) FROM testTable";
+    protected static final String FILTER1 = " WHERE column7 IN (2147483647, 211, 336, 363, 469, 565)"
+        + " AND column6 = 2147483647"
+        + " AND column3 <> 'L'";
+    protected static final String FILTER2 = " WHERE column7 IN (2147483647, 211, 336, 363, 469, 565)"
+        + " AND column6 = 3267"
+        + " AND column3 <> 'L'";
+    protected static final String FILTER3 = FILTER1 + " AND column1 > '50000000'";
     private static final String AVRO_DATA = "data" + File.separator + "test_data-mv.avro";
     private static final String SEGMENT_NAME = "testTable_1756015683_1756015683";
     private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "MultiValueRawQueriesTest");
     private static final String SET_AND_OPTIMIZATION = "SET "
         + CommonConstants.Broker.Request.QueryOptionKey.AND_SCAN_REORDERING + " = 'True';";
-
-    protected static final String COUNT_STAR_QUERY = "SELECT SUM(column1) FROM testTable";
-
-    protected static final String FILTER1 = " WHERE column7 IN (2147483647, 211, 336, 363, 469, 565)"
-        + " AND column6 = 2147483647"
-        + " AND column3 <> 'L'";
-
-    protected static final String FILTER2 = " WHERE column7 IN (2147483647, 211, 336, 363, 469, 565)"
-        + " AND column6 = 3267"
-        + " AND column3 <> 'L'";
-
-    protected static final String FILTER3 = FILTER1 + " AND column1 > '50000000'";
-
     private IndexSegment _indexSegment;
     // Contains 2 identical index segments.
     private List<IndexSegment> _indexSegments;
@@ -214,7 +209,7 @@ public class ScanBasedANDFilterReorderingTest {
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 0);
 
       // Test query with optimization, bitmap + scan + range
-      aggregationOperator = getOperator(  SET_AND_OPTIMIZATION + COUNT_STAR_QUERY + FILTER3);
+      aggregationOperator = getOperator(SET_AND_OPTIMIZATION + COUNT_STAR_QUERY + FILTER3);
       resultsBlock = aggregationOperator.nextBlock();
       executionStatistics = aggregationOperator.getExecutionStatistics();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 45681L, 201648L,
@@ -222,7 +217,7 @@ public class ScanBasedANDFilterReorderingTest {
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 44199078145668L);
 
       // Test query without optimization, bitmap + scan + range
-      aggregationOperator = getOperator( COUNT_STAR_QUERY + FILTER3);
+      aggregationOperator = getOperator(COUNT_STAR_QUERY + FILTER3);
       resultsBlock = aggregationOperator.nextBlock();
       executionStatistics = aggregationOperator.getExecutionStatistics();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 45681L, 276352L,
