@@ -39,7 +39,6 @@ public class HttpRequesterIdentity extends RequesterIdentity {
     HttpRequesterIdentity identity = new HttpRequesterIdentity();
     identity.setHttpHeaders(headers);
     identity.setEndpointUrl(request.getRequestURL().toString());
-
     return identity;
   }
 
