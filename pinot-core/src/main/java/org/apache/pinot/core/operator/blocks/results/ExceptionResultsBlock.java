@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
+import java.util.Collection;
+import java.util.Collections;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -33,6 +36,17 @@ public class ExceptionResultsBlock extends BaseResultsBlock {
 
   public ExceptionResultsBlock(Exception e) {
     this(QueryException.QUERY_EXECUTION_ERROR, e);
+  }
+
+  @Override
+  public DataSchema getDataSchema(QueryContext queryContext) {
+    return null;
+  }
+
+  @Override
+  public Collection<Object[]> getRows(QueryContext queryContext)
+      throws Exception {
+    return Collections.emptyList();
   }
 
   @Override

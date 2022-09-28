@@ -52,7 +52,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
   private static final String EXPLAIN_NAME = "SELECT_STREAMING_COMBINE";
 
   // Special results block to indicate that this is the last results block for an operator
-  private static final MetadataResultsBlock LAST_RESULTS_BLOCK = new MetadataResultsBlock();
+  private static final MetadataResultsBlock LAST_RESULTS_BLOCK = new MetadataResultsBlock(null);
 
   private final StreamObserver<Server.ServerResponse> _streamObserver;
   private final int _limit;
@@ -103,6 +103,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
       throws Exception {
     long numRowsCollected = 0;
     int numOperatorsFinished = 0;
+    DataSchema dataSchema = null;
     long endTimeMs = _queryContext.getEndTimeMs();
     while (numRowsCollected < _limit && numOperatorsFinished < _numOperators) {
       BaseResultsBlock resultsBlock =
@@ -123,7 +124,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
         continue;
       }
       SelectionResultsBlock selectionResultsBlock = (SelectionResultsBlock) resultsBlock;
-      DataSchema dataSchema = selectionResultsBlock.getDataSchema();
+      dataSchema = selectionResultsBlock.getDataSchema();
       Collection<Object[]> rows = selectionResultsBlock.getRows();
       assert dataSchema != null && rows != null;
       numRowsCollected += rows.size();
@@ -132,7 +133,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
       _streamObserver.onNext(StreamingResponseUtils.getDataResponse(dataTable));
     }
     // Return a metadata results block in the end
-    return new MetadataResultsBlock();
+    return new MetadataResultsBlock(dataSchema);
   }
 
   @Override

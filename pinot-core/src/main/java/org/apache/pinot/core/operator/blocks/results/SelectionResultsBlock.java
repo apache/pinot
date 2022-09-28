@@ -41,7 +41,17 @@ public class SelectionResultsBlock extends BaseResultsBlock {
     return _dataSchema;
   }
 
+  @Override
+  public DataSchema getDataSchema(QueryContext queryContext) {
+    return _dataSchema;
+  }
+
   public Collection<Object[]> getRows() {
+    return _rows;
+  }
+
+  @Override
+  public Collection<Object[]> getRows(QueryContext queryContext) {
     return _rows;
   }
 

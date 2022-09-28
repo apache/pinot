@@ -18,26 +18,71 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
-import org.apache.pinot.common.datatable.DataTable;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
  * InstanceResponseBlock is just a holder to get InstanceResponse from InstanceResponseBlock.
  */
 public class InstanceResponseBlock implements Block {
-  private final DataTable _instanceResponseDataTable;
+  private final QueryContext _queryContext;
+  private final BaseResultsBlock _baseResultsBlock;
+  private final Map<String, String> _metadata;
+  private final Map<Integer, String> _exceptionMap;
 
-  public InstanceResponseBlock(DataTable dataTable) {
-    _instanceResponseDataTable = dataTable;
+  public InstanceResponseBlock(BaseResultsBlock baseResultsBlock, QueryContext queryContext) {
+    this(baseResultsBlock, queryContext, baseResultsBlock.computeMetadata());
   }
 
-  public DataTable getInstanceResponseDataTable() {
-    return _instanceResponseDataTable;
+  public InstanceResponseBlock(BaseResultsBlock baseResultsBlock, QueryContext queryContext,
+      Map<String, String> metadata) {
+    _queryContext = queryContext;
+    _baseResultsBlock = baseResultsBlock;
+    _metadata = metadata;
+    _exceptionMap = new HashMap<>();
+  }
+
+  public InstanceResponseBlock(Map<String, String> metadata) {
+    _queryContext = null;
+    _baseResultsBlock = null;
+    _metadata = metadata;
+    _exceptionMap = new HashMap<>();
+  }
+
+  public InstanceResponseBlock() {
+    _queryContext = null;
+    _baseResultsBlock = null;
+    _metadata = new HashMap<>();
+    _exceptionMap = new HashMap<>();
+  }
+
+  public QueryContext getQueryContext() {
+    return _queryContext;
+  }
+
+  public BaseResultsBlock getBaseResultsBlock() {
+    return _baseResultsBlock;
+  }
+
+  public Map<String, String> getInstanceResponseMetadata() {
+    return _metadata;
+  }
+
+  public Map<Integer, String> getExceptionMap() {
+    return _exceptionMap;
+  }
+
+  public void addException(ProcessingException exception) {
+    _exceptionMap.put(exception.getErrorCode(), exception.getMessage());
   }
 
   @Override

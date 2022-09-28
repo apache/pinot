@@ -18,17 +18,45 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 public class MetadataResultsBlock extends BaseResultsBlock {
+  private final DataSchema _dataSchema;
+  private final List<Object[]> _rows;
+
+  public MetadataResultsBlock(DataSchema dataSchema) {
+    _dataSchema = dataSchema;
+    _rows = new ArrayList<>();
+  }
+
+  @Override
+  public DataSchema getDataSchema(QueryContext queryContext) {
+    return _dataSchema;
+  }
+
+  @Override
+  public Collection<Object[]> getRows(QueryContext queryContext)
+      throws Exception {
+    return _rows;
+  }
 
   @Override
   public DataTable getDataTable(QueryContext queryContext)
       throws Exception {
-    DataTable dataTable = DataTableBuilderUtils.getEmptyDataTable();
+    DataTable dataTable;
+    if (_dataSchema == null) {
+      dataTable = DataTableBuilderUtils.getEmptyDataTable();
+    } else {
+      dataTable = SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, false);
+    }
     attachMetadataToDataTable(dataTable);
     return dataTable;
   }

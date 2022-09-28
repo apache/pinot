@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
@@ -83,10 +85,6 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _table = table;
   }
 
-  public DataSchema getDataSchema() {
-    return _dataSchema;
-  }
-
   public AggregationGroupByResult getAggregationGroupByResult() {
     return _aggregationGroupByResult;
   }
@@ -121,6 +119,24 @@ public class GroupByResultsBlock extends BaseResultsBlock {
 
   public void setResizeTimeMs(long resizeTimeMs) {
     _resizeTimeMs = resizeTimeMs;
+  }
+
+  @Override
+  public DataSchema getDataSchema(QueryContext queryContext) {
+    return _dataSchema;
+  }
+
+  @Override
+  public Collection<Object[]> getRows(QueryContext queryContext)
+      throws Exception {
+    Preconditions.checkState(_table != null, "Cannot get DataTable from segment level results");
+    Iterator<Record> iterator = _table.iterator();
+    List<Object[]> resultRows = new ArrayList<>(_table.size());
+    while (iterator.hasNext()) {
+      Object[] values = iterator.next().getValues();
+      resultRows.add(values);
+    }
+    return resultRows;
   }
 
   @Override

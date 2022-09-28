@@ -26,6 +26,8 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.InstanceResponseUtils;
+import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingResponseUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -47,17 +49,19 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
   @Override
   protected InstanceResponseBlock getNextBlock() {
     InstanceResponseBlock nextBlock = super.getNextBlock();
-    DataTable instanceResponseDataTable = nextBlock.getInstanceResponseDataTable();
+    DataTable instanceResponseDataTable = InstanceResponseUtils.toDataTable(nextBlock);
     DataTable metadataOnlyDataTable;
     try {
       metadataOnlyDataTable = instanceResponseDataTable.toMetadataOnlyDataTable();
-      _streamObserver.onNext(StreamingResponseUtils.getDataResponse(instanceResponseDataTable.toDataOnlyDataTable()));
+      _streamObserver.onNext(StreamingResponseUtils.getDataResponse(instanceResponseDataTable));
     } catch (IOException e) {
       // when exception occurs in streaming, we return an error-only metadata block.
       metadataOnlyDataTable = DataTableBuilderUtils.getEmptyDataTable();
       metadataOnlyDataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     }
     // return a metadata-only block.
-    return new InstanceResponseBlock(metadataOnlyDataTable);
+    MetadataResultsBlock metadataResultsBlock = new MetadataResultsBlock(instanceResponseDataTable.getDataSchema());
+    // metadata result block doesn't use query context to extract out data table.
+    return new InstanceResponseBlock(metadataResultsBlock, null, metadataOnlyDataTable.getMetadata());
   }
 }

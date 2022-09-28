@@ -21,6 +21,8 @@ package org.apache.pinot.core.operator.blocks.results;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -54,11 +56,8 @@ public class AggregationResultsBlock extends BaseResultsBlock {
     return _results;
   }
 
-  @Override
-  public DataTable getDataTable(QueryContext queryContext)
-      throws Exception {
+  public DataSchema getDataSchema(QueryContext queryContext) {
     boolean returnFinalResult = queryContext.isServerReturnFinalResult();
-
     // Extract result column name and type from each aggregation function
     int numColumns = _aggregationFunctions.length;
     String[] columnNames = new String[numColumns];
@@ -69,10 +68,31 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       columnDataTypes[i] = returnFinalResult ? aggregationFunction.getFinalResultColumnType()
           : aggregationFunction.getIntermediateResultColumnType();
     }
+    return new DataSchema(columnNames, columnDataTypes);
+  }
+
+  @Override
+  public Collection<Object[]> getRows(QueryContext queryContext)
+      throws Exception {
+    int numColumns = _aggregationFunctions.length;
+
+    // Build the result.
+    Object[] result = new Object[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      result[i] = _results.get(i);
+    }
+    return Collections.singletonList(result);
+  }
+
+  @Override
+  public DataTable getDataTable(QueryContext queryContext)
+      throws Exception {
+    boolean returnFinalResult = queryContext.isServerReturnFinalResult();
+    int numColumns = _aggregationFunctions.length;
+    DataSchema dataSchema = getDataSchema(queryContext);
 
     // Build the data table.
-    DataTableBuilder dataTableBuilder =
-        DataTableBuilderFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     if (queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       for (int i = 0; i < numColumns; i++) {
@@ -82,13 +102,13 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       for (int i = 0; i < numColumns; i++) {
         Object result = _results.get(i);
         if (result == null) {
-          result = columnDataTypes[i].getNullPlaceholder();
+          result = dataSchema.getColumnDataType(i).getNullPlaceholder();
           nullBitmaps[i].add(0);
         }
         if (!returnFinalResult) {
-          setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
+          setIntermediateResult(dataTableBuilder, dataSchema.getColumnDataTypes(), i, result);
         } else {
-          setFinalResult(dataTableBuilder, columnDataTypes, i, result);
+          setFinalResult(dataTableBuilder, dataSchema.getColumnDataTypes(), i, result);
         }
       }
       dataTableBuilder.finishRow();
@@ -100,10 +120,10 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       for (int i = 0; i < numColumns; i++) {
         Object result = _results.get(i);
         if (!returnFinalResult) {
-          setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
+          setIntermediateResult(dataTableBuilder, dataSchema.getColumnDataTypes(), i, result);
         } else {
           result = _aggregationFunctions[i].extractFinalResult(result);
-          setFinalResult(dataTableBuilder, columnDataTypes, i, result);
+          setFinalResult(dataTableBuilder, dataSchema.getColumnDataTypes(), i, result);
         }
       }
       dataTableBuilder.finishRow();

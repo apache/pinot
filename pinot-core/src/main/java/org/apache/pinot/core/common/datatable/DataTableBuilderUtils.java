@@ -62,6 +62,10 @@ public class DataTableBuilderUtils {
     }
   }
 
+  public static DataTable buildEmptyDataTable() {
+    return getEmptyDataTable();
+  }
+
   /**
    * Builds an empty data table based on the broker request.
    */

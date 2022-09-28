@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.core.common.Operator;
@@ -83,7 +82,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
       ThreadTimer mainThreadTimer = new ThreadTimer();
       BaseResultsBlock resultsBlock = getCombinedResults();
-      InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(getDataTable(resultsBlock));
+      InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(resultsBlock, _queryContext);
       long mainThreadCpuTimeNs = mainThreadTimer.getThreadTimeNs();
 
       long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
@@ -99,14 +98,14 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
               numServerThreads);
 
       long threadCpuTimeNs = mainThreadCpuTimeNs + multipleThreadCpuTimeNs;
-      Map<String, String> responseMetaData = instanceResponseBlock.getInstanceResponseDataTable().getMetadata();
+      Map<String, String> responseMetaData = instanceResponseBlock.getInstanceResponseMetadata();
       responseMetaData.put(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(threadCpuTimeNs));
       responseMetaData.put(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
           String.valueOf(systemActivitiesCpuTimeNs));
 
       return instanceResponseBlock;
     } else {
-      return new InstanceResponseBlock(getDataTable(getCombinedResults()));
+      return new InstanceResponseBlock(getCombinedResults(), _queryContext);
     }
   }
 
@@ -116,14 +115,6 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
       return _combineOperator.nextBlock();
     } finally {
       releaseAll();
-    }
-  }
-
-  private DataTable getDataTable(BaseResultsBlock resultsBlock) {
-    try {
-      return resultsBlock.getDataTable(_queryContext);
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while building data table", e);
     }
   }
 
