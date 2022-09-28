@@ -16,38 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka;
+package org.apache.pinot.spi.stream;
 
-import java.nio.ByteBuffer;
-
-
-public class MessageAndOffset {
-
-  private ByteBuffer _message;
-  private long _offset;
-
-  public MessageAndOffset(byte[] message, long offset) {
-    this(ByteBuffer.wrap(message), offset);
-  }
-
-  public MessageAndOffset(ByteBuffer message, long offset) {
-    _message = message;
-    _offset = offset;
-  }
-
-  public ByteBuffer getMessage() {
-    return _message;
-  }
-
-  public long getOffset() {
-    return _offset;
-  }
-
-  public long getNextOffset() {
-    return getOffset() + 1;
-  }
-
-  public int payloadSize() {
-    return getMessage().array().length;
-  }
+/**
+ * A decoder for {@link StreamMessage}
+ */
+public interface StreamDataDecoder {
+  /**
+   * Decodes a {@link StreamMessage}
+   *
+   * Please note that the expectation is that the implementations of this class should never throw an exception.
+   * Instead, it should encapsulate the exception within the {@link StreamDataDecoderResult} object.
+   *
+   * @param message {@link StreamMessage} that contains the data payload and optionally, a key and row metadata
+   * @return {@link StreamDataDecoderResult} that either contains the decoded row or the exception
+   */
+  StreamDataDecoderResult decode(StreamMessage message);
 }

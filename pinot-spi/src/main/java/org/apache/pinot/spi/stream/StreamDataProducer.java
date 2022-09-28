@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
@@ -34,6 +35,10 @@ public interface StreamDataProducer {
 
   void produce(String topic, byte[] key, byte[] payload);
 
+  default void produce(String topic, byte[] key, byte[] payload, GenericRow headers) {
+    produce(topic, key, payload);
+  }
+
   void close();
 
   /**
@@ -43,7 +48,7 @@ public interface StreamDataProducer {
    * @param rows the rows
    */
   default void produceBatch(String topic, List<byte[]> rows) {
-    for (byte[] row: rows) {
+    for (byte[] row : rows) {
       produce(topic, row);
     }
   }
@@ -54,20 +59,30 @@ public interface StreamDataProducer {
    * @param topic the topic of the output
    * @param payloadWithKey the payload rows with key
    */
-  default void produceKeyedBatch(String topic, List<RowWithKey> payloadWithKey) {
-    for (RowWithKey rowWithKey: payloadWithKey) {
+  default void produceKeyedBatch(String topic, List<RowWithKey> payloadWithKey, boolean includeHeaders) {
+    for (RowWithKey rowWithKey : payloadWithKey) {
       if (rowWithKey.getKey() == null) {
         produce(topic, rowWithKey.getPayload());
       } else {
-        produce(topic, rowWithKey.getKey(), rowWithKey.getPayload());
+        if (includeHeaders) {
+          GenericRow header = new GenericRow();
+          header.putValue("header1", System.currentTimeMillis());
+          produce(topic, rowWithKey.getKey(), rowWithKey.getPayload(), header);
+        } else {
+          produce(topic, rowWithKey.getKey(), rowWithKey.getPayload());
+        }
       }
     }
   }
 
-  /**
-   * Helper class so the key and payload can be easily tied together instead of using a pair
-   * The class is intended for StreamDataProducer only
-   */
+  default void produceKeyedBatch(String topic, List<RowWithKey> payloadWithKey) {
+    produceKeyedBatch(topic, payloadWithKey, false);
+  }
+
+    /**
+     * Helper class so the key and payload can be easily tied together instead of using a pair
+     * The class is intended for StreamDataProducer only
+     */
   class RowWithKey {
     private final byte[] _key;
     private final byte[] _payload;

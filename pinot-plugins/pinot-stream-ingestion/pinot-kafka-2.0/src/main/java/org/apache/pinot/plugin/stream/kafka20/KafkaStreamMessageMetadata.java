@@ -18,25 +18,18 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import java.nio.ByteBuffer;
-import org.apache.pinot.plugin.stream.kafka.MessageAndOffset;
-import org.apache.pinot.spi.stream.RowMetadata;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
-public class MessageAndOffsetAndMetadata extends MessageAndOffset {
-  private final RowMetadata _rowMetadata;
+public class KafkaStreamMessageMetadata extends StreamMessageMetadata {
+  public static final String METADATA_OFFSET_KEY = "offset";
+  public static final String RECORD_TIMESTAMP_KEY = "recordTimestamp";
 
-  public MessageAndOffsetAndMetadata(byte[] message, long offset, RowMetadata rowMetadata) {
-    super(message, offset);
-    _rowMetadata = rowMetadata;
-  }
-
-  public MessageAndOffsetAndMetadata(ByteBuffer message, long offset, RowMetadata rowMetadata) {
-    super(message, offset);
-    _rowMetadata = rowMetadata;
-  }
-
-  public RowMetadata getRowMetadata() {
-    return _rowMetadata;
+  public KafkaStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
+      Map<String, String> metadata) {
+    super(recordIngestionTimeMs, headers, metadata);
   }
 }

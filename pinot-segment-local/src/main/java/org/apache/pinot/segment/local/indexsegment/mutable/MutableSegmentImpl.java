@@ -543,7 +543,7 @@ public class MutableSegmentImpl implements MutableSegment {
     // Update last indexed time and latest ingestion time
     _lastIndexedTimeMs = System.currentTimeMillis();
     if (rowMetadata != null) {
-      _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getIngestionTimeMs());
+      _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getRecordIngestionTimeMs());
     }
 
     return canTakeMore;

@@ -18,16 +18,21 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.pinot.spi.stream.RowMetadata;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
-@FunctionalInterface
-public interface RowMetadataExtractor {
-  static RowMetadataExtractor build(boolean populateMetadata) {
-    return populateMetadata ? record -> new StreamMessageMetadata(record.timestamp()) : record -> null;
+public class KafkaStreamMessage extends StreamMessage {
+  public KafkaStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
+    super(key, value, metadata);
   }
 
-  RowMetadata extract(ConsumerRecord<?, ?> consumerRecord);
+  public long getNextOffset() {
+    if (_metadata != null) {
+      long offset = Long.parseLong(_metadata.getRecordMetadata().get(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY));
+      return offset < 0 ? -1 : offset + 1;
+    }
+    return -1;
+  }
 }
