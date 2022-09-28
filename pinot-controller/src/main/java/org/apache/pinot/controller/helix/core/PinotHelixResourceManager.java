@@ -1285,8 +1285,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void updateSchemaDateTime(TableConfig tableConfig, Schema schema)
-      throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
+  public void updateSegmentsZKTimeInterval(TableConfig tableConfig, Schema schema) {
     String schemaName = schema.getSchemaName();
     LOGGER.info("Updating segment zookeeper time interval metadata: {}", schemaName);
 
@@ -1294,7 +1293,7 @@ public class PinotHelixResourceManager {
     List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
     for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       int version = segmentZKMetadata.toZNRecord().getVersion();
-      updateSegmentInterval(tableConfig, segmentZKMetadata, schema);
+      updateZkTimeInterval(tableConfig, segmentZKMetadata, schema);
       updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
     }
   }
@@ -2280,14 +2279,14 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void updateSegmentInterval(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata,
+  public void updateZkTimeInterval(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata,
       Schema newSchema) {
     String segmentName = segmentZKMetadata.getSegmentName();
 
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     if (StringUtils.isNotEmpty(timeColumnName)) {
       DateTimeFieldSpec dateTimeFieldSpec = newSchema.getDateTimeSpec(timeColumnName);
-      ZKMetadataUtils.updateSegmentZKMetadataInterval(segmentZKMetadata, dateTimeFieldSpec);
+      ZKMetadataUtils.updateSegmentZKTimeInterval(segmentZKMetadata, dateTimeFieldSpec);
       LOGGER.info("Updated segment zookeeper metadata: {} of table: {}", segmentName, tableConfig.getTableName());
     }
   }

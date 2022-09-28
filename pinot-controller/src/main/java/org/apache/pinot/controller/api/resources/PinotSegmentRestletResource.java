@@ -1063,33 +1063,26 @@ public class PinotSegmentRestletResource {
 
   /**
    * Internal method to update schema
-   * @param tableName  name of the table
+   * @param tableNameWithType  name of the table
    * @return
    */
-  private SuccessResponse updateZKTimeIntervalInternal(String tableName) {
+  private SuccessResponse updateZKTimeIntervalInternal(String tableNameWithType) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
 
-    try {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
-      if (tableConfig == null) {
-        throw new ControllerApplicationException(LOGGER,
-            String.format("No table config found for table %s", tableName), Response.Status.INTERNAL_SERVER_ERROR);
-      }
-
-      Schema tableSchema = _pinotHelixResourceManager.getTableSchema(tableName);
-      if (tableSchema == null) {
-        throw new ControllerApplicationException(LOGGER,
-            String.format("No schema found for table %s", tableName), Response.Status.INTERNAL_SERVER_ERROR);
-      }
+      Schema tableSchema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+      Preconditions.checkState(tableSchema != null, "Failed to find schema for table: {}", tableNameWithType);
 
       String schemaName = tableSchema.getSchemaName();
-      _pinotHelixResourceManager.updateSchemaDateTime(tableConfig, tableSchema);
+      try {
+        _pinotHelixResourceManager.updateSegmentsZKTimeInterval(tableConfig, tableSchema);
+      } catch (Exception e) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Failed to update time interval zk metadata for table %s, exception: %s", tableNameWithType,
+                e.getMessage()), Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
-      return new SuccessResponse("Successfully updated time interval zk metadata for table: " + tableName);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to update time interval zk metadata for table %s, exception: %s",
-              tableName, e.getMessage()), Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
+      return new SuccessResponse("Successfully updated time interval zk metadata for table: " + tableNameWithType);
   }
 }

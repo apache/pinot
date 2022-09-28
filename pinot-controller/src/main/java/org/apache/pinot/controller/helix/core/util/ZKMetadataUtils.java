@@ -60,7 +60,7 @@ public class ZKMetadataUtils {
         segmentSizeInBytes, false);
   }
 
-  public static void updateSegmentZKMetadataInterval(SegmentZKMetadata segmentZKMetadata,
+  public static void updateSegmentZKTimeInterval(SegmentZKMetadata segmentZKMetadata,
       DateTimeFieldSpec dateTimeFieldSpec) {
     String startTimeString = segmentZKMetadata.getRawStartTime();
     if (StringUtils.isNotEmpty(startTimeString)) {

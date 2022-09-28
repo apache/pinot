@@ -350,7 +350,8 @@ public class PinotHelixResourceManagerTest {
     schemaBuilder.addDateTime("timestamp", FieldSpec.DataType.STRING, "SIMPLE_DATE_FORMAT|yyyy-MM-dd'T'HH:mm:ss.SSS",
         "1:MILLISECONDS");
 
-    TEST_INSTANCE.getHelixResourceManager().updateSchemaDateTime(tableConfigBuilder.build(), schemaBuilder.build());
+    TEST_INSTANCE.getHelixResourceManager()
+        .updateSegmentsZKTimeInterval(tableConfigBuilder.build(), schemaBuilder.build());
     retrievedSegmentZKMetadataList =
         TEST_INSTANCE.getHelixResourceManager().getSegmentsZKMetadata(OFFLINE_SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME);
     retrievedSegmentZKMetadata = retrievedSegmentZKMetadataList.get(0);
