@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.query;
+package org.apache.pinot.core.query.utils;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
