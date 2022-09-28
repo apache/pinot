@@ -184,7 +184,7 @@ public class ScanBasedANDFilterReorderingTest {
       return _indexSegments;
     }
 
-    public void testMultiValueAggregationOnly() {
+    public void testScanBasedANDFilterReorderingOptimization1() {
       // Test query with optimization
       AggregationOperator aggregationOperator = getOperator(SET_AND_OPTIMIZATION + COUNT_STAR_QUERY + FILTER1);
       AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
