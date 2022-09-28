@@ -122,8 +122,8 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
           if (!receivingMailbox.isClosed()) {
             hasOpenedMailbox = true;
             TransferableBlock transferableBlock = receivingMailbox.receive();
-            if (transferableBlock != null) {
-              // here we only return data table block when it is not empty.
+            if (transferableBlock != null && !transferableBlock.isEndOfStreamBlock()) {
+              // Return the block only if it has some valid data
               return transferableBlock;
             }
           }

@@ -104,9 +104,6 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
       if (dataBlock instanceof MetadataBlock && !dataBlock.getExceptions().isEmpty()) {
         return TransferableBlockUtils.getErrorTransferableBlock(dataBlock.getExceptions());
       }
-      if (dataBlock.getNumberOfRows() == 0) {
-        return null;
-      }
       return new TransferableBlock(dataBlock);
     }
     return null;

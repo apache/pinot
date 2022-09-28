@@ -33,12 +33,14 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
 
   @Override
   public void start() {
-
+    _grpcMailboxService.start();
+    _inMemoryMailboxService.start();
   }
 
   @Override
   public void shutdown() {
-
+    _grpcMailboxService.shutdown();
+    _inMemoryMailboxService.shutdown();
   }
 
   @Override
