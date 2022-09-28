@@ -20,9 +20,9 @@ package org.apache.pinot.queries;
 
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.testng.annotations.Test;
 
 
@@ -95,7 +95,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testSmallAggregationGroupBy() {
     // Test query without filter.
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(AGGREGATION_QUERY + SMALL_GROUP_BY);
+    GroupByOperator groupByOperator = getOperator(AGGREGATION_QUERY + SMALL_GROUP_BY);
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 150000L,
         30000L);
@@ -114,7 +114,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testMediumAggregationGroupBy() {
     // Test query without filter.
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(AGGREGATION_QUERY + MEDIUM_GROUP_BY);
+    GroupByOperator groupByOperator = getOperator(AGGREGATION_QUERY + MEDIUM_GROUP_BY);
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 210000L,
         30000L);
@@ -134,7 +134,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testLargeAggregationGroupBy() {
     // Test query without filter.
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(AGGREGATION_QUERY + LARGE_GROUP_BY);
+    GroupByOperator groupByOperator = getOperator(AGGREGATION_QUERY + LARGE_GROUP_BY);
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 210000L,
         30000L);
@@ -155,7 +155,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testVeryLargeAggregationGroupBy() {
     // Test query without filter.
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(AGGREGATION_QUERY + VERY_LARGE_GROUP_BY);
+    GroupByOperator groupByOperator = getOperator(AGGREGATION_QUERY + VERY_LARGE_GROUP_BY);
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 270000L,
         30000L);

@@ -29,8 +29,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.utils.idset.BloomFilterIdSet;
@@ -354,7 +354,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
 
     // Inner segment
     {
-      AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+      GroupByOperator groupByOperator = getOperator(query);
       GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
           11 * NUM_RECORDS, NUM_RECORDS);

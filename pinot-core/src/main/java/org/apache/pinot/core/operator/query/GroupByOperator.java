@@ -41,12 +41,11 @@ import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
- * The <code>AggregationGroupByOrderByOperator</code> class provides the operator for aggregation group-by query on a
- * single segment.
+ * The <code>GroupByOperator</code> class provides the operator for group-by query on a single segment.
  */
 @SuppressWarnings("rawtypes")
-public class AggregationGroupByOrderByOperator extends BaseOperator<GroupByResultsBlock> {
-  private static final String EXPLAIN_NAME = "AGGREGATE_GROUPBY_ORDERBY";
+public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
+  private static final String EXPLAIN_NAME = "GROUP_BY";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
@@ -58,9 +57,8 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<GroupByResul
 
   private int _numDocsScanned = 0;
 
-  public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
-      ExpressionContext[] groupByExpressions, TransformOperator transformOperator, long numTotalDocs,
-      QueryContext queryContext, boolean useStarTree) {
+  public GroupByOperator(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
+      TransformOperator transformOperator, long numTotalDocs, QueryContext queryContext, boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
     _transformOperator = transformOperator;

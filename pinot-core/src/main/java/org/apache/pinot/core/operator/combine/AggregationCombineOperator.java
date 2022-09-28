@@ -27,13 +27,13 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
- * Combine operator for aggregation only queries.
+ * Combine operator for aggregation queries.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class AggregationOnlyCombineOperator extends BaseCombineOperator<AggregationResultsBlock> {
+public class AggregationCombineOperator extends BaseCombineOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "COMBINE_AGGREGATE";
 
-  public AggregationOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
+  public AggregationCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
     super(operators, queryContext, executorService);
   }

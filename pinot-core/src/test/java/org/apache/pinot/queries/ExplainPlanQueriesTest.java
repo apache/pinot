@@ -1109,17 +1109,19 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
             + "TEXT_MATCH(textIndexCol1, 'foo') GROUP BY noIndexCol1, noIndexCol2";
     List<Object[]> result1 = new ArrayList<>();
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
-    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
-    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
-        ExplainPlanRows.PLAN_START_IDS});
+    result1.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
     result1.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min"
-            + "(noIndexCol3))", 3, 2});
+        "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
+    });
+    result1.add(new Object[]{
+        "GROUP_BY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min(noIndexCol3))", 3, 2
+    });
     result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
-    result1.add(new Object[]{"FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match"
-        + "(textIndexCol1,'foo'))", 7, 6});
+    result1.add(new Object[]{
+        "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,'foo'))", 7, 6
+    });
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
     String query2 =
@@ -1128,17 +1130,19 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
             + "(noIndexCol2)";
     List<Object[]> result2 = new ArrayList<>();
     result2.add(new Object[]{"BROKER_REDUCE(sort:[noIndexCol1 ASC, max(noIndexCol2) ASC],limit:10)", 1, 0});
-    result2.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
-    result2.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
-        ExplainPlanRows.PLAN_START_IDS});
+    result2.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
     result2.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min"
-            + "(noIndexCol3))", 3, 2});
+        "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
+    });
+    result2.add(new Object[]{
+        "GROUP_BY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min(noIndexCol3))", 3, 2
+    });
     result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 4, 3});
     result2.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result2.add(new Object[]{"DOC_ID_SET", 6, 5});
-    result2.add(new Object[]{"FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match"
-        + "(textIndexCol1,'foo'))", 7, 6});
+    result2.add(new Object[]{
+        "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,'foo'))", 7, 6
+    });
     check(query2, new ResultTable(DATA_SCHEMA, result2));
   }
 
@@ -1151,11 +1155,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
             + "noIndexCol2";
     List<Object[]> result1 = new ArrayList<>();
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
-    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
+    result1.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
     result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result1.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min"
+        "GROUP_BY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min"
             + "(noIndexCol3))", 3, 2});
     result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
@@ -1170,11 +1174,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
             + "noIndexCol1, noIndexCol2 ORDER BY noIndexCol1, max(noIndexCol2)";
     List<Object[]> result2 = new ArrayList<>();
     result2.add(new Object[]{"BROKER_REDUCE(sort:[noIndexCol1 ASC, max(noIndexCol2) ASC],limit:10)", 1, 0});
-    result2.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
+    result2.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
     result2.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result2.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min"
+        "GROUP_BY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min"
             + "(noIndexCol3))", 3, 2});
     result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 4, 3});
     result2.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
@@ -1744,11 +1748,13 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
             + "WHERE noIndexCol1 < 3 GROUP BY noIndexCol2";
     List<Object[]> result1 = new ArrayList<>();
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
-    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
-    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
-        ExplainPlanRows.PLAN_START_IDS});
-    result1.add(new Object[]{"AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1,"
-        + "noIndexCol2)), min(noIndexCol3))", 3, 2});
+    result1.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
+    result1.add(new Object[]{
+        "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
+    });
+    result1.add(new Object[]{
+        "GROUP_BY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1,noIndexCol2)), min(noIndexCol3))", 3, 2
+    });
     result1.add(new Object[]{"TRANSFORM(add(noIndexCol1,noIndexCol2), noIndexCol2, noIndexCol3)", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
@@ -1765,14 +1771,17 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
             + "min(noIndexCol3) FROM testTable WHERE noIndexCol1 < 3 GROUP BY noIndexCol2";
     List<Object[]> result1 = new ArrayList<>();
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
-    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
-    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
-        ExplainPlanRows.PLAN_START_IDS});
+    result1.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
+    result1.add(new Object[]{
+        "PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
+    });
     result1.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
-    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
-        ExplainPlanRows.PLAN_START_IDS});
-    result1.add(new Object[]{"AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1,"
-        + "noIndexCol2)), min(noIndexCol3))", 3, 2});
+    result1.add(new Object[]{
+        "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
+    });
+    result1.add(new Object[]{
+        "GROUP_BY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1," + "noIndexCol2)), min(noIndexCol3))", 3, 2
+    });
     result1.add(new Object[]{"TRANSFORM(add(noIndexCol1,noIndexCol2), noIndexCol2, noIndexCol3)", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
@@ -2166,11 +2175,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         + "invertedIndexCol2 = 1 GROUP BY noIndexCol1";
     List<Object[]> result1 = new ArrayList<>();
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
-    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
+    result1.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
     result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result1.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, aggregations:max(noIndexCol2), min(noIndexCol3)"
+        "GROUP_BY(groupKeys:noIndexCol1, aggregations:max(noIndexCol2), min(noIndexCol3)"
             + ")", 3, 2});
     result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
@@ -2188,11 +2197,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         + "min(noIndexCol3) FROM testTable WHERE invertedIndexCol2 = 1 GROUP BY noIndexCol1";
     List<Object[]> result1 = new ArrayList<>();
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
-    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
+    result1.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
     result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result1.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, aggregations:max(noIndexCol2), min(noIndexCol3)"
+        "GROUP_BY(groupKeys:noIndexCol1, aggregations:max(noIndexCol2), min(noIndexCol3)"
             + ")", 3, 2});
     result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
@@ -2213,10 +2222,10 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result1 = new ArrayList<>();
     result1.add(
         new Object[]{"BROKER_REDUCE(sort:[noIndexCol1 ASC, concat(invertedIndexCol3,'test','-') ASC],limit:10)", 1, 0});
-    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
+    result1.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
     result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
-    result1.add(new Object[]{"AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, concat(invertedIndexCol3,'test','-'), "
+    result1.add(new Object[]{"GROUP_BY(groupKeys:noIndexCol1, concat(invertedIndexCol3,'test','-'), "
         + "aggregations:count(*))", 3, 2});
     result1.add(new Object[]{"TRANSFORM(concat(invertedIndexCol3,'test','-'), noIndexCol1)", 4, 3});
     result1.add(new Object[]{"PROJECT(invertedIndexCol3, noIndexCol1)", 5, 4});
@@ -2237,17 +2246,19 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result1 = new ArrayList<>();
     result1.add(
         new Object[]{"BROKER_REDUCE(sort:[noIndexCol1 ASC, concat(invertedIndexCol3,'test','-') ASC],limit:10)", 1, 0});
-    result1.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
-    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
-        ExplainPlanRows.PLAN_START_IDS});
-    result1.add(new Object[]{"AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol1, concat(invertedIndexCol3,'test','-'), "
-        + "aggregations:count(*))", 3, 2});
+    result1.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
+    result1.add(new Object[]{
+        "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
+    });
+    result1.add(new Object[]{
+        "GROUP_BY(groupKeys:noIndexCol1, concat(invertedIndexCol3,'test','-'), " + "aggregations:count(*))", 3, 2
+    });
     result1.add(new Object[]{"TRANSFORM(concat(invertedIndexCol3,'test','-'), noIndexCol1)", 4, 3});
     result1.add(new Object[]{"PROJECT(invertedIndexCol3, noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{
-        "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:NOT_EQ,predicate:invertedIndexCol2 !="
-            + " '1')", 7, 6});
+        "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:NOT_EQ,predicate:invertedIndexCol2 != '1')", 7, 6
+    });
     check(query1, new ResultTable(DATA_SCHEMA, result1));
   }
 
@@ -2259,18 +2270,19 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result = new ArrayList<>();
     result.add(
         new Object[]{"BROKER_REDUCE(havingFilter:max(noIndexCol1) > '2',sort:[max(noIndexCol1) DESC],limit:10)", 1, 0});
-    result.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
-    result.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
-        ExplainPlanRows.PLAN_START_IDS});
+    result.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
     result.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol3, aggregations:max(noIndexCol1), min(noIndexCol2)"
-            + ")", 3, 2});
+        "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
+    });
+    result.add(new Object[]{
+        "GROUP_BY(groupKeys:noIndexCol3, aggregations:max(noIndexCol1), min(noIndexCol2))", 3, 2
+    });
     result.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 4, 3});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result.add(new Object[]{"DOC_ID_SET", 6, 5});
-    result.add(
-        new Object[]{"FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '1')",
-            7, 6});
+    result.add(new Object[]{
+        "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '1')", 7, 6
+    });
     check(query, new ResultTable(DATA_SCHEMA, result));
   }
 
@@ -2283,18 +2295,19 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result = new ArrayList<>();
     result.add(
         new Object[]{"BROKER_REDUCE(havingFilter:max(noIndexCol1) > '2',sort:[max(noIndexCol1) DESC],limit:10)", 1, 0});
-    result.add(new Object[]{"COMBINE_GROUPBY_ORDERBY", 2, 1});
-    result.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
-        ExplainPlanRows.PLAN_START_IDS});
+    result.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
     result.add(new Object[]{
-        "AGGREGATE_GROUPBY_ORDERBY(groupKeys:noIndexCol3, aggregations:max(noIndexCol1), min(noIndexCol2)"
-            + ")", 3, 2});
+        "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
+    });
+    result.add(new Object[]{
+        "GROUP_BY(groupKeys:noIndexCol3, aggregations:max(noIndexCol1), min(noIndexCol2)" + ")", 3, 2
+    });
     result.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol1, noIndexCol2, noIndexCol3)", 4, 3});
     result.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result.add(new Object[]{"DOC_ID_SET", 6, 5});
-    result.add(
-        new Object[]{"FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '1')",
-            7, 6});
+    result.add(new Object[]{
+        "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '1')", 7, 6
+    });
     check(query, new ResultTable(DATA_SCHEMA, result));
   }
 

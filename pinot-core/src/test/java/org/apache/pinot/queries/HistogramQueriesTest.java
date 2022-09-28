@@ -30,8 +30,8 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -213,8 +213,8 @@ public class HistogramQueriesTest extends BaseQueriesTest {
 
     // Inner segment
     Object operator = getOperator(query);
-    assertTrue(operator instanceof AggregationGroupByOrderByOperator);
-    GroupByResultsBlock resultsBlock = ((AggregationGroupByOrderByOperator) operator).nextBlock();
+    assertTrue(operator instanceof GroupByOperator);
+    GroupByResultsBlock resultsBlock = ((GroupByOperator) operator).nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();

@@ -28,8 +28,8 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -178,7 +178,7 @@ public class CastQueriesTest extends BaseQueriesTest {
         + "cast(sum(" + Y_COL + ") as int) "
         + "from " + RAW_TABLE_NAME + " "
         + "group by " + CLASSIFICATION_COLUMN;
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    GroupByOperator groupByOperator = getOperator(query);
     AggregationGroupByResult result = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(result);
     Iterator<GroupKeyGenerator.GroupKey> it = result.getGroupKeyIterator();
