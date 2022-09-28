@@ -96,7 +96,7 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
         }
         // then try to add the best rows from previous block
         Iterator<Object[]> localBestRowIt = localBestRows.iterator();
-        while (localBestRowIt.hasNext() && !(newPartition && listBuilder.sortedSize() >= _numRowsToKeep)) {
+        while (localBestRowIt.hasNext() && !newPartition && listBuilder.sortedSize() < _numRowsToKeep) {
           newPartition = listBuilder.add(localBestRowIt.next());
         }
         // finally update bestRowsFromPrevBloc
