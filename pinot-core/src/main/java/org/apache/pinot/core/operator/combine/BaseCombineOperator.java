@@ -169,19 +169,19 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         }
       }
 
-      T resultBlock;
+      T resultsBlock;
       try {
-        resultBlock = ((T) operatorBlock);
+        resultsBlock = ((T) operatorBlock);
       } catch (ClassCastException ex) {
-        resultBlock = convertToMergeableBlock(operatorBlock);
+        resultsBlock = convertToMergeableBlock(operatorBlock);
       }
 
-      if (isQuerySatisfied(resultBlock)) {
+      if (isQuerySatisfied(resultsBlock)) {
         // Query is satisfied, skip processing the remaining segments
-        _blockingQueue.offer(resultBlock);
+        _blockingQueue.offer(resultsBlock);
         return;
       } else {
-        _blockingQueue.offer(resultBlock);
+        _blockingQueue.offer(resultsBlock);
       }
     }
   }
