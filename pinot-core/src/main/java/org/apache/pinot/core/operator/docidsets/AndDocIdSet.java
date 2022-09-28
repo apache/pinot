@@ -96,7 +96,7 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
     // ExpressionScanDocIdIterator in the end.
     // TODO: 1. remainingDocIdIterators currently doesn't report cardinality; therefore, right now it cannot be
     //          prioritized even if it provides high effective cardinality, one way to do this is to let AND/OR
-    //          DocIdIterators pass up cardinality for the sort to happen recursively for nested AND OR predicates
+    //          DocIdIterators bubble up cardinality for the sort to happen recursively for nested AND OR predicates
     //       2. range eval currently doesn't report effective cardinality but theoretically it can at least for the
     //          dictionary backed column
     if (_cardinalityBasedRankingForScan) {
