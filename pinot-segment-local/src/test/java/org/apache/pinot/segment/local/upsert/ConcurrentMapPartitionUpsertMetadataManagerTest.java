@@ -63,7 +63,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private void verifyAddReplaceRemoveSegment(HashFunction hashFunction) {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            "timeCol", hashFunction, null, mock(ServerMetrics.class));
+            "timeCol", hashFunction, null, false, null, mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -233,7 +233,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private void verifyAddRecord(HashFunction hashFunction) {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            "timeCol", hashFunction, null, mock(ServerMetrics.class));
+            "timeCol", hashFunction, null, false, null, mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment

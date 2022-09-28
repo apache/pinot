@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.concurrent.ThreadSafe;
@@ -38,6 +39,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected String _comparisonColumn;
   protected HashFunction _hashFunction;
   protected PartialUpsertHandler _partialUpsertHandler;
+  protected boolean _snapshotEnabled;
+  protected File _indexDir;
   protected ServerMetrics _serverMetrics;
 
   @Override
@@ -69,11 +72,19 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
               _comparisonColumn);
     }
 
+    _snapshotEnabled = upsertConfig.isSnapshotEnabled();
+    _indexDir = tableDataManager.getTableDataDir();
+
     _serverMetrics = serverMetrics;
   }
 
   @Override
   public UpsertConfig.Mode getUpsertMode() {
     return _partialUpsertHandler == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
+  }
+
+  @Override
+  public boolean isSnapshotEnabled() {
+    return _snapshotEnabled;
   }
 }

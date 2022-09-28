@@ -19,12 +19,17 @@
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
@@ -34,6 +39,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -42,8 +48,12 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -244,5 +254,56 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     } catch (Exception e) {
       throw new RuntimeException("Failed to use PinotSegmentRecordReader to read value from immutable segment");
     }
+  }
+
+  @Nullable
+  public ImmutableRoaringBitmap loadValidDocIdsSnapshot(File indexDir, SegmentMetadataImpl segmentMetadata) {
+    Preconditions.checkNotNull(indexDir, "IndexDir for %s should not be null. ", segmentMetadata.getName());
+    File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+    String validDocIdsFileName = segmentMetadata.getName() + V1Constants.Indexes.VALID_DOCS_FILE_EXTENSION;
+    File validDocIdsFile = new File(segmentDirectory, validDocIdsFileName);
+    MutableRoaringBitmap validDocIdsSnapshot;
+
+    try {
+      PinotDataBuffer dataBuffer;
+      dataBuffer = PinotDataBuffer.mapFile(validDocIdsFile, true, 0, validDocIdsFile.length(), ByteOrder.LITTLE_ENDIAN,
+          "Valid Doc Snapshot data buffer");
+
+      if (!validDocIdsFile.exists()) {
+        validDocIdsSnapshot = new MutableRoaringBitmap();
+      } else {
+        validDocIdsSnapshot = new ImmutableRoaringBitmap(
+            dataBuffer.toDirectByteBuffer(0, (int) dataBuffer.size())).toMutableRoaringBitmap();
+      }
+      dataBuffer.close();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load validDocIdsSnapshot");
+    }
+    return validDocIdsSnapshot;
+  }
+
+  public void persistValidDocIdsSnapshot(File indexDir, MutableRoaringBitmap validDocIdsSnapshot, String segmentName) {
+    Preconditions.checkNotNull(indexDir, "IndexDir for %s should not be null. ", segmentName);
+    File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+    File validDocIdsSnapshotFile = new File(segmentDir, segmentName + V1Constants.Indexes.VALID_DOCS_FILE_EXTENSION);
+
+    try {
+      // Create valid doc snapshot file only if the bitmap is not empty
+      if (!validDocIdsSnapshot.isEmpty()) {
+        try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(validDocIdsSnapshotFile))) {
+          validDocIdsSnapshot.serialize(outputStream);
+        }
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to persist validDocIdsSnapshot");
+    }
+  }
+
+  public void deleteValidDocIdsSnapshot(File indexDir, String segmentName) {
+    Preconditions.checkNotNull(indexDir, "IndexDir for %s should not be null. ", segmentName);
+    File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+    String validDocIdsFileName = segmentName + V1Constants.Indexes.VALID_DOCS_FILE_EXTENSION;
+    File validDocIdsFile = new File(segmentDirectory, validDocIdsFileName);
+    FileUtils.deleteQuietly(validDocIdsFile);
   }
 }

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.spi.index.mutable;
 
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -51,6 +53,13 @@ public class ThreadSafeMutableRoaringBitmap {
   public synchronized void replace(int oldDocId, int newDocId) {
     _mutableRoaringBitmap.remove(oldDocId);
     _mutableRoaringBitmap.add(newDocId);
+  }
+
+  public synchronized void copy(ImmutableRoaringBitmap immutableRoaringBitmap) {
+    PeekableIntIterator intIterator = immutableRoaringBitmap.getIntIterator();
+    while (intIterator.hasNext()) {
+      _mutableRoaringBitmap.add(intIterator.next());
+    }
   }
 
   public synchronized MutableRoaringBitmap getMutableRoaringBitmap() {

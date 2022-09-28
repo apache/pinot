@@ -49,6 +49,7 @@ public class V1Constants {
     public static final String H3_INDEX_FILE_EXTENSION = ".h3.idx";
     public static final String BLOOM_FILTER_FILE_EXTENSION = ".bloom";
     public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
+    public static final String VALID_DOCS_FILE_EXTENSION = ".bitmap.validdocs";
     public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
     public static final String LUCENE_TEXT_INDEX_FILE_EXTENSION = ".lucene.index";
   }

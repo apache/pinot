@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -39,6 +40,9 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +58,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final String _comparisonColumn;
   protected final HashFunction _hashFunction;
   protected final PartialUpsertHandler _partialUpsertHandler;
+  protected final File _indexDir;
+  protected boolean _snapshotEnabled;
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
 
@@ -65,13 +71,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, String comparisonColumn, HashFunction hashFunction,
-      @Nullable PartialUpsertHandler partialUpsertHandler, ServerMetrics serverMetrics) {
+      @Nullable PartialUpsertHandler partialUpsertHandler, boolean snapshotEnabled, File indexDir,
+      ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
     _comparisonColumn = comparisonColumn;
     _hashFunction = hashFunction;
     _partialUpsertHandler = partialUpsertHandler;
+    _snapshotEnabled = snapshotEnabled;
+    _indexDir = indexDir;
     _serverMetrics = serverMetrics;
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
   }
@@ -83,7 +92,46 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   @Override
   public void addSegment(ImmutableSegment segment) {
-    addSegment(segment, null, null);
+    if (_snapshotEnabled) {
+      ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+      ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+      ImmutableRoaringBitmap validDocIdsSnapshot =
+          immutableSegment.loadValidDocIdsSnapshot(_indexDir, immutableSegment.getSegmentMetadata());
+      int numTotalDocs = validDocIdsSnapshot != null ? validDocIdsSnapshot.getCardinality()
+          : segment.getSegmentMetadata().getTotalDocs();
+      Iterator<RecordInfo> recordInfoIterator = new Iterator<RecordInfo>() {
+        private int _incId = 0;
+        private Iterator<Integer> _docIdIterator = validDocIdsSnapshot != null ? validDocIdsSnapshot.iterator() : null;
+
+        @Override
+        public boolean hasNext() {
+          return _incId < numTotalDocs && _docIdIterator.hasNext();
+        }
+
+        @Override
+        public RecordInfo next() {
+          int docId;
+          if (_docIdIterator != null) {
+            docId = _docIdIterator.next();
+          } else {
+            docId = _incId;
+          }
+          PrimaryKey primaryKey = new PrimaryKey(new Object[_primaryKeyColumns.size()]);
+          UpsertUtils.getPrimaryKey(segment, _primaryKeyColumns, docId, primaryKey);
+
+          Object comparisonValue = segment.getValue(docId, _comparisonColumn);
+          if (comparisonValue instanceof byte[]) {
+            comparisonValue = new ByteArray((byte[]) comparisonValue);
+          }
+          return new RecordInfo(primaryKey, _incId++, (Comparable) comparisonValue);
+        }
+      };
+
+      validDocIds.copy(validDocIdsSnapshot);
+      addSegment(segment, validDocIds, recordInfoIterator);
+    } else {
+      addSegment(segment, null, null);
+    }
   }
 
   @VisibleForTesting

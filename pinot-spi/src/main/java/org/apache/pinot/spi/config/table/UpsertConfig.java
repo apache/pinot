@@ -60,6 +60,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Custom configs for upsert metadata manager")
   private Map<String, String> _metadataManagerConfigs;
 
+  @JsonPropertyDescription("whether use snapshot for fast upsert metadata recovery")
+  private boolean _snapshotEnabled;
+
   @Deprecated
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
       @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
@@ -159,5 +162,9 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setMetadataManagerConfigs(Map<String, String> metadataManagerConfigs) {
     _metadataManagerConfigs = metadataManagerConfigs;
+  }
+
+  public boolean isSnapshotEnabled() {
+    return _snapshotEnabled;
   }
 }
