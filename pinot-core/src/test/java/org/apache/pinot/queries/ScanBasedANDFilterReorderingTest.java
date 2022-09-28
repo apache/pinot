@@ -231,6 +231,5 @@ public class ScanBasedANDFilterReorderingTest {
           45681L, 100000L);
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 44199078145668L);
     }
-
   }
 }
