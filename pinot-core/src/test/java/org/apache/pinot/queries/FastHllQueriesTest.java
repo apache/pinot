@@ -28,8 +28,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -126,7 +126,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 17L);
     assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
     // Test query with group-by
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(BASE_QUERY + GROUP_BY);
+    GroupByOperator groupByOperator = getOperator(BASE_QUERY + GROUP_BY);
     GroupByResultsBlock groupByResultsBlock = groupByOperator.nextBlock();
     executionStatistics = groupByOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 90000L, 30000L);

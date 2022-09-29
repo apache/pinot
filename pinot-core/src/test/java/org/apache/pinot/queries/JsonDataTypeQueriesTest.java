@@ -30,7 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -359,7 +359,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testJsonMatchMultidimensionalArrayGroupByWithIndex() {
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(
+    GroupByOperator groupByOperator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING'), count(*) FROM testTable WHERE json_match"
             + "(jsonColumn, '\"$.data[0][1][0]\" = ''3''') GROUP BY json_extract_scalar(jsonColumn, '$.name.first', "
             + "'STRING')");

@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -37,21 +37,20 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 /**
- * The <code>AggregationGroupByOrderByPlanNode</code> class provides the execution plan for aggregation group-by
- * order-by query on a single segment.
+ * The <code>GroupByPlanNode</code> class provides the execution plan for group-by query on a single segment.
  */
 @SuppressWarnings("rawtypes")
-public class AggregationGroupByOrderByPlanNode implements PlanNode {
+public class GroupByPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
 
-  public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+  public GroupByPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
   }
 
   @Override
-  public AggregationGroupByOrderByOperator run() {
+  public GroupByOperator run() {
     assert _queryContext.getAggregationFunctions() != null;
     assert _queryContext.getGroupByExpressions() != null;
 
@@ -78,8 +77,8 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
               TransformOperator transformOperator =
                   new StarTreeTransformPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs,
                       groupByExpressions, predicateEvaluatorsMap).run();
-              return new AggregationGroupByOrderByOperator(aggregationFunctions, groupByExpressions, transformOperator,
-                  numTotalDocs, _queryContext, true);
+              return new GroupByOperator(aggregationFunctions, groupByExpressions, transformOperator, numTotalDocs,
+                  _queryContext, true);
             }
           }
         }
@@ -91,7 +90,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     TransformOperator transformPlanNode =
         new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationGroupByOrderByOperator(aggregationFunctions, groupByExpressions, transformPlanNode,
-        numTotalDocs, _queryContext, false);
+    return new GroupByOperator(aggregationFunctions, groupByExpressions, transformPlanNode, numTotalDocs, _queryContext,
+        false);
   }
 }

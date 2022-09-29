@@ -32,8 +32,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -194,7 +194,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentGroupBy() {
     // For inner segment case, percentile does not affect the intermediate result
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(getGroupByQuery(0));
+    GroupByOperator groupByOperator = getOperator(getGroupByQuery(0));
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(groupByResult);

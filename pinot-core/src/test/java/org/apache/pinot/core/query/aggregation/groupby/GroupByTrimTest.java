@@ -32,9 +32,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
-import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
+import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
+import org.apache.pinot.core.plan.GroupByPlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -120,10 +120,9 @@ public class GroupByTrimTest {
     queryContext.setMinServerGroupTrimSize(minServerGroupTrimSize);
 
     // Create a query operator
-    AggregationGroupByOrderByOperator groupByOperator =
-        new AggregationGroupByOrderByPlanNode(_indexSegment, queryContext).run();
-    GroupByOrderByCombineOperator combineOperator =
-        new GroupByOrderByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService);
+    GroupByOperator groupByOperator = new GroupByPlanNode(_indexSegment, queryContext).run();
+    GroupByCombineOperator combineOperator =
+        new GroupByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService);
 
     // Execute the query
     GroupByResultsBlock resultsBlock = (GroupByResultsBlock) combineOperator.nextBlock();

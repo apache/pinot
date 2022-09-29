@@ -33,8 +33,8 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -367,7 +367,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     // case 1: (col1, groupByCol) group by groupByCol => all covariances are 0's
     String query =
         "SELECT COVAR_POP(doubleColumnX, groupByColumn) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    GroupByOperator groupByOperator = getOperator(query);
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);

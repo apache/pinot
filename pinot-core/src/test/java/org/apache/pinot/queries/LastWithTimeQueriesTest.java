@@ -36,8 +36,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
@@ -370,7 +370,7 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
 
   private void verifyAggregationGroupBy(String query, int numProjectedColumns) {
     // Inner segment
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    GroupByOperator groupByOperator = getOperator(query);
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         numProjectedColumns * (long) NUM_RECORDS, NUM_RECORDS);

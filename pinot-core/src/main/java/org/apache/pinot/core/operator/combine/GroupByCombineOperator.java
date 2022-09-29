@@ -53,18 +53,18 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Combine operator for aggregation group-by queries with SQL semantic.
+ * Combine operator for group-by queries.
  * TODO: Use CombineOperatorUtils.getNumThreadsForQuery() to get the parallelism of the query instead of using
- *   all threads
+ *       all threads
  */
 @SuppressWarnings("rawtypes")
-public class GroupByOrderByCombineOperator extends BaseCombineOperator<GroupByResultsBlock> {
+public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBlock> {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
   public static final int MAX_GROUP_BY_KEYS_MERGED_PER_INTERRUPTION_CHECK = 10_000;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOrderByCombineOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
+  private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
-  private static final String EXPLAIN_NAME = "COMBINE_GROUPBY_ORDERBY";
   private final int _trimSize;
   private final int _trimThreshold;
   private final int _numAggregationFunctions;
@@ -78,8 +78,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator<GroupByRe
   private volatile IndexedTable _indexedTable;
   private volatile boolean _numGroupsLimitReached;
 
-  public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService) {
+  public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
     int minTrimSize = queryContext.getMinServerGroupTrimSize();

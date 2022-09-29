@@ -93,8 +93,8 @@ public class CombineSlowOperatorsTest {
     List<Operator> operators = getOperators();
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable");
     queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
-    AggregationOnlyCombineOperator combineOperator =
-        new AggregationOnlyCombineOperator(operators, queryContext, _executorService);
+    AggregationCombineOperator combineOperator =
+        new AggregationCombineOperator(operators, queryContext, _executorService);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -104,8 +104,7 @@ public class CombineSlowOperatorsTest {
     QueryContext queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable GROUP BY column");
     queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
-    GroupByOrderByCombineOperator combineOperator =
-        new GroupByOrderByCombineOperator(operators, queryContext, _executorService);
+    GroupByCombineOperator combineOperator = new GroupByCombineOperator(operators, queryContext, _executorService);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -158,8 +157,8 @@ public class CombineSlowOperatorsTest {
     List<Operator> operators = getOperators(ready, null);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable");
     queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
-    AggregationOnlyCombineOperator combineOperator =
-        new AggregationOnlyCombineOperator(operators, queryContext, _executorService);
+    AggregationCombineOperator combineOperator =
+        new AggregationCombineOperator(operators, queryContext, _executorService);
     testCancelCombineOperator(combineOperator, ready, "Cancelled while merging results blocks");
   }
 
@@ -170,8 +169,7 @@ public class CombineSlowOperatorsTest {
     QueryContext queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable GROUP BY column");
     queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
-    GroupByOrderByCombineOperator combineOperator =
-        new GroupByOrderByCombineOperator(operators, queryContext, _executorService);
+    GroupByCombineOperator combineOperator = new GroupByCombineOperator(operators, queryContext, _executorService);
     testCancelCombineOperator(combineOperator, ready, "Cancelled while merging results blocks");
   }
 
