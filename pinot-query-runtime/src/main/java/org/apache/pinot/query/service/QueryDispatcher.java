@@ -48,6 +48,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -158,18 +159,29 @@ public class QueryDispatcher {
     for (DataTable dataTable : queryResult) {
       resultSchema = resultSchema == null ? toResultSchema(dataTable.getDataSchema(), fields) : resultSchema;
       int numColumns = resultSchema.getColumnNames().length;
+      int numRows = dataTable.getNumberOfRows();
       DataSchema.ColumnDataType[] resultColumnDataTypes = resultSchema.getColumnDataTypes();
       List<Object[]> rows = new ArrayList<>(dataTable.getNumberOfRows());
-      for (int rowId = 0; rowId < dataTable.getNumberOfRows(); rowId++) {
-        Object[] row = new Object[numColumns];
-        Object[] rawRow = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        // Only the masked fields should be selected out.
-        int colId = 0;
-        for (Pair<Integer, String> field : fields) {
-          int colRef = field.left;
-          row[colId++] = resultColumnDataTypes[colRef].convertAndFormat(rawRow[colRef]);
+      if (numRows > 0) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+        for (int colId = 0; colId < numColumns; colId++) {
+          nullBitmaps[colId] = dataTable.getNullRowIds(colId);
         }
-        rows.add(row);
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = new Object[numColumns];
+          Object[] rawRow = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          // Only the masked fields should be selected out.
+          int colId = 0;
+          for (Pair<Integer, String> field : fields) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId++] = null;
+            } else {
+              int colRef = field.left;
+              row[colId++] = resultColumnDataTypes[colRef].convertAndFormat(rawRow[colRef]);
+            }
+          }
+          rows.add(row);
+        }
       }
       resultRows.addAll(rows);
     }
