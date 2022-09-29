@@ -56,69 +56,50 @@ public class IpAddressFunctions {
       throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
     }
     subnetSize = Integer.parseInt(prefixLengthPair[1]);
+    if (subnetSize < 0 || address.length * 8 < subnetSize) {
+      throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
+    }
     try {
       argAddress = InetAddresses.forString(ipAddress).getAddress();
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException("Invalid IP: " + ipAddress);
     }
+    if (address.length != 4 && address.length != 16) {
+      throw new IllegalArgumentException("Invalid IP: " + ipAddress);
+    }
+    if (argAddress.length != address.length) {
+      throw new IllegalArgumentException("IP type of " + ipAddress + " is different from " + ipPrefix);
+    }
+    if (subnetSize == 0) {
+      // all IPs are in range
+      return true;
+    }
+
+    int shift;
+    int numRangeBits = address.length * 8 - subnetSize;
     BigInteger arg = new BigInteger(argAddress);
-    byte[] copy = new byte[address.length];
-    for (int i = 0; i < copy.length; i++) {
-      copy[i] = address[i];
+    byte[] maxBits = new byte[address.length];
+    for (int i = 0; i < maxBits.length; i++) {
+      maxBits[i] = address[i];
     }
-
-    if (address.length == 4) {
-      // IPv4
-      if (subnetSize < 0 || 32 < subnetSize) {
-        throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
+    // min
+    for (int i = 0; i < address.length; i++) {
+      if (numRangeBits > i * 8) {
+        shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
+        address[address.length - 1 - i] &= -0x1 << shift;
       }
-      if (subnetSize == 0) {
-        return true;
-      }
-      int shift;
-      for (int i = 0; i < 4; i++) {
-        if (32 - subnetSize > i * 8) {
-          shift = (32 - subnetSize - i * 8) < 8 ? (32 - subnetSize - i * 8) : 8;
-          address[3 - i] &= -0x1 << shift;
-        }
-      }
-      BigInteger min = new BigInteger(address);
-
-      for (int i = 0; i < 4; i++) {
-        if (32 - subnetSize > i * 8) {
-          shift = (32 - subnetSize - i * 8) < 8 ? (32 - subnetSize - i * 8) : 8;
-          copy[3 - i] |= ~(-0x1 << shift);
-        }
-      }
-      BigInteger max = new BigInteger(copy);
-      return min.compareTo(arg) <= 0 && max.compareTo(arg) >= 0;
-    } else if (address.length == 16) {
-      // IPv6
-      if (subnetSize < 0 || 128 < subnetSize) {
-        throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
-      }
-      if (subnetSize == 0) {
-        return true;
-      }
-      int shift;
-      for (int i = 0; i < 16; i++) {
-        if (128 - subnetSize > i * 8) {
-          shift = (128 - subnetSize - i * 8) < 8 ? (128 - subnetSize - i * 8) : 8;
-          address[15 - i] &= -0x1 << shift;
-        }
-      }
-      BigInteger min = new BigInteger(address);
-
-      for (int i = 0; i < 16; i++) {
-        if (128 - subnetSize > i * 8) {
-          shift = (128 - subnetSize - i * 8) < 8 ? (128 - subnetSize - i * 8) : 8;
-          copy[15 - i] |= ~(-0x1 << shift);
-        }
-      }
-      BigInteger max = new BigInteger(copy);
-      return min.compareTo(arg) <= 0 && max.compareTo(arg) >= 0;
-    } else {
-      throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
     }
+    BigInteger min = new BigInteger(address);
+
+    // max
+    for (int i = 0; i < maxBits.length; i++) {
+      if (numRangeBits > i * 8) {
+        shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
+        maxBits[maxBits.length - 1 - i] |= ~(-0x1 << shift);
+      }
+    }
+    BigInteger max = new BigInteger(maxBits);
+
+    return min.compareTo(arg) <= 0 && max.compareTo(arg) >= 0;
   }
 }
