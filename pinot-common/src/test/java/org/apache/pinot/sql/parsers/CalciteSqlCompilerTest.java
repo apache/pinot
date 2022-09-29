@@ -2022,7 +2022,9 @@ public class CalciteSqlCompilerTest {
     result = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
     Assert.assertEquals(result, "true");
 
-    query = "select is_subnet_of('2001:db8:85a3::8a2e:370:7334/62', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') from mytable";
+    query =
+        "select is_subnet_of('2001:db8:85a3::8a2e:370:7334/62', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') from "
+            + "mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
     Assert.assertEquals(result, "true");

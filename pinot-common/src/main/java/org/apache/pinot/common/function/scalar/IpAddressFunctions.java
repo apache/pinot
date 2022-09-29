@@ -19,15 +19,10 @@
 
 package org.apache.pinot.common.function.scalar;
 
-import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import com.google.common.net.InetAddresses;
-
-import static java.lang.Math.max;
-import static java.lang.Math.min;
 
 
 public class IpAddressFunctions {
