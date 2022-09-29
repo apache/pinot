@@ -24,7 +24,7 @@ kind: Service
 metadata:
   name: {{ template "pinot.controller.external" . }}
   annotations:
-{{ toYaml .Values.controller.external.annotations | indent 4 }}
+    {{ toYaml .Values.controller.external.annotations | indent 4 }}
   labels:
     {{- include "pinot.controllerLabels" . | nindent 4 }}
 spec:
