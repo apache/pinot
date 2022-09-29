@@ -516,6 +516,10 @@ public class PinotHelixTaskResourceManager {
       }
     }
     // Check if any subtask missed their progress from the worker.
+    // And simply check all subtasks if no subtasks are specified.
+    if (selectedSubtasks.isEmpty()) {
+      selectedSubtasks = allSubtasks.keySet();
+    }
     for (String subtaskName : selectedSubtasks) {
       if (subtaskProgressMap.containsKey(subtaskName)) {
         continue;
@@ -530,12 +534,11 @@ public class PinotHelixTaskResourceManager {
             String.format("No status from worker: %s. Got status: %s from Helix", taskWorker, helixState));
       }
     }
-    // Raise error if any worker failed to report progress, with partial result.
     if (serviceResponse._failedResponseCount > 0) {
-      // TODO: track detailed worker failure via CompletionServiceHelper and send them back in response.
-      throw new RuntimeException(String
-          .format("There were %d workers failed to report task progress. Got partial progress info: %s",
-              serviceResponse._failedResponseCount, subtaskProgressMap));
+      // Subtasks without worker side progress are filled with status tracked by Helix so return them back.
+      // The detailed worker failure response is logged as error by CompletionServiceResponse for debugging.
+      LOGGER.warn("There were {} workers failed to report task progress. Got partial progress info: {}",
+          serviceResponse._failedResponseCount, subtaskProgressMap);
     }
     return subtaskProgressMap;
   }

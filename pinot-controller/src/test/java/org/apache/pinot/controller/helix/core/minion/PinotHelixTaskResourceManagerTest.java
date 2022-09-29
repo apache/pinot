@@ -29,6 +29,7 @@ import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -81,6 +82,7 @@ public class PinotHelixTaskResourceManagerTest {
         new CompletionServiceHelper.CompletionServiceResponse();
     when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt())).thenReturn(httpResp);
     // Three workers to run 3 subtasks but got no progress status from workers.
+    httpResp._failedResponseCount = 3;
     String[] workers = new String[]{"worker01", "worker02", "worker03"};
     Map<String, String> workerEndpoints = new HashMap<>();
     for (String worker : workers) {
@@ -108,8 +110,8 @@ public class PinotHelixTaskResourceManagerTest {
     }
   }
 
-  @Test(expectedExceptions = RuntimeException.class)
-  public void testGetSubtaskProgressWithFailure()
+  @Test
+  public void testGetSubtaskProgressWithResponse()
       throws Exception {
     TaskDriver taskDriver = mock(TaskDriver.class);
     JobContext jobContext = mock(JobContext.class);
@@ -120,8 +122,6 @@ public class PinotHelixTaskResourceManagerTest {
     CompletionServiceHelper.CompletionServiceResponse httpResp =
         new CompletionServiceHelper.CompletionServiceResponse();
     when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt())).thenReturn(httpResp);
-    // Three workers to run 3 subtasks but got failure.
-    httpResp._failedResponseCount = 3;
     String[] workers = new String[]{"worker01", "worker02", "worker03"};
     Map<String, String> workerEndpoints = new HashMap<>();
     for (String worker : workers) {
@@ -133,6 +133,8 @@ public class PinotHelixTaskResourceManagerTest {
     for (int i = 0; i < 3; i++) {
       subtaskIds.add(i);
       subtaskNames[i] = taskName + "_" + i;
+      httpResp._httpResponses.put(workers[i],
+          JsonUtils.objectToString(Collections.singletonMap(subtaskNames[i], "running on worker: " + i)));
     }
     TaskPartitionState[] helixStates =
         new TaskPartitionState[]{TaskPartitionState.INIT, TaskPartitionState.RUNNING, TaskPartitionState.TASK_ERROR};
@@ -140,7 +142,12 @@ public class PinotHelixTaskResourceManagerTest {
     when(jobContext.getAssignedParticipant(anyInt())).thenReturn(workers[0], workers[1], workers[2]);
     when(jobContext.getPartitionState(anyInt())).thenReturn(helixStates[0], helixStates[1], helixStates[2]);
     when(jobContext.getPartitionSet()).thenReturn(subtaskIds);
-    mgr.getSubtaskProgress(taskName, StringUtils.join(subtaskNames, ','), httpHelper, workerEndpoints,
-        Collections.emptyMap(), 1000);
+    Map<String, Object> progress =
+        mgr.getSubtaskProgress(taskName, StringUtils.join(subtaskNames, ','), httpHelper, workerEndpoints,
+            Collections.emptyMap(), 1000);
+    for (int i = 0; i < 3; i++) {
+      String taskProgress = (String) progress.get(subtaskNames[i]);
+      assertEquals(taskProgress, "running on worker: " + i);
+    }
   }
 }
