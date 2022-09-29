@@ -97,8 +97,6 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
     // TODO: 1. remainingDocIdIterators currently doesn't report cardinality; therefore, it cannot be
     //          prioritized even if it provides high effective cardinality, one way to do this is to let AND/OR
     //          DocIdIterators bubble up cardinality for the sort to happen recursively for nested AND-OR predicates
-    //       2. range eval currently doesn't report effective cardinality but theoretically it can at least for the
-    //          dictionary backed columns
     if (_cardinalityBasedRankingForScan) {
       scanBasedDocIdIterators.sort(Comparator.comparing(x -> (-x.getEstimatedCardinality(true))));
     }

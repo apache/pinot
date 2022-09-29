@@ -76,7 +76,7 @@ public class ScanBasedANDFilterReorderingTest {
 
   @Test
   public static class MVTest extends BaseQueriesTest {
-    protected static final String COUNT_STAR_QUERY = "SELECT SUM(column1) FROM testTable";
+    protected static final String SUM_QUERY = "SELECT SUM(column1) FROM testTable";
     protected static final String FILTER1 = " WHERE column7 IN (2147483647, 211, 336, 363, 469, 565)"
         + " AND column6 = 2147483647"
         + " AND column3 <> 'L'";
@@ -178,7 +178,7 @@ public class ScanBasedANDFilterReorderingTest {
     @Test
     public void testScanBasedANDFilterReorderingOptimization1() {
       // Test query with optimization, bitmap + scan
-      AggregationOperator aggregationOperator = getOperator(SET_AND_OPTIMIZATION + COUNT_STAR_QUERY + FILTER1);
+      AggregationOperator aggregationOperator = getOperator(SET_AND_OPTIMIZATION + SUM_QUERY + FILTER1);
       AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 46649L, 154999L,
@@ -186,7 +186,7 @@ public class ScanBasedANDFilterReorderingTest {
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 44224075056091L);
 
       // Test query without optimization, bitmap + scan
-      aggregationOperator = getOperator(COUNT_STAR_QUERY + FILTER1);
+      aggregationOperator = getOperator(SUM_QUERY + FILTER1);
       resultsBlock = aggregationOperator.nextBlock();
       executionStatistics = aggregationOperator.getExecutionStatistics();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 46649L, 189513L,
@@ -197,7 +197,7 @@ public class ScanBasedANDFilterReorderingTest {
     @Test
     public void testScanBasedANDFilterReorderingOptimization2() {
       // Test query with optimization, another bitmap + scan
-      AggregationOperator aggregationOperator = getOperator(SET_AND_OPTIMIZATION + COUNT_STAR_QUERY + FILTER2);
+      AggregationOperator aggregationOperator = getOperator(SET_AND_OPTIMIZATION + SUM_QUERY + FILTER2);
       AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 0, 97458L,
@@ -205,7 +205,7 @@ public class ScanBasedANDFilterReorderingTest {
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 0);
 
       // Test query without optimization, another bitmap + scan
-      aggregationOperator = getOperator(COUNT_STAR_QUERY + FILTER2);
+      aggregationOperator = getOperator(SUM_QUERY + FILTER2);
       resultsBlock = aggregationOperator.nextBlock();
       executionStatistics = aggregationOperator.getExecutionStatistics();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 0, 189513L,
@@ -216,7 +216,7 @@ public class ScanBasedANDFilterReorderingTest {
     @Test
     public void testScanBasedANDFilterReorderingOptimization3() {
       // Test query with optimization, bitmap + scan + range
-      AggregationOperator aggregationOperator = getOperator(SET_AND_OPTIMIZATION + COUNT_STAR_QUERY + FILTER3);
+      AggregationOperator aggregationOperator = getOperator(SET_AND_OPTIMIZATION + SUM_QUERY + FILTER3);
       AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 45681L, 201648L,
@@ -224,7 +224,7 @@ public class ScanBasedANDFilterReorderingTest {
       Assert.assertEquals(((Number) resultsBlock.getResults().get(0)).longValue(), 44199078145668L);
 
       // Test query without optimization, bitmap + scan + range
-      aggregationOperator = getOperator(COUNT_STAR_QUERY + FILTER3);
+      aggregationOperator = getOperator(SUM_QUERY + FILTER3);
       resultsBlock = aggregationOperator.nextBlock();
       executionStatistics = aggregationOperator.getExecutionStatistics();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 45681L, 276352L,
