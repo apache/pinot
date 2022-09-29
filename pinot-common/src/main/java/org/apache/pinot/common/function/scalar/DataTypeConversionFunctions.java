@@ -20,6 +20,8 @@ package org.apache.pinot.common.function.scalar;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.Base64;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -77,6 +79,34 @@ public class DataTypeConversionFunctions {
   @ScalarFunction
   public static byte[] bigDecimalToBytes(String number) {
     return BigDecimalUtils.serialize(new BigDecimal(number));
+  }
+
+  /**
+   * Converts big decimal string representation to bytes.
+   * Only scale of upto 2 bytes is supported by the function
+   * @param number big decimal number in plain string. e.g. '1234.12121'
+   * @param precision apply a specific precision to BigDecimal
+   * @return The result byte array contains the bytes of the unscaled value appended to bytes of the scale in BIG
+   * ENDIAN order.
+   */
+  @ScalarFunction
+  public static byte[] bigDecimalToBytes(String number, int precision) {
+    return BigDecimalUtils.serialize(new BigDecimal(number, new MathContext(precision, RoundingMode.HALF_EVEN)));
+  }
+
+  /**
+   * Converts big decimal string representation to bytes.
+   * Only scale of upto 2 bytes is supported by the function
+   * @param number big decimal number in plain string. e.g. '1234.12121'
+   * @param precision apply a specific precision to BigDecimal
+   * @param scale specify the number of digits after decimal
+   * @return The result byte array contains the bytes of the unscaled value appended to bytes of the scale in BIG
+   * ENDIAN order.
+   */
+  @ScalarFunction
+  public static byte[] bigDecimalToBytes(String number, int precision, int scale) {
+    return BigDecimalUtils.serialize(new BigDecimal(number, new MathContext(precision, RoundingMode.HALF_EVEN))
+        .setScale(scale, RoundingMode.HALF_EVEN));
   }
 
   /**
