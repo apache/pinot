@@ -37,8 +37,8 @@ public class PinotQueryRuleSets {
           EnumerableRules.ENUMERABLE_PROJECT_RULE, EnumerableRules.ENUMERABLE_SORT_RULE,
           EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE,
 
-          // push a filter into a join, replaced CoreRules.FILTER_INTO_JOIN with special config
-          PinotFilterIntoJoinRule.INSTANCE,
+          // push a filter into a join
+          CoreRules.FILTER_INTO_JOIN,
           // push filter through an aggregation
           CoreRules.FILTER_AGGREGATE_TRANSPOSE,
           // push filter through set operation

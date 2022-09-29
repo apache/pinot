@@ -220,8 +220,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // Projection pushdown
         new Object[]{"SELECT a.col1, a.col3 + a.col3 FROM a WHERE a.col3 >= 0 AND a.col2 = 'alice'"},
 
-        // Partial filter pushdown
+        // Inequality JOIN & partial filter pushdown
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3"},
+
+        new Object[]{"SELECT * FROM a, b WHERE a.col1 > b.col2 AND a.col3 > b.col3"},
 
         // Aggregation with group by
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 GROUP BY a.col1"},
@@ -269,7 +271,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // Sub-query with IN clause to SEMI JOIN.
         new Object[]{"SELECT b.col1, b.col2, SUM(b.col3) * 100 / COUNT(b.col3) FROM b WHERE b.col1 IN "
-            + "(SELECT a.col2 FROM a WHERE a.col2 != 'foo') GROUP BY b.col1, b.col2"},
+            + " (SELECT a.col2 FROM a WHERE a.col2 != 'foo') GROUP BY b.col1, b.col2"},
+        new Object[]{"SELECT SUM(b.col3) FROM b WHERE b.col3 > (SELECT AVG(a.col3) FROM a WHERE a.col2 != 'bar')"},
 
         // Aggregate query with HAVING clause, "foo" and "bar" occurred 6/2 times each and "alice" occurred 3/1 times
         // numbers are cycle in (1, 42, 1, 42, 1), and (foo, bar, alice, foo, bar)
