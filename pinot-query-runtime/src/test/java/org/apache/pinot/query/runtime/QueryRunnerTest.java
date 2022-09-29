@@ -318,9 +318,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // using join clause
         new Object[]{"SELECT * FROM a JOIN b USING (col1)", 15},
 
+        // cannot compare with H2 w/o an ORDER BY because ordering is indeterminate
+        new Object[]{"SELECT * FROM a LIMIT 2", 2},
+
         // test dateTrunc
         //   - on leaf stage
-        new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 15},
+        new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 10},
         //   - on intermediate stage
         new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
             + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
