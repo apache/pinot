@@ -24,7 +24,7 @@ kind: Service
 metadata:
   name: {{ template "pinot.broker.external" . }}
   annotations:
-{{ toYaml .Values.broker.external.annotations | indent 4 }}
+    {{ toYaml .Values.broker.external.annotations | indent 4 }}
   labels:
     {{- include "pinot.brokerLabels" . | nindent 4 }}
 spec:
@@ -34,4 +34,6 @@ spec:
       port: {{ .Values.broker.external.port }}
   selector:
     {{- include "pinot.brokerMatchLabels" . | nindent 4 }}
+  loadBalancerSourceRanges:
+    {{ toYaml .Values.broker.service.loadBalancerSourceRanges | indent 4 }}
 {{- end }}
