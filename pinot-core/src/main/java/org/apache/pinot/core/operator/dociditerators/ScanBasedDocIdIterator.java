@@ -46,7 +46,7 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
   long getNumEntriesScanned();
 
   /**
-   * Returns the effective cardinality of the underlying data source
+   * Returns the estimated (effective) cardinality of the underlying data source
    */
 
   default float getEstimatedCardinality(boolean isAndDocIdSet) {
