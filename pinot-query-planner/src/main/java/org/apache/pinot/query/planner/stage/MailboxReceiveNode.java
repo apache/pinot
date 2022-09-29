@@ -56,4 +56,9 @@ public class MailboxReceiveNode extends AbstractStageNode {
   public KeySelector<Object[], Object[]> getPartitionKeySelector() {
     return _partitionKeySelector;
   }
+
+  @Override
+  public String debugString() {
+    return "MAIL_RECEIVE";
+  }
 }

@@ -41,4 +41,9 @@ public class ProjectNode extends AbstractStageNode {
   public List<RexExpression> getProjects() {
     return _projects;
   }
+
+  @Override
+  public String debugString() {
+    return "PROJECT";
+  }
 }

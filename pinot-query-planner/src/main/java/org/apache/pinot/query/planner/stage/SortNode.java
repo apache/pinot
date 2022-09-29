@@ -67,4 +67,9 @@ public class SortNode extends AbstractStageNode {
   public int getOffset() {
     return _offset;
   }
+
+  @Override
+  public String debugString() {
+    return "SORT" + (_fetch > 0 ? " (LIMIT " + _fetch + ")" : "");
+  }
 }

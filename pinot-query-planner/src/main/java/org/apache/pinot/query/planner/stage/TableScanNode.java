@@ -46,4 +46,9 @@ public class TableScanNode extends AbstractStageNode {
   public List<String> getTableScanColumns() {
     return _tableScanColumns;
   }
+
+  @Override
+  public String debugString() {
+    return "TABLE SCAN (" + _tableName + ")";
+  }
 }

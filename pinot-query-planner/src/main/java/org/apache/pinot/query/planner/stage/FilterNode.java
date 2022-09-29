@@ -40,4 +40,9 @@ public class FilterNode extends AbstractStageNode {
   public RexExpression getCondition() {
     return _condition;
   }
+
+  @Override
+  public String debugString() {
+    return "FILTER";
+  }
 }

@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.query.planner;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.util.Pair;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
+import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 
 
@@ -70,5 +73,34 @@ public class QueryPlan {
    */
   public List<Pair<Integer, String>> getQueryResultFields() {
     return _queryResultFields;
+  }
+
+  public String debugString() {
+    if (_queryStageMap.isEmpty()) return "EMPTY";
+
+    StringBuilder builder = new StringBuilder();
+    debugString(builder, _queryStageMap.get(0), "", "");
+    return builder.toString();
+  }
+
+  private void debugString(StringBuilder builder, StageNode root, String prefix, String childPrefix) {
+    builder
+        .append(prefix)
+        .append(root.debugString())
+        .append('\n');
+
+    if (root instanceof MailboxReceiveNode) {
+      int senderStage = ((MailboxReceiveNode) root).getSenderStageId();
+      debugString(builder, _queryStageMap.get(senderStage), childPrefix + "└── ", childPrefix + "    ");
+    } else {
+      for (Iterator<StageNode> iterator = root.getInputs().iterator(); iterator.hasNext(); ) {
+        StageNode input = iterator.next();
+        if (iterator.hasNext()) {
+          debugString(builder, input, childPrefix + "├── ", childPrefix + "│   " );
+        } else {
+          debugString(builder, input, childPrefix + "└── ", childPrefix + "    ");
+        }
+      }
+    }
   }
 }
