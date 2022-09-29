@@ -33,7 +33,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public class ExpressionContext {
   public enum Type {
-    LITERAL, IDENTIFIER, FUNCTION,
+    LITERAL, IDENTIFIER, FUNCTION
   }
 
   private final Type _type;
@@ -42,11 +42,11 @@ public class ExpressionContext {
   // Only set when the _type is LITERAL
   private final LiteralContext _literal;
 
-  public static ExpressionContext forLiteralContext(Literal literal){
+  public static ExpressionContext forLiteralContext(Literal literal) {
     return new ExpressionContext(Type.LITERAL, null, null, new LiteralContext(literal));
   }
-  
-  public static ExpressionContext forLiteralContext(FieldSpec.DataType type, Object val){
+
+  public static ExpressionContext forLiteralContext(FieldSpec.DataType type, Object val) {
     return new ExpressionContext(Type.LITERAL, null, null, new LiteralContext(type, val));
   }
 
@@ -58,9 +58,9 @@ public class ExpressionContext {
     return new ExpressionContext(Type.FUNCTION, null, function, null);
   }
 
-  private ExpressionContext(Type type, String value, FunctionContext function, LiteralContext literal) {
+  private ExpressionContext(Type type, String identifier, FunctionContext function, LiteralContext literal) {
     _type = type;
-    _identifier = value;
+    _identifier = identifier;
     _function = function;
     _literal = literal;
   }

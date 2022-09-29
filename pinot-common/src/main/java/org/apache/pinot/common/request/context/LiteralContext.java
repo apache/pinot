@@ -37,6 +37,7 @@ public class LiteralContext {
   private FieldSpec.DataType _type;
   private Object _value;
 
+  // TODO: Support all data types.
   private static FieldSpec.DataType convertThriftTypeToDataType(Literal._Fields fields) {
     switch (fields) {
       case LONG_VALUE:
@@ -115,10 +116,10 @@ public class LiteralContext {
   @Override
   public String toString() {
     if (_value == null) {
-      return '\'' + "" + '\'';
+      return "null";
     }
     // TODO: print out the type.
-    if(_type == FieldSpec.DataType.STRING || _type == FieldSpec.DataType.BYTES) {
+    if(_type == FieldSpec.DataType.STRING) {
       return '\'' + _value.toString() + '\'';
     }
     return _value.toString();
