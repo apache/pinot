@@ -178,4 +178,13 @@ declare module 'Models' {
   export type UserList = {
     users: UserObject
   }
+
+  export interface TaskProgressResponse {
+    [key: string]: TaskProgressStatus[] | string;
+  }
+
+  export interface TaskProgressStatus {
+    ts: number,
+    status: string
+  }
 }

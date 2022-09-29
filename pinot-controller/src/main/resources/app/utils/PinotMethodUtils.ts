@@ -89,7 +89,8 @@ import {
   requestUserList,
   requestAddUser,
   requestDeleteUser,
-  requestUpdateUser
+  requestUpdateUser,
+  getTaskProgress
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -830,6 +831,12 @@ const getTaskDebugData = async (taskName) => {
   return debugRes;
 };
 
+const getTaskProgressData = async (taskName, subTaskName) => {
+  const progressData = await getTaskProgress(taskName, subTaskName);
+
+  return progressData.data;
+}
+
 const getTaskGeneratorDebugData = async (taskName, taskType) => {
   const debugRes = await getTaskGeneratorDebug(taskName, taskType);
   return debugRes;
@@ -1107,6 +1114,7 @@ export default {
   getElapsedTime,
   getTasksList,
   getTaskDebugData,
+  getTaskProgressData,
   getTaskGeneratorDebugData,
   deleteSegmentOp,
   reloadSegmentOp,
