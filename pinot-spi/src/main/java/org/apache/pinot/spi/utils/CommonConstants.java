@@ -738,6 +738,8 @@ public class CommonConstants {
 
     public static final String START_TIME = "segment.start.time";
     public static final String END_TIME = "segment.end.time";
+    public static final String RAW_START_TIME = "segment.start.time.raw";
+    public static final String RAW_END_TIME = "segment.end.time.raw";
     public static final String TIME_UNIT = "segment.time.unit";
     public static final String INDEX_VERSION = "segment.index.version";
     public static final String TOTAL_DOCS = "segment.total.docs";

@@ -21,13 +21,17 @@ package org.apache.pinot.controller.helix.core.util;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -56,6 +60,21 @@ public class ZKMetadataUtils {
         segmentSizeInBytes, false);
   }
 
+  public static void updateSegmentZKTimeInterval(SegmentZKMetadata segmentZKMetadata,
+      DateTimeFieldSpec dateTimeFieldSpec) {
+    String startTimeString = segmentZKMetadata.getRawStartTime();
+    if (StringUtils.isNotEmpty(startTimeString)) {
+      long updatedStartTime = dateTimeFieldSpec.getFormatSpec().fromFormatToMillis(startTimeString);
+      segmentZKMetadata.setStartTime(updatedStartTime);
+    }
+
+    String endTimeString = segmentZKMetadata.getRawEndTime();
+    if (StringUtils.isNotEmpty(endTimeString)) {
+      long updatedEndTime = dateTimeFieldSpec.getFormatSpec().fromFormatToMillis(endTimeString);
+      segmentZKMetadata.setEndTime(updatedEndTime);
+    }
+  }
+
   private static void updateSegmentZKMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
       SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes,
       boolean newSegment) {
@@ -66,9 +85,14 @@ public class ZKMetadataUtils {
     }
 
     if (segmentMetadata.getTimeInterval() != null) {
-      segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
-      segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
-      segmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
+      segmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
+      segmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
+      segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+      ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor(segmentMetadata.getTimeColumn());
+      if (isValidTimeMetadata(timeColumnMetadata)) {
+        segmentZKMetadata.setRawStartTime(timeColumnMetadata.getMinValue().toString());
+        segmentZKMetadata.setRawEndTime(timeColumnMetadata.getMaxValue().toString());
+      }
     } else {
       segmentZKMetadata.setStartTime(-1);
       segmentZKMetadata.setEndTime(-1);
@@ -127,5 +151,10 @@ public class ZKMetadataUtils {
         segmentZKMetadata.setEndOffset(segmentMetadata.getEndOffset());
       }
     }
+  }
+
+  private static boolean isValidTimeMetadata(ColumnMetadata timeColumnMetadata) {
+    return timeColumnMetadata != null && timeColumnMetadata.getMinValue() != null
+        && timeColumnMetadata.getMaxValue() != null && !timeColumnMetadata.isMinMaxValueInvalid();
   }
 }

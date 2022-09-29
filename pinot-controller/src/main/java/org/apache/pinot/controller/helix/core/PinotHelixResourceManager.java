@@ -152,6 +152,7 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -1284,6 +1285,17 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public void updateSegmentsZKTimeInterval(String tableNameWithType, DateTimeFieldSpec timeColumnFieldSpec) {
+    LOGGER.info("Updating segment time interval in ZK metadata for table: {}", tableNameWithType);
+
+    List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      int version = segmentZKMetadata.toZNRecord().getVersion();
+      updateZkTimeInterval(segmentZKMetadata, timeColumnFieldSpec);
+      updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
+    }
+  }
+
   public void updateSchema(Schema schema, boolean reload)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     String schemaName = schema.getSchemaName();
@@ -2263,6 +2275,11 @@ public class PinotHelixResourceManager {
     } else {
       LOGGER.warn("No delete table message sent for table: {}", tableNameWithType);
     }
+  }
+
+  public void updateZkTimeInterval(SegmentZKMetadata segmentZKMetadata,
+      DateTimeFieldSpec timeColumnFieldSpec) {
+    ZKMetadataUtils.updateSegmentZKTimeInterval(segmentZKMetadata, timeColumnFieldSpec);
   }
 
   @VisibleForTesting
