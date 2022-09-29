@@ -55,6 +55,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -64,6 +65,7 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByDataTableReducer implements DataTableReducer {
   private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
+  private static final int MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK = 10_000;
 
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
@@ -289,6 +291,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
               int numRows = dataTable.getNumberOfRows();
               for (int rowId = 0; rowId < numRows; rowId++) {
+                if (rowId % MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK == 0 && Thread.interrupted()) {
+                  throw new EarlyTerminationException();
+                }
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
                   switch (storedColumnDataTypes[colId]) {
