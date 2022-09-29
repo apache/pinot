@@ -22,7 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.util.Pair;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.StageNode;
@@ -76,7 +75,9 @@ public class QueryPlan {
   }
 
   public String debugString() {
-    if (_queryStageMap.isEmpty()) return "EMPTY";
+    if (_queryStageMap.isEmpty()) {
+      return "EMPTY";
+    }
 
     StringBuilder builder = new StringBuilder();
     debugString(builder, _queryStageMap.get(0), "", "");
@@ -93,10 +94,10 @@ public class QueryPlan {
       int senderStage = ((MailboxReceiveNode) root).getSenderStageId();
       debugString(builder, _queryStageMap.get(senderStage), childPrefix + "└── ", childPrefix + "    ");
     } else {
-      for (Iterator<StageNode> iterator = root.getInputs().iterator(); iterator.hasNext(); ) {
+      for (Iterator<StageNode> iterator = root.getInputs().iterator(); iterator.hasNext();) {
         StageNode input = iterator.next();
         if (iterator.hasNext()) {
-          debugString(builder, input, childPrefix + "├── ", childPrefix + "│   " );
+          debugString(builder, input, childPrefix + "├── ", childPrefix + "│   ");
         } else {
           debugString(builder, input, childPrefix + "└── ", childPrefix + "    ");
         }
