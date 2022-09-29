@@ -209,10 +209,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT MAX(ArrDelay) + MAX(AirTime) FROM mytable";
     testQuery(query);
     query = "SELECT MAX(ArrDelay) - MAX(AirTime), DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX"
-        + "(ArrDelay) - MIN(AirTime) DESC";
+        + "(ArrDelay) - MIN(AirTime) DESC, DaysSinceEpoch";
     testQuery(query);
     query = "SELECT DaysSinceEpoch, MAX(ArrDelay) * 2 - MAX(AirTime) - 3 FROM mytable GROUP BY DaysSinceEpoch ORDER BY "
-        + "MAX(ArrDelay) - MIN(AirTime) DESC";
+        + "MAX(ArrDelay) - MIN(AirTime) DESC, DaysSinceEpoch";
     testQuery(query);
 
     // Having
