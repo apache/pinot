@@ -292,7 +292,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
               int numRows = dataTable.getNumberOfRows();
               for (int rowId = 0; rowId < numRows; rowId++) {
                 if (rowId % MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK == 0 && Thread.interrupted()) {
-                  throw new EarlyTerminationException();
+                  return;
                 }
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
