@@ -62,9 +62,8 @@ public class ForwardIndexHandler implements IndexHandler {
   IndexLoadingConfig _indexLoadingConfig;
 
   protected enum Operation {
-    CHANGE_RAW_COMPRESSION_TYPE,
-
     // TODO: Add other operations like ENABLE_DICTIONARY, DISABLE_DICTIONARY.
+    CHANGE_RAW_INDEX_COMPRESSION_TYPE,
   }
 
   public ForwardIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
@@ -92,7 +91,7 @@ public class ForwardIndexHandler implements IndexHandler {
       Operation operation = entry.getValue();
 
       switch (operation) {
-        case CHANGE_RAW_COMPRESSION_TYPE:
+        case CHANGE_RAW_INDEX_COMPRESSION_TYPE:
           rewriteRawForwardIndex(column, segmentWriter, indexCreatorProvider);
           break;
         // TODO: Add other operations here.
@@ -130,7 +129,7 @@ public class ForwardIndexHandler implements IndexHandler {
       if (existingNoDictColumns.contains(column) && newNoDictColumns.contains(column)) {
         // Both existing and new column is RAW forward index encoded. Check if compression needs to be changed.
         if (shouldChangeCompressionType(column, segmentReader)) {
-          columnOperationMap.put(column, Operation.CHANGE_RAW_COMPRESSION_TYPE);
+          columnOperationMap.put(column, Operation.CHANGE_RAW_INDEX_COMPRESSION_TYPE);
         }
       }
     }
