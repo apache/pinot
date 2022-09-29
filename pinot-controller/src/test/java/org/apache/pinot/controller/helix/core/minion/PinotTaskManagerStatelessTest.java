@@ -113,6 +113,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     Map<String, Object> properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     startController(properties);
+    waitForController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
