@@ -67,8 +67,8 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -340,18 +340,11 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(retrievedSegmentZKMetadata.getStartTimeMs(), -1);
     Assert.assertEquals(retrievedSegmentZKMetadata.getEndTimeMs(), -1);
 
-    TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.OFFLINE);
-    tableConfigBuilder.setTableName(OFFLINE_SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME);
-    tableConfigBuilder.setTimeColumnName("timestamp");
-    tableConfigBuilder.setTimeType("MILLISECONDS");
-
-    Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder();
-    schemaBuilder.setSchemaName(OFFLINE_TABLE_NAME);
-    schemaBuilder.addDateTime("timestamp", FieldSpec.DataType.STRING, "SIMPLE_DATE_FORMAT|yyyy-MM-dd'T'HH:mm:ss.SSS",
-        "1:MILLISECONDS");
+    DateTimeFieldSpec timeColumnFieldSpec = new DateTimeFieldSpec("timestamp",
+        FieldSpec.DataType.STRING, "SIMPLE_DATE_FORMAT|yyyy-MM-dd'T'HH:mm:ss.SSS", "1:MILLISECONDS");
 
     TEST_INSTANCE.getHelixResourceManager()
-        .updateSegmentsZKTimeInterval(tableConfigBuilder.build(), schemaBuilder.build());
+        .updateSegmentsZKTimeInterval(OFFLINE_SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME, timeColumnFieldSpec);
     retrievedSegmentZKMetadataList =
         TEST_INSTANCE.getHelixResourceManager().getSegmentsZKMetadata(OFFLINE_SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME);
     retrievedSegmentZKMetadata = retrievedSegmentZKMetadataList.get(0);

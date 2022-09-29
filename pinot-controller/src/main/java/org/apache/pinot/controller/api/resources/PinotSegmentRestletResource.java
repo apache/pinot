@@ -59,6 +59,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -81,6 +82,7 @@ import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -1056,7 +1058,7 @@ public class PinotSegmentRestletResource {
       if (tableType == null) {
         throw new ControllerApplicationException(LOGGER,
             String.format("Table type not provided with table name %s", tableNameWithType),
-            Response.Status.INTERNAL_SERVER_ERROR);
+            Status.BAD_REQUEST);
       }
       return updateZKTimeIntervalInternal(tableNameWithType);
   }
@@ -1068,21 +1070,37 @@ public class PinotSegmentRestletResource {
    */
   private SuccessResponse updateZKTimeIntervalInternal(String tableNameWithType) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
+      if (tableConfig == null) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find table config for table: " + tableNameWithType, Status.NOT_FOUND);
+      }
 
       Schema tableSchema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
-      Preconditions.checkState(tableSchema != null, "Failed to find schema for table: {}", tableNameWithType);
+      if (tableSchema == null) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find schema for table: " + tableNameWithType, Status.NOT_FOUND);
+      }
 
-      String schemaName = tableSchema.getSchemaName();
+      String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      if (StringUtils.isEmpty(timeColumn)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find time column for table : " + tableNameWithType, Status.NOT_FOUND);
+      }
+
+      DateTimeFieldSpec timeColumnFieldSpec = tableSchema.getSpecForTimeColumn(timeColumn);
+      if (timeColumnFieldSpec == null) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Failed to find field spec for column: %s and table: %s", timeColumn, tableNameWithType),
+            Status.NOT_FOUND);
+      }
+
       try {
-        _pinotHelixResourceManager.updateSegmentsZKTimeInterval(tableConfig, tableSchema);
+        _pinotHelixResourceManager.updateSegmentsZKTimeInterval(tableNameWithType, timeColumnFieldSpec);
       } catch (Exception e) {
         throw new ControllerApplicationException(LOGGER,
-            String.format("Failed to update time interval zk metadata for table %s, exception: %s", tableNameWithType,
-                e.getMessage()), Response.Status.INTERNAL_SERVER_ERROR, e);
+            String.format("Failed to update time interval zk metadata for table %s", tableNameWithType),
+            Response.Status.INTERNAL_SERVER_ERROR, e);
       }
-      // Best effort notification. If controller fails at this point, no notification is given.
-      LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       return new SuccessResponse("Successfully updated time interval zk metadata for table: " + tableNameWithType);
   }
 }

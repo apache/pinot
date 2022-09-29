@@ -1285,15 +1285,13 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void updateSegmentsZKTimeInterval(TableConfig tableConfig, Schema schema) {
-    String schemaName = schema.getSchemaName();
-    LOGGER.info("Updating segment zookeeper time interval metadata: {}", schemaName);
+  public void updateSegmentsZKTimeInterval(String tableNameWithType, DateTimeFieldSpec timeColumnFieldSpec) {
+    LOGGER.info("Updating segment time interval in ZK metadata for table: {}", tableNameWithType);
 
-    String tableNameWithType = tableConfig.getTableName();
     List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
     for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       int version = segmentZKMetadata.toZNRecord().getVersion();
-      updateZkTimeInterval(tableConfig, segmentZKMetadata, schema);
+      updateZkTimeInterval(segmentZKMetadata, timeColumnFieldSpec);
       updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
     }
   }
@@ -2279,16 +2277,9 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void updateZkTimeInterval(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata,
-      Schema newSchema) {
-    String segmentName = segmentZKMetadata.getSegmentName();
-
-    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    if (StringUtils.isNotEmpty(timeColumnName)) {
-      DateTimeFieldSpec dateTimeFieldSpec = newSchema.getDateTimeSpec(timeColumnName);
-      ZKMetadataUtils.updateSegmentZKTimeInterval(segmentZKMetadata, dateTimeFieldSpec);
-      LOGGER.info("Updated segment zookeeper metadata: {} of table: {}", segmentName, tableConfig.getTableName());
-    }
+  public void updateZkTimeInterval(SegmentZKMetadata segmentZKMetadata,
+      DateTimeFieldSpec timeColumnFieldSpec) {
+    ZKMetadataUtils.updateSegmentZKTimeInterval(segmentZKMetadata, timeColumnFieldSpec);
   }
 
   @VisibleForTesting
