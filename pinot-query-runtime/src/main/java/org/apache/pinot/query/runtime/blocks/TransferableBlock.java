@@ -86,6 +86,7 @@ public class TransferableBlock implements Block {
           _container = DataBlockUtils.extractRows(_dataBlock);
           break;
         case COLUMNAR:
+        case METADATA:
         default:
           throw new UnsupportedOperationException("Unable to extract from container with type: " + _type);
       }
@@ -154,9 +155,10 @@ public class TransferableBlock implements Block {
     return _isErrorBlock;
   }
 
-  public byte[] toBytes()
+  // Only support data block based construction or container based construction for row or columnar format.
+  public byte[] getDataBlockBytes()
       throws IOException {
-    return _dataBlock.toBytes();
+    return getDataBlock().toBytes();
   }
 
   @Override

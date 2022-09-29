@@ -103,7 +103,7 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
         .setPayload(ByteString.copyFrom(new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(new DataSchema(
             new String[]{"foo", "bar"},
             new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING}))
-        ).toBytes()))
+        ).getDataBlockBytes()))
         .build();
   }
 
