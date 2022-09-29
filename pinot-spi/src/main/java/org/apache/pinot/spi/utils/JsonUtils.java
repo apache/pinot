@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -79,6 +80,9 @@ public class JsonUtils {
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
+  public static final ObjectReader READER_WITH_BIG_DECIMAL =
+      new ObjectMapper().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).reader();
+
   public static final TypeReference<HashMap<String, Object>> MAP_TYPE_REFERENCE =
       new TypeReference<HashMap<String, Object>>() {
       };
@@ -143,6 +147,11 @@ public class JsonUtils {
     return DEFAULT_READER.readTree(jsonString);
   }
 
+  public static JsonNode stringToJsonNodeWithBigDecimal(String jsonString)
+      throws IOException {
+    return READER_WITH_BIG_DECIMAL.readTree(jsonString);
+  }
+
   public static <T> T fileToObject(File jsonFile, Class<T> valueType)
       throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonFile);
@@ -168,8 +177,7 @@ public class JsonUtils {
   public static JsonNode fileToFirstJsonNode(File jsonFile)
       throws IOException {
     JsonFactory jf = new JsonFactory();
-    try (InputStream inputStream = new FileInputStream(jsonFile);
-        JsonParser jp = jf.createParser(inputStream)) {
+    try (InputStream inputStream = new FileInputStream(jsonFile); JsonParser jp = jf.createParser(inputStream)) {
       jp.setCodec(DEFAULT_MAPPER);
       jp.nextToken();
       if (jp.hasCurrentToken()) {

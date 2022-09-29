@@ -966,7 +966,7 @@ public enum PinotDataType {
     if (value instanceof String) {
       try {
         // Try to parse the string as JSON first
-        return JsonUtils.stringToJsonNode((String) value).toString();
+        return JsonUtils.stringToJsonNodeWithBigDecimal((String) value).toString();
       } catch (JsonParseException jpe) {
         // String does not represent a well-formed JSON. Ignore this exception because we are going to try to convert
         // Java String object to JSON string.
