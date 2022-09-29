@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.segment.spi.store;
 
+// Note: It is required to keep DICTIONARY and FORWARD_INDEX as the starting entries in this enum to ensure
+// correctness during preprocessing a segment during segmentReload. Please add new entries at the end (or at least
+// below DICTIONARY and FORWARD_INDEX).
 public enum ColumnIndexType {
   DICTIONARY("dictionary"),
   FORWARD_INDEX("forward_index"),

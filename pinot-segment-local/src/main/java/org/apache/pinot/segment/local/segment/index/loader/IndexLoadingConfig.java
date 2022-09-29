@@ -31,6 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
@@ -75,6 +76,7 @@ public class IndexLoadingConfig {
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
+  private Map<String, ChunkCompressionType> _compressionConfigs = new HashMap<>();
 
   private SegmentVersion _segmentVersion;
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
@@ -153,6 +155,7 @@ public class IndexLoadingConfig {
       }
     }
 
+    extractCompressionConfigs(tableConfig);
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
     extractH3IndexConfigsFromTableConfig(tableConfig);
@@ -212,6 +215,28 @@ public class IndexLoadingConfig {
     if (columnMinMaxValueGeneratorMode != null) {
       _columnMinMaxValueGeneratorMode =
           ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
+    }
+  }
+
+  /**
+   * Extracts compressionType for each column. Populates a map containing column name as key and compression type as
+   * value. This map will only contain the compressionType overrides, and it does not correspond to the default value
+   * of compressionType (derived using SegmentColumnarIndexCreator.getColumnCompressionType())  used for a column.
+   * Note that only RAW forward index columns will be populated in this map.
+   * @param tableConfig table config
+   */
+  private void extractCompressionConfigs(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList == null) {
+      return;
+    }
+
+    for (FieldConfig fieldConfig : fieldConfigList) {
+      String column = fieldConfig.getName();
+      if (fieldConfig.getCompressionCodec() != null) {
+        ChunkCompressionType compressionType = ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name());
+        _compressionConfigs.put(column, compressionType);
+      }
     }
   }
 
@@ -373,6 +398,24 @@ public class IndexLoadingConfig {
 
   /**
    * For tests only.
+   * Used by segmentPreProcessorTest to set raw columns.
+   */
+  @VisibleForTesting
+  public void setNoDictionaryColumns(Set<String> noDictionaryColumns) {
+    _noDictionaryColumns = noDictionaryColumns;
+  }
+
+  /**
+   * For tests only.
+   * Used by segmentPreProcessorTest to set compression configs.
+   */
+  @VisibleForTesting
+  public void setCompressionConfigs(Map<String, ChunkCompressionType> compressionConfigs) {
+    _compressionConfigs = compressionConfigs;
+  }
+
+  /**
+   * For tests only.
    */
   @VisibleForTesting
   public void setRangeIndexColumns(Set<String> rangeIndexColumns) {
@@ -422,6 +465,18 @@ public class IndexLoadingConfig {
 
   public Set<String> getNoDictionaryColumns() {
     return _noDictionaryColumns;
+  }
+
+  /**
+   * Populates a map containing column name as key and compression type as value. This map will only contain the
+   * compressionType overrides, and it does not correspond to the default value of compressionType (derived using
+   * SegmentColumnarIndexCreator.getColumnCompressionType())  used for a column. Note that only RAW forward index
+   * columns will be populated in this map.
+   *
+   * @return a map containing column name as key and compressionType as value.
+   */
+  public Map<String, ChunkCompressionType> getCompressionConfigs() {
+    return _compressionConfigs;
   }
 
   public Map<String, String> getnoDictionaryConfig() {

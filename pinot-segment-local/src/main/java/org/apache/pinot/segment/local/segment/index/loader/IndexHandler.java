@@ -37,5 +37,6 @@ public interface IndexHandler {
    * Check if there is a need to add new indices or removes obsolete indices.
    * @return true if there is a need to update.
    */
-  boolean needUpdateIndices(SegmentDirectory.Reader segmentReader);
+  boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
+      throws Exception;
 }
