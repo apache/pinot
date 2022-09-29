@@ -23,7 +23,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteOrder;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +48,6 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -101,6 +100,59 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       ThreadSafeMutableRoaringBitmap validDocIds) {
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _validDocIds = validDocIds;
+  }
+
+  @Nullable
+  public MutableRoaringBitmap loadValidDocIdsFromSnapshot() {
+    File validDocIdsSnapshotFile = getValidDocIdsSnapshotFile();
+    if (validDocIdsSnapshotFile.exists()) {
+      try {
+        byte[] bytes = FileUtils.readFileToByteArray(validDocIdsSnapshotFile);
+        MutableRoaringBitmap validDocIds = new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
+        LOGGER.info("Loaded valid doc ids for segment: {} with: {} valid docs", getSegmentName(),
+            validDocIds.getCardinality());
+        return validDocIds;
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while loading valid doc ids from snapshot file: {}, ignoring the snapshot",
+            validDocIdsSnapshotFile);
+      }
+    }
+    return null;
+  }
+
+  public void persistValidDocIdsSnapshot(MutableRoaringBitmap validDocIds) {
+    File validDocIdsSnapshotFile = getValidDocIdsSnapshotFile();
+    try {
+      if (validDocIdsSnapshotFile.exists()) {
+        FileUtils.delete(validDocIdsSnapshotFile);
+      }
+      try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(validDocIdsSnapshotFile))) {
+        validDocIds.serialize(dataOutputStream);
+      }
+      LOGGER.info("Persisted valid doc ids for segment: {} with: {} valid docs", getSegmentName(),
+          validDocIds.getCardinality());
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while persisting valid doc ids to snapshot file: {}, skipping",
+          validDocIdsSnapshotFile);
+    }
+  }
+
+  public void deleteValidDocIdsSnapshot() {
+    File validDocIdsSnapshotFile = getValidDocIdsSnapshotFile();
+    if (validDocIdsSnapshotFile.exists()) {
+      try {
+        FileUtils.delete(validDocIdsSnapshotFile);
+        LOGGER.info("Deleted valid doc ids snapshot for segment: {}", getSegmentName());
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while deleting valid doc ids snapshot file: {}, skipping",
+            validDocIdsSnapshotFile);
+      }
+    }
+  }
+
+  private File getValidDocIdsSnapshotFile() {
+    return new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
+        V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
   }
 
   @Override
@@ -254,56 +306,5 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     } catch (Exception e) {
       throw new RuntimeException("Failed to use PinotSegmentRecordReader to read value from immutable segment");
     }
-  }
-
-  @Nullable
-  public ImmutableRoaringBitmap loadValidDocIdsSnapshot(File indexDir, SegmentMetadataImpl segmentMetadata) {
-    Preconditions.checkNotNull(indexDir, "IndexDir for %s should not be null. ", segmentMetadata.getName());
-    File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
-    String validDocIdsFileName = segmentMetadata.getName() + V1Constants.Indexes.VALID_DOCS_FILE_EXTENSION;
-    File validDocIdsFile = new File(segmentDirectory, validDocIdsFileName);
-    MutableRoaringBitmap validDocIdsSnapshot;
-
-    try {
-      PinotDataBuffer dataBuffer;
-      dataBuffer = PinotDataBuffer.mapFile(validDocIdsFile, true, 0, validDocIdsFile.length(), ByteOrder.LITTLE_ENDIAN,
-          "Valid Doc Snapshot data buffer");
-
-      if (!validDocIdsFile.exists()) {
-        validDocIdsSnapshot = new MutableRoaringBitmap();
-      } else {
-        validDocIdsSnapshot = new ImmutableRoaringBitmap(
-            dataBuffer.toDirectByteBuffer(0, (int) dataBuffer.size())).toMutableRoaringBitmap();
-      }
-      dataBuffer.close();
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to load validDocIdsSnapshot");
-    }
-    return validDocIdsSnapshot;
-  }
-
-  public void persistValidDocIdsSnapshot(File indexDir, MutableRoaringBitmap validDocIdsSnapshot, String segmentName) {
-    Preconditions.checkNotNull(indexDir, "IndexDir for %s should not be null. ", segmentName);
-    File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
-    File validDocIdsSnapshotFile = new File(segmentDir, segmentName + V1Constants.Indexes.VALID_DOCS_FILE_EXTENSION);
-
-    try {
-      // Create valid doc snapshot file only if the bitmap is not empty
-      if (!validDocIdsSnapshot.isEmpty()) {
-        try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(validDocIdsSnapshotFile))) {
-          validDocIdsSnapshot.serialize(outputStream);
-        }
-      }
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to persist validDocIdsSnapshot");
-    }
-  }
-
-  public void deleteValidDocIdsSnapshot(File indexDir, String segmentName) {
-    Preconditions.checkNotNull(indexDir, "IndexDir for %s should not be null. ", segmentName);
-    File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
-    String validDocIdsFileName = segmentName + V1Constants.Indexes.VALID_DOCS_FILE_EXTENSION;
-    File validDocIdsFile = new File(segmentDirectory, validDocIdsFileName);
-    FileUtils.deleteQuietly(validDocIdsFile);
   }
 }

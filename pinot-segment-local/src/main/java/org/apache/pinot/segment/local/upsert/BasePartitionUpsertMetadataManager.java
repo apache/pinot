@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -40,9 +39,6 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.HashFunction;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,8 +54,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final String _comparisonColumn;
   protected final HashFunction _hashFunction;
   protected final PartialUpsertHandler _partialUpsertHandler;
-  protected final File _indexDir;
-  protected boolean _snapshotEnabled;
+  protected final boolean _enableSnapshot;
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
 
@@ -71,16 +66,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, String comparisonColumn, HashFunction hashFunction,
-      @Nullable PartialUpsertHandler partialUpsertHandler, boolean snapshotEnabled, File indexDir,
-      ServerMetrics serverMetrics) {
+      @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
     _comparisonColumn = comparisonColumn;
     _hashFunction = hashFunction;
     _partialUpsertHandler = partialUpsertHandler;
-    _snapshotEnabled = snapshotEnabled;
-    _indexDir = indexDir;
+    _enableSnapshot = enableSnapshot;
     _serverMetrics = serverMetrics;
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
   }
@@ -92,48 +85,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   @Override
   public void addSegment(ImmutableSegment segment) {
-    if (_snapshotEnabled) {
-      ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-      ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
-      ImmutableRoaringBitmap validDocIdsSnapshot =
-          immutableSegment.loadValidDocIdsSnapshot(_indexDir, immutableSegment.getSegmentMetadata());
-      int numTotalDocs = validDocIdsSnapshot != null ? validDocIdsSnapshot.getCardinality()
-          : segment.getSegmentMetadata().getTotalDocs();
-      Iterator<RecordInfo> recordInfoIterator = new Iterator<RecordInfo>() {
-        private int _incId = 0;
-        private Iterator<Integer> _docIdIterator = validDocIdsSnapshot != null ? validDocIdsSnapshot.iterator() : null;
-
-        @Override
-        public boolean hasNext() {
-          return _incId < numTotalDocs && _docIdIterator.hasNext();
+    Iterator<RecordInfo> recordInfoIterator = null;
+    if (segment instanceof ImmutableSegmentImpl) {
+      if (_enableSnapshot) {
+        MutableRoaringBitmap validDocIds = ((ImmutableSegmentImpl) segment).loadValidDocIdsFromSnapshot();
+        if (validDocIds != null) {
+          recordInfoIterator =
+              UpsertUtils.getRecordInfoIterator(segment, _primaryKeyColumns, _comparisonColumn, validDocIds);
         }
-
-        @Override
-        public RecordInfo next() {
-          int docId;
-          if (_docIdIterator != null) {
-            docId = _docIdIterator.next();
-          } else {
-            docId = _incId;
-          }
-          PrimaryKey primaryKey = new PrimaryKey(new Object[_primaryKeyColumns.size()]);
-          UpsertUtils.getPrimaryKey(segment, _primaryKeyColumns, docId, primaryKey);
-
-          Object comparisonValue = segment.getValue(docId, _comparisonColumn);
-          if (comparisonValue instanceof byte[]) {
-            comparisonValue = new ByteArray((byte[]) comparisonValue);
-          }
-          return new RecordInfo(primaryKey, _incId++, (Comparable) comparisonValue);
-        }
-      };
-
-      validDocIds.copy(validDocIdsSnapshot);
-      addSegment(segment, validDocIds, recordInfoIterator);
-    } else {
-      addSegment(segment, null, null);
+      } else {
+        ((ImmutableSegmentImpl) segment).deleteValidDocIdsSnapshot();
+      }
     }
+    addSegment(segment, null, recordInfoIterator);
   }
 
+  /**
+   * NOTE: We allow passing in validDocIds here so that the value can be easily accessed from the tests. The passed in
+   *       validDocIds should always be empty.
+   */
   @VisibleForTesting
   public void addSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable Iterator<RecordInfo> recordInfoIterator) {
@@ -181,6 +151,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     replaceSegment(segment, null, null, oldSegment);
   }
 
+  /**
+   * NOTE: We allow passing in validDocIds here so that the value can be easily accessed from the tests. The passed in
+   *       validDocIds should always be empty.
+   */
   @VisibleForTesting
   public void replaceSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable Iterator<RecordInfo> recordInfoIterator, IndexSegment oldSegment) {
@@ -263,6 +237,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     try {
       MutableRoaringBitmap validDocIds =
           segment.getValidDocIds() != null ? segment.getValidDocIds().getMutableRoaringBitmap() : null;
+
+      if (_enableSnapshot && segment instanceof ImmutableSegmentImpl && validDocIds != null) {
+        ((ImmutableSegmentImpl) segment).persistValidDocIdsSnapshot(validDocIds);
+      }
+
       if (validDocIds == null || validDocIds.isEmpty()) {
         _logger.info("Skip removing segment without valid docs: {}", segmentName);
         return;

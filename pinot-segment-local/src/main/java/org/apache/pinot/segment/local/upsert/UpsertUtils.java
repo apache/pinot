@@ -24,6 +24,8 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 @SuppressWarnings("rawtypes")
@@ -32,7 +34,7 @@ public class UpsertUtils {
   }
 
   /**
-   * Returns an iterator of {@link RecordInfo} from the segment.
+   * Returns an iterator of {@link RecordInfo} for all the documents from the segment.
    */
   public static Iterator<RecordInfo> getRecordInfoIterator(ImmutableSegment segment, List<String> primaryKeyColumns,
       String comparisonColumn) {
@@ -47,16 +49,43 @@ public class UpsertUtils {
 
       @Override
       public RecordInfo next() {
-        PrimaryKey primaryKey = new PrimaryKey(new Object[primaryKeyColumns.size()]);
-        getPrimaryKey(segment, primaryKeyColumns, _docId, primaryKey);
-
-        Object comparisonValue = segment.getValue(_docId, comparisonColumn);
-        if (comparisonValue instanceof byte[]) {
-          comparisonValue = new ByteArray((byte[]) comparisonValue);
-        }
-        return new RecordInfo(primaryKey, _docId++, (Comparable) comparisonValue);
+        return getRecordInfo(segment, primaryKeyColumns, comparisonColumn, _docId++);
       }
     };
+  }
+
+  /**
+   * Returns an iterator of {@link RecordInfo} for the valid documents from the segment.
+   */
+  public static Iterator<RecordInfo> getRecordInfoIterator(ImmutableSegment segment, List<String> primaryKeyColumns,
+      String comparisonColumn, MutableRoaringBitmap validDocIds) {
+    return new Iterator<RecordInfo>() {
+      private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
+
+      @Override
+      public boolean hasNext() {
+        return _docIdIterator.hasNext();
+      }
+
+      @Override
+      public RecordInfo next() {
+        return getRecordInfo(segment, primaryKeyColumns, comparisonColumn, _docIdIterator.next());
+      }
+    };
+  }
+
+  /**
+   * Reads a {@link RecordInfo} from the segment.
+   */
+  public static RecordInfo getRecordInfo(ImmutableSegment segment, List<String> primaryKeyColumns,
+      String comparisonColumn, int docId) {
+    PrimaryKey primaryKey = new PrimaryKey(new Object[primaryKeyColumns.size()]);
+    getPrimaryKey(segment, primaryKeyColumns, docId, primaryKey);
+    Object comparisonValue = segment.getValue(docId, comparisonColumn);
+    if (comparisonValue instanceof byte[]) {
+      comparisonValue = new ByteArray((byte[]) comparisonValue);
+    }
+    return new RecordInfo(primaryKey, docId, (Comparable) comparisonValue);
   }
 
   /**

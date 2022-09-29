@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -34,7 +33,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.utils.HashUtils;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -60,10 +58,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, String comparisonColumn, HashFunction hashFunction,
-      @Nullable PartialUpsertHandler partialUpsertHandler, boolean snapshotEnabled, @Nullable File indexDir,
-      ServerMetrics serverMetrics) {
+      @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, ServerMetrics serverMetrics) {
     super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumn, hashFunction, partialUpsertHandler,
-        snapshotEnabled, indexDir, serverMetrics);
+        enableSnapshot, serverMetrics);
   }
 
   @Override
@@ -175,15 +172,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             }
             return recordLocation;
           });
-    }
-    if (_snapshotEnabled && segment instanceof ImmutableSegment) {
-      try {
-        ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-        immutableSegment.persistValidDocIdsSnapshot(_indexDir, validDocIds, segment.getSegmentName());
-      } catch (Exception e) {
-        _logger.error("Failed to persist snapshot for segment {}, table {}", segment.getSegmentName(),
-            _tableNameWithType);
-      }
     }
   }
 
