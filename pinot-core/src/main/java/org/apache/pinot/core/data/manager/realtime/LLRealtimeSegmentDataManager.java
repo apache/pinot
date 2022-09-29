@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
@@ -1433,7 +1432,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     try {
       return _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA,
           maxWaitTimeMs);
-    } catch (TimeoutException e) {
+    } catch (Exception e) {
       _segmentLogger.warn(
           "Cannot fetch latest stream offset for clientId {} and partitionGroupId {} with maxWaitTime {}", _clientId,
           _partitionGroupId, maxWaitTimeMs);
