@@ -36,7 +36,7 @@ import org.openjdk.jmh.runner.options.TimeValue;
 @State(Scope.Benchmark)
 public class BenchmarkThreadInterruptionCheck {
 
-  static final int MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK_MASK = 0b1111_11111_11111;
+  static final int MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK_MASK = 0b111_11111_11111;
 
   public static void main(String[] args)
       throws RunnerException {
@@ -52,7 +52,7 @@ public class BenchmarkThreadInterruptionCheck {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void benchMaskingTime(Blackhole bh) {
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 1000000; i++) {
       bh.consume((i & MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK_MASK) == 0);
     }
   }
@@ -60,8 +60,26 @@ public class BenchmarkThreadInterruptionCheck {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public void benchModuloTime(Blackhole bh) {
+    for (int i = 0; i < 1000000; i++) {
+      bh.consume((i % 16321) == 0);
+    }
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public void benchLoopTilingTime(Blackhole bh) {
+    for (int i = 0; i < 1000000; i += 16321) {
+      bh.consume(Math.min(i + 16321, 1000000));
+    }
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void benchInterruptionCheckTime(Blackhole bh) {
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 1000000; i++) {
       bh.consume(Thread.interrupted());
     }
   }
