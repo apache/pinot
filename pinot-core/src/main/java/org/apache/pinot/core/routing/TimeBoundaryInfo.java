@@ -21,10 +21,12 @@ package org.apache.pinot.core.routing;
 public class TimeBoundaryInfo {
   private final String _timeColumn;
   private final String _timeValue;
+  private final boolean _enforced;
 
-  public TimeBoundaryInfo(String timeColumn, String timeValue) {
+  public TimeBoundaryInfo(String timeColumn, String timeValue, boolean enforced) {
     _timeColumn = timeColumn;
     _timeValue = timeValue;
+    _enforced = enforced;
   }
 
   public String getTimeColumn() {
@@ -33,5 +35,9 @@ public class TimeBoundaryInfo {
 
   public String getTimeValue() {
     return _timeValue;
+  }
+
+  public boolean isEnforced() {
+    return _enforced;
   }
 }

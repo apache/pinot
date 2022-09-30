@@ -33,6 +33,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -56,6 +58,7 @@ public class TimeBoundaryManager {
 
   private final String _offlineTableName;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private final BrokerMetrics _brokerMetrics;
   private final String _segmentZKMetadataPathPrefix;
   private final String _timeColumn;
   private final DateTimeFormatSpec _timeFormatSpec;
@@ -63,13 +66,14 @@ public class TimeBoundaryManager {
   private final Map<String, Long> _endTimeMsMap = new HashMap<>();
 
   private volatile TimeBoundaryInfo _timeBoundaryInfo;
-  private volatile TimeBoundaryInfo _enforcedTimeBoundaryInfo;
 
-  public TimeBoundaryManager(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public TimeBoundaryManager(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics) {
     Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
         "Cannot construct TimeBoundaryManager for real-time table: %s", tableConfig.getTableName());
     _offlineTableName = tableConfig.getTableName();
     _propertyStore = propertyStore;
+    _brokerMetrics = brokerMetrics;
     _segmentZKMetadataPathPrefix = ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName) + "/";
 
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _offlineTableName);
@@ -107,11 +111,9 @@ public class TimeBoundaryManager {
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // Bulk load time info for all online segments
     String enforcedTimeBoundary = idealState.getRecord().getSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
+    Long enforcedTimeBoundaryMs = null;
     if (enforcedTimeBoundary != null) {
-      long timeBoundary = Long.parseLong(enforcedTimeBoundary);
-      updateEnforcedTimeBoundaryInfo(timeBoundary);
-    } else {
-      _enforcedTimeBoundaryInfo = null;
+      enforcedTimeBoundaryMs = Long.parseLong(enforcedTimeBoundary);
     }
 
     int numSegments = onlineSegments.size();
@@ -129,7 +131,7 @@ public class TimeBoundaryManager {
       _endTimeMsMap.put(segment, endTimeMs);
       maxEndTimeMs = Math.max(maxEndTimeMs, endTimeMs);
     }
-    updateTimeBoundaryInfo(maxEndTimeMs);
+    updateTimeBoundaryInfo(enforcedTimeBoundaryMs, maxEndTimeMs, true);
   }
 
   private long extractEndTimeMsFromSegmentZKMetadataZNRecord(String segment, @Nullable ZNRecord znRecord) {
@@ -151,24 +153,44 @@ public class TimeBoundaryManager {
     return endTimeMs;
   }
 
-  private void updateTimeBoundaryInfo(long maxEndTimeMs) {
-    if (maxEndTimeMs > 0) {
-      String timeBoundary = _timeFormatSpec.fromMillisToFormat(maxEndTimeMs - _timeOffsetMs);
-      TimeBoundaryInfo currentTimeBoundaryInfo = _timeBoundaryInfo;
-      if (currentTimeBoundaryInfo == null || !currentTimeBoundaryInfo.getTimeValue().equals(timeBoundary)) {
-        _timeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, timeBoundary);
-        LOGGER.info("Updated time boundary to: {} for table: {}", timeBoundary, _offlineTableName);
+  private synchronized void updateTimeBoundaryInfo(Long enforcedTimeBoundary, long maxEndTimeMs,
+      boolean idealStateReffered) {
+    TimeBoundaryInfo currentTimeBoundaryInfo = _timeBoundaryInfo;
+    Long finalTimeBoundaryMs = null;
+    boolean isEnforced = false;
+    boolean validTimeBoundaryFound = false;
+
+    if (enforcedTimeBoundary != null) {
+      finalTimeBoundaryMs = enforcedTimeBoundary;
+      isEnforced = true;
+      validTimeBoundaryFound = true;
+      LOGGER.info("Enforced table time boundary in use: {} for table: {}", enforcedTimeBoundary, _offlineTableName);
+    } else if (idealStateReffered || !currentTimeBoundaryInfo.isEnforced()) {
+      if (maxEndTimeMs > 0) {
+        finalTimeBoundaryMs = maxEndTimeMs - _timeOffsetMs;
+        validTimeBoundaryFound = true;
+      } else {
+        LOGGER.warn("Failed to find segment with valid end time for table: {}, no time boundary generated",
+            _offlineTableName);
       }
     } else {
-      LOGGER.warn("Failed to find segment with valid end time for table: {}, no time boundary generated",
-          _offlineTableName);
+      validTimeBoundaryFound = true;
+      LOGGER.info("Skipping time boundary update since enforced time boundary exists");
+    }
+
+    if (validTimeBoundaryFound) {
+      if (finalTimeBoundaryMs != null) {
+        String timeBoundary = _timeFormatSpec.fromMillisToFormat(finalTimeBoundaryMs);
+        if (currentTimeBoundaryInfo == null || !currentTimeBoundaryInfo.getTimeValue().equals(timeBoundary)) {
+          _timeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, timeBoundary, isEnforced);
+          LOGGER.info("Updated time boundary to: {} for table: {}", timeBoundary, _offlineTableName);
+        }
+        _brokerMetrics.setValueOfTableGauge(_offlineTableName, BrokerGauge.TIME_BOUNDARY_DIFFERENCE,
+            Math.max(0, maxEndTimeMs - finalTimeBoundaryMs));
+      }
+    } else {
       _timeBoundaryInfo = null;
     }
-  }
-
-  private void updateEnforcedTimeBoundaryInfo(long maxEndTimeMs) {
-    String timeBoundary = _timeFormatSpec.fromMillisToFormat(maxEndTimeMs);
-    _enforcedTimeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, timeBoundary);
   }
 
   /**
@@ -182,11 +204,9 @@ public class TimeBoundaryManager {
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     String enforcedTimeBoundary = idealState.getRecord().getSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
+    Long enforcedTimeBoundaryMs = null;
     if (enforcedTimeBoundary != null) {
-      long timeBoundary = Long.parseLong(enforcedTimeBoundary);
-      updateEnforcedTimeBoundaryInfo(timeBoundary);
-    } else {
-      _enforcedTimeBoundaryInfo = null;
+      enforcedTimeBoundaryMs = Long.parseLong(enforcedTimeBoundary);
     }
 
     for (String segment : onlineSegments) {
@@ -199,7 +219,7 @@ public class TimeBoundaryManager {
       }
     }
     _endTimeMsMap.keySet().retainAll(onlineSegments);
-    updateTimeBoundaryInfo(getMaxEndTimeMs());
+    updateTimeBoundaryInfo(enforcedTimeBoundaryMs, getMaxEndTimeMs(), true);
   }
 
   private long getMaxEndTimeMs() {
@@ -216,12 +236,11 @@ public class TimeBoundaryManager {
   public synchronized void refreshSegment(String segment) {
     _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
         _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
-    updateTimeBoundaryInfo(getMaxEndTimeMs());
+    updateTimeBoundaryInfo(null, getMaxEndTimeMs(), false);
   }
 
   @Nullable
   public TimeBoundaryInfo getTimeBoundaryInfo() {
-    TimeBoundaryInfo enforcedTimeBoundary = _enforcedTimeBoundaryInfo;
-    return (enforcedTimeBoundary != null) ? enforcedTimeBoundary : _timeBoundaryInfo;
+    return _timeBoundaryInfo;
   }
 }
