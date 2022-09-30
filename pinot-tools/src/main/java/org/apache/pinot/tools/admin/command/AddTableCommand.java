@@ -214,8 +214,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       TableConfig tableConfig = attempt(() -> JsonUtils.fileToObject(new File(_tableConfigFile), TableConfig.class),
           "Failed reading table config " + _tableConfigFile);
       rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableConfig.getTableName());
-      if (tableType == TableType.OFFLINE) {
+      if (tableConfig.getTableType() == TableType.OFFLINE) {
         offlineTableConfig = tableConfig;
       } else {
         realtimeTableConfig = tableConfig;
