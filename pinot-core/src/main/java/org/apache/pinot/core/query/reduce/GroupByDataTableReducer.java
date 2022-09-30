@@ -64,7 +64,7 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByDataTableReducer implements DataTableReducer {
   private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
-  private static final int MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK = 10_000;
+  private static final int MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK_MASK = 0b1111_11111_11111; // checks every 32768 rows
 
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
@@ -290,7 +290,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
               int numRows = dataTable.getNumberOfRows();
               for (int rowId = 0; rowId < numRows; rowId++) {
-                if (rowId % MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK == 0 && Thread.interrupted()) {
+                if ((rowId & MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK_MASK) == 0 && Thread.interrupted()) {
                   return;
                 }
                 Object[] values = new Object[_numColumns];
