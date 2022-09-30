@@ -165,11 +165,11 @@ public class TableRetentionValidator {
         SegmentZKMetadata segmentMetadata =
             ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
         long startTimeMs = segmentMetadata.getStartTimeMs();
-        if (!TimeUtils.timeValueInValidRange(startTimeMs)) {
+        if (startTimeMs != -1 && !TimeUtils.timeValueInValidRange(startTimeMs)) {
           errorMessages.add("Segment: " + segmentName + " has invalid start time in millis: " + startTimeMs);
         }
         long endTimeMs = segmentMetadata.getEndTimeMs();
-        if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
+        if (endTimeMs != -1 && !TimeUtils.timeValueInValidRange(endTimeMs)) {
           errorMessages.add("Segment: " + segmentName + " has invalid end time in millis: " + endTimeMs);
         }
       }
