@@ -19,6 +19,7 @@
 package org.apache.pinot.query.service;
 
 import com.google.common.collect.Lists;
+import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
+import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.StageNode;
@@ -42,13 +44,12 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 
 
-public class QueryServerTest {
+public class QueryServerTest extends QueryTestSet {
   private static final Random RANDOM_REQUEST_ID_GEN = new Random();
   private static final int QUERY_SERVER_COUNT = 2;
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
@@ -88,7 +89,7 @@ public class QueryServerTest {
   }
 
   @SuppressWarnings("unchecked")
-  @Test(dataProvider = "testDataWithSqlToCompiledAsWorkerRequest")
+  @Test(dataProvider = "testSql")
   public void testWorkerAcceptsWorkerRequestCorrect(String sql)
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
@@ -126,17 +127,6 @@ public class QueryServerTest {
     }
   }
 
-  @DataProvider(name = "testDataWithSqlToCompiledAsWorkerRequest")
-  private Object[][] provideTestSqlToCompiledToWorkerRequest() {
-    return new Object[][] {
-        new Object[]{"SELECT * FROM b"},
-        new Object[]{"SELECT * FROM a"},
-        new Object[]{"SELECT * FROM a JOIN b ON a.col3 = b.col3"},
-        new Object[]{"SELECT a.col1, a.ts, c.col2, c.col3 FROM a JOIN c ON a.col1 = c.col2 "
-            + " WHERE (a.col3 >= 0 OR a.col2 = 'foo') AND c.col3 >= 0"},
-    };
-  }
-
   private static boolean isMetadataMapsEqual(StageMetadata left, StageMetadata right) {
     return left.getServerInstances().equals(right.getServerInstances())
         && left.getServerInstanceToSegmentsMap().equals(right.getServerInstanceToSegmentsMap())
@@ -163,11 +153,12 @@ public class QueryServerTest {
   private void submitRequest(Worker.QueryRequest queryRequest) {
     String host = queryRequest.getMetadataMap().get("SERVER_INSTANCE_HOST");
     int port = Integer.parseInt(queryRequest.getMetadataMap().get("SERVER_INSTANCE_PORT"));
-    PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub stub =
-        PinotQueryWorkerGrpc.newBlockingStub(ManagedChannelBuilder.forAddress(host, port).usePlaintext().build());
+    ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+    PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub stub = PinotQueryWorkerGrpc.newBlockingStub(channel);
     Worker.QueryResponse resp = stub.submit(queryRequest);
     // TODO: validate meaningful return value
     Assert.assertNotNull(resp.getMetadataMap().get("OK"));
+    channel.shutdown();
   }
 
   private Worker.QueryRequest getQueryRequest(QueryPlan queryPlan, int stageId) {
