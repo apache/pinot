@@ -16,46 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common.datablock;
+package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.datablock.BaseDataBlock;
-import org.apache.pinot.common.datablock.ColumnarDataBlock;
-import org.apache.pinot.common.datablock.MetadataBlock;
-import org.apache.pinot.common.datablock.RowDataBlock;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public final class DataBlockUtils {
   protected static final int VERSION_TYPE_SHIFT = 5;
+
   private DataBlockUtils() {
     // do not instantiate.
-  }
-
-  public static MetadataBlock getErrorDataBlock(Exception e) {
-    String errorMessage = e.getMessage() == null ? e.toString() : e.getMessage();
-    if (e instanceof ProcessingException) {
-      return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), errorMessage));
-    } else {
-      return getErrorDataBlock(Collections.singletonMap(QueryException.UNKNOWN_ERROR_CODE, errorMessage));
-    }
-  }
-
-  public static MetadataBlock getErrorDataBlock(Map<Integer, String> exceptions) {
-    MetadataBlock errorBlock = new MetadataBlock();
-    for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
-      errorBlock.addException(exception.getKey(), exception.getValue());
-    }
-    return errorBlock;
   }
 
   public static MetadataBlock getEndOfStreamDataBlock(@Nonnull DataSchema dataSchema) {

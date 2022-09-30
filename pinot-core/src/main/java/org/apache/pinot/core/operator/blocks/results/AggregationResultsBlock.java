@@ -22,11 +22,11 @@ import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -72,7 +72,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
 
     // Build the data table.
     DataTableBuilder dataTableBuilder =
-        DataTableFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
+        DataTableUtils.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
     if (queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       for (int i = 0; i < numColumns; i++) {

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -101,7 +102,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     if (value == null) {
       _currentRowDataByteBuffer.putInt(0);
-      _variableSizeDataOutputStream.writeInt(ObjectSerDeUtils.NULL_TYPE_VALUE);
+      _variableSizeDataOutputStream.writeInt(org.apache.pinot.common.ObjectSerDeUtils.NULL_TYPE_VALUE);
     } else {
       int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
       byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);

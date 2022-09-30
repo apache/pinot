@@ -19,22 +19,19 @@
 package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -43,52 +40,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @SuppressWarnings("rawtypes")
 public class DataTableUtils {
   private DataTableUtils() {
-  }
-
-  /**
-   * Given a {@link DataSchema}, compute each column's offset and fill them into the passed in array, then return the
-   * row size in bytes.
-   *
-   * @param dataSchema data schema.
-   * @param columnOffsets array of column offsets.
-   * @return row size in bytes.
-   */
-  public static int computeColumnOffsets(DataSchema dataSchema, int[] columnOffsets, int dataTableVersion) {
-    int numColumns = columnOffsets.length;
-    assert numColumns == dataSchema.size();
-
-    ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
-    int rowSizeInBytes = 0;
-    for (int i = 0; i < numColumns; i++) {
-      columnOffsets[i] = rowSizeInBytes;
-      switch (storedColumnDataTypes[i]) {
-        case INT:
-          rowSizeInBytes += 4;
-          break;
-        case LONG:
-          rowSizeInBytes += 8;
-          break;
-        case FLOAT:
-          if (dataTableVersion >= DataTableFactory.VERSION_4) {
-            rowSizeInBytes += 4;
-          } else {
-            rowSizeInBytes += 8;
-          }
-          break;
-        case DOUBLE:
-          rowSizeInBytes += 8;
-          break;
-        case STRING:
-          rowSizeInBytes += 4;
-          break;
-        // Object and array. (POSITION|LENGTH)
-        default:
-          rowSizeInBytes += 8;
-          break;
-      }
-    }
-
-    return rowSizeInBytes;
   }
 
   /**
@@ -120,7 +71,20 @@ public class DataTableUtils {
     // NOTE: Use STRING column data type as default for selection query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    return DataTableFactory.getDataTableBuilder(dataSchema).build();
+    return getDataTableBuilder(dataSchema).build();
+  }
+
+  public static DataTableBuilder getDataTableBuilder(DataSchema dataSchema) {
+    switch (DataTableFactory.getDataTableVersion()) {
+      case DataTableFactory.VERSION_2:
+      case DataTableFactory.VERSION_3:
+        return new DataTableBuilderV2V3(dataSchema, DataTableFactory.getDataTableVersion());
+      case DataTableFactory.VERSION_4:
+        return new DataTableBuilderV4(dataSchema);
+      default:
+        throw new UnsupportedOperationException(
+            "Unsupported data table version: " + DataTableFactory.getDataTableVersion());
+    }
   }
 
   /**
@@ -151,7 +115,7 @@ public class DataTableUtils {
         columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
         index++;
       }
-      return DataTableFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes)).build();
+      return getDataTableBuilder(new DataSchema(columnNames, columnDataTypes)).build();
     } else {
       // Aggregation only query
 
@@ -168,8 +132,7 @@ public class DataTableUtils {
       }
 
       // Build the data table
-      DataTableBuilder dataTableBuilder =
-          DataTableFactory.getDataTableBuilder(new DataSchema(aggregationColumnNames, columnDataTypes));
+      DataTableBuilder dataTableBuilder = getDataTableBuilder(new DataSchema(aggregationColumnNames, columnDataTypes));
       dataTableBuilder.startRow();
       for (int i = 0; i < numAggregations; i++) {
         switch (columnDataTypes[i]) {
@@ -212,27 +175,12 @@ public class DataTableUtils {
         new DataSchema(columnNames, columnDataTypes), Collections.emptySet(), queryContext.isNullHandlingEnabled());
 
     // Build the data table
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(
+    DataTableBuilder dataTableBuilder = getDataTableBuilder(
         new DataSchema(new String[]{distinctAggregationFunction.getColumnName()},
             new ColumnDataType[]{ColumnDataType.OBJECT}));
     dataTableBuilder.startRow();
     dataTableBuilder.setColumn(0, distinctTable);
     dataTableBuilder.finishRow();
     return dataTableBuilder.build();
-  }
-
-  /**
-   * Helper method to decode string.
-   */
-  public static String decodeString(ByteBuffer buffer)
-      throws IOException {
-    int length = buffer.getInt();
-    if (length == 0) {
-      return StringUtils.EMPTY;
-    } else {
-      byte[] bytes = new byte[length];
-      buffer.get(bytes);
-      return new String(bytes, UTF_8);
-    }
   }
 }

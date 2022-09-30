@@ -24,7 +24,6 @@ import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -49,11 +48,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
     extends BaseSingleInputAggregationFunction<ValueLongPair<V>, V> {
   protected final ExpressionContext _timeCol;
-  private final ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> _objectSerDe;
+  private final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> _objectSerDe;
 
   public FirstWithTimeAggregationFunction(ExpressionContext dataCol,
       ExpressionContext timeCol,
-      ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe) {
+      org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe) {
     super(dataCol);
     _timeCol = timeCol;
     _objectSerDe = objectSerDe;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.request.context;
+package org.apache.pinot.common.request.context;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;

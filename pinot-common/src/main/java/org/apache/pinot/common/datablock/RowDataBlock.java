@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common.datablock;
+package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -24,52 +24,45 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 /**
- * Column-wise data table. It stores data in columnar-major format.
+ * Wrapper for row-wise data table. It stores data in row-major format.
  */
-public class ColumnarDataBlock extends BaseDataBlock {
+public class RowDataBlock extends BaseDataBlock {
   private static final int VERSION = 1;
-  protected int[] _cumulativeColumnOffsetSizeInBytes;
-  protected int[] _columnSizeInBytes;
+  protected int[] _columnOffsets;
+  protected int _rowSizeInBytes;
 
-  public ColumnarDataBlock() {
+  public RowDataBlock() {
     super();
   }
 
-  public ColumnarDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
+  public RowDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
     super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
     computeBlockObjectConstants();
   }
 
-  public ColumnarDataBlock(ByteBuffer byteBuffer)
+  public RowDataBlock(ByteBuffer byteBuffer)
       throws IOException {
     super(byteBuffer);
     computeBlockObjectConstants();
   }
 
   protected void computeBlockObjectConstants() {
-    _fixDataSize = 0;
     if (_dataSchema != null) {
-      _cumulativeColumnOffsetSizeInBytes = new int[_numColumns];
-      _columnSizeInBytes = new int[_numColumns];
-      DataBlockUtils.computeColumnSizeInBytes(_dataSchema, _columnSizeInBytes);
-      int cumulativeColumnOffset = 0;
-      for (int i = 0; i < _numColumns; i++) {
-        _cumulativeColumnOffsetSizeInBytes[i] = cumulativeColumnOffset;
-        cumulativeColumnOffset += _columnSizeInBytes[i] * _numRows;
-      }
-      _fixDataSize = cumulativeColumnOffset;
+      _columnOffsets = new int[_numColumns];
+      _rowSizeInBytes = DataBlockUtils.computeColumnOffsets(_dataSchema, _columnOffsets);
+      _fixDataSize = _numRows * _rowSizeInBytes;
     }
   }
 
   @Override
   protected int getDataBlockVersionType() {
-    return VERSION + (Type.COLUMNAR.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
+    return VERSION + (Type.ROW.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
   }
 
   @Override
   protected int getOffsetInFixedBuffer(int rowId, int colId) {
-    return _cumulativeColumnOffsetSizeInBytes[colId] + _columnSizeInBytes[colId] * rowId;
+    return rowId * _rowSizeInBytes + _columnOffsets[colId];
   }
 
   @Override
@@ -80,17 +73,17 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   @Override
-  public ColumnarDataBlock toMetadataOnlyDataTable() {
-    ColumnarDataBlock metadataOnlyDataTable = new ColumnarDataBlock();
+  public RowDataBlock toMetadataOnlyDataTable() {
+    RowDataBlock metadataOnlyDataTable = new RowDataBlock();
     metadataOnlyDataTable._metadata.putAll(_metadata);
     metadataOnlyDataTable._errCodeToExceptionMap.putAll(_errCodeToExceptionMap);
     return metadataOnlyDataTable;
   }
 
   @Override
-  public ColumnarDataBlock toDataOnlyDataTable() {
-    return new ColumnarDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
+  public RowDataBlock toDataOnlyDataTable() {
+    return new RowDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
 
-  // TODO: add whole-column access methods.
+  // TODO: add whole-row access methods.
 }

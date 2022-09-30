@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common.datatable;
+package org.apache.pinot.common.datatable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -129,26 +129,27 @@ public class DataTableImplV2 extends BaseDataTable {
 
   private Map<String, String> deserializeMetadata(ByteBuffer buffer)
       throws IOException {
-      int numEntries = buffer.getInt();
-      Map<String, String> metadata = new HashMap<>(numEntries);
+    int numEntries = buffer.getInt();
+    Map<String, String> metadata = new HashMap<>(numEntries);
 
-      for (int i = 0; i < numEntries; i++) {
-        String key = DataTableUtils.decodeString(buffer);
-        String value = DataTableUtils.decodeString(buffer);
-        metadata.put(key, value);
-      }
+    for (int i = 0; i < numEntries; i++) {
+      String key = DataTableUtils.decodeString(buffer);
+      String value = DataTableUtils.decodeString(buffer);
+      metadata.put(key, value);
+    }
 
-      return metadata;
+    return metadata;
   }
 
   @Override
   public void addException(ProcessingException processingException) {
-    _metadata.put(EXCEPTION_METADATA_KEY + processingException.getErrorCode(), processingException.getMessage());
+    _metadata.put(DataTable.EXCEPTION_METADATA_KEY + processingException.getErrorCode(),
+        processingException.getMessage());
   }
 
   @Override
   public void addException(int errCode, String errMsg) {
-    _metadata.put(EXCEPTION_METADATA_KEY + errCode, errMsg);
+    _metadata.put(DataTable.EXCEPTION_METADATA_KEY + errCode, errMsg);
   }
 
   // getExceptions return a map of errorCode->errMessage of the datatable.
@@ -156,7 +157,7 @@ public class DataTableImplV2 extends BaseDataTable {
   public Map<Integer, String> getExceptions() {
     Map<Integer, String> exceptions = new HashMap<>();
     for (String key : _metadata.keySet()) {
-      if (key.startsWith(EXCEPTION_METADATA_KEY)) {
+      if (key.startsWith(DataTable.EXCEPTION_METADATA_KEY)) {
         // In V2, all exceptions are added into metadata, using "Exception"+errCode as key,
         // Integer.parseInt(key.substring(9)) can extract the error code from the key.
         exceptions.put(Integer.parseInt(key.substring(9)), _metadata.get(key));

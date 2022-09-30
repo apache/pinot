@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.core.common.datatable;
+package org.apache.pinot.common.datatable;
 
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
@@ -27,9 +27,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.query.request.context.ThreadTimer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -196,7 +196,8 @@ public class DataTableImplV3 extends BaseDataTable {
     // Add table serialization time metadata if thread timer is enabled.
     if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
       long responseSerializationCpuTimeNs = threadTimer.getThreadTimeNs();
-      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(responseSerializationCpuTimeNs));
+      getMetadata().put(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(),
+          String.valueOf(responseSerializationCpuTimeNs));
     }
 
     // Write metadata: length followed by actual metadata bytes.
@@ -316,16 +317,16 @@ public class DataTableImplV3 extends BaseDataTable {
     dataOutputStream.writeInt(_metadata.size());
 
     for (Map.Entry<String, String> entry : _metadata.entrySet()) {
-      MetadataKey key = MetadataKey.getByName(entry.getKey());
+      DataTable.MetadataKey key = DataTable.MetadataKey.getByName(entry.getKey());
       // Ignore unknown keys.
       if (key == null) {
         continue;
       }
       String value = entry.getValue();
       dataOutputStream.writeInt(key.getId());
-      if (key.getValueType() == MetadataValueType.INT) {
+      if (key.getValueType() == DataTable.MetadataValueType.INT) {
         dataOutputStream.write(Ints.toByteArray(Integer.parseInt(value)));
-      } else if (key.getValueType() == MetadataValueType.LONG) {
+      } else if (key.getValueType() == DataTable.MetadataValueType.LONG) {
         dataOutputStream.write(Longs.toByteArray(Long.parseLong(value)));
       } else {
         byte[] valueBytes = value.getBytes(UTF_8);
@@ -353,15 +354,15 @@ public class DataTableImplV3 extends BaseDataTable {
     Map<String, String> metadata = new HashMap<>();
     for (int i = 0; i < numEntries; i++) {
       int keyId = buffer.getInt();
-      MetadataKey key = MetadataKey.getById(keyId);
+      DataTable.MetadataKey key = DataTable.MetadataKey.getById(keyId);
       // Ignore unknown keys.
       if (key == null) {
         continue;
       }
-      if (key.getValueType() == MetadataValueType.INT) {
+      if (key.getValueType() == DataTable.MetadataValueType.INT) {
         String value = "" + buffer.getInt();
         metadata.put(key.getName(), value);
-      } else if (key.getValueType() == MetadataValueType.LONG) {
+      } else if (key.getValueType() == DataTable.MetadataValueType.LONG) {
         String value = "" + buffer.getLong();
         metadata.put(key.getName(), value);
       } else {

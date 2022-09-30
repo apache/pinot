@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package org.apache.pinot.core.common.datatable;
+package org.apache.pinot.common.datatable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.datablock.RowDataBlock;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 

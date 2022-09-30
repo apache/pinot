@@ -19,7 +19,7 @@
 package org.apache.pinot.core.plan;
 
 import java.util.concurrent.TimeoutException;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 
 
