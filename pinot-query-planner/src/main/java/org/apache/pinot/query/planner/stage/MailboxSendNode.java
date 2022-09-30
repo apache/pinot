@@ -56,4 +56,9 @@ public class MailboxSendNode extends AbstractStageNode {
   public KeySelector<Object[], Object[]> getPartitionKeySelector() {
     return _partitionKeySelector;
   }
+
+  @Override
+  public String explain() {
+    return "MAIL_SEND";
+  }
 }

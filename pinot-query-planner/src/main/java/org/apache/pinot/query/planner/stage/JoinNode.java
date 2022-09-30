@@ -59,6 +59,11 @@ public class JoinNode extends AbstractStageNode {
     return _joinClause;
   }
 
+  @Override
+  public String explain() {
+    return "JOIN";
+  }
+
   public static class JoinKeys {
     @ProtoProperties
     private KeySelector<Object[], Object[]> _leftJoinKeySelector;
