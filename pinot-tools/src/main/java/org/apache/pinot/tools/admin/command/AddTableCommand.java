@@ -19,12 +19,14 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Callable;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -45,19 +47,29 @@ import picocli.CommandLine;
 public class AddTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
 
-  @CommandLine.Option(names = {"-tableConfigFile", "-tableConf", "-tableConfig", "-filePath"}, required = true,
-      description = "Path to table config file.")
+  @CommandLine.Option(names = {"-tableConfigFile", "-tableConf", "-tableConfig", "-filePath"}, description = "Path to"
+      + " table config file.")
   private String _tableConfigFile;
 
-  @CommandLine.Option(names = {"-schemaFile", "-schemaFileName", "-schema"}, required = false,
-      description = "Path to table schema file.")
+  @CommandLine.Option(names = {
+      "-offlineTableConfigFile", "-offlineTableConf", "-offlineTableConfig", "-offlineFilePath"
+  }, description = "Path to offline table config file.")
+  private String _offlineTableConfigFile;
+
+  @CommandLine.Option(names = {
+      "-realtimeTableConfigFile", "-realtimeTableConf", "-realtimeTableConfig", "-realtimeFilePath"
+  }, description = "Path to realtime table config file.")
+  private String _realtimeTableConfigFile;
+
+  @CommandLine.Option(names = {"-schemaFile", "-schemaFileName", "-schema"}, required = false, description = "Path to"
+      + " table schema file.")
   private String _schemaFile = null;
 
   @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
   private String _controllerHost;
 
-  @CommandLine.Option(names = {"-controllerPort"}, required = false,
-      description = "Port number to start the controller at.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number to start the "
+      + "controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
@@ -78,8 +90,8 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
+      + "this message.")
   private boolean _help = false;
 
   private String _controllerAddress;
@@ -104,9 +116,10 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   @Override
   public String toString() {
     String retString =
-        ("AddTable -tableConfigFile " + _tableConfigFile + " -schemaFile " + _schemaFile + " -controllerProtocol "
-            + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
-            + " -user " + _user + " -password " + "[hidden]");
+        ("AddTable -tableConfigFile " + _tableConfigFile + " -offlineTableConfigFile " + _offlineTableConfigFile
+            + " -realtimeTableConfigFile" + _realtimeTableConfigFile + " -schemaFile " + _schemaFile
+            + " -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
+            + " -controllerPort " + _controllerPort + " -user " + _user + " -password " + "[hidden]");
     return ((_exec) ? (retString + " -exec") : retString);
   }
 
@@ -116,6 +129,16 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   public AddTableCommand setTableConfigFile(String tableConfigFile) {
     _tableConfigFile = tableConfigFile;
+    return this;
+  }
+
+  public AddTableCommand setOfflineTableConfigFile(String offlineTableConfigFile) {
+    _offlineTableConfigFile = offlineTableConfigFile;
+    return this;
+  }
+
+  public AddTableCommand setRealtimeTableConfigFile(String realtimeTableConfigFile) {
+    _realtimeTableConfigFile = realtimeTableConfigFile;
     return this;
   }
 
@@ -184,14 +207,37 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
     LOGGER.info("Executing command: " + toString());
 
-    TableConfig tableConfig = attempt(() -> JsonUtils.fileToObject(new File(_tableConfigFile), TableConfig.class),
-        "Failed reading table config " + _tableConfigFile);
+    String rawTableName = null;
+    TableConfig offlineTableConfig = null;
+    TableConfig realtimeTableConfig = null;
+    if (_tableConfigFile != null) {
+      TableConfig tableConfig = attempt(() -> JsonUtils.fileToObject(new File(_tableConfigFile), TableConfig.class),
+          "Failed reading table config " + _tableConfigFile);
+      rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+      if (tableConfig.getTableType() == TableType.OFFLINE) {
+        offlineTableConfig = tableConfig;
+      } else {
+        realtimeTableConfig = tableConfig;
+      }
+    }
+
+    if (_offlineTableConfigFile != null) {
+      offlineTableConfig = attempt(() -> JsonUtils.fileToObject(new File(_offlineTableConfigFile), TableConfig.class),
+          "Failed reading offline table config " + _offlineTableConfigFile);
+      rawTableName = TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName());
+    }
+    if (_realtimeTableConfigFile != null) {
+      realtimeTableConfig = attempt(() -> JsonUtils.fileToObject(new File(_realtimeTableConfigFile), TableConfig.class),
+          "Failed reading realtime table config " + _realtimeTableConfigFile);
+      rawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
+    }
+
+    Preconditions.checkState(rawTableName != null,
+        "Must provide at least one of -tableConfigFile, -offlineTableConfigFile, -realtimeTableConfigFile");
 
     Schema schema = attempt(() -> JsonUtils.fileToObject(new File(_schemaFile), Schema.class),
         "Failed reading schema " + _schemaFile);
-
-    String tableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-    TableConfigs tableConfigs = new TableConfigs(tableName, schema, tableConfig, null);
+    TableConfigs tableConfigs = new TableConfigs(rawTableName, schema, offlineTableConfig, realtimeTableConfig);
 
     return sendTableCreationRequest(JsonUtils.objectToJsonNode(tableConfigs));
   }
