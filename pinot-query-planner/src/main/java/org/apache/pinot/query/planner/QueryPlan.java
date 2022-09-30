@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.query.planner;
 
+import com.google.common.collect.Iterables;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.util.Pair;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.StageNode;
@@ -80,26 +82,58 @@ public class QueryPlan {
     }
 
     StringBuilder builder = new StringBuilder();
-    debugString(builder, _queryStageMap.get(0), "", "");
+    debugString(
+        builder,
+        _queryStageMap.get(0),
+        "",
+        "",
+        Iterables.getOnlyElement(_stageMetadataMap.get(0).getServerInstances()));
     return builder.toString();
   }
 
-  private void debugString(StringBuilder builder, StageNode root, String prefix, String childPrefix) {
+  private void debugString(
+      StringBuilder builder,
+      StageNode root,
+      String prefix,
+      String childPrefix,
+      ServerInstance server
+  ) {
     builder
         .append(prefix)
         .append(root.debugString())
+        .append('(')
+        .append(server)
+        .append(')')
         .append('\n');
 
     if (root instanceof MailboxReceiveNode) {
       int senderStage = ((MailboxReceiveNode) root).getSenderStageId();
-      debugString(builder, _queryStageMap.get(senderStage), childPrefix + "└── ", childPrefix + "    ");
+      List<ServerInstance> senders = _stageMetadataMap.get(senderStage).getServerInstances();
+      for (Iterator<ServerInstance> iterator = senders.iterator(); iterator.hasNext();) {
+        ServerInstance serverInstance = iterator.next();
+        if (iterator.hasNext()) {
+          debugString(
+              builder,
+              _queryStageMap.get(senderStage),
+              childPrefix + "├── ",
+              childPrefix + "│   ",
+              serverInstance);
+        } else {
+          debugString(
+              builder,
+              _queryStageMap.get(senderStage),
+              childPrefix + "└── ",
+              childPrefix + "    ",
+              serverInstance);
+        }
+      }
     } else {
       for (Iterator<StageNode> iterator = root.getInputs().iterator(); iterator.hasNext();) {
         StageNode input = iterator.next();
         if (iterator.hasNext()) {
-          debugString(builder, input, childPrefix + "├── ", childPrefix + "│   ");
+          debugString(builder, input, childPrefix + "├── ", childPrefix + "│   ", server);
         } else {
-          debugString(builder, input, childPrefix + "└── ", childPrefix + "    ");
+          debugString(builder, input, childPrefix + "└── ", childPrefix + "    ", server);
         }
       }
     }
