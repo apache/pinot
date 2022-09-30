@@ -57,6 +57,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
   private List<Object[]> queryRunner(String sql) {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
+    System.out.println(queryPlan.explain());
     Map<String, String> requestMetadataMap =
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
     MailboxReceiveOperator mailboxReceiveOperator = null;

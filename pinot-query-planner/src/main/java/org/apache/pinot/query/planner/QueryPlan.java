@@ -18,15 +18,14 @@
  */
 package org.apache.pinot.query.planner;
 
-import com.google.common.collect.Iterables;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.util.Pair;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.planner.stage.TableScanNode;
 
 
 /**
@@ -86,8 +85,7 @@ public class QueryPlan {
         builder,
         _queryStageMap.get(0),
         "",
-        "",
-        Iterables.getOnlyElement(_stageMetadataMap.get(0).getServerInstances()));
+        "");
     return builder.toString();
   }
 
@@ -95,50 +93,33 @@ public class QueryPlan {
       StringBuilder builder,
       StageNode root,
       String prefix,
-      String childPrefix,
-      ServerInstance server
+      String childPrefix
   ) {
     int stage = root.getStageId();
-    Map<String, List<String>> segments = _stageMetadataMap
-        .get(stage)
-        .getServerInstanceToSegmentsMap()
-        .getOrDefault(server, Map.of());
 
     builder
         .append(prefix)
-        .append('[').append(stage).append(']')
-        .append(root.explain())
-        .append('(').append(server).append(' ').append(segments).append(')')
-        .append('\n');
+        .append("[").append(stage).append("] ")
+        .append(root.explain());
+
+    if (root instanceof TableScanNode) {
+      builder.append(' ');
+      builder.append(_stageMetadataMap.get(root.getStageId()).getServerInstanceToSegmentsMap());
+    }
+
+    builder.append('\n');
 
     if (root instanceof MailboxReceiveNode) {
       int senderStage = ((MailboxReceiveNode) root).getSenderStageId();
-      List<ServerInstance> senders = _stageMetadataMap.get(stage).getServerInstances();
-      for (Iterator<ServerInstance> iterator = senders.iterator(); iterator.hasNext();) {
-        ServerInstance serverInstance = iterator.next();
-        if (iterator.hasNext()) {
-          explain(
-              builder,
-              _queryStageMap.get(senderStage),
-              childPrefix + "├── ",
-              childPrefix + "│   ",
-              serverInstance);
-        } else {
-          explain(
-              builder,
-              _queryStageMap.get(senderStage),
-              childPrefix + "└── ",
-              childPrefix + "    ",
-              serverInstance);
-        }
-      }
+      StageNode sender = _queryStageMap.get(senderStage);
+      explain(builder, sender, childPrefix + "└── ", childPrefix + "    ");
     } else {
       for (Iterator<StageNode> iterator = root.getInputs().iterator(); iterator.hasNext();) {
         StageNode input = iterator.next();
         if (iterator.hasNext()) {
-          explain(builder, input, childPrefix + "├── ", childPrefix + "│   ", server);
+          explain(builder, input, childPrefix + "├── ", childPrefix + "│   ");
         } else {
-          explain(builder, input, childPrefix + "└── ", childPrefix + "    ", server);
+          explain(builder, input, childPrefix + "└── ", childPrefix + "    ");
         }
       }
     }
