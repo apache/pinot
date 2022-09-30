@@ -694,9 +694,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         LOGGER.debug("Remove track of running query: {}", requestId);
       }
     } else {
-      brokerResponse =
-          processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest, offlineRoutingTable,
-              realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
+      brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
+          offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
+          requestContext);
     }
 
     brokerResponse.setExceptions(exceptions);

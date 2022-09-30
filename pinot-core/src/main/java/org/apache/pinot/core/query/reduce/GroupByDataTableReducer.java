@@ -64,6 +64,7 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByDataTableReducer implements DataTableReducer {
   private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
+  private static final int MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK = 10_000;
 
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
@@ -288,51 +289,57 @@ public class GroupByDataTableReducer implements DataTableReducer {
               }
 
               int numRows = dataTable.getNumberOfRows();
-              for (int rowId = 0; rowId < numRows; rowId++) {
-                Object[] values = new Object[_numColumns];
-                for (int colId = 0; colId < _numColumns; colId++) {
-                  switch (storedColumnDataTypes[colId]) {
-                    case INT:
-                      values[colId] = dataTable.getInt(rowId, colId);
-                      break;
-                    case LONG:
-                      values[colId] = dataTable.getLong(rowId, colId);
-                      break;
-                    case FLOAT:
-                      values[colId] = dataTable.getFloat(rowId, colId);
-                      break;
-                    case DOUBLE:
-                      values[colId] = dataTable.getDouble(rowId, colId);
-                      break;
-                    case BIG_DECIMAL:
-                      values[colId] = dataTable.getBigDecimal(rowId, colId);
-                      break;
-                    case STRING:
-                      values[colId] = dataTable.getString(rowId, colId);
-                      break;
-                    case BYTES:
-                      values[colId] = dataTable.getBytes(rowId, colId);
-                      break;
-                    case OBJECT:
-                      // TODO: Move ser/de into AggregationFunction interface
-                      DataTable.CustomObject customObject = dataTable.getCustomObject(rowId, colId);
-                      if (customObject != null) {
-                        values[colId] = ObjectSerDeUtils.deserialize(customObject);
-                      }
-                      break;
-                    // Add other aggregation intermediate result / group-by column type supports here
-                    default:
-                      throw new IllegalStateException();
-                  }
+              for (int rowIdBatch = 0; rowIdBatch < numRows; rowIdBatch += MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK) {
+                if (Thread.interrupted()) {
+                  return;
                 }
-                if (nullHandlingEnabled) {
+                int upper = Math.min(rowIdBatch + MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK, numRows);
+                for (int rowId = rowIdBatch; rowId < upper; rowId++) {
+                  Object[] values = new Object[_numColumns];
                   for (int colId = 0; colId < _numColumns; colId++) {
-                    if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-                      values[colId] = null;
+                    switch (storedColumnDataTypes[colId]) {
+                      case INT:
+                        values[colId] = dataTable.getInt(rowId, colId);
+                        break;
+                      case LONG:
+                        values[colId] = dataTable.getLong(rowId, colId);
+                        break;
+                      case FLOAT:
+                        values[colId] = dataTable.getFloat(rowId, colId);
+                        break;
+                      case DOUBLE:
+                        values[colId] = dataTable.getDouble(rowId, colId);
+                        break;
+                      case BIG_DECIMAL:
+                        values[colId] = dataTable.getBigDecimal(rowId, colId);
+                        break;
+                      case STRING:
+                        values[colId] = dataTable.getString(rowId, colId);
+                        break;
+                      case BYTES:
+                        values[colId] = dataTable.getBytes(rowId, colId);
+                        break;
+                      case OBJECT:
+                        // TODO: Move ser/de into AggregationFunction interface
+                        DataTable.CustomObject customObject = dataTable.getCustomObject(rowId, colId);
+                        if (customObject != null) {
+                          values[colId] = ObjectSerDeUtils.deserialize(customObject);
+                        }
+                        break;
+                      // Add other aggregation intermediate result / group-by column type supports here
+                      default:
+                        throw new IllegalStateException();
                     }
                   }
+                  if (nullHandlingEnabled) {
+                    for (int colId = 0; colId < _numColumns; colId++) {
+                      if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+                        values[colId] = null;
+                      }
+                    }
+                  }
+                  indexedTable.upsert(new Record(values));
                 }
-                indexedTable.upsert(new Record(values));
               }
             } finally {
               countDownLatch.countDown();
