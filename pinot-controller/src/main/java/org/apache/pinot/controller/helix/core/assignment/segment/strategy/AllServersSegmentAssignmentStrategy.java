@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.assignment.segment;
+package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -24,17 +24,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import javax.annotation.Nullable;
-import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -51,7 +51,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
  *   </li>
  * </ul>
  */
-public class OfflineDimTableSegmentAssignment implements SegmentAssignment {
+public class AllServersSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AllServersSegmentAssignmentStrategy.class);
 
   private HelixManager _helixManager;
   private String _offlineTableName;
@@ -59,15 +60,15 @@ public class OfflineDimTableSegmentAssignment implements SegmentAssignment {
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
-    Preconditions.checkState(tableConfig.isDimTable(), "Not a dimension table: %s" + _offlineTableName);
     _helixManager = helixManager;
     _offlineTableName = tableConfig.getTableName();
     _tenantConfig = tableConfig.getTenantConfig();
+    LOGGER.info("Initialized AllServersSegmentAssignmentStrategy for table: {}", _offlineTableName);
   }
 
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+      InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType) {
     String serverTag = _tenantConfig.getServer();
     Set<String> instances = HelixHelper.getServerInstancesForTenant(_helixManager, serverTag);
     int numInstances = instances.size();
@@ -77,9 +78,9 @@ public class OfflineDimTableSegmentAssignment implements SegmentAssignment {
   }
 
   @Override
-  public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config) {
+  public Map<String, Map<String, String>> reassignSegments(Map<String, Map<String, String>> currentAssignment,
+      InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType) {
+
     String serverTag = _tenantConfig.getServer();
     Set<String> instances = HelixHelper.getServerInstancesForTenant(_helixManager, serverTag);
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();

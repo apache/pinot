@@ -768,8 +768,9 @@ public class CommonConstants {
     public static final String METADATA_URI_FOR_PEER_DOWNLOAD = "";
 
     public static class AssignmentStrategy {
-      public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
-      public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "ReplicaGroupSegmentAssignmentStrategy";
+      public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "balanced";
+      public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "replicagroup";
+      public static final String DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY = "allservers";
     }
 
     public static class BuiltInVirtualColumn {

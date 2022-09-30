@@ -16,28 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.assignment.segment;
+package org.apache.pinot.spi.config.table.assignment;
 
-import org.apache.helix.HelixManager;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Factory for the {@link SegmentAssignment}.
- */
-public class SegmentAssignmentFactory {
-  private SegmentAssignmentFactory() {
+public class SegmentAssignmentConfig extends BaseJsonConfig {
+
+  @JsonPropertyDescription("Configuration for Segment Assignment Strategy")
+  private final String _assignmentStrategy;
+
+  @JsonCreator
+  public SegmentAssignmentConfig(@JsonProperty(value = "segmentAssignmentStrategy") String assignmentStrategy) {
+    _assignmentStrategy = assignmentStrategy;
   }
 
-  public static SegmentAssignment getSegmentAssignment(HelixManager helixManager, TableConfig tableConfig) {
-    SegmentAssignment segmentAssignment;
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      segmentAssignment = new OfflineSegmentAssignment();
-    } else {
-      segmentAssignment = new RealtimeSegmentAssignment();
-    }
-    segmentAssignment.init(helixManager, tableConfig);
-    return segmentAssignment;
+  public String getAssignmentStrategy() {
+    return _assignmentStrategy;
   }
 }
