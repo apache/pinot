@@ -58,7 +58,7 @@ public class MailboxSendNode extends AbstractStageNode {
   }
 
   @Override
-  public String debugString() {
+  public String explain() {
     return "MAIL_SEND";
   }
 }

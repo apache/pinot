@@ -76,13 +76,13 @@ public class QueryPlan {
     return _queryResultFields;
   }
 
-  public String debugString() {
+  public String explain() {
     if (_queryStageMap.isEmpty()) {
       return "EMPTY";
     }
 
     StringBuilder builder = new StringBuilder();
-    debugString(
+    explain(
         builder,
         _queryStageMap.get(0),
         "",
@@ -91,35 +91,40 @@ public class QueryPlan {
     return builder.toString();
   }
 
-  private void debugString(
+  private void explain(
       StringBuilder builder,
       StageNode root,
       String prefix,
       String childPrefix,
       ServerInstance server
   ) {
+    int stage = root.getStageId();
+    Map<String, List<String>> segments = _stageMetadataMap
+        .get(stage)
+        .getServerInstanceToSegmentsMap()
+        .getOrDefault(server, Map.of());
+
     builder
         .append(prefix)
-        .append(root.debugString())
-        .append('(')
-        .append(server)
-        .append(')')
+        .append('[').append(stage).append(']')
+        .append(root.explain())
+        .append('(').append(server).append(' ').append(segments).append(')')
         .append('\n');
 
     if (root instanceof MailboxReceiveNode) {
       int senderStage = ((MailboxReceiveNode) root).getSenderStageId();
-      List<ServerInstance> senders = _stageMetadataMap.get(senderStage).getServerInstances();
+      List<ServerInstance> senders = _stageMetadataMap.get(stage).getServerInstances();
       for (Iterator<ServerInstance> iterator = senders.iterator(); iterator.hasNext();) {
         ServerInstance serverInstance = iterator.next();
         if (iterator.hasNext()) {
-          debugString(
+          explain(
               builder,
               _queryStageMap.get(senderStage),
               childPrefix + "├── ",
               childPrefix + "│   ",
               serverInstance);
         } else {
-          debugString(
+          explain(
               builder,
               _queryStageMap.get(senderStage),
               childPrefix + "└── ",
@@ -131,9 +136,9 @@ public class QueryPlan {
       for (Iterator<StageNode> iterator = root.getInputs().iterator(); iterator.hasNext();) {
         StageNode input = iterator.next();
         if (iterator.hasNext()) {
-          debugString(builder, input, childPrefix + "├── ", childPrefix + "│   ", server);
+          explain(builder, input, childPrefix + "├── ", childPrefix + "│   ", server);
         } else {
-          debugString(builder, input, childPrefix + "└── ", childPrefix + "    ", server);
+          explain(builder, input, childPrefix + "└── ", childPrefix + "    ", server);
         }
       }
     }

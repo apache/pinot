@@ -42,7 +42,7 @@ public class FilterNode extends AbstractStageNode {
   }
 
   @Override
-  public String debugString() {
+  public String explain() {
     return "FILTER";
   }
 }

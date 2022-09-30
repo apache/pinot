@@ -53,7 +53,7 @@ public class ValueNode extends AbstractStageNode {
   }
 
   @Override
-  public String debugString() {
+  public String explain() {
     return "LITERAL";
   }
 }

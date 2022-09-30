@@ -49,5 +49,5 @@ public interface StageNode extends Serializable {
 
   void setPartitionKeys(Collection<Integer> partitionKeys);
 
-  String debugString();
+  String explain();
 }

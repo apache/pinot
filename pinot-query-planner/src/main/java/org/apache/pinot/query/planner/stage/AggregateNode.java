@@ -56,7 +56,7 @@ public class AggregateNode extends AbstractStageNode {
   }
 
   @Override
-  public String debugString() {
+  public String explain() {
     return "AGGREGATE";
   }
 }

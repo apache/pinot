@@ -60,7 +60,7 @@ public class JoinNode extends AbstractStageNode {
   }
 
   @Override
-  public String debugString() {
+  public String explain() {
     return "JOIN";
   }
 

@@ -69,7 +69,7 @@ public class SortNode extends AbstractStageNode {
   }
 
   @Override
-  public String debugString() {
+  public String explain() {
     return "SORT" + (_fetch > 0 ? " (LIMIT " + _fetch + ")" : "");
   }
 }

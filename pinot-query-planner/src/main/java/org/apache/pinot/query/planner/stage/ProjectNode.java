@@ -43,7 +43,7 @@ public class ProjectNode extends AbstractStageNode {
   }
 
   @Override
-  public String debugString() {
+  public String explain() {
     return "PROJECT";
   }
 }
