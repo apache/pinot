@@ -55,7 +55,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.roaringbitmap.RoaringBitmap;
 
 
