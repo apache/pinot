@@ -734,13 +734,23 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               DateTimeFormatSpec formatSpec = _config.getDateTimeFormatSpec();
               Preconditions.checkNotNull(formatSpec, "DateTimeFormatSpec must exist for SimpleDate");
               DateTimeFormatter dateTimeFormatter = formatSpec.getDateTimeFormatter();
-              startTime = dateTimeFormatter.parseMillis(startTimeStr);
-              endTime = dateTimeFormatter.parseMillis(endTimeStr);
+              try {
+                startTime = dateTimeFormatter.parseMillis(startTimeStr);
+                endTime = dateTimeFormatter.parseMillis(endTimeStr);
+              } catch (Exception ignore) {
+                startTime = Long.MIN_VALUE;
+                endTime = Long.MAX_VALUE;
+              }
               timeUnit = TimeUnit.MILLISECONDS;
             } else {
               // by default, time column type is TimeColumnType.EPOCH
-              startTime = Long.parseLong(startTimeStr);
-              endTime = Long.parseLong(endTimeStr);
+              try {
+                startTime = Long.parseLong(startTimeStr);
+                endTime = Long.parseLong(endTimeStr);
+              } catch (Exception ignore) {
+                startTime = Long.MIN_VALUE;
+                endTime = Long.MAX_VALUE;
+              }
               timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
             }
           } else {
