@@ -165,7 +165,6 @@ public class PinotClientRequest {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
       @ApiResponse(code = 404, message = "Query not found on the requested broker")
   })
-  @ManualAuthorization
   public String cancelQuery(
       @ApiParam(value = "QueryId as assigned by the broker", required = true) @PathParam("queryId") long queryId,
       @ApiParam(value = "Timeout for servers to respond the cancel request") @QueryParam("timeoutMs")
@@ -199,7 +198,6 @@ public class PinotClientRequest {
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
-  @ManualAuthorization
   public Map<Long, String> getRunningQueries() {
     try {
       return _requestHandler.getRunningQueries();
