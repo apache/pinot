@@ -761,15 +761,21 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         if (!_config.isSkipTimeValueCheck()) {
           Interval timeInterval =
               new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
-          Preconditions.checkState(TimeUtils.isValidTimeInterval(timeInterval),
-              "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
-              timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumnName,
-              TimeUtils.VALID_TIME_INTERVAL);
+          boolean isValidTimeInterval = TimeUtils.isValidTimeInterval(timeInterval);
+          if (!_config.isContinueOnError()) {
+            Preconditions.checkState(isValidTimeInterval,
+                "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
+                timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumnName,
+                TimeUtils.VALID_TIME_INTERVAL);
+            setSegmentTimeInterval(properties, startTime, endTime, timeUnit);
+          } else {
+            if (isValidTimeInterval) {
+              setSegmentTimeInterval(properties, startTime, endTime, timeUnit);
+            }
+          }
+        } else {
+          setSegmentTimeInterval(properties, startTime, endTime, timeUnit);
         }
-
-        properties.setProperty(SEGMENT_START_TIME, startTime);
-        properties.setProperty(SEGMENT_END_TIME, endTime);
-        properties.setProperty(TIME_UNIT, timeUnit);
       }
     }
 
@@ -793,6 +799,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     properties.save();
+  }
+
+  private void setSegmentTimeInterval(PropertiesConfiguration properties, long startTime, long endTime,
+      TimeUnit timeUnit) {
+    properties.setProperty(SEGMENT_START_TIME, startTime);
+    properties.setProperty(SEGMENT_END_TIME, endTime);
+    properties.setProperty(TIME_UNIT, timeUnit);
   }
 
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
