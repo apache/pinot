@@ -545,23 +545,32 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // Decode message
       StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(messagesAndOffsets.getStreamMessage(index));
       RowMetadata msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
+      GenericRow decoderResult;
       if (decodedRow.getException() != null) {
-        // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
-        // decode error
-        realtimeRowsDroppedMeter =
-            _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
-                realtimeRowsDroppedMeter);
+        if(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError()) {
+          decoderResult = new GenericRow();
+          decoderResult.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+        } else {
+          decoderResult = null;
+          realtimeRowsDroppedMeter =
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                  realtimeRowsDroppedMeter);
+        }
       } else {
+        decoderResult = decodedRow.getResult();
+      }
+
+      if(decoderResult != null) {
         try {
-          _transformPipeline.processRow(decodedRow.getResult(), reusedResult);
+          _transformPipeline.processRow(decoderResult, reusedResult);
         } catch (Exception e) {
           _numRowsErrored++;
           // when exception happens we prefer abandoning the whole batch and not partially indexing some rows
           reusedResult.getTransformedRows().clear();
           String errorMessage = String.format("Caught exception while transforming the record: %s", decodedRow);
           _segmentLogger.error(errorMessage, e);
-          _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-              new SegmentErrorInfo(now(), errorMessage, e));
+          _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         }
         if (reusedResult.getSkippedRowCount() > 0) {
           realtimeRowsDroppedMeter =
@@ -584,8 +593,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             _numRowsErrored++;
             String errorMessage = String.format("Caught exception while indexing the record: %s", transformedRow);
             _segmentLogger.error(errorMessage, e);
-            _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-                new SegmentErrorInfo(now(), errorMessage, e));
+            _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
           }
         }
       }
