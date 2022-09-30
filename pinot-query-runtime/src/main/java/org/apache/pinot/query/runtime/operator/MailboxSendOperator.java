@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.BaseDataBlock;
@@ -111,7 +112,10 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   @Nullable
   @Override
   public String toExplainString() {
-    return EXPLAIN_NAME;
+    return String.format("%s(%s->[%s])",
+        EXPLAIN_NAME,
+        _exchangeType,
+        _receivingStageInstances.stream().map(this::toMailboxId).collect(Collectors.joining(",")));
   }
 
   @Override
@@ -154,7 +158,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
           throw new UnsupportedOperationException("Unsupported mailbox exchange type: " + _exchangeType);
       }
     } catch (Exception e) {
-      LOGGER.error("Exception occur while sending data via mailbox", e);
+      LOGGER.error("{} Exception occur while sending data.", this.toExplainString(), e);
     }
     return transferableBlock;
   }

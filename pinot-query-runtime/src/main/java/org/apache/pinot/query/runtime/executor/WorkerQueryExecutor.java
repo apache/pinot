@@ -95,10 +95,16 @@ public class WorkerQueryExecutor {
       @Override
       public void runJob() {
         ThreadTimer executionThreadTimer = new ThreadTimer();
-        while (!TransferableBlockUtils.isEndOfStream(rootOperator.nextBlock())) {
-          LOGGER.debug("Result Block acquired");
+        try {
+          while (!TransferableBlockUtils.isEndOfStream(rootOperator.nextBlock())) {
+            LOGGER.debug("Result Block acquired");
+          }
+          LOGGER.debug("Execution time:" + executionThreadTimer.getThreadTimeNs());
+        } catch (final Exception e) {
+          LOGGER.error("Failed to execute query after {}ns. Base operator: {}.",
+              executionThreadTimer.getThreadTimeNs(), e);
+          throw e;
         }
-        LOGGER.info("Execution time:" + executionThreadTimer.getThreadTimeNs());
       }
     });
   }

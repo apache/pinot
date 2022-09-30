@@ -41,10 +41,10 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
 
   @Override
   public boolean matches(RelOptRuleCall call) {
-    if (call.rels.length < 1) {
+    if (call.getRelList().size() < 1) {
       return false;
     }
-    if (call.rel(0) instanceof Sort) {
+    if (call.rel(0) instanceof Sort && !(call.rel(0) instanceof InnerSort)) {
       Sort sort = call.rel(0);
       return !PinotRuleUtils.isExchange(sort.getInput());
     }
@@ -54,8 +54,9 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Sort sort = call.rel(0);
-    // TODO: this is a single value
-    LogicalExchange exchange = LogicalExchange.create(sort.getInput(), RelDistributions.hash(Collections.emptyList()));
+
+    Sort innerSort = InnerSort.create(sort.getInput(), sort.getCollation(), sort.offset, sort.fetch);
+    LogicalExchange exchange = LogicalExchange.create(innerSort, RelDistributions.hash(Collections.emptyList()));
     call.transformTo(LogicalSort.create(exchange, sort.getCollation(), sort.offset, sort.fetch));
   }
 }

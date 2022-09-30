@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.query.runtime;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -39,6 +41,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -107,7 +110,8 @@ public class QueryRunner {
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, ExecutorService executorService,
-      Map<String, String> requestMetadataMap) {
+      Map<String, String> requestMetadataMap)
+      throws IOException {
     if (isLeafStage(distributedStagePlan)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
@@ -116,13 +120,25 @@ public class QueryRunner {
           ServerRequestUtils.constructServerQueryRequest(distributedStagePlan, requestMetadataMap,
               _helixPropertyStore);
 
+      MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
+
       // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
       List<BaseDataBlock> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
       for (ServerQueryRequest request : serverQueryRequests) {
-        serverQueryResults.add(processServerQuery(request, executorService));
+        BaseDataBlock block = processServerQuery(request, executorService);
+        if (request.getQueryContext().getOrderByExpressions() != null
+            && request.getQueryContext().getOrderByExpressions().size() > 0) {
+          SelectionOperatorService selectionService =
+              new SelectionOperatorService(request.getQueryContext(), block.getDataSchema());
+
+          selectionService.reduceWithOrdering(Collections.singleton(block),
+              request.getQueryContext().isNullHandlingEnabled());
+          serverQueryResults.add(selectionService.renderResultDataBlockWithOrdering());
+        } else {
+          serverQueryResults.add(block);
+        }
       }
 
-      MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
           new MailboxSendOperator(_mailboxService, sendNode.getDataSchema(),

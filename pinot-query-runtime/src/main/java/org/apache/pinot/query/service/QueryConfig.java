@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.query.service;
 
+import java.util.concurrent.TimeUnit;
+
+
 /**
  * Configuration for setting up query runtime.
  */
 public class QueryConfig {
-  public static final long DEFAULT_TIMEOUT_NANO = 10_000_000_000L;
+  public static final long DEFAULT_TIMEOUT_NANO = TimeUnit.SECONDS.toNanos(10);
 
   public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_BYTES_SIZE = "pinot.query.runner.max.msg.size";
   public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_BYTES_SIZE = 128 * 1024 * 1024;

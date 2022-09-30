@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.BaseDataBlock;
@@ -101,7 +102,10 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   @Nullable
   @Override
   public String toExplainString() {
-    return EXPLAIN_NAME;
+    return String.format("%s(%s<-[%s])",
+        EXPLAIN_NAME,
+        _exchangeType,
+        _sendingStageInstances.stream().map(this::toMailboxId).collect(Collectors.joining(",")));
   }
 
   @Override

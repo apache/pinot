@@ -32,6 +32,9 @@ public class QueryTestSet {
         new Object[]{"SELECT * FROM a ORDER BY col1 LIMIT 20"},
         new Object[]{"SELECT * FROM a ORDER BY col1, ts LIMIT 1, 2"},
         new Object[]{"SELECT * FROM a ORDER BY col1, ts LIMIT 2 OFFSET 1"},
+        // this tests the special case handling of scenarios where all order
+        // by columns are also select expressions
+        new Object[]{"SELECT col3, col2, col1, ts FROM a ORDER BY col1, col2, col3, ts LIMIT 10"},
 
         // No match filter
         new Object[]{"SELECT * FROM b WHERE col3 < 0.5"},

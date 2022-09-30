@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.core.query.selection;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
+import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -94,7 +97,6 @@ public class SelectionOperatorService {
 
   /**
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
-   * (Broker side)
    */
   public void reduceWithOrdering(Collection<DataTable> dataTables, boolean nullHandlingEnabled) {
     for (DataTable dataTable : dataTables) {
@@ -123,12 +125,30 @@ public class SelectionOperatorService {
   }
 
   /**
+   * Render the selection rows to a {@link BaseDataBlock} object for selection queries with <code>ORDER BY</code>.
+   * (Server Side)
+   *
+   * <p>Should be called after method {@link #reduceWithOrdering(Collection, boolean)}
+   * @apiNote this is intended to be used in the V2 multi-stage
+   */
+  public BaseDataBlock renderResultDataBlockWithOrdering()
+      throws IOException {
+    SchemaAndRows result = render();
+    return DataBlockBuilder.buildFromRows(result._rows, result._dataSchema);
+  }
+
+  /**
    * Render the selection rows to a {@link ResultTable} object for selection queries with <code>ORDER BY</code>.
    * (Broker side)
    * <p>{@link ResultTable} object will be used to build the broker response.
    * <p>Should be called after method "reduceWithOrdering()".
    */
   public ResultTable renderResultTableWithOrdering() {
+    SchemaAndRows result = render();
+    return new ResultTable(result._dataSchema, result._rows);
+  }
+
+  private SchemaAndRows render() {
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
     int numColumns = columnIndices.length;
 
@@ -159,6 +179,16 @@ public class SelectionOperatorService {
       rowsInSelectionResults.addFirst(extractedRow);
     }
 
-    return new ResultTable(resultDataSchema, rowsInSelectionResults);
+    return new SchemaAndRows(resultDataSchema, rowsInSelectionResults);
+  }
+
+  private static class SchemaAndRows {
+    final DataSchema _dataSchema;
+    final List<Object[]> _rows;
+
+    private SchemaAndRows(DataSchema dataSchema, List<Object[]> rows) {
+      _dataSchema = dataSchema;
+      _rows = rows;
+    }
   }
 }

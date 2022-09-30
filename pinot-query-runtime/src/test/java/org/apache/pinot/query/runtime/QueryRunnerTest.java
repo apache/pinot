@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -55,7 +56,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     compareRowEquals(resultRows, expectedRows);
   }
 
-  private List<Object[]> queryRunner(String sql) {
+  private List<Object[]> queryRunner(String sql)
+      throws IOException {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));

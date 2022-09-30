@@ -19,6 +19,7 @@
 package org.apache.pinot.query;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -230,7 +231,8 @@ public class QueryServerEnclosure {
     }
   }
 
-  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
+  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap)
+      throws IOException {
     _queryRunner.processQuery(distributedStagePlan, _testExecutor, requestMetadataMap);
   }
 }

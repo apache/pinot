@@ -21,16 +21,18 @@ package org.apache.pinot.query.planner.logical;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
-import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.logical.LogicalValues;
+import org.apache.calcite.rel.rules.InnerSort;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
@@ -76,8 +78,8 @@ public final class RelToStageConverter {
       return convertLogicalFilter((LogicalFilter) node, currentStageId);
     } else if (node instanceof LogicalAggregate) {
       return convertLogicalAggregate((LogicalAggregate) node, currentStageId);
-    } else if (node instanceof LogicalSort) {
-      return convertLogicalSort((LogicalSort) node, currentStageId);
+    } else if (node instanceof Sort) {
+      return convertLogicalSort((Sort) node, currentStageId);
     } else if (node instanceof LogicalValues) {
       return convertLogicalValues((LogicalValues) node, currentStageId);
     } else {
@@ -89,11 +91,16 @@ public final class RelToStageConverter {
     return new ValueNode(currentStageId, toDataSchema(node.getRowType()), node.tuples);
   }
 
-  private static StageNode convertLogicalSort(LogicalSort node, int currentStageId) {
+  private static StageNode convertLogicalSort(Sort node, int currentStageId) {
     int fetch = node.fetch == null ? 0 : ((RexLiteral) node.fetch).getValueAs(Integer.class);
     int offset = node.offset == null ? 0 : ((RexLiteral) node.offset).getValueAs(Integer.class);
-    return new SortNode(currentStageId, node.getCollation().getFieldCollations(), fetch, offset,
-        toDataSchema(node.getRowType()));
+
+    List<RelFieldCollation> collations = node.getCollation().getFieldCollations();
+    if (node instanceof InnerSort) {
+      return new SortNode(currentStageId, collations, offset + fetch, 0, toDataSchema(node.getRowType()));
+    } else {
+      return new SortNode(currentStageId, collations, fetch, offset, toDataSchema(node.getRowType()));
+    }
   }
 
   private static StageNode convertLogicalAggregate(LogicalAggregate node, int currentStageId) {
@@ -118,7 +125,7 @@ public final class RelToStageConverter {
 
   private static StageNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
     JoinRelType joinType = node.getJoinType();
-    Preconditions.checkState(node.getCondition() instanceof RexCall);
+    Preconditions.checkState(node.getCondition() instanceof RexCall, node.getCondition().getClass());
     RexCall joinCondition = (RexCall) node.getCondition();
 
     // Parse out all equality JOIN conditions
