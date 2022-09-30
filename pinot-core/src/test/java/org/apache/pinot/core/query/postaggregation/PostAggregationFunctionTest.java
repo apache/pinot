@@ -71,5 +71,25 @@ public class PostAggregationFunctionTest {
     assertEquals(function.getResultType(), ColumnDataType.BOOLEAN);
     assertFalse((Boolean) function.invoke(new Object[]{true}));
     assertTrue((Boolean) function.invoke(new Object[]{false}));
+
+    // isDistinctFrom
+    function = new PostAggregationFunction("isDistinctFrom",
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
+    assertEquals(function.getResultType(), ColumnDataType.BOOLEAN);
+    assertFalse((Boolean) function.invoke(new Object[]{null, null}));
+    assertFalse((Boolean) function.invoke(new Object[]{"a", "a"}));
+    assertTrue((Boolean) function.invoke(new Object[]{null, "a"}));
+    assertTrue((Boolean) function.invoke(new Object[]{"a", null}));
+    assertTrue((Boolean) function.invoke(new Object[]{"a", "b"}));
+
+    // isNotDistinctFrom
+    function = new PostAggregationFunction("isNotDistinctFrom",
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
+    assertEquals(function.getResultType(), ColumnDataType.BOOLEAN);
+    assertTrue((Boolean) function.invoke(new Object[]{null, null}));
+    assertTrue((Boolean) function.invoke(new Object[]{"a", "a"}));
+    assertFalse((Boolean) function.invoke(new Object[]{null, "a"}));
+    assertFalse((Boolean) function.invoke(new Object[]{"a", null}));
+    assertFalse((Boolean) function.invoke(new Object[]{"a", "b"}));
   }
 }
