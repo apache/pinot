@@ -26,7 +26,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.common.datatable.DataTableUtils;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -72,7 +72,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
 
     // Build the data table.
     DataTableBuilder dataTableBuilder =
-        DataTableUtils.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
+        DataTableBuilderFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
     if (queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       for (int i = 0; i < numColumns; i++) {

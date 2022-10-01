@@ -29,6 +29,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;

@@ -22,7 +22,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.common.datatable.DataTableUtils;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -54,7 +54,7 @@ public class DistinctResultsBlock extends BaseResultsBlock {
     String[] columnNames = new String[]{_distinctFunction.getColumnName()};
     ColumnDataType[] columnDataTypes = new ColumnDataType[]{ColumnDataType.OBJECT};
     DataTableBuilder dataTableBuilder =
-        DataTableUtils.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
+        DataTableBuilderFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
     dataTableBuilder.startRow();
     dataTableBuilder.setColumn(0, _distinctTable);
     dataTableBuilder.finishRow();

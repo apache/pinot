@@ -22,9 +22,9 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Server;
+import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingResponseUtils;
@@ -54,7 +54,7 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
       _streamObserver.onNext(StreamingResponseUtils.getDataResponse(instanceResponseDataTable.toDataOnlyDataTable()));
     } catch (IOException e) {
       // when exception occurs in streaming, we return an error-only metadata block.
-      metadataOnlyDataTable = DataTableFactory.getEmptyDataTable();
+      metadataOnlyDataTable = DataTableBuilderUtils.getEmptyDataTable();
       metadataOnlyDataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     }
     // return a metadata-only block.

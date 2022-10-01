@@ -196,8 +196,7 @@ public class DataTableImplV3 extends BaseDataTable {
     // Add table serialization time metadata if thread timer is enabled.
     if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
       long responseSerializationCpuTimeNs = threadTimer.getThreadTimeNs();
-      getMetadata().put(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(),
-          String.valueOf(responseSerializationCpuTimeNs));
+      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(responseSerializationCpuTimeNs));
     }
 
     // Write metadata: length followed by actual metadata bytes.
@@ -317,16 +316,16 @@ public class DataTableImplV3 extends BaseDataTable {
     dataOutputStream.writeInt(_metadata.size());
 
     for (Map.Entry<String, String> entry : _metadata.entrySet()) {
-      DataTable.MetadataKey key = DataTable.MetadataKey.getByName(entry.getKey());
+      MetadataKey key = MetadataKey.getByName(entry.getKey());
       // Ignore unknown keys.
       if (key == null) {
         continue;
       }
       String value = entry.getValue();
       dataOutputStream.writeInt(key.getId());
-      if (key.getValueType() == DataTable.MetadataValueType.INT) {
+      if (key.getValueType() == MetadataValueType.INT) {
         dataOutputStream.write(Ints.toByteArray(Integer.parseInt(value)));
-      } else if (key.getValueType() == DataTable.MetadataValueType.LONG) {
+      } else if (key.getValueType() == MetadataValueType.LONG) {
         dataOutputStream.write(Longs.toByteArray(Long.parseLong(value)));
       } else {
         byte[] valueBytes = value.getBytes(UTF_8);
@@ -354,15 +353,15 @@ public class DataTableImplV3 extends BaseDataTable {
     Map<String, String> metadata = new HashMap<>();
     for (int i = 0; i < numEntries; i++) {
       int keyId = buffer.getInt();
-      DataTable.MetadataKey key = DataTable.MetadataKey.getById(keyId);
+      MetadataKey key = MetadataKey.getById(keyId);
       // Ignore unknown keys.
       if (key == null) {
         continue;
       }
-      if (key.getValueType() == DataTable.MetadataValueType.INT) {
+      if (key.getValueType() == MetadataValueType.INT) {
         String value = "" + buffer.getInt();
         metadata.put(key.getName(), value);
-      } else if (key.getValueType() == DataTable.MetadataValueType.LONG) {
+      } else if (key.getValueType() == MetadataValueType.LONG) {
         String value = "" + buffer.getLong();
         metadata.put(key.getName(), value);
       } else {

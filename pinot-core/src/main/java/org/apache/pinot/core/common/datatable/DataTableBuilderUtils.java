@@ -24,6 +24,9 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
+import org.apache.pinot.common.datatable.DataTableImplV2;
+import org.apache.pinot.common.datatable.DataTableImplV3;
+import org.apache.pinot.common.datatable.DataTableImplV4;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -38,8 +41,25 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
  * The <code>DataTableUtils</code> class provides utility methods for data table.
  */
 @SuppressWarnings("rawtypes")
-public class DataTableUtils {
-  private DataTableUtils() {
+public class DataTableBuilderUtils {
+  private DataTableBuilderUtils() {
+  }
+
+  /**
+   * Returns an empty data table without data.
+   */
+  public static DataTable getEmptyDataTable() {
+    int version = DataTableBuilderFactory.getDataTableVersion();
+    switch (version) {
+      case DataTableFactory.VERSION_2:
+        return new DataTableImplV2();
+      case DataTableFactory.VERSION_3:
+        return new DataTableImplV3();
+      case DataTableFactory.VERSION_4:
+        return new DataTableImplV4();
+      default:
+        throw new IllegalStateException("Unsupported data table version: " + version);
+    }
   }
 
   /**
@@ -71,20 +91,7 @@ public class DataTableUtils {
     // NOTE: Use STRING column data type as default for selection query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    return getDataTableBuilder(dataSchema).build();
-  }
-
-  public static DataTableBuilder getDataTableBuilder(DataSchema dataSchema) {
-    switch (DataTableFactory.getDataTableVersion()) {
-      case DataTableFactory.VERSION_2:
-      case DataTableFactory.VERSION_3:
-        return new DataTableBuilderV2V3(dataSchema, DataTableFactory.getDataTableVersion());
-      case DataTableFactory.VERSION_4:
-        return new DataTableBuilderV4(dataSchema);
-      default:
-        throw new UnsupportedOperationException(
-            "Unsupported data table version: " + DataTableFactory.getDataTableVersion());
-    }
+    return DataTableBuilderFactory.getDataTableBuilder(dataSchema).build();
   }
 
   /**
@@ -115,7 +122,7 @@ public class DataTableUtils {
         columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
         index++;
       }
-      return getDataTableBuilder(new DataSchema(columnNames, columnDataTypes)).build();
+      return DataTableBuilderFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes)).build();
     } else {
       // Aggregation only query
 
@@ -132,7 +139,8 @@ public class DataTableUtils {
       }
 
       // Build the data table
-      DataTableBuilder dataTableBuilder = getDataTableBuilder(new DataSchema(aggregationColumnNames, columnDataTypes));
+      DataTableBuilder dataTableBuilder =
+          DataTableBuilderFactory.getDataTableBuilder(new DataSchema(aggregationColumnNames, columnDataTypes));
       dataTableBuilder.startRow();
       for (int i = 0; i < numAggregations; i++) {
         switch (columnDataTypes[i]) {
@@ -171,11 +179,12 @@ public class DataTableUtils {
     ColumnDataType[] columnDataTypes = new ColumnDataType[columnNames.length];
     // NOTE: Use STRING column data type as default for distinct query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-    DistinctTable distinctTable = new DistinctTable(
-        new DataSchema(columnNames, columnDataTypes), Collections.emptySet(), queryContext.isNullHandlingEnabled());
+    DistinctTable distinctTable =
+        new DistinctTable(new DataSchema(columnNames, columnDataTypes), Collections.emptySet(),
+            queryContext.isNullHandlingEnabled());
 
     // Build the data table
-    DataTableBuilder dataTableBuilder = getDataTableBuilder(
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(
         new DataSchema(new String[]{distinctAggregationFunction.getColumnName()},
             new ColumnDataType[]{ColumnDataType.OBJECT}));
     dataTableBuilder.startRow();

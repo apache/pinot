@@ -38,7 +38,7 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.common.datatable.DataTableUtils;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -277,7 +277,7 @@ public class DistinctTable {
   public byte[] toBytes()
       throws IOException {
     // NOTE: Serialize the DistinctTable as a DataTable
-    DataTableBuilder dataTableBuilder = DataTableUtils.getDataTableBuilder(_dataSchema);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(_dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
     RoaringBitmap[] nullBitmaps = null;

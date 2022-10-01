@@ -595,7 +595,6 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
 
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
-    public static final int DEFAULT_CURRENT_DATA_TABLE_VERSION = 3;
 
     // Environment Provider Configs
     public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY =

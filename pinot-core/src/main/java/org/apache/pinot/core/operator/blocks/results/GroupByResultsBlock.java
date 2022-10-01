@@ -30,7 +30,7 @@ import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.common.datatable.DataTableUtils;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
@@ -127,7 +127,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   public DataTable getDataTable(QueryContext queryContext)
       throws Exception {
     Preconditions.checkState(_table != null, "Cannot get DataTable from segment level results");
-    DataTableBuilder dataTableBuilder = DataTableUtils.getDataTableBuilder(_dataSchema);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(_dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = _dataSchema.size();
     Iterator<Record> iterator = _table.iterator();

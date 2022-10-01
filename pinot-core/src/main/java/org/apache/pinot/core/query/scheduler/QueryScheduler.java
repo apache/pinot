@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
-import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -39,6 +38,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.TimerContext;
@@ -71,6 +71,7 @@ public abstract class QueryScheduler {
   private final RateLimiter _numDroppedLogRateLimiter;
   private final AtomicInteger _numDroppedLogCounter;
   protected volatile boolean _isRunning = false;
+
   /**
    * Constructor to initialize QueryScheduler
    * @param queryExecutor QueryExecutor engine to use
@@ -152,7 +153,7 @@ public abstract class QueryScheduler {
           queryRequest.getBrokerId(), e);
       // For not handled exceptions
       _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
-      dataTable = DataTableFactory.getEmptyDataTable();
+      dataTable = DataTableBuilderUtils.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
     long requestId = queryRequest.getRequestId();
@@ -174,14 +175,11 @@ public abstract class QueryScheduler {
     long numSegmentsMatched = Long.parseLong(
         dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsPrunedInvalid = Long.parseLong(
-        dataTableMetadata.getOrDefault(
-            MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(), INVALID_SEGMENTS_COUNT));
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsPrunedByLimit = Long.parseLong(
-        dataTableMetadata.getOrDefault(
-            MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(), INVALID_SEGMENTS_COUNT));
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsPrunedByValue = Long.parseLong(
-        dataTableMetadata.getOrDefault(
-            MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(), INVALID_SEGMENTS_COUNT));
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsConsuming = Long.parseLong(
         dataTableMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), INVALID_SEGMENTS_COUNT));
     long numConsumingSegmentsProcessed = Long.parseLong(
@@ -250,8 +248,8 @@ public abstract class QueryScheduler {
               + "broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
               + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}", requestId, tableNameWithType,
           numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
-          numConsumingSegmentsProcessed, numConsumingSegmentsMatched,
-          numSegmentsPrunedInvalid, numSegmentsPrunedByLimit, numSegmentsPrunedByValue, schedulerWaitMs,
+          numConsumingSegmentsProcessed, numConsumingSegmentsMatched, numSegmentsPrunedInvalid,
+          numSegmentsPrunedByLimit, numSegmentsPrunedByValue, schedulerWaitMs,
           timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
           timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
@@ -346,7 +344,7 @@ public abstract class QueryScheduler {
    */
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
       ProcessingException error) {
-    DataTable result = DataTableFactory.getEmptyDataTable();
+    DataTable result = DataTableBuilderUtils.getEmptyDataTable();
 
     Map<String, String> dataTableMetadata = result.getMetadata();
     dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
