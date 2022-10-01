@@ -21,7 +21,6 @@ package org.apache.pinot.core.util;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
@@ -91,12 +90,7 @@ public class QueryOptionsUtils {
   }
 
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
-    boolean nullHandlingEnabled = Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_NULL_HANDLING));
-    if (nullHandlingEnabled) {
-      Preconditions.checkState(DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4,
-          "Null handling cannot be enabled for data table version smaller than 4");
-    }
-    return nullHandlingEnabled;
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_NULL_HANDLING));
   }
 
   public static boolean isServerReturnFinalResult(Map<String, String> queryOptions) {
