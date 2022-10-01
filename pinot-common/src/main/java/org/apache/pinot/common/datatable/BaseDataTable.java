@@ -26,7 +26,6 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.ObjectSerDeUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -248,7 +247,7 @@ public abstract class BaseDataTable implements DataTable {
     int size = positionCursorInVariableBuffer(rowId, colId);
     int type = _variableSizeData.getInt();
     if (size == 0) {
-      assert type == ObjectSerDeUtils.NULL_TYPE_VALUE;
+      assert type == CustomObject.NULL_TYPE_VALUE;
       return null;
     }
     ByteBuffer buffer = _variableSizeData.slice();

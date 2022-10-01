@@ -90,6 +90,8 @@ public interface DataTable {
   DataTable toDataOnlyDataTable();
 
   class CustomObject {
+    public static final int NULL_TYPE_VALUE = 100;
+
     private final int _type;
     private final ByteBuffer _buffer;
 

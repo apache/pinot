@@ -26,10 +26,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
-import org.apache.pinot.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.roaringbitmap.RoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -39,7 +39,30 @@ public class CustomSerDeUtils {
   private CustomSerDeUtils() {
   }
 
-  public static final ObjectSerDeUtils.ObjectSerDe<String> STRING_SER_DE = new ObjectSerDeUtils.ObjectSerDe<String>() {
+  /**
+   * Serializer/De-serializer for a specific type of object.
+   *
+   * @param <T> Type of the object
+   */
+  public interface ObjectSerDe<T> {
+
+    /**
+     * Serializes a value into a byte array.
+     */
+    byte[] serialize(T value);
+
+    /**
+     * De-serializes a value from a byte array.
+     */
+    T deserialize(byte[] bytes);
+
+    /**
+     * De-serializes a value from a byte buffer.
+     */
+    T deserialize(ByteBuffer byteBuffer);
+  }
+
+  public static final ObjectSerDe<String> STRING_SER_DE = new ObjectSerDe<String>() {
 
     @Override
     public byte[] serialize(String value) {
@@ -59,7 +82,7 @@ public class CustomSerDeUtils {
     }
   };
 
-  public static final ObjectSerDeUtils.ObjectSerDe<Long> LONG_SER_DE = new ObjectSerDeUtils.ObjectSerDe<Long>() {
+  public static final ObjectSerDe<Long> LONG_SER_DE = new ObjectSerDe<Long>() {
 
     @Override
     public byte[] serialize(Long value) {
@@ -77,7 +100,7 @@ public class CustomSerDeUtils {
     }
   };
 
-  public static final ObjectSerDeUtils.ObjectSerDe<Double> DOUBLE_SER_DE = new ObjectSerDeUtils.ObjectSerDe<Double>() {
+  public static final ObjectSerDe<Double> DOUBLE_SER_DE = new ObjectSerDe<Double>() {
 
     @Override
     public byte[] serialize(Double value) {
@@ -95,137 +118,158 @@ public class CustomSerDeUtils {
     }
   };
 
-  public static final ObjectSerDeUtils.ObjectSerDe<AvgPair> AVG_PAIR_SER_DE =
-      new ObjectSerDeUtils.ObjectSerDe<AvgPair>() {
+  public static final ObjectSerDe<AvgPair> AVG_PAIR_SER_DE = new ObjectSerDe<AvgPair>() {
 
-        @Override
-        public byte[] serialize(AvgPair avgPair) {
-          return avgPair.toBytes();
-        }
+    @Override
+    public byte[] serialize(AvgPair avgPair) {
+      return avgPair.toBytes();
+    }
 
-        @Override
-        public AvgPair deserialize(byte[] bytes) {
-          return AvgPair.fromBytes(bytes);
-        }
+    @Override
+    public AvgPair deserialize(byte[] bytes) {
+      return AvgPair.fromBytes(bytes);
+    }
 
-        @Override
-        public AvgPair deserialize(ByteBuffer byteBuffer) {
-          return AvgPair.fromByteBuffer(byteBuffer);
-        }
-      };
+    @Override
+    public AvgPair deserialize(ByteBuffer byteBuffer) {
+      return AvgPair.fromByteBuffer(byteBuffer);
+    }
+  };
 
-  public static final ObjectSerDeUtils.ObjectSerDe<MinMaxRangePair> MIN_MAX_RANGE_PAIR_SER_DE =
-      new ObjectSerDeUtils.ObjectSerDe<MinMaxRangePair>() {
+  public static final ObjectSerDe<MinMaxRangePair> MIN_MAX_RANGE_PAIR_SER_DE = new ObjectSerDe<MinMaxRangePair>() {
 
-        @Override
-        public byte[] serialize(MinMaxRangePair minMaxRangePair) {
-          return minMaxRangePair.toBytes();
-        }
+    @Override
+    public byte[] serialize(MinMaxRangePair minMaxRangePair) {
+      return minMaxRangePair.toBytes();
+    }
 
-        @Override
-        public MinMaxRangePair deserialize(byte[] bytes) {
-          return MinMaxRangePair.fromBytes(bytes);
-        }
+    @Override
+    public MinMaxRangePair deserialize(byte[] bytes) {
+      return MinMaxRangePair.fromBytes(bytes);
+    }
 
-        @Override
-        public MinMaxRangePair deserialize(ByteBuffer byteBuffer) {
-          return MinMaxRangePair.fromByteBuffer(byteBuffer);
-        }
-      };
+    @Override
+    public MinMaxRangePair deserialize(ByteBuffer byteBuffer) {
+      return MinMaxRangePair.fromByteBuffer(byteBuffer);
+    }
+  };
 
-  public static final ObjectSerDeUtils.ObjectSerDe<HyperLogLog> HYPER_LOG_LOG_SER_DE =
-      new ObjectSerDeUtils.ObjectSerDe<HyperLogLog>() {
+  public static final ObjectSerDe<HyperLogLog> HYPER_LOG_LOG_SER_DE = new ObjectSerDe<HyperLogLog>() {
 
-        @Override
-        public byte[] serialize(HyperLogLog hyperLogLog) {
-          try {
-            return hyperLogLog.getBytes();
-          } catch (IOException e) {
-            throw new RuntimeException("Caught exception while serializing HyperLogLog", e);
-          }
-        }
+    @Override
+    public byte[] serialize(HyperLogLog hyperLogLog) {
+      try {
+        return hyperLogLog.getBytes();
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLog", e);
+      }
+    }
 
-        @Override
-        public HyperLogLog deserialize(byte[] bytes) {
-          try {
-            return HyperLogLog.Builder.build(bytes);
-          } catch (IOException e) {
-            throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
-          }
-        }
+    @Override
+    public HyperLogLog deserialize(byte[] bytes) {
+      try {
+        return HyperLogLog.Builder.build(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
+      }
+    }
 
-        @Override
-        public HyperLogLog deserialize(ByteBuffer byteBuffer) {
-          byte[] bytes = new byte[byteBuffer.remaining()];
-          byteBuffer.get(bytes);
-          try {
-            return HyperLogLog.Builder.build(bytes);
-          } catch (IOException e) {
-            throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
-          }
-        }
-      };
+    @Override
+    public HyperLogLog deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      try {
+        return HyperLogLog.Builder.build(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
+      }
+    }
+  };
 
-  public static final ObjectSerDeUtils.ObjectSerDe<TDigest> TDIGEST_SER_DE =
-      new ObjectSerDeUtils.ObjectSerDe<TDigest>() {
+  public static final ObjectSerDe<TDigest> TDIGEST_SER_DE = new ObjectSerDe<TDigest>() {
 
-        @Override
-        public byte[] serialize(TDigest tDigest) {
-          byte[] bytes = new byte[tDigest.byteSize()];
-          tDigest.asBytes(ByteBuffer.wrap(bytes));
-          return bytes;
-        }
+    @Override
+    public byte[] serialize(TDigest tDigest) {
+      byte[] bytes = new byte[tDigest.byteSize()];
+      tDigest.asBytes(ByteBuffer.wrap(bytes));
+      return bytes;
+    }
 
-        @Override
-        public TDigest deserialize(byte[] bytes) {
-          return MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
-        }
+    @Override
+    public TDigest deserialize(byte[] bytes) {
+      return MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
+    }
 
-        @Override
-        public TDigest deserialize(ByteBuffer byteBuffer) {
-          return MergingDigest.fromBytes(byteBuffer);
-        }
-      };
+    @Override
+    public TDigest deserialize(ByteBuffer byteBuffer) {
+      return MergingDigest.fromBytes(byteBuffer);
+    }
+  };
 
-  public static final ObjectSerDeUtils.ObjectSerDe<Sketch> DATA_SKETCH_SER_DE =
-      new ObjectSerDeUtils.ObjectSerDe<Sketch>() {
+  public static final ObjectSerDe<Sketch> DATA_SKETCH_SER_DE = new ObjectSerDe<Sketch>() {
 
-        @Override
-        public byte[] serialize(Sketch value) {
-          // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
-          //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
-          return value.compact(false, null).toByteArray();
-        }
+    @Override
+    public byte[] serialize(Sketch value) {
+      // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
+      //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
+      return value.compact(false, null).toByteArray();
+    }
 
-        @Override
-        public Sketch deserialize(byte[] bytes) {
-          return Sketch.wrap(Memory.wrap(bytes));
-        }
+    @Override
+    public Sketch deserialize(byte[] bytes) {
+      return Sketch.wrap(Memory.wrap(bytes));
+    }
 
-        @Override
-        public Sketch deserialize(ByteBuffer byteBuffer) {
-          byte[] bytes = new byte[byteBuffer.remaining()];
-          byteBuffer.get(bytes);
-          return Sketch.wrap(Memory.wrap(bytes));
-        }
-      };
+    @Override
+    public Sketch deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return Sketch.wrap(Memory.wrap(bytes));
+    }
+  };
 
-  public static final ObjectSerDeUtils.ObjectSerDe<QuantileDigest> QUANTILE_DIGEST_SER_DE =
-      new ObjectSerDeUtils.ObjectSerDe<QuantileDigest>() {
+  public static final ObjectSerDe<RoaringBitmap> ROARING_BITMAP_SER_DE = new ObjectSerDe<RoaringBitmap>() {
 
-        @Override
-        public byte[] serialize(QuantileDigest quantileDigest) {
-          return quantileDigest.toBytes();
-        }
+    @Override
+    public byte[] serialize(RoaringBitmap bitmap) {
+      byte[] bytes = new byte[bitmap.serializedSizeInBytes()];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      bitmap.serialize(byteBuffer);
+      return bytes;
+    }
 
-        @Override
-        public QuantileDigest deserialize(byte[] bytes) {
-          return QuantileDigest.fromBytes(bytes);
-        }
+    @Override
+    public RoaringBitmap deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
 
-        @Override
-        public QuantileDigest deserialize(ByteBuffer byteBuffer) {
-          return QuantileDigest.fromByteBuffer(byteBuffer);
-        }
-      };
+    @Override
+    public RoaringBitmap deserialize(ByteBuffer byteBuffer) {
+      RoaringBitmap bitmap = new RoaringBitmap();
+      try {
+        bitmap.deserialize(byteBuffer);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while deserializing RoaringBitmap", e);
+      }
+      return bitmap;
+    }
+  };
+
+  public static final ObjectSerDe<QuantileDigest> QUANTILE_DIGEST_SER_DE = new ObjectSerDe<QuantileDigest>() {
+
+    @Override
+    public byte[] serialize(QuantileDigest quantileDigest) {
+      return quantileDigest.toBytes();
+    }
+
+    @Override
+    public QuantileDigest deserialize(byte[] bytes) {
+      return QuantileDigest.fromBytes(bytes);
+    }
+
+    @Override
+    public QuantileDigest deserialize(ByteBuffer byteBuffer) {
+      return QuantileDigest.fromByteBuffer(byteBuffer);
+    }
+  };
 }

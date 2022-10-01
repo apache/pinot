@@ -29,8 +29,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.ObjectSerDeUtils;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -135,7 +135,7 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
       // Store serialized bitmaps in the BYTES column
       RoaringBitmap bitmap = new RoaringBitmap();
       bitmap.add(value);
-      byte[] bytesValue = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.serialize(bitmap);
+      byte[] bytesValue = RoaringBitmapUtils.serialize(bitmap);
       record.putValue(BYTES_COLUMN, bytesValue);
       records.add(record);
     }

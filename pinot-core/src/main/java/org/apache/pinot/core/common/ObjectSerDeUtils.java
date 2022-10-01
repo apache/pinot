@@ -209,230 +209,241 @@ public class ObjectSerDeUtils {
     }
   }
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<String> STRING_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<String>() {
+  /**
+   * Serializer/De-serializer for a specific type of object.
+   *
+   * @param <T> Type of the object
+   */
+  public interface ObjectSerDe<T> {
 
-        @Override
-        public byte[] serialize(String value) {
-          return value.getBytes(UTF_8);
-        }
+    /**
+     * Serializes a value into a byte array.
+     */
+    byte[] serialize(T value);
 
-        @Override
-        public String deserialize(byte[] bytes) {
-          return new String(bytes, UTF_8);
-        }
+    /**
+     * De-serializes a value from a byte array.
+     */
+    T deserialize(byte[] bytes);
 
-        @Override
-        public String deserialize(ByteBuffer byteBuffer) {
-          byte[] bytes = new byte[byteBuffer.remaining()];
-          byteBuffer.get(bytes);
-          return new String(bytes, UTF_8);
-        }
-      };
+    /**
+     * De-serializes a value from a byte buffer.
+     */
+    T deserialize(ByteBuffer byteBuffer);
+  }
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Long> LONG_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Long>() {
+  public static final ObjectSerDe<String> STRING_SER_DE = new ObjectSerDe<String>() {
 
-        @Override
-        public byte[] serialize(Long value) {
-          return Longs.toByteArray(value);
-        }
+    @Override
+    public byte[] serialize(String value) {
+      return value.getBytes(UTF_8);
+    }
 
-        @Override
-        public Long deserialize(byte[] bytes) {
-          return Longs.fromByteArray(bytes);
-        }
+    @Override
+    public String deserialize(byte[] bytes) {
+      return new String(bytes, UTF_8);
+    }
 
-        @Override
-        public Long deserialize(ByteBuffer byteBuffer) {
-          return byteBuffer.getLong();
-        }
-      };
+    @Override
+    public String deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return new String(bytes, UTF_8);
+    }
+  };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Double> DOUBLE_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Double>() {
+  public static final ObjectSerDe<Long> LONG_SER_DE = new ObjectSerDe<Long>() {
 
-        @Override
-        public byte[] serialize(Double value) {
-          return Longs.toByteArray(Double.doubleToRawLongBits(value));
-        }
+    @Override
+    public byte[] serialize(Long value) {
+      return Longs.toByteArray(value);
+    }
 
-        @Override
-        public Double deserialize(byte[] bytes) {
-          return Double.longBitsToDouble(Longs.fromByteArray(bytes));
-        }
+    @Override
+    public Long deserialize(byte[] bytes) {
+      return Longs.fromByteArray(bytes);
+    }
 
-        @Override
-        public Double deserialize(ByteBuffer byteBuffer) {
-          return byteBuffer.getDouble();
-        }
-      };
+    @Override
+    public Long deserialize(ByteBuffer byteBuffer) {
+      return byteBuffer.getLong();
+    }
+  };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<DoubleArrayList> DOUBLE_ARRAY_LIST_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<DoubleArrayList>() {
+  public static final ObjectSerDe<Double> DOUBLE_SER_DE = new ObjectSerDe<Double>() {
 
-        @Override
-        public byte[] serialize(DoubleArrayList doubleArrayList) {
-          int size = doubleArrayList.size();
-          byte[] bytes = new byte[Integer.BYTES + size * Double.BYTES];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          double[] values = doubleArrayList.elements();
-          for (int i = 0; i < size; i++) {
-            byteBuffer.putDouble(values[i]);
-          }
-          return bytes;
-        }
+    @Override
+    public byte[] serialize(Double value) {
+      return Longs.toByteArray(Double.doubleToRawLongBits(value));
+    }
 
-        @Override
-        public DoubleArrayList deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
+    @Override
+    public Double deserialize(byte[] bytes) {
+      return Double.longBitsToDouble(Longs.fromByteArray(bytes));
+    }
 
-        @Override
-        public DoubleArrayList deserialize(ByteBuffer byteBuffer) {
-          int numValues = byteBuffer.getInt();
-          DoubleArrayList doubleArrayList = new DoubleArrayList(numValues);
-          for (int i = 0; i < numValues; i++) {
-            doubleArrayList.add(byteBuffer.getDouble());
-          }
-          return doubleArrayList;
-        }
-      };
+    @Override
+    public Double deserialize(ByteBuffer byteBuffer) {
+      return byteBuffer.getDouble();
+    }
+  };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<AvgPair> AVG_PAIR_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<AvgPair>() {
+  public static final ObjectSerDe<DoubleArrayList> DOUBLE_ARRAY_LIST_SER_DE = new ObjectSerDe<DoubleArrayList>() {
 
-        @Override
-        public byte[] serialize(AvgPair avgPair) {
-          return avgPair.toBytes();
-        }
+    @Override
+    public byte[] serialize(DoubleArrayList doubleArrayList) {
+      int size = doubleArrayList.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Double.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      double[] values = doubleArrayList.elements();
+      for (int i = 0; i < size; i++) {
+        byteBuffer.putDouble(values[i]);
+      }
+      return bytes;
+    }
 
-        @Override
-        public AvgPair deserialize(byte[] bytes) {
-          return AvgPair.fromBytes(bytes);
-        }
+    @Override
+    public DoubleArrayList deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
 
-        @Override
-        public AvgPair deserialize(ByteBuffer byteBuffer) {
-          return AvgPair.fromByteBuffer(byteBuffer);
-        }
-      };
+    @Override
+    public DoubleArrayList deserialize(ByteBuffer byteBuffer) {
+      int numValues = byteBuffer.getInt();
+      DoubleArrayList doubleArrayList = new DoubleArrayList(numValues);
+      for (int i = 0; i < numValues; i++) {
+        doubleArrayList.add(byteBuffer.getDouble());
+      }
+      return doubleArrayList;
+    }
+  };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<MinMaxRangePair> MIN_MAX_RANGE_PAIR_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<MinMaxRangePair>() {
+  public static final ObjectSerDe<AvgPair> AVG_PAIR_SER_DE = new ObjectSerDe<AvgPair>() {
 
-        @Override
-        public byte[] serialize(MinMaxRangePair minMaxRangePair) {
-          return minMaxRangePair.toBytes();
-        }
+    @Override
+    public byte[] serialize(AvgPair avgPair) {
+      return avgPair.toBytes();
+    }
 
-        @Override
-        public MinMaxRangePair deserialize(byte[] bytes) {
-          return MinMaxRangePair.fromBytes(bytes);
-        }
+    @Override
+    public AvgPair deserialize(byte[] bytes) {
+      return AvgPair.fromBytes(bytes);
+    }
 
-        @Override
-        public MinMaxRangePair deserialize(ByteBuffer byteBuffer) {
-          return MinMaxRangePair.fromByteBuffer(byteBuffer);
-        }
-      };
+    @Override
+    public AvgPair deserialize(ByteBuffer byteBuffer) {
+      return AvgPair.fromByteBuffer(byteBuffer);
+    }
+  };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<IntLongPair> INT_LONG_PAIR_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<IntLongPair>() {
+  public static final ObjectSerDe<MinMaxRangePair> MIN_MAX_RANGE_PAIR_SER_DE = new ObjectSerDe<MinMaxRangePair>() {
 
-        @Override
-        public byte[] serialize(IntLongPair intLongPair) {
-          return intLongPair.toBytes();
-        }
+    @Override
+    public byte[] serialize(MinMaxRangePair minMaxRangePair) {
+      return minMaxRangePair.toBytes();
+    }
 
-        @Override
-        public IntLongPair deserialize(byte[] bytes) {
-          return IntLongPair.fromBytes(bytes);
-        }
+    @Override
+    public MinMaxRangePair deserialize(byte[] bytes) {
+      return MinMaxRangePair.fromBytes(bytes);
+    }
 
-        @Override
-        public IntLongPair deserialize(ByteBuffer byteBuffer) {
-          return IntLongPair.fromByteBuffer(byteBuffer);
-        }
-      };
+    @Override
+    public MinMaxRangePair deserialize(ByteBuffer byteBuffer) {
+      return MinMaxRangePair.fromByteBuffer(byteBuffer);
+    }
+  };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<LongLongPair> LONG_LONG_PAIR_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<LongLongPair>() {
+  public static final ObjectSerDe<IntLongPair> INT_LONG_PAIR_SER_DE = new ObjectSerDe<IntLongPair>() {
 
-        @Override
-        public byte[] serialize(LongLongPair longLongPair) {
-          return longLongPair.toBytes();
-        }
+    @Override
+    public byte[] serialize(IntLongPair intLongPair) {
+      return intLongPair.toBytes();
+    }
 
-        @Override
-        public LongLongPair deserialize(byte[] bytes) {
-          return LongLongPair.fromBytes(bytes);
-        }
+    @Override
+    public IntLongPair deserialize(byte[] bytes) {
+      return IntLongPair.fromBytes(bytes);
+    }
 
-        @Override
-        public LongLongPair deserialize(ByteBuffer byteBuffer) {
-          return LongLongPair.fromByteBuffer(byteBuffer);
-        }
-      };
+    @Override
+    public IntLongPair deserialize(ByteBuffer byteBuffer) {
+      return IntLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<FloatLongPair> FLOAT_LONG_PAIR_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<FloatLongPair>() {
+  public static final ObjectSerDe<LongLongPair> LONG_LONG_PAIR_SER_DE = new ObjectSerDe<LongLongPair>() {
 
-        @Override
-        public byte[] serialize(FloatLongPair floatLongPair) {
-          return floatLongPair.toBytes();
-        }
+    @Override
+    public byte[] serialize(LongLongPair longLongPair) {
+      return longLongPair.toBytes();
+    }
 
-        @Override
-        public FloatLongPair deserialize(byte[] bytes) {
-          return FloatLongPair.fromBytes(bytes);
-        }
+    @Override
+    public LongLongPair deserialize(byte[] bytes) {
+      return LongLongPair.fromBytes(bytes);
+    }
 
-        @Override
-        public FloatLongPair deserialize(ByteBuffer byteBuffer) {
-          return FloatLongPair.fromByteBuffer(byteBuffer);
-        }
-      };
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<DoubleLongPair> DOUBLE_LONG_PAIR_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<DoubleLongPair>() {
+    @Override
+    public LongLongPair deserialize(ByteBuffer byteBuffer) {
+      return LongLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
 
-        @Override
-        public byte[] serialize(DoubleLongPair doubleLongPair) {
-          return doubleLongPair.toBytes();
-        }
+  public static final ObjectSerDe<FloatLongPair> FLOAT_LONG_PAIR_SER_DE = new ObjectSerDe<FloatLongPair>() {
 
-        @Override
-        public DoubleLongPair deserialize(byte[] bytes) {
-          return DoubleLongPair.fromBytes(bytes);
-        }
+    @Override
+    public byte[] serialize(FloatLongPair floatLongPair) {
+      return floatLongPair.toBytes();
+    }
 
-        @Override
-        public DoubleLongPair deserialize(ByteBuffer byteBuffer) {
-          return DoubleLongPair.fromByteBuffer(byteBuffer);
-        }
-      };
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<StringLongPair> STRING_LONG_PAIR_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<StringLongPair>() {
+    @Override
+    public FloatLongPair deserialize(byte[] bytes) {
+      return FloatLongPair.fromBytes(bytes);
+    }
 
-        @Override
-        public byte[] serialize(StringLongPair stringLongPair) {
-          return stringLongPair.toBytes();
-        }
+    @Override
+    public FloatLongPair deserialize(ByteBuffer byteBuffer) {
+      return FloatLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+  public static final ObjectSerDe<DoubleLongPair> DOUBLE_LONG_PAIR_SER_DE = new ObjectSerDe<DoubleLongPair>() {
 
-        @Override
-        public StringLongPair deserialize(byte[] bytes) {
-          return StringLongPair.fromBytes(bytes);
-        }
+    @Override
+    public byte[] serialize(DoubleLongPair doubleLongPair) {
+      return doubleLongPair.toBytes();
+    }
 
-        @Override
-        public StringLongPair deserialize(ByteBuffer byteBuffer) {
-          return StringLongPair.fromByteBuffer(byteBuffer);
-        }
-      };
+    @Override
+    public DoubleLongPair deserialize(byte[] bytes) {
+      return DoubleLongPair.fromBytes(bytes);
+    }
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<CovarianceTuple>
-      COVARIANCE_TUPLE_OBJECT_SER_DE = new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<CovarianceTuple>() {
+    @Override
+    public DoubleLongPair deserialize(ByteBuffer byteBuffer) {
+      return DoubleLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+  public static final ObjectSerDe<StringLongPair> STRING_LONG_PAIR_SER_DE = new ObjectSerDe<StringLongPair>() {
+
+    @Override
+    public byte[] serialize(StringLongPair stringLongPair) {
+      return stringLongPair.toBytes();
+    }
+
+    @Override
+    public StringLongPair deserialize(byte[] bytes) {
+      return StringLongPair.fromBytes(bytes);
+    }
+
+    @Override
+    public StringLongPair deserialize(ByteBuffer byteBuffer) {
+      return StringLongPair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<CovarianceTuple> COVARIANCE_TUPLE_OBJECT_SER_DE = new ObjectSerDe<CovarianceTuple>() {
     @Override
     public byte[] serialize(CovarianceTuple covarianceTuple) {
       return covarianceTuple.toBytes();
@@ -449,692 +460,699 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<HyperLogLog> HYPER_LOG_LOG_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<HyperLogLog>() {
+  public static final ObjectSerDe<HyperLogLog> HYPER_LOG_LOG_SER_DE = new ObjectSerDe<HyperLogLog>() {
 
-        @Override
-        public byte[] serialize(HyperLogLog hyperLogLog) {
-          try {
-            return hyperLogLog.getBytes();
-          } catch (IOException e) {
-            throw new RuntimeException("Caught exception while serializing HyperLogLog", e);
-          }
-        }
+    @Override
+    public byte[] serialize(HyperLogLog hyperLogLog) {
+      try {
+        return hyperLogLog.getBytes();
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLog", e);
+      }
+    }
 
-        @Override
-        public HyperLogLog deserialize(byte[] bytes) {
-          try {
-            return HyperLogLog.Builder.build(bytes);
-          } catch (IOException e) {
-            throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
-          }
-        }
+    @Override
+    public HyperLogLog deserialize(byte[] bytes) {
+      try {
+        return HyperLogLog.Builder.build(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
+      }
+    }
 
-        @Override
-        public HyperLogLog deserialize(ByteBuffer byteBuffer) {
-          byte[] bytes = new byte[byteBuffer.remaining()];
-          byteBuffer.get(bytes);
-          try {
-            return HyperLogLog.Builder.build(bytes);
-          } catch (IOException e) {
-            throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
-          }
-        }
-      };
+    @Override
+    public HyperLogLog deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      try {
+        return HyperLogLog.Builder.build(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
+      }
+    }
+  };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<DistinctTable> DISTINCT_TABLE_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<DistinctTable>() {
+  public static final ObjectSerDe<DistinctTable> DISTINCT_TABLE_SER_DE = new ObjectSerDe<DistinctTable>() {
 
-        @Override
-        public byte[] serialize(DistinctTable distinctTable) {
-          try {
-            return distinctTable.toBytes();
-          } catch (IOException e) {
-            throw new IllegalStateException("Caught exception while serializing DistinctTable", e);
-          }
-        }
+    @Override
+    public byte[] serialize(DistinctTable distinctTable) {
+      try {
+        return distinctTable.toBytes();
+      } catch (IOException e) {
+        throw new IllegalStateException("Caught exception while serializing DistinctTable", e);
+      }
+    }
 
-        @Override
-        public DistinctTable deserialize(byte[] bytes) {
-          try {
-            return DistinctTable.fromByteBuffer(ByteBuffer.wrap(bytes));
-          } catch (IOException e) {
-            throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
-          }
-        }
+    @Override
+    public DistinctTable deserialize(byte[] bytes) {
+      try {
+        return DistinctTable.fromByteBuffer(ByteBuffer.wrap(bytes));
+      } catch (IOException e) {
+        throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
+      }
+    }
 
-        @Override
-        public DistinctTable deserialize(ByteBuffer byteBuffer) {
-          try {
-            return DistinctTable.fromByteBuffer(byteBuffer);
-          } catch (IOException e) {
-            throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
-          }
-        }
-      };
+    @Override
+    public DistinctTable deserialize(ByteBuffer byteBuffer) {
+      try {
+        return DistinctTable.fromByteBuffer(byteBuffer);
+      } catch (IOException e) {
+        throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
+      }
+    }
+  };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<QuantileDigest> QUANTILE_DIGEST_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<QuantileDigest>() {
+  public static final ObjectSerDe<QuantileDigest> QUANTILE_DIGEST_SER_DE = new ObjectSerDe<QuantileDigest>() {
 
-        @Override
-        public byte[] serialize(QuantileDigest quantileDigest) {
-          return quantileDigest.toBytes();
-        }
+    @Override
+    public byte[] serialize(QuantileDigest quantileDigest) {
+      return quantileDigest.toBytes();
+    }
 
-        @Override
-        public QuantileDigest deserialize(byte[] bytes) {
-          return QuantileDigest.fromBytes(bytes);
-        }
+    @Override
+    public QuantileDigest deserialize(byte[] bytes) {
+      return QuantileDigest.fromBytes(bytes);
+    }
 
-        @Override
-        public QuantileDigest deserialize(ByteBuffer byteBuffer) {
-          return QuantileDigest.fromByteBuffer(byteBuffer);
-        }
-      };
+    @Override
+    public QuantileDigest deserialize(ByteBuffer byteBuffer) {
+      return QuantileDigest.fromByteBuffer(byteBuffer);
+    }
+  };
 
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Map<Object, Object>> MAP_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Map<Object, Object>>() {
+  public static final ObjectSerDe<Map<Object, Object>> MAP_SER_DE = new ObjectSerDe<Map<Object, Object>>() {
 
-        @Override
-        public byte[] serialize(Map<Object, Object> map) {
-          int size = map.size();
+    @Override
+    public byte[] serialize(Map<Object, Object> map) {
+      int size = map.size();
 
-          // Directly return the size (0) for empty map
-          if (size == 0) {
-            return new byte[Integer.BYTES];
-          }
+      // Directly return the size (0) for empty map
+      if (size == 0) {
+        return new byte[Integer.BYTES];
+      }
 
-          // Besides the value bytes, we store: size, key type, value type, length for each key, length for each value
-          long bufferSize = (3 + 2 * (long) size) * Integer.BYTES;
-          byte[][] keyBytesArray = new byte[size][];
-          byte[][] valueBytesArray = new byte[size][];
-          Map.Entry<Object, Object> firstEntry = map.entrySet().iterator().next();
-          int keyTypeValue = ObjectType.getObjectType(firstEntry.getKey()).getValue();
-          int valueTypeValue = ObjectType.getObjectType(firstEntry.getValue()).getValue();
-          org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe keySerDe = SER_DES[keyTypeValue];
-          org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe valueSerDe = SER_DES[valueTypeValue];
-          int index = 0;
-          for (Map.Entry<Object, Object> entry : map.entrySet()) {
-            byte[] keyBytes = keySerDe.serialize(entry.getKey());
-            bufferSize += keyBytes.length;
-            keyBytesArray[index] = keyBytes;
-            byte[] valueBytes = valueSerDe.serialize(entry.getValue());
-            bufferSize += valueBytes.length;
-            valueBytesArray[index++] = valueBytes;
-          }
-          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
-          byte[] bytes = new byte[(int) bufferSize];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          byteBuffer.putInt(keyTypeValue);
-          byteBuffer.putInt(valueTypeValue);
-          for (int i = 0; i < index; i++) {
-            byte[] keyBytes = keyBytesArray[i];
-            byteBuffer.putInt(keyBytes.length);
-            byteBuffer.put(keyBytes);
-            byte[] valueBytes = valueBytesArray[i];
-            byteBuffer.putInt(valueBytes.length);
-            byteBuffer.put(valueBytes);
-          }
-          return bytes;
-        }
+      // Besides the value bytes, we store: size, key type, value type, length for each key, length for each value
+      long bufferSize = (3 + 2 * (long) size) * Integer.BYTES;
+      byte[][] keyBytesArray = new byte[size][];
+      byte[][] valueBytesArray = new byte[size][];
+      Map.Entry<Object, Object> firstEntry = map.entrySet().iterator().next();
+      int keyTypeValue = ObjectType.getObjectType(firstEntry.getKey()).getValue();
+      int valueTypeValue = ObjectType.getObjectType(firstEntry.getValue()).getValue();
+      ObjectSerDe keySerDe = SER_DES[keyTypeValue];
+      ObjectSerDe valueSerDe = SER_DES[valueTypeValue];
+      int index = 0;
+      for (Map.Entry<Object, Object> entry : map.entrySet()) {
+        byte[] keyBytes = keySerDe.serialize(entry.getKey());
+        bufferSize += keyBytes.length;
+        keyBytesArray[index] = keyBytes;
+        byte[] valueBytes = valueSerDe.serialize(entry.getValue());
+        bufferSize += valueBytes.length;
+        valueBytesArray[index++] = valueBytes;
+      }
+      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+      byte[] bytes = new byte[(int) bufferSize];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      byteBuffer.putInt(keyTypeValue);
+      byteBuffer.putInt(valueTypeValue);
+      for (int i = 0; i < index; i++) {
+        byte[] keyBytes = keyBytesArray[i];
+        byteBuffer.putInt(keyBytes.length);
+        byteBuffer.put(keyBytes);
+        byte[] valueBytes = valueBytesArray[i];
+        byteBuffer.putInt(valueBytes.length);
+        byteBuffer.put(valueBytes);
+      }
+      return bytes;
+    }
 
-        @Override
-        public HashMap<Object, Object> deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
+    @Override
+    public HashMap<Object, Object> deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
 
-        @Override
-        public HashMap<Object, Object> deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          HashMap<Object, Object> map = new HashMap<>(size);
-          if (size == 0) {
-            return map;
-          }
+    @Override
+    public HashMap<Object, Object> deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      HashMap<Object, Object> map = new HashMap<>(size);
+      if (size == 0) {
+        return map;
+      }
 
-          // De-serialize each key-value pair
-          org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe keySerDe = SER_DES[byteBuffer.getInt()];
-          org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe valueSerDe = SER_DES[byteBuffer.getInt()];
-          for (int i = 0; i < size; i++) {
-            Object key = keySerDe.deserialize(sliceByteBuffer(byteBuffer, byteBuffer.getInt()));
-            Object value = valueSerDe.deserialize(sliceByteBuffer(byteBuffer, byteBuffer.getInt()));
-            map.put(key, value);
-          }
-          return map;
-        }
+      // De-serialize each key-value pair
+      ObjectSerDe keySerDe = SER_DES[byteBuffer.getInt()];
+      ObjectSerDe valueSerDe = SER_DES[byteBuffer.getInt()];
+      for (int i = 0; i < size; i++) {
+        Object key = keySerDe.deserialize(sliceByteBuffer(byteBuffer, byteBuffer.getInt()));
+        Object value = valueSerDe.deserialize(sliceByteBuffer(byteBuffer, byteBuffer.getInt()));
+        map.put(key, value);
+      }
+      return map;
+    }
 
-        private ByteBuffer sliceByteBuffer(ByteBuffer byteBuffer, int size) {
+    private ByteBuffer sliceByteBuffer(ByteBuffer byteBuffer, int size) {
+      ByteBuffer slice = byteBuffer.slice();
+      slice.limit(size);
+      byteBuffer.position(byteBuffer.position() + size);
+      return slice;
+    }
+  };
+
+  public static final ObjectSerDe<IntSet> INT_SET_SER_DE = new ObjectSerDe<IntSet>() {
+
+    @Override
+    public byte[] serialize(IntSet intSet) {
+      int size = intSet.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Integer.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      IntIterator iterator = intSet.iterator();
+      while (iterator.hasNext()) {
+        byteBuffer.putInt(iterator.nextInt());
+      }
+      return bytes;
+    }
+
+    @Override
+    public IntOpenHashSet deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public IntOpenHashSet deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      IntOpenHashSet intSet = new IntOpenHashSet(size);
+      for (int i = 0; i < size; i++) {
+        intSet.add(byteBuffer.getInt());
+      }
+      return intSet;
+    }
+  };
+
+  public static final ObjectSerDe<LongSet> LONG_SET_SER_DE = new ObjectSerDe<LongSet>() {
+
+    @Override
+    public byte[] serialize(LongSet longSet) {
+      int size = longSet.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Long.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      LongIterator iterator = longSet.iterator();
+      while (iterator.hasNext()) {
+        byteBuffer.putLong(iterator.nextLong());
+      }
+      return bytes;
+    }
+
+    @Override
+    public LongOpenHashSet deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public LongOpenHashSet deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      LongOpenHashSet longSet = new LongOpenHashSet(size);
+      for (int i = 0; i < size; i++) {
+        longSet.add(byteBuffer.getLong());
+      }
+      return longSet;
+    }
+  };
+
+  public static final ObjectSerDe<FloatSet> FLOAT_SET_SER_DE = new ObjectSerDe<FloatSet>() {
+
+    @Override
+    public byte[] serialize(FloatSet floatSet) {
+      int size = floatSet.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Float.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      FloatIterator iterator = floatSet.iterator();
+      while (iterator.hasNext()) {
+        byteBuffer.putFloat(iterator.nextFloat());
+      }
+      return bytes;
+    }
+
+    @Override
+    public FloatOpenHashSet deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public FloatOpenHashSet deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      FloatOpenHashSet floatSet = new FloatOpenHashSet(size);
+      for (int i = 0; i < size; i++) {
+        floatSet.add(byteBuffer.getFloat());
+      }
+      return floatSet;
+    }
+  };
+
+  public static final ObjectSerDe<DoubleSet> DOUBLE_SET_SER_DE = new ObjectSerDe<DoubleSet>() {
+
+    @Override
+    public byte[] serialize(DoubleSet doubleSet) {
+      int size = doubleSet.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Double.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      DoubleIterator iterator = doubleSet.iterator();
+      while (iterator.hasNext()) {
+        byteBuffer.putDouble(iterator.nextDouble());
+      }
+      return bytes;
+    }
+
+    @Override
+    public DoubleOpenHashSet deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public DoubleOpenHashSet deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(size);
+      for (int i = 0; i < size; i++) {
+        doubleSet.add(byteBuffer.getDouble());
+      }
+      return doubleSet;
+    }
+  };
+
+  public static final ObjectSerDe<Set<String>> STRING_SET_SER_DE = new ObjectSerDe<Set<String>>() {
+
+    @Override
+    public byte[] serialize(Set<String> stringSet) {
+      int size = stringSet.size();
+      // Besides the value bytes, we store: size, length for each value
+      long bufferSize = (1 + (long) size) * Integer.BYTES;
+      byte[][] valueBytesArray = new byte[size][];
+      int index = 0;
+      for (String value : stringSet) {
+        byte[] valueBytes = value.getBytes(UTF_8);
+        bufferSize += valueBytes.length;
+        valueBytesArray[index++] = valueBytes;
+      }
+      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+      byte[] bytes = new byte[(int) bufferSize];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (byte[] valueBytes : valueBytesArray) {
+        byteBuffer.putInt(valueBytes.length);
+        byteBuffer.put(valueBytes);
+      }
+      return bytes;
+    }
+
+    @Override
+    public ObjectOpenHashSet<String> deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public ObjectOpenHashSet<String> deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(size);
+      for (int i = 0; i < size; i++) {
+        int length = byteBuffer.getInt();
+        byte[] bytes = new byte[length];
+        byteBuffer.get(bytes);
+        stringSet.add(new String(bytes, UTF_8));
+      }
+      return stringSet;
+    }
+  };
+
+  public static final ObjectSerDe<Set<ByteArray>> BYTES_SET_SER_DE = new ObjectSerDe<Set<ByteArray>>() {
+
+    @Override
+    public byte[] serialize(Set<ByteArray> bytesSet) {
+      int size = bytesSet.size();
+      // Besides the value bytes, we store: size, length for each value
+      long bufferSize = (1 + (long) size) * Integer.BYTES;
+      for (ByteArray value : bytesSet) {
+        bufferSize += value.length();
+      }
+      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+      byte[] bytes = new byte[(int) bufferSize];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (ByteArray value : bytesSet) {
+        byte[] valueBytes = value.getBytes();
+        byteBuffer.putInt(valueBytes.length);
+        byteBuffer.put(valueBytes);
+      }
+      return bytes;
+    }
+
+    @Override
+    public ObjectOpenHashSet<ByteArray> deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public ObjectOpenHashSet<ByteArray> deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(size);
+      for (int i = 0; i < size; i++) {
+        int length = byteBuffer.getInt();
+        byte[] bytes = new byte[length];
+        byteBuffer.get(bytes);
+        bytesSet.add(new ByteArray(bytes));
+      }
+      return bytesSet;
+    }
+  };
+
+  public static final ObjectSerDe<TDigest> TDIGEST_SER_DE = new ObjectSerDe<TDigest>() {
+
+    @Override
+    public byte[] serialize(TDigest tDigest) {
+      byte[] bytes = new byte[tDigest.byteSize()];
+      tDigest.asBytes(ByteBuffer.wrap(bytes));
+      return bytes;
+    }
+
+    @Override
+    public TDigest deserialize(byte[] bytes) {
+      return MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public TDigest deserialize(ByteBuffer byteBuffer) {
+      return MergingDigest.fromBytes(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<Sketch> DATA_SKETCH_SER_DE = new ObjectSerDe<Sketch>() {
+
+    @Override
+    public byte[] serialize(Sketch value) {
+      // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
+      //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
+      return value.compact(false, null).toByteArray();
+    }
+
+    @Override
+    public Sketch deserialize(byte[] bytes) {
+      return Sketch.wrap(Memory.wrap(bytes));
+    }
+
+    @Override
+    public Sketch deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return Sketch.wrap(Memory.wrap(bytes));
+    }
+  };
+
+  public static final ObjectSerDe<Geometry> GEOMETRY_SER_DE = new ObjectSerDe<Geometry>() {
+
+    @Override
+    public byte[] serialize(Geometry value) {
+      return GeometrySerializer.serialize(value);
+    }
+
+    @Override
+    public Geometry deserialize(byte[] bytes) {
+      return GeometrySerializer.deserialize(bytes);
+    }
+
+    @Override
+    public Geometry deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return GeometrySerializer.deserialize(bytes);
+    }
+  };
+
+  public static final ObjectSerDe<RoaringBitmap> ROARING_BITMAP_SER_DE = new ObjectSerDe<RoaringBitmap>() {
+
+    @Override
+    public byte[] serialize(RoaringBitmap bitmap) {
+      byte[] bytes = new byte[bitmap.serializedSizeInBytes()];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      bitmap.serialize(byteBuffer);
+      return bytes;
+    }
+
+    @Override
+    public RoaringBitmap deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public RoaringBitmap deserialize(ByteBuffer byteBuffer) {
+      RoaringBitmap bitmap = new RoaringBitmap();
+      try {
+        bitmap.deserialize(byteBuffer);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while deserializing RoaringBitmap", e);
+      }
+      return bitmap;
+    }
+  };
+
+  public static final ObjectSerDe<IdSet> ID_SET_SER_DE = new ObjectSerDe<IdSet>() {
+
+    @Override
+    public byte[] serialize(IdSet idSet) {
+      try {
+        return idSet.toBytes();
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing IdSet", e);
+      }
+    }
+
+    @Override
+    public IdSet deserialize(byte[] bytes) {
+      try {
+        return IdSets.fromBytes(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while deserializing IdSet", e);
+      }
+    }
+
+    @Override
+    public IdSet deserialize(ByteBuffer byteBuffer) {
+      try {
+        return IdSets.fromByteBuffer(byteBuffer);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while deserializing IdSet", e);
+      }
+    }
+  };
+
+  public static final ObjectSerDe<List<Object>> LIST_SER_DE = new ObjectSerDe<List<Object>>() {
+
+    @Override
+    public byte[] serialize(List<Object> list) {
+      int size = list.size();
+
+      // Directly return the size (0) for empty list
+      if (size == 0) {
+        return new byte[Integer.BYTES];
+      }
+
+      // Besides the value bytes, we store: size, value type, length for each value
+      long bufferSize = (2 + (long) size) * Integer.BYTES;
+      byte[][] valueBytesArray = new byte[size][];
+      int valueType = ObjectType.getObjectType(list.get(0)).getValue();
+      ObjectSerDe serDe = SER_DES[valueType];
+      int index = 0;
+      for (Object value : list) {
+        byte[] valueBytes = serDe.serialize(value);
+        bufferSize += valueBytes.length;
+        valueBytesArray[index++] = valueBytes;
+      }
+      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+      byte[] bytes = new byte[(int) bufferSize];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      byteBuffer.putInt(valueType);
+      for (byte[] valueBytes : valueBytesArray) {
+        byteBuffer.putInt(valueBytes.length);
+        byteBuffer.put(valueBytes);
+      }
+      return bytes;
+    }
+
+    @Override
+    public ArrayList<Object> deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public ArrayList<Object> deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      ArrayList<Object> list = new ArrayList<>(size);
+
+      // De-serialize the values
+      if (size != 0) {
+        ObjectSerDe serDe = SER_DES[byteBuffer.getInt()];
+        for (int i = 0; i < size; i++) {
+          int numBytes = byteBuffer.getInt();
           ByteBuffer slice = byteBuffer.slice();
-          slice.limit(size);
-          byteBuffer.position(byteBuffer.position() + size);
-          return slice;
+          slice.limit(numBytes);
+          list.add(serDe.deserialize(slice));
+          byteBuffer.position(byteBuffer.position() + numBytes);
         }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<IntSet> INT_SET_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<IntSet>() {
-
-        @Override
-        public byte[] serialize(IntSet intSet) {
-          int size = intSet.size();
-          byte[] bytes = new byte[Integer.BYTES + size * Integer.BYTES];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          IntIterator iterator = intSet.iterator();
-          while (iterator.hasNext()) {
-            byteBuffer.putInt(iterator.nextInt());
-          }
-          return bytes;
-        }
-
-        @Override
-        public IntOpenHashSet deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public IntOpenHashSet deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          IntOpenHashSet intSet = new IntOpenHashSet(size);
-          for (int i = 0; i < size; i++) {
-            intSet.add(byteBuffer.getInt());
-          }
-          return intSet;
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<LongSet> LONG_SET_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<LongSet>() {
-
-        @Override
-        public byte[] serialize(LongSet longSet) {
-          int size = longSet.size();
-          byte[] bytes = new byte[Integer.BYTES + size * Long.BYTES];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          LongIterator iterator = longSet.iterator();
-          while (iterator.hasNext()) {
-            byteBuffer.putLong(iterator.nextLong());
-          }
-          return bytes;
-        }
-
-        @Override
-        public LongOpenHashSet deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public LongOpenHashSet deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          LongOpenHashSet longSet = new LongOpenHashSet(size);
-          for (int i = 0; i < size; i++) {
-            longSet.add(byteBuffer.getLong());
-          }
-          return longSet;
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<FloatSet> FLOAT_SET_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<FloatSet>() {
-
-        @Override
-        public byte[] serialize(FloatSet floatSet) {
-          int size = floatSet.size();
-          byte[] bytes = new byte[Integer.BYTES + size * Float.BYTES];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          FloatIterator iterator = floatSet.iterator();
-          while (iterator.hasNext()) {
-            byteBuffer.putFloat(iterator.nextFloat());
-          }
-          return bytes;
-        }
-
-        @Override
-        public FloatOpenHashSet deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public FloatOpenHashSet deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          FloatOpenHashSet floatSet = new FloatOpenHashSet(size);
-          for (int i = 0; i < size; i++) {
-            floatSet.add(byteBuffer.getFloat());
-          }
-          return floatSet;
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<DoubleSet> DOUBLE_SET_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<DoubleSet>() {
-
-        @Override
-        public byte[] serialize(DoubleSet doubleSet) {
-          int size = doubleSet.size();
-          byte[] bytes = new byte[Integer.BYTES + size * Double.BYTES];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          DoubleIterator iterator = doubleSet.iterator();
-          while (iterator.hasNext()) {
-            byteBuffer.putDouble(iterator.nextDouble());
-          }
-          return bytes;
-        }
-
-        @Override
-        public DoubleOpenHashSet deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public DoubleOpenHashSet deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          DoubleOpenHashSet doubleSet = new DoubleOpenHashSet(size);
-          for (int i = 0; i < size; i++) {
-            doubleSet.add(byteBuffer.getDouble());
-          }
-          return doubleSet;
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Set<String>> STRING_SET_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Set<String>>() {
-
-        @Override
-        public byte[] serialize(Set<String> stringSet) {
-          int size = stringSet.size();
-          // Besides the value bytes, we store: size, length for each value
-          long bufferSize = (1 + (long) size) * Integer.BYTES;
-          byte[][] valueBytesArray = new byte[size][];
-          int index = 0;
-          for (String value : stringSet) {
-            byte[] valueBytes = value.getBytes(UTF_8);
-            bufferSize += valueBytes.length;
-            valueBytesArray[index++] = valueBytes;
-          }
-          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
-          byte[] bytes = new byte[(int) bufferSize];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          for (byte[] valueBytes : valueBytesArray) {
-            byteBuffer.putInt(valueBytes.length);
-            byteBuffer.put(valueBytes);
-          }
-          return bytes;
-        }
-
-        @Override
-        public ObjectOpenHashSet<String> deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public ObjectOpenHashSet<String> deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(size);
-          for (int i = 0; i < size; i++) {
-            int length = byteBuffer.getInt();
-            byte[] bytes = new byte[length];
-            byteBuffer.get(bytes);
-            stringSet.add(new String(bytes, UTF_8));
-          }
-          return stringSet;
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Set<ByteArray>> BYTES_SET_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Set<ByteArray>>() {
-
-        @Override
-        public byte[] serialize(Set<ByteArray> bytesSet) {
-          int size = bytesSet.size();
-          // Besides the value bytes, we store: size, length for each value
-          long bufferSize = (1 + (long) size) * Integer.BYTES;
-          for (ByteArray value : bytesSet) {
-            bufferSize += value.length();
-          }
-          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
-          byte[] bytes = new byte[(int) bufferSize];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          for (ByteArray value : bytesSet) {
-            byte[] valueBytes = value.getBytes();
-            byteBuffer.putInt(valueBytes.length);
-            byteBuffer.put(valueBytes);
-          }
-          return bytes;
-        }
-
-        @Override
-        public ObjectOpenHashSet<ByteArray> deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public ObjectOpenHashSet<ByteArray> deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          ObjectOpenHashSet<ByteArray> bytesSet = new ObjectOpenHashSet<>(size);
-          for (int i = 0; i < size; i++) {
-            int length = byteBuffer.getInt();
-            byte[] bytes = new byte[length];
-            byteBuffer.get(bytes);
-            bytesSet.add(new ByteArray(bytes));
-          }
-          return bytesSet;
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<TDigest> TDIGEST_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<TDigest>() {
-
-        @Override
-        public byte[] serialize(TDigest tDigest) {
-          byte[] bytes = new byte[tDigest.byteSize()];
-          tDigest.asBytes(ByteBuffer.wrap(bytes));
-          return bytes;
-        }
-
-        @Override
-        public TDigest deserialize(byte[] bytes) {
-          return MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public TDigest deserialize(ByteBuffer byteBuffer) {
-          return MergingDigest.fromBytes(byteBuffer);
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Sketch> DATA_SKETCH_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Sketch>() {
-
-        @Override
-        public byte[] serialize(Sketch value) {
-          // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
-          //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
-          return value.compact(false, null).toByteArray();
-        }
-
-        @Override
-        public Sketch deserialize(byte[] bytes) {
-          return Sketch.wrap(Memory.wrap(bytes));
-        }
-
-        @Override
-        public Sketch deserialize(ByteBuffer byteBuffer) {
-          byte[] bytes = new byte[byteBuffer.remaining()];
-          byteBuffer.get(bytes);
-          return Sketch.wrap(Memory.wrap(bytes));
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Geometry> GEOMETRY_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Geometry>() {
-
-        @Override
-        public byte[] serialize(Geometry value) {
-          return GeometrySerializer.serialize(value);
-        }
-
-        @Override
-        public Geometry deserialize(byte[] bytes) {
-          return GeometrySerializer.deserialize(bytes);
-        }
-
-        @Override
-        public Geometry deserialize(ByteBuffer byteBuffer) {
-          byte[] bytes = new byte[byteBuffer.remaining()];
-          byteBuffer.get(bytes);
-          return GeometrySerializer.deserialize(bytes);
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<IdSet> ID_SET_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<IdSet>() {
-
-        @Override
-        public byte[] serialize(IdSet idSet) {
-          try {
-            return idSet.toBytes();
-          } catch (IOException e) {
-            throw new RuntimeException("Caught exception while serializing IdSet", e);
-          }
-        }
-
-        @Override
-        public IdSet deserialize(byte[] bytes) {
-          try {
-            return IdSets.fromBytes(bytes);
-          } catch (IOException e) {
-            throw new RuntimeException("Caught exception while deserializing IdSet", e);
-          }
-        }
-
-        @Override
-        public IdSet deserialize(ByteBuffer byteBuffer) {
-          try {
-            return IdSets.fromByteBuffer(byteBuffer);
-          } catch (IOException e) {
-            throw new RuntimeException("Caught exception while deserializing IdSet", e);
-          }
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<List<Object>> LIST_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<List<Object>>() {
-
-        @Override
-        public byte[] serialize(List<Object> list) {
-          int size = list.size();
-
-          // Directly return the size (0) for empty list
-          if (size == 0) {
-            return new byte[Integer.BYTES];
-          }
-
-          // Besides the value bytes, we store: size, value type, length for each value
-          long bufferSize = (2 + (long) size) * Integer.BYTES;
-          byte[][] valueBytesArray = new byte[size][];
-          int valueType = ObjectType.getObjectType(list.get(0)).getValue();
-          org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe serDe = SER_DES[valueType];
-          int index = 0;
-          for (Object value : list) {
-            byte[] valueBytes = serDe.serialize(value);
-            bufferSize += valueBytes.length;
-            valueBytesArray[index++] = valueBytes;
-          }
-          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
-          byte[] bytes = new byte[(int) bufferSize];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          byteBuffer.putInt(valueType);
-          for (byte[] valueBytes : valueBytesArray) {
-            byteBuffer.putInt(valueBytes.length);
-            byteBuffer.put(valueBytes);
-          }
-          return bytes;
-        }
-
-        @Override
-        public ArrayList<Object> deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public ArrayList<Object> deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          ArrayList<Object> list = new ArrayList<>(size);
-
-          // De-serialize the values
-          if (size != 0) {
-            org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe serDe = SER_DES[byteBuffer.getInt()];
-            for (int i = 0; i < size; i++) {
-              int numBytes = byteBuffer.getInt();
-              ByteBuffer slice = byteBuffer.slice();
-              slice.limit(numBytes);
-              list.add(serDe.deserialize(slice));
-              byteBuffer.position(byteBuffer.position() + numBytes);
-            }
-          }
-
-          return list;
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<BigDecimal> BIGDECIMAL_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<BigDecimal>() {
-
-        @Override
-        public byte[] serialize(BigDecimal value) {
-          return BigDecimalUtils.serialize(value);
-        }
-
-        @Override
-        public BigDecimal deserialize(byte[] bytes) {
-          return BigDecimalUtils.deserialize(bytes);
-        }
-
-        @Override
-        public BigDecimal deserialize(ByteBuffer byteBuffer) {
-          byte[] bytes = new byte[byteBuffer.remaining()];
-          byteBuffer.get(bytes);
-          return BigDecimalUtils.deserialize(bytes);
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Int2LongMap> INT_2_LONG_MAP_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Int2LongMap>() {
-
-        @Override
-        public byte[] serialize(Int2LongMap map) {
-          int size = map.size();
-          byte[] bytes = new byte[Integer.BYTES + size * (Integer.BYTES + Long.BYTES)];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          for (Int2LongMap.Entry entry : map.int2LongEntrySet()) {
-            byteBuffer.putInt(entry.getIntKey());
-            byteBuffer.putLong(entry.getLongValue());
-          }
-          return bytes;
-        }
-
-        @Override
-        public Int2LongOpenHashMap deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public Int2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          Int2LongOpenHashMap map = new Int2LongOpenHashMap(size);
-          for (int i = 0; i < size; i++) {
-            map.put(byteBuffer.getInt(), byteBuffer.getLong());
-          }
-          return map;
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Long2LongMap> LONG_2_LONG_MAP_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Long2LongMap>() {
-
-        @Override
-        public byte[] serialize(Long2LongMap map) {
-          int size = map.size();
-          byte[] bytes = new byte[Integer.BYTES + size * (Long.BYTES + Long.BYTES)];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          for (Long2LongMap.Entry entry : map.long2LongEntrySet()) {
-            byteBuffer.putLong(entry.getLongKey());
-            byteBuffer.putLong(entry.getLongValue());
-          }
-          return bytes;
-        }
-
-        @Override
-        public Long2LongOpenHashMap deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public Long2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          Long2LongOpenHashMap map = new Long2LongOpenHashMap(size);
-          for (int i = 0; i < size; i++) {
-            map.put(byteBuffer.getLong(), byteBuffer.getLong());
-          }
-          return map;
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Float2LongMap> FLOAT_2_LONG_MAP_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Float2LongMap>() {
-
-        @Override
-        public byte[] serialize(Float2LongMap map) {
-          int size = map.size();
-          byte[] bytes = new byte[Integer.BYTES + size * (Float.BYTES + Long.BYTES)];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          for (Float2LongMap.Entry entry : map.float2LongEntrySet()) {
-            byteBuffer.putFloat(entry.getFloatKey());
-            byteBuffer.putLong(entry.getLongValue());
-          }
-          return bytes;
-        }
-
-        @Override
-        public Float2LongOpenHashMap deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public Float2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          Float2LongOpenHashMap map = new Float2LongOpenHashMap(size);
-          for (int i = 0; i < size; i++) {
-            map.put(byteBuffer.getFloat(), byteBuffer.getLong());
-          }
-          return map;
-        }
-      };
-
-  public static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Double2LongMap> DOUBLE_2_LONG_MAP_SER_DE =
-      new org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe<Double2LongMap>() {
-
-        @Override
-        public byte[] serialize(Double2LongMap map) {
-          int size = map.size();
-          byte[] bytes = new byte[Integer.BYTES + size * (Double.BYTES + Long.BYTES)];
-          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(size);
-          for (Double2LongMap.Entry entry : map.double2LongEntrySet()) {
-            byteBuffer.putDouble(entry.getDoubleKey());
-            byteBuffer.putLong(entry.getLongValue());
-          }
-          return bytes;
-        }
-
-        @Override
-        public Double2LongOpenHashMap deserialize(byte[] bytes) {
-          return deserialize(ByteBuffer.wrap(bytes));
-        }
-
-        @Override
-        public Double2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
-          int size = byteBuffer.getInt();
-          Double2LongOpenHashMap map = new Double2LongOpenHashMap(size);
-          for (int i = 0; i < size; i++) {
-            map.put(byteBuffer.getDouble(), byteBuffer.getLong());
-          }
-          return map;
-        }
-      };
+      }
+
+      return list;
+    }
+  };
+
+  public static final ObjectSerDe<BigDecimal> BIGDECIMAL_SER_DE = new ObjectSerDe<BigDecimal>() {
+
+    @Override
+    public byte[] serialize(BigDecimal value) {
+      return BigDecimalUtils.serialize(value);
+    }
+
+    @Override
+    public BigDecimal deserialize(byte[] bytes) {
+      return BigDecimalUtils.deserialize(bytes);
+    }
+
+    @Override
+    public BigDecimal deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return BigDecimalUtils.deserialize(bytes);
+    }
+  };
+
+  public static final ObjectSerDe<Int2LongMap> INT_2_LONG_MAP_SER_DE = new ObjectSerDe<Int2LongMap>() {
+
+    @Override
+    public byte[] serialize(Int2LongMap map) {
+      int size = map.size();
+      byte[] bytes = new byte[Integer.BYTES + size * (Integer.BYTES + Long.BYTES)];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (Int2LongMap.Entry entry : map.int2LongEntrySet()) {
+        byteBuffer.putInt(entry.getIntKey());
+        byteBuffer.putLong(entry.getLongValue());
+      }
+      return bytes;
+    }
+
+    @Override
+    public Int2LongOpenHashMap deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public Int2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      Int2LongOpenHashMap map = new Int2LongOpenHashMap(size);
+      for (int i = 0; i < size; i++) {
+        map.put(byteBuffer.getInt(), byteBuffer.getLong());
+      }
+      return map;
+    }
+  };
+
+  public static final ObjectSerDe<Long2LongMap> LONG_2_LONG_MAP_SER_DE = new ObjectSerDe<Long2LongMap>() {
+
+    @Override
+    public byte[] serialize(Long2LongMap map) {
+      int size = map.size();
+      byte[] bytes = new byte[Integer.BYTES + size * (Long.BYTES + Long.BYTES)];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (Long2LongMap.Entry entry : map.long2LongEntrySet()) {
+        byteBuffer.putLong(entry.getLongKey());
+        byteBuffer.putLong(entry.getLongValue());
+      }
+      return bytes;
+    }
+
+    @Override
+    public Long2LongOpenHashMap deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public Long2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      Long2LongOpenHashMap map = new Long2LongOpenHashMap(size);
+      for (int i = 0; i < size; i++) {
+        map.put(byteBuffer.getLong(), byteBuffer.getLong());
+      }
+      return map;
+    }
+  };
+
+  public static final ObjectSerDe<Float2LongMap> FLOAT_2_LONG_MAP_SER_DE = new ObjectSerDe<Float2LongMap>() {
+
+    @Override
+    public byte[] serialize(Float2LongMap map) {
+      int size = map.size();
+      byte[] bytes = new byte[Integer.BYTES + size * (Float.BYTES + Long.BYTES)];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (Float2LongMap.Entry entry : map.float2LongEntrySet()) {
+        byteBuffer.putFloat(entry.getFloatKey());
+        byteBuffer.putLong(entry.getLongValue());
+      }
+      return bytes;
+    }
+
+    @Override
+    public Float2LongOpenHashMap deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public Float2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      Float2LongOpenHashMap map = new Float2LongOpenHashMap(size);
+      for (int i = 0; i < size; i++) {
+        map.put(byteBuffer.getFloat(), byteBuffer.getLong());
+      }
+      return map;
+    }
+  };
+
+  public static final ObjectSerDe<Double2LongMap> DOUBLE_2_LONG_MAP_SER_DE = new ObjectSerDe<Double2LongMap>() {
+
+    @Override
+    public byte[] serialize(Double2LongMap map) {
+      int size = map.size();
+      byte[] bytes = new byte[Integer.BYTES + size * (Double.BYTES + Long.BYTES)];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (Double2LongMap.Entry entry : map.double2LongEntrySet()) {
+        byteBuffer.putDouble(entry.getDoubleKey());
+        byteBuffer.putLong(entry.getLongValue());
+      }
+      return bytes;
+    }
+
+    @Override
+    public Double2LongOpenHashMap deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public Double2LongOpenHashMap deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      Double2LongOpenHashMap map = new Double2LongOpenHashMap(size);
+      for (int i = 0; i < size; i++) {
+        map.put(byteBuffer.getDouble(), byteBuffer.getLong());
+      }
+      return map;
+    }
+  };
 
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
-  private static final org.apache.pinot.common.ObjectSerDeUtils.ObjectSerDe[] SER_DES = {
+  private static final ObjectSerDe[] SER_DES = {
       STRING_SER_DE,
       LONG_SER_DE,
       DOUBLE_SER_DE,
@@ -1149,7 +1167,7 @@ public class ObjectSerDeUtils {
       DISTINCT_TABLE_SER_DE,
       DATA_SKETCH_SER_DE,
       GEOMETRY_SER_DE,
-      org.apache.pinot.common.ObjectSerDeUtils.ROARING_BITMAP_SER_DE,
+      ROARING_BITMAP_SER_DE,
       LONG_SET_SER_DE,
       FLOAT_SET_SER_DE,
       DOUBLE_SET_SER_DE,

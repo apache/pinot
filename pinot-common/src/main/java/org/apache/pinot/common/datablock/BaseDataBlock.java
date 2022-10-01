@@ -28,7 +28,6 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.ObjectSerDeUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.datatable.DataTableImplV3;
@@ -36,6 +35,7 @@ import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -354,7 +354,7 @@ public abstract class BaseDataBlock implements DataTable {
     int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     int type = _variableSizeData.getInt();
     if (size == 0) {
-      assert type == ObjectSerDeUtils.NULL_TYPE_VALUE;
+      assert type == CustomObject.NULL_TYPE_VALUE;
       return null;
     }
     ByteBuffer buffer = _variableSizeData.slice();
@@ -377,7 +377,7 @@ public abstract class BaseDataBlock implements DataTable {
       _variableSizeData.position(offset);
       byte[] nullBitmapBytes = new byte[bytesLength];
       _variableSizeData.get(nullBitmapBytes);
-      return ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(nullBitmapBytes);
+      return RoaringBitmapUtils.deserialize(nullBitmapBytes);
     } else {
       return null;
     }
