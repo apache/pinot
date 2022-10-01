@@ -30,6 +30,8 @@ public class QueryTestSet {
         new Object[]{"SELECT * FROM b ORDER BY col1, col2 DESC LIMIT 3"},
         new Object[]{"SELECT * FROM a ORDER BY col1, ts LIMIT 10"},
         new Object[]{"SELECT * FROM a ORDER BY col1 LIMIT 20"},
+        new Object[]{"SELECT * FROM a ORDER BY col1, ts LIMIT 1, 2"},
+        new Object[]{"SELECT * FROM a ORDER BY col1, ts LIMIT 2 OFFSET 1"},
 
         // No match filter
         new Object[]{"SELECT * FROM b WHERE col3 < 0.5"},
