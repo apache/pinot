@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.query.request;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -56,7 +59,7 @@ public class ServerQueryRequest {
     _enableTrace = instanceRequest.isEnableTrace();
     _enableStreaming = false;
     _segmentsToQuery = instanceRequest.getSearchSegments();
-    _queryContext = QueryContextConverterUtils.getQueryContext(instanceRequest.getQuery().getPinotQuery());
+    _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
@@ -83,8 +86,17 @@ public class ServerQueryRequest {
     } else {
       throw new UnsupportedOperationException("Unsupported payloadType: " + payloadType);
     }
-    _queryContext = QueryContextConverterUtils.getQueryContext(brokerRequest.getPinotQuery());
+    _queryContext = getQueryContext(brokerRequest.getPinotQuery());
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+  }
+
+  private static QueryContext getQueryContext(PinotQuery pinotQuery) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    if (queryContext.isNullHandlingEnabled()) {
+      Preconditions.checkState(DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4,
+          "Null handling cannot be enabled for data table version smaller than 4");
+    }
+    return queryContext;
   }
 
   /**
