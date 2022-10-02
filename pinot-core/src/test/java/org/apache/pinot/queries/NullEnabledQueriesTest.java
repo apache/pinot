@@ -28,11 +28,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -213,7 +214,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   }
 
   public void testQueries(Number baseValue, ColumnDataType dataType) {
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     {
@@ -652,7 +653,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       }
       assertNull(rows.get(rows.size() - 1)[0]);
     }
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
   @AfterClass

@@ -34,6 +34,8 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -44,15 +46,13 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.ExplainPlanRowData;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
-import org.apache.pinot.core.common.datatable.DataTableUtils;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
@@ -177,7 +177,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       String errorMessage =
           String.format("Query scheduling took %dms (longer than query timeout of %dms) on server: %s",
               querySchedulingTimeMs, queryTimeoutMs, _instanceDataManager.getInstanceId());
-      DataTable dataTable = DataTableFactory.getEmptyDataTable();
+      DataTable dataTable = DataTableBuilderUtils.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
       return dataTable;
@@ -187,7 +187,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (tableDataManager == null) {
       String errorMessage = String.format("Failed to find table: %s on server: %s", tableNameWithType,
           _instanceDataManager.getInstanceId());
-      DataTable dataTable = DataTableFactory.getEmptyDataTable();
+      DataTable dataTable = DataTableBuilderUtils.getEmptyDataTable();
       dataTable.addException(QueryException.getException(QueryException.SERVER_TABLE_MISSING_ERROR, errorMessage));
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
       return dataTable;
@@ -250,7 +250,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           queryRequest.isEnableStreaming());
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
-      dataTable = DataTableFactory.getEmptyDataTable();
+      dataTable = DataTableBuilderUtils.getEmptyDataTable();
       // Do not log verbose error for BadQueryRequestException and QueryCancelledException.
       if (e instanceof BadQueryRequestException) {
         LOGGER.info("Caught BadQueryRequestException while processing requestId: {}, {}", requestId, e.getMessage());
@@ -356,7 +356,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       if (queryContext.isExplain()) {
         dataTable = getExplainPlanResultsForNoMatchingSegment(totalSegments);
       } else {
-        dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
+        dataTable = DataTableBuilderUtils.buildEmptyDataTable(queryContext);
       }
 
       Map<String, String> metadata = dataTable.getMetadata();
@@ -398,7 +398,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   /** @return EXPLAIN_PLAN query result {@link DataTable} when no segments get selected for query execution.*/
   private static DataTable getExplainPlanResultsForNoMatchingSegment(int totalNumSegments) {
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
     try {
       dataTableBuilder.startRow();
       dataTableBuilder.setColumn(0, String.format(ExplainPlanRows.PLAN_START_FORMAT, totalNumSegments));
@@ -503,7 +503,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   /** @return EXPLAIN PLAN query result {@link DataTable}. */
   public static DataTable processExplainPlanQueries(Plan queryPlan) {
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
     List<Operator> childOperators = queryPlan.getPlanNode().run().getChildOperators();
     assert childOperators.size() == 1;
     Operator root = childOperators.get(0);

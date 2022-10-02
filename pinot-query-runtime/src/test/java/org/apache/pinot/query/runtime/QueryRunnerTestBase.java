@@ -31,7 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
@@ -125,7 +126,7 @@ public class QueryRunnerTestBase extends QueryTestSet {
   @BeforeClass
   public void setUp()
       throws Exception {
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     QueryServerEnclosure server1 = new QueryServerEnclosure(
         ImmutableMap.of("a", INDEX_DIR_S1_A, "b", INDEX_DIR_S1_B, "c", INDEX_DIR_S1_C, "d_O", INDEX_DIR_S1_D),
         QueryEnvironmentTestUtils.SERVER1_SEGMENTS);
@@ -161,7 +162,7 @@ public class QueryRunnerTestBase extends QueryTestSet {
 
   @AfterClass
   public void tearDown() {
-    DataTableFactory.setDataTableVersion(DataTableFactory.DEFAULT_VERSION);
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
     for (QueryServerEnclosure server : _servers.values()) {
       server.shutDown();
     }

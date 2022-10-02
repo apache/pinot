@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -38,7 +38,7 @@ public class ExceptionResultsBlock extends BaseResultsBlock {
   @Override
   public DataTable getDataTable(QueryContext queryContext)
       throws Exception {
-    DataTable dataTable = DataTableFactory.getEmptyDataTable();
+    DataTable dataTable = DataTableBuilderUtils.getEmptyDataTable();
     attachMetadataToDataTable(dataTable);
     return dataTable;
   }

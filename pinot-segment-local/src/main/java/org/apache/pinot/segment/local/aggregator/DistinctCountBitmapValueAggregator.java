@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
@@ -84,11 +84,11 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
 
   @Override
   public byte[] serializeAggregatedValue(RoaringBitmap value) {
-    return CustomSerDeUtils.ROARING_BITMAP_SER_DE.serialize(value);
+    return RoaringBitmapUtils.serialize(value);
   }
 
   @Override
   public RoaringBitmap deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(bytes);
+    return RoaringBitmapUtils.deserialize(bytes);
   }
 }

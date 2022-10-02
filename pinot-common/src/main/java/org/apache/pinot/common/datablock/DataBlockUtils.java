@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common.datablock;
+package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -32,10 +31,10 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public final class DataBlockUtils {
-  protected static final int VERSION_TYPE_SHIFT = 5;
   private DataBlockUtils() {
-    // do not instantiate.
   }
+
+  static final int VERSION_TYPE_SHIFT = 5;
 
   public static MetadataBlock getErrorDataBlock(Exception e) {
     String errorMessage = e.getMessage() == null ? e.toString() : e.getMessage();
@@ -54,7 +53,7 @@ public final class DataBlockUtils {
     return errorBlock;
   }
 
-  public static MetadataBlock getEndOfStreamDataBlock(@Nonnull DataSchema dataSchema) {
+  public static MetadataBlock getEndOfStreamDataBlock(DataSchema dataSchema) {
     // TODO: add query statistics metadata for the block.
     return new MetadataBlock(dataSchema);
   }

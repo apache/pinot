@@ -19,9 +19,9 @@
 package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -32,14 +32,14 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-public class DataTableUtilsTest {
+public class DataTableBuilderUtilsTest {
 
   @Test
   public void testBuildEmptyDataTable()
       throws IOException {
     // Selection
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable WHERE foo = 'bar'");
-    DataTable dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
+    DataTable dataTable = DataTableBuilderUtils.buildEmptyDataTable(queryContext);
     DataSchema dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"*"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.STRING});
@@ -48,7 +48,7 @@ public class DataTableUtilsTest {
     // Aggregation
     queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT COUNT(*), SUM(a), MAX(b) FROM testTable WHERE foo = 'bar'");
-    dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
+    dataTable = DataTableBuilderUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"count_star", "sum_a", "max_b"});
     assertEquals(dataSchema.getColumnDataTypes(),
@@ -61,7 +61,7 @@ public class DataTableUtilsTest {
     // Group-by
     queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT c, d, COUNT(*), SUM(a), MAX(b) FROM testTable WHERE foo = 'bar' GROUP BY c, d");
-    dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
+    dataTable = DataTableBuilderUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"c", "d", "count(*)", "sum(a)", "max(b)"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
@@ -71,7 +71,7 @@ public class DataTableUtilsTest {
 
     // Distinct
     queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCT a, b FROM testTable WHERE foo = 'bar'");
-    dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
+    dataTable = DataTableBuilderUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"distinct_a:b"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.OBJECT});

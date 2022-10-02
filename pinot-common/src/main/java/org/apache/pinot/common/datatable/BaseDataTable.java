@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common.datatable;
+package org.apache.pinot.common.datatable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -28,8 +28,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -249,7 +247,7 @@ public abstract class BaseDataTable implements DataTable {
     int size = positionCursorInVariableBuffer(rowId, colId);
     int type = _variableSizeData.getInt();
     if (size == 0) {
-      assert type == ObjectSerDeUtils.NULL_TYPE_VALUE;
+      assert type == CustomObject.NULL_TYPE_VALUE;
       return null;
     }
     ByteBuffer buffer = _variableSizeData.slice();

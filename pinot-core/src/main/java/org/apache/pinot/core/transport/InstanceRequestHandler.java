@@ -38,15 +38,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
@@ -154,7 +154,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
       long requestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
       LOGGER.error("Exception while processing instance request: {}", hexString, e);
-      sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, DataTableFactory.getEmptyDataTable(), e);
+      sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
+          DataTableBuilderUtils.getEmptyDataTable(), e);
     }
   }
 
@@ -197,7 +198,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         } else {
           // Send exception response.
           sendErrorResponse(ctx, queryRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs,
-              DataTableFactory.getEmptyDataTable(), new Exception("Null query response."));
+              DataTableBuilderUtils.getEmptyDataTable(), new Exception("Null query response."));
         }
       }
 
@@ -224,7 +225,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
           e = new Exception(t);
         }
         sendErrorResponse(ctx, instanceRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs,
-            DataTableFactory.getEmptyDataTable(), e);
+            DataTableBuilderUtils.getEmptyDataTable(), e);
       }
     };
   }
@@ -235,7 +236,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     // will only be called if for some remote reason we are unable to handle exceptions in channelRead0.
     String message = "Unhandled Exception in " + getClass().getCanonicalName();
     LOGGER.error(message, cause);
-    sendErrorResponse(ctx, 0, null, System.currentTimeMillis(), DataTableFactory.getEmptyDataTable(),
+    sendErrorResponse(ctx, 0, null, System.currentTimeMillis(), DataTableBuilderUtils.getEmptyDataTable(),
         new Exception(message, cause));
   }
 

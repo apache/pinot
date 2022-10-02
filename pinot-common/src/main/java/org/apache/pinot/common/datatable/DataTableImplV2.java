@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common.datatable;
+package org.apache.pinot.common.datatable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -129,16 +129,16 @@ public class DataTableImplV2 extends BaseDataTable {
 
   private Map<String, String> deserializeMetadata(ByteBuffer buffer)
       throws IOException {
-      int numEntries = buffer.getInt();
-      Map<String, String> metadata = new HashMap<>(numEntries);
+    int numEntries = buffer.getInt();
+    Map<String, String> metadata = new HashMap<>(numEntries);
 
-      for (int i = 0; i < numEntries; i++) {
-        String key = DataTableUtils.decodeString(buffer);
-        String value = DataTableUtils.decodeString(buffer);
-        metadata.put(key, value);
-      }
+    for (int i = 0; i < numEntries; i++) {
+      String key = DataTableUtils.decodeString(buffer);
+      String value = DataTableUtils.decodeString(buffer);
+      metadata.put(key, value);
+    }
 
-      return metadata;
+    return metadata;
   }
 
   @Override

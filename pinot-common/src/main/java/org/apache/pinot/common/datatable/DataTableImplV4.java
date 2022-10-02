@@ -16,31 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.blocks;
 
-import java.util.Map;
-import org.apache.pinot.common.datablock.DataBlockUtils;
+package org.apache.pinot.common.datatable;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-public final class TransferableBlockUtils {
-  private TransferableBlockUtils() {
-    // do not instantiate.
+/**
+ * Datatable V4 Implementation is a wrapper around the Row-based data block.
+ */
+@InterfaceStability.Evolving
+public class DataTableImplV4 extends RowDataBlock {
+
+  public DataTableImplV4() {
+    super();
   }
 
-  public static TransferableBlock getEndOfStreamTransferableBlock(DataSchema dataSchema) {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(dataSchema));
+  public DataTableImplV4(ByteBuffer byteBuffer)
+      throws IOException {
+    super(byteBuffer);
   }
 
-  public static TransferableBlock getErrorTransferableBlock(Exception e) {
-    return new TransferableBlock(DataBlockUtils.getErrorDataBlock(e));
+  public DataTableImplV4(int numRows, DataSchema dataSchema, String[] dictionary, byte[] fixedSizeDataBytes,
+      byte[] variableSizeDataBytes) {
+    super(numRows, dataSchema, dictionary, fixedSizeDataBytes, variableSizeDataBytes);
   }
 
-  public static TransferableBlock getErrorTransferableBlock(Map<Integer, String> exceptions) {
-    return new TransferableBlock(DataBlockUtils.getErrorDataBlock(exceptions));
-  }
-
-  public static boolean isEndOfStream(TransferableBlock transferableBlock) {
-    return transferableBlock.isEndOfStreamBlock();
+  @Override
+  protected int getDataBlockVersionType() {
+    return DataTableFactory.VERSION_4;
   }
 }

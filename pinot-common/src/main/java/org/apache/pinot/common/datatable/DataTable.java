@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.common.datatable;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -89,6 +90,8 @@ public interface DataTable {
   DataTable toDataOnlyDataTable();
 
   class CustomObject {
+    public static final int NULL_TYPE_VALUE = 100;
+
     private final int _type;
     private final ByteBuffer _buffer;
 

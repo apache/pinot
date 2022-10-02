@@ -21,8 +21,8 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -72,13 +72,13 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       RoaringBitmap valueBitmap = aggregationResultHolder.getResult();
       if (valueBitmap != null) {
         for (int i = 0; i < length; i++) {
-          valueBitmap.or(ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(bytesValues[i]));
+          valueBitmap.or(RoaringBitmapUtils.deserialize(bytesValues[i]));
         }
       } else {
-        valueBitmap = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(bytesValues[0]);
+        valueBitmap = RoaringBitmapUtils.deserialize(bytesValues[0]);
         aggregationResultHolder.setValue(valueBitmap);
         for (int i = 1; i < length; i++) {
-          valueBitmap.or(ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(bytesValues[i]));
+          valueBitmap.or(RoaringBitmapUtils.deserialize(bytesValues[i]));
         }
       }
       return;
@@ -139,7 +139,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        RoaringBitmap value = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(bytesValues[i]);
+        RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
         int groupKey = groupKeyArray[i];
         RoaringBitmap valueBitmap = groupByResultHolder.getResult(groupKey);
         if (valueBitmap != null) {
@@ -209,7 +209,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        RoaringBitmap value = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(bytesValues[i]);
+        RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
         for (int groupKey : groupKeysArray[i]) {
           RoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
           if (bitmap != null) {

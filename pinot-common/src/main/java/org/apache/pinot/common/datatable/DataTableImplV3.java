@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.core.common.datatable;
+package org.apache.pinot.common.datatable;
 
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
@@ -27,9 +27,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.query.request.context.ThreadTimer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 

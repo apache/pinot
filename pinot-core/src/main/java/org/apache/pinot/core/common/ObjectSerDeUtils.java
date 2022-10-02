@@ -57,7 +57,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
@@ -86,8 +86,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class ObjectSerDeUtils {
   private ObjectSerDeUtils() {
   }
-
-  public static final int NULL_TYPE_VALUE = 100;
 
   public enum ObjectType {
     // NOTE: DO NOT change the value, we rely on the value to indicate the object type
