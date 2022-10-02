@@ -20,11 +20,14 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -38,9 +41,18 @@ import org.apache.pinot.spi.utils.StringUtil;
  * {@link FieldSpec}.
  */
 public class SanitizationTransformer implements RecordTransformer {
-  private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
+  private static final Logger LOGGER = LoggerFactory.getLogger(SanitizationTransformer.class);
 
-  public SanitizationTransformer(Schema schema) {
+  private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
+  private final boolean _continueOnError;
+
+  public SanitizationTransformer(TableConfig tableConfig, Schema schema) {
+    if (tableConfig.getIngestionConfig() != null) {
+      _continueOnError = tableConfig.getIngestionConfig().isContinueOnError();
+    } else {
+      _continueOnError = false;
+    }
+
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn() && fieldSpec.getDataType() == DataType.STRING) {
         _stringColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
@@ -56,24 +68,35 @@ public class SanitizationTransformer implements RecordTransformer {
   @Override
   public GenericRow transform(GenericRow record) {
     for (Map.Entry<String, Integer> entry : _stringColumnMaxLengthMap.entrySet()) {
-      String stringColumn = entry.getKey();
-      int maxLength = entry.getValue();
-      Object value = record.getValue(stringColumn);
-      if (value instanceof String) {
-        // Single-valued column
-        String stringValue = (String) value;
-        String sanitizedValue = StringUtil.sanitizeStringValue(stringValue, maxLength);
-        // NOTE: reference comparison
-        //noinspection StringEquality
-        if (sanitizedValue != stringValue) {
-          record.putValue(stringColumn, sanitizedValue);
+      try {
+        String stringColumn = entry.getKey();
+        int maxLength = entry.getValue();
+        Object value = record.getValue(stringColumn);
+        if (value instanceof String) {
+          // Single-valued column
+          String stringValue = (String) value;
+          String sanitizedValue = StringUtil.sanitizeStringValue(stringValue, maxLength);
+          // NOTE: reference comparison
+          //noinspection StringEquality
+          if (sanitizedValue != stringValue) {
+            record.putValue(stringColumn, sanitizedValue);
+          }
+        } else {
+          // Multi-valued column
+          Object[] values = (Object[]) value;
+          int numValues = values.length;
+          for (int i = 0; i < numValues; i++) {
+            values[i] = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
+          }
         }
-      } else {
-        // Multi-valued column
-        Object[] values = (Object[]) value;
-        int numValues = values.length;
-        for (int i = 0; i < numValues; i++) {
-          values[i] = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
+      } catch (Exception e) {
+        if (!_continueOnError) {
+          throw new RuntimeException("Caught exception while sanitizing value for column: " + entry.getKey(), e);
+        } else {
+          LOGGER.debug("Caught exception while sanitizing value for column: {}", entry.getKey(), e);
+          //TODO: should put NULL here instead of string `null` and use NullValueTransformer for appropriate value
+          record.putValue(entry.getKey(), "null");
+          record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
         }
       }
     }

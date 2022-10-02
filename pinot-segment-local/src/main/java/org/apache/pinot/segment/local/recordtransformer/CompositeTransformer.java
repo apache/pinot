@@ -68,7 +68,7 @@ public class CompositeTransformer implements RecordTransformer {
     return new CompositeTransformer(
         Stream.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
                 new DataTypeTransformer(tableConfig, schema), new TimeValidationTransformer(tableConfig, schema),
-                new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(schema))
+                new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(tableConfig, schema))
             .filter(t -> !t.isNoOp()).collect(Collectors.toList()));
   }
 
