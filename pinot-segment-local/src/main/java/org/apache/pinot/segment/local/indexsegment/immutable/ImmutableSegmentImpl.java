@@ -229,7 +229,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       _pinotSegmentRecordReader.getRecord(reuse, docId);
       return reuse;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to use PinotSegmentRecordReader to read immutable segment");
+      throw new RuntimeException(
+          String.format("Failed to use PinotSegmentRecordReader to read immutable segment for docId: %d", docId), e);
     }
   }
 
@@ -242,7 +243,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       }
       return _pinotSegmentRecordReader.getValue(docId, column);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to use PinotSegmentRecordReader to read value from immutable segment");
+      throw new RuntimeException(
+          String.format("Failed to use PinotSegmentRecordReader to read value from immutable segment"
+              + " for docId: %d, column: %s", docId, column), e);
     }
   }
 }
