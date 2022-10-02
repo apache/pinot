@@ -392,9 +392,18 @@ public final class IngestionUtils {
 
   /**
    * Returns false if the record contains key {@link GenericRow#SKIP_RECORD_KEY} with value true
+   * or incomplete records should not be consumed
    */
-  public static boolean shouldIngestRow(GenericRow genericRow) {
-    return !Boolean.TRUE.equals(genericRow.getValue(GenericRow.SKIP_RECORD_KEY));
+  public static boolean shouldIngestRow(GenericRow genericRow, @Nullable IngestionConfig ingestionConfig) {
+    if (Boolean.TRUE.equals(genericRow.getValue(GenericRow.SKIP_RECORD_KEY))) {
+      return false;
+    }
+    if (ingestionConfig != null && ingestionConfig.isSkipPartialRecords()
+        && Boolean.TRUE.equals(genericRow.getValue(GenericRow.INCOMPLETE_RECORD_KEY))) {
+      return false;
+    }
+
+    return true;
   }
 
   public static Long extractTimeValue(Comparable time) {

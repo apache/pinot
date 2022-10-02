@@ -547,7 +547,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       RowMetadata msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
       GenericRow decoderResult;
       if (decodedRow.getException() != null) {
-        if(_tableConfig.getIngestionConfig() != null
+        if (_tableConfig.getIngestionConfig() != null
             && _tableConfig.getIngestionConfig().isContinueOnError()) {
           decoderResult = new GenericRow();
           decoderResult.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
@@ -561,7 +561,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         decoderResult = decodedRow.getResult();
       }
 
-      if(decoderResult != null) {
+      if (decoderResult != null) {
         try {
           _transformPipeline.processRow(decoderResult, reusedResult);
         } catch (Exception e) {

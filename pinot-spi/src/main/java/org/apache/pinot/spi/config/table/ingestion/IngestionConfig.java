@@ -51,6 +51,10 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to skip any row which has error and continue during ingestion")
   private boolean _continueOnError;
 
+  @JsonPropertyDescription("If set to true, the records with GenericRow.INCOMPLETE_RECORD_KEY will not be consumed."
+      + "This can be helpful if user only wants to see correct data in the table")
+  private boolean _skipPartialRecords;
+
   @JsonPropertyDescription("Configs related to validate time value for each record during ingestion")
   private boolean _rowTimeValueCheck;
 
@@ -115,6 +119,10 @@ public class IngestionConfig extends BaseJsonConfig {
     return _segmentTimeValueCheck;
   }
 
+  public boolean isSkipPartialRecords() {
+    return _skipPartialRecords;
+  }
+
   public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {
     _batchIngestionConfig = batchIngestionConfig;
   }
@@ -141,6 +149,10 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setContinueOnError(boolean continueOnError) {
     _continueOnError = continueOnError;
+  }
+
+  public void setSkipPartialRecords(boolean skipPartialRecords) {
+    _skipPartialRecords = skipPartialRecords;
   }
 
   public void setRowTimeValueCheck(boolean rowTimeValueCheck) {
