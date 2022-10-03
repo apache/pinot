@@ -27,6 +27,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.AssertJUnit.assertNull;
 
 
 public class PostAggregationFunctionTest {
@@ -91,5 +92,14 @@ public class PostAggregationFunctionTest {
     assertFalse((Boolean) function.invoke(new Object[]{null, "a"}));
     assertFalse((Boolean) function.invoke(new Object[]{"a", null}));
     assertFalse((Boolean) function.invoke(new Object[]{"a", "b"}));
+
+    // Coalesce
+    function = new PostAggregationFunction("coalesce", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING,
+    ColumnDataType.BOOLEAN});
+    assertEquals(function.getResultType(), ColumnDataType.OBJECT);
+    assertNull(function.invoke(new Object[]{null, null, null}));
+    assertEquals(function.invoke(new Object[]{null, "1", null}), "1");
+    assertEquals(function.invoke(new Object[]{1, "2", false}), 1);
+    assertEquals(function.invoke(new Object[]{null, null, true}), true);
   }
 }

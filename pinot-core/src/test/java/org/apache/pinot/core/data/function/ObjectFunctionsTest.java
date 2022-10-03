@@ -82,6 +82,37 @@ public class ObjectFunctionsTest {
     inputs.add(new Object[]{"isDistinctFrom(value1,value2)", Lists.newArrayList("value1", "value2"), equal, false});
     inputs.add(new Object[]{"isNotDistinctFrom(value1,value2)", Lists.newArrayList("value1", "value2"), equal, true});
 
+    // all nulls
+    GenericRow nullRows2 = new GenericRow();
+    nullRows2.putValue("null0", null);
+    nullRows2.putValue("null1", null);
+    inputs.add(new Object[]{"coalesce(null0,null1)", Lists.newArrayList("null0", "null1"), nullRows, null});
+
+    // one not null
+    GenericRow oneValue = new GenericRow();
+    oneValue.putValue("null0", null);
+    oneValue.putValue("null1", null);
+    oneValue.putValue("null2", null);
+    oneValue.putValue("value1", 1);
+    oneValue.putValue("value2", null);
+
+    inputs.add(new Object[]{
+        "coalesce(null0,null1, null2, value1, value2)", Lists.newArrayList("null0", "null1", "null2", "value1",
+        "value2"), oneValue, 1
+    });
+
+    // all not null
+    GenericRow allValues = new GenericRow();
+    allValues.putValue("value1", "1");
+    allValues.putValue("value2", 2);
+    allValues.putValue("value3", 3);
+    allValues.putValue("value4", 4);
+    allValues.putValue("value5", 5);
+
+    inputs.add(new Object[]{
+        "coalesce(value1,value2,value3,value4,value5)", Lists.newArrayList("value1", "value2", "value3", "value4",
+        "value5"), allValues, "1"
+    });
     return inputs.toArray(new Object[0][]);
   }
 }
