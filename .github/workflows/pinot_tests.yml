@@ -105,7 +105,7 @@ jobs:
         with:
           flags: unittests${{ matrix.testset }}
           name: codecov-unit-tests
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           verbose: true
 
   integration-test:
@@ -147,7 +147,7 @@ jobs:
         with:
           flags: integration${{ matrix.testset }}
           name: codecov-integration-tests
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           verbose: true
 
   compatibility-verifier:
