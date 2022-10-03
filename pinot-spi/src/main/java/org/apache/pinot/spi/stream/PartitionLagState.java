@@ -34,11 +34,5 @@ public class PartitionLagState {
     return NOT_CALCULATED;
   }
 
-/*  *//**
-   * Defines how far away the current record's timestamp is from upstream latest record's timestamp
-   * The distance is relative to the event time, as opposed to the ingestion time
-   *//*
-  public String getEventTimeLag() {
-    return NOT_CALCULATED;
-  }*/
+  // TODO: Define record availability lag ($latest_record_consumption_time - $latest_record_ingestion_time)
 }
