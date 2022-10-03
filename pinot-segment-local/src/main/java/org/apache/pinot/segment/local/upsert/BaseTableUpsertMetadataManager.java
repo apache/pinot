@@ -38,6 +38,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected String _comparisonColumn;
   protected HashFunction _hashFunction;
   protected PartialUpsertHandler _partialUpsertHandler;
+  protected boolean _enableSnapshot;
   protected ServerMetrics _serverMetrics;
 
   @Override
@@ -68,6 +69,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
           new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig.getDefaultPartialUpsertStrategy(),
               _comparisonColumn);
     }
+
+    _enableSnapshot = upsertConfig.isEnableSnapshot();
 
     _serverMetrics = serverMetrics;
   }

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -37,6 +38,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -55,15 +57,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   @Test
   public void testAddReplaceRemoveSegment() {
-    verifyAddReplaceRemoveSegment(HashFunction.NONE);
-    verifyAddReplaceRemoveSegment(HashFunction.MD5);
-    verifyAddReplaceRemoveSegment(HashFunction.MURMUR3);
+    verifyAddReplaceRemoveSegment(HashFunction.NONE, false);
+    verifyAddReplaceRemoveSegment(HashFunction.MD5, false);
+    verifyAddReplaceRemoveSegment(HashFunction.MURMUR3, false);
+    verifyAddReplaceRemoveSegment(HashFunction.NONE, true);
+    verifyAddReplaceRemoveSegment(HashFunction.MD5, true);
+    verifyAddReplaceRemoveSegment(HashFunction.MURMUR3, true);
   }
 
-  private void verifyAddReplaceRemoveSegment(HashFunction hashFunction) {
+  private void verifyAddReplaceRemoveSegment(HashFunction hashFunction, boolean enableSnapshot) {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            "timeCol", hashFunction, null, mock(ServerMetrics.class));
+            "timeCol", hashFunction, null, false, mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -73,7 +78,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
     ImmutableSegmentImpl segment1 = mockImmutableSegment(1, validDocIds1, primaryKeys1);
-    List<RecordInfo> recordInfoList1 = getRecordInfoList(numRecords, primaryKeys, timestamps);
+    List<RecordInfo> recordInfoList1;
+    if (enableSnapshot) {
+      // get recordInfo from validDocIdSnapshot.
+      // segment1 snapshot: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
+      int[] docIds1 = new int[]{2, 4, 5};
+      MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
+      validDocIdsSnapshot1.add(docIds1);
+      recordInfoList1 = getRecordInfoList(validDocIdsSnapshot1, primaryKeys, timestamps);
+    } else {
+      // get recordInfo by iterating all records.
+      recordInfoList1 = getRecordInfoList(numRecords, primaryKeys, timestamps);
+    }
     upsertMetadataManager.addSegment(segment1, validDocIds1, recordInfoList1.iterator());
     // segment1: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
     assertEquals(recordLocationMap.size(), 3);
@@ -88,8 +104,20 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     timestamps = new int[]{100, 100, 120, 80, 80};
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl segment2 = mockImmutableSegment(2, validDocIds2, getPrimaryKeyList(numRecords, primaryKeys));
-    upsertMetadataManager.addSegment(segment2, validDocIds2,
-        getRecordInfoList(numRecords, primaryKeys, timestamps).iterator());
+    List<RecordInfo> recordInfoList2;
+    if (enableSnapshot) {
+      // get recordInfo from validDocIdSnapshot.
+      // segment2 snapshot: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
+      // segment1 snapshot: 1 -> {4, 120}
+      MutableRoaringBitmap validDocIdsSnapshot2 = new MutableRoaringBitmap();
+      validDocIdsSnapshot2.add(new int[]{0, 2, 3});
+      recordInfoList2 = getRecordInfoList(validDocIdsSnapshot2, primaryKeys, timestamps);
+    } else {
+      // get recordInfo by iterating all records.
+      recordInfoList2 = getRecordInfoList(numRecords, primaryKeys, timestamps);
+    }
+    upsertMetadataManager.addSegment(segment2, validDocIds2, recordInfoList2.iterator());
+
     // segment1: 1 -> {4, 120}
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     assertEquals(recordLocationMap.size(), 4);
@@ -174,6 +202,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     return recordInfoList;
   }
 
+  /**
+   * Get recordInfo from validDocIdsSnapshot (enabledSnapshot = True).
+   */
+  private List<RecordInfo> getRecordInfoList(MutableRoaringBitmap validDocIdsSnapshot, int[] primaryKeys,
+      int[] timestamps) {
+    List<RecordInfo> recordInfoList = new ArrayList<>();
+    Iterator<Integer> validDocIdsIterator = validDocIdsSnapshot.iterator();
+    validDocIdsIterator.forEachRemaining((docId) -> recordInfoList.add(
+        new RecordInfo(makePrimaryKey(primaryKeys[docId]), docId, new IntWrapper(timestamps[docId]))));
+    return recordInfoList;
+  }
+
   private List<PrimaryKey> getPrimaryKeyList(int numRecords, int[] primaryKeys) {
     List<PrimaryKey> primaryKeyList = new ArrayList<>();
     for (int i = 0; i < numRecords; i++) {
@@ -233,7 +273,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private void verifyAddRecord(HashFunction hashFunction) {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            "timeCol", hashFunction, null, mock(ServerMetrics.class));
+            "timeCol", hashFunction, null, false, mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
