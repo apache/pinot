@@ -31,8 +31,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.BaseDataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -151,10 +149,10 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
         case HASH_DISTRIBUTED:
           // TODO: ensure that server instance list is sorted using same function in sender.
           List<BaseDataBlock> dataTableList =
-              constructPartitionedDataBlock(transferableBlock.getDataBlock(), _keySelector,
-                  _receivingStageInstances.size(), isEndOfStream);
-          for (BaseDataBlock block : dataTableList) {
-            sendDataTableBlockToServers(_receivingStageInstances, block, type, isEndOfStream);
+              constructPartitionedDataBlock(dataBlock, _keySelector, _receivingStageInstances.size(), isEndOfStream);
+          for (int i = 0; i < _receivingStageInstances.size(); i++) {
+            sendDataTableBlockToServers(Arrays.asList(_receivingStageInstances.get(i)), dataTableList.get(i), type,
+                isEndOfStream);
           }
           break;
         case RANGE_DISTRIBUTED:
