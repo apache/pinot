@@ -124,13 +124,13 @@ export default function ReloadStatusOp({
       return;
     }
     setJobDetailsDialogOpen(true);
+    setSegmentJobDetails(null);
     setSelectedSegmentJobId(id);
   }
 
   const handleJobDetailsDialogClose = () => {
     setJobDetailsDialogOpen(false);
     setSelectedSegmentJobId(null);
-    setSegmentJobDetails(null);
   }
 
   const handleActiveTabChange = (_: React.ChangeEvent<{}>, newIndex: number) => {
