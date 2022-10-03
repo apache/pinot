@@ -288,6 +288,9 @@ public class SelectionOperatorUtils {
           case BYTES:
             dataTableBuilder.setColumn(i, (ByteArray) columnValue);
             break;
+          case OBJECT:
+            dataTableBuilder.setColumn(i, (Object) columnValue);
+            break;
 
           // Multi-value column
           case INT_ARRAY:

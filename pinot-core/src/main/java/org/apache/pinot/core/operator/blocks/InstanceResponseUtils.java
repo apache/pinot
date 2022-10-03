@@ -57,17 +57,16 @@ public final class InstanceResponseUtils {
     try {
       if (instanceResponseBlock.getBaseResultsBlock() == null) {
         dataTable = DataTableBuilderUtils.buildEmptyDataTable();
-        if (MapUtils.isNotEmpty(instanceResponseBlock.getExceptionMap())) {
-          for (Map.Entry<Integer, String> e : instanceResponseBlock.getExceptionMap().entrySet()) {
-            dataTable.addException(e.getKey(), e.getValue());
-          }
-        }
-        if (MapUtils.isNotEmpty(instanceResponseBlock.getInstanceResponseMetadata())) {
-          dataTable.getMetadata().putAll(instanceResponseBlock.getInstanceResponseMetadata());
-        }
       } else {
          dataTable = instanceResponseBlock.getBaseResultsBlock().getDataTable(instanceResponseBlock.getQueryContext());
-         dataTable.getMetadata().putAll(instanceResponseBlock.getInstanceResponseMetadata());
+      }
+      if (MapUtils.isNotEmpty(instanceResponseBlock.getExceptionMap())) {
+        for (Map.Entry<Integer, String> e : instanceResponseBlock.getExceptionMap().entrySet()) {
+          dataTable.addException(e.getKey(), e.getValue());
+        }
+      }
+      if (MapUtils.isNotEmpty(instanceResponseBlock.getInstanceResponseMetadata())) {
+        dataTable.getMetadata().putAll(instanceResponseBlock.getInstanceResponseMetadata());
       }
       return dataTable;
     } catch (ProcessingException pe) {
