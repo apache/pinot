@@ -27,15 +27,6 @@ public class ObjectFunctions {
   private ObjectFunctions() {
   }
 
-  private static Object coalesce(List<Object> objects) {
-    for (Object o : objects) {
-      if (o != null) {
-        return o;
-      }
-    }
-    return null;
-  }
-
   @ScalarFunction(nullableParameters = true)
   public static boolean isNull(@Nullable Object obj) {
     return obj == null;
@@ -62,29 +53,44 @@ public class ObjectFunctions {
     return !isDistinctFrom(obj1, obj2);
   }
 
+  @Nullable
   public static Object coalesce(@Nullable Object obj) {
     return coalesce(Arrays.asList(obj));
   }
 
+  @Nullable
   @ScalarFunction(nullableParameters = true)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2) {
     return coalesce(Arrays.asList(obj1, obj2));
   }
 
+  @Nullable
   @ScalarFunction(nullableParameters = true)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3) {
     return coalesce(Arrays.asList(obj1, obj2, obj3));
   }
 
+  @Nullable
   @ScalarFunction(nullableParameters = true)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
       @Nullable Object obj4) {
     return coalesce(Arrays.asList(obj1, obj2, obj3, obj4));
   }
 
+  @Nullable
   @ScalarFunction(nullableParameters = true)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
       @Nullable Object obj4, @Nullable Object obj5) {
     return coalesce(Arrays.asList(obj1, obj2, obj3, obj4, obj5));
+  }
+
+  @Nullable
+  private static Object coalesce(Object... objects) {
+    for (Object o : objects) {
+      if (o != null) {
+        return o;
+      }
+    }
+    return null;
   }
 }

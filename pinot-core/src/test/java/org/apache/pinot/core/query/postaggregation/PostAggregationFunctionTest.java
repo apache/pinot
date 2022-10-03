@@ -73,7 +73,6 @@ public class PostAggregationFunctionTest {
     assertFalse((Boolean) function.invoke(new Object[]{true}));
     assertTrue((Boolean) function.invoke(new Object[]{false}));
 
-<<<<<<< HEAD
     // isDistinctFrom
     function = new PostAggregationFunction("isDistinctFrom",
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
@@ -93,7 +92,7 @@ public class PostAggregationFunctionTest {
     assertFalse((Boolean) function.invoke(new Object[]{null, "a"}));
     assertFalse((Boolean) function.invoke(new Object[]{"a", null}));
     assertFalse((Boolean) function.invoke(new Object[]{"a", "b"}));
-=======
+
     // Coalesce
     function = new PostAggregationFunction("coalesce", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING,
     ColumnDataType.BOOLEAN});
@@ -102,6 +101,5 @@ public class PostAggregationFunctionTest {
     assertEquals(function.invoke(new Object[]{null, "1", null}), "1");
     assertEquals(function.invoke(new Object[]{1, "2", false}), 1);
     assertEquals(function.invoke(new Object[]{null, null, true}), true);
->>>>>>> 594ca96651 (coalesce scalar)
   }
 }
