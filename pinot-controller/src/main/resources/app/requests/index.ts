@@ -20,7 +20,7 @@
 import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
   IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
-  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse
+  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs
 } from 'Models';
 
 const headers = {
@@ -191,6 +191,12 @@ export const reloadStatus = (tableName: string, tableType: string): Promise<Axio
 
 export const deleteSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/segments/${tableName}/${instanceName}`, {headers});
+
+export const getTableJobs = (tableName: string): Promise<AxiosResponse<TableSegmentJobs>> => 
+  baseApi.get(`/table/${tableName}/jobs`);
+
+export const getSegmentReloadStatus = (jobId: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/segments/segmentReloadStatus/${jobId}`, {headers});
 
 export const deleteTable = (tableName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/tables/${tableName}`, {headers});
