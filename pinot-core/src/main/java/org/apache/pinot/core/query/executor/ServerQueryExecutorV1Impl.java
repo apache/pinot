@@ -360,7 +360,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       if (queryContext.isExplain()) {
         instanceResponseBlock = getExplainPlanResultsForNoMatchingSegment(totalSegments);
       } else {
-        instanceResponseBlock = InstanceResponseUtils.getEmptyResponse();
+        instanceResponseBlock = InstanceResponseUtils.buildEmptyResultBlock(queryContext);
       }
 
       Map<String, String> metadata = instanceResponseBlock.getInstanceResponseMetadata();
