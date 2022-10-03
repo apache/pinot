@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.broker.api;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.util.Map;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.glassfish.grizzly.http.server.Request;
 
 
 /**
@@ -29,6 +31,16 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class HttpRequesterIdentity extends RequesterIdentity {
   private Multimap<String, String> _httpHeaders;
   private String _endpointUrl;
+
+  public static HttpRequesterIdentity fromRequest(Request request) {
+    Multimap<String, String> headers = ArrayListMultimap.create();
+    request.getHeaderNames().forEach(key -> request.getHeaders(key).forEach(value -> headers.put(key, value)));
+
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    identity.setHttpHeaders(headers);
+    identity.setEndpointUrl(request.getRequestURL().toString());
+    return identity;
+  }
 
   public Multimap<String, String> getHttpHeaders() {
     return _httpHeaders;

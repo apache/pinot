@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.controller.api.access;
+package org.apache.pinot.core.auth;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

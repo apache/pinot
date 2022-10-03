@@ -65,7 +65,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
-      ServerRoutingStatsManager serverRoutingStatsManager) {
+      ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory) {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, brokerConf);
     _useHttps = Boolean.parseBoolean(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_USE_HTTPS));
@@ -95,11 +95,13 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         }
         bind(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID)).named(BROKER_INSTANCE_ID);
         bind(serverRoutingStatsManager).to(ServerRoutingStatsManager.class);
+        bind(accessFactory).to(AccessControlFactory.class);
       }
     });
     register(JacksonFeature.class);
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(AuthenticationFilter.class);
   }
 
   public void start(List<ListenerConfig> listenerConfigs) {
