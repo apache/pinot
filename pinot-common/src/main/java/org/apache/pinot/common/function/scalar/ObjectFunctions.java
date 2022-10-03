@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import java.util.Arrays;
-import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
@@ -55,33 +53,43 @@ public class ObjectFunctions {
 
   @Nullable
   public static Object coalesce(@Nullable Object obj) {
-    return coalesce(Arrays.asList(obj));
+    return coalesceVar(obj);
   }
 
   @Nullable
   @ScalarFunction(nullableParameters = true)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2) {
-    return coalesce(Arrays.asList(obj1, obj2));
+    return coalesceVar(obj1, obj2);
   }
 
   @Nullable
   @ScalarFunction(nullableParameters = true)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3) {
-    return coalesce(Arrays.asList(obj1, obj2, obj3));
+    return coalesceVar(obj1, obj2, obj3);
   }
 
   @Nullable
   @ScalarFunction(nullableParameters = true)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
       @Nullable Object obj4) {
-    return coalesce(Arrays.asList(obj1, obj2, obj3, obj4));
+    return coalesceVar(obj1, obj2, obj3, obj4);
   }
 
   @Nullable
   @ScalarFunction(nullableParameters = true)
   public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
       @Nullable Object obj4, @Nullable Object obj5) {
-    return coalesce(Arrays.asList(obj1, obj2, obj3, obj4, obj5));
+    return coalesceVar(obj1, obj2, obj3, obj4, obj5);
+  }
+
+  @Nullable
+  private static Object coalesceVar(Object... objects) {
+    for (Object o : objects) {
+      if (o != null) {
+        return o;
+      }
+    }
+    return null;
   }
 
   @Nullable
