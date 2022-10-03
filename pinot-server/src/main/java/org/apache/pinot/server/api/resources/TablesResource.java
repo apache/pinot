@@ -513,7 +513,8 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState();
+          Map<String, ConsumerPartitionState> partitionStateMap =
+              realtimeSegmentDataManager.getConsumerPartitionState();
           Map<String, PartitionLagState> partitionLagStateMap = realtimeSegmentDataManager.getPartitionToLagState(
               new ArrayList<>(partitionStateMap.values()));
           segmentConsumerInfoList.add(
@@ -528,7 +529,6 @@ public class TablesResource {
                       Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getRecordsLag())
                   ))
           );
-
         }
       }
     } catch (Exception e) {

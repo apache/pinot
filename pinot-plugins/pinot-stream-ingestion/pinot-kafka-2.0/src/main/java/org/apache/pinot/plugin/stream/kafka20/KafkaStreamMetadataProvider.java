@@ -122,13 +122,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
         perPartitionLag.put(entry.getKey(), new KafkaConsumerPartitionLag("UNKNOWN"));
       }
     }
-/*    _consumer.metrics().forEach((k, v) -> {
-      if (k.name().equals("records-lag")) {
-        perPartitionLag.put("parititonId", new KafkaConsumerPartitionLag(null,
-            String.valueOf((v.metricValue()))));
-      }
-    });*/
-
     return perPartitionLag;
   }
 

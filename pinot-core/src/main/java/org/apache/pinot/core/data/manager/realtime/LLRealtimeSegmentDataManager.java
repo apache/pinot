@@ -832,11 +832,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   @Override
   public Map<String, PartitionLagState> getPartitionToLagState(List<ConsumerPartitionState> consumerPartitionState) {
-    if (_streamMetadataProvider == null) {
-      _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
+    if (_partitionMetadataProvider == null) {
+      createPartitionMetadataProvider("Get Partition Lag State");
     }
     ;
-    return _streamMetadataProvider.getCurrentPartitionLagState(
+    return _partitionMetadataProvider.getCurrentPartitionLagState(
         consumerPartitionState.stream().collect(
             Collectors.toMap(ConsumerPartitionState::getPartitionId, Function.identity())));
   }
