@@ -179,15 +179,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         if (validDocIds == null) {
           validDocIds = new ThreadSafeMutableRoaringBitmap();
         }
+        // New segment doesn't necessary have the same docs as the old segment.
+        // Even for consuming segment, we might re-order the docs.
+        // As a result, we iterate all docIds of the new segment instead of loading it from old segment's snapshot.
         if (recordInfoIterator == null) {
-          if (_enableSnapshot && oldSegment instanceof ImmutableSegmentImpl) {
-            MutableRoaringBitmap validDocIdsSnapshot =
-                ((ImmutableSegmentImpl) oldSegment).loadValidDocIdsFromSnapshot();
-            recordInfoIterator =
-                UpsertUtils.getRecordInfoIterator(segment, _primaryKeyColumns, _comparisonColumn, validDocIdsSnapshot);
-          } else {
-            recordInfoIterator = UpsertUtils.getRecordInfoIterator(segment, _primaryKeyColumns, _comparisonColumn);
-          }
+          recordInfoIterator = UpsertUtils.getRecordInfoIterator(segment, _primaryKeyColumns, _comparisonColumn);
         }
         addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, recordInfoIterator, oldSegment,
             validDocIdsForOldSegment);

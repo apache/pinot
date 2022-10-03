@@ -144,17 +144,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // Replace (reload) the first segment
     ThreadSafeMutableRoaringBitmap newValidDocIds1 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl newSegment1 = mockImmutableSegment(1, newValidDocIds1, primaryKeys1);
-    if (enableSnapshot) {
-      // get recordInfo from validDocIdSnapshot.
-      // segment1 snapshot: 1 -> {4, 120}
-      // segment2 snapshot: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
-      int[] docIds1 = new int[]{4};
-      MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
-      validDocIdsSnapshot1.add(docIds1);
-      primaryKeys = new int[]{0, 1, 2, 0, 1, 0};
-      timestamps = new int[]{100, 100, 100, 80, 120, 100};
-      recordInfoList1 = getRecordInfoList(validDocIdsSnapshot1, primaryKeys, timestamps);
-    }
     upsertMetadataManager.replaceSegment(newSegment1, newValidDocIds1, recordInfoList1.iterator(), segment1);
     // original segment1: 1 -> {4, 120} (not in the map)
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
