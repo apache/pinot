@@ -44,6 +44,10 @@ public class QueryOptionsUtils {
     }
   }
 
+  public static boolean isAndScanReorderingEnabled(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
+  }
+
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }

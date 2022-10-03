@@ -420,7 +420,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertEquals((int) lastRow[columnIndexMap.get("column1")], 335520083);
   }
 
-  private int getVirtualColumns(DataSchema selectionDataSchema) {
+  int getVirtualColumns(DataSchema selectionDataSchema) {
     int virtualCols = 0;
     for (int i = 0; i < selectionDataSchema.size(); i++) {
       if (selectionDataSchema.getColumnName(i).startsWith("$")) {
@@ -430,7 +430,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     return virtualCols;
   }
 
-  private Map<String, Integer> computeColumnNameToIndexMap(DataSchema dataSchema) {
+  Map<String, Integer> computeColumnNameToIndexMap(DataSchema dataSchema) {
     Map<String, Integer> columnIndexMap = new HashMap<>();
 
     for (int i = 0; i < dataSchema.size(); i++) {

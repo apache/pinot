@@ -30,8 +30,7 @@ public final class SVScanDocIdSet implements FilterBlockDocIdSet {
   public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
       boolean nullHandlingEnabled) {
     NullValueVectorReader nullValueVector = nullHandlingEnabled ? dataSource.getNullValueVector() : null;
-    _docIdIterator = new SVScanDocIdIterator(
-        predicateEvaluator, dataSource.getForwardIndex(), numDocs, nullValueVector);
+    _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource, numDocs, nullValueVector);
   }
 
   @Override

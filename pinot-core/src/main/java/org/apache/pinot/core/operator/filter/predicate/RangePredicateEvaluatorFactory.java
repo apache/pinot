@@ -209,6 +209,11 @@ public class RangePredicateEvaluatorFactory {
       }
       return _matchingDictIds;
     }
+
+    @Override
+    public int getNumMatchingItems() {
+      return Math.max(_numMatchingDictIds, 0);
+    }
   }
 
   private static final class UnsortedDictionaryBasedRangePredicateEvaluator
@@ -276,6 +281,11 @@ public class RangePredicateEvaluatorFactory {
             throw new IllegalStateException();
         }
       }
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return _matchingDictIdSet == null ? super.getNumMatchingItems() : _matchingDictIdSet.size();
     }
 
     @Override
