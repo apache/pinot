@@ -110,8 +110,9 @@ public class TimeBoundaryManager {
   @SuppressWarnings("unused")
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // Bulk load time info for all online segments
-    String enforcedTimeBoundary = idealState.getRecord().getSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
-    Long enforcedTimeBoundaryMs = null;
+    String enforcedTimeBoundary =
+        idealState.getRecord().getSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
+    long enforcedTimeBoundaryMs = -1;
     if (enforcedTimeBoundary != null) {
       enforcedTimeBoundaryMs = Long.parseLong(enforcedTimeBoundary);
     }
@@ -153,20 +154,22 @@ public class TimeBoundaryManager {
     return endTimeMs;
   }
 
-  private synchronized void updateTimeBoundaryInfo(Long enforcedTimeBoundary, long maxEndTimeMs,
-      boolean idealStateReffered) {
+  private void updateTimeBoundaryInfo(long explicitlySetTimeBoundaryMS, long maxEndTimeMs, boolean idealStateReferred) {
     TimeBoundaryInfo currentTimeBoundaryInfo = _timeBoundaryInfo;
-    Long finalTimeBoundaryMs = null;
-    boolean isEnforced = false;
+    long finalTimeBoundaryMs = -1;
+    boolean isExplicitlySet = false;
     boolean validTimeBoundaryFound = false;
 
-    if (enforcedTimeBoundary != null) {
-      finalTimeBoundaryMs = enforcedTimeBoundary;
-      isEnforced = true;
+    if (explicitlySetTimeBoundaryMS != -1) {
+      // We're using explicitly set time boundary, ignoring maxEndTimeMs
+      finalTimeBoundaryMs = explicitlySetTimeBoundaryMS;
+      isExplicitlySet = true;
       validTimeBoundaryFound = true;
-      LOGGER.info("Enforced table time boundary in use: {} for table: {}", enforcedTimeBoundary, _offlineTableName);
-    } else if (idealStateReffered || !currentTimeBoundaryInfo.isEnforced()) {
+      LOGGER.info("Enforced table time boundary in use: {} for table: {}", explicitlySetTimeBoundaryMS,
+          _offlineTableName);
+    } else if (idealStateReferred || !currentTimeBoundaryInfo.isExplicitlySet()) {
       if (maxEndTimeMs > 0) {
+        // Current time boundary isn't explicitly set. Updating to maxEndTimeMs.
         finalTimeBoundaryMs = maxEndTimeMs - _timeOffsetMs;
         validTimeBoundaryFound = true;
       } else {
@@ -174,22 +177,26 @@ public class TimeBoundaryManager {
             _offlineTableName);
       }
     } else {
+      // Segment refreshed, but explicitly set time boundary already exists. No change needed.
       validTimeBoundaryFound = true;
       LOGGER.info("Skipping time boundary update since enforced time boundary exists");
     }
 
     if (validTimeBoundaryFound) {
-      if (finalTimeBoundaryMs != null) {
+      if (finalTimeBoundaryMs != -1) {
         String timeBoundary = _timeFormatSpec.fromMillisToFormat(finalTimeBoundaryMs);
-        if (currentTimeBoundaryInfo == null || !currentTimeBoundaryInfo.getTimeValue().equals(timeBoundary)) {
-          _timeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, timeBoundary, isEnforced);
+        if (currentTimeBoundaryInfo == null || !currentTimeBoundaryInfo.getTimeValue().equals(timeBoundary)
+            || currentTimeBoundaryInfo.isExplicitlySet() != isExplicitlySet) {
+          _timeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, timeBoundary, isExplicitlySet);
           LOGGER.info("Updated time boundary to: {} for table: {}", timeBoundary, _offlineTableName);
         }
-        _brokerMetrics.setValueOfTableGauge(_offlineTableName, BrokerGauge.TIME_BOUNDARY_DIFFERENCE,
-            Math.max(0, maxEndTimeMs - finalTimeBoundaryMs));
       }
+      long timeBoundaryEndTime = _timeFormatSpec.fromFormatToMillis(_timeBoundaryInfo.getTimeValue());
+      _brokerMetrics.setValueOfTableGauge(_offlineTableName, BrokerGauge.TIME_BOUNDARY_DIFFERENCE,
+          Math.max(0, maxEndTimeMs - timeBoundaryEndTime));
     } else {
       _timeBoundaryInfo = null;
+      _brokerMetrics.setValueOfTableGauge(_offlineTableName, BrokerGauge.TIME_BOUNDARY_DIFFERENCE, -1);
     }
   }
 
@@ -203,8 +210,9 @@ public class TimeBoundaryManager {
   @SuppressWarnings("unused")
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
-    String enforcedTimeBoundary = idealState.getRecord().getSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
-    Long enforcedTimeBoundaryMs = null;
+    String enforcedTimeBoundary =
+        idealState.getRecord().getSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
+    long enforcedTimeBoundaryMs = -1;
     if (enforcedTimeBoundary != null) {
       enforcedTimeBoundaryMs = Long.parseLong(enforcedTimeBoundary);
     }
@@ -236,7 +244,7 @@ public class TimeBoundaryManager {
   public synchronized void refreshSegment(String segment) {
     _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
         _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
-    updateTimeBoundaryInfo(null, getMaxEndTimeMs(), false);
+    updateTimeBoundaryInfo(-1, getMaxEndTimeMs(), false);
   }
 
   @Nullable

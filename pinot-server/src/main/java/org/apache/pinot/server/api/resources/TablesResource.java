@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -530,8 +531,8 @@ public class TablesResource {
   @GET
   @Path("tables/{tableNameWithType}/allSegmentsLoaded")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Validates if the ideal state matches with the segmentstate on this server", notes =
-      "Validates if the ideal state matches with the segmentstate on this server")
+  @ApiOperation(value = "Validates if the ideal state matches with the segment state on this server", notes =
+      "Validates if the ideal state matches with the segment state on this server")
   public TableSegmentValidationInfo validateTableSegmentState(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableNameWithType")
           String tableNameWithType) {
@@ -563,6 +564,8 @@ public class TablesResource {
               SegmentZKMetadata zkMetadata =
                   ZKMetadataProvider.getSegmentZKMetadata(_serverInstance.getHelixManager().getHelixPropertyStore(),
                       tableNameWithType, segmentName);
+              Preconditions.checkState(zkMetadata != null,
+                  "Segment zk metadata not found for segment : " + segmentName);
               if ((segmentDataManager == null) || !segmentDataManager.getSegment().getSegmentMetadata().getCrc()
                   .equals(String.valueOf(zkMetadata.getCrc()))) {
                 return new TableSegmentValidationInfo(false, -1);

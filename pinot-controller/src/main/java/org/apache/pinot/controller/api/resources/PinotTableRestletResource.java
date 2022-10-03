@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -850,9 +851,9 @@ public class PinotTableRestletResource {
   }
 
   @POST
-  @Path("table/{tableName}/timeBoundary")
-  @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata",
-      notes = "Set hybrid table query time boundary based on offline segments' metadata")
+  @Path("tables/{tableName}/timeBoundary")
+  @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata", notes = "Set "
+      + "hybrid table query time boundary based on offline segments' metadata")
   public SuccessResponse setEnforcedQueryTimeBoundary(
       @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
           String tableName)
@@ -864,42 +865,16 @@ public class PinotTableRestletResource {
     }
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    IdealState offlineTableIdealState = _pinotHelixResourceManager.getTableIdealState(offlineTableName);
+    Preconditions.checkState(offlineTableIdealState != null,
+        "Could not find table ideal state record for table name : " + offlineTableName);
 
     // Call all servers to validate offline table state
-    Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(offlineTableName);
-    BiMap<String, String> serverEndPoints =
-        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
-    CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
-    List<String> serverUrls = new ArrayList<>();
-    BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
-    for (String endpoint : endpointsToServers.keySet()) {
-      String reloadTaskStatusEndpoint = endpoint + "/tables/" + offlineTableName + "/allSegmentsLoaded";
-      serverUrls.add(reloadTaskStatusEndpoint);
-    }
+    Long timeBoundary = validateSegmentStateForTable(offlineTableName);
 
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
-
-    if (serviceResponse._failedResponseCount > 0) {
-      throw new ControllerApplicationException(LOGGER, "Could not validate table segment status",
-          Response.Status.SERVICE_UNAVAILABLE);
-    }
-
-    Long timeBoundary = null;
-    // Validate all responses
-    for (String response : serviceResponse._httpResponses.values()) {
-      TableSegmentValidationInfo tableSegmentValidationInfo =
-          JsonUtils.stringToObject(response, TableSegmentValidationInfo.class);
-      if (!tableSegmentValidationInfo.isValid()) {
-        throw new ControllerApplicationException(LOGGER, "Table segment validation failed",
-            Response.Status.INTERNAL_SERVER_ERROR);
-      }
-      timeBoundary = Math.max((timeBoundary == null) ? -1 : timeBoundary, tableSegmentValidationInfo.getMaxTimestamp());
-    }
-
-    if (timeBoundary == null) {
-      throw new ControllerApplicationException(LOGGER, "Could not validate table segment status",
+    if (timeBoundary == -1) {
+      throw new ControllerApplicationException(LOGGER,
+          "No segments found for offline table : " + offlineTableName + ". Could not update time boundary.",
           Response.Status.SERVICE_UNAVAILABLE);
     }
 
@@ -908,8 +883,7 @@ public class PinotTableRestletResource {
     // Set the timeBoundary in tableIdealState
     IdealState idealState =
         HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
-          assert is != null;
-          is.getRecord().setSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY, timeBoundaryFinal);
+          is.getRecord().setSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY, timeBoundaryFinal);
           return is;
         }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
 
@@ -918,29 +892,25 @@ public class PinotTableRestletResource {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
 
-    return new SuccessResponse("Time boundary updated successfully to " + timeBoundaryFinal);
+    return new SuccessResponse("Time boundary successfully updated to " + timeBoundaryFinal);
   }
 
   @DELETE
-  @Path("table/{tableName}/timeBoundary")
+  @Path("tables/{tableName}/timeBoundary")
   @ApiOperation(value = "Delete hybrid table query time boundary", notes = "Delete hybrid table query time boundary")
   public SuccessResponse deleteEnforcedQueryTimeBoundary(
       @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
           String tableName)
       throws Exception {
-    // Validate its a hybrid table
-    if (!_pinotHelixResourceManager.hasRealtimeTable(tableName) || !_pinotHelixResourceManager.hasOfflineTable(
-        tableName)) {
-      throw new ControllerApplicationException(LOGGER, "Table isn't a hybrid table", Response.Status.BAD_REQUEST);
-    }
-
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    IdealState offlineTableIdealState = _pinotHelixResourceManager.getTableIdealState(offlineTableName);
+    Preconditions.checkState(offlineTableIdealState != null,
+        "Could not find table ideal state record for table name : " + offlineTableName);
 
     // Delete the timeBoundary in tableIdealState
     IdealState idealState =
         HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
-          assert is != null;
-          is.getRecord().getSimpleFields().remove(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
+          is.getRecord().getSimpleFields().remove(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
           return is;
         }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
 
@@ -964,5 +934,44 @@ public class PinotTableRestletResource {
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader.getAggregateTableMetadata(tableNameWithType, columns, numReplica,
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+  }
+
+  private Long validateSegmentStateForTable(String offlineTableNameWithType)
+      throws InvalidConfigException, JsonProcessingException {
+    // Call all servers to validate offline table state
+    Map<String, List<String>> serverToSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(offlineTableNameWithType);
+    BiMap<String, String> serverEndPoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+    List<String> serverUrls = new ArrayList<>();
+    BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
+    for (String endpoint : endpointsToServers.keySet()) {
+      String reloadTaskStatusEndpoint = endpoint + "/tables/" + offlineTableNameWithType + "/allSegmentsLoaded";
+      serverUrls.add(reloadTaskStatusEndpoint);
+    }
+
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
+
+    if (serviceResponse._failedResponseCount > 0) {
+      throw new ControllerApplicationException(LOGGER, "Could not validate table segment status",
+          Response.Status.SERVICE_UNAVAILABLE);
+    }
+
+    long timeBoundary = -1;
+    // Validate all responses
+    for (String response : serviceResponse._httpResponses.values()) {
+      TableSegmentValidationInfo tableSegmentValidationInfo =
+          JsonUtils.stringToObject(response, TableSegmentValidationInfo.class);
+      if (!tableSegmentValidationInfo.isValid()) {
+        throw new ControllerApplicationException(LOGGER, "Table segment validation failed",
+            Response.Status.PRECONDITION_FAILED);
+      }
+      timeBoundary = Math.max(timeBoundary, tableSegmentValidationInfo.getMaxTimestamp());
+    }
+
+    return timeBoundary;
   }
 }

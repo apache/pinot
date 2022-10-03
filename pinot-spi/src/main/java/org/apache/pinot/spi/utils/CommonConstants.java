@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils;
 
 import java.io.File;
 
+
 public class CommonConstants {
   private CommonConstants() {
   }
@@ -822,6 +823,6 @@ public class CommonConstants {
   }
 
   public static class IdealState {
-    public static final String QUERY_TIME_BOUNDARY = "HYBRID_TABLE_TIME_BOUNDARY";
+    public static final String HYBRID_TABLE_TIME_BOUNDARY = "HYBRID_TABLE_TIME_BOUNDARY";
   }
 }

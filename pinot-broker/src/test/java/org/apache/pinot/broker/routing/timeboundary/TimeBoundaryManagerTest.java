@@ -174,7 +174,7 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(4, TimeUnit.DAYS));
 
     // Setting the enforced time boundary in ideal state should update the time boundary
-    idealState.getRecord().setSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY,
+    idealState.getRecord().setSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY,
         Long.toString(TimeUnit.MILLISECONDS.convert(50, TimeUnit.DAYS)));
     timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(50, TimeUnit.DAYS));
@@ -188,7 +188,7 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(50, TimeUnit.DAYS));
 
     // Unsetting the enforced time boundary should change it to most recent time boundary
-    idealState.getRecord().getSimpleFields().remove(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
+    idealState.getRecord().getSimpleFields().remove(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
     timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(99, TimeUnit.DAYS));
   }
@@ -216,13 +216,13 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), expectedTimeValue);
 
     // Setting the enforced time boundary in ideal state should update the time boundary
-    idealState.getRecord().setSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY,
+    idealState.getRecord().setSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY,
         Long.toString(TimeUnit.MILLISECONDS.convert(50, TimeUnit.HOURS)));
     timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(50, TimeUnit.HOURS));
 
     // Unsetting the enforced time boundary should change it back to original time boundary
-    idealState.getRecord().getSimpleFields().remove(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
+    idealState.getRecord().getSimpleFields().remove(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
     timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), expectedTimeValue);
   }
