@@ -180,7 +180,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           validDocIds = new ThreadSafeMutableRoaringBitmap();
         }
         if (recordInfoIterator == null) {
-          recordInfoIterator = UpsertUtils.getRecordInfoIterator(segment, _primaryKeyColumns, _comparisonColumn);
+          if (_enableSnapshot && oldSegment instanceof ImmutableSegmentImpl) {
+            MutableRoaringBitmap validDocIdsSnapshot =
+                ((ImmutableSegmentImpl) oldSegment).loadValidDocIdsFromSnapshot();
+            recordInfoIterator =
+                UpsertUtils.getRecordInfoIterator(segment, _primaryKeyColumns, _comparisonColumn, validDocIdsSnapshot);
+          } else {
+            recordInfoIterator = UpsertUtils.getRecordInfoIterator(segment, _primaryKeyColumns, _comparisonColumn);
+          }
         }
         addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, recordInfoIterator, oldSegment,
             validDocIdsForOldSegment);

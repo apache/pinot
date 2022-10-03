@@ -59,6 +59,9 @@ public class UpsertUtils {
    */
   public static Iterator<RecordInfo> getRecordInfoIterator(ImmutableSegment segment, List<String> primaryKeyColumns,
       String comparisonColumn, MutableRoaringBitmap validDocIds) {
+    if (validDocIds == null) {
+      return getRecordInfoIterator(segment, primaryKeyColumns, comparisonColumn);
+    }
     return new Iterator<RecordInfo>() {
       private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
 
