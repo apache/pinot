@@ -373,11 +373,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return false;
     }
 
+    // Do not create dictionaries for json or text index columns as they are high-cardinality values almost always
+    if (config.getJsonIndexCreationColumns().contains(column)
+        || config.getTextIndexCreationColumns().contains(column)) {
+      return false;
+    }
+
     // Do not create dictionary if index size with dictionary is going to be larger than index size without dictionary
     // This is done to reduce the cost of dictionary for high cardinality columns
     // Off by default and needs optimizeDictionaryEnabled to be set to true
-    if (config.isOptimizeDictionaryForMetrics() && spec.getFieldType() == FieldType.METRIC && spec.isSingleValueField()
-        && spec.getDataType().isFixedWidth()) {
+    if (config.isOptimizeDictionaryForMetrics() && spec.isSingleValueField() && spec.getDataType().isFixedWidth()) {
       long dictionarySize = info.getDistinctValueCount() * spec.getDataType().size();
       long forwardIndexSize =
           ((long) info.getTotalNumberOfEntries() * PinotDataBitSet.getNumBitsPerValue(info.getDistinctValueCount() - 1)
