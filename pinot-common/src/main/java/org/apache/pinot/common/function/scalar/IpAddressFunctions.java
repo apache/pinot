@@ -27,6 +27,14 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 
 /**
  * Inbuilt IP related transform functions
+ *
+ * Functions added:
+ * isSubnetOf(String ipPrefix, String ipAddress) --> boolean
+ *
+ * Functions to add:
+ * ipPrefix(String ipAddress, int prefixBits) -> String ipPrefix
+ * ipSubnetMin(String ipPrefix) -> String ipMin
+ * ipSubnetMax(String ipPrefix) -> String ipMax
  */
 public class IpAddressFunctions {
 
@@ -51,6 +59,28 @@ public class IpAddressFunctions {
       throw new IllegalArgumentException("Invalid IP: " + ipAddress);
     }
     return address;
+  }
+
+  private static byte[] getAddrMin(byte[] addr, int subnetSize) {
+    int numRangeBits = addr.length * 8 - subnetSize;
+    for (int i = 0; i < addr.length; i++) {
+      if (numRangeBits > i * 8) {
+        int shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
+        addr[addr.length - 1 - i] &= -0x1 << shift;
+      }
+    }
+    return addr;
+  }
+
+  private static byte[] getAddrMax(byte[] addr, int subnetSize) {
+    int numRangeBits = addr.length * 8 - subnetSize;
+    for (int i = 0; i < addr.length; i++) {
+      if (numRangeBits > i * 8) {
+        int shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
+        addr[addr.length - 1 - i] |= ~(-0x1 << shift);
+      }
+    }
+    return addr;
   }
 
   /**
@@ -95,29 +125,19 @@ public class IpAddressFunctions {
      * Check
      * addrMin <= arg <= addMax
      */
-    int numRangeBits = addr.length * 8 - subnetSize;
-
     // create a copy of addr for computing addrMax
     byte[] maxBits = new byte[addr.length];
+    byte[] minBits = new byte[addr.length];
     for (int i = 0; i < maxBits.length; i++) {
+      minBits[i] = addr[i];
       maxBits[i] = addr[i];
     }
     // min
-    for (int i = 0; i < addr.length; i++) {
-      if (numRangeBits > i * 8) {
-        int shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
-        addr[addr.length - 1 - i] &= -0x1 << shift;
-      }
-    }
-    BigInteger addrMin = new BigInteger(addr);
+    minBits = getAddrMin(minBits, subnetSize);
+    BigInteger addrMin = new BigInteger(minBits);
 
     // max
-    for (int i = 0; i < maxBits.length; i++) {
-      if (numRangeBits > i * 8) {
-        int shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
-        maxBits[maxBits.length - 1 - i] |= ~(-0x1 << shift);
-      }
-    }
+    maxBits = getAddrMax(maxBits, subnetSize);
     BigInteger addrMax = new BigInteger(maxBits);
     BigInteger arg = new BigInteger(argAddress);
     return addrMin.compareTo(arg) <= 0 && addrMax.compareTo(arg) >= 0;
