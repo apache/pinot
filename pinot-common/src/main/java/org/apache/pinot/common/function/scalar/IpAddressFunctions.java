@@ -53,10 +53,12 @@ public class IpAddressFunctions {
     try {
       address = InetAddresses.forString(ipAddress).getAddress();
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Invalid IP: " + ipAddress);
+      throw new IllegalArgumentException("Invalid IP: " + ipAddress + " due to " + e.getMessage());
     }
     if (address.length != 4 && address.length != 16) {
-      throw new IllegalArgumentException("Invalid IP: " + ipAddress);
+      throw new IllegalArgumentException(
+          "Valid IP address should have length 32 (IPv4) or 128 (IPv6). Invalid IP " + ipAddress + " has length "
+              + address.length);
     }
     return address;
   }
@@ -93,11 +95,14 @@ public class IpAddressFunctions {
     byte[] addr = fromStringToBytes(prefixLengthPair[0]);
     int subnetSize = Integer.parseInt(prefixLengthPair[1]);
     if (subnetSize < 0 || addr.length * 8 < subnetSize) {
-      throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
+      throw new IllegalArgumentException("Invalid subnet size " + subnetSize
+          + ". IPv4 subnet size should be in range [0, 32]. IPv6 subnet size should be in range [0, 128].");
     }
     byte[] argAddress = fromStringToBytes(ipAddress);
     if (argAddress.length != addr.length) {
-      throw new IllegalArgumentException("IP type of " + ipAddress + " is different from " + ipPrefix);
+      String argType = argAddress.length == 32 ? "IPv4" : "IPv6";
+      String addrType = addr.length == 32 ? "IPv4" : "IPv6";
+      throw new IllegalArgumentException(ipAddress + " is " + argType + ", but " + ipPrefix + " is " + addrType);
     }
     if (subnetSize == 0) {
       // all IPs are in range
