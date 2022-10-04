@@ -60,7 +60,7 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
       metadataOnlyDataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     }
     // return a metadata-only block.
-    MetadataResultsBlock metadataResultsBlock = new MetadataResultsBlock(instanceResponseDataTable.getDataSchema());
+    MetadataResultsBlock metadataResultsBlock = new MetadataResultsBlock(null);
     // metadata result block doesn't use query context to extract out data table.
     return new InstanceResponseBlock(metadataResultsBlock, null, metadataOnlyDataTable.getMetadata());
   }

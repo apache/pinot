@@ -103,7 +103,6 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
       throws Exception {
     long numRowsCollected = 0;
     int numOperatorsFinished = 0;
-    DataSchema dataSchema = null;
     long endTimeMs = _queryContext.getEndTimeMs();
     while (numRowsCollected < _limit && numOperatorsFinished < _numOperators) {
       BaseResultsBlock resultsBlock =
@@ -124,7 +123,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
         continue;
       }
       SelectionResultsBlock selectionResultsBlock = (SelectionResultsBlock) resultsBlock;
-      dataSchema = selectionResultsBlock.getDataSchema();
+      DataSchema dataSchema = selectionResultsBlock.getDataSchema();
       Collection<Object[]> rows = selectionResultsBlock.getRows();
       assert dataSchema != null && rows != null;
       numRowsCollected += rows.size();
@@ -133,7 +132,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
       _streamObserver.onNext(StreamingResponseUtils.getDataResponse(dataTable));
     }
     // Return a metadata results block in the end
-    return new MetadataResultsBlock(dataSchema);
+    return new MetadataResultsBlock(null);
   }
 
   @Override
