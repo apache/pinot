@@ -25,44 +25,48 @@ import java.net.UnknownHostException;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
+/**
+ * Inbuilt IP related transform functions
+ */
 public class IpAddressFunctions {
 
   private IpAddressFunctions() {
   }
 
-  /**
-   * Returns true if ipAddress is in the subnet of ipPrefix
-   * ipPrefix is in cidr format (IPv4 or IPv6)
-   */
-  @ScalarFunction
-  public static boolean isSubnetOf(String ipPrefix, String ipAddress)
-      throws UnknownHostException {
+  private static String[] fromPrefixToPair(String ipPrefix) {
     if (!ipPrefix.contains("/")) {
       throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
     }
-    byte[] address;
-    byte[] argAddress;
-    int subnetSize;
+    return ipPrefix.split("/");
+  }
 
-    String[] prefixLengthPair = ipPrefix.split("/");
+  private static byte[] fromStringToBytes(String ipAddress) {
+    byte[] address;
     try {
-      address = InetAddresses.forString(prefixLengthPair[0]).getAddress();
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
-    }
-    subnetSize = Integer.parseInt(prefixLengthPair[1]);
-    if (subnetSize < 0 || address.length * 8 < subnetSize) {
-      throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
-    }
-    try {
-      argAddress = InetAddresses.forString(ipAddress).getAddress();
+      address = InetAddresses.forString(ipAddress).getAddress();
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException("Invalid IP: " + ipAddress);
     }
     if (address.length != 4 && address.length != 16) {
       throw new IllegalArgumentException("Invalid IP: " + ipAddress);
     }
-    if (argAddress.length != address.length) {
+    return address;
+  }
+
+  /**
+   * Returns true if ipAddress is in the subnet of ipPrefix (IPv4 or IPv6)
+   */
+  @ScalarFunction
+  public static boolean isSubnetOf(String ipPrefix, String ipAddress)
+      throws UnknownHostException {
+    String[] prefixLengthPair = fromPrefixToPair(ipPrefix);
+    byte[] addr = fromStringToBytes(prefixLengthPair[0]);
+    int subnetSize = Integer.parseInt(prefixLengthPair[1]);
+    if (subnetSize < 0 || addr.length * 8 < subnetSize) {
+      throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
+    }
+    byte[] argAddress = fromStringToBytes(ipAddress);
+    if (argAddress.length != addr.length) {
       throw new IllegalArgumentException("IP type of " + ipAddress + " is different from " + ipPrefix);
     }
     if (subnetSize == 0) {
@@ -70,31 +74,52 @@ public class IpAddressFunctions {
       return true;
     }
 
-    int shift;
-    int numRangeBits = address.length * 8 - subnetSize;
-    BigInteger arg = new BigInteger(argAddress);
-    byte[] maxBits = new byte[address.length];
+    /**
+     * Alg for checking if IP address arg is in the subnet of IP address addr with subnetSize
+     * which is the number of network bits (= number of 1's in the subnet mask).
+     *
+     * Given
+     * addr: [---network bits---][---random bits---]
+     *
+     * Compute
+     * addrMin: [---network bits---][---all 0's---]
+     *    [---network bits---][---random bits---]
+     *    &
+     *   [-----all 1's------][-----all 0's------]
+     *
+     * addrMax: [---network bits---][---all 1's---]
+     *    [---network bits---][---random bits---]
+     *    |
+     *   [-----all 0's------][-----all 1's------]
+     *
+     * Check
+     * addrMin <= arg <= addMax
+     */
+    int numRangeBits = addr.length * 8 - subnetSize;
+
+    // create a copy of addr for computing addrMax
+    byte[] maxBits = new byte[addr.length];
     for (int i = 0; i < maxBits.length; i++) {
-      maxBits[i] = address[i];
+      maxBits[i] = addr[i];
     }
     // min
-    for (int i = 0; i < address.length; i++) {
+    for (int i = 0; i < addr.length; i++) {
       if (numRangeBits > i * 8) {
-        shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
-        address[address.length - 1 - i] &= -0x1 << shift;
+        int shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
+        addr[addr.length - 1 - i] &= -0x1 << shift;
       }
     }
-    BigInteger min = new BigInteger(address);
+    BigInteger addrMin = new BigInteger(addr);
 
     // max
     for (int i = 0; i < maxBits.length; i++) {
       if (numRangeBits > i * 8) {
-        shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
+        int shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
         maxBits[maxBits.length - 1 - i] |= ~(-0x1 << shift);
       }
     }
-    BigInteger max = new BigInteger(maxBits);
-
-    return min.compareTo(arg) <= 0 && max.compareTo(arg) >= 0;
+    BigInteger addrMax = new BigInteger(maxBits);
+    BigInteger arg = new BigInteger(argAddress);
+    return addrMin.compareTo(arg) <= 0 && addrMax.compareTo(arg) >= 0;
   }
 }
