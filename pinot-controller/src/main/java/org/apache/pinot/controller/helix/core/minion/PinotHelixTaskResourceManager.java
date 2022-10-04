@@ -696,6 +696,10 @@ public class PinotHelixTaskResourceManager {
       if (jobExecutionStartTimeMs > 0) {
         taskDebugInfo.setExecutionStartTime(DateTimeUtils.epochToDefaultDateFormat(jobExecutionStartTimeMs));
       }
+      long jobFinishTimeMs = jobContext.getFinishTime();
+      if (jobFinishTimeMs > 0) {
+        taskDebugInfo.setFinishTime(DateTimeUtils.epochToDefaultDateFormat(jobFinishTimeMs));
+      }
       Set<Integer> partitionSet = jobContext.getPartitionSet();
       TaskCount subtaskCount = new TaskCount();
       for (int partition : partitionSet) {
@@ -798,11 +802,15 @@ public class PinotHelixTaskResourceManager {
     MinionTaskMetadataUtils.deleteTaskMetadata(propertyStore, taskType, tableNameWithType);
   }
 
-  @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "subtaskInfos"})
+  @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "finishTime", "subtaskInfos"})
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class TaskDebugInfo {
+    // Time at which the task (which may have multiple subtasks) got created.
     private String _startTime;
+    // Time at which the first subtask of the task got scheduled.
     private String _executionStartTime;
+    // Time at which the task has ended.
+    private String _finishTime;
     private TaskState _taskState;
     private TaskCount _subtaskCount;
     private List<SubtaskDebugInfo> _subtaskInfos;
@@ -816,6 +824,10 @@ public class PinotHelixTaskResourceManager {
 
     public void setExecutionStartTime(String executionStartTime) {
       _executionStartTime = executionStartTime;
+    }
+
+    public void setFinishTime(String finishTime) {
+      _finishTime = finishTime;
     }
 
     public void setTaskState(TaskState taskState) {
@@ -839,6 +851,10 @@ public class PinotHelixTaskResourceManager {
 
     public String getExecutionStartTime() {
       return _executionStartTime;
+    }
+
+    public String getFinishTime() {
+      return _finishTime;
     }
 
     public TaskState getTaskState() {
