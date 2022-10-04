@@ -54,29 +54,18 @@ public class QueryLogger {
   private final AtomicLong _numDroppedLogs = new AtomicLong(0L);
 
   public QueryLogger(PinotConfiguration config) {
-    this(RateLimiter.create(
-        config.getProperty(
-            Broker.CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND,
+    this(RateLimiter.create(config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND,
             Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND)),
-        config.getProperty(
-            Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH,
-            Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH),
-        config.getProperty(
-            Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
-            Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING),
-        LOGGER,
-        RateLimiter.create(1) // log once a second for dropped log count
+        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH, Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH),
+        config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
+            Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING), LOGGER, RateLimiter.create(1)
+        // log once a second for dropped log count
     );
   }
 
   @VisibleForTesting
-  QueryLogger(
-      RateLimiter logRateLimiter,
-      int maxQueryLengthToLog,
-      boolean enableIpLogging,
-      Logger logger,
-      RateLimiter droppedLogRateLimiter
-  ) {
+  QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, Logger logger,
+      RateLimiter droppedLogRateLimiter) {
     _logRateLimiter = logRateLimiter;
     _maxQueryLengthToLog = maxQueryLengthToLog;
     _enableIpLogging = enableIpLogging;
@@ -99,8 +88,7 @@ public class QueryLogger {
     }
 
     // always log the query last - don't add this to the QueryLogEntry enum
-    queryLogBuilder.append("query=")
-        .append(StringUtils.substring(params._query, 0, _maxQueryLengthToLog));
+    queryLogBuilder.append("query=").append(StringUtils.substring(params._query, 0, _maxQueryLengthToLog));
     _logger.info(queryLogBuilder.toString());
 
     if (_droppedLogRateLimiter.tryAcquire()) {
@@ -108,8 +96,7 @@ public class QueryLogger {
       // loggers that increment this counter and this thread
       long numDroppedLogsSinceLastLog = _numDroppedLogs.getAndSet(0);
       if (numDroppedLogsSinceLastLog > 0) {
-        _logger.warn("{} logs were dropped. (log max rate per second: {})",
-            numDroppedLogsSinceLastLog,
+        _logger.warn("{} logs were dropped. (log max rate per second: {})", numDroppedLogsSinceLastLog,
             _droppedLogRateLimiter.getRate());
       }
     }
@@ -124,8 +111,7 @@ public class QueryLogger {
   }
 
   private boolean shouldForceLog(QueryLogParams params) {
-    return params._response.isNumGroupsLimitReached()
-        || params._response.getExceptionsSize() > 0
+    return params._response.isNumGroupsLimitReached() || params._response.getExceptionsSize() > 0
         || params._timeUsedMs > TimeUnit.SECONDS.toMillis(1);
   }
 
@@ -138,19 +124,12 @@ public class QueryLogger {
     final BaseBrokerRequestHandler.ServerStats _serverStats;
     final BrokerResponse _response;
     final long _timeUsedMs;
-    @Nullable final RequesterIdentity _requester;
+    @Nullable
+    final RequesterIdentity _requester;
 
-    public QueryLogParams(
-        long requestId,
-        String query,
-        RequestContext requestContext,
-        String table,
-        int numUnavailableSegments,
-        BaseBrokerRequestHandler.ServerStats serverStats,
-        BrokerResponse response,
-        long timeUsedMs,
-        @Nullable RequesterIdentity requester
-    ) {
+    public QueryLogParams(long requestId, String query, RequestContext requestContext, String table,
+        int numUnavailableSegments, BaseBrokerRequestHandler.ServerStats serverStats, BrokerResponse response,
+        long timeUsedMs, @Nullable RequesterIdentity requester) {
       _requestId = requestId;
       _query = query;
       _table = table;
@@ -169,39 +148,40 @@ public class QueryLogger {
    */
   private enum QueryLogEntry {
     REQUEST_ID("requestId") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._requestId);
       }
     },
     TABLE("table") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._table);
       }
     },
     TIME_MS("timeMs") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._timeUsedMs);
       }
     },
     DOCS("docs") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._response.getNumDocsScanned())
-            .append('/')
-            .append(params._response.getTotalDocs());
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getNumDocsScanned()).append('/').append(params._response.getTotalDocs());
       }
     },
     ENTRIES("entries") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._response.getNumEntriesScannedInFilter())
-            .append('/')
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getNumEntriesScannedInFilter()).append('/')
             .append(params._response.getNumEntriesScannedPostFilter());
       }
     },
-    SEGMENT_INFO(
-        "segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/unavailable)",
-        ':'
-    ) {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+    SEGMENT_INFO("segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/unavailable)",
+        ':') {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.getNumSegmentsQueried()).append('/')
             .append(params._response.getNumSegmentsProcessed()).append('/')
             .append(params._response.getNumSegmentsMatched()).append('/')
@@ -212,39 +192,45 @@ public class QueryLogger {
       }
     },
     CONSUMING_FRESHNESS_MS("consumingFreshnessTimeMs") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.getMinConsumingFreshnessTimeMs());
       }
     },
     SERVERS("servers") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._response.getNumServersResponded())
-            .append('/')
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getNumServersResponded()).append('/')
             .append(params._response.getNumServersQueried());
       }
     },
     GROUP_LIMIT_REACHED("groupLimitReached") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.isNumGroupsLimitReached());
       }
     },
     BROKER_REDUCE_TIME_MS("brokerReduceTimeMs") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._requestContext.getReduceTimeMillis());
       }
     },
     EXCEPTIONS("exceptions") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.getExceptionsSize());
       }
     },
     SERVER_STATS("serverStats") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._serverStats.getServerStats());
       }
     },
     OFFLINE_THREAD_CPU_TIME("offlineThreadCpuTimeNs(total/thread/sysActivity/resSer)", ':') {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.getOfflineTotalCpuTimeNs()).append('/')
             .append(params._response.getOfflineThreadCpuTimeNs()).append('/')
             .append(params._response.getOfflineSystemActivitiesCpuTimeNs()).append('/')
@@ -252,7 +238,8 @@ public class QueryLogger {
       }
     },
     REALTIME_THREAD_CPU_TIME("realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer)", ':') {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.getRealtimeTotalCpuTimeNs()).append('/')
             .append(params._response.getRealtimeThreadCpuTimeNs()).append('/')
             .append(params._response.getRealtimeSystemActivitiesCpuTimeNs()).append('/')
@@ -260,7 +247,8 @@ public class QueryLogger {
       }
     },
     CLIENT_IP("clientIp") {
-      @Override void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         if (logger._enableIpLogging && params._requester != null) {
           builder.append(params._requester.getClientIp());
         } else {
