@@ -26,11 +26,6 @@
     </Console>
   </Appenders>
   <Loggers>
-    <!--Turn off the logger for KafkaConfluentSchemaRegistryAvroMessageDecoder because we intentionally inject
-     tombstones in KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest which can flood the log
-     -->
-    <Logger name="org.apache.pinot.plugin.inputformat.avro.confluent.KafkaConfluentSchemaRegistryAvroMessageDecoder"
-            level="off" additivity="false"/>
     <Logger name="org.apache.pinot" level="warn" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>

@@ -75,6 +75,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegr
   private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS = Collections.singletonList("DivActualElapsedTime");
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
+  private static final int NUM_INVALID_RECORDS = 5;
 
   private final boolean _isDirectAlloc = RANDOM.nextBoolean();
   private final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
@@ -129,29 +130,39 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegr
         "io.confluent.kafka.serializers.KafkaAvroSerializer");
     Producer<byte[], GenericRecord> avroProducer = new KafkaProducer<>(avroProducerProps);
 
+    // this producer produces intentionally malformatted records so that
+    // we can test the behavior when consuming such records
     Properties nonAvroProducerProps = new Properties();
     nonAvroProducerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + getKafkaPort());
     nonAvroProducerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
         "org.apache.kafka.common.serialization.ByteArraySerializer");
     nonAvroProducerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
         "org.apache.kafka.common.serialization.ByteArraySerializer");
-    Producer<byte[], byte[]> nonAvroProducer = new KafkaProducer<>(nonAvroProducerProps);
+    Producer<byte[], byte[]> invalidDataProducer = new KafkaProducer<>(nonAvroProducerProps);
 
     if (injectTombstones()) {
       // publish lots of tombstones to livelock the consumer if it can't handle this properly
       for (int i = 0; i < 1000; i++) {
         // publish a tombstone first
-        nonAvroProducer.send(
+        avroProducer.send(
             new ProducerRecord<>(getKafkaTopic(), Longs.toByteArray(System.currentTimeMillis()), null));
       }
     }
+
     for (File avroFile : avroFiles) {
+      int numInvalidRecords = 0;
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord genericRecord : reader) {
           byte[] keyBytes = (getPartitionColumn() == null) ? Longs.toByteArray(System.currentTimeMillis())
               : (genericRecord.get(getPartitionColumn())).toString().getBytes();
-          // Ignore getKafkaMessageHeader()
-          nonAvroProducer.send(new ProducerRecord<>(getKafkaTopic(), keyBytes, "Rubbish".getBytes(UTF_8)));
+
+          if (numInvalidRecords < NUM_INVALID_RECORDS) {
+            // send a few rubbish records to validate that the consumer will skip over non-avro records, but
+            // don't spam them every time as it causes log spam
+            invalidDataProducer.send(new ProducerRecord<>(getKafkaTopic(), keyBytes, "Rubbish".getBytes(UTF_8)));
+            numInvalidRecords++;
+          }
+
           avroProducer.send(new ProducerRecord<>(getKafkaTopic(), keyBytes, genericRecord));
         }
       }
