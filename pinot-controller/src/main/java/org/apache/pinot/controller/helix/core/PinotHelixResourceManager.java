@@ -2770,7 +2770,8 @@ public class PinotHelixResourceManager {
   }
 
   public boolean hasTable(String tableNameWithType) {
-    return getAllResources().contains(tableNameWithType);
+    return _helixDataAccessor.getBaseDataAccessor()
+        .exists(_keyBuilder.idealStates(tableNameWithType).getPath(), AccessOption.PERSISTENT);
   }
 
   public boolean hasOfflineTable(String tableName) {
