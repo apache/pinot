@@ -33,6 +33,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -54,7 +55,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TimeBoundaryManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeBoundaryManager.class);
-  private static final long INVALID_END_TIME_MS = -1;
+  private static final long INVALID_TIME_MS = -1;
 
   private final String _offlineTableName;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -65,6 +66,7 @@ public class TimeBoundaryManager {
   private final long _timeOffsetMs;
   private final Map<String, Long> _endTimeMsMap = new HashMap<>();
 
+  private long _explicitlySetTimeBoundaryMs = INVALID_TIME_MS;
   private volatile TimeBoundaryInfo _timeBoundaryInfo;
 
   public TimeBoundaryManager(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -109,14 +111,9 @@ public class TimeBoundaryManager {
    */
   @SuppressWarnings("unused")
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
-    // Bulk load time info for all online segments
-    String enforcedTimeBoundary =
-        idealState.getRecord().getSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
-    long enforcedTimeBoundaryMs = -1;
-    if (enforcedTimeBoundary != null) {
-      enforcedTimeBoundaryMs = Long.parseLong(enforcedTimeBoundary);
-    }
+    updateExplicitlySetTimeBoundary(idealState);
 
+    // Bulk load time info for all online segments
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
     List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
@@ -125,78 +122,76 @@ public class TimeBoundaryManager {
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
     List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    long maxEndTimeMs = INVALID_END_TIME_MS;
+    long maxEndTimeMs = INVALID_TIME_MS;
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
       long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
       _endTimeMsMap.put(segment, endTimeMs);
       maxEndTimeMs = Math.max(maxEndTimeMs, endTimeMs);
     }
-    updateTimeBoundaryInfo(enforcedTimeBoundaryMs, maxEndTimeMs, true);
+    updateTimeBoundaryInfo(maxEndTimeMs);
+  }
+
+  private void updateExplicitlySetTimeBoundary(IdealState idealState) {
+    String timeBoundary = idealState.getRecord().getSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
+    long timeBoundaryMs = timeBoundary != null ? Long.parseLong(timeBoundary) : INVALID_TIME_MS;
+    if (_explicitlySetTimeBoundaryMs != timeBoundaryMs) {
+      LOGGER.info("Updating explicitly set time boundary to: {} for table: {}", timeBoundaryMs, _offlineTableName);
+      _explicitlySetTimeBoundaryMs = timeBoundaryMs;
+    }
   }
 
   private long extractEndTimeMsFromSegmentZKMetadataZNRecord(String segment, @Nullable ZNRecord znRecord) {
     if (znRecord == null) {
       LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}", segment, _offlineTableName);
-      return INVALID_END_TIME_MS;
+      return INVALID_TIME_MS;
     }
-    long totalDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
-    long endTimeMs = INVALID_END_TIME_MS;
-    if (totalDocs != 0) {
-      long endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
-      if (endTime > 0) {
-        TimeUnit timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
-        endTimeMs = timeUnit.toMillis(endTime);
-      } else {
-        LOGGER.warn("Failed to find valid end time for segment: {}, table: {}", segment, _offlineTableName);
-      }
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(znRecord);
+    if (segmentZKMetadata.getTotalDocs() == 0) {
+      return INVALID_TIME_MS;
     }
-    return endTimeMs;
+    long endTimeMs = segmentZKMetadata.getEndTimeMs();
+    if (endTimeMs > 0) {
+      return endTimeMs;
+    } else {
+      LOGGER.warn("Failed to find valid end time for segment: {}, table: {}", segment, _offlineTableName);
+      return INVALID_TIME_MS;
+    }
   }
 
-  private void updateTimeBoundaryInfo(long explicitlySetTimeBoundaryMS, long maxEndTimeMs, boolean idealStateReferred) {
+  private void updateTimeBoundaryInfo(long maxEndTimeMs) {
     TimeBoundaryInfo currentTimeBoundaryInfo = _timeBoundaryInfo;
-    long finalTimeBoundaryMs = -1;
-    boolean isExplicitlySet = false;
-    boolean validTimeBoundaryFound = false;
 
-    if (explicitlySetTimeBoundaryMS != -1) {
-      // We're using explicitly set time boundary, ignoring maxEndTimeMs
-      finalTimeBoundaryMs = explicitlySetTimeBoundaryMS;
-      isExplicitlySet = true;
-      validTimeBoundaryFound = true;
-      LOGGER.info("Enforced table time boundary in use: {} for table: {}", explicitlySetTimeBoundaryMS,
+    long timeBoundaryMs;
+    if (_explicitlySetTimeBoundaryMs > 0) {
+      // Use explicitly set time boundary
+      timeBoundaryMs = _explicitlySetTimeBoundaryMs;
+      LOGGER.debug("Using explicitly set time boundary: {} for table: {}", _explicitlySetTimeBoundaryMs,
           _offlineTableName);
-    } else if (idealStateReferred || !currentTimeBoundaryInfo.isExplicitlySet()) {
+    } else {
+      // No explicit time boundary set
       if (maxEndTimeMs > 0) {
-        // Current time boundary isn't explicitly set. Updating to maxEndTimeMs.
-        finalTimeBoundaryMs = maxEndTimeMs - _timeOffsetMs;
-        validTimeBoundaryFound = true;
+        timeBoundaryMs = maxEndTimeMs - _timeOffsetMs;
       } else {
         LOGGER.warn("Failed to find segment with valid end time for table: {}, no time boundary generated",
             _offlineTableName);
+        timeBoundaryMs = INVALID_TIME_MS;
       }
-    } else {
-      // Segment refreshed, but explicitly set time boundary already exists. No change needed.
-      validTimeBoundaryFound = true;
-      LOGGER.info("Skipping time boundary update since enforced time boundary exists");
     }
 
-    if (validTimeBoundaryFound) {
-      if (finalTimeBoundaryMs != -1) {
-        String timeBoundary = _timeFormatSpec.fromMillisToFormat(finalTimeBoundaryMs);
-        if (currentTimeBoundaryInfo == null || !currentTimeBoundaryInfo.getTimeValue().equals(timeBoundary)
-            || currentTimeBoundaryInfo.isExplicitlySet() != isExplicitlySet) {
-          _timeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, timeBoundary, isExplicitlySet);
-          LOGGER.info("Updated time boundary to: {} for table: {}", timeBoundary, _offlineTableName);
-        }
+    if (timeBoundaryMs > 0) {
+      String timeBoundary = _timeFormatSpec.fromMillisToFormat(timeBoundaryMs);
+      if (currentTimeBoundaryInfo == null || !currentTimeBoundaryInfo.getTimeValue().equals(timeBoundary)) {
+        _timeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, timeBoundary);
+        LOGGER.info("Updated time boundary to: {} for table: {}", timeBoundary, _offlineTableName);
       }
-      long timeBoundaryEndTime = _timeFormatSpec.fromFormatToMillis(_timeBoundaryInfo.getTimeValue());
+      // Convert formatted time boundary to millis in case the time boundary is rounded
+      long formattedTimeBoundaryMs = _timeFormatSpec.fromFormatToMillis(timeBoundary);
       _brokerMetrics.setValueOfTableGauge(_offlineTableName, BrokerGauge.TIME_BOUNDARY_DIFFERENCE,
-          Math.max(0, maxEndTimeMs - timeBoundaryEndTime));
+          maxEndTimeMs - formattedTimeBoundaryMs);
     } else {
       _timeBoundaryInfo = null;
-      _brokerMetrics.setValueOfTableGauge(_offlineTableName, BrokerGauge.TIME_BOUNDARY_DIFFERENCE, -1);
+      _brokerMetrics.removeTableGauge(_offlineTableName, BrokerGauge.TIME_BOUNDARY_DIFFERENCE);
     }
   }
 
@@ -210,12 +205,7 @@ public class TimeBoundaryManager {
   @SuppressWarnings("unused")
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
-    String enforcedTimeBoundary =
-        idealState.getRecord().getSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
-    long enforcedTimeBoundaryMs = -1;
-    if (enforcedTimeBoundary != null) {
-      enforcedTimeBoundaryMs = Long.parseLong(enforcedTimeBoundary);
-    }
+    updateExplicitlySetTimeBoundary(idealState);
 
     for (String segment : onlineSegments) {
       // NOTE: Only update the segment end time when there are ONLINE instances in the external view to prevent moving
@@ -227,11 +217,11 @@ public class TimeBoundaryManager {
       }
     }
     _endTimeMsMap.keySet().retainAll(onlineSegments);
-    updateTimeBoundaryInfo(enforcedTimeBoundaryMs, getMaxEndTimeMs(), true);
+    updateTimeBoundaryInfo(getMaxEndTimeMs());
   }
 
   private long getMaxEndTimeMs() {
-    long maxEndTimeMs = INVALID_END_TIME_MS;
+    long maxEndTimeMs = INVALID_TIME_MS;
     for (long endTimeMs : _endTimeMsMap.values()) {
       maxEndTimeMs = Math.max(maxEndTimeMs, endTimeMs);
     }
@@ -244,7 +234,7 @@ public class TimeBoundaryManager {
   public synchronized void refreshSegment(String segment) {
     _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
         _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
-    updateTimeBoundaryInfo(-1, getMaxEndTimeMs(), false);
+    updateTimeBoundaryInfo(getMaxEndTimeMs());
   }
 
   @Nullable

@@ -21,12 +21,10 @@ package org.apache.pinot.core.routing;
 public class TimeBoundaryInfo {
   private final String _timeColumn;
   private final String _timeValue;
-  private final boolean _explicitlySet;
 
-  public TimeBoundaryInfo(String timeColumn, String timeValue, boolean explicitlySet) {
+  public TimeBoundaryInfo(String timeColumn, String timeValue) {
     _timeColumn = timeColumn;
     _timeValue = timeValue;
-    _explicitlySet = explicitlySet;
   }
 
   public String getTimeColumn() {
@@ -35,9 +33,5 @@ public class TimeBoundaryInfo {
 
   public String getTimeValue() {
     return _timeValue;
-  }
-
-  public boolean isExplicitlySet() {
-    return _explicitlySet;
   }
 }

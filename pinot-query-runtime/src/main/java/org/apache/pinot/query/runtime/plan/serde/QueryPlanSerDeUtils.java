@@ -99,7 +99,7 @@ public class QueryPlanSerDeUtils {
     // time boundary info
     if (!workerStageMetadata.getTimeColumn().isEmpty()) {
       stageMetadata.setTimeBoundaryInfo(new TimeBoundaryInfo(workerStageMetadata.getTimeColumn(),
-          workerStageMetadata.getTimeValue(), false));
+          workerStageMetadata.getTimeValue()));
     }
     return stageMetadata;
   }

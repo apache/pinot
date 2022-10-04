@@ -139,7 +139,7 @@ public class QueryEnvironmentTestUtils {
     when(mock.getTimeBoundaryInfo(anyString())).thenAnswer(invocation -> {
       String offlineTableName = invocation.getArgument(0);
       return "d_OFFLINE".equals(offlineTableName) ? new TimeBoundaryInfo("ts",
-          String.valueOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1)), false) : null;
+          String.valueOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))) : null;
     });
     return mock;
   }

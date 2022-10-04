@@ -88,7 +88,7 @@ import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,8 +121,8 @@ public class TablesResource {
   //swagger annotations
   @ApiOperation(value = "List tables", notes = "List all the tables on this server")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success", response = TablesList.class), @ApiResponse(code = 500, message =
-      "Server initialization error", response = ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success", response = TablesList.class),
+      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
   })
   public String listTables() {
     InstanceDataManager instanceDataManager = ServerResourceUtils.checkGetInstanceDataManager(_serverInstance);
@@ -535,42 +535,41 @@ public class TablesResource {
       "Validates if the ideal state matches with the segment state on this server")
   public TableSegmentValidationInfo validateTableSegmentState(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType) {
+      String tableNameWithType) {
     // Get table current ideal state
     IdealState tableIdealState = HelixHelper.getTableIdealState(_serverInstance.getHelixManager(), tableNameWithType);
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
 
-    // Validate segments in idealstate which belong to this server
-    long maxEndTime = -1;
+    // Validate segments in ideal state which belong to this server
+    long maxEndTimeMs = -1;
     Map<String, Map<String, String>> instanceStatesMap = tableIdealState.getRecord().getMapFields();
-    for (Map.Entry<String, Map<String, String>> kv : instanceStatesMap.entrySet()) {
-      String segmentName = kv.getKey();
-      if (kv.getValue().containsKey(_instanceId)) {
+    for (Map.Entry<String, Map<String, String>> entry : instanceStatesMap.entrySet()) {
+      String segmentState = entry.getValue().get(_instanceId);
+      if (segmentState != null) {
         // Segment hosted by this server. Validate segment state
+        String segmentName = entry.getKey();
         SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
         try {
-          String segmentState = kv.getValue().get(_instanceId);
-
           switch (segmentState) {
-            case CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING:
+            case SegmentStateModel.CONSUMING:
               // Only validate presence of segment
               if (segmentDataManager == null) {
                 return new TableSegmentValidationInfo(false, -1);
               }
               break;
-            case CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE:
+            case SegmentStateModel.ONLINE:
               // Validate segment CRC
               SegmentZKMetadata zkMetadata =
                   ZKMetadataProvider.getSegmentZKMetadata(_serverInstance.getHelixManager().getHelixPropertyStore(),
                       tableNameWithType, segmentName);
               Preconditions.checkState(zkMetadata != null,
                   "Segment zk metadata not found for segment : " + segmentName);
-              if ((segmentDataManager == null) || !segmentDataManager.getSegment().getSegmentMetadata().getCrc()
+              if (segmentDataManager == null || !segmentDataManager.getSegment().getSegmentMetadata().getCrc()
                   .equals(String.valueOf(zkMetadata.getCrc()))) {
                 return new TableSegmentValidationInfo(false, -1);
               }
-              maxEndTime = Math.max(maxEndTime, zkMetadata.getEndTimeMs());
+              maxEndTimeMs = Math.max(maxEndTimeMs, zkMetadata.getEndTimeMs());
               break;
             default:
               break;
@@ -582,6 +581,6 @@ public class TablesResource {
         }
       }
     }
-    return new TableSegmentValidationInfo(true, maxEndTime);
+    return new TableSegmentValidationInfo(true, maxEndTimeMs);
   }
 }
