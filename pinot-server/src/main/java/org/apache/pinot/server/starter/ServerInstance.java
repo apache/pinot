@@ -69,6 +69,7 @@ public class ServerInstance {
   private final QueryServer _nettyTlsQueryServer;
   private final GrpcQueryServer _grpcQueryServer;
   private final AccessControl _accessControl;
+  private final HelixManager _helixManager;
 
   private final WorkerQueryServer _workerQueryServer;
   private ChannelHandler _instanceRequestHandler;
@@ -79,6 +80,7 @@ public class ServerInstance {
   public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory)
       throws Exception {
     LOGGER.info("Initializing server instance");
+    _helixManager = helixManager;
 
     LOGGER.info("Initializing server metrics");
     PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(serverConf.getMetricsConfig());
@@ -277,5 +279,9 @@ public class ServerInstance {
     Preconditions.checkState(_instanceRequestHandler instanceof InstanceRequestHandler,
         "Unexpected type of instance request handler");
     return (InstanceRequestHandler) _instanceRequestHandler;
+  }
+
+  public HelixManager getHelixManager() {
+    return _helixManager;
   }
 }
