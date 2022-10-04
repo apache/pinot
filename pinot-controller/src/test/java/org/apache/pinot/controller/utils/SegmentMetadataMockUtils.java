@@ -101,6 +101,7 @@ public class SegmentMetadataMockUtils {
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
     Mockito.when(segmentMetadata.getStartTime()).thenReturn(endTime - 10);
     Mockito.when(segmentMetadata.getEndTime()).thenReturn(endTime);
+    Mockito.when(segmentMetadata.getTimeColumn()).thenReturn(tableName);
     Mockito.when(segmentMetadata.getTimeInterval()).thenReturn(
         new Interval(TimeUnit.MILLISECONDS.convert(endTime - 10, TimeUnit.DAYS),
             TimeUnit.MILLISECONDS.convert(endTime, TimeUnit.DAYS)));
