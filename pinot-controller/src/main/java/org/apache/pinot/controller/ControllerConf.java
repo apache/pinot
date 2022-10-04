@@ -148,6 +148,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.minion.task.metrics.emitter.frequencyPeriod";
 
     public static final String PINOT_TASK_MANAGER_SCHEDULER_ENABLED = "controller.task.scheduler.enabled";
+    // This is the expiry for the ended tasks. Helix cleans up the task info from ZK after the expiry time from the
+    // end of the task.
     public static final String PINOT_TASK_EXPIRE_TIME_MS = "controller.task.expire.time.ms";
 
     @Deprecated
