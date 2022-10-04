@@ -87,18 +87,16 @@ public class ZKMetadataUtils {
     if (segmentMetadata.getTimeInterval() != null) {
       segmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
       segmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
-      segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
-      setRawTimeInterval(segmentZKMetadata, segmentMetadata);
     } else {
       segmentZKMetadata.setStartTime(-1);
       segmentZKMetadata.setEndTime(-1);
-      if (segmentMetadata.getTimeColumn() != null) {
-        segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
-        setRawTimeInterval(segmentZKMetadata, segmentMetadata);
-      } else {
-        segmentZKMetadata.setTimeUnit(null);
-      }
     }
+
+    if (segmentMetadata.getTimeColumn() != null) {
+      segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+      setRawTimeInterval(segmentZKMetadata, segmentMetadata);
+    }
+
     segmentZKMetadata.setIndexVersion(
         segmentMetadata.getVersion() != null ? segmentMetadata.getVersion().name() : null);
     segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());

@@ -147,7 +147,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       List<SegmentZKMetadata> preSelectedSegments = new ArrayList<>();
       for (SegmentZKMetadata segment : allSegments) {
         if (preSelectedSegmentsBasedOnLineage.contains(segment.getSegmentName()) && segment.getTotalDocs() > 0
-            && MergeTaskUtils.allowMerge(segment) && segment.getStartTimeMs() != -1 && segment.getEndTimeMs() != -1) {
+            && MergeTaskUtils.allowMerge(segment) && TimeUtils.timeValueInValidRange(segment.getStartTimeMs())
+            && TimeUtils.timeValueInValidRange(segment.getEndTimeMs())) {
           preSelectedSegments.add(segment);
         }
       }

@@ -306,7 +306,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       long minStartTimeMs = Long.MAX_VALUE;
       for (SegmentZKMetadata segmentZKMetadata : completedSegmentsZKMetadata) {
         long startTimeMs = segmentZKMetadata.getStartTimeMs();
-        if (startTimeMs != -1) {
+        if (TimeUtils.timeValueInValidRange(startTimeMs)) {
           minStartTimeMs = Math.min(minStartTimeMs, startTimeMs);
         }
       }

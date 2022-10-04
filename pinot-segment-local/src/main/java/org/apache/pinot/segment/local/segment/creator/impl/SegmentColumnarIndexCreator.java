@@ -739,8 +739,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 endTime = dateTimeFormatter.parseMillis(endTimeStr);
               } catch (Exception e) {
                 if (_config.isContinueOnError()) {
-                  startTime = Long.MIN_VALUE;
-                  endTime = Long.MAX_VALUE;
+                  startTime = -1;
+                  endTime = -1;
                 } else {
                   throw new RuntimeException("Error occurred while parsing datetime", e);
                 }
@@ -753,8 +753,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 endTime = Long.parseLong(endTimeStr);
               } catch (Exception e) {
                 if (_config.isContinueOnError()) {
-                  startTime = Long.MIN_VALUE;
-                  endTime = Long.MAX_VALUE;
+                  startTime = -1;
+                  endTime = -1;
                 } else {
                   throw new RuntimeException("Error occurred while parsing datetime", e);
                 }
