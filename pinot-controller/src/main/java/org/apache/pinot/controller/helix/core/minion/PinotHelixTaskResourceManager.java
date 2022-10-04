@@ -83,10 +83,17 @@ public class PinotHelixTaskResourceManager {
 
   private final TaskDriver _taskDriver;
   private final PinotHelixResourceManager _helixResourceManager;
+  private final long _taskExpireTimeMs;
 
   public PinotHelixTaskResourceManager(PinotHelixResourceManager helixResourceManager, TaskDriver taskDriver) {
+    this(helixResourceManager, taskDriver, TimeUnit.HOURS.toMillis(24));
+  }
+
+  public PinotHelixTaskResourceManager(PinotHelixResourceManager helixResourceManager, TaskDriver taskDriver,
+      long taskExpireTimeMs) {
     _helixResourceManager = helixResourceManager;
     _taskDriver = taskDriver;
+    _taskExpireTimeMs = taskExpireTimeMs;
   }
 
   /**
@@ -288,7 +295,8 @@ public class PinotHelixTaskResourceManager {
     JobConfig.Builder jobBuilder =
         new JobConfig.Builder().addTaskConfigs(helixTaskConfigs).setInstanceGroupTag(minionInstanceTag)
             .setTimeoutPerTask(taskTimeoutMs).setNumConcurrentTasksPerInstance(numConcurrentTasksPerInstance)
-            .setIgnoreDependentJobFailure(true).setMaxAttemptsPerTask(1).setFailureThreshold(Integer.MAX_VALUE);
+            .setIgnoreDependentJobFailure(true).setMaxAttemptsPerTask(1).setFailureThreshold(Integer.MAX_VALUE)
+            .setExpiry(_taskExpireTimeMs);
     _taskDriver.enqueueJob(getHelixJobQueueName(taskType), parentTaskName, jobBuilder);
 
     // Wait until task state is available

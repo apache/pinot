@@ -148,6 +148,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.minion.task.metrics.emitter.frequencyPeriod";
 
     public static final String PINOT_TASK_MANAGER_SCHEDULER_ENABLED = "controller.task.scheduler.enabled";
+    public static final String PINOT_TASK_EXPIRE_TIME_MS = "controller.task.expire.time.ms";
+
     @Deprecated
     // RealtimeSegmentRelocator has been rebranded as SegmentRelocator
     public static final String DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY =
@@ -823,6 +825,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isPinotTaskManagerSchedulerEnabled() {
     return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
+  }
+
+  public long getPinotTaskExpireTimeInMs() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS, TimeUnit.HOURS.toMillis(24));
   }
 
   /**
