@@ -112,7 +112,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     try {
       _receivingBuffer.offer(Mailbox.MailboxContent.newBuilder()
           .setPayload(ByteString.copyFrom(
-              TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(e)).getDataBlockBytes()))
+              TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(e)).getDataBlock().toBytes()))
           .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build());
       throw new RuntimeException(e);
     } catch (IOException ioe) {

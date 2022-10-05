@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
@@ -43,6 +42,7 @@ public class TransferableBlock implements Block {
   private final BaseDataBlock.Type _type;
   private final DataSchema _dataSchema;
   private final boolean _isErrorBlock;
+  private final int _numRows;
 
   private BaseDataBlock _dataBlock;
   private List<Object[]> _container;
@@ -58,6 +58,7 @@ public class TransferableBlock implements Block {
     _dataSchema = dataSchema;
     _type = containerType;
     _isErrorBlock = isErrorBlock;
+    _numRows = _container.size();
   }
 
   public TransferableBlock(BaseDataBlock dataBlock) {
@@ -66,6 +67,11 @@ public class TransferableBlock implements Block {
     _type = dataBlock instanceof ColumnarDataBlock ? BaseDataBlock.Type.COLUMNAR
         : dataBlock instanceof RowDataBlock ? BaseDataBlock.Type.ROW : BaseDataBlock.Type.METADATA;
     _isErrorBlock = !_dataBlock.getExceptions().isEmpty();
+    _numRows = _dataBlock.getNumberOfRows();
+  }
+
+  public int getNumRows() {
+    return _numRows;
   }
 
   public DataSchema getDataSchema() {
@@ -155,10 +161,12 @@ public class TransferableBlock implements Block {
     return _isErrorBlock;
   }
 
-  // Only support data block based construction or container based construction for row or columnar format.
-  public byte[] getDataBlockBytes()
-      throws IOException {
-    return getDataBlock().toBytes();
+  boolean isContainerBlock() {
+    return _container != null;
+  }
+
+  boolean isDataBlock() {
+    return _dataBlock != null;
   }
 
   @Override

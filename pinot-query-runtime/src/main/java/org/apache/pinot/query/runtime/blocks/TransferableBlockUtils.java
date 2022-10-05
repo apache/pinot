@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
-import java.io.IOException;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 public final class TransferableBlockUtils {
@@ -57,52 +59,32 @@ public final class TransferableBlockUtils {
    *
    *  When row size is greater than maxBlockSize, we pack each row as a separate block.
    */
-  public static List<BaseDataBlock> getDataBlockChunks(BaseDataBlock block, BaseDataBlock.Type type, int maxBlockSize)
-      throws IOException {
-    List<BaseDataBlock> blockChunks = new ArrayList<>();
-    switch (type) {
-      // TODO: Add support for columnar data block.
-      case COLUMNAR:
-        blockChunks.add(block);
-        return blockChunks;
-      case METADATA:
-        throw new UnsupportedOperationException("splitBlock is not supported for metdata block.");
-      case ROW:
-        break;
-      default:
-        throw new UnsupportedOperationException("splitBlock is not supported for type:" + type);
-    }
-    // TODO: Store row size in bytes inside data block.
-    // TODO: Calculate dictionary and var bytes size as well.
-    DataSchema dataSchema = block.getDataSchema();
-    int[] columnOffsets = new int[dataSchema.size()];
-    int rowSizeInBytes = DataBlockUtils.computeColumnOffsets(dataSchema, columnOffsets);
-    List<Object[]> chunk = new ArrayList<>();
-    int numRowsPerChunk = maxBlockSize / rowSizeInBytes;
-    long numRows = 0;
-    List<Object[]> container = DataBlockUtils.extractRows(block);
-    for (Object[] unit : container) {
-      // When rowSizeInBytes is greater than maxBlockSize, send one row per block.
-      if (numRowsPerChunk == 0) {
-        chunk.add(unit);
-        blockChunks.add(DataBlockBuilder.buildFromRows(chunk, dataSchema));
-        chunk = new ArrayList<>();
-        continue;
+  public static List<TransferableBlock> splitBlock(TransferableBlock block, BaseDataBlock.Type type, int maxBlockSize) {
+    List<TransferableBlock> blockChunks = new ArrayList<>();
+    if (type != BaseDataBlock.Type.ROW) {
+      return Collections.singletonList(block);
+    } else {
+      int rowSizeInBytes = ((RowDataBlock) block.getDataBlock()).getRowSizeInBytes();
+      int numRowsPerChunk = maxBlockSize / rowSizeInBytes;
+      Preconditions.checkState(numRowsPerChunk > 0, "row size too large for query engine to handle, abort!");
+
+      int totalNumRows = block.getNumRows();
+      List<Object[]> allRows = block.getContainer();
+      int currentRow = 0;
+      while (currentRow < totalNumRows) {
+        List<Object[]> chunk = allRows.subList(currentRow, Math.min(currentRow + numRowsPerChunk, allRows.size()));
+        currentRow += numRowsPerChunk;
+        blockChunks.add(new TransferableBlock(chunk, block.getDataSchema(), block.getType()));
       }
-      if (numRows < numRowsPerChunk) {
-        chunk.add(unit);
-        ++numRows;
-      }
-      if (numRows == numRowsPerChunk) {
-        blockChunks.add(DataBlockBuilder.buildFromRows(chunk, dataSchema));
-        numRows = 0;
-        chunk = new ArrayList<>();
-      }
-    }
-    // Send last chunk.
-    if (numRows > 0) {
-      blockChunks.add(DataBlockBuilder.buildFromRows(chunk, dataSchema));
     }
     return blockChunks;
+  }
+
+  public static Object[] getRow(TransferableBlock transferableBlock, int rowId) {
+    if (transferableBlock.isContainerBlock() && transferableBlock.getType() == BaseDataBlock.Type.ROW) {
+      return transferableBlock.getContainer().get(rowId);
+    } else {
+      return SelectionOperatorUtils.extractRowFromDataTable(transferableBlock.getDataBlock(), rowId);
+    }
   }
 }

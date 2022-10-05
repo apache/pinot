@@ -85,5 +85,9 @@ public class RowDataBlock extends BaseDataBlock {
     return new RowDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
 
+  public int getRowSizeInBytes() {
+    return _rowSizeInBytes;
+  }
+
   // TODO: add whole-row access methods.
 }

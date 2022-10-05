@@ -27,7 +27,6 @@ import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -83,8 +82,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Setting data table version to 4
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    // Set the block size so that some rows need to be splitted and some not.
-    MailboxSendOperator.testOnlySetMaxBlockSize(50);
   }
 
   @Test
