@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.apache.commons.lang3.SerializationUtils;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -37,7 +41,53 @@ public class PrimaryKey {
   }
 
   public byte[] asBytes() {
-    return SerializationUtils.serialize(_values);
+    int arraySize = 0;
+    byte[][] cache = new byte[_values.length][];
+    for (int i = 0; i < _values.length; i++) {
+      Object value = _values[i];
+      if (value instanceof Integer) {
+        arraySize += Integer.BYTES;
+      } else if (value instanceof Double) {
+        arraySize += Double.BYTES;
+      } else if (value instanceof Float) {
+        arraySize += Float.BYTES;
+      } else if (value instanceof Long) {
+        arraySize += Long.BYTES;
+      } else if (value instanceof String) {
+        cache[i] = ((String) value).getBytes(StandardCharsets.UTF_8);
+        arraySize += cache[i].length;
+      } else if (value instanceof BigDecimal) {
+        cache[i] = BigDecimalUtils.serialize((BigDecimal) value);
+        arraySize += cache[i].length;
+      } else if (value instanceof byte[]) {
+        arraySize += ((byte[]) value).length;
+      } else {
+        throw new IllegalStateException("Data type not supported for serializing Primary Key");
+      }
+    }
+
+    ByteBuffer byteBuffer = ByteBuffer.allocate(arraySize);
+    for (int i = 0; i < _values.length; i++) {
+      Object value = _values[i];
+      if (value instanceof Integer) {
+        byteBuffer.putInt((Integer) value);
+      } else if (value instanceof Double) {
+        byteBuffer.putDouble((Double) value);
+      } else if (value instanceof Float) {
+        byteBuffer.putFloat((Float) value);
+      } else if (value instanceof Long) {
+        byteBuffer.putLong((Long) value);
+      } else if (value instanceof String) {
+        byteBuffer.put(cache[i]);
+      } else if (value instanceof BigDecimal) {
+        byteBuffer.put(cache[i]);
+      } else if (value instanceof byte[]) {
+        byteBuffer.put(cache[i]);
+      } else {
+        throw new IllegalStateException("Data type not supported for serializing Primary Key");
+      }
+    }
+    return byteBuffer.array();
   }
 
   @Override
