@@ -379,12 +379,24 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
                   argument);
               return false;
             }
+            // TODO: Support creation of derived columns from forward index disabled columns
+            if (!_segmentWriter.hasIndexFor(argument, ColumnIndexType.FORWARD_INDEX)) {
+              LOGGER.warn("Skip creating derived column: {} because argument: {} does not have a forward index", column,
+                  argument);
+              return false;
+            }
             argumentsMetadata.add(columnMetadata);
           }
 
           // TODO: Support raw derived column
           if (_indexLoadingConfig.getNoDictionaryColumns().contains(column)) {
             LOGGER.warn("Skip creating raw derived column: {}", column);
+            return false;
+          }
+
+          // TODO: Support forward index disabled derived column
+          if (_indexLoadingConfig.getForwardIndexDisabledColumns().contains(column)) {
+            LOGGER.warn("Skip creating forward index disabled derived column: {}", column);
             return false;
           }
 
