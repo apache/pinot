@@ -525,8 +525,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
       try (
           MultiValueUnsortedForwardIndexCreator mvFwdIndexCreator = new MultiValueUnsortedForwardIndexCreator(_indexDir,
-              fieldSpec.getName(), 1/*cardinality*/, totalDocs/*numDocs*/,
-          totalDocs/*totalNumberOfValues*/)) {
+              fieldSpec.getName(), 1/*cardinality*/, totalDocs/*numDocs*/, totalDocs/*totalNumberOfValues*/)) {
         int[] dictIds = {0};
         for (int docId = 0; docId < totalDocs; docId++) {
           mvFwdIndexCreator.putDictIdMV(dictIds);
