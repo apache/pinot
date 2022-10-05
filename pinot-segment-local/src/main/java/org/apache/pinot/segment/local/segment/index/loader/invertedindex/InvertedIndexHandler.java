@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
@@ -35,7 +34,6 @@ import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.InvertedIndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -134,46 +132,22 @@ public class InvertedIndexHandler implements IndexHandler {
     try (DictionaryBasedInvertedIndexCreator creator = indexCreatorProvider.newInvertedIndexCreator(
         IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
             .forInvertedIndex())) {
-      boolean forwardIndexDisabled = !segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
-      if (forwardIndexDisabled) {
-        try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
-          // Create the inverted index if the dictionary length is 1 as this is for a default column (i.e. newly added
-          // column). For existing columns it is not possible to create the inverted index without forward index
-          Preconditions.checkState(dictionary.length() == 1, String.format("Creating inverted index for forward "
-              + "index disabled default column: %s, dictionary size must be 1", columnName));
-          if (columnMetadata.isSingleValue()) {
-            for (int i = 0; i < numDocs; i++) {
-              creator.add(0);
-            }
-          } else {
-            Preconditions.checkState(columnMetadata.getMaxNumberOfMultiValues() == 1
-                && columnMetadata.getTotalNumberOfEntries() == numDocs, "Creating inverted index for forward index "
-                + "disabled default column only, MV column has too many entries");
-            int[] dictIds = new int[]{0};
-            for (int i = 0; i < numDocs; i++) {
-              creator.add(dictIds, 1);
-            }
+      try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
+          ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
+        if (columnMetadata.isSingleValue()) {
+          // Single-value column.
+          for (int i = 0; i < numDocs; i++) {
+            creator.add(forwardIndexReader.getDictId(i, readerContext));
           }
-          creator.seal();
-        }
-      } else {
-        try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
-            ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
-          if (columnMetadata.isSingleValue()) {
-            // Single-value column.
-            for (int i = 0; i < numDocs; i++) {
-              creator.add(forwardIndexReader.getDictId(i, readerContext));
-            }
-          } else {
-            // Multi-value column.
-            int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-            for (int i = 0; i < numDocs; i++) {
-              int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-              creator.add(dictIds, length);
-            }
+        } else {
+          // Multi-value column.
+          int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+          for (int i = 0; i < numDocs; i++) {
+            int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
+            creator.add(dictIds, length);
           }
-          creator.seal();
         }
+        creator.seal();
       }
     }
 

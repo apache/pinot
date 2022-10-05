@@ -61,21 +61,18 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     // Write index to V3 format
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     Preconditions.checkNotNull(fieldSpec);
-    boolean forwardIndexDisabled = isForwardIndexDisabled(column);
-    if (!forwardIndexDisabled) {
-      boolean isSingleValue = fieldSpec.isSingleValueField();
-      File forwardIndexFile;
-      if (isSingleValue) {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-        if (!forwardIndexFile.exists()) {
-          forwardIndexFile = new File(_indexDir,
-              column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-        }
-      } else {
-        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+    boolean isSingleValue = fieldSpec.isSingleValueField();
+    File forwardIndexFile;
+    if (isSingleValue) {
+      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+      if (!forwardIndexFile.exists()) {
+        forwardIndexFile = new File(_indexDir,
+            column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
-      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+    } else {
+      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
     }
+    LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
     File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
     LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
     return true;

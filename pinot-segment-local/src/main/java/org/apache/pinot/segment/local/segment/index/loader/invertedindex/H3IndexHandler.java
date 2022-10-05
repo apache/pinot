@@ -155,31 +155,18 @@ public class H3IndexHandler implements IndexHandler {
       throws IOException {
     File indexDir = _segmentMetadata.getIndexDir();
     String columnName = columnMetadata.getColumnName();
-    int numDocs = columnMetadata.getTotalDocs();
-    try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
+        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
+        Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata);
         GeoSpatialIndexCreator h3IndexCreator = indexCreatorProvider.newGeoSpatialIndexCreator(
             IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
                 .build().forGeospatialIndex(_h3Configs.get(columnName)))) {
-      boolean forwardIndexDisabled = !segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
-      if (forwardIndexDisabled) {
-        // Create the h3 index if the dictionary length is 1 as this is for a default column (i.e. newly added
-        // column). For existing columns it is not possible to create the h3 index without forward index
-        Preconditions.checkState(dictionary.length() == 1, String.format("Creating h3 index for forward index "
-            + "disabled default column: %s, dictionary size must be 1", columnName));
-        for (int i = 0; i < numDocs; i++) {
-          h3IndexCreator.add(GeometrySerializer.deserialize(dictionary.getBytesValue(0)));
-        }
-        h3IndexCreator.seal();
-      } else {
-        try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
-            ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
-          for (int i = 0; i < numDocs; i++) {
-            int dictId = forwardIndexReader.getDictId(i, readerContext);
-            h3IndexCreator.add(GeometrySerializer.deserialize(dictionary.getBytesValue(dictId)));
-          }
-          h3IndexCreator.seal();
-        }
+      int numDocs = columnMetadata.getTotalDocs();
+      for (int i = 0; i < numDocs; i++) {
+        int dictId = forwardIndexReader.getDictId(i, readerContext);
+        h3IndexCreator.add(GeometrySerializer.deserialize(dictionary.getBytesValue(dictId)));
       }
+      h3IndexCreator.seal();
     }
   }
 
