@@ -51,6 +51,10 @@ public final class TierConfigUtils {
     return CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList());
   }
 
+  public static String normalizeTierName(String tierName) {
+    return tierName == null ? "default" : tierName;
+  }
+
   public static String getDataDirForTier(TableConfig tableConfig, String tierName) {
     String tableNameWithType = tableConfig.getTableName();
     List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();

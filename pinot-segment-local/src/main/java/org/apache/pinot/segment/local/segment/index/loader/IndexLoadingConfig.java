@@ -93,7 +93,9 @@ public class IndexLoadingConfig {
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
   private TableConfig _tableConfig;
+  private String _tableDataDir;
   private String _segmentDirectoryLoader;
+  private String _segmentTier;
 
   private String _instanceId;
 
@@ -645,5 +647,21 @@ public class IndexLoadingConfig {
 
   public String getInstanceId() {
     return _instanceId;
+  }
+
+  public void setTableDataDir(String tableDataDir) {
+    _tableDataDir = tableDataDir;
+  }
+
+  public String getTableDataDir() {
+    return _tableDataDir;
+  }
+
+  public void setSegmentTier(String segmentTier) {
+    _segmentTier = segmentTier;
+  }
+
+  public String getSegmentTier() {
+    return _segmentTier;
   }
 }

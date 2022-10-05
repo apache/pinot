@@ -22,10 +22,8 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -155,13 +153,9 @@ public class BaseTableDataManagerTest {
     tmgr = createTableManager();
     IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
     tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false);
-    File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
+    File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg.getTableConfig());
     assertTrue(segDirOnTier.exists());
-    // A tier track file is put into the default seg dir, and nothing else.
-    Collection<File> filesInDefaultSegDir = FileUtils.listFiles(defaultSegDir, null, true);
-    assertEquals(filesInDefaultSegDir.size(), 1);
-    File tierTrackFile = filesInDefaultSegDir.iterator().next();
-    assertEquals(FileUtils.readFileToString(tierTrackFile, StandardCharsets.UTF_8), tierName);
+    assertFalse(defaultSegDir.exists());
     llmd = new SegmentMetadataImpl(segDirOnTier);
     assertEquals(llmd.getTotalDocs(), 5);
     assertEquals(llmd.getIndexDir(), segDirOnTier);
@@ -228,13 +222,9 @@ public class BaseTableDataManagerTest {
     tmgr = createTableManager();
     IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
     tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false);
-    File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
+    File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg.getTableConfig());
     assertTrue(segDirOnTier.exists());
-    // A tier track file is put into the default seg dir, and nothing else.
-    Collection<File> filesInDefaultSegDir = FileUtils.listFiles(localSegDir, null, true);
-    assertEquals(filesInDefaultSegDir.size(), 1);
-    File tierTrackFile = filesInDefaultSegDir.iterator().next();
-    assertEquals(FileUtils.readFileToString(tierTrackFile, StandardCharsets.UTF_8), tierName);
+    assertFalse(localSegDir.exists());
     llmd = new SegmentMetadataImpl(segDirOnTier);
     assertEquals(llmd.getTotalDocs(), 5);
     assertEquals(llmd.getIndexDir(), segDirOnTier);
@@ -377,13 +367,9 @@ public class BaseTableDataManagerTest {
     tmgr = createTableManager();
     IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
     tmgr.addOrReplaceSegment(segName, loadingCfg, zkmd, llmd);
-    File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
+    File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg.getTableConfig());
     assertTrue(segDirOnTier.exists());
-    // A tier track file is put into the default seg dir, and nothing else.
-    Collection<File> filesInDefaultSegDir = FileUtils.listFiles(defaultSegDir, null, true);
-    assertEquals(filesInDefaultSegDir.size(), 1);
-    File tierTrackFile = filesInDefaultSegDir.iterator().next();
-    assertEquals(FileUtils.readFileToString(tierTrackFile, StandardCharsets.UTF_8), tierName);
+    assertFalse(defaultSegDir.exists());
     llmd = new SegmentMetadataImpl(segDirOnTier);
     assertEquals(llmd.getTotalDocs(), 5);
     assertEquals(llmd.getIndexDir(), segDirOnTier);
@@ -461,7 +447,7 @@ public class BaseTableDataManagerTest {
     // Configured dataDir for coolTier, thus move to new dir.
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
     IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
-    File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
+    File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg.getTableConfig());
     assertFalse(segDirOnTier.exists());
     // Move segDir to new tier to see if addOrReplaceSegment() can load segDir from new tier directly.
     FileUtils.moveDirectory(localSegDir, segDirOnTier);
