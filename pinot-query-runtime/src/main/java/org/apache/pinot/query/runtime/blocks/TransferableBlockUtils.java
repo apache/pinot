@@ -18,9 +18,16 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 public final class TransferableBlockUtils {
@@ -42,5 +49,42 @@ public final class TransferableBlockUtils {
 
   public static boolean isEndOfStream(TransferableBlock transferableBlock) {
     return transferableBlock.isEndOfStreamBlock();
+  }
+
+  /**
+   *  Split a block into multiple block so that each block size is within maxBlockSize.
+   *  Currently, we only support split for row type dataBlock.
+   *  For columnar data block, we return the original data block.
+   *  Metadata data block split is not supported.
+   *
+   *  When row size is greater than maxBlockSize, we pack each row as a separate block.
+   */
+  public static List<TransferableBlock> splitBlock(TransferableBlock block, BaseDataBlock.Type type, int maxBlockSize) {
+    List<TransferableBlock> blockChunks = new ArrayList<>();
+    if (type != BaseDataBlock.Type.ROW) {
+      return Collections.singletonList(block);
+    } else {
+      int rowSizeInBytes = ((RowDataBlock) block.getDataBlock()).getRowSizeInBytes();
+      int numRowsPerChunk = maxBlockSize / rowSizeInBytes;
+      Preconditions.checkState(numRowsPerChunk > 0, "row size too large for query engine to handle, abort!");
+
+      int totalNumRows = block.getNumRows();
+      List<Object[]> allRows = block.getContainer();
+      int currentRow = 0;
+      while (currentRow < totalNumRows) {
+        List<Object[]> chunk = allRows.subList(currentRow, Math.min(currentRow + numRowsPerChunk, allRows.size()));
+        currentRow += numRowsPerChunk;
+        blockChunks.add(new TransferableBlock(chunk, block.getDataSchema(), block.getType()));
+      }
+    }
+    return blockChunks;
+  }
+
+  public static Object[] getRow(TransferableBlock transferableBlock, int rowId) {
+    if (transferableBlock.isContainerBlock() && transferableBlock.getType() == BaseDataBlock.Type.ROW) {
+      return transferableBlock.getContainer().get(rowId);
+    } else {
+      return SelectionOperatorUtils.extractRowFromDataTable(transferableBlock.getDataBlock(), rowId);
+    }
   }
 }
