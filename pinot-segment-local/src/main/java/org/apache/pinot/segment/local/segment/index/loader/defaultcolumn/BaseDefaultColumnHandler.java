@@ -512,8 +512,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     if (isSingleValue) {
       // Single-value column.
 
-      try (SingleValueSortedForwardIndexCreator svFwdIndexCreator = new SingleValueSortedForwardIndexCreator(
-          _indexDir, fieldSpec.getName(), 1/*cardinality*/)) {
+      try (SingleValueSortedForwardIndexCreator svFwdIndexCreator = new SingleValueSortedForwardIndexCreator(_indexDir,
+          fieldSpec.getName(), 1/*cardinality*/)) {
         for (int docId = 0; docId < totalDocs; docId++) {
           svFwdIndexCreator.putDictId(0);
         }
@@ -523,8 +523,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       //       multi-value column.
       // Multi-value column.
 
-      try (MultiValueUnsortedForwardIndexCreator mvFwdIndexCreator = new MultiValueUnsortedForwardIndexCreator(
-          _indexDir, fieldSpec.getName(), 1/*cardinality*/, totalDocs/*numDocs*/,
+      try (
+          MultiValueUnsortedForwardIndexCreator mvFwdIndexCreator = new MultiValueUnsortedForwardIndexCreator(_indexDir,
+              fieldSpec.getName(), 1/*cardinality*/, totalDocs/*numDocs*/,
           totalDocs/*totalNumberOfValues*/)) {
         int[] dictIds = {0};
         for (int docId = 0; docId < totalDocs; docId++) {
