@@ -163,7 +163,11 @@ public class DictionaryOptimiserTest {
 
       final FieldSpec fieldSpec;
       if ((pinotType != null && "METRIC".equals(pinotType)) || columnName.contains("cardinality")) {
-        fieldSpec = new MetricFieldSpec();
+        if (field.schema().isUnion() && isDoubleOrFloat(field)) {
+          fieldSpec = new MetricFieldSpec();
+        } else {
+          fieldSpec = new DimensionFieldSpec();
+        }
       } else {
         fieldSpec = new DimensionFieldSpec();
       }
@@ -176,5 +180,10 @@ public class DictionaryOptimiserTest {
 
     dataStream.close();
     return schema;
+  }
+
+  private static boolean isDoubleOrFloat(org.apache.avro.Schema.Field field) {
+    return field.schema().getTypes().contains(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE))
+        || field.schema().getTypes().contains(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.FLOAT));
   }
 }
