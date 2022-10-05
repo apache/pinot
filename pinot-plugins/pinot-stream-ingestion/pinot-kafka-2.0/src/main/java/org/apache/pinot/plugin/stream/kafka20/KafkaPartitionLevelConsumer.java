@@ -58,8 +58,6 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       LOGGER.debug("poll consumer: {}, startOffset: {}, endOffset:{} timeout: {}ms", _topicPartition, startOffset,
           endOffset, timeoutMillis);
     }
-    LOGGER.warn("poll consumer: {}, startOffset: {}, endOffset:{} timeout: {}ms", _topicPartition, startOffset,
-        endOffset, timeoutMillis);
     _consumer.seek(_topicPartition, startOffset);
     ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMillis));
     List<ConsumerRecord<String, Bytes>> messageAndOffsets = consumerRecords.records(_topicPartition);
@@ -73,8 +71,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       if (offset >= startOffset & (endOffset > offset | endOffset == -1)) {
         if (message != null) {
           StreamMessageMetadata rowMetadata = (StreamMessageMetadata) _kafkaMetadataExtractor.extract(messageAndOffset);
-          filtered.add(
-              new KafkaStreamMessage(keyBytes, message.get(), rowMetadata));
+          filtered.add(new KafkaStreamMessage(keyBytes, message.get(), rowMetadata));
         } else if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("tombstone message at offset {}", offset);
         }
