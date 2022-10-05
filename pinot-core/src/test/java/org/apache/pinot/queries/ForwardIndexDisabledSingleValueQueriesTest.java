@@ -47,6 +47,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -54,7 +55,6 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -224,10 +224,22 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
   @Test
   public void testSelectStarQueries() {
     // Select * without any filters
-    assertThrows(IllegalStateException.class, () -> getBrokerResponse(SELECT_STAR_QUERY));
+    try {
+      getBrokerResponse(SELECT_STAR_QUERY);
+      Assert.fail("Select * query should fail since forwardIndexDisabled on a select column");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Forward index disabled for column:")
+          && e.getMessage().contains("cannot create DataFetcher!"));
+    }
 
     // Select * with filters
-    assertThrows(IllegalStateException.class, () -> getBrokerResponse(SELECT_STAR_QUERY + FILTER));
+    try {
+      getBrokerResponse(SELECT_STAR_QUERY + FILTER);
+      Assert.fail("Select * query should fail since forwardIndexDisabled on a select column");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Forward index disabled for column:")
+          && e.getMessage().contains("cannot create DataFetcher!"));
+    }
   }
 
   @Test
@@ -235,22 +247,46 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     {
       // Selection query without filters including a column with forwardIndexDisabled enabled on both segments
       String query = "SELECT column1, column5, column6, column9, column11 FROM testTable";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a select column");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Selection query without filters including a column with forwardIndexDisabled enabled on one segment
       String query = "SELECT column1, column5, column7, column9, column11 FROM testTable";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a select column");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Selection query with filters including a column with forwardIndexDisabled enabled on both segments
       String query = "SELECT column1, column5, column6, column9, column11 FROM testTable WHERE column6 = 2147458029";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a select column");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Selection query with filters including a column with forwardIndexDisabled enabled on one segment
       String query = "SELECT column1, column5, column7, column9, column11 FROM testTable WHERE column7 = 675695";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a select column");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Selection query without filters and without columns with forwardIndexDisabled enabled on either segment
@@ -289,7 +325,13 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     {
       // Transform function on a selection clause with a forwardIndexDisabled column in transform
       String query = "SELECT CONCAT(column6, column9, '-') from testTable";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in transform");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Transform function on a selection clause without a forwardIndexDisabled column in transform
@@ -550,7 +592,13 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     {
       // Selection query with '>=' filter on a forwardIndexDisabled column without range index available
       String query = "SELECT column1, column5, column9, column11 FROM testTable WHERE column7 >= 676000";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a range query column without range index");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("creating ScanDocIdSet unsupported!"));
+      }
     }
     {
       // Select query with a filter on a column which doesn't have forwardIndexDisabled enabled
@@ -620,7 +668,13 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     {
       // Select a mix of forwardIndexDisabled and non-forwardIndexDisabled columns with distinct
       String query = "SELECT DISTINCT column1, column6, column9 FROM testTable LIMIT 10";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in select distinct");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Select non-forwardIndexDisabled columns with distinct
@@ -658,13 +712,25 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       // Select a mix of forwardIndexDisabled and non-forwardIndexDisabled columns with group by order by
       String query = "SELECT column1, column6 FROM testTable GROUP BY column1, column6 ORDER BY column1, column6 "
           + " LIMIT 10";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in select group by order by");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Select forwardIndexDisabled columns with group by order by
       String query = "SELECT column7, column6 FROM testTable GROUP BY column7, column6 ORDER BY column7, column6 "
           + " LIMIT 10";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in select group by order by");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Select non-forwardIndexDisabled columns with group by order by
@@ -698,7 +764,13 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       // Select forwardIndexDisabled columns using transform with group by order by
       String query = "SELECT CONCAT(column1, column6, '-') FROM testTable GROUP BY CONCAT(column1, column6, '-') "
           + "ORDER BY CONCAT(column1, column6, '-') LIMIT 10";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a transformed column in group by order by");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Select non-forwardIndexDisabled columns using transform with group by order by
@@ -768,37 +840,73 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     {
       // Not allowed aggregation functions on forwardIndexDisabled columns
       String query = "SELECT sum(column7), avg(column6) from testTable";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in unsupported aggregation query");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Allowed aggregation functions on forwardIndexDisabled columns with group by on non-forwardIndexDisabled
-      // column - this fails due to indexTable being null in `GroupByOrderByCombineOperator`.
+      // column
       String query = "SELECT column1, max(column6) from testTable GROUP BY column1";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in unsupported aggregation query");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Allowed aggregation functions on forwardIndexDisabled columns with group by order by on
-      // non-forwardIndexDisabled column - this fails due to indexTable being null in `GroupByOrderByCombineOperator`.
+      // non-forwardIndexDisabled column
       String query = "SELECT column1, max(column6) from testTable GROUP BY column1 ORDER BY column1";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in unsupported aggregation query");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Allowed aggregation functions on non-forwardIndexDisabled columns with group by on non-forwardIndexDisabled
       // column but order by on allowed aggregation function on forwardIndexDisabled column
       String query = "SELECT column1, max(column9) from testTable GROUP BY column1 ORDER BY min(column6)";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in unsupported aggregation query");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Allowed aggregation functions on forwardIndexDisabled columns with a filter - results in trying to scan which
       // fails
       String query = "SELECT max(column7), min(column6) from testTable WHERE column7 = 675695";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in unsupported aggregation query");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Allowed aggregation functions on forwardIndexDisabled columns with a filter - results in trying to scan which
       // fails
       String query = "SELECT max(column1), min(column6) from testTable WHERE column1 > 675695";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in unsupported aggregation query");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Allowed aggregation functions on non-forwardIndexDisabled columns with a filter on a forwardIndexDisabled
@@ -857,16 +965,27 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     }
     {
       // Allowed aggregation functions on non-forwardIndexDisabled columns with a filter on a forwardIndexDisabled
-      // column and group by on non-forwardIndexDisabled column order by on forwardIndexDisabled aggregation column -
-      // this fails due to indexTable being null in `GroupByOrderByCombineOperator`.
+      // column and group by on non-forwardIndexDisabled column order by on forwardIndexDisabled aggregation column
       String query = "SELECT column1, max(column1), sum(column9) from testTable WHERE column7 = 675695 GROUP BY "
           + "column1 ORDER BY max(column6)";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in unsupported aggregation query");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Transform inside aggregation involving a forwardIndexDisabled column
       String query = "SELECT MAX(ADD(column6, column9)) from testTable LIMIT 10";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in unsupported aggregation query");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Transform inside aggregation not involving any forwardIndexDisabled columns
@@ -895,7 +1014,13 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     {
       // Transform inside aggregation involving a forwardIndexDisabled column with group by
       String query = "SELECT column1, MAX(ADD(column6, column9)) from testTable GROUP BY column1 LIMIT 10";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in unsupported aggregation query");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Transform inside aggregation not involving any forwardIndexDisabled column with group by
@@ -924,7 +1049,13 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       // Transform inside aggregation involving a forwardIndexDisabled column with group by order by
       String query = "SELECT column1, MAX(ADD(column6, column9)) from testTable GROUP BY column1 ORDER BY column1 "
           + "DESC LIMIT 10";
-      assertThrows(IllegalStateException.class, () -> getBrokerResponse(query));
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in unsupported aggregation query");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
     }
     {
       // Transform inside aggregation not involving any forwardIndexDisabled column with group by order by

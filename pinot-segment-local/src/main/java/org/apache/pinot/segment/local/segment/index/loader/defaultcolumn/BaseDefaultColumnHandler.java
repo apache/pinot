@@ -450,9 +450,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     boolean isSingleValue = fieldSpec.isSingleValueField();
     int maxNumberOfMultiValueElements = isSingleValue ? 0 : 1;
 
-    // TODO: These validations are done as a sanity check though the reload code doesn't actually look at the
-    //       forwardIndexDisabled flag to disable the forward index. These checks will become more relevant once the
-    //       reload code path is ready to handle the forwardIndexDisabled.
+    // Validate that the forwardIndexDisabled flag, if enabled, is compatible with other indexes and configs
+    // For now the forwardIndexDisabled flag is ignored for default columns but will be handled as part of reload
+    // changes
     boolean forwardIndexDisabled = isForwardIndexDisabled(column);
     validateForwardIndexDisabledConfigsIfPresent(column, forwardIndexDisabled);
 

@@ -65,8 +65,8 @@ import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -599,8 +599,21 @@ public class LoaderTest {
     indexSegment.destroy();
 
     // Test scenarios to create a column with no forward index but without enabling inverted index for it
-    assertThrows(IllegalStateException.class, () -> constructSegmentWithForwardIndexDisabled(SegmentVersion.v3, false));
-    assertThrows(IllegalStateException.class, () -> constructSegmentWithForwardIndexDisabled(SegmentVersion.v1, false));
+    try {
+      constructSegmentWithForwardIndexDisabled(SegmentVersion.v3, false);
+      Assert.fail("Disabling forward index without enabling inverted index is not allowed!");
+    } catch (IllegalStateException e) {
+      assertEquals(String.format("Cannot disable forward index for column %s without inverted index enabled",
+          NO_FORWARD_INDEX_COL_NAME), e.getMessage());
+    }
+
+    try {
+      constructSegmentWithForwardIndexDisabled(SegmentVersion.v1, false);
+      Assert.fail("Disabling forward index without enabling inverted index is not allowed!");
+    } catch (IllegalStateException e) {
+      assertEquals(String.format("Cannot disable forward index for column %s without inverted index enabled",
+          NO_FORWARD_INDEX_COL_NAME), e.getMessage());
+    }
   }
 
   private void constructSegmentWithTextIndex(SegmentVersion segmentVersion)

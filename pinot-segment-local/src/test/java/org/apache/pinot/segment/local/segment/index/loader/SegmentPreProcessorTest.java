@@ -70,6 +70,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -1521,23 +1522,32 @@ public class SegmentPreProcessorTest {
     // Create a segment in V3, add a new column with no forward index enabled
     constructV3Segment();
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
+    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV);
     // should be null since column does not exist in the schema
     assertNull(columnMetadata);
 
-    assertThrows(IllegalStateException.class, () -> createAndValidateIndex(ColumnIndexType.FORWARD_INDEX,
-        NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1, _newColumnsSchemaWithForwardIndexDisabled, true, true, false,
-        4, false, 1, null, false));
+    try {
+    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX,
+        NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1, _newColumnsSchemaWithForwardIndexDisabled, true, true, false,
+        4, false, 1, null, false);
+      Assert.fail("Forward index cannot be disabled for dictionary disabled columns!");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Dictionary disabled columns cannot disable the forward index");
+    }
 
     constructV1Segment();
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
+    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV);
     // should be null since column does not exist in the schema
     assertNull(columnMetadata);
 
-    assertThrows(IllegalStateException.class, () -> createAndValidateIndex(ColumnIndexType.FORWARD_INDEX,
-        NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1, _newColumnsSchemaWithForwardIndexDisabled, true, true, false,
-        4, false, 1, null, false));
+    try {
+      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
+          _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, false);
+      Assert.fail("Forward index cannot be disabled for dictionary disabled columns!");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Dictionary disabled columns cannot disable the forward index");
+    }
 
     // Reset the no dictionary columns
     _indexLoadingConfig.setNoDictionaryColumns(existingNoDictionaryColumns);
@@ -1549,7 +1559,7 @@ public class SegmentPreProcessorTest {
     // Create a segment in V3, add a new column with no forward index enabled
     constructV3Segment();
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
+    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV);
     // should be null since column does not exist in the schema
     assertNull(columnMetadata);
 
@@ -1561,7 +1571,7 @@ public class SegmentPreProcessorTest {
 
     constructV1Segment();
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
+    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV);
     // should be null since column does not exist in the schema
     assertNull(columnMetadata);
 
@@ -1585,9 +1595,13 @@ public class SegmentPreProcessorTest {
     // should be null since column does not exist in the schema
     assertNull(columnMetadata);
 
-    assertThrows(IllegalStateException.class, () -> createAndValidateIndex(ColumnIndexType.FORWARD_INDEX,
-        NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1, _newColumnsSchemaWithForwardIndexDisabled, true, true, true,
-        4, true, 0, null, false));
+    try {
+      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
+          _newColumnsSchemaWithForwardIndexDisabled, true, true, true, 4, true, 0, null, false);
+      Assert.fail("Forward index cannot be disabled without enabling the inverted index!");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Inverted index must be enabled for forward index disabled columns");
+    }
 
     constructV1Segment();
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
@@ -1595,9 +1609,13 @@ public class SegmentPreProcessorTest {
     // should be null since column does not exist in the schema
     assertNull(columnMetadata);
 
-    assertThrows(IllegalStateException.class, () -> createAndValidateIndex(ColumnIndexType.FORWARD_INDEX,
-        NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1, _newColumnsSchemaWithForwardIndexDisabled, true, true, true,
-        4, true, 0, null, false));
+    try {
+      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX,
+          NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1, _newColumnsSchemaWithForwardIndexDisabled, true, true, true,
+          4, true, 0, null, false);
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Inverted index must be enabled for forward index disabled columns");
+    }
 
     _indexLoadingConfig.setForwardIndexDisabledColumns(new HashSet<>());
   }
