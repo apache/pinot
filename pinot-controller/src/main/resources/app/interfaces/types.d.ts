@@ -187,4 +187,14 @@ declare module 'Models' {
     ts: number,
     status: string
   }
+
+  export type TableSegmentJobs = {
+    [key: string]: {
+      jobId: string,
+      messageCount: number,
+      submissionTimeMs: number,
+      jobType: string,
+      tableName: string
+    }
+  }
 }
