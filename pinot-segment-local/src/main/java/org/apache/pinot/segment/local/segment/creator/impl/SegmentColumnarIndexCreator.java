@@ -339,10 +339,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         String.format("Cannot disable forward index for column %s without dictionary", columnName));
     Preconditions.checkState(invertedIndexColumns.contains(columnName),
         String.format("Cannot disable forward index for column %s without inverted index enabled", columnName));
-    Preconditions.checkState(!rangeIndexColumns.contains(columnName)
-        || (fieldSpec.isSingleValueField() && rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION), String.format(
-            "Cannot disable forward index for column %s which has range index with version < 2 or is multi-value",
-        columnName));
+    if (rangeIndexColumns.contains(columnName)) {
+      Preconditions.checkState(fieldSpec.isSingleValueField(),
+          String.format("Feature not supported for multi-value columns with range index. Cannot disable forward index "
+              + "for column %s. Disable range index on this column to use this feature", columnName));
+      Preconditions.checkState(rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION,
+          String.format("Feature not supported for single-value columns with range index version < 2. Cannot disable "
+              + "forward index for column %s. Either disable range index or create range index with version >= 2 to "
+              + "use this feature", columnName));
+    }
   }
 
   /**

@@ -233,7 +233,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       Assert.fail("Select * query should fail since forwardIndexDisabled on a select column");
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains("Forward index disabled for column:")
-          && e.getMessage().contains("creating ScanDocIdSet unsupported!"));
+          && e.getMessage().contains("scan based filtering not supported!"));
     }
   }
 
@@ -529,7 +529,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
         Assert.fail("Query should fail since forwardIndexDisabled on a range query column without range index");
       } catch (IllegalStateException e) {
         assertTrue(e.getMessage().contains("Forward index disabled for column:")
-            && e.getMessage().contains("creating ScanDocIdSet unsupported!"));
+            && e.getMessage().contains("scan based filtering not supported!"));
       }
     }
     {
@@ -540,7 +540,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
         Assert.fail("Query should fail since forwardIndexDisabled on a range query column without range index");
       } catch (IllegalStateException e) {
         assertTrue(e.getMessage().contains("Forward index disabled for column:")
-            && e.getMessage().contains("creating ScanDocIdSet unsupported!"));
+            && e.getMessage().contains("scan based filtering not supported!"));
       }
     }
     {

@@ -133,8 +133,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _rangeIndex = null;
     }
 
-    // Setting the 'fwdIndexBuffer' to null if forward index is enabled. No-op index readers will be setup for the
-    // forward index disabled columns which doesn't require the 'fwdIndexBuffer'.
+    // Setting the 'fwdIndexBuffer' to null if forward index is disabled
     PinotDataBuffer fwdIndexBuffer = segmentReader.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)
         ? segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX) : null;
 

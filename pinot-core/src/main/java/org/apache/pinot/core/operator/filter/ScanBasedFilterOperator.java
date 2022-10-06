@@ -45,7 +45,7 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     _numDocs = numDocs;
     _nullHandlingEnabled = nullHandlingEnabled;
     Preconditions.checkState(_dataSource.getForwardIndex() != null,
-        "Forward index disabled for column: %s, creating ScanDocIdSet unsupported!",
+        "Forward index disabled for column: %s, scan based filtering not supported!",
         _dataSource.getDataSourceMetadata().getFieldSpec().getName());
   }
 

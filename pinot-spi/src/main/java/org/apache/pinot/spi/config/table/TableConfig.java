@@ -143,16 +143,6 @@ public class TableConfig extends BaseJsonConfig {
     Preconditions.checkArgument(indexingConfig != null, "'tableIndexConfig' must be configured");
     Preconditions.checkArgument(customConfig != null, "'metadata' must be configured");
 
-    if (fieldConfigList != null) {
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
-        if (fieldConfigProperties != null) {
-          boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties.getOrDefault(
-              FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
-        }
-      }
-    }
-
     // NOTE: Handle lower case table type and raw table name for backward-compatibility
     _tableType = TableType.valueOf(tableType.toUpperCase());
     _tableName = TableNameBuilder.forType(_tableType).tableNameWithType(tableName);

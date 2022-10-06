@@ -235,7 +235,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
                 "Forward index disabled in segment: " + forwardIndexDisabled + " for column: " + column
                     + " does not match forward index disabled flag: "
                     + _indexLoadingConfig.getForwardIndexDisabledColumns().contains(column) + " in the TableConfig, "
-                    + "updating this flag is not supported at the moment.";
+                    + "setting this flag on new columns or updating this flag is not supported at the moment. Please "
+                    + "backfill or refresh segments to use this feature.";
             throw new RuntimeException(failureMessage);
           }
         }
@@ -381,9 +382,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             }
             // TODO: Support creation of derived columns from forward index disabled columns
             if (!_segmentWriter.hasIndexFor(argument, ColumnIndexType.FORWARD_INDEX)) {
-              LOGGER.warn("Skip creating derived column: {} because argument: {} does not have a forward index", column,
-                  argument);
-              return false;
+              throw new UnsupportedOperationException(String.format("Operation not supported! Cannot create a derived "
+                  + "column %s because argument: %s does not have a forward index. Enable forward index and "
+                  + "refresh/backfill the segments to create a derived column from source column %s", column, argument,
+                  argument));
             }
             argumentsMetadata.add(columnMetadata);
           }
@@ -428,15 +430,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     if (!forwardIndexDisabled) {
       return;
     }
+    LOGGER.warn("Disabling forward index on a new column {} is currently not supported. Treating this as a no-op!",
+        column);
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     Preconditions.checkState(_indexLoadingConfig.getInvertedIndexColumns().contains(column),
-          "Inverted index must be enabled for forward index disabled columns");
+          String.format("Inverted index must be enabled for forward index disabled column: %s", column));
       Preconditions.checkState(!_indexLoadingConfig.getNoDictionaryColumns().contains(column),
-          "Dictionary disabled columns cannot disable the forward index");
-      Preconditions.checkState(!_indexLoadingConfig.getRangeIndexColumns().contains(column)
-              || (fieldSpec.isSingleValueField()
-              && (_indexLoadingConfig.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION)),
-          "Range index must be >= version 2 if forward index is disabled and cannot be a multi-value column");
+          String.format("Dictionary disabled column: %s cannot disable the forward index", column));
+      if (_indexLoadingConfig.getRangeIndexColumns() != null
+          && _indexLoadingConfig.getRangeIndexColumns().contains(column)) {
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            String.format("Multi-value column with range index: %s cannot disable the forward index", column));
+        Preconditions.checkState(_indexLoadingConfig.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION,
+            String.format("Single-value column with range index version < 2: %s cannot disable the forward index",
+                column));
+      }
   }
 
   /**

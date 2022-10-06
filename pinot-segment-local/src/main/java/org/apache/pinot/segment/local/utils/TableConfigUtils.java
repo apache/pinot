@@ -929,17 +929,21 @@ public final class TableConfigUtils {
     }
 
     FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-    Preconditions.checkState(noDictionaryColumns == null || !noDictionaryColumns.contains(columnName),
+    Preconditions.checkState(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
+            || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName),
         String.format("Forward index disabled column %s must have dictionary enabled", columnName));
     Preconditions.checkState(indexingConfigs.getInvertedIndexColumns() != null
             && indexingConfigs.getInvertedIndexColumns().contains(columnName),
         String.format("Forward index disabled column %s must have inverted index enabled", columnName));
-    Preconditions.checkState(indexingConfigs.getRangeIndexColumns() == null
-            || !indexingConfigs.getRangeIndexColumns().contains(columnName)
-            || (fieldSpec.isSingleValueField()
-            && (indexingConfigs.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION)), String.format(
-                "Forward index disabled column %s cannot have a range index with version < 2 and cannot be multi-value",
-        columnName));
+    if (indexingConfigs.getRangeIndexColumns() != null && indexingConfigs.getRangeIndexColumns().contains(columnName)) {
+      Preconditions.checkState(fieldSpec.isSingleValueField(), String.format("Feature not supported for multi-value "
+          + "columns with range index. Cannot disable forward index for column %s. Disable range index on this "
+          + "column to use this feature", columnName));
+      Preconditions.checkState(indexingConfigs.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION,
+          String.format("Feature not supported for single-value columns with range index version < 2. Cannot disable "
+              + "forward index for column %s. Either disable range index or create range index with"
+              + " version >= 2 to use this feature", columnName));
+    }
   }
 
   private static void sanitize(TableConfig tableConfig) {

@@ -597,7 +597,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
         Assert.fail("Query should fail since forwardIndexDisabled on a range query column without range index");
       } catch (IllegalStateException e) {
         assertTrue(e.getMessage().contains("Forward index disabled for column:")
-            && e.getMessage().contains("creating ScanDocIdSet unsupported!"));
+            && e.getMessage().contains("scan based filtering not supported!"));
       }
     }
     {
@@ -659,6 +659,43 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
         assertEquals(resultRow.length, 2);
         assertEquals(resultRow[0], 815409257);
         assertEquals(resultRow[1], "P");
+      }
+    }
+    {
+      // Transform function on a filter clause for forwardIndexDisabled column in transform
+      String query = "SELECT column1, column11 from testTable WHERE CONCAT(ADD(column6, column1), column9, '-') = "
+          + "'1689277-11270'";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Transform function on a filter clause for a non-forwardIndexDisabled column in transform
+      String query = "SELECT column1, column11 from testTable WHERE CONCAT(column5, ADD(column9, column1), '-') = "
+          + "'gFuH-2.96708164E8' ORDER BY column1";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+      assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 28L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 56L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 120000L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column11"},
+          new DataSchema.ColumnDataType[]{
+              DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+          }));
+      List<Object[]> resultRows = resultTable.getRows();
+      assertEquals(resultRows.size(), 10);
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 2);
+        assertEquals(resultRow[0], 240528);
+        assertEquals(resultRow[1], "o");
       }
     }
   }
@@ -790,6 +827,43 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       assertNotNull(brokerResponseNative.getProcessingExceptions());
       assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
       assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"concat(column1,column5,'-')"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
+      List<Object[]> resultRows = resultTable.getRows();
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 1);
+        assertTrue(resultRow[0].toString().endsWith("-gFuH"));
+      }
+    }
+    {
+      // Select forwardIndexDisabled columns using nested transform with group by order by
+      String query = "SELECT CONCAT(ADD(column1, column6), column5, '-') FROM testTable GROUP BY "
+          + "CONCAT(ADD(column1, column6), column5, '-') ORDER BY CONCAT(ADD(column1, column6), column5, '-') LIMIT 10";
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail for forwardIndexDisabled on a nested transformed column in group by order by");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
+    }
+    {
+      // Select non-forwardIndexDisabled columns using nested transform with group by order by
+      String query = "SELECT CONCAT(ADD(column1, column9), column5, '-') FROM testTable GROUP BY "
+          + "CONCAT(ADD(column1, column9), column5, '-') ORDER BY CONCAT(ADD(column1, column9), column5, '-') LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+      assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 120000L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 360000L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"concat(add(column1,column9),column5,'-')"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
       List<Object[]> resultRows = resultTable.getRows();
       for (Object[] resultRow : resultRows) {
@@ -1082,6 +1156,61 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
         assertEquals(resultRow.length, 2);
         assertTrue((int) resultRow[0] <= previousVal);
         previousVal = (int) resultRow[0];
+      }
+    }
+  }
+
+  @Test
+  public void testSelectWithAggregationGroupByHaving() {
+    {
+      // forwardIndexDisabled column used in HAVING clause
+      String query = "SELECT min(column7), max(column6) from testTable GROUP BY column1 HAVING min(column7) > 675695 "
+          + "ORDER BY column1 LIMIT 10";
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in HAVING clause");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
+    }
+    {
+      // forwardIndexDisabled column not used in HAVING clause but used in aggregation select
+      String query = "SELECT max(column6), min(column9) from testTable GROUP BY column1 HAVING min(column9) > 11270 "
+          + "ORDER BY column1 LIMIT 10";
+      try {
+        getBrokerResponse(query);
+        Assert.fail("Query should fail since forwardIndexDisabled on a column in HAVING clause");
+      } catch (IllegalStateException e) {
+        assertTrue(e.getMessage().contains("Forward index disabled for column:")
+            && e.getMessage().contains("cannot create DataFetcher!"));
+      }
+    }
+    {
+      // forwardIndexDisabled column not used in HAVING clause or aggregation select
+      String query = "SELECT min(column9), column1 from testTable GROUP BY column1, column9 HAVING min(column9) "
+          + "> 11270 ORDER BY column9 DESC LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+      assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 120_000L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 240000L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"min(column9)", "column1"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.INT}));
+      List<Object[]> resultRows = resultTable.getRows();
+      double previousVal = Double.MAX_VALUE;
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 2);
+        assertTrue((double) resultRow[0] <= previousVal);
+        previousVal = (double) resultRow[0];
       }
     }
   }
