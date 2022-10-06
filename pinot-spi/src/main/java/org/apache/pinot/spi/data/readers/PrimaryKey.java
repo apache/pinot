@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -40,53 +41,54 @@ public class PrimaryKey {
   }
 
   public byte[] asBytes() {
-    int arraySize = 0;
+    int sizeInBytes = 0;
     byte[][] cache = new byte[_values.length][];
     for (int i = 0; i < _values.length; i++) {
       Object value = _values[i];
+      if (value == null) {
+        continue;
+      }
+
       if (value instanceof Integer) {
-        arraySize += Integer.BYTES;
-      } else if (value instanceof Double) {
-        arraySize += Double.BYTES;
-      } else if (value instanceof Float) {
-        arraySize += Float.BYTES;
+        sizeInBytes += Integer.BYTES;
       } else if (value instanceof Long) {
-        arraySize += Long.BYTES;
+        sizeInBytes += Long.BYTES;
       } else if (value instanceof String) {
         cache[i] = ((String) value).getBytes(StandardCharsets.UTF_8);
-        arraySize += cache[i].length + Integer.BYTES;
+        sizeInBytes += cache[i].length + Integer.BYTES;
+      } else if (value instanceof ByteArray) {
+        cache[i] = ((ByteArray) value).getBytes();
+        sizeInBytes += ((ByteArray) value).length() + Integer.BYTES;
+      } else if (value instanceof Float) {
+        sizeInBytes += Float.BYTES;
+      } else if (value instanceof Double) {
+        sizeInBytes += Double.BYTES;
       } else if (value instanceof BigDecimal) {
         cache[i] = BigDecimalUtils.serialize((BigDecimal) value);
-        arraySize += cache[i].length + Integer.BYTES;
-      } else if (value instanceof byte[]) {
-        arraySize += ((byte[]) value).length + Integer.BYTES;
+        sizeInBytes += cache[i].length + Integer.BYTES;
       } else {
-        throw new IllegalStateException("Data type not supported for serializing Primary Key");
+        throw new IllegalStateException("Data type not supported for serializing Primary Key with value: " + value);
       }
     }
 
-    ByteBuffer byteBuffer = ByteBuffer.allocate(arraySize);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(sizeInBytes);
     for (int i = 0; i < _values.length; i++) {
       Object value = _values[i];
+      if (value == null) {
+        continue;
+      }
+
       if (value instanceof Integer) {
         byteBuffer.putInt((Integer) value);
-      } else if (value instanceof Double) {
-        byteBuffer.putDouble((Double) value);
-      } else if (value instanceof Float) {
-        byteBuffer.putFloat((Float) value);
       } else if (value instanceof Long) {
         byteBuffer.putLong((Long) value);
-      } else if (value instanceof String) {
-        byteBuffer.putInt(cache[i].length);
-        byteBuffer.put(cache[i]);
-      } else if (value instanceof BigDecimal) {
-        byteBuffer.putInt(cache[i].length);
-        byteBuffer.put(cache[i]);
-      } else if (value instanceof byte[]) {
-        byteBuffer.putInt(cache[i].length);
-        byteBuffer.put(cache[i]);
+      } else if (value instanceof Float) {
+        byteBuffer.putFloat((Float) value);
+      } else if (value instanceof Double) {
+        byteBuffer.putDouble((Double) value);
       } else {
-        throw new IllegalStateException("Data type not supported for serializing Primary Key");
+        byteBuffer.putInt(cache[i].length);
+        byteBuffer.put(cache[i]);
       }
     }
     return byteBuffer.array();
