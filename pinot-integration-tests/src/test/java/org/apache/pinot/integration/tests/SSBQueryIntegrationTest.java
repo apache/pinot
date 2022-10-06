@@ -74,9 +74,6 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
 
     // load all SSB tables to H2.
     loadSSBToH2();
-
-    // wait for table to load successfully
-    waitForAllDocsLoaded(60000L);
   }
 
   @Test(dataProvider = "ssbQueryDataProvider")
@@ -110,6 +107,9 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
           if (error) {
             throw new RuntimeException("Value: " + c + " does not match at (" + i + ", " + c + "), "
                 + "expected h2 value: " + h2Value + ", actual Pinot value: " + pinotValue);
+          } else {
+            throw new RuntimeException("Value match at (" + i + ", " + c + "), " + "expected h2 value: " + h2Value
+                + ", actual Pinot value: " + pinotValue);
           }
         }
         if (!h2ResultSet.next() && i != numRows - 1) {
@@ -119,16 +119,6 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
     }
     Assert.assertFalse(h2ResultSet.next(), "Pinot result set is smaller than H2 result set after: "
         + numRows + " rows!");
-  }
-
-  @Override
-  protected long getCurrentCountStarResult() {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM lineorder").getResultSet(0).getLong(0);
-  }
-
-  @Override
-  protected long getCountStarResult() {
-    return 9999L;
   }
 
   @Override
@@ -229,6 +219,11 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   public static Object[][] ssbQueryDataProvider() {
     // TODO: refactor these out to .sql files
     return new Object[][]{
+        new Object[]{"SELECT COUNT(*) FROM lineorder"},
+        new Object[]{"SELECT COUNT(*) FROM customer"},
+        new Object[]{"SELECT COUNT(*) FROM supplier"},
+        new Object[]{"SELECT COUNT(*) FROM part"},
+        new Object[]{"SELECT COUNT(*) FROM dates"},
         new Object[]{"select sum(CAST(LO_EXTENDEDPRICE AS DOUBLE) * LO_DISCOUNT) as revenue "
             + " from lineorder, dates where LO_ORDERDATE = D_DATEKEY and D_YEAR = 1993 "
             + " and LO_DISCOUNT between 1 and 3 and LO_QUANTITY < 25; \n"},
