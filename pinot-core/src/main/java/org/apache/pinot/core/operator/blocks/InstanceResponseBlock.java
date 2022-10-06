@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.core.common.Block;
@@ -40,29 +39,16 @@ public class InstanceResponseBlock implements Block {
   private final Map<Integer, String> _exceptionMap;
 
   public InstanceResponseBlock(BaseResultsBlock baseResultsBlock, QueryContext queryContext) {
-    this(baseResultsBlock, queryContext, baseResultsBlock.computeMetadata());
+    this(baseResultsBlock, queryContext, baseResultsBlock.computeMetadata(),
+        InstanceResponseUtils.parseExceptions(baseResultsBlock.getProcessingExceptions()));
   }
 
   public InstanceResponseBlock(BaseResultsBlock baseResultsBlock, QueryContext queryContext,
-      Map<String, String> metadata) {
+      Map<String, String> metadata, Map<Integer, String> exceptionMap) {
     _queryContext = queryContext;
     _baseResultsBlock = baseResultsBlock;
     _metadata = metadata;
-    _exceptionMap = new HashMap<>();
-  }
-
-  public InstanceResponseBlock(Map<String, String> metadata) {
-    _queryContext = null;
-    _baseResultsBlock = null;
-    _metadata = metadata;
-    _exceptionMap = new HashMap<>();
-  }
-
-  public InstanceResponseBlock() {
-    _queryContext = null;
-    _baseResultsBlock = null;
-    _metadata = new HashMap<>();
-    _exceptionMap = new HashMap<>();
+    _exceptionMap = exceptionMap;
   }
 
   public QueryContext getQueryContext() {

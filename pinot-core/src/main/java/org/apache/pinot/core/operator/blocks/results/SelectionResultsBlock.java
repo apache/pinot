@@ -37,12 +37,8 @@ public class SelectionResultsBlock extends BaseResultsBlock {
     _rows = rows;
   }
 
-  public DataSchema getDataSchema() {
-    return _dataSchema;
-  }
-
   @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
+  public DataSchema getDataSchema() {
     return _dataSchema;
   }
 
@@ -58,9 +54,6 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   @Override
   public DataTable getDataTable(QueryContext queryContext)
       throws Exception {
-    DataTable dataTable =
-        SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, queryContext.isNullHandlingEnabled());
-    attachMetadataToDataTable(dataTable);
-    return dataTable;
+    return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, queryContext.isNullHandlingEnabled());
   }
 }

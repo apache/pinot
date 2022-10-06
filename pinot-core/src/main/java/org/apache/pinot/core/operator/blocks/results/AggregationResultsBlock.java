@@ -42,10 +42,13 @@ import org.roaringbitmap.RoaringBitmap;
 public class AggregationResultsBlock extends BaseResultsBlock {
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Object> _results;
+  private final boolean _isServerReturnFinalResult;
 
-  public AggregationResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> results) {
+  public AggregationResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> results,
+      boolean isServerReturnFinalResult) {
     _aggregationFunctions = aggregationFunctions;
     _results = results;
+    _isServerReturnFinalResult = isServerReturnFinalResult;
   }
 
   public AggregationFunction[] getAggregationFunctions() {
@@ -56,8 +59,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
     return _results;
   }
 
-  public DataSchema getDataSchema(QueryContext queryContext) {
-    boolean returnFinalResult = queryContext.isServerReturnFinalResult();
+  public DataSchema getDataSchema() {
     // Extract result column name and type from each aggregation function
     int numColumns = _aggregationFunctions.length;
     String[] columnNames = new String[numColumns];
@@ -65,7 +67,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
     for (int i = 0; i < numColumns; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       columnNames[i] = aggregationFunction.getColumnName();
-      columnDataTypes[i] = returnFinalResult ? aggregationFunction.getFinalResultColumnType()
+      columnDataTypes[i] = _isServerReturnFinalResult ? aggregationFunction.getFinalResultColumnType()
           : aggregationFunction.getIntermediateResultColumnType();
     }
     return new DataSchema(columnNames, columnDataTypes);
@@ -89,7 +91,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       throws Exception {
     boolean returnFinalResult = queryContext.isServerReturnFinalResult();
     int numColumns = _aggregationFunctions.length;
-    DataSchema dataSchema = getDataSchema(queryContext);
+    DataSchema dataSchema = getDataSchema();
 
     // Build the data table.
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
@@ -129,9 +131,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       dataTableBuilder.finishRow();
     }
 
-    DataTable dataTable = dataTableBuilder.build();
-    attachMetadataToDataTable(dataTable);
-    return dataTable;
+    return dataTableBuilder.build();
   }
 
   private void setIntermediateResult(DataTableBuilder dataTableBuilder, ColumnDataType[] columnDataTypes, int index,

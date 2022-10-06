@@ -140,7 +140,8 @@ public class AggregationPlanNode implements PlanNode {
     aggToTransformOpList.add(
         Pair.of(nonFilteredAggregationFunctions.toArray(new AggregationFunction[0]), mainTransformOperator));
 
-    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList, numTotalDocs);
+    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList, numTotalDocs,
+        _queryContext.isServerReturnFinalResult());
   }
 
   /**
@@ -178,7 +179,8 @@ public class AggregationPlanNode implements PlanNode {
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
     if (canOptimizeFilteredCount(filterOperator, aggregationFunctions) && !_queryContext.isNullHandlingEnabled()) {
-      return new FastFilteredCountOperator(aggregationFunctions, filterOperator, _indexSegment.getSegmentMetadata());
+      return new FastFilteredCountOperator(aggregationFunctions, filterOperator, _indexSegment.getSegmentMetadata(),
+          _queryContext.isServerReturnFinalResult());
     }
 
     if (filterOperator.isResultMatchingAll() && !_queryContext.isNullHandlingEnabled()) {
@@ -191,7 +193,8 @@ public class AggregationPlanNode implements PlanNode {
             dataSources[i] = _indexSegment.getDataSource(column);
           }
         }
-        return new NonScanBasedAggregationOperator(aggregationFunctions, dataSources, numTotalDocs);
+        return new NonScanBasedAggregationOperator(aggregationFunctions, dataSources, numTotalDocs,
+            _queryContext.isServerReturnFinalResult());
       }
     }
 
@@ -211,7 +214,8 @@ public class AggregationPlanNode implements PlanNode {
               TransformOperator transformOperator =
                   new StarTreeTransformPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs, null,
                       predicateEvaluatorsMap).run();
-              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true);
+              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true,
+                  _queryContext.isServerReturnFinalResult());
             }
           }
         }
@@ -223,7 +227,8 @@ public class AggregationPlanNode implements PlanNode {
     TransformOperator transformOperator =
         new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
+    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false,
+        _queryContext.isServerReturnFinalResult());
   }
 
   /**

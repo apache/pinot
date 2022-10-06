@@ -140,7 +140,7 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
-              DataSchema dataSchema = resultsBlock.getDataSchema(_queryContext);
+              DataSchema dataSchema = resultsBlock.getDataSchema();
               // NOTE: Use trimSize as resultSize on server size.
               if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
                 // special case of trim threshold where it is set to max value.

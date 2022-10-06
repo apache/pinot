@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.blocks;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
@@ -44,14 +45,36 @@ public final class InstanceResponseUtils {
     // do not instantiate.
   }
 
-  public static InstanceResponseBlock getEmptyResponseBlock(DataSchema explainResultSchema) {
-    return new InstanceResponseBlock(new MetadataResultsBlock(explainResultSchema), null);
+  /**
+   * get an empty {@link MetadataResultsBlock} with schema.
+   * For queries with literal or trivial response we will also use thie metadata result block to return hard-coded
+   * rows.
+   *
+   * @param resultSchema data schema of the result table.
+   * @return instance response block with metadata result, no query context is set in this block.
+   */
+  public static InstanceResponseBlock getEmptyResponseBlock(DataSchema resultSchema) {
+    return new InstanceResponseBlock(new MetadataResultsBlock(resultSchema), null);
   }
 
+  /**
+   * get an empty {@link ExceptionResultsBlock}.
+   *
+   * @param exception processing exception.
+   * @return instance response block with only exception result.
+   */
   public static InstanceResponseBlock getExceptionBlock(ProcessingException exception) {
     return new InstanceResponseBlock(new ExceptionResultsBlock(exception), null);
   }
 
+  /**
+   * Convert an {@link InstanceResponseBlock} to a {@link DataTable}.
+   * It will generate the payload from the {@link org.apache.pinot.core.operator.blocks.results.BaseResultsBlock},
+   * then attach metadata and exceptions.
+   *
+   * @param instanceResponseBlock the block
+   * @return data table.
+   */
   public static DataTable toDataTable(InstanceResponseBlock instanceResponseBlock) {
     DataTable dataTable;
     try {
@@ -76,19 +99,18 @@ public final class InstanceResponseUtils {
     }
   }
 
+  /**
+   * Convert an {@link InstanceResponseBlock} to a collection of raw {@link Object}[] rows.
+   * It will generate the payload from the {@link org.apache.pinot.core.operator.blocks.results.BaseResultsBlock}.
+   *
+   * @param instanceResponseBlock the block
+   * @return collection of raw object row.
+   */
   public static Collection<Object[]> toRows(InstanceResponseBlock instanceResponseBlock) {
     try {
       return instanceResponseBlock.getBaseResultsBlock().getRows(instanceResponseBlock.getQueryContext());
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while building data table", e);
-    }
-  }
-
-  public static DataTable getDataSchema(InstanceResponseBlock instanceResponseBlock) {
-    try {
-      return instanceResponseBlock.getBaseResultsBlock().getDataTable(instanceResponseBlock.getQueryContext());
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while building data table", e);
+      throw new RuntimeException("Caught exception while extracting rows", e);
     }
   }
 
@@ -222,5 +244,13 @@ public final class InstanceResponseUtils {
     Collection<Object[]> rows = baseResultsBlock.getRows(instanceResponseBlock.getQueryContext());
     rows.add(new Object[]{distinctTable});
     return instanceResponseBlock;
+  }
+
+  public static Map<Integer, String> parseExceptions(List<ProcessingException> processingExceptions) {
+    Map<Integer, String> exceptionMap = new HashMap<>();
+    for (ProcessingException processingException : processingExceptions) {
+      exceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
+    }
+    return exceptionMap;
   }
 }

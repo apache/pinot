@@ -39,7 +39,7 @@ public class ExceptionResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
+  public DataSchema getDataSchema() {
     return null;
   }
 
@@ -53,7 +53,6 @@ public class ExceptionResultsBlock extends BaseResultsBlock {
   public DataTable getDataTable(QueryContext queryContext)
       throws Exception {
     DataTable dataTable = DataTableBuilderUtils.getEmptyDataTable();
-    attachMetadataToDataTable(dataTable);
     return dataTable;
   }
 }

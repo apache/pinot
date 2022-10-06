@@ -53,7 +53,7 @@ public class DistinctResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
+  public DataSchema getDataSchema() {
     String[] columnNames = new String[]{_distinctFunction.getColumnName()};
     ColumnDataType[] columnDataTypes = new ColumnDataType[]{ColumnDataType.OBJECT};
     return new DataSchema(columnNames, columnDataTypes);
@@ -72,12 +72,11 @@ public class DistinctResultsBlock extends BaseResultsBlock {
   @Override
   public DataTable getDataTable(QueryContext queryContext)
       throws Exception {
-    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(getDataSchema(queryContext));
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(getDataSchema());
     dataTableBuilder.startRow();
     dataTableBuilder.setColumn(0, _distinctTable);
     dataTableBuilder.finishRow();
     DataTable dataTable = dataTableBuilder.build();
-    attachMetadataToDataTable(dataTable);
     return dataTable;
   }
 }

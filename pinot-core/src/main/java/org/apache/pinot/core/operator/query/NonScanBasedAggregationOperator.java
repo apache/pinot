@@ -67,12 +67,14 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
   private final AggregationFunction[] _aggregationFunctions;
   private final DataSource[] _dataSources;
   private final int _numTotalDocs;
+  private final boolean _isServerReturnFinalResult;
 
   public NonScanBasedAggregationOperator(AggregationFunction[] aggregationFunctions, DataSource[] dataSources,
-      int numTotalDocs) {
+      int numTotalDocs, boolean isServerReturnFinalResult) {
     _aggregationFunctions = aggregationFunctions;
     _dataSources = dataSources;
     _numTotalDocs = numTotalDocs;
+    _isServerReturnFinalResult = isServerReturnFinalResult;
   }
 
   @Override
@@ -128,7 +130,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     }
 
     // Build intermediate result block based on aggregation result from the executor.
-    return new AggregationResultsBlock(_aggregationFunctions, aggregationResults);
+    return new AggregationResultsBlock(_aggregationFunctions, aggregationResults, _isServerReturnFinalResult);
   }
 
   private static Double getMinValue(DataSource dataSource) {

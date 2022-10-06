@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.response.ProcessingException;
@@ -158,14 +157,40 @@ public abstract class BaseResultsBlock implements Block {
     _numServerThreads = numServerThreads;
   }
 
-  public abstract DataSchema getDataSchema(QueryContext queryContext);
+  /**
+   * extract data schema of this result block
+   *
+   * @return data schema.
+   */
+  public abstract DataSchema getDataSchema();
 
+  /**
+   * Return a raw collection of Object arrays (row format) of the result.
+   *
+   * @param queryContext query context
+   * @return a collection of rows
+   */
   public abstract Collection<Object[]> getRows(QueryContext queryContext)
       throws Exception;
 
+  /**
+   * Return a data table with no metadata or exception attached.
+   * This method should only be called by {@link org.apache.pinot.core.operator.blocks.InstanceResponseUtils}.
+   *
+   * @param queryContext query context.
+   * @return datatable
+   */
   public abstract DataTable getDataTable(QueryContext queryContext)
       throws Exception;
 
+  /**
+   * Compute the metadata of this result block.
+   * This should only be called by {@link org.apache.pinot.core.operator.blocks.InstanceResponseUtils} or
+   * {@link org.apache.pinot.core.operator.blocks.InstanceResponseBlock}.
+   * This can be overwritten by subclasses to provide more metadata.
+   *
+   * @return metadata map.
+   */
   public Map<String, String> computeMetadata() {
     Map<String, String> metadata = new HashMap<>();
     metadata.put(MetadataKey.TOTAL_DOCS.getName(), Long.toString(_numTotalDocs));
@@ -178,20 +203,6 @@ public abstract class BaseResultsBlock implements Block {
         Integer.toString(_numConsumingSegmentsProcessed));
     metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), Integer.toString(_numConsumingSegmentsMatched));
     return metadata;
-  }
-
-  protected void attachMetadataToDataTable(DataTable dataTable) {
-    attachMetadataToDataTable(dataTable, computeMetadata());
-  }
-
-  protected void attachMetadataToDataTable(DataTable dataTable, Map<String, String> metadataToAttach) {
-    if (CollectionUtils.isNotEmpty(_processingExceptions)) {
-      for (ProcessingException exception : _processingExceptions) {
-        dataTable.addException(exception);
-      }
-    }
-    Map<String, String> metadata = dataTable.getMetadata();
-    metadata.putAll(metadataToAttach);
   }
 
   @Override

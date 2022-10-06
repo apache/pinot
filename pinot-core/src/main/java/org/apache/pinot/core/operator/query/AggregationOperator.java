@@ -43,15 +43,17 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
+  private final boolean _isServerReturnFinalResult;
 
   private int _numDocsScanned = 0;
 
   public AggregationOperator(AggregationFunction[] aggregationFunctions, TransformOperator transformOperator,
-      long numTotalDocs, boolean useStarTree) {
+      long numTotalDocs, boolean useStarTree, boolean isServerReturnFinalResult) {
     _aggregationFunctions = aggregationFunctions;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
+    _isServerReturnFinalResult = isServerReturnFinalResult;
   }
 
   @Override
@@ -70,7 +72,8 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
     }
 
     // Build intermediate result block based on aggregation result from the executor
-    return new AggregationResultsBlock(_aggregationFunctions, aggregationExecutor.getResult());
+    return new AggregationResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(),
+        _isServerReturnFinalResult);
   }
 
   @Override

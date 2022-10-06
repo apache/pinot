@@ -122,7 +122,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
+  public DataSchema getDataSchema() {
     return _dataSchema;
   }
 
@@ -183,7 +183,6 @@ public class GroupByResultsBlock extends BaseResultsBlock {
       }
     }
     DataTable dataTable = dataTableBuilder.build();
-    attachMetadataToDataTable(dataTable);
     return dataTable;
   }
 
@@ -240,13 +239,13 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  protected void attachMetadataToDataTable(DataTable dataTable) {
-    super.attachMetadataToDataTable(dataTable);
-    Map<String, String> metadata = dataTable.getMetadata();
+  public Map<String, String> computeMetadata() {
+    Map<String, String> metadata = super.computeMetadata();
     if (_numGroupsLimitReached) {
       metadata.put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
     }
     metadata.put(MetadataKey.NUM_RESIZES.getName(), Integer.toString(_numResizes));
     metadata.put(MetadataKey.RESIZE_TIME_MS.getName(), Long.toString(_resizeTimeMs));
+    return metadata;
   }
 }

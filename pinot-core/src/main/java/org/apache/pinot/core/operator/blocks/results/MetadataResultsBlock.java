@@ -38,7 +38,7 @@ public class MetadataResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
+  public DataSchema getDataSchema() {
     return _dataSchema;
   }
 
@@ -57,7 +57,6 @@ public class MetadataResultsBlock extends BaseResultsBlock {
     } else {
       dataTable = SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, false);
     }
-    attachMetadataToDataTable(dataTable);
     return dataTable;
   }
 }

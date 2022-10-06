@@ -47,6 +47,7 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Pair<AggregationFunction[], TransformOperator>> _aggFunctionsWithTransformOperator;
   private final long _numTotalDocs;
+  private final boolean _isServerReturnFinalResult;
 
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -55,10 +56,12 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
   // We can potentially do away with aggregationFunctions parameter, but its cleaner to pass it in than to construct
   // it from aggFunctionsWithTransformOperator
   public FilteredAggregationOperator(AggregationFunction[] aggregationFunctions,
-      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs) {
+      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs,
+      boolean isServerReturnFinalResult) {
     _aggregationFunctions = aggregationFunctions;
     _aggFunctionsWithTransformOperator = aggFunctionsWithTransformOperator;
     _numTotalDocs = numTotalDocs;
+    _isServerReturnFinalResult = isServerReturnFinalResult;
   }
 
   @Override
@@ -89,7 +92,7 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
       _numEntriesScannedInFilter += transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
     }
-    return new AggregationResultsBlock(_aggregationFunctions, Arrays.asList(result));
+    return new AggregationResultsBlock(_aggregationFunctions, Arrays.asList(result), _isServerReturnFinalResult);
   }
 
   @Override
