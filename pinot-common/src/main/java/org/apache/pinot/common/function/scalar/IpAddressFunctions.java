@@ -20,6 +20,8 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.google.common.net.InetAddresses;
+import inet.ipaddr.IPAddress;
+import inet.ipaddr.IPAddressString;
 import java.math.BigInteger;
 import java.net.UnknownHostException;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -85,11 +87,16 @@ public class IpAddressFunctions {
     return addr;
   }
 
+  @ScalarFunction
+  public static boolean isSubnetOf(String ipPrefix, String ipAddress) {
+    IPAddress prefix = new IPAddressString(ipPrefix).getAddress().toPrefixBlock();
+    return prefix.contains(new IPAddressString(ipAddress).getAddress());
+  }
   /**
    * Returns true if ipAddress is in the subnet of ipPrefix (IPv4 or IPv6)
    */
   @ScalarFunction
-  public static boolean isSubnetOf(String ipPrefix, String ipAddress)
+  public static boolean isSubnetOfV1(String ipPrefix, String ipAddress)
       throws UnknownHostException {
     String[] prefixLengthPair = fromPrefixToPair(ipPrefix);
     byte[] addr = fromStringToBytes(prefixLengthPair[0]);

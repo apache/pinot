@@ -27,8 +27,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -136,12 +134,12 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
     List<Object[]> rows = resultTable.getRows();
     for (int i = 0; i < rows.size(); i++) {
       Object[] row = rows.get(i);
-      boolean IPv4Result = (boolean) row[0];
-      boolean IPv6Result = (boolean) row[1];
+      boolean iPv4Result = (boolean) row[0];
+      boolean iPv6Result = (boolean) row[1];
       boolean expectedIPv4Result = (boolean) row[2];
       boolean expectedIPv6Result = (boolean) row[3];
-      assertEquals(IPv4Result, expectedIPv4Result);
-      assertEquals(IPv6Result, expectedIPv6Result);
+      assertEquals(iPv4Result, expectedIPv4Result);
+      assertEquals(iPv6Result, expectedIPv6Result);
     }
   }
 
