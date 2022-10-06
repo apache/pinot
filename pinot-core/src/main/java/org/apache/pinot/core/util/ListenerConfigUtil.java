@@ -103,6 +103,7 @@ public final class ListenerConfigUtil {
 
     listeners.addAll(buildListenerConfigs(controllerConf, "controller", tlsDefaults));
 
+    Preconditions.checkState(!listeners.isEmpty(), "Missing listener configs");
     return listeners;
   }
 
@@ -163,6 +164,13 @@ public final class ListenerConfigUtil {
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(minionConf, CommonConstants.Minion.MINION_TLS_PREFIX);
     listeners.addAll(buildListenerConfigs(minionConf, "pinot.minion.adminapi", tlsDefaults));
+
+    // support legacy behavior < 0.7.0
+    if (listeners.isEmpty()) {
+      listeners.add(
+          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, CommonConstants.Minion.DEFAULT_HELIX_PORT,
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
+    }
 
     return listeners;
   }
