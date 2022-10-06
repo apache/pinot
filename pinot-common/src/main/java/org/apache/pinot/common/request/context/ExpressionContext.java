@@ -118,7 +118,7 @@ public class ExpressionContext {
 
   @Override
   public int hashCode() {
-    int hash = 31 * _type.hashCode();
+    int hash = 31 * 31 * _type.hashCode();
     switch (_type) {
       case LITERAL:
         return hash + _literal.hashCode();

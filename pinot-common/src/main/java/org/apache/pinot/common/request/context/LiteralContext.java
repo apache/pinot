@@ -96,9 +96,9 @@ public class LiteralContext {
   @Override
   public int hashCode() {
     if (_value == null) {
-      return 31 * 31 * _type.hashCode();
+      return 31 * _type.hashCode();
     }
-    return 31 * 31 * _type.hashCode() + 31 * _value.hashCode();
+    return 31 * _value.hashCode();
   }
 
   @Override
@@ -119,9 +119,6 @@ public class LiteralContext {
       return "null";
     }
     // TODO: print out the type.
-    if(_type == FieldSpec.DataType.STRING) {
-      return '\'' + _value.toString() + '\'';
-    }
-    return _value.toString();
+    return '\'' + _value.toString() + '\'';
   }
 }
