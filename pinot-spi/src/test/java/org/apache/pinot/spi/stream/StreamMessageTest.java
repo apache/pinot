@@ -27,17 +27,29 @@ public class StreamMessageTest {
 
   @Test
   public void testAllowNullKeyAndMetadata() {
-    StreamMessage msg = new StreamMessage("hello".getBytes(StandardCharsets.UTF_8));
+    String value = "hello";
+    byte[] valBytes = value.getBytes(StandardCharsets.UTF_8);
+    StreamMessage<byte[]> msg = new StreamMessage(valBytes, valBytes.length);
     Assert.assertNull(msg.getKey());
     Assert.assertNull(msg.getMetadata());
-    Assert.assertEquals(new String(msg.getValue()), "hello");
+    Assert.assertEquals(new String(msg.getValue()), value);
 
-    StreamMessage msg1 = new StreamMessage("key".getBytes(StandardCharsets.UTF_8),
-        "value".getBytes(StandardCharsets.UTF_8), null);
+    value = "value";
+    valBytes = value.getBytes(StandardCharsets.UTF_8);
+    StreamMessage<byte[]> msg1 =
+        new StreamMessage("key".getBytes(StandardCharsets.UTF_8), valBytes, null, valBytes.length);
     Assert.assertNotNull(msg1.getKey());
     Assert.assertEquals(new String(msg1.getKey()), "key");
     Assert.assertNotNull(msg1.getValue());
-    Assert.assertEquals(new String(msg1.getValue()), "value");
+    Assert.assertEquals(new String(msg1.getValue()), value);
     Assert.assertNull(msg1.getMetadata());
+
+    StreamMessage<String> msg2 = new StreamMessage<>("key".getBytes(StandardCharsets.UTF_8), value, null,
+        value.length());
+    Assert.assertNotNull(msg2.getKey());
+    Assert.assertEquals(new String(msg2.getKey()), "key");
+    Assert.assertNotNull(msg2.getValue());
+    Assert.assertEquals(msg2.getValue(), value);
+    Assert.assertNull(msg2.getMetadata());
   }
 }

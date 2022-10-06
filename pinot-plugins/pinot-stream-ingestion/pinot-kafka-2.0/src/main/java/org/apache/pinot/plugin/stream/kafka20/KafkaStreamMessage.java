@@ -25,7 +25,7 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 public class KafkaStreamMessage extends StreamMessage {
   public KafkaStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
-    super(key, value, metadata);
+    super(key, value, metadata, value.length);
   }
 
   public long getNextOffset() {

@@ -27,8 +27,8 @@ import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
-public class KafkaMessageBatch implements MessageBatch<StreamMessage> {
-  private final List<StreamMessage> _messageList;
+public class KafkaMessageBatch implements MessageBatch<StreamMessage<byte[]>> {
+  private final List<StreamMessage<byte[]>> _messageList;
   private final int _unfilteredMessageCount;
   private final long _lastOffset;
 
@@ -37,7 +37,7 @@ public class KafkaMessageBatch implements MessageBatch<StreamMessage> {
    * @param lastOffset the offset of the last message in the batch
    * @param batch the messages, which may be smaller than {@see unfilteredMessageCount}
    */
-  public KafkaMessageBatch(int unfilteredMessageCount, long lastOffset, List<StreamMessage> batch) {
+  public KafkaMessageBatch(int unfilteredMessageCount, long lastOffset, List<StreamMessage<byte[]>> batch) {
     _messageList = batch;
     _lastOffset = lastOffset;
     _unfilteredMessageCount = unfilteredMessageCount;
