@@ -54,12 +54,12 @@ public class PrimaryKey {
         arraySize += Long.BYTES;
       } else if (value instanceof String) {
         cache[i] = ((String) value).getBytes(StandardCharsets.UTF_8);
-        arraySize += cache[i].length;
+        arraySize += cache[i].length + Integer.BYTES;
       } else if (value instanceof BigDecimal) {
         cache[i] = BigDecimalUtils.serialize((BigDecimal) value);
-        arraySize += cache[i].length;
+        arraySize += cache[i].length + Integer.BYTES;
       } else if (value instanceof byte[]) {
-        arraySize += ((byte[]) value).length;
+        arraySize += ((byte[]) value).length + Integer.BYTES;
       } else {
         throw new IllegalStateException("Data type not supported for serializing Primary Key");
       }
@@ -77,10 +77,13 @@ public class PrimaryKey {
       } else if (value instanceof Long) {
         byteBuffer.putLong((Long) value);
       } else if (value instanceof String) {
+        byteBuffer.putInt(cache[i].length);
         byteBuffer.put(cache[i]);
       } else if (value instanceof BigDecimal) {
+        byteBuffer.putInt(cache[i].length);
         byteBuffer.put(cache[i]);
       } else if (value instanceof byte[]) {
+        byteBuffer.putInt(cache[i].length);
         byteBuffer.put(cache[i]);
       } else {
         throw new IllegalStateException("Data type not supported for serializing Primary Key");
