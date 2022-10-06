@@ -60,6 +60,7 @@ import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -167,11 +168,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       fstIndexColumns.add(columnName);
     }
 
-    Set<String> jsonIndexColumns = new HashSet<>();
-    for (String columnName : _config.getJsonIndexCreationColumns()) {
+    Map<String, JsonIndexConfig> jsonIndexConfigs = _config.getJsonIndexConfigs();
+    for (String columnName : jsonIndexConfigs.keySet()) {
       Preconditions.checkState(schema.hasColumn(columnName),
-          "Cannot create text index for column: %s because it is not in schema", columnName);
-      jsonIndexColumns.add(columnName);
+          "Cannot create json index for column: %s because it is not in schema", columnName);
     }
 
     Map<String, H3IndexConfig> h3IndexConfigs = _config.getH3IndexConfigs();
@@ -278,8 +278,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 (String[]) columnIndexCreationInfo.getSortedUniqueElementsArray())));
       }
 
-      if (jsonIndexColumns.contains(columnName)) {
-        _jsonIndexCreatorMap.put(columnName, _indexCreatorProvider.newJsonIndexCreator(context.forJsonIndex()));
+      JsonIndexConfig jsonIndexConfig = jsonIndexConfigs.get(columnName);
+      if (jsonIndexConfig != null) {
+        _jsonIndexCreatorMap.put(columnName,
+            _indexCreatorProvider.newJsonIndexCreator(context.forJsonIndex(jsonIndexConfig)));
       }
 
       H3IndexConfig h3IndexConfig = h3IndexConfigs.get(columnName);

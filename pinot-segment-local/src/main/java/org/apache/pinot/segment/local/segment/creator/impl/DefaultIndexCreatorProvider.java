@@ -122,8 +122,10 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
         "Json index is currently only supported on single-value columns");
     Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
         "Json index is currently only supported on STRING columns");
-    return context.isOnHeap() ? new OnHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName())
-        : new OffHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName());
+    return context.isOnHeap() ? new OnHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+        context.getJsonIndexConfig())
+        : new OffHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+            context.getJsonIndexConfig());
   }
 
   @Override

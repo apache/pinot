@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
@@ -66,11 +67,11 @@ public class IndexLoadingConfig {
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
   private FSTType _fstIndexType = FSTType.LUCENE;
-  private Set<String> _jsonIndexColumns = new HashSet<>();
+  private Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
   private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
-  private Map<String, String> _noDictionaryConfig = new HashMap<>();
-  private Set<String> _varLengthDictionaryColumns = new HashSet<>();
+  private final Map<String, String> _noDictionaryConfig = new HashMap<>();
+  private final Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
@@ -118,9 +119,18 @@ public class IndexLoadingConfig {
       _invertedIndexColumns.addAll(invertedIndexColumns);
     }
 
-    List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
-    if (jsonIndexColumns != null) {
-      _jsonIndexColumns.addAll(jsonIndexColumns);
+    // Ignore jsonIndexColumns when jsonIndexConfigs is configured
+    Map<String, JsonIndexConfig> jsonIndexConfigs = indexingConfig.getJsonIndexConfigs();
+    if (jsonIndexConfigs != null) {
+      _jsonIndexConfigs = jsonIndexConfigs;
+    } else {
+      List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
+      if (jsonIndexColumns != null) {
+        _jsonIndexConfigs = new HashMap<>();
+        for (String jsonIndexColumn : jsonIndexColumns) {
+          _jsonIndexConfigs.put(jsonIndexColumn, new JsonIndexConfig());
+        }
+      }
     }
 
     List<String> rangeIndexColumns = indexingConfig.getRangeIndexColumns();
@@ -372,8 +382,8 @@ public class IndexLoadingConfig {
     return _fstIndexColumns;
   }
 
-  public Set<String> getJsonIndexColumns() {
-    return _jsonIndexColumns;
+  public Map<String, JsonIndexConfig> getJsonIndexConfigs() {
+    return _jsonIndexConfigs;
   }
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
@@ -445,7 +455,14 @@ public class IndexLoadingConfig {
 
   @VisibleForTesting
   public void setJsonIndexColumns(Set<String> jsonIndexColumns) {
-    _jsonIndexColumns = jsonIndexColumns;
+    if (jsonIndexColumns != null) {
+      _jsonIndexConfigs = new HashMap<>();
+      for (String jsonIndexColumn : jsonIndexColumns) {
+        _jsonIndexConfigs.put(jsonIndexColumn, new JsonIndexConfig());
+      }
+    } else {
+      _jsonIndexConfigs = null;
+    }
   }
 
   @VisibleForTesting
