@@ -460,13 +460,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   /**
-   * Sets up the H2 connection to a table with pre-loaded data.
+   * Sets up the H2 connection
    */
-  protected void setUpH2Connection(List<File> avroFiles)
+  protected void setUpH2Connection()
       throws Exception {
     Assert.assertNull(_h2Connection);
     Class.forName("org.h2.Driver");
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
+  }
+
+  /**
+   * Sets up the H2 connection to a table with pre-loaded data.
+   */
+  protected void setUpH2Connection(List<File> avroFiles)
+      throws Exception {
+    setUpH2Connection();
     ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getTableName(), _h2Connection);
   }
 

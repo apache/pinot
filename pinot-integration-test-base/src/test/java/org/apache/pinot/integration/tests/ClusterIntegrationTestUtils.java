@@ -853,7 +853,7 @@ public class ClusterIntegrationTestUtils {
     return value;
   }
 
-  private static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
+  public static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
     // Fuzzy compare expected value and actual value
     boolean error = false;
     if (NumberUtils.isParsable(h2Value)) {
