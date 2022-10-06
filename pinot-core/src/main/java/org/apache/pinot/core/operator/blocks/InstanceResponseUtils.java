@@ -248,8 +248,10 @@ public final class InstanceResponseUtils {
 
   public static Map<Integer, String> parseExceptions(List<ProcessingException> processingExceptions) {
     Map<Integer, String> exceptionMap = new HashMap<>();
-    for (ProcessingException processingException : processingExceptions) {
-      exceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
+    if (processingExceptions != null && processingExceptions.size() > 0) {
+      for (ProcessingException processingException : processingExceptions) {
+        exceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
+      }
     }
     return exceptionMap;
   }
