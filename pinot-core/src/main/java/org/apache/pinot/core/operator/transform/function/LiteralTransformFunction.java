@@ -22,7 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /**
@@ -74,7 +76,10 @@ public class LiteralTransformFunction implements TransformFunction {
       } else if (_dataType == DataType.TIMESTAMP) {
         // inferLiteralDataType successfully interpreted the literal as TIMESTAMP. _bigDecimalLiteral is populated and
         // assigned to _longLiteral.
-        _bigDecimalLiteral = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(_literal));
+        _bigDecimalLiteral = PinotDataType.TIMESTAMP.toBigDecimal(TimestampUtils.toTimestamp(_literal));
+      } else if (_dataType == DataType.TIMESTAMP_WITH_TIME_ZONE) {
+        OffsetDateTime ts = TimestampUtils.toTimestampWithTimeZone(_literal);
+        _bigDecimalLiteral = PinotDataType.TIMESTAMP_WITH_TIME_ZONE.toBigDecimal(ts);
       } else {
         _bigDecimalLiteral = BigDecimal.ZERO;
       }
@@ -110,8 +115,16 @@ public class LiteralTransformFunction implements TransformFunction {
 
     // Try to interpret the literal as TIMESTAMP
     try {
-      Timestamp.valueOf(literal);
+      TimestampUtils.toTimestamp(literal);
       return DataType.TIMESTAMP;
+    } catch (Exception e) {
+      // Ignored
+    }
+
+    // Try to interpret the literal as TIMESTAMP_WITH_TIME_ZONE
+    try {
+      TimestampUtils.toTimestampWithTimeZone(literal);
+      return DataType.TIMESTAMP_WITH_TIME_ZONE;
     } catch (Exception e) {
       // Ignored
     }
@@ -176,12 +189,14 @@ public class LiteralTransformFunction implements TransformFunction {
     long[] longResult = _longResult;
     if (longResult == null || longResult.length < numDocs) {
       longResult = new long[numDocs];
-      if (_dataType != DataType.TIMESTAMP) {
+      if (_dataType != DataType.TIMESTAMP && _dataType != DataType.TIMESTAMP_WITH_TIME_ZONE) {
         if (_longLiteral != 0) {
           Arrays.fill(longResult, _longLiteral);
         }
+      } else if (_dataType == DataType.TIMESTAMP) {
+        Arrays.fill(longResult, TimestampUtils.toTimestamp(_literal).toInstant(ZoneOffset.UTC).toEpochMilli());
       } else {
-        Arrays.fill(longResult, Timestamp.valueOf(_literal).getTime());
+        Arrays.fill(longResult, TimestampUtils.toTimestampWithTimeZone(_literal).toInstant().toEpochMilli());
       }
       _longResult = longResult;
     }

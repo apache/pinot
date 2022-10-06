@@ -116,6 +116,7 @@ public class InPredicateEvaluatorFactory {
         }
         return new IntRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
+      case TIMESTAMP_WITH_TIME_ZONE:
       case TIMESTAMP: {
         long[] timestampValues = inPredicate.getTimestampValues();
         LongSet matchingValues = new LongOpenHashSet(HashUtil.getMinHashSetSize(timestampValues.length));

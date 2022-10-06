@@ -19,8 +19,9 @@
 package org.apache.pinot.plugin.inputformat.avro;
 
 import com.google.common.collect.ImmutableSet;
-import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -134,7 +135,7 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
   @Override
   protected Object convertSingleValue(Object value) {
     if (value instanceof Instant) {
-      return Timestamp.from((Instant) value);
+      return LocalDateTime.ofInstant((Instant) value, ZoneOffset.UTC);
     }
     // LocalDate, LocalTime and UUID are returned as the ::toString version of the logical type
     return super.convertSingleValue(value);

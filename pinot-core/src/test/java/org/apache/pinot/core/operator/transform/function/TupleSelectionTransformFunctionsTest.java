@@ -194,7 +194,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.TIMESTAMP);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(longValues[i], Math.min(_longSVValues[i], _timeValues[i]));
+      assertEquals(longValues[i], Math.min(_longSVValues[i], _timeSVValues[i]));
     }
   }
 
@@ -215,7 +215,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.TIMESTAMP);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(longValues[i], _timeValues[i]);
+      assertEquals(longValues[i], _timeSVValues[i]);
     }
   }
 
@@ -362,7 +362,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.TIMESTAMP);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(longValues[i], Math.max(_longSVValues[i], -1), _timeValues[i]);
+      assertEquals(longValues[i], Math.max(_longSVValues[i], -1), _timeSVValues[i]);
     }
   }
 
@@ -373,7 +373,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.TIMESTAMP);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(longValues[i], _timeValues[i]);
+      assertEquals(longValues[i], _timeSVValues[i]);
     }
   }
 

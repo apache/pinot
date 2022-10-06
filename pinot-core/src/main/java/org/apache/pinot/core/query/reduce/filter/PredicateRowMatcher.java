@@ -19,7 +19,9 @@
 package org.apache.pinot.core.query.reduce.filter;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
@@ -62,7 +64,9 @@ public class PredicateRowMatcher implements RowMatcher {
       case BOOLEAN:
         return _predicateEvaluator.applySV((boolean) value ? 1 : 0);
       case TIMESTAMP:
-        return _predicateEvaluator.applySV(((Timestamp) value).getTime());
+        return _predicateEvaluator.applySV(((LocalDateTime) value).toInstant(ZoneOffset.UTC).toEpochMilli());
+      case TIMESTAMP_WITH_TIME_ZONE:
+        return _predicateEvaluator.applySV(((OffsetDateTime) value).toInstant().toEpochMilli());
       case STRING:
         return _predicateEvaluator.applySV((String) value);
       case BYTES:

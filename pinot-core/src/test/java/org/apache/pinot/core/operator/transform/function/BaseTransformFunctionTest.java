@@ -20,9 +20,9 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.io.File;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -55,6 +55,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -87,6 +88,7 @@ public abstract class BaseTransformFunctionTest {
   protected static final String STRING_LONG_MV_COLUMN = "stringLongMV";
   protected static final String TIME_COLUMN = "timeColumn";
   protected static final String TIMESTAMP_COLUMN = "timestampColumn";
+  protected static final String TIMESTAMP_TZ_COLUMN = "timestampTzColumn";
   protected static final String JSON_COLUMN = "json";
   protected static final String DEFAULT_JSON_COLUMN = "defaultJson";
   protected final int[] _intSVValues = new int[NUM_ROWS];
@@ -104,7 +106,7 @@ public abstract class BaseTransformFunctionTest {
   protected final String[][] _stringMVValues = new String[NUM_ROWS][];
   protected final String[][] _stringAlphaNumericMVValues = new String[NUM_ROWS][];
   protected final String[][] _stringLongFormatMVValues = new String[NUM_ROWS][];
-  protected final long[] _timeValues = new long[NUM_ROWS];
+  protected final long[] _timeSVValues = new long[NUM_ROWS];
   protected final String[] _jsonValues = new String[NUM_ROWS];
 
   protected Map<String, DataSource> _dataSourceMap;
@@ -147,7 +149,7 @@ public abstract class BaseTransformFunctionTest {
       }
 
       // Time in the past year
-      _timeValues[i] = currentTimeMs - RANDOM.nextInt(365 * 24 * 3600) * 1000L;
+      _timeSVValues[i] = currentTimeMs - RANDOM.nextInt(365 * 24 * 3600) * 1000L;
     }
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
@@ -168,8 +170,9 @@ public abstract class BaseTransformFunctionTest {
       map.put(STRING_MV_COLUMN, _stringMVValues[i]);
       map.put(STRING_ALPHANUM_MV_COLUMN, _stringAlphaNumericMVValues[i]);
       map.put(STRING_LONG_MV_COLUMN, _stringLongFormatMVValues[i]);
-      map.put(TIMESTAMP_COLUMN, _timeValues[i]);
-      map.put(TIME_COLUMN, _timeValues[i]);
+      map.put(TIMESTAMP_COLUMN, _timeSVValues[i]);
+      map.put(TIMESTAMP_TZ_COLUMN, _timeSVValues[i]);
+      map.put(TIME_COLUMN, _timeSVValues[i]);
       _jsonValues[i] = JsonUtils.objectToJsonNode(map).toString();
       map.put(JSON_COLUMN, _jsonValues[i]);
       GenericRow row = new GenericRow();
@@ -195,6 +198,8 @@ public abstract class BaseTransformFunctionTest {
         .addMultiValueDimension(STRING_ALPHANUM_MV_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(STRING_LONG_MV_COLUMN, FieldSpec.DataType.STRING)
         .addDateTime(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addDateTime(
+            TIMESTAMP_TZ_COLUMN, FieldSpec.DataType.TIMESTAMP_WITH_TIME_ZONE, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
@@ -331,7 +336,7 @@ public abstract class BaseTransformFunctionTest {
     }
   }
 
-  protected void testTransformFunction(TransformFunction transformFunction, Timestamp[] expectedValues) {
+  protected void testTransformFunction(TransformFunction transformFunction, LocalDateTime[] expectedValues) {
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
@@ -340,11 +345,11 @@ public abstract class BaseTransformFunctionTest {
     // TODO: Support implicit cast from TIMESTAMP to STRING
 //    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(intValues[i], (int) expectedValues[i].getTime());
-      assertEquals(longValues[i], expectedValues[i].getTime());
-      assertEquals(floatValues[i], (float) expectedValues[i].getTime());
-      assertEquals(doubleValues[i], (double) expectedValues[i].getTime());
-      assertEquals(bigDecimalValues[i], BigDecimal.valueOf(expectedValues[i].getTime()));
+      assertEquals(intValues[i], (int) TimestampUtils.toMillisSinceEpoch(expectedValues[i]));
+      assertEquals(longValues[i], TimestampUtils.toMillisSinceEpoch(expectedValues[i]));
+      assertEquals(floatValues[i], (float) TimestampUtils.toMillisSinceEpoch(expectedValues[i]));
+      assertEquals(doubleValues[i], (double) TimestampUtils.toMillisSinceEpoch(expectedValues[i]));
+      assertEquals(bigDecimalValues[i], BigDecimal.valueOf(TimestampUtils.toMillisSinceEpoch(expectedValues[i])));
 //      assertEquals(stringValues[i], expectedValues[i].toString());
     }
   }

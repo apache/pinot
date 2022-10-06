@@ -95,6 +95,7 @@ public class RangePredicateEvaluatorFactory {
         return new IntRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? Integer.MIN_VALUE : BooleanUtils.toInt(lowerBound),
             upperUnbounded ? Integer.MAX_VALUE : BooleanUtils.toInt(upperBound), lowerInclusive, upperInclusive);
+      case TIMESTAMP_WITH_TIME_ZONE:
       case TIMESTAMP:
         return new LongRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? Long.MIN_VALUE : TimestampUtils.toMillisSinceEpoch(lowerBound),

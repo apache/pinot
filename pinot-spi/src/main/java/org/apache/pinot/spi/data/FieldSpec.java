@@ -22,7 +22,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -52,6 +55,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN = 0;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP = 0L;
+  public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP_WITH_TIME_ZONE = 0L;
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
@@ -232,6 +236,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN;
             case TIMESTAMP:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP;
+            case TIMESTAMP_WITH_TIME_ZONE:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP_WITH_TIME_ZONE;
             case STRING:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
             case JSON:
@@ -310,7 +316,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, (Integer) _defaultNullValue == 1);
           break;
         case TIMESTAMP:
-          jsonNode.put(key, new Timestamp((Long) _defaultNullValue).toString());
+          jsonNode.put(key,
+              LocalDateTime.ofInstant(Instant.ofEpochMilli((Long) _defaultNullValue), ZoneOffset.UTC).toString());
+          break;
+        case TIMESTAMP_WITH_TIME_ZONE:
+          jsonNode.put(key,
+              OffsetDateTime.ofInstant(Instant.ofEpochMilli((Long) _defaultNullValue), ZoneOffset.UTC).toString());
           break;
         case STRING:
         case JSON:
@@ -389,6 +400,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BIG_DECIMAL(true, true),
     BOOLEAN(INT, false, true),
     TIMESTAMP(LONG, false, true),
+    TIMESTAMP_WITH_TIME_ZONE(LONG, false, true),
     STRING(false, true),
     JSON(STRING, false, false),
     BYTES(false, false),
@@ -433,7 +445,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
-     * Returns {@code true} if the data type is of fixed width (INT, LONG, FLOAT, DOUBLE, BOOLEAN, TIMESTAMP),
+     * Returns {@code true} if the data type is of fixed width (INT, LONG, FLOAT, DOUBLE, BOOLEAN, TIMESTAMP,
+     * TIMESTAMP_WITH_TIME_ZONE),
      * {@code false} otherwise.
      */
     public boolean isFixedWidth() {
@@ -478,6 +491,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return BooleanUtils.toInt(value);
           case TIMESTAMP:
             return TimestampUtils.toMillisSinceEpoch(value);
+          case TIMESTAMP_WITH_TIME_ZONE:
+            return TimestampUtils.toMillisSinceEpochWithTimeZone(value);
           case STRING:
           case JSON:
             return value;
@@ -511,6 +526,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return BooleanUtils.toInt(value);
           case TIMESTAMP:
             return TimestampUtils.toMillisSinceEpoch(value);
+          case TIMESTAMP_WITH_TIME_ZONE:
+            return TimestampUtils.toMillisSinceEpochWithTimeZone(value);
           case STRING:
           case JSON:
             return value;

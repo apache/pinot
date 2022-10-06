@@ -83,6 +83,9 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "TIMESTAMP":
           _resultMetadata = sourceSV ? TIMESTAMP_SV_NO_DICTIONARY_METADATA : TIMESTAMP_MV_NO_DICTIONARY_METADATA;
           break;
+        case "TIMESTAMP WITH TIME ZONE":
+          _resultMetadata = sourceSV ? TIMESTAMP_TZ_SV_NO_DICTIONARY_METADATA : TIMESTAMP_TZ_MV_NO_DICTIONARY_METADATA;
+          break;
         case "STRING":
         case "VARCHAR":
           _resultMetadata = sourceSV ? STRING_SV_NO_DICTIONARY_METADATA : STRING_MV_NO_DICTIONARY_METADATA;
@@ -159,6 +162,8 @@ public class CastTransformFunction extends BaseTransformFunction {
         return _transformFunction.transformToLongValuesSV(projectionBlock);
       case TIMESTAMP:
         return transformToTimestampValuesSV(projectionBlock);
+      case TIMESTAMP_WITH_TIME_ZONE:
+        return transformToTimestampWithTimeZoneValuesSV(projectionBlock);
       default:
         return super.transformToLongValuesSV(projectionBlock);
     }
@@ -173,6 +178,21 @@ public class CastTransformFunction extends BaseTransformFunction {
       }
       String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
       ArrayCopyUtils.copyToTimestamp(stringValues, _longValuesSV, length);
+      return _longValuesSV;
+    } else {
+      return _transformFunction.transformToLongValuesSV(projectionBlock);
+    }
+  }
+
+  // TODO: Add it to the interface
+  private long[] transformToTimestampWithTimeZoneValuesSV(ProjectionBlock projectionBlock) {
+    if (_sourceDataType.getStoredType() == DataType.STRING) {
+      int length = projectionBlock.getNumDocs();
+      if (_longValuesSV == null) {
+        _longValuesSV = new long[length];
+      }
+      String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
+      ArrayCopyUtils.copyToTimestampWithTimeZone(stringValues, _longValuesSV, length);
       return _longValuesSV;
     } else {
       return _transformFunction.transformToLongValuesSV(projectionBlock);
@@ -227,6 +247,14 @@ public class CastTransformFunction extends BaseTransformFunction {
           long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
           ArrayCopyUtils.copyFromTimestamp(longValues, _stringValuesSV, length);
           return _stringValuesSV;
+        case TIMESTAMP_WITH_TIME_ZONE:
+          length = projectionBlock.getNumDocs();
+          if (_stringValuesSV == null) {
+            _stringValuesSV = new String[length];
+          }
+          long[] longTzValues = _transformFunction.transformToLongValuesSV(projectionBlock);
+          ArrayCopyUtils.copyFromTimestampWithTimeZone(longTzValues, _stringValuesSV, length);
+          return _stringValuesSV;
         default:
           return _transformFunction.transformToStringValuesSV(projectionBlock);
       }
@@ -263,6 +291,10 @@ public class CastTransformFunction extends BaseTransformFunction {
         case TIMESTAMP:
           longValues = transformToTimestampValuesSV(projectionBlock);
           ArrayCopyUtils.copyFromTimestamp(longValues, _stringValuesSV, length);
+          break;
+        case TIMESTAMP_WITH_TIME_ZONE:
+          longValues = transformToTimestampWithTimeZoneValuesSV(projectionBlock);
+          ArrayCopyUtils.copyFromTimestampWithTimeZone(longValues, _stringValuesSV, length);
           break;
         case BYTES:
           byte[][] bytesValues = transformToBytesValuesSV(projectionBlock);
@@ -327,6 +359,8 @@ public class CastTransformFunction extends BaseTransformFunction {
         return _transformFunction.transformToLongValuesMV(projectionBlock);
       case TIMESTAMP:
         return transformToTimestampValuesMV(projectionBlock);
+      case TIMESTAMP_WITH_TIME_ZONE:
+        return transformToTimestampWithTimeZoneValuesMV(projectionBlock);
       default:
         return super.transformToLongValuesMV(projectionBlock);
     }
@@ -341,6 +375,21 @@ public class CastTransformFunction extends BaseTransformFunction {
       }
       String[][] stringValuesMV = _transformFunction.transformToStringValuesMV(projectionBlock);
       ArrayCopyUtils.copyToTimestamp(stringValuesMV, _longValuesMV, length);
+      return _longValuesMV;
+    } else {
+      return _transformFunction.transformToLongValuesMV(projectionBlock);
+    }
+  }
+
+  // TODO: Add it to the interface
+  private long[][] transformToTimestampWithTimeZoneValuesMV(ProjectionBlock projectionBlock) {
+    if (_sourceDataType.getStoredType() == DataType.STRING) {
+      int length = projectionBlock.getNumDocs();
+      if (_longValuesMV == null) {
+        _longValuesMV = new long[length][];
+      }
+      String[][] stringValuesMV = _transformFunction.transformToStringValuesMV(projectionBlock);
+      ArrayCopyUtils.copyToTimestampWithTimeZone(stringValuesMV, _longValuesMV, length);
       return _longValuesMV;
     } else {
       return _transformFunction.transformToLongValuesMV(projectionBlock);
@@ -386,6 +435,14 @@ public class CastTransformFunction extends BaseTransformFunction {
           long[][] longValuesMV = _transformFunction.transformToLongValuesMV(projectionBlock);
           ArrayCopyUtils.copyFromTimestamp(longValuesMV, _stringValuesMV, length);
           return _stringValuesMV;
+        case TIMESTAMP_WITH_TIME_ZONE:
+          length = projectionBlock.getNumDocs();
+          if (_stringValuesMV == null) {
+            _stringValuesMV = new String[length][];
+          }
+          long[][] longValuesTzMV = _transformFunction.transformToLongValuesMV(projectionBlock);
+          ArrayCopyUtils.copyFromTimestampWithTimeZone(longValuesTzMV, _stringValuesMV, length);
+          return _stringValuesMV;
         default:
           return _transformFunction.transformToStringValuesMV(projectionBlock);
       }
@@ -418,6 +475,10 @@ public class CastTransformFunction extends BaseTransformFunction {
         case TIMESTAMP:
           longValuesMV = transformToTimestampValuesMV(projectionBlock);
           ArrayCopyUtils.copyFromTimestamp(longValuesMV, _stringValuesMV, length);
+          break;
+        case TIMESTAMP_WITH_TIME_ZONE:
+          longValuesMV = transformToTimestampWithTimeZoneValuesMV(projectionBlock);
+          ArrayCopyUtils.copyFromTimestampWithTimeZone(longValuesMV, _stringValuesMV, length);
           break;
         default:
           throw new IllegalStateException(String.format("Cannot cast from MV %s to STRING", resultDataType));

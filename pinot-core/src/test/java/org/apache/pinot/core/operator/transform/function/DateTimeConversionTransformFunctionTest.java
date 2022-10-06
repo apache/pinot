@@ -46,7 +46,7 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
     assertEquals(resultMetadata.getDataType(), DataType.LONG);
     long[] expectedValues = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = TimeUnit.MILLISECONDS.toMinutes(_timeValues[i]);
+      expectedValues[i] = TimeUnit.MILLISECONDS.toMinutes(_timeSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
   }

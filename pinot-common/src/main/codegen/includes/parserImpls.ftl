@@ -119,3 +119,48 @@ void SqlAtTimeZone(List<Object> list, ExprContext exprContext, Span s) :
         list.addAll(list2);
     }
 }
+
+/**
+* Parse datetime types: date, time, timestamp.
+*/
+SqlTypeNameSpec TimestampWithTimeZone() :
+{
+    int precision = -1;
+    TimeZoneOpt timeZone = TimeZoneOpt.NONE;
+    final Span s;
+}
+{
+    <TIMESTAMP> { s = span(); }
+    precision = PrecisionOpt()
+    timeZone = PinotTimeZoneOpt()
+    {
+        if (timeZone == TimeZoneOpt.WITH_LOCAL_TIME_ZONE) {
+            return new SqlBasicTypeNameSpec(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, precision, s.end(this));
+        } else if (timeZone == TimeZoneOpt.WITH_TIME_ZONE) {
+            return new SqlUserDefinedTypeNameSpec("TIMESTAMP WITH TIME ZONE", s.end(this));
+        } else {
+            return new SqlBasicTypeNameSpec(SqlTypeName.TIMESTAMP, precision, s.end(this));
+        }
+    }
+}
+
+/**
+* Parse a time zone suffix for DateTime types. According to SQL-2011,
+* "with time zone" and "without time zone" belong to standard SQL but Calcite
+* only implements the "without time zone" and "with local time zone".
+*
+* Pinot adds support for "with time zone"
+*/
+TimeZoneOpt PinotTimeZoneOpt() :
+{
+}
+{
+    LOOKAHEAD(3)
+    <WITHOUT> <TIME> <ZONE> { return TimeZoneOpt.WITHOUT_TIME_ZONE; }
+|
+    <WITH> <LOCAL> <TIME> <ZONE> { return TimeZoneOpt.WITH_LOCAL_TIME_ZONE; }
+|
+    <WITH> <TIME> <ZONE> { return TimeZoneOpt.WITH_TIME_ZONE; }
+|
+    { return TimeZoneOpt.NONE; }
+}

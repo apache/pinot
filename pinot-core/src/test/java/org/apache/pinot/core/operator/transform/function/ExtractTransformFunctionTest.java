@@ -60,7 +60,7 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertTrue(transformFunction instanceof ExtractTransformFunction);
     int[] value = transformFunction.transformToIntValuesSV(_projectionBlock);
     for (int i = 0; i < _projectionBlock.getNumDocs(); i++) {
-      assertEquals(value[i], expected.applyAsInt(_timeValues[i]));
+      assertEquals(value[i], expected.applyAsInt(_timeSVValues[i]));
     }
   }
 }

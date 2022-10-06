@@ -85,7 +85,7 @@ public class DateTimeTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertTrue(expectedClass.isInstance(transformFunction));
     int[] values = transformFunction.transformToIntValuesSV(_projectionBlock);
     for (int i = 0; i < _projectionBlock.getNumDocs(); i++) {
-      assertEquals(values[i], expected.applyAsInt(_timeValues[i]));
+      assertEquals(values[i], expected.applyAsInt(_timeSVValues[i]));
     }
   }
 
@@ -98,7 +98,7 @@ public class DateTimeTransformFunctionTest extends BaseTransformFunctionTest {
       Assert.assertTrue(expectedClass.isInstance(transformFunction));
       int[] values = transformFunction.transformToIntValuesSV(_projectionBlock);
       for (int i = 0; i < _projectionBlock.getNumDocs(); i++) {
-        assertEquals(values[i], expected.apply(_timeValues[i], zone));
+        assertEquals(values[i], expected.apply(_timeSVValues[i], zone));
       }
     }
   }

@@ -19,6 +19,7 @@
 package org.apache.pinot.common.data;
 
 import java.sql.Timestamp;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -27,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.ISODateTimeFormat;
@@ -55,7 +57,8 @@ public class DateTimeFormatSpecTest {
     entries.add(new Object[]{"1:HOURS:EPOCH", "0", 0L});
     entries.add(new Object[]{"5:MINUTES:EPOCH", "4996308", 1498892400000L});
     entries.add(new Object[]{
-        "1:MILLISECONDS:TIMESTAMP", "2017-07-01 00:00:00", Timestamp.valueOf("2017-07-01 00:00:00").getTime()
+        "1:MILLISECONDS:TIMESTAMP", "2017-07-01 00:00:00",
+        TimestampUtils.toTimestamp("2017-07-01 00:00:00").toInstant(ZoneOffset.UTC).toEpochMilli()
     });
     entries.add(new Object[]{"1:MILLISECONDS:TIMESTAMP", "1498892400000", 1498892400000L});
     entries.add(new Object[]{
@@ -84,7 +87,8 @@ public class DateTimeFormatSpecTest {
     entries.add(new Object[]{"EPOCH|HOURS", "0", 0L});
     entries.add(new Object[]{"EPOCH|MINUTES|5", "4996308", 1498892400000L});
     entries.add(new Object[]{
-        "TIMESTAMP", "2017-07-01 00:00:00", Timestamp.valueOf("2017-07-01 00:00:00").getTime()
+        "TIMESTAMP", "2017-07-01 00:00:00",
+        TimestampUtils.toTimestamp("2017-07-01 00:00:00").toInstant(ZoneOffset.UTC).toEpochMilli()
     });
     entries.add(new Object[]{"TIMESTAMP", "1498892400000", 1498892400000L});
     entries.add(new Object[]{

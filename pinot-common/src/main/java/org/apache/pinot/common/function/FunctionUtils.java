@@ -19,7 +19,8 @@
 package org.apache.pinot.common.function;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -45,7 +46,8 @@ public class FunctionUtils {
     put(BigDecimal.class, PinotDataType.BIG_DECIMAL);
     put(boolean.class, PinotDataType.BOOLEAN);
     put(Boolean.class, PinotDataType.BOOLEAN);
-    put(Timestamp.class, PinotDataType.TIMESTAMP);
+    put(LocalDateTime.class, PinotDataType.TIMESTAMP);
+    put(OffsetDateTime.class, PinotDataType.TIMESTAMP_WITH_TIME_ZONE);
     put(String.class, PinotDataType.STRING);
     put(byte[].class, PinotDataType.BYTES);
     put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
@@ -67,7 +69,8 @@ public class FunctionUtils {
     put(Float.class, PinotDataType.FLOAT);
     put(Double.class, PinotDataType.DOUBLE);
     put(BigDecimal.class, PinotDataType.BIG_DECIMAL);
-    put(Timestamp.class, PinotDataType.TIMESTAMP);
+    put(LocalDateTime.class, PinotDataType.TIMESTAMP);
+    put(OffsetDateTime.class, PinotDataType.TIMESTAMP_WITH_TIME_ZONE);
     put(String.class, PinotDataType.STRING);
     put(byte[].class, PinotDataType.BYTES);
     put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
@@ -94,7 +97,8 @@ public class FunctionUtils {
     put(BigDecimal.class, DataType.BIG_DECIMAL);
     put(boolean.class, DataType.BOOLEAN);
     put(Boolean.class, DataType.BOOLEAN);
-    put(Timestamp.class, DataType.TIMESTAMP);
+    put(LocalDateTime.class, DataType.TIMESTAMP);
+    put(OffsetDateTime.class, DataType.TIMESTAMP_WITH_TIME_ZONE);
     put(String.class, DataType.STRING);
     put(byte[].class, DataType.BYTES);
     put(int[].class, DataType.INT);
@@ -116,7 +120,8 @@ public class FunctionUtils {
     put(BigDecimal.class, ColumnDataType.BIG_DECIMAL);
     put(boolean.class, ColumnDataType.BOOLEAN);
     put(Boolean.class, ColumnDataType.BOOLEAN);
-    put(Timestamp.class, ColumnDataType.TIMESTAMP);
+    put(LocalDateTime.class, ColumnDataType.TIMESTAMP);
+    put(OffsetDateTime.class, ColumnDataType.TIMESTAMP_WITH_TIME_ZONE);
     put(String.class, ColumnDataType.STRING);
     put(byte[].class, ColumnDataType.BYTES);
     put(int[].class, ColumnDataType.INT_ARRAY);

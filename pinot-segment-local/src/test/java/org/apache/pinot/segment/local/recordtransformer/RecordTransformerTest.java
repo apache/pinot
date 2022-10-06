@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
-import java.sql.Timestamp;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -31,6 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -70,7 +70,7 @@ public class RecordTransformerTest {
     record.putValue("svFloat", Collections.singletonList((short) 123));
     record.putValue("svDouble", new String[]{"123"});
     record.putValue("svBoolean", "true");
-    record.putValue("svTimestamp", "2020-02-02 22:22:22.222");
+    record.putValue("svTimestamp", "2020-02-02 22:22:22.222222222");
     record.putValue("svBytes", "7b7b"/*new byte[]{123, 123}*/);
     record.putValue("svJson", "{\"first\": \"daffy\", \"last\": \"duck\"}");
     record.putValue("mvInt", new Object[]{123L});
@@ -142,7 +142,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svFloat"), 123f);
       assertEquals(record.getValue("svDouble"), 123d);
       assertEquals(record.getValue("svBoolean"), 1);
-      assertEquals(record.getValue("svTimestamp"), Timestamp.valueOf("2020-02-02 22:22:22.222").getTime());
+      assertEquals(record.getValue("svTimestamp"), TimestampUtils.toMillisSinceEpoch("2020-02-02 22:22:22.222"));
       assertEquals(record.getValue("svBytes"), new byte[]{123, 123});
       assertEquals(record.getValue("svJson"), "{\"first\":\"daffy\",\"last\":\"duck\"}");
       assertEquals(record.getValue("mvInt"), new Object[]{123});
@@ -528,7 +528,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svFloat"), 123f);
       assertEquals(record.getValue("svDouble"), 123d);
       assertEquals(record.getValue("svBoolean"), 1);
-      assertEquals(record.getValue("svTimestamp"), Timestamp.valueOf("2020-02-02 22:22:22.222").getTime());
+      assertEquals(record.getValue("svTimestamp"), TimestampUtils.toMillisSinceEpoch("2020-02-02 22:22:22.222222222"));
       assertEquals(record.getValue("svJson"), "{\"first\":\"daffy\",\"last\":\"duck\"}");
       assertEquals(record.getValue("svBytes"), new byte[]{123, 123});
       assertEquals(record.getValue("mvInt"), new Object[]{123});

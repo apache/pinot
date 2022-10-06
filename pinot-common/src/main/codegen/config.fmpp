@@ -533,6 +533,11 @@ data: {
       "SqlAtTimeZone"
     ]
 
+    # List of custom type syntax to add
+    dataTypeParserMethods: [
+      "TimestampWithTimeZone()"
+    ]
+
     # List of files in @includes directory that have parser method
     implementationFiles: [
       "parserImpls.ftl"

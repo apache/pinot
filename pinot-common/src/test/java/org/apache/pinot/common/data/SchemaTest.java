@@ -21,7 +21,6 @@ package org.apache.pinot.common.data;
 import java.io.File;
 import java.math.BigDecimal;
 import java.net.URL;
-import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -33,6 +32,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -84,7 +84,17 @@ public class SchemaTest {
     schemaToValidate.validate();
 
     schemaToValidate = new Schema();
-    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.TIMESTAMP, new Timestamp(0)));
+    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.TIMESTAMP, TimestampUtils.toTimestamp(0)));
+    try {
+      schemaToValidate.validate();
+      Assert.fail("Should have failed validation for invalid schema.");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.TIMESTAMP_WITH_TIME_ZONE,
+        TimestampUtils.toTimestampWithTimeZone(0)));
     try {
       schemaToValidate.validate();
       Assert.fail("Should have failed validation for invalid schema.");

@@ -64,6 +64,7 @@ public class DataTableSerDeTest {
   private static final BigDecimal[] BIG_DECIMALS = new BigDecimal[NUM_ROWS];
   private static final int[] BOOLEANS = new int[NUM_ROWS];
   private static final long[] TIMESTAMPS = new long[NUM_ROWS];
+  private static final long[] TIMESTAMPS_WITH_TIME_ZONE = new long[NUM_ROWS];
   private static final String[] STRINGS = new String[NUM_ROWS];
   private static final String[] JSONS = new String[NUM_ROWS];
   private static final byte[][] BYTES = new byte[NUM_ROWS][];
@@ -74,6 +75,7 @@ public class DataTableSerDeTest {
   private static final double[][] DOUBLE_ARRAYS = new double[NUM_ROWS][];
   private static final int[][] BOOLEAN_ARRAYS = new int[NUM_ROWS][];
   private static final long[][] TIMESTAMP_ARRAYS = new long[NUM_ROWS][];
+  private static final long[][] TIMESTAMP_WITH_TZ_ARRAYS = new long[NUM_ROWS][];
   private static final String[][] STRING_ARRAYS = new String[NUM_ROWS][];
   private static final Map<String, String> EXPECTED_METADATA =
       ImmutableMap.<String, String>builder().put(MetadataKey.NUM_DOCS_SCANNED.getName(), String.valueOf(20L))
@@ -583,6 +585,10 @@ public class DataTableSerDeTest {
             TIMESTAMPS[rowId] = isNull ? 0 : RANDOM.nextLong();
             dataTableBuilder.setColumn(colId, TIMESTAMPS[rowId]);
             break;
+          case TIMESTAMP_WITH_TIME_ZONE:
+            TIMESTAMPS_WITH_TIME_ZONE[rowId] = isNull ? 0 : RANDOM.nextLong();
+            dataTableBuilder.setColumn(colId, TIMESTAMPS_WITH_TIME_ZONE[rowId]);
+            break;
           case BOOLEAN:
             BOOLEANS[rowId] = isNull ? 0 : RANDOM.nextInt(2);
             dataTableBuilder.setColumn(colId, BOOLEANS[rowId]);
@@ -658,6 +664,15 @@ public class DataTableSerDeTest {
             TIMESTAMP_ARRAYS[rowId] = timestampArray;
             dataTableBuilder.setColumn(colId, timestampArray);
             break;
+          case TIMESTAMP_WITH_TIME_ZONE_ARRAY:
+            length = RANDOM.nextInt(20);
+            long[] timestampTzArray = new long[length];
+            for (int i = 0; i < length; i++) {
+              timestampTzArray[i] = RANDOM.nextLong();
+            }
+            TIMESTAMP_WITH_TZ_ARRAYS[rowId] = timestampTzArray;
+            dataTableBuilder.setColumn(colId, timestampTzArray);
+            break;
           case BYTES_ARRAY:
             // TODO: add once implementation of datatable bytes array support is added
             break;
@@ -714,6 +729,10 @@ public class DataTableSerDeTest {
           case TIMESTAMP:
             Assert.assertEquals(newDataTable.getLong(rowId, colId), isNull ? 0 : TIMESTAMPS[rowId], ERROR_MESSAGE);
             break;
+          case TIMESTAMP_WITH_TIME_ZONE:
+            Assert.assertEquals(newDataTable.getLong(rowId, colId), isNull
+                ? 0 : TIMESTAMPS_WITH_TIME_ZONE[rowId], ERROR_MESSAGE);
+            break;
           case STRING:
             Assert.assertEquals(newDataTable.getString(rowId, colId), isNull ? "" : STRINGS[rowId], ERROR_MESSAGE);
             break;
@@ -754,6 +773,10 @@ public class DataTableSerDeTest {
             break;
           case TIMESTAMP_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), TIMESTAMP_ARRAYS[rowId]),
+                ERROR_MESSAGE);
+            break;
+          case TIMESTAMP_WITH_TIME_ZONE_ARRAY:
+            Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), TIMESTAMP_WITH_TZ_ARRAYS[rowId]),
                 ERROR_MESSAGE);
             break;
           case BYTES_ARRAY:

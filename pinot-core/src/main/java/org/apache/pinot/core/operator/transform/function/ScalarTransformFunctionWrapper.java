@@ -20,7 +20,10 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
@@ -374,9 +377,19 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case TIMESTAMP: {
           long[] longValues = transformFunction.transformToLongValuesSV(projectionBlock);
           int numValues = longValues.length;
-          Timestamp[] timestampValues = new Timestamp[numValues];
+          LocalDateTime[] timestampValues = new LocalDateTime[numValues];
           for (int j = 0; j < numValues; j++) {
-            timestampValues[j] = new Timestamp(longValues[j]);
+            timestampValues[j] = LocalDateTime.ofInstant(Instant.ofEpochMilli(longValues[j]), ZoneOffset.UTC);
+          }
+          _nonLiteralValues[i] = timestampValues;
+          break;
+        }
+        case TIMESTAMP_WITH_TIME_ZONE: {
+          long[] longValues = transformFunction.transformToLongValuesSV(projectionBlock);
+          int numValues = longValues.length;
+          OffsetDateTime[] timestampValues = new OffsetDateTime[numValues];
+          for (int j = 0; j < numValues; j++) {
+            timestampValues[j] = OffsetDateTime.ofInstant(Instant.ofEpochMilli(longValues[j]), ZoneOffset.UTC);
           }
           _nonLiteralValues[i] = timestampValues;
           break;

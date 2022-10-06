@@ -116,6 +116,7 @@ public class NotInPredicateEvaluatorFactory {
         }
         return new IntRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
+      case TIMESTAMP_WITH_TIME_ZONE:
       case TIMESTAMP: {
         long[] timestampValues = notInPredicate.getTimestampValues();
         LongSet nonMatchingValues = new LongOpenHashSet(HashUtil.getMinHashSetSize(timestampValues.length));

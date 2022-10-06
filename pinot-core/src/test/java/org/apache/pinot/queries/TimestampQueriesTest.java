@@ -20,7 +20,6 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -42,6 +41,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -57,13 +57,17 @@ public class TimestampQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TimestampQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
-  private static final long BASE_TIMESTAMP = Timestamp.valueOf("2021-01-01 00:00:00").getTime();
+  private static final long BASE_TIMESTAMP = TimestampUtils.toMillisSinceEpoch("2021-01-01 00:00:00");
 
   private static final int NUM_RECORDS = 1000;
 
   private static final String TIMESTAMP_COLUMN = "timestampColumn";
+  private static final String TIMESTAMP_TZ_COLUMN = "timestampTzColumn";
   private static final Schema SCHEMA =
-      new Schema.SchemaBuilder().addSingleValueDimension(TIMESTAMP_COLUMN, DataType.TIMESTAMP).build();
+      new Schema.SchemaBuilder()
+          .addSingleValueDimension(TIMESTAMP_COLUMN, DataType.TIMESTAMP)
+          .addSingleValueDimension(TIMESTAMP_TZ_COLUMN, DataType.TIMESTAMP_WITH_TIME_ZONE)
+          .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
@@ -97,10 +101,13 @@ public class TimestampQueriesTest extends BaseQueriesTest {
       // Insert data in 3 different formats
       if (i % 3 == 0) {
         record.putValue(TIMESTAMP_COLUMN, timestamp);
+        record.putValue(TIMESTAMP_TZ_COLUMN, timestamp);
       } else if (i % 3 == 1) {
-        record.putValue(TIMESTAMP_COLUMN, new Timestamp(timestamp));
+        record.putValue(TIMESTAMP_COLUMN, TimestampUtils.toTimestamp(timestamp));
+        record.putValue(TIMESTAMP_TZ_COLUMN, TimestampUtils.toTimestampWithTimeZone(timestamp));
       } else {
-        record.putValue(TIMESTAMP_COLUMN, new Timestamp(timestamp).toString());
+        record.putValue(TIMESTAMP_COLUMN, TimestampUtils.format(TimestampUtils.toTimestamp(timestamp)));
+        record.putValue(TIMESTAMP_TZ_COLUMN, TimestampUtils.format(TimestampUtils.toTimestampWithTimeZone(timestamp)));
       }
       records.add(record);
     }
@@ -127,13 +134,16 @@ public class TimestampQueriesTest extends BaseQueriesTest {
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
-          new DataSchema(new String[]{"timestampColumn"}, new ColumnDataType[]{ColumnDataType.TIMESTAMP}));
+          new DataSchema(
+              new String[]{TIMESTAMP_COLUMN, TIMESTAMP_TZ_COLUMN},
+              new ColumnDataType[]{ColumnDataType.TIMESTAMP, ColumnDataType.TIMESTAMP_WITH_TIME_ZONE}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
-        assertEquals(row.length, 1);
-        assertEquals(row[0], new Timestamp(BASE_TIMESTAMP + i).toString());
+        assertEquals(row.length, 2);
+        assertEquals(row[0], TimestampUtils.format(TimestampUtils.toTimestamp(BASE_TIMESTAMP + i)));
+        assertEquals(row[1], TimestampUtils.format(TimestampUtils.toTimestampWithTimeZone(BASE_TIMESTAMP + i)));
       }
     }
     {
@@ -142,15 +152,20 @@ public class TimestampQueriesTest extends BaseQueriesTest {
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
-          new DataSchema(new String[]{"timestampColumn"}, new ColumnDataType[]{ColumnDataType.TIMESTAMP}));
+          new DataSchema(
+              new String[]{TIMESTAMP_COLUMN, TIMESTAMP_TZ_COLUMN},
+              new ColumnDataType[]{ColumnDataType.TIMESTAMP, ColumnDataType.TIMESTAMP_WITH_TIME_ZONE}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 40);
       for (int i = 0; i < 10; i++) {
-        String expectedResult = new Timestamp(BASE_TIMESTAMP + NUM_RECORDS - 1 - i).toString();
+        long epoch = BASE_TIMESTAMP + NUM_RECORDS - 1 - i;
+        String expectedResult = TimestampUtils.format(TimestampUtils.toTimestamp(epoch));
+        String expectedResultTz = TimestampUtils.format(TimestampUtils.toTimestampWithTimeZone(epoch));
         for (int j = 0; j < 4; j++) {
           Object[] row = rows.get(i * 4 + j);
-          assertEquals(row.length, 1);
+          assertEquals(row.length, 2);
           assertEquals(row[0], expectedResult);
+          assertEquals(row[1], expectedResultTz);
         }
       }
     }
@@ -183,7 +198,23 @@ public class TimestampQueriesTest extends BaseQueriesTest {
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
         assertEquals(row.length, 1);
-        assertEquals(row[0], new Timestamp(BASE_TIMESTAMP + i).toString());
+        assertEquals(row[0], TimestampUtils.format(TimestampUtils.toTimestamp(BASE_TIMESTAMP + i)));
+      }
+    }
+    {
+      String query = "SELECT DISTINCT timestampTzColumn FROM testTable ORDER BY timestampTzColumn";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema, new DataSchema(
+          new String[]{"timestampTzColumn"},
+          new ColumnDataType[]{ColumnDataType.TIMESTAMP_WITH_TIME_ZONE}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 10);
+      for (int i = 0; i < 10; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], TimestampUtils.format(TimestampUtils.toTimestampWithTimeZone(BASE_TIMESTAMP + i)));
       }
     }
     {
@@ -201,7 +232,26 @@ public class TimestampQueriesTest extends BaseQueriesTest {
         Object[] row = rows.get(i);
         assertEquals(row.length, 2);
         assertEquals(row[0], 4L);
-        assertEquals(row[1], new Timestamp(BASE_TIMESTAMP + NUM_RECORDS - i - 1).toString());
+        assertEquals(row[1], TimestampUtils.format(TimestampUtils.toTimestamp(BASE_TIMESTAMP + NUM_RECORDS - i - 1)));
+      }
+    }
+    {
+      String query =
+          "SELECT COUNT(*) AS count, timestampTzColumn FROM testTable GROUP BY timestampTzColumn"
+              + " ORDER BY timestampTzColumn DESC";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema, new DataSchema(new String[]{"count", "timestampTzColumn"},
+          new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.TIMESTAMP_WITH_TIME_ZONE}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 10);
+      for (int i = 0; i < 10; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 2);
+        assertEquals(row[0], 4L);
+        assertEquals(row[1], TimestampUtils.format(
+            TimestampUtils.toTimestampWithTimeZone(BASE_TIMESTAMP + NUM_RECORDS - i - 1)));
       }
     }
     {
@@ -218,7 +268,23 @@ public class TimestampQueriesTest extends BaseQueriesTest {
       for (int i = 0; i < 5; i++) {
         Object[] row = rows.get(i);
         assertEquals(row.length, 1);
-        assertEquals(row[0], new Timestamp(BASE_TIMESTAMP + i).toString());
+        assertEquals(row[0], TimestampUtils.format(TimestampUtils.toTimestamp(BASE_TIMESTAMP + i)));
+      }
+    }
+    {
+      String query = "SELECT CAST(timestampColumn AS TIMESTAMP WITH TIME ZONE) as timestampColumn FROM testTable";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{"timestampColumn"},
+              new ColumnDataType[]{ColumnDataType.TIMESTAMP_WITH_TIME_ZONE}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 10);
+      for (int i = 0; i < 10; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], TimestampUtils.format(TimestampUtils.toTimestampWithTimeZone(BASE_TIMESTAMP + i)));
       }
     }
   }

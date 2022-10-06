@@ -19,7 +19,10 @@
 package org.apache.pinot.core.query.reduce;
 
 import com.google.common.base.Preconditions;
-import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -477,7 +480,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
       case BOOLEAN:
         return dataTable.getInt(rowId, colId) == 1;
       case TIMESTAMP:
-        return new Timestamp(dataTable.getLong(rowId, colId));
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(dataTable.getLong(rowId, colId)), ZoneOffset.UTC);
+      case TIMESTAMP_WITH_TIME_ZONE:
+        return OffsetDateTime.ofInstant(Instant.ofEpochMilli(dataTable.getLong(rowId, colId)), ZoneOffset.UTC);
       case STRING:
       case JSON:
         return dataTable.getString(rowId, colId);

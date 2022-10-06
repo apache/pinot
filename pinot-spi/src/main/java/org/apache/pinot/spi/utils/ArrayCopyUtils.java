@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.utils;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -226,7 +225,13 @@ public class ArrayCopyUtils {
 
   public static void copyFromTimestamp(long[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = new Timestamp(src[i]).toString();
+      dest[i] = TimestampUtils.format(TimestampUtils.toTimestamp(src[i]));
+    }
+  }
+
+  public static void copyFromTimestampWithTimeZone(long[] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = TimestampUtils.format(TimestampUtils.toTimestampWithTimeZone(src[i]));
     }
   }
 
@@ -269,6 +274,12 @@ public class ArrayCopyUtils {
   public static void copyToTimestamp(String[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = TimestampUtils.toMillisSinceEpoch(src[i]);
+    }
+  }
+
+  public static void copyToTimestampWithTimeZone(String[] src, long[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = TimestampUtils.toMillisSinceEpochWithTimeZone(src[i]);
     }
   }
 
@@ -508,6 +519,14 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copyFromTimestampWithTimeZone(long[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copyFromTimestampWithTimeZone(src[i], dest[i], rowLength);
+    }
+  }
+
   public static void copy(String[][] src, int[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       int rowLength = src[i].length;
@@ -561,6 +580,14 @@ public class ArrayCopyUtils {
       int rowLength = src[i].length;
       dest[i] = new long[rowLength];
       copyToTimestamp(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyToTimestampWithTimeZone(String[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copyToTimestampWithTimeZone(src[i], dest[i], rowLength);
     }
   }
 }

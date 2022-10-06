@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.chrono.ISOChronology;
@@ -235,18 +236,20 @@ public class DateTimeFunctions {
    * Converts epoch millis to Timestamp
    */
   @ScalarFunction
-  public static Timestamp toTimestamp(long millis) {
-    return new Timestamp(millis);
+  public static LocalDateTime toTimestamp(long millis) {
+    return TimestampUtils.toTimestamp(millis);
   }
 
+  // TODO: add support for OffsetDateTime as well - this is not
+  // done in the initial pr that introduces TIMESTAMP WITH TIME ZONE
+  // because it requires changes to the way we handle FunctionRegistry
   /**
    * Converts Timestamp to epoch millis
    */
   @ScalarFunction
-  public static long fromTimestamp(Timestamp timestamp) {
-    return timestamp.getTime();
+  public static long fromTimestamp(LocalDateTime timestamp) {
+    return TimestampUtils.toMillisSinceEpoch(timestamp);
   }
-
   /**
    * Converts epoch millis to DateTime string represented by pattern
    */

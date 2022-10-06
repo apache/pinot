@@ -24,10 +24,11 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
@@ -149,12 +150,12 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     LocalTime timeMicrosColLogicalValue = LocalTime.parse(timeMicrosColValue);
     String timestampMillisColName = "column7";
     Instant timestampMillisColLogicalValue = Instant.ofEpochMilli(1649924302123L);
-    Timestamp timestampColValue = new Timestamp(1649924302000L);
-    timestampColValue.setNanos(123000000);
+    LocalDateTime timestampColValue = LocalDateTime.ofInstant(
+        Instant.ofEpochSecond(1649924302L, 123000000), ZoneOffset.UTC);
     String timestampMicrosColName = "column8";
     Instant timestampMicrosColLogicalValue = Instant.ofEpochMilli(1649924302123L).plus(987, ChronoUnit.MICROS);
-    Timestamp timestampMicrosColValue = new Timestamp(1649924302000L);
-    timestampMicrosColValue.setNanos(123987000);
+    LocalDateTime timestampMicrosColValue = LocalDateTime.ofInstant(
+        Instant.ofEpochSecond(1649924302L, 123987000), ZoneOffset.UTC);
     AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
     config.setEnableLogicalTypes(true);
     AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
@@ -226,8 +227,8 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     Assert.assertEquals(genericRow.getValue(timeMicrosColName), timeMicrosColValue);
     Assert.assertEquals(genericRow.getValue(timeMicrosColName).getClass().getSimpleName(), "String");
     Assert.assertEquals(genericRow.getValue(timestampMillisColName), timestampColValue);
-    Assert.assertEquals(genericRow.getValue(timestampMillisColName).getClass().getSimpleName(), "Timestamp");
+    Assert.assertEquals(genericRow.getValue(timestampMillisColName).getClass().getSimpleName(), "LocalDateTime");
     Assert.assertEquals(genericRow.getValue(timestampMicrosColName), timestampMicrosColValue);
-    Assert.assertEquals(genericRow.getValue(timestampMicrosColName).getClass().getSimpleName(), "Timestamp");
+    Assert.assertEquals(genericRow.getValue(timestampMicrosColName).getClass().getSimpleName(), "LocalDateTime");
   }
 }

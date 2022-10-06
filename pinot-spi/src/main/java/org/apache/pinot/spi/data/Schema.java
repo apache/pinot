@@ -436,7 +436,7 @@ public final class Schema implements Serializable {
    * <p>The following validations are performed:
    * <ul>
    *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BOOLEAN,
-   *   TIMESTAMP, STRING, BYTES</li>
+   *   TIMESTAMP, TIMESTAMP WITH TIME ZONE, STRING, BYTES</li>
    *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BYTES</li>
    * </ul>
    */
@@ -457,6 +457,7 @@ public final class Schema implements Serializable {
             case BIG_DECIMAL:
             case BOOLEAN:
             case TIMESTAMP:
+            case TIMESTAMP_WITH_TIME_ZONE:
             case STRING:
             case JSON:
             case BYTES:

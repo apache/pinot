@@ -19,7 +19,6 @@
 package org.apache.pinot.common.data;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -32,6 +31,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -91,8 +91,20 @@ public class FieldSpecTest {
     fieldSpec1 = new DimensionFieldSpec();
     fieldSpec1.setName("svDimension");
     fieldSpec1.setDataType(TIMESTAMP);
-    fieldSpec1.setDefaultNullValue(new Timestamp(0).toString());
-    fieldSpec2 = new DimensionFieldSpec("svDimension", TIMESTAMP, true, new Timestamp(0).toString());
+    fieldSpec1.setDefaultNullValue(TimestampUtils.toTimestamp(0).toString());
+    fieldSpec2 = new DimensionFieldSpec("svDimension", TIMESTAMP, true, TimestampUtils.toTimestamp(0).toString());
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 0L);
+
+    // Single-value timestamp with time zone type dimension field with default null value.
+    fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("svDimension");
+    fieldSpec1.setDataType(TIMESTAMP_WITH_TIME_ZONE);
+    fieldSpec1.setDefaultNullValue(TimestampUtils.toTimestampWithTimeZone(0).toString());
+    fieldSpec2 = new DimensionFieldSpec(
+        "svDimension", TIMESTAMP_WITH_TIME_ZONE, true, TimestampUtils.toTimestampWithTimeZone(0).toString());
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());

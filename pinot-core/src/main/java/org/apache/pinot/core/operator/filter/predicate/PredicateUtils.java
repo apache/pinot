@@ -48,6 +48,8 @@ public class PredicateUtils {
         return getStoredBooleanValue(value);
       case TIMESTAMP:
         return getStoredTimestampValue(value);
+      case TIMESTAMP_WITH_TIME_ZONE:
+        return getStoredTimestampWithTimeZoneValue(value);
       default:
         return value;
     }
@@ -65,6 +67,13 @@ public class PredicateUtils {
    */
   public static String getStoredTimestampValue(String timestampValue) {
     return Long.toString(TimestampUtils.toMillisSinceEpoch(timestampValue));
+  }
+
+  /**
+   * Converts the given timestamp predicate value to the inner representation (millis since epoch).
+   */
+  public static String getStoredTimestampWithTimeZoneValue(String timestampValue) {
+    return Long.toString(TimestampUtils.toMillisSinceEpochWithTimeZone(timestampValue));
   }
 
   /**
@@ -129,6 +138,7 @@ public class PredicateUtils {
           }
         }
         break;
+      case TIMESTAMP_WITH_TIME_ZONE:
       case TIMESTAMP:
         long[] timestampValues = inPredicate.getTimestampValues();
         for (long value : timestampValues) {

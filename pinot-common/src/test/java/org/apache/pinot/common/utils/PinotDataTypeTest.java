@@ -19,10 +19,13 @@
 package org.apache.pinot.common.utils;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -139,10 +142,21 @@ public class PinotDataTypeTest {
     return new Object[][]{
         {STRING_ARRAY, BOOLEAN_ARRAY, new String[] {"true", "false"}, new boolean[] { true, false }},
         {BOOLEAN_ARRAY, BOOLEAN_ARRAY, new boolean[] { true, false }, new boolean[] { true, false }},
-        {LONG_ARRAY, TIMESTAMP_ARRAY, new long[] {1000000L, 2000000L},
-            new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
-        {TIMESTAMP_ARRAY, TIMESTAMP_ARRAY, new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) },
-        new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
+        {LONG_ARRAY, TIMESTAMP_ARRAY,
+            new long[] {1000000L, 2000000L},
+            new LocalDateTime[] { TimestampUtils.toTimestamp(1000000L), TimestampUtils.toTimestamp(2000000L) }},
+        {TIMESTAMP_ARRAY, TIMESTAMP_ARRAY,
+            new LocalDateTime[] { TimestampUtils.toTimestamp(1000000L), TimestampUtils.toTimestamp(2000000L) },
+            new LocalDateTime[] { TimestampUtils.toTimestamp(1000000L), TimestampUtils.toTimestamp(2000000L) }},
+        {LONG_ARRAY, TIMESTAMP_WITH_TIME_ZONE_ARRAY,
+            new long[] {1000000L, 2000000L},
+            new OffsetDateTime[] {
+                TimestampUtils.toTimestampWithTimeZone(1000000L), TimestampUtils.toTimestampWithTimeZone(2000000L) }},
+        {TIMESTAMP_WITH_TIME_ZONE_ARRAY, TIMESTAMP_WITH_TIME_ZONE_ARRAY,
+            new OffsetDateTime[] {
+                TimestampUtils.toTimestampWithTimeZone(1000000L), TimestampUtils.toTimestampWithTimeZone(2000000L) },
+            new OffsetDateTime[] {
+                TimestampUtils.toTimestampWithTimeZone(1000000L), TimestampUtils.toTimestampWithTimeZone(2000000L) }},
         {BYTES_ARRAY, BYTES_ARRAY, new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) },
             new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) }}
     };
@@ -197,11 +211,20 @@ public class PinotDataTypeTest {
 
   @Test
   public void testTimestamp() {
-    Timestamp timestamp = new Timestamp(System.currentTimeMillis());
-    assertEquals(TIMESTAMP.convert(timestamp.getTime(), LONG), timestamp);
+    LocalDateTime timestamp = TimestampUtils.toTimestamp(System.currentTimeMillis());
+    assertEquals(TIMESTAMP.convert(timestamp.toInstant(ZoneOffset.UTC).toEpochMilli(), LONG), timestamp);
     assertEquals(TIMESTAMP.convert(timestamp.toString(), STRING), timestamp);
-    assertEquals(TIMESTAMP.convert(timestamp.getTime(), JSON), timestamp);
+    assertEquals(TIMESTAMP.convert(timestamp.toInstant(ZoneOffset.UTC).toEpochMilli(), JSON), timestamp);
     assertEquals(TIMESTAMP.convert(timestamp.toString(), JSON), timestamp);
+  }
+
+  @Test
+  public void testTimestampWithTimeZone() {
+    OffsetDateTime timestamp = TimestampUtils.toTimestampWithTimeZone(System.currentTimeMillis());
+    assertEquals(TIMESTAMP_WITH_TIME_ZONE.convert(timestamp.toInstant().toEpochMilli(), LONG), timestamp);
+    assertEquals(TIMESTAMP_WITH_TIME_ZONE.convert(timestamp.toString(), STRING), timestamp);
+    assertEquals(TIMESTAMP_WITH_TIME_ZONE.convert(timestamp.toInstant().toEpochMilli(), JSON), timestamp);
+    assertEquals(TIMESTAMP_WITH_TIME_ZONE.convert(timestamp.toString(), JSON), timestamp);
   }
 
   @Test
@@ -213,7 +236,7 @@ public class PinotDataTypeTest {
             + "\"timestamp\":1620324238610}", STRING),
         "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},"
             + "\"timestamp\":1620324238610}");
-    assertEquals(JSON.convert(new Timestamp(1620324238610L), TIMESTAMP), "1620324238610");
+    assertEquals(JSON.convert(TimestampUtils.toTimestamp(1620324238610L), TIMESTAMP), "1620324238610");
   }
 
   @Test
@@ -223,13 +246,14 @@ public class PinotDataTypeTest {
     assertEquals(OBJECT.toFloat(new NumberObject("123")), 123f);
     assertEquals(OBJECT.toDouble(new NumberObject("123")), 123.0);
     assertTrue(OBJECT.toBoolean(new NumberObject("123")));
-    assertEquals(OBJECT.toTimestamp(new NumberObject("123")).getTime(), 123L);
+    assertEquals(OBJECT.toTimestamp(new NumberObject("123")).toInstant(ZoneOffset.UTC).toEpochMilli(), 123L);
+    assertEquals(OBJECT.toTimestampWithTimeZone(new NumberObject("123")).toInstant().toEpochMilli(), 123L);
     assertEquals(OBJECT.toString(new NumberObject("123")), "123");
 
     // check if a well formed JSON string string can be converted to JSON.
     assertEquals(OBJECT.toJson(getGenericTestObject()),
-        "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},"
-            + "\"timestamp\":1620324238610}");
+        "{\"bytes\":\"AAE=\",\"timestampWithTimeZone\":1620324238610,\"map\":{\"key1\":\"value\",\"key2\":null,"
+            + "\"array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}");
 
     // check if a Java string (which does not represent JSON) can be converted into JSON.
     assertEquals(OBJECT.toJson("test"), "\"test\"");
@@ -253,7 +277,8 @@ public class PinotDataTypeTest {
     testCases.put(Float.class, FLOAT);
     testCases.put(Double.class, DOUBLE);
     testCases.put(BigDecimal.class, BIG_DECIMAL);
-    testCases.put(Timestamp.class, TIMESTAMP);
+    testCases.put(LocalDateTime.class, TIMESTAMP);
+    testCases.put(OffsetDateTime.class, TIMESTAMP_WITH_TIME_ZONE);
     testCases.put(String.class, STRING);
     testCases.put(byte[].class, BYTES);
 
@@ -276,7 +301,8 @@ public class PinotDataTypeTest {
     testCases.put(Double.class, DOUBLE_ARRAY);
     testCases.put(String.class, STRING_ARRAY);
     testCases.put(Boolean.class, BOOLEAN_ARRAY);
-    testCases.put(Timestamp.class, TIMESTAMP_ARRAY);
+    testCases.put(LocalDateTime.class, TIMESTAMP_ARRAY);
+    testCases.put(OffsetDateTime.class, TIMESTAMP_WITH_TIME_ZONE_ARRAY);
     testCases.put(byte[].class, BYTES_ARRAY);
 
     for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
@@ -295,7 +321,8 @@ public class PinotDataTypeTest {
     Map<String, Object> map2 = new HashMap<>();
     map2.put("map", map1);
     map2.put("bytes", new byte[]{0, 1});
-    map2.put("timestamp", new Timestamp(1620324238610L));
+    map2.put("timestamp", TimestampUtils.toTimestamp(1620324238610L));
+    map2.put("timestampWithTimeZone", TimestampUtils.toTimestampWithTimeZone(1620324238610L));
 
     return map2;
   }

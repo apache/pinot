@@ -19,12 +19,12 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.cast;
@@ -73,12 +73,23 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     assertEquals(expectedStringValues, scalarStringValues);
 
     expression =
-        RequestContextUtils.getExpression(String.format("CAST(CAST(%s as TIMESTAMP) as STRING)", LONG_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("CAST(CAST(%s as TIMESTAMP) as STRING)", TIMESTAMP_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof CastTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedStringValues[i] = new Timestamp(_longSVValues[i]).toString();
-      scalarStringValues[i] = (String) cast(cast(_longSVValues[i], "timestamp"), "string");
+      expectedStringValues[i] = TimestampUtils.format(TimestampUtils.toTimestamp(_timeSVValues[i]));
+      scalarStringValues[i] = (String) cast(cast(_timeSVValues[i], "timestamp"), "string");
+    }
+    testTransformFunction(transformFunction, expectedStringValues);
+    assertEquals(expectedStringValues, scalarStringValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("CAST(CAST(%s as TIMESTAMP WITH TIME ZONE) as STRING)", TIMESTAMP_TZ_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof CastTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedStringValues[i] = TimestampUtils.format(TimestampUtils.toTimestampWithTimeZone(_timeSVValues[i]));
+      scalarStringValues[i] = (String) cast(cast(_timeSVValues[i], "timestamp with time zone"), "string");
     }
     testTransformFunction(transformFunction, expectedStringValues);
     assertEquals(expectedStringValues, scalarStringValues);
@@ -235,7 +246,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
       int length = _longMVValues[i].length;
       expectedStringValues[i] = new String[length];
       for (int j = 0; j < length; j++) {
-        expectedStringValues[i][j] = new Timestamp(_longMVValues[i][j]).toString();
+        expectedStringValues[i][j] = TimestampUtils.format(TimestampUtils.toTimestamp(_longMVValues[i][j]));
       }
     }
 

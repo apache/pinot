@@ -47,14 +47,7 @@ public class DataTypeConversionFunctions {
       Preconditions.checkArgument(!clazz.isArray() | clazz == byte[].class, "%s must not be an array type", clazz);
       PinotDataType sourceType = PinotDataType.getSingleValueType(clazz);
       String transformed = targetTypeLiteral.toUpperCase();
-      PinotDataType targetDataType;
-      if ("INT".equals(transformed)) {
-        targetDataType = INTEGER;
-      } else if ("VARCHAR".equals(transformed)) {
-        targetDataType = STRING;
-      } else {
-        targetDataType = PinotDataType.valueOf(transformed);
-      }
+      PinotDataType targetDataType = PinotDataType.fromString(transformed);
       if (sourceType == STRING && (targetDataType == INTEGER || targetDataType == LONG)) {
         if (String.valueOf(value).contains(".")) {
           // convert integers via double to avoid parse errors

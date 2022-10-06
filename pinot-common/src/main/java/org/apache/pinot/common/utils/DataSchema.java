@@ -29,7 +29,10 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.EnumSet;
 import org.apache.pinot.common.datatable.DataTable;
@@ -37,6 +40,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -248,6 +252,7 @@ public class DataSchema {
     BIG_DECIMAL(BigDecimal.ZERO),
     BOOLEAN(0) /* Stored as INT */,
     TIMESTAMP(0L) /* Stored as LONG */,
+    TIMESTAMP_WITH_TIME_ZONE(0L) /* Stored as LONG */,
     STRING(""),
     JSON("") /* Stored as STRING */,
     BYTES(new ByteArray(new byte[0])),
@@ -258,6 +263,7 @@ public class DataSchema {
     DOUBLE_ARRAY(new double[0]),
     BOOLEAN_ARRAY(new int[0]) /* Stored as INT_ARRAY */,
     TIMESTAMP_ARRAY(new long[0]) /* Stored as LONG_ARRAY */,
+    TIMESTAMP_WITH_TIME_ZONE_ARRAY(new long[0]) /* Stored as LONG_ARRAY */,
     STRING_ARRAY(new String[0]),
     BYTES_ARRAY(new byte[0][]);
 
@@ -265,7 +271,7 @@ public class DataSchema {
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
     private static final EnumSet<ColumnDataType> ARRAY_TYPES =
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY,
-            BYTES_ARRAY);
+            TIMESTAMP_WITH_TIME_ZONE_ARRAY, BYTES_ARRAY);
     private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES =
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
@@ -289,12 +295,14 @@ public class DataSchema {
         case BOOLEAN:
           return INT;
         case TIMESTAMP:
+        case TIMESTAMP_WITH_TIME_ZONE:
           return LONG;
         case JSON:
           return STRING;
         case BOOLEAN_ARRAY:
           return INT_ARRAY;
         case TIMESTAMP_ARRAY:
+        case TIMESTAMP_WITH_TIME_ZONE_ARRAY:
           return LONG_ARRAY;
         default:
           return this;
@@ -343,6 +351,8 @@ public class DataSchema {
           return DataType.BOOLEAN;
         case TIMESTAMP:
           return DataType.TIMESTAMP;
+        case TIMESTAMP_WITH_TIME_ZONE:
+          return DataType.TIMESTAMP_WITH_TIME_ZONE;
         case STRING:
           return DataType.STRING;
         case JSON:
@@ -373,7 +383,9 @@ public class DataSchema {
         case BOOLEAN:
           return (Integer) value == 1;
         case TIMESTAMP:
-          return new Timestamp((long) value);
+          return LocalDateTime.ofInstant(Instant.ofEpochMilli((long) value), ZoneOffset.UTC);
+        case TIMESTAMP_WITH_TIME_ZONE:
+          return OffsetDateTime.ofInstant(Instant.ofEpochMilli((long) value), ZoneOffset.UTC);
         case STRING:
         case JSON:
           return value.toString();
@@ -393,6 +405,8 @@ public class DataSchema {
           return toBooleanArray(value);
         case TIMESTAMP_ARRAY:
           return toTimestampArray(value);
+        case TIMESTAMP_WITH_TIME_ZONE_ARRAY:
+          return toTimestampWithTimeZoneArray(value);
         case BYTES_ARRAY:
           return (byte[][]) value;
         default:
@@ -408,8 +422,11 @@ public class DataSchema {
         case BIG_DECIMAL:
           return ((BigDecimal) value).toPlainString();
         case TIMESTAMP:
-          assert value instanceof Timestamp;
-          return value.toString();
+          assert value instanceof LocalDateTime;
+          return TimestampUtils.format((LocalDateTime) value);
+        case TIMESTAMP_WITH_TIME_ZONE:
+          assert value instanceof OffsetDateTime;
+          return TimestampUtils.format((OffsetDateTime) value);
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
         default:
@@ -435,7 +452,9 @@ public class DataSchema {
         case BOOLEAN:
           return (Integer) value == 1;
         case TIMESTAMP:
-          return new Timestamp((long) value).toString();
+          return TimestampUtils.format(TimestampUtils.toTimestamp((long) value));
+        case TIMESTAMP_WITH_TIME_ZONE:
+          return TimestampUtils.format(TimestampUtils.toTimestampWithTimeZone((long) value));
         case STRING:
         case JSON:
           return value.toString();
@@ -455,6 +474,8 @@ public class DataSchema {
           return toBooleanArray(value);
         case TIMESTAMP_ARRAY:
           return formatTimestampArray(value);
+        case TIMESTAMP_WITH_TIME_ZONE_ARRAY:
+          return formatTimestampWithTimeZoneArray(value);
         case BYTES_ARRAY:
           return (byte[][]) value;
         default:
@@ -517,17 +538,32 @@ public class DataSchema {
       return booleans;
     }
 
-    private static Timestamp[] toTimestampArray(Object value) {
+    private static LocalDateTime[] toTimestampArray(Object value) {
       long[] longs = (long[]) value;
-      Timestamp[] timestamps = new Timestamp[longs.length];
-      Arrays.setAll(timestamps, i -> new Timestamp(longs[i]));
+      LocalDateTime[] timestamps = new LocalDateTime[longs.length];
+      Arrays.setAll(timestamps, i -> LocalDateTime.ofInstant(Instant.ofEpochMilli(longs[i]), ZoneOffset.UTC));
       return timestamps;
     }
 
     private static String[] formatTimestampArray(Object value) {
       long[] longs = (long[]) value;
       String[] formatted = new String[longs.length];
-      Arrays.setAll(formatted, i -> new Timestamp(longs[i]).toString());
+      Arrays.setAll(formatted, i -> LocalDateTime.ofInstant(Instant.ofEpochMilli(longs[i]), ZoneOffset.UTC).toString());
+      return formatted;
+    }
+
+    private static OffsetDateTime[] toTimestampWithTimeZoneArray(Object value) {
+      long[] longs = (long[]) value;
+      OffsetDateTime[] timestamps = new OffsetDateTime[longs.length];
+      Arrays.setAll(timestamps, i -> OffsetDateTime.ofInstant(Instant.ofEpochMilli(longs[i]), ZoneOffset.UTC));
+      return timestamps;
+    }
+
+    private static String[] formatTimestampWithTimeZoneArray(Object value) {
+      long[] longs = (long[]) value;
+      String[] formatted = new String[longs.length];
+      Arrays.setAll(
+          formatted, i -> OffsetDateTime.ofInstant(Instant.ofEpochMilli(longs[i]), ZoneOffset.UTC).toString());
       return formatted;
     }
 
@@ -551,6 +587,8 @@ public class DataSchema {
           return BOOLEAN;
         case TIMESTAMP:
           return TIMESTAMP;
+        case TIMESTAMP_WITH_TIME_ZONE:
+          return TIMESTAMP_WITH_TIME_ZONE;
         case STRING:
           return STRING;
         case JSON:
@@ -576,6 +614,8 @@ public class DataSchema {
           return BOOLEAN_ARRAY;
         case TIMESTAMP:
           return TIMESTAMP_ARRAY;
+        case TIMESTAMP_WITH_TIME_ZONE:
+          return TIMESTAMP_WITH_TIME_ZONE_ARRAY;
         case STRING:
           return STRING_ARRAY;
         case BYTES:

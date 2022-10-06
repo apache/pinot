@@ -46,7 +46,7 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
     assertFalse(resultMetadata.hasDictionary());
     long[] expectedValues = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = TimeUnit.MILLISECONDS.toDays(_timeValues[i]);
+      expectedValues[i] = TimeUnit.MILLISECONDS.toDays(_timeSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
   }

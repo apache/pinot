@@ -76,16 +76,14 @@ public class JsonUtils {
   public static final String WILDCARD = "*";
 
   // NOTE: Do not expose the ObjectMapper to prevent configuration change
-  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
+  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper().registerModule(new PinotJsonTimeModule());
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
   public static final ObjectReader READER_WITH_BIG_DECIMAL =
       new ObjectMapper().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).reader();
 
-  public static final TypeReference<HashMap<String, Object>> MAP_TYPE_REFERENCE =
-      new TypeReference<HashMap<String, Object>>() {
-      };
+  public static final TypeReference<HashMap<String, Object>> MAP_TYPE_REFERENCE = new TypeReference<>() { };
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws JsonProcessingException {
@@ -292,6 +290,7 @@ public class JsonUtils {
       case BOOLEAN:
         return jsonValue.asBoolean();
       case TIMESTAMP:
+      case TIMESTAMP_WITH_TIME_ZONE:
       case STRING:
       case JSON:
         return jsonValue.asText();
