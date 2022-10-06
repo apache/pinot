@@ -237,7 +237,16 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         }
 
         for (GenericRow row : reusedResult.getTransformedRows()) {
-          _indexCreator.indexRow(row);
+          try {
+            _indexCreator.indexRow(row);
+          } catch (Exception e) {
+            if (!_continueOnError) {
+              throw new RuntimeException("Error occurred while indexing row", e);
+            } else {
+              incompleteRowsFound++;
+              LOGGER.debug("Error occurred while indexing row", e);
+            }
+          }
         }
         indexStopTime = System.currentTimeMillis();
         _totalIndexTime += (indexStopTime - recordReadStopTime);

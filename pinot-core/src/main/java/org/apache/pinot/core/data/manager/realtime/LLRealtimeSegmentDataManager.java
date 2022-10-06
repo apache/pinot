@@ -549,13 +549,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (decodedRow.getException() != null) {
         if (_tableConfig.getIngestionConfig() != null
             && _tableConfig.getIngestionConfig().isContinueOnError()) {
-          decoderResult = new GenericRow();
-          decoderResult.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
-        } else {
           decoderResult = null;
           realtimeRowsDroppedMeter =
               _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
                   realtimeRowsDroppedMeter);
+        } else {
+          throw new RuntimeException("Caught exception while decoding record", decodedRow.getException());
         }
       } else {
         decoderResult = decodedRow.getResult();
