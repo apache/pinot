@@ -1746,7 +1746,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(), "[\"mult(DaysSinceEpoch,'24',3600)\",\"count(*)\"]");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"mult(DaysSinceEpoch,'24','3600')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
