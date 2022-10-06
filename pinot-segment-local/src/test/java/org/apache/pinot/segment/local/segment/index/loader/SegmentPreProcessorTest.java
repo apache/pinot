@@ -1532,7 +1532,8 @@ public class SegmentPreProcessorTest {
         4, false, 1, null, false);
       Assert.fail("Forward index cannot be disabled for dictionary disabled columns!");
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Dictionary disabled columns cannot disable the forward index");
+      assertEquals(e.getMessage(), "Dictionary disabled column: newForwardIndexDisabledColumnSV cannot disable the "
+          + "forward index");
     }
 
     constructV1Segment();
@@ -1546,7 +1547,8 @@ public class SegmentPreProcessorTest {
           _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, false);
       Assert.fail("Forward index cannot be disabled for dictionary disabled columns!");
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Dictionary disabled columns cannot disable the forward index");
+      assertEquals(e.getMessage(), "Dictionary disabled column: newForwardIndexDisabledColumnSV cannot disable the "
+          + "forward index");
     }
 
     // Reset the no dictionary columns
@@ -1600,7 +1602,8 @@ public class SegmentPreProcessorTest {
           _newColumnsSchemaWithForwardIndexDisabled, true, true, true, 4, true, 0, null, false);
       Assert.fail("Forward index cannot be disabled without enabling the inverted index!");
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Inverted index must be enabled for forward index disabled columns");
+      assertEquals(e.getMessage(), "Inverted index must be enabled for forward index disabled column: "
+          + "newForwardIndexDisabledColumnSV");
     }
 
     constructV1Segment();
@@ -1614,7 +1617,8 @@ public class SegmentPreProcessorTest {
           NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1, _newColumnsSchemaWithForwardIndexDisabled, true, true, true,
           4, true, 0, null, false);
     } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "Inverted index must be enabled for forward index disabled columns");
+      assertEquals(e.getMessage(), "Inverted index must be enabled for forward index disabled column: "
+          + "newForwardIndexDisabledColumnSV");
     }
 
     _indexLoadingConfig.setForwardIndexDisabledColumns(new HashSet<>());
