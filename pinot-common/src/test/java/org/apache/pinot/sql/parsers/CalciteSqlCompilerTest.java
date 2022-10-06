@@ -363,7 +363,7 @@ public class CalciteSqlCompilerTest {
 
     {
       PinotQuery pinotQuery =
-          CalciteSqlParser.compileToPinotQuery("select * from vegetable where is_subnet_of('192.168.0.1/24', foo)");
+          CalciteSqlParser.compileToPinotQuery("select * from vegetable where isSubnetOf('192.168.0.1/24', foo)");
       Function func = pinotQuery.getFilterExpression().getFunctionCall();
       Assert.assertEquals(func.getOperator(), FilterKind.EQUALS.name());
       List<Expression> operands = func.getOperands();
@@ -374,7 +374,7 @@ public class CalciteSqlCompilerTest {
 
     {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
-          "select * from vegetable where is_subnet_of('192.168.0.1/24', foo)=true AND is_subnet_of('192.168.0.1/24', "
+          "select * from vegetable where isSubnetOf('192.168.0.1/24', foo)=true AND isSubnetOf('192.168.0.1/24', "
               + "foo)");
       Function func = pinotQuery.getFilterExpression().getFunctionCall();
       Assert.assertEquals(func.getOperator(), FilterKind.AND.name());
@@ -2015,64 +2015,104 @@ public class CalciteSqlCompilerTest {
     Assert.assertNotNull(expectedError);
     Assert.assertTrue(expectedError instanceof SqlCompilationException);
 
-    query = "select is_subnet_of('192.168.0.1/24', '192.168.0.225') from mytable";
+    query = "select isSubnetOf('192.168.0.1/24', '192.168.0.225') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     boolean result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
 
-    query = "select is_subnet_of('192.168.0.1/24', '192.168.0.1') from mytable";
+    query = "select isSubnetOf('192.168.0.1/24', '192.168.0.1') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
 
-    query = "select is_subnet_of('192.168.0.1/24', '192.168.0.0') from mytable";
+    query = "select isSubnetOf('10.34.0.32/27', '10.34.0.40') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
 
-    query = "select is_subnet_of('10.3.168.0/22', '10.3.168.123') from mytable";
+    query = "select isSubnetOf('10.32.229.160/28', '10.32.229.166') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
 
-    query = "select is_subnet_of('10.3.168.0/22', '10.3.171.255') from mytable";
+    query = "select isSubnetOf('2a04:f547:255:1::/64', '2a04:f547:255:1::2050') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
 
-    query = "select is_subnet_of('10.3.168.0/22', '1.2.3.1') from mytable";
+    query = "select isSubnetOf('10.154.116.0/26', '10.154.116.21') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select isSubnetOf('2620:119:50e7:101::/64', '2620:119:50e7:101::9002:e15') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select isSubnetOf('144.2.15.0/26', '144.2.15.28') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select isSubnetOf('10.252.186.64/26', '10.252.186.79') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select isSubnetOf('10.187.84.128/26', '10.187.84.178') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select isSubnetOf('192.168.0.1/24', '192.168.0.0') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select isSubnetOf('10.3.168.0/22', '10.3.168.123') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select isSubnetOf('10.3.168.0/22', '10.3.171.255') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select isSubnetOf('10.3.168.0/22', '1.2.3.1') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertFalse(result);
 
-    query = "select is_subnet_of('1.2.3.128/1', '127.255.255.255') from mytable";
+    query = "select isSubnetOf('1.2.3.128/1', '127.255.255.255') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
 
-    query = "select is_subnet_of('1.2.3.128/0', '192.168.5.1') from mytable";
+    query = "select isSubnetOf('1.2.3.128/0', '192.168.5.1') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
 
     query =
-        "select is_subnet_of('2001:db8:85a3::8a2e:370:7334/62', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') from "
+        "select isSubnetOf('2001:db8:85a3::8a2e:370:7334/62', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') from "
             + "mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
 
-    query = "select is_subnet_of('123:db8:85a3::8a2e:370:7334/72', '124:db8:85a3::8a2e:370:7334') from mytable";
+    query = "select isSubnetOf('123:db8:85a3::8a2e:370:7334/72', '124:db8:85a3::8a2e:370:7334') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertFalse(result);
 
-    query = "select is_subnet_of('7890:db8:113::8a2e:370:7334/127', '7890:db8:113::8a2e:370:7336') from mytable";
+    query = "select isSubnetOf('7890:db8:113::8a2e:370:7334/127', '7890:db8:113::8a2e:370:7336') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertFalse(result);
 
-    query = "select is_subnet_of('7890:db8:113::8a2e:370:7334/127', '7890:db8:113::8a2e:370:7335') from mytable";
+    query = "select isSubnetOf('7890:db8:113::8a2e:370:7334/127', '7890:db8:113::8a2e:370:7335') from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
