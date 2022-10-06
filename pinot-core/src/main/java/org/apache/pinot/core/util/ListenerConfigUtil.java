@@ -155,10 +155,11 @@ public final class ListenerConfigUtil {
   public static List<ListenerConfig> buildMinionConfigs(PinotConfiguration minionConf) {
     List<ListenerConfig> listeners = new ArrayList<>();
 
-    int port = minionConf.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT,
-        CommonConstants.Minion.DEFAULT_HELIX_PORT);
-    listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, port,
-        CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
+    String portString = minionConf.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT);
+    if (portString != null) {
+      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(portString),
+          CommonConstants.HTTP_PROTOCOL, new TlsConfig()));
+    }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(minionConf, CommonConstants.Minion.MINION_TLS_PREFIX);
     listeners.addAll(buildListenerConfigs(minionConf, "pinot.minion.adminapi", tlsDefaults));
