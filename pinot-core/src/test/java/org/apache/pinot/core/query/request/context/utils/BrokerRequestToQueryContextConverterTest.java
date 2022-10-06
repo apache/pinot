@@ -37,6 +37,7 @@ import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction
 import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -177,11 +178,13 @@ public class BrokerRequestToQueryContextConverterTest {
           new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
               Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forFunction(
                   new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
-                      Arrays.asList(ExpressionContext.forIdentifier("bar"), ExpressionContext.forLiteral("123"))))))));
+                      Arrays.asList(ExpressionContext.forIdentifier("bar"),
+                          ExpressionContext.forLiteralContext(FieldSpec.DataType.LONG, Long.valueOf(123)))))))));
       assertEquals(selectExpressions.get(0).toString(), "add(foo,add(bar,'123'))");
       assertEquals(selectExpressions.get(1), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
-              Arrays.asList(ExpressionContext.forLiteral("456"), ExpressionContext.forIdentifier("foobar")))));
+              Arrays.asList(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "456"),
+                  ExpressionContext.forIdentifier("foobar")))));
       assertEquals(selectExpressions.get(1).toString(), "sub('456',foobar)");
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
       assertNull(queryContext.getFilter());
@@ -191,7 +194,8 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(orderByExpressions.size(), 1);
       assertEquals(orderByExpressions.get(0), new OrderByExpressionContext(ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
-              Arrays.asList(ExpressionContext.forLiteral("456"), ExpressionContext.forIdentifier("foobar")))), true));
+              Arrays.asList(ExpressionContext.forLiteralContext(FieldSpec.DataType.LONG, Long.valueOf(456)),
+                  ExpressionContext.forIdentifier("foobar")))), true));
       assertEquals(orderByExpressions.get(0).toString(), "sub('456',foobar) ASC");
       assertNull(queryContext.getHavingFilter());
       assertEquals(queryContext.getLimit(), 20);
@@ -200,6 +204,17 @@ public class BrokerRequestToQueryContextConverterTest {
       assertTrue(QueryContextUtils.isSelectionQuery(queryContext));
       assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
       assertFalse(QueryContextUtils.isDistinctQuery(queryContext));
+    }
+
+    // Boolean literal parsing
+    {
+      String query = "SELECT true = true FROM testTable;";
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      assertEquals(queryContext.getTableName(), "testTable");
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      assertEquals(selectExpressions.size(), 1);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forLiteralContext(FieldSpec.DataType.BOOLEAN, true));
+      assertEquals(selectExpressions.get(0).toString(), "'true'");
     }
 
     // Aggregation group-by with transform, order-by
@@ -485,10 +500,12 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(function.getFunctionName(), "distinctcountthetasketch");
       List<ExpressionContext> arguments = function.getArguments();
       assertEquals(arguments.get(0), ExpressionContext.forIdentifier("foo"));
-      assertEquals(arguments.get(1), ExpressionContext.forLiteral("nominalEntries=1000"));
-      assertEquals(arguments.get(2), ExpressionContext.forLiteral("bar='a'"));
-      assertEquals(arguments.get(3), ExpressionContext.forLiteral("bar='b'"));
-      assertEquals(arguments.get(4), ExpressionContext.forLiteral("SET_INTERSECT($1, $2)"));
+      assertEquals(arguments.get(1),
+          ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "nominalEntries=1000"));
+      assertEquals(arguments.get(2), ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "bar='a'"));
+      assertEquals(arguments.get(3), ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "bar='b'"));
+      assertEquals(arguments.get(4),
+          ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "SET_INTERSECT($1, $2)"));
       assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
       assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
       assertTrue(QueryContextUtils.isAggregationQuery(queryContext));

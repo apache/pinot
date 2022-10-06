@@ -2792,4 +2792,37 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
     return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
   }
+
+  @Test
+  public void testBooleanLiteralsFunc()
+      throws Exception {
+    // Test boolean equal true case.
+    String sqlQuery = "SELECT (true = true) = true FROM mytable where true = true";
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertTrue(rows.get(0).get(0).asBoolean());
+    // Test boolean equal false case.
+    sqlQuery = "SELECT (true = true) = false FROM mytable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertFalse(rows.get(0).get(0).asBoolean());
+    // Test boolean not equal true case.
+    sqlQuery = "SELECT true != false FROM mytable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertTrue(rows.get(0).get(0).asBoolean());
+    // Test boolean not equal false case.
+    sqlQuery = "SELECT true != true FROM mytable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertFalse(rows.get(0).get(0).asBoolean());
+  }
 }
