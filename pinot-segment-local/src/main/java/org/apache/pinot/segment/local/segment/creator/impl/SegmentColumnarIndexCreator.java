@@ -714,8 +714,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (timeColumnName != null) {
       ColumnIndexCreationInfo timeColumnIndexCreationInfo = _indexCreationInfoMap.get(timeColumnName);
       if (timeColumnIndexCreationInfo != null) {
-        long startTime;
-        long endTime;
+        long startTime = -1;
+        long endTime = -1;
         TimeUnit timeUnit;
 
         // Use start/end time in config if defined
@@ -738,12 +738,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 startTime = dateTimeFormatter.parseMillis(startTimeStr);
                 endTime = dateTimeFormatter.parseMillis(endTimeStr);
               } catch (Exception e) {
-                if (_config.isContinueOnError()) {
-                  startTime = -1;
-                  endTime = -1;
-                } else {
-                  throw new RuntimeException("Error occurred while parsing datetime", e);
-                }
+                  LOGGER.debug("Error occurred while parsing timestamp, startTime: {}, endTime: {}",
+                      startTimeStr, endTimeStr, e);
               }
               timeUnit = TimeUnit.MILLISECONDS;
             } else {
@@ -752,12 +748,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 startTime = Long.parseLong(startTimeStr);
                 endTime = Long.parseLong(endTimeStr);
               } catch (Exception e) {
-                if (_config.isContinueOnError()) {
-                  startTime = -1;
-                  endTime = -1;
-                } else {
-                  throw new RuntimeException("Error occurred while parsing datetime", e);
-                }
+                LOGGER.debug("Error occurred while parsing timestamp, startTime: {}, endTime: {}",
+                    startTimeStr, endTimeStr, e);
               }
               timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
             }
@@ -776,23 +768,19 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           }
         }
 
+        Interval timeInterval =
+            new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
+        boolean isValidTimeInterval = TimeUtils.isValidTimeInterval(timeInterval);
         if (!_config.isSkipTimeValueCheck()) {
-          Interval timeInterval =
-              new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
-          boolean isValidTimeInterval = TimeUtils.isValidTimeInterval(timeInterval);
-          if (!_config.isContinueOnError()) {
-            Preconditions.checkState(isValidTimeInterval,
-                "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
-                timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumnName,
-                TimeUtils.VALID_TIME_INTERVAL);
-            setSegmentTimeInterval(properties, startTime, endTime, timeUnit);
-          } else {
-            if (isValidTimeInterval) {
-              setSegmentTimeInterval(properties, startTime, endTime, timeUnit);
-            }
-          }
-        } else {
+          Preconditions.checkState(isValidTimeInterval,
+              "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
+              timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumnName,
+              TimeUtils.VALID_TIME_INTERVAL);
           setSegmentTimeInterval(properties, startTime, endTime, timeUnit);
+        } else if (isValidTimeInterval) {
+          setSegmentTimeInterval(properties, startTime, endTime, timeUnit);
+        } else {
+          // Do not set value
         }
       }
     }

@@ -37,7 +37,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-
+import static org.testng.Assert.assertTrue;
 
 public class SegmentMetadataImplTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
@@ -79,9 +79,9 @@ public class SegmentMetadataImplTest {
     Assert.assertTrue(jsonMeta.get("creatorName").isNull());
     assertEquals(jsonMeta.get("creationTimeMillis").asLong(), metadata.getIndexCreationTime());
     assertEquals(jsonMeta.get("timeColumn").asText(), metadata.getTimeColumn());
-    assertEquals(jsonMeta.get("timeUnit").asText(), metadata.getTimeUnit().name());
-    assertEquals(jsonMeta.get("startTimeMillis").asLong(), metadata.getTimeInterval().getStartMillis());
-    assertEquals(jsonMeta.get("endTimeMillis").asLong(), metadata.getTimeInterval().getEndMillis());
+    assertTrue(jsonMeta.get("timeUnit").isNull());
+    assertTrue(jsonMeta.get("startTimeMillis").isNull());
+    assertTrue(jsonMeta.get("endTimeMillis").isNull());
     assertEquals(jsonMeta.get("totalDocs").asInt(), metadata.getTotalDocs());
     assertEquals(jsonMeta.get("custom").get("k1").asText(), metadata.getCustomMap().get("k1"));
     assertEquals(jsonMeta.get("custom").get("k2").asText(), metadata.getCustomMap().get("k2"));

@@ -136,26 +136,25 @@ public class SegmentColumnarIndexCreatorTest {
       throws Exception {
     long withTZ =
         getStartTimeInSegmentMetadata("1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ssZ",
-            "2021-07-21T06:48:51Z", false);
+            "2021-07-21T06:48:51Z", true);
     long withoutTZ =
         getStartTimeInSegmentMetadata("1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ss",
-            "2021-07-21T06:48:51", false);
+            "2021-07-21T06:48:51", true);
     Assert.assertEquals(withTZ, 1626850131000L); // as UTC timestamp.
     Assert.assertEquals(withTZ, withoutTZ);
 
-   Assert.assertThrows(() ->
-       getStartTimeInSegmentMetadata("1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ssZ", "2021-07-21", false));
+
     long wrongFormat =
-        getStartTimeInSegmentMetadata("1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ssZ", "2021-07-21", true);
+        getStartTimeInSegmentMetadata("1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ssZ", "2021-07-21", false);
     long outOfRangeTime =
         getStartTimeInSegmentMetadata("1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ssZ",
-            "2092-07-21T06:48:51Z", true);
+            "2092-07-21T06:48:51Z", false);
     Assert.assertEquals(wrongFormat, Long.MAX_VALUE);
     Assert.assertEquals(outOfRangeTime, Long.MAX_VALUE);
   }
 
   private static long getStartTimeInSegmentMetadata(String testDateTimeFormat, String testDateTime,
-      boolean continueOnError) throws Exception {
+      boolean segmentTimeValueCheck) throws Exception {
     String timeColumn = "foo";
     Schema schema = new Schema.SchemaBuilder().addDateTime(timeColumn, FieldSpec.DataType.STRING, testDateTimeFormat,
         "1:MILLISECONDS").build();
@@ -166,7 +165,7 @@ public class SegmentColumnarIndexCreatorTest {
     String indexDirPath = new File(TEMP_DIR, segmentName).getAbsolutePath();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(indexDirPath);
-    config.setContinueOnError(continueOnError);
+    config.setSegmentTimeValueCheck(segmentTimeValueCheck);
     config.setSegmentName(segmentName);
     try {
       FileUtils.deleteQuietly(new File(indexDirPath));
