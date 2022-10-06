@@ -453,11 +453,10 @@ public class PinotHelixTaskResourceManager {
    */
   public synchronized Map<String, String> getTaskRuntimeConfig(String taskName) {
     JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
-    jobConfig.getNumConcurrentTasksPerInstance();
     HashMap<String, String> configs = new HashMap<>();
     configs.put("ConcurrentTasksPerWorker", String.valueOf(jobConfig.getNumConcurrentTasksPerInstance()));
-    configs.put("TaskTimeoutInMs", String.valueOf(jobConfig.getTimeoutPerTask()));
-    configs.put("TaskExpireTimeInMs", String.valueOf(jobConfig.getExpiry()));
+    configs.put("TaskTimeoutMs", String.valueOf(jobConfig.getTimeoutPerTask()));
+    configs.put("TaskExpireTimeMs", String.valueOf(jobConfig.getExpiry()));
     configs.put("MinionWorkerGroupTag", jobConfig.getInstanceGroupTag());
     return configs;
   }
