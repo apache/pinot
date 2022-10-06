@@ -1,0 +1,22 @@
+{
+  "tableName": "lineorder",
+  "tableType": "OFFLINE",
+  "tenants": {
+  },
+  "segmentsConfig": {
+    "segmentPushType": "REFRESH",
+    "replication": "1",
+    "schemaName": "lineorder"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP"
+  },
+  "ingestionConfig": {
+    "transformConfigs": [
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

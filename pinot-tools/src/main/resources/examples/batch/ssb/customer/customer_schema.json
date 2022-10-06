@@ -1,0 +1,41 @@
+{
+  "schemaName": "customer",
+  "metricFieldSpecs": [
+
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "C_CUSTKEY"
+    },
+    {
+      "dataType": "STRING",
+      "name": "C_NAME"
+    },
+    {
+      "dataType": "STRING",
+      "name": "C_ADDRESS"
+    },
+    {
+      "dataType": "STRING",
+      "name": "C_CITY"
+    },
+    {
+      "dataType": "STRING",
+      "name": "C_NATION"
+    },
+    {
+      "dataType": "STRING",
+      "name": "C_REGION"
+    },
+    {
+      "dataType": "STRING",
+      "name": "C_PHONE"
+    },
+    {
+      "dataType": "STRING",
+      "name": "C_MKTSEGMENT"
+    }
+  ],
+  "primaryKeyColumns": ["C_CUSTKEY"]
+}
