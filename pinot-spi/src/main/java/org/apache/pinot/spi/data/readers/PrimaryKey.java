@@ -22,7 +22,6 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
