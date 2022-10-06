@@ -1,0 +1,74 @@
+{
+  "schemaName": "dates",
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "D_DATEKEY"
+    },
+    {
+      "dataType": "STRING",
+      "name": "D_DATE"
+    },
+    {
+      "dataType": "STRING",
+      "name": "D_DAYOFWEEK"
+    },
+    {
+      "dataType": "STRING",
+      "name": "D_MONTH"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_YEAR"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_YEARMONTHNUM"
+    },
+    {
+      "dataType": "STRING",
+      "name": "D_YEARMONTH"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_DAYNUMINWEEK"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_DAYNUMINMONTH"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_DAYNUMINYEAR"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_MONTHNUMINYEAR"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_WEEKNUMINYEAR"
+    },
+    {
+      "dataType": "STRING",
+      "name": "D_SELLINGSEASON"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_LASTDAYINWEEKFL"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_LASTDAYINMONTHFL"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_HOLIDAYFL"
+    },
+    {
+      "dataType": "INT",
+      "name": "D_WEEKDAYFL"
+    }
+  ],
+  "primaryKeyColumns": ["D_DATEKEY"]
+}

@@ -1,0 +1,76 @@
+{
+  "schemaName": "lineorder",
+  "metricFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "LO_EXTENDEDPRICE"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_ORDTOTALPRICE"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_DISCOUNT"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_REVENUE"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_SUPPLYCOST"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "LO_ORDERKEY"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_LINENUMBER"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_CUSTKEY"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_PARTKEY"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_SUPPKEY"
+    },
+    {
+      "dataType": "STRING",
+      "name": "LO_ORDERPRIORITY"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_SHIPPRIORITY"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_QUANTITY"
+    },
+    {
+      "dataType": "INT",
+      "name": "LO_TAX"
+    },
+    {
+      "dataType": "STRING",
+      "name": "LO_SHIPMODE"
+    },
+    {
+      "name": "LO_COMMITDATE",
+      "dataType": "INT"
+    },
+    {
+      "name": "LO_ORDERDATE",
+      "dataType": "INT"
+    }
+  ],
+  "primaryKeyColumns": ["LO_ORDERKEY", "LO_LINENUMBER"]
+}

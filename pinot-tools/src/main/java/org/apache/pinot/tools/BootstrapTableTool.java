@@ -38,7 +38,9 @@ import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
+import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -158,10 +160,23 @@ public class BootstrapTableTool {
     }
     if (ingestionJobSpecFile != null) {
       if (ingestionJobSpecFile.exists()) {
-        LOGGER.info("Launch data ingestion job to build index segment for table {} and push to controller [{}://{}:{}]",
-            tableName, _controllerProtocol, _controllerHost, _controllerPort);
+        String controllerAuthority = String.format("%s://%s:%s", _controllerProtocol, _controllerHost, _controllerPort);
+        LOGGER.info("Launch data ingestion job to build index segment for table {} and push to controller [{}]",
+            tableName, controllerAuthority);
         try (Reader reader = new BufferedReader(new FileReader(ingestionJobSpecFile.getAbsolutePath()))) {
           SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
+
+          // rewrite table and schema URI spec if the controller URI is not the same as the bootstrap tool setting.
+          TableSpec tableSpec = spec.getTableSpec();
+          URI tableConfigURI = URI.create(tableSpec.getTableConfigURI());
+          tableSpec.setTableConfigURI(controllerAuthority + tableConfigURI.getPath());
+          URI schemaURI = URI.create(tableSpec.getSchemaURI());
+          tableSpec.setSchemaURI(controllerAuthority + schemaURI.getPath());
+          PinotClusterSpec[] pinotClusterSpecs = spec.getPinotClusterSpecs();
+          for (PinotClusterSpec pinotClusterSpec : pinotClusterSpecs) {
+            pinotClusterSpec.setControllerURI(controllerAuthority);
+          }
+
           String inputDirURI = spec.getInputDirURI();
           if (!new File(inputDirURI).exists()) {
             URL resolvedInputDirURI = BootstrapTableTool.class.getClassLoader().getResource(inputDirURI);
