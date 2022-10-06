@@ -398,7 +398,7 @@ public final class IngestionUtils {
     if (Boolean.TRUE.equals(genericRow.getValue(GenericRow.SKIP_RECORD_KEY))) {
       return false;
     }
-    if (ingestionConfig != null && ingestionConfig.isSkipPartialRecords()
+    if (ingestionConfig != null && ingestionConfig.isSkipIncompleteRecords()
         && Boolean.TRUE.equals(genericRow.getValue(GenericRow.INCOMPLETE_RECORD_KEY))) {
       return false;
     }
