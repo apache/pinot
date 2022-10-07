@@ -24,6 +24,20 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
+/**
+ * Configs related to the JSON index:
+ * - maxLevels: Max levels to flatten the json object (array is also counted as one level), non-positive value means
+ *              unlimited
+ * - excludeArray: Whether to exclude array when flattening the object
+ * - disableCrossArrayUnnest: Whether to not unnest multiple arrays (unique combination of all elements)
+ * - includePaths: Only include the given paths, e.g. "$.a.b", "$.a.c[*]" (mutual exclusive with excludePaths). Paths
+ *                 under the included paths will be included, e.g. "$.a.b.c" will be included when "$.a.b" is configured
+ *                 to be included.
+ * - excludePaths: Exclude the given paths, e.g. "$.a.b", "$.a.c[*]" (mutual exclusive with includePaths). Paths under
+ *                 the excluded paths will also be excluded, e.g. "$.a.b.c" will be excluded when "$.a.b" is configured
+ *                 to be excluded.
+ * - excludeFields: Exclude the given fields, e.g. "b", "c", even if it is under the included paths.
+ */
 public class JsonIndexConfig extends BaseJsonConfig {
   private int _maxLevels = -1;
   private boolean _excludeArray = false;
