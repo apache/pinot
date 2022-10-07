@@ -61,6 +61,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   @VisibleForTesting
   public final Set<IndexSegment> _replacedSegments = ConcurrentHashMap.newKeySet();
 
+  protected volatile boolean _closed = false;
+
   protected long _lastOutOfOrderEventReportTimeNs = Long.MIN_VALUE;
   protected int _numOutOfOrderEvents = 0;
 
@@ -245,6 +247,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ((ImmutableSegmentImpl) segment).persistValidDocIdsSnapshot(validDocIds);
       }
 
+      if (_closed) {
+        _logger.info("Skip removing segment: {} because metadata manager is already closed", segment);
+        return;
+      }
+
       if (validDocIds == null || validDocIds.isEmpty()) {
         _logger.info("Skip removing segment without valid docs: {}", segmentName);
         return;
@@ -281,5 +288,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   public void close()
       throws IOException {
     _logger.info("Closing the metadata manager, current primary key count: {}", getNumPrimaryKeys());
+    _closed = true;
   }
 }
