@@ -335,15 +335,15 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   public void testHashPrimaryKey() {
     PrimaryKey pk = new PrimaryKey(new Object[]{"uuid-1", "uuid-2", "uuid-3"});
     assertEquals(BytesUtils.toHexString(((ByteArray) HashUtils.hashPrimaryKey(pk, HashFunction.MD5)).getBytes()),
-        "58de44997505014e02982846a4d1cbbd");
+        "6ca926be8c2d1d980acf48ba48418e24");
     assertEquals(BytesUtils.toHexString(((ByteArray) HashUtils.hashPrimaryKey(pk, HashFunction.MURMUR3)).getBytes()),
-        "7e6b4a98296292a4012225fff037fa8c");
+        "e4540494e43b27e312d01f33208c6a4e");
     // reorder
     pk = new PrimaryKey(new Object[]{"uuid-3", "uuid-2", "uuid-1"});
     assertEquals(BytesUtils.toHexString(((ByteArray) HashUtils.hashPrimaryKey(pk, HashFunction.MD5)).getBytes()),
-        "d2df12c6dea7b83f965613614eee58e2");
+        "fc2159b78d07f803fdfb0b727315a445");
     assertEquals(BytesUtils.toHexString(((ByteArray) HashUtils.hashPrimaryKey(pk, HashFunction.MURMUR3)).getBytes()),
-        "8d68b314cc0c8de4dbd55f4dad3c3e66");
+        "37fab5ef0ea39711feabcdc623cb8a4e");
   }
 
   /**
