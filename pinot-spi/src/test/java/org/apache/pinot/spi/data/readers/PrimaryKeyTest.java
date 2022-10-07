@@ -75,4 +75,18 @@ public class PrimaryKeyTest {
     byteBuffer.get(arr);
     assertEquals(BigDecimalUtils.deserialize(arr), values[6]);
   }
+
+  @Test
+  public void testSerializationSingleVal() {
+    Object[] values = new Object[]{
+        "foo_bar"
+    };
+    PrimaryKey pk = new PrimaryKey(values);
+    byte[] bytes = pk.asBytes();
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    byte[] arr = new byte[7];
+    byteBuffer.get(arr);
+    String out = new String(arr, StandardCharsets.UTF_8);
+    assertEquals(out, values[0]);
+  }
 }
