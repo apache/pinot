@@ -809,12 +809,11 @@ const getTasksList = async (tableName, taskType) => {
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
         const debugData = await getTaskDebugData(taskID);
-        const startTime = moment(get(debugData, 'data.subtaskInfos.0.startTime'), 'YYYY-MM-DD hh:mm:ss');
         finalResponse.records.push([
           taskID,
           status,
-          get(debugData, 'data.subtaskInfos.0.startTime'),
-          get(debugData, 'data.subtaskInfos.0.finishTime', ''),
+          get(debugData, 'data.startTime', ''),
+          get(debugData, 'data.finishTime', ''),
           get(debugData, 'data.subtaskCount.total', 0)
         ]);
       };
