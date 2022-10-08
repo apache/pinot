@@ -89,8 +89,12 @@ public class IpAddressFunctions {
 
   @ScalarFunction
   public static boolean isSubnetOf(String ipPrefix, String ipAddress) {
-    IPAddress prefix = new IPAddressString(ipPrefix).getAddress().toPrefixBlock();
-    return prefix.contains(new IPAddressString(ipAddress).getAddress());
+    IPAddressString prefix = new IPAddressString(ipPrefix);
+    if (!prefix.isPrefixed()) {
+      throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
+    }
+    IPAddress address = prefix.getAddress().toPrefixBlock();
+    return address.contains(new IPAddressString(ipAddress).getAddress());
   }
   /**
    * Returns true if ipAddress is in the subnet of ipPrefix (IPv4 or IPv6)
