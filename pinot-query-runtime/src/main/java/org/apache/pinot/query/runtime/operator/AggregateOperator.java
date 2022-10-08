@@ -48,7 +48,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
 
-  private BaseOperator<TransferableBlock> _inputOperator;
+  private Operator<TransferableBlock> _inputOperator;
   private List<RexExpression> _aggCalls;
   private List<RexExpression> _groupSet;
 
@@ -64,7 +64,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private boolean _isCumulativeBlockConstructed;
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
-  public AggregateOperator(BaseOperator<TransferableBlock> inputOperator, DataSchema dataSchema,
+  public AggregateOperator(Operator<TransferableBlock> inputOperator, DataSchema dataSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema upstreamDataSchema) {
     _inputOperator = inputOperator;
     _aggCalls = aggCalls;

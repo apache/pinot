@@ -18,36 +18,23 @@
  */
 package org.apache.pinot.query.planner.stage;
 
-import org.apache.calcite.rex.RexNode;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
+public interface StageNodeVisitor<T, C> {
 
+  T visitAggregate(AggregateNode node, C context);
 
-public class FilterNode extends AbstractStageNode {
-  @ProtoProperties
-  private RexExpression _condition;
+  T visitFilter(FilterNode node, C context);
 
-  public FilterNode(int stageId) {
-    super(stageId);
-  }
+  T visitJoin(JoinNode node, C context);
 
-  public FilterNode(int currentStageId, DataSchema dataSchema, RexNode condition) {
-    super(currentStageId, dataSchema);
-    _condition = RexExpression.toRexExpression(condition);
-  }
+  T visitMailboxReceive(MailboxReceiveNode node, C context);
 
-  public RexExpression getCondition() {
-    return _condition;
-  }
+  T visitMailboxSend(MailboxSendNode node, C context);
 
-  @Override
-  public String explain() {
-    return "FILTER";
-  }
+  T visitProject(ProjectNode node, C context);
 
-  @Override
-  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
-    return visitor.visitFilter(this, context);
-  }
+  T visitSort(SortNode node, C context);
+
+  T visitTableScan(TableScanNode node, C context);
+
+  T visitValue(ValueNode node, C context);
 }

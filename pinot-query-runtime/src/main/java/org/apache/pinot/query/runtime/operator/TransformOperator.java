@@ -37,13 +37,13 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
  */
 public class TransformOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "TRANSFORM";
-  private final BaseOperator<TransferableBlock> _upstreamOperator;
+  private final Operator<TransferableBlock> _upstreamOperator;
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public TransformOperator(BaseOperator<TransferableBlock> upstreamOperator, DataSchema dataSchema,
+  public TransformOperator(Operator<TransferableBlock> upstreamOperator, DataSchema dataSchema,
       List<RexExpression> transforms, DataSchema upstreamDataSchema) {
     _upstreamOperator = upstreamOperator;
     _resultColumnSize = transforms.size();

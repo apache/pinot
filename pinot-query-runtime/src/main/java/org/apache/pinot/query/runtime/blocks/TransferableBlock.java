@@ -123,7 +123,7 @@ public class TransferableBlock implements Block {
             throw new UnsupportedOperationException("Unable to build from container with type: " + _type);
         }
       } catch (Exception e) {
-        throw new RuntimeException("Unable to create DataBlock");
+        throw new RuntimeException("Unable to create DataBlock", e);
       }
     }
     return _dataBlock;

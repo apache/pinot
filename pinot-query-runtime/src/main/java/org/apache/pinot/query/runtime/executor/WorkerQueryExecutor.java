@@ -18,38 +18,17 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.request.context.ThreadTimer;
-import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
-import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.AggregateOperator;
-import org.apache.pinot.query.runtime.operator.FilterOperator;
-import org.apache.pinot.query.runtime.operator.HashJoinOperator;
-import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
-import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
-import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
-import org.apache.pinot.query.runtime.operator.SortOperator;
-import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,16 +41,11 @@ import org.slf4j.LoggerFactory;
  */
 public class WorkerQueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerQueryExecutor.class);
-  private PinotConfiguration _config;
-  private ServerMetrics _serverMetrics;
   private MailboxService<Mailbox.MailboxContent> _mailboxService;
   private String _hostName;
   private int _port;
 
-  public void init(PinotConfiguration config, ServerMetrics serverMetrics,
-      MailboxService<Mailbox.MailboxContent> mailboxService, String hostName, int port) {
-    _config = config;
-    _serverMetrics = serverMetrics;
+  public void init(MailboxService<Mailbox.MailboxContent> mailboxService, String hostName, int port) {
     _mailboxService = mailboxService;
     _hostName = hostName;
     _port = port;
@@ -85,12 +59,14 @@ public class WorkerQueryExecutor {
     LOGGER.info("Worker query executor shut down");
   }
 
-  // TODO: split this execution from PhysicalPlanner
   public void processQuery(DistributedStagePlan queryRequest, Map<String, String> requestMetadataMap,
       ExecutorService executorService) {
     long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
     StageNode stageRoot = queryRequest.getStageRoot();
-    BaseOperator<TransferableBlock> rootOperator = getOperator(requestId, stageRoot, queryRequest.getMetadataMap());
+
+    Operator<TransferableBlock> rootOperator = new PhysicalPlanBuilder(
+        _mailboxService, _hostName, _port, requestId, queryRequest.getMetadataMap()).build(stageRoot);
+
     executorService.submit(new TraceRunnable() {
       @Override
       public void runJob() {
@@ -101,56 +77,5 @@ public class WorkerQueryExecutor {
         LOGGER.info("Execution time:" + executionThreadTimer.getThreadTimeNs());
       }
     });
-  }
-
-  // TODO: split this PhysicalPlanner into a separate module
-  // TODO: optimize this into a framework. (physical planner)
-  private BaseOperator<TransferableBlock> getOperator(long requestId, StageNode stageNode,
-      Map<Integer, StageMetadata> metadataMap) {
-    if (stageNode instanceof MailboxReceiveNode) {
-      MailboxReceiveNode receiveNode = (MailboxReceiveNode) stageNode;
-      List<ServerInstance> sendingInstances = metadataMap.get(receiveNode.getSenderStageId()).getServerInstances();
-      return new MailboxReceiveOperator(_mailboxService, receiveNode.getDataSchema(), sendingInstances,
-          receiveNode.getExchangeType(), receiveNode.getPartitionKeySelector(), _hostName, _port, requestId,
-          receiveNode.getSenderStageId());
-    } else if (stageNode instanceof MailboxSendNode) {
-      MailboxSendNode sendNode = (MailboxSendNode) stageNode;
-      BaseOperator<TransferableBlock> nextOperator = getOperator(requestId, sendNode.getInputs().get(0), metadataMap);
-      StageMetadata receivingStageMetadata = metadataMap.get(sendNode.getReceiverStageId());
-      return new MailboxSendOperator(_mailboxService, sendNode.getDataSchema(), nextOperator,
-          receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(), sendNode.getPartitionKeySelector(),
-          _hostName, _port, requestId, sendNode.getStageId());
-    } else if (stageNode instanceof JoinNode) {
-      JoinNode joinNode = (JoinNode) stageNode;
-      BaseOperator<TransferableBlock> leftOperator = getOperator(requestId, joinNode.getInputs().get(0), metadataMap);
-      BaseOperator<TransferableBlock> rightOperator = getOperator(requestId, joinNode.getInputs().get(1), metadataMap);
-      return new HashJoinOperator(leftOperator, joinNode.getInputs().get(0).getDataSchema(), rightOperator,
-          joinNode.getInputs().get(1).getDataSchema(), joinNode.getDataSchema(), joinNode.getJoinKeys(),
-          joinNode.getJoinClauses(), joinNode.getJoinRelType());
-    } else if (stageNode instanceof AggregateNode) {
-      AggregateNode aggregateNode = (AggregateNode) stageNode;
-      BaseOperator<TransferableBlock> inputOperator =
-          getOperator(requestId, aggregateNode.getInputs().get(0), metadataMap);
-      return new AggregateOperator(inputOperator, aggregateNode.getDataSchema(), aggregateNode.getAggCalls(),
-          aggregateNode.getGroupSet(), aggregateNode.getInputs().get(0).getDataSchema());
-    } else if (stageNode instanceof FilterNode) {
-      FilterNode filterNode = (FilterNode) stageNode;
-      return new FilterOperator(getOperator(requestId, filterNode.getInputs().get(0), metadataMap),
-          filterNode.getDataSchema(), filterNode.getCondition());
-    } else if (stageNode instanceof ProjectNode) {
-      ProjectNode projectNode = (ProjectNode) stageNode;
-      return new TransformOperator(getOperator(requestId, projectNode.getInputs().get(0), metadataMap),
-          projectNode.getDataSchema(), projectNode.getProjects(), projectNode.getInputs().get(0).getDataSchema());
-    } else if (stageNode instanceof SortNode) {
-      SortNode sortNode = (SortNode) stageNode;
-      return new SortOperator(getOperator(requestId, sortNode.getInputs().get(0), metadataMap),
-          sortNode.getCollationKeys(), sortNode.getCollationDirections(), sortNode.getFetch(), sortNode.getOffset(),
-          sortNode.getDataSchema());
-    } else if (stageNode instanceof ValueNode) {
-      return new LiteralValueOperator(stageNode.getDataSchema(), ((ValueNode) stageNode).getLiteralRows());
-    } else {
-      throw new UnsupportedOperationException(
-          String.format("Stage node type %s is not supported!", stageNode.getClass().getSimpleName()));
-    }
   }
 }

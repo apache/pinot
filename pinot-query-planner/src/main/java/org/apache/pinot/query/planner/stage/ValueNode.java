@@ -56,4 +56,9 @@ public class ValueNode extends AbstractStageNode {
   public String explain() {
     return "LITERAL";
   }
+
+  @Override
+  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitValue(this, context);
+  }
 }
