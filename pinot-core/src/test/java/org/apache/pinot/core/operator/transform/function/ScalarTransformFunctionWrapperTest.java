@@ -879,8 +879,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
     int[] expectedValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _intMVValues[i].length > index ? _intMVValues[i][index] :
-          (Integer) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+      expectedValues[i] = _intMVValues[i].length > index ? _intMVValues[i][index]
+          : (Integer) DataSchema.ColumnDataType.INT.getNullPlaceholder();
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -897,8 +897,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
     long[] expectedValues = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _longMVValues[i].length > index ? _longMVValues[i][index] :
-          (Long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+      expectedValues[i] = _longMVValues[i].length > index ? _longMVValues[i][index]
+          : (Long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -915,8 +915,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
     float[] expectedValues = new float[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _floatMVValues[i].length > index ? _floatMVValues[i][index] :
-          (Float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+      expectedValues[i] = _floatMVValues[i].length > index ? _floatMVValues[i][index]
+          : (Float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -933,8 +933,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
     double[] expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _doubleMVValues[i].length > index ? _doubleMVValues[i][index] :
-          (Double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+      expectedValues[i] = _doubleMVValues[i].length > index ? _doubleMVValues[i][index]
+          : (Double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -951,8 +951,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _stringMVValues[i].length > index ? _stringMVValues[i][index] :
-          (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+      expectedValues[i] = _stringMVValues[i].length > index ? _stringMVValues[i][index]
+          : (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
     }
     testTransformFunction(transformFunction, expectedValues);
   }
