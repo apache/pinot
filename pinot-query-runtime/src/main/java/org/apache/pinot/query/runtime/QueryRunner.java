@@ -37,6 +37,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -139,18 +140,17 @@ public class QueryRunner {
     }
   }
 
-  private BaseDataBlock processServerQuery(ServerQueryRequest serverQueryRequest,
-      ExecutorService executorService) {
+  private BaseDataBlock processServerQuery(ServerQueryRequest serverQueryRequest, ExecutorService executorService) {
     BaseDataBlock dataBlock;
     try {
-      DataTable dataTable = _serverExecutor.processQuery(serverQueryRequest, executorService, null);
-      if (!dataTable.getExceptions().isEmpty()) {
+      InstanceResponseBlock instanceResponse = _serverExecutor.execute(serverQueryRequest, executorService);
+      if (!instanceResponse.getExceptions().isEmpty()) {
         // if contains exception, directly return a metadata block with the exceptions.
-        dataBlock = DataBlockUtils.getErrorDataBlock(dataTable.getExceptions());
+        dataBlock = DataBlockUtils.getErrorDataBlock(instanceResponse.getExceptions());
       } else {
         // this works because default DataTableImplV3 will have a version number at beginning:
         // the new DataBlock encodes lower 16 bits as version and upper 16 bits as type (ROW, COLUMNAR, METADATA)
-        dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTable.toBytes()));
+        dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(instanceResponse.toDataTable().toBytes()));
       }
     } catch (Exception e) {
       dataBlock = DataBlockUtils.getErrorDataBlock(e);

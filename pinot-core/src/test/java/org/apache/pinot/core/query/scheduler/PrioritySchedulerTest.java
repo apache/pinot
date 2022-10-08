@@ -44,8 +44,8 @@ import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
@@ -297,7 +297,7 @@ public class PrioritySchedulerTest {
     }
 
     @Override
-    public DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService,
+    public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
         @Nullable StreamObserver<Server.ServerResponse> responseObserver) {
       if (_useBarrier) {
         try {
@@ -306,8 +306,8 @@ public class PrioritySchedulerTest {
           throw new RuntimeException(e);
         }
       }
-      DataTable result = DataTableBuilderUtils.getEmptyDataTable();
-      result.getMetadata().put(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
+      InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
+      instanceResponse.addMetadata(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
       if (_useBarrier) {
         try {
           _validationBarrier.await();
@@ -316,7 +316,7 @@ public class PrioritySchedulerTest {
         }
       }
       _numQueries.countDown();
-      return result;
+      return instanceResponse;
     }
   }
 }

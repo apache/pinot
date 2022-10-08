@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -38,7 +37,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.TimerContext;
@@ -145,59 +144,58 @@ public abstract class QueryScheduler {
   @Nullable
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
     _latestQueryTime.accumulate(System.currentTimeMillis());
-    DataTable dataTable;
+    InstanceResponseBlock instanceResponse;
     try {
-      dataTable = _queryExecutor.processQuery(queryRequest, executorService);
+      instanceResponse = _queryExecutor.execute(queryRequest, executorService);
     } catch (Exception e) {
       LOGGER.error("Encountered exception while processing requestId {} from broker {}", queryRequest.getRequestId(),
           queryRequest.getBrokerId(), e);
       // For not handled exceptions
       _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
-      dataTable = DataTableBuilderUtils.getEmptyDataTable();
-      dataTable.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+      instanceResponse = new InstanceResponseBlock();
+      instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
     long requestId = queryRequest.getRequestId();
-    Map<String, String> dataTableMetadata = dataTable.getMetadata();
-    dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
+    responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
 
-    byte[] responseBytes = serializeDataTable(queryRequest, dataTable);
+    byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
 
     // Log the statistics
     String tableNameWithType = queryRequest.getTableNameWithType();
     long numDocsScanned =
-        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.NUM_DOCS_SCANNED.getName(), INVALID_NUM_SCANNED));
+        Long.parseLong(responseMetadata.getOrDefault(MetadataKey.NUM_DOCS_SCANNED.getName(), INVALID_NUM_SCANNED));
     long numEntriesScannedInFilter = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), INVALID_NUM_SCANNED));
+        responseMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), INVALID_NUM_SCANNED));
     long numEntriesScannedPostFilter = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), INVALID_NUM_SCANNED));
+        responseMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), INVALID_NUM_SCANNED));
     long numSegmentsProcessed = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
+        responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsMatched = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
+        responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsPrunedInvalid = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(), INVALID_SEGMENTS_COUNT));
+        responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsPrunedByLimit = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(), INVALID_SEGMENTS_COUNT));
+        responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsPrunedByValue = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(), INVALID_SEGMENTS_COUNT));
+        responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsConsuming = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), INVALID_SEGMENTS_COUNT));
+        responseMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), INVALID_SEGMENTS_COUNT));
     long numConsumingSegmentsProcessed = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
+        responseMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
     long numConsumingSegmentsMatched = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
+        responseMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
     long minConsumingFreshnessMs = Long.parseLong(
-        dataTableMetadata.getOrDefault(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), INVALID_FRESHNESS_MS));
+        responseMetadata.getOrDefault(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), INVALID_FRESHNESS_MS));
     int numResizes =
-        Integer.parseInt(dataTableMetadata.getOrDefault(MetadataKey.NUM_RESIZES.getName(), INVALID_NUM_RESIZES));
+        Integer.parseInt(responseMetadata.getOrDefault(MetadataKey.NUM_RESIZES.getName(), INVALID_NUM_RESIZES));
     long resizeTimeMs =
-        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESIZE_TIME_MS.getName(), INVALID_RESIZE_TIME_MS));
-    long threadCpuTimeNs =
-        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"));
+        Long.parseLong(responseMetadata.getOrDefault(MetadataKey.RESIZE_TIME_MS.getName(), INVALID_RESIZE_TIME_MS));
+    long threadCpuTimeNs = Long.parseLong(responseMetadata.getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"));
     long systemActivitiesCpuTimeNs =
-        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(), "0"));
+        Long.parseLong(responseMetadata.getOrDefault(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(), "0"));
     long responseSerializationCpuTimeNs =
-        Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0"));
+        Long.parseLong(responseMetadata.getOrDefault(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0"));
     long totalCpuTimeNs = threadCpuTimeNs + systemActivitiesCpuTimeNs + responseSerializationCpuTimeNs;
 
     if (numDocsScanned > 0) {
@@ -311,20 +309,20 @@ public abstract class QueryScheduler {
   }
 
   /**
-   * Serialize the DataTable response for query request
+   * Serialize the instance response for query request
    * @param queryRequest Server query request for which response is serialized
-   * @param dataTable DataTable to serialize
+   * @param instanceResponse instance response to serialize
    * @return serialized response bytes
    */
   @Nullable
-  private byte[] serializeDataTable(ServerQueryRequest queryRequest, DataTable dataTable) {
+  private byte[] serializeResponse(ServerQueryRequest queryRequest, InstanceResponseBlock instanceResponse) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer responseSerializationTimer =
         timerContext.startNewPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION);
 
     byte[] responseByte = null;
     try {
-      responseByte = dataTable.toBytes();
+      responseByte = instanceResponse.toDataTable().toBytes();
     } catch (Exception e) {
       _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
       LOGGER.error("Caught exception while serializing response for requestId: {}, brokerId: {}",
@@ -344,12 +342,9 @@ public abstract class QueryScheduler {
    */
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
       ProcessingException error) {
-    DataTable result = DataTableBuilderUtils.getEmptyDataTable();
-
-    Map<String, String> dataTableMetadata = result.getMetadata();
-    dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
-
-    result.addException(error);
-    return Futures.immediateFuture(serializeDataTable(queryRequest, result));
+    InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
+    instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
+    instanceResponse.addException(error);
+    return Futures.immediateFuture(serializeResponse(queryRequest, instanceResponse));
   }
 }

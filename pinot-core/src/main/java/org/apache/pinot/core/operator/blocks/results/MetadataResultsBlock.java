@@ -18,18 +18,30 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
+import java.util.Collection;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public class MetadataResultsBlock extends BaseResultsBlock {
 
+  @Nullable
   @Override
-  public DataTable getDataTable(QueryContext queryContext)
-      throws Exception {
-    DataTable dataTable = DataTableBuilderUtils.getEmptyDataTable();
-    attachMetadataToDataTable(dataTable);
-    return dataTable;
+  public DataSchema getDataSchema(QueryContext queryContext) {
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public Collection<Object[]> getRows(QueryContext queryContext) {
+    return null;
+  }
+
+  @Override
+  public DataTable getDataTable(QueryContext queryContext) {
+    return DataTableBuilderFactory.getEmptyDataTable();
   }
 }
