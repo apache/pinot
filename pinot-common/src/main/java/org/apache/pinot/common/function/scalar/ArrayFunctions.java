@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -150,5 +151,30 @@ public class ArrayFunctions {
   @ScalarFunction
   public static String[] arrayConcatString(String[] values1, String[] values2) {
     return ArrayUtils.addAll(values1, values2);
+  }
+
+  @ScalarFunction
+  public static int arrayElementAtInt(int[] arr, int idx) {
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+  }
+
+  @ScalarFunction
+  public static long arrayElementAtLong(long[] arr, int idx) {
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+  }
+
+  @ScalarFunction
+  public static float arrayElementAtFloat(float[] arr, int idx) {
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+  }
+
+  @ScalarFunction
+  public static double arrayElementAtDouble(double[] arr, int idx) {
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+  }
+
+  @ScalarFunction
+  public static String arrayElementAtString(String[] arr, int idx) {
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
   }
 }
