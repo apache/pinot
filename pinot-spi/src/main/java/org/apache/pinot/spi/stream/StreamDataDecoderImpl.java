@@ -44,13 +44,13 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
 
     try {
       _reuse.clear();
-      GenericRow row = _valueDecoder.decode(message.getValue(), 0, message.getValue().length, _reuse);
+      GenericRow row = _valueDecoder.decode(message.getValue(), 0, message.getLength(), _reuse);
       if (row != null) {
         if (message.getKey() != null) {
           row.putValue(KEY, new String(message.getKey(), StandardCharsets.UTF_8));
         }
         RowMetadata metadata = message.getMetadata();
-        if (metadata != null) {
+        if (metadata != null && metadata.getHeaders() != null) {
           metadata.getHeaders().getFieldToValueMap()
               .forEach((key, value) -> row.putValue(HEADER_KEY_PREFIX + key, value));
 
