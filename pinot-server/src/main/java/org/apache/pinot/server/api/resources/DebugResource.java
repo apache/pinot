@@ -145,13 +145,13 @@ public class DebugResource {
               segmentDataManager.getSegmentName(),
               realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(),
-              realtimeSegmentDataManager.getPartitionToCurrentOffset(),
-              partitionStateMap.entrySet().stream().collect(
-                  Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
-              ),
-              partitionLagStateMap.entrySet().stream().collect(
-                  Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getRecordsLag())
-              ));
+              new SegmentConsumerInfo.PartitionOffsetInfo(realtimeSegmentDataManager.getPartitionToCurrentOffset(),
+                  partitionStateMap.entrySet().stream().collect(
+                      Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
+                  ),
+                  partitionLagStateMap.entrySet().stream().collect(
+                      Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getRecordsLag())
+                  )));
     }
     return segmentConsumerInfo;
   }

@@ -31,22 +31,16 @@ public class SegmentConsumerInfo {
   private final String _segmentName;
   private final String _consumerState;
   private final long _lastConsumedTimestamp;
-  private final Map<String, String> _partitionToOffsetMap;
-  private final Map<String, String> _partitionToUpstreamLatestOffsetMap;
-  private final Map<String, String> _partitionToOffsetLag;
+  private final PartitionOffsetInfo _partitionOffsetInfo;
 
   public SegmentConsumerInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("consumerState") String consumerState,
       @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
-      @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap,
-      @JsonProperty("partitionToUpstreamLatestOffsetMap") Map<String, String> partitionToUpstreamLatestMap,
-      @JsonProperty("partitionToOffsetLag") Map<String, String> partitionToOffsetLagMap) {
+      @JsonProperty("partitionOffsetInfo") PartitionOffsetInfo partitionOffsetInfo) {
     _segmentName = segmentName;
     _consumerState = consumerState;
     _lastConsumedTimestamp = lastConsumedTimestamp;
-    _partitionToOffsetMap = partitionToOffsetMap;
-    _partitionToUpstreamLatestOffsetMap = partitionToUpstreamLatestMap;
-    _partitionToOffsetLag = partitionToOffsetLagMap;
+    _partitionOffsetInfo = partitionOffsetInfo;
   }
 
   public String getSegmentName() {
@@ -61,15 +55,40 @@ public class SegmentConsumerInfo {
     return _lastConsumedTimestamp;
   }
 
-  public Map<String, String> getPartitionToOffsetMap() {
-    return _partitionToOffsetMap;
+  public PartitionOffsetInfo getPartitionOffsetInfo() {
+    return _partitionOffsetInfo;
   }
 
-  public Map<String, String> getPartitionToUpstreamLatestMap() {
-    return _partitionToUpstreamLatestOffsetMap;
-  }
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  static public class PartitionOffsetInfo {
+      @JsonProperty("currentOffsetsMap")
+      public Map<String, String> _currentOffsetsMap;
 
-  public Map<String, String> getPartitionToOffsetLag() {
-    return _partitionToOffsetLag;
+      @JsonProperty("recordsLagMap")
+      public Map<String, String> _recordsLagMap;
+
+      @JsonProperty("latestUpstreamOffsetMap")
+      public Map<String, String> _latestUpstreamOffsetMap;
+
+      public PartitionOffsetInfo(
+          @JsonProperty("currentOffsetsMap") Map<String, String> currentOffsetsMap,
+          @JsonProperty("latestUpstreamOffsetMap") Map<String, String> latestUpstreamOffsetMap,
+          @JsonProperty("recordsLagMap") Map<String, String> recordsLagMap) {
+        _currentOffsetsMap = currentOffsetsMap;
+        _latestUpstreamOffsetMap = latestUpstreamOffsetMap;
+        _recordsLagMap = recordsLagMap;
+      }
+
+    public Map<String, String> getCurrentOffsetsMap() {
+      return _currentOffsetsMap;
+    }
+
+    public Map<String, String> getRecordsLagMap() {
+      return _recordsLagMap;
+    }
+
+    public Map<String, String> getLatestUpstreamOffsetMap() {
+      return _latestUpstreamOffsetMap;
+    }
   }
 }
