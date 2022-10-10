@@ -35,7 +35,7 @@ public abstract class GrpcMailboxServiceTestBase {
   public void setUp()
       throws Exception {
     PinotConfiguration extraConfig = new PinotConfiguration(Collections.singletonMap(
-        QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_BYTES_SIZE, 4_000_000));
+        QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 4_000_000));
     for (int i = 0; i < MAILBOX_TEST_SIZE; i++) {
       int availablePort = QueryEnvironmentTestUtils.getAvailablePort();
       GrpcMailboxService grpcMailboxService = new GrpcMailboxService("localhost", availablePort, extraConfig);
