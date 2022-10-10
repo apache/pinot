@@ -54,12 +54,14 @@ message StageNode {
 //   2. list
 //   3. map
 //   4. complex class object
+//   5. another StageNode
 message MemberVariableField {
   oneof member_variable_field {
     LiteralField literalField = 1;
     ListField listField = 2;
     MapField mapField = 3;
     ObjectField objectField = 4;
+    StageNode stageNode = 5;
   }
 }
 
