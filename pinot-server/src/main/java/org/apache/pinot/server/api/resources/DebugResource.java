@@ -138,8 +138,8 @@ public class DebugResource {
     if (tableType == TableType.REALTIME) {
       RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
       Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState();
-      Map<String, PartitionLagState> partitionLagStateMap = realtimeSegmentDataManager.getPartitionToLagState(
-          new ArrayList<>(partitionStateMap.values()));
+      Map<String, PartitionLagState> partitionLagStateMap =
+          realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap);
       segmentConsumerInfo =
           new SegmentConsumerInfo(
               segmentDataManager.getSegmentName(),

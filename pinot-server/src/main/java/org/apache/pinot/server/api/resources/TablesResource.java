@@ -515,8 +515,8 @@ public class TablesResource {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
           Map<String, ConsumerPartitionState> partitionStateMap =
               realtimeSegmentDataManager.getConsumerPartitionState();
-          Map<String, PartitionLagState> partitionLagStateMap = realtimeSegmentDataManager.getPartitionToLagState(
-              new ArrayList<>(partitionStateMap.values()));
+          Map<String, PartitionLagState> partitionLagStateMap =
+              realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap);
           segmentConsumerInfoList.add(
               new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
                   realtimeSegmentDataManager.getConsumerState().toString(),

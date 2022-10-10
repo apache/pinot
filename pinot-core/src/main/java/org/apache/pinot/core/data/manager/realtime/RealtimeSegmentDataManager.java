@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -69,5 +68,5 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
   public abstract Map<String, ConsumerPartitionState> getConsumerPartitionState();
 
   public abstract Map<String, PartitionLagState> getPartitionToLagState(
-      List<ConsumerPartitionState> consumerPartitionState);
+      Map<String, ConsumerPartitionState> consumerPartitionStateMap);
 }

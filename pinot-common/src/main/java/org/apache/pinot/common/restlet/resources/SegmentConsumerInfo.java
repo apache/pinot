@@ -32,20 +32,20 @@ public class SegmentConsumerInfo {
   private final String _consumerState;
   private final long _lastConsumedTimestamp;
   private final Map<String, String> _partitionToOffsetMap;
-  private final Map<String, String> _partitionToUpstreamLatestMap;
+  private final Map<String, String> _partitionToUpstreamLatestOffsetMap;
   private final Map<String, String> _partitionToOffsetLag;
 
   public SegmentConsumerInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("consumerState") String consumerState,
       @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
       @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap,
-      @JsonProperty("partitionToUpstreamLatestMap") Map<String, String> partitionToUpstreamLatestMap,
+      @JsonProperty("partitionToUpstreamLatestOffsetMap") Map<String, String> partitionToUpstreamLatestMap,
       @JsonProperty("partitionToOffsetLag") Map<String, String> partitionToOffsetLagMap) {
     _segmentName = segmentName;
     _consumerState = consumerState;
     _lastConsumedTimestamp = lastConsumedTimestamp;
     _partitionToOffsetMap = partitionToOffsetMap;
-    _partitionToUpstreamLatestMap = partitionToUpstreamLatestMap;
+    _partitionToUpstreamLatestOffsetMap = partitionToUpstreamLatestMap;
     _partitionToOffsetLag = partitionToOffsetLagMap;
   }
 
@@ -66,7 +66,7 @@ public class SegmentConsumerInfo {
   }
 
   public Map<String, String> getPartitionToUpstreamLatestMap() {
-    return _partitionToUpstreamLatestMap;
+    return _partitionToUpstreamLatestOffsetMap;
   }
 
   public Map<String, String> getPartitionToOffsetLag() {

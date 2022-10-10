@@ -34,8 +34,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
@@ -831,14 +829,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
-  public Map<String, PartitionLagState> getPartitionToLagState(List<ConsumerPartitionState> consumerPartitionState) {
+  public Map<String, PartitionLagState> getPartitionToLagState(
+      Map<String, ConsumerPartitionState> consumerPartitionStateMap) {
     if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("Get Partition Lag State");
     }
     ;
-    return _partitionMetadataProvider.getCurrentPartitionLagState(
-        consumerPartitionState.stream().collect(
-            Collectors.toMap(ConsumerPartitionState::getPartitionId, Function.identity())));
+    return _partitionMetadataProvider.getCurrentPartitionLagState(consumerPartitionStateMap);
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {

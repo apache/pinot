@@ -159,7 +159,7 @@ public class PinotRealtimeTableResource {
       @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap getConsumingSegmentsInfo2(
+  public ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap getConsumingSegmentsInfo(
       @ApiParam(value = "Realtime table name with or without type", required = true,
           example = "myTable | myTable_REALTIME") @PathParam("tableName") String realtimeTableName) {
     try {
