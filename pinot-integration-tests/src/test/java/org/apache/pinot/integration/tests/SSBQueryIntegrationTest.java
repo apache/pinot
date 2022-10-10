@@ -49,6 +49,7 @@ import org.testng.annotations.Test;
 
 public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(SSBQueryIntegrationTest.class);
+  private static final int MIN_AVAILABLE_CORE_REQUIREMENT = 4;
   private static final Map<String, String> SSB_QUICKSTART_TABLE_RESOURCES = ImmutableMap.of(
       "customer", "examples/batch/ssb/customer",
       "dates", "examples/batch/ssb/dates",
@@ -59,45 +60,51 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    if (Runtime.getRuntime().availableProcessors() < MIN_AVAILABLE_CORE_REQUIREMENT) {
+      LOGGER.warn("Skip SSB query testing. Insufficient core count: " + Runtime.getRuntime().availableProcessors());
+    } else {
+      TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
+      // Start the Pinot cluster
+      startZk();
+      startController();
+      startBroker();
+      startServer();
 
-    setUpH2Connection();
-    for (Map.Entry<String, String> tableResource : SSB_QUICKSTART_TABLE_RESOURCES.entrySet()) {
-      String tableName = tableResource.getKey();
-      URL resourceUrl = getClass().getClassLoader().getResource(tableResource.getValue());
-      Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResource.getValue());
-      File resourceFile = new File(resourceUrl.getFile());
-      File dataFile = new File(resourceFile.getAbsolutePath(), "rawdata" + File.separator + tableName + ".avro");
-      Assert.assertTrue(dataFile.exists(), "Unable to load resource file from URL: " + dataFile);
-      File schemaFile = new File(resourceFile.getPath(), tableName + "_schema.json");
-      File tableFile = new File(resourceFile.getPath(), tableName + "_offline_table_config.json");
-      // Pinot
-      TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
-      Schema schema = createSchema(schemaFile);
-      addSchema(schema);
-      TableConfig tableConfig = createTableConfig(tableFile);
-      addTableConfig(tableConfig);
-      ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema,
-          0, _segmentDir, _tarDir);
-      uploadSegments(tableName, _tarDir);
-      // H2
-      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
+      setUpH2Connection();
+      for (Map.Entry<String, String> tableResource : SSB_QUICKSTART_TABLE_RESOURCES.entrySet()) {
+        String tableName = tableResource.getKey();
+        URL resourceUrl = getClass().getClassLoader().getResource(tableResource.getValue());
+        Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResource.getValue());
+        File resourceFile = new File(resourceUrl.getFile());
+        File dataFile = new File(resourceFile.getAbsolutePath(), "rawdata" + File.separator + tableName + ".avro");
+        Assert.assertTrue(dataFile.exists(), "Unable to load resource file from URL: " + dataFile);
+        File schemaFile = new File(resourceFile.getPath(), tableName + "_schema.json");
+        File tableFile = new File(resourceFile.getPath(), tableName + "_offline_table_config.json");
+        // Pinot
+        TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
+        Schema schema = createSchema(schemaFile);
+        addSchema(schema);
+        TableConfig tableConfig = createTableConfig(tableFile);
+        addTableConfig(tableConfig);
+        ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
+            _segmentDir, _tarDir);
+        uploadSegments(tableName, _tarDir);
+        // H2
+        ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
+      }
+
+      // Setting data table version to 4
+      DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     }
-
-    // Setting data table version to 4
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
   }
 
   @Test(dataProvider = "ssbQueryDataProvider")
   public void testSSBQueries(String query)
       throws Exception {
-    testSSBQuery(query);
+    if (Runtime.getRuntime().availableProcessors() >= MIN_AVAILABLE_CORE_REQUIREMENT) {
+      testSSBQuery(query);
+    }
   }
 
   private void testSSBQuery(String query)
@@ -172,18 +179,20 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   @AfterClass
   public void tearDown()
       throws Exception {
-    // unload all SSB tables.
-    for (String table : SSB_QUICKSTART_TABLE_RESOURCES.keySet()) {
-      dropOfflineTable(table);
+    if (Runtime.getRuntime().availableProcessors() >= MIN_AVAILABLE_CORE_REQUIREMENT) {
+      // unload all SSB tables.
+      for (String table : SSB_QUICKSTART_TABLE_RESOURCES.keySet()) {
+        dropOfflineTable(table);
+      }
+
+      // stop components and clean up
+      stopServer();
+      stopBroker();
+      stopController();
+      stopZk();
+
+      FileUtils.deleteDirectory(_tempDir);
     }
-
-    // stop components and clean up
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
   }
 
   @DataProvider(name = "ssbQueryDataProvider")
