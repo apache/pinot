@@ -105,7 +105,7 @@ public class DefaultMutableIndexProvider implements MutableIndexProvider {
 
   @Override
   public MutableJsonIndex newJsonIndex(MutableIndexContext.Json context) {
-    return new MutableJsonIndexImpl();
+    return new MutableJsonIndexImpl(context.getJsonIndexConfig());
   }
 
   @Override

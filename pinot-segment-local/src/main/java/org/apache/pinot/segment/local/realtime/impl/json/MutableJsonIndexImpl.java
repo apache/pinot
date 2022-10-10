@@ -37,6 +37,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -49,6 +50,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * Json index for mutable segment.
  */
 public class MutableJsonIndexImpl implements MutableJsonIndex {
+  private final JsonIndexConfig _jsonIndexConfig;
   private final Map<String, RoaringBitmap> _postingListMap;
   private final IntList _docIdMapping;
   private final ReentrantReadWriteLock.ReadLock _readLock;
@@ -57,7 +59,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   private int _nextDocId;
   private int _nextFlattenedDocId;
 
-  public MutableJsonIndexImpl() {
+  public MutableJsonIndexImpl(JsonIndexConfig jsonIndexConfig) {
+    _jsonIndexConfig = jsonIndexConfig;
     _postingListMap = new HashMap<>();
     _docIdMapping = new IntArrayList();
 
@@ -73,7 +76,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   public void add(String jsonString)
       throws IOException {
     try {
-      List<Map<String, String>> flattenedRecords = JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString));
+      List<Map<String, String>> flattenedRecords =
+          JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString), _jsonIndexConfig);
       _writeLock.lock();
       try {
         addFlattenedRecords(flattenedRecords);
@@ -90,8 +94,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
    */
   private void addFlattenedRecords(List<Map<String, String>> records) {
     int numRecords = records.size();
-    Preconditions
-        .checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records", Integer.MAX_VALUE);
+    Preconditions.checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records",
+        Integer.MAX_VALUE);
     for (int i = 0; i < numRecords; i++) {
       _docIdMapping.add(_nextDocId);
     }
@@ -125,15 +129,15 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         // order to get the correct result, and it cannot be nested
         RoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
         MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
-        matchingFlattenedDocIds
-            .forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
+        matchingFlattenedDocIds.forEach(
+            (IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
         matchingDocIds.flip(0, (long) _nextDocId);
         return matchingDocIds;
       } else {
         RoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter);
         MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
-        matchingFlattenedDocIds
-            .forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
+        matchingFlattenedDocIds.forEach(
+            (IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
         return matchingDocIds;
       }
     } finally {
@@ -174,8 +178,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       }
       case PREDICATE: {
         Predicate predicate = filter.getPredicate();
-        Preconditions
-            .checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested", predicate);
+        Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
+            predicate);
         return getMatchingFlattenedDocIds(predicate);
       }
       default:
@@ -192,8 +196,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     ExpressionContext lhs = predicate.getLhs();
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
         "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier"
-            + " if needed.",
-        lhs, lhs.getType());
+            + " if needed.", lhs, lhs.getType());
     String key = lhs.getIdentifier();
 
     // Support 2 formats:
