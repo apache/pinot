@@ -82,8 +82,8 @@ public class ConsumingSegmentInfoReader {
       String serverName = entry.getKey();
       for (SegmentConsumerInfo info : entry.getValue()) {
         SegmentConsumerInfo.PartitionOffsetInfo partitionOffsetInfo = info.getPartitionOffsetInfo();
-        PartitionOffsetInfo offsetInfo = new PartitionOffsetInfo(partitionOffsetInfo.getCurrentOffsetsMap(),
-            partitionOffsetInfo.getLatestUpstreamOffsetMap(), partitionOffsetInfo.getRecordsLagMap());
+        PartitionOffsetInfo offsetInfo = new PartitionOffsetInfo(partitionOffsetInfo.getCurrentOffsets(),
+            partitionOffsetInfo.getLatestUpstreamOffsets(), partitionOffsetInfo.getRecordsLag());
         consumingSegmentInfoMap.computeIfAbsent(info.getSegmentName(), k -> new ArrayList<>()).add(
             new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getLastConsumedTimestamp(), offsetInfo));
       }

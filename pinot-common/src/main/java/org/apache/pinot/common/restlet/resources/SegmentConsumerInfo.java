@@ -61,34 +61,34 @@ public class SegmentConsumerInfo {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class PartitionOffsetInfo {
-      @JsonProperty("currentOffsetsMap")
-      public Map<String, String> _currentOffsetsMap;
+      @JsonProperty("currentOffsets")
+      public Map<String, String> _currentOffsets;
 
-      @JsonProperty("recordsLagMap")
-      public Map<String, String> _recordsLagMap;
+      @JsonProperty("recordsLag")
+      public Map<String, String> _recordsLag;
 
-      @JsonProperty("latestUpstreamOffsetMap")
-      public Map<String, String> _latestUpstreamOffsetMap;
+      @JsonProperty("latestUpstreamOffsets")
+      public Map<String, String> _latestUpstreamOffsets;
 
       public PartitionOffsetInfo(
-          @JsonProperty("currentOffsetsMap") Map<String, String> currentOffsetsMap,
-          @JsonProperty("latestUpstreamOffsetMap") Map<String, String> latestUpstreamOffsetMap,
-          @JsonProperty("recordsLagMap") Map<String, String> recordsLagMap) {
-        _currentOffsetsMap = currentOffsetsMap;
-        _latestUpstreamOffsetMap = latestUpstreamOffsetMap;
-        _recordsLagMap = recordsLagMap;
+          @JsonProperty("currentOffsets") Map<String, String> currentOffsets,
+          @JsonProperty("latestUpstreamOffsets") Map<String, String> latestUpstreamOffsets,
+          @JsonProperty("recordsLag") Map<String, String> recordsLag) {
+        _currentOffsets = currentOffsets;
+        _latestUpstreamOffsets = latestUpstreamOffsets;
+        _recordsLag = recordsLag;
       }
 
-    public Map<String, String> getCurrentOffsetsMap() {
-      return _currentOffsetsMap;
+    public Map<String, String> getCurrentOffsets() {
+      return _currentOffsets;
     }
 
-    public Map<String, String> getRecordsLagMap() {
-      return _recordsLagMap;
+    public Map<String, String> getRecordsLag() {
+      return _recordsLag;
     }
 
-    public Map<String, String> getLatestUpstreamOffsetMap() {
-      return _latestUpstreamOffsetMap;
+    public Map<String, String> getLatestUpstreamOffsets() {
+      return _latestUpstreamOffsets;
     }
   }
 }
