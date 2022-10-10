@@ -48,7 +48,7 @@ inputDirURI: 'examples/batch/ssb/supplier/rawdata'
 # Sample usage:
 #   'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
 #   'glob:**/*.avro' will include all the avro files under inputDirURI recursively.
-includeFileNamePattern: 'glob:**/*.csv'
+includeFileNamePattern: 'glob:**/*.avro'
 
 # excludeFileNamePattern: exclude file name pattern, supported glob pattern.
 # Sample usage:
@@ -80,7 +80,7 @@ pinotFSSpecs:
 recordReaderSpec:
 
   # dataFormat: Record data format, e.g. 'avro', 'parquet', 'orc', 'csv', 'json', 'thrift' etc.
-  dataFormat: 'csv'
+  dataFormat: 'avro'
 
   # className: Corresponding RecordReader class name.
   # E.g.
@@ -91,17 +91,7 @@ recordReaderSpec:
   #   org.apache.pinot.plugin.inputformat.json.JSONRecordReader
   #   org.apache.pinot.plugin.inputformat.orc.ORCRecordReader
   #   org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader
-  className: 'org.apache.pinot.plugin.inputformat.csv.CSVRecordReader'
-
-  # configClassName: Corresponding RecordReaderConfig class name, it's mandatory for CSV and Thrift file format.
-  # E.g.
-  #    org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig
-  #    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig
-  configClassName: 'org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig'
-
-  # configs: Used to init RecordReaderConfig class name, this config is required for CSV and Thrift data format.
-  configs:
-    delimiter: "|"
+  className: 'org.apache.pinot.plugin.inputformat.avro.AvroRecordReader'
 
 
 # tableSpec: defines table name and where to fetch corresponding table config and table schema.
