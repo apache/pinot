@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
-import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.DataSchema;
@@ -83,6 +86,16 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _table = table;
   }
 
+  /**
+   * For instance level empty group-by results.
+   */
+  public GroupByResultsBlock(DataSchema dataSchema) {
+    _dataSchema = dataSchema;
+    _aggregationGroupByResult = null;
+    _intermediateRecords = null;
+    _table = null;
+  }
+
   public DataSchema getDataSchema() {
     return _dataSchema;
   }
@@ -123,11 +136,33 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _resizeTimeMs = resizeTimeMs;
   }
 
+  @Nullable
+  @Override
+  public DataSchema getDataSchema(QueryContext queryContext) {
+    return _dataSchema;
+  }
+
+  @Nullable
+  @Override
+  public Collection<Object[]> getRows(QueryContext queryContext) {
+    if (_table == null) {
+      return Collections.emptyList();
+    }
+    List<Object[]> rows = new ArrayList<>(_table.size());
+    Iterator<Record> iterator = _table.iterator();
+    while (iterator.hasNext()) {
+      rows.add(iterator.next().getValues());
+    }
+    return rows;
+  }
+
   @Override
   public DataTable getDataTable(QueryContext queryContext)
-      throws Exception {
-    Preconditions.checkState(_table != null, "Cannot get DataTable from segment level results");
+      throws IOException {
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(_dataSchema);
+    if (_table == null) {
+      return dataTableBuilder.build();
+    }
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = _dataSchema.size();
     Iterator<Record> iterator = _table.iterator();
@@ -166,9 +201,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         dataTableBuilder.finishRow();
       }
     }
-    DataTable dataTable = dataTableBuilder.build();
-    attachMetadataToDataTable(dataTable);
-    return dataTable;
+    return dataTableBuilder.build();
   }
 
   private void setDataTableColumn(ColumnDataType storedColumnDataType, DataTableBuilder dataTableBuilder,
@@ -224,13 +257,13 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  protected void attachMetadataToDataTable(DataTable dataTable) {
-    super.attachMetadataToDataTable(dataTable);
-    Map<String, String> metadata = dataTable.getMetadata();
+  public Map<String, String> getResultsMetadata() {
+    Map<String, String> metadata = super.getResultsMetadata();
     if (_numGroupsLimitReached) {
       metadata.put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
     }
     metadata.put(MetadataKey.NUM_RESIZES.getName(), Integer.toString(_numResizes));
     metadata.put(MetadataKey.RESIZE_TIME_MS.getName(), Long.toString(_resizeTimeMs));
+    return metadata;
   }
 }

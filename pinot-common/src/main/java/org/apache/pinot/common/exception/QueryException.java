@@ -25,6 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.response.ProcessingException;
 
 
+// TODO: Clean up ProcessingException (thrift) because we don't send it through the wire
 public class QueryException {
   private QueryException() {
   }
@@ -61,6 +62,7 @@ public class QueryException {
   public static final int SERVER_SEGMENT_MISSING_ERROR_CODE = 235;
   public static final int QUERY_SCHEDULING_TIMEOUT_ERROR_CODE = 240;
   public static final int EXECUTION_TIMEOUT_ERROR_CODE = 250;
+  public static final int DATA_TABLE_SERIALIZATION_ERROR_CODE = 260;
   public static final int BROKER_GATHER_ERROR_CODE = 300;
   public static final int BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE = 305;
   public static final int DATA_TABLE_DESERIALIZATION_ERROR_CODE = 310;
@@ -105,6 +107,8 @@ public class QueryException {
       new ProcessingException(QUERY_SCHEDULING_TIMEOUT_ERROR_CODE);
   public static final ProcessingException EXECUTION_TIMEOUT_ERROR =
       new ProcessingException(EXECUTION_TIMEOUT_ERROR_CODE);
+  public static final ProcessingException DATA_TABLE_SERIALIZATION_ERROR =
+      new ProcessingException(DATA_TABLE_SERIALIZATION_ERROR_CODE);
   public static final ProcessingException BROKER_GATHER_ERROR = new ProcessingException(BROKER_GATHER_ERROR_CODE);
   public static final ProcessingException DATA_TABLE_DESERIALIZATION_ERROR =
       new ProcessingException(DATA_TABLE_DESERIALIZATION_ERROR_CODE);
@@ -142,6 +146,7 @@ public class QueryException {
     SERVER_SEGMENT_MISSING_ERROR.setMessage("ServerSegmentMissing");
     QUERY_SCHEDULING_TIMEOUT_ERROR.setMessage("QuerySchedulingTimeoutError");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
+    DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableSerializationError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
     DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableDeserializationError");
     FUTURE_CALL_ERROR.setMessage("FutureCallError");

@@ -16,18 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
+package org.apache.pinot.core.operator.streaming;
 
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.List;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
+import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
-import org.apache.pinot.core.operator.streaming.StreamingResponseUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -46,18 +44,15 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
-    InstanceResponseBlock nextBlock = super.getNextBlock();
-    DataTable instanceResponseDataTable = nextBlock.getInstanceResponseDataTable();
-    DataTable metadataOnlyDataTable;
+    InstanceResponseBlock responseBlock = super.getNextBlock();
+    InstanceResponseBlock metadataOnlyResponseBlock = responseBlock.toMetadataOnlyResponseBlock();
     try {
-      metadataOnlyDataTable = instanceResponseDataTable.toMetadataOnlyDataTable();
-      _streamObserver.onNext(StreamingResponseUtils.getDataResponse(instanceResponseDataTable.toDataOnlyDataTable()));
+      _streamObserver.onNext(StreamingResponseUtils.getDataResponse(responseBlock.toDataOnlyDataTable()));
     } catch (IOException e) {
-      // when exception occurs in streaming, we return an error-only metadata block.
-      metadataOnlyDataTable = DataTableBuilderUtils.getEmptyDataTable();
-      metadataOnlyDataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+      metadataOnlyResponseBlock.addException(
+          QueryException.getException(QueryException.DATA_TABLE_SERIALIZATION_ERROR, e));
     }
     // return a metadata-only block.
-    return new InstanceResponseBlock(metadataOnlyDataTable);
+    return metadataOnlyResponseBlock;
   }
 }
