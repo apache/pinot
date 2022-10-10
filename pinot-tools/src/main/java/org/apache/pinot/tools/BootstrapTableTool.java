@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -19,16 +19,19 @@
 package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.IOException;
 import java.io.Reader;
 import java.net.URI;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.minion.MinionClient;
@@ -62,7 +65,7 @@ public class BootstrapTableTool {
   private final MinionClient _minionClient;
 
   public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir,
-      AuthProvider authProvider) {
+                            AuthProvider authProvider) {
     Preconditions.checkNotNull(controllerProtocol);
     Preconditions.checkNotNull(controllerHost);
     Preconditions.checkNotNull(tableDir);
@@ -89,13 +92,17 @@ public class BootstrapTableTool {
     }
     boolean tableCreationResult = false;
     File offlineTableConfigFile = new File(tableDir, String.format("%s_offline_table_config.json", tableName));
-    if (offlineTableConfigFile.exists()) {
+    File realtimeTableConfigFile = new File(tableDir, String.format("%s_realtime_table_config.json", tableName));
+
+    if (offlineTableConfigFile.exists() && realtimeTableConfigFile.exists()) {
+      File ingestionJobSpecFile = new File(tableDir, "ingestionJobSpec.yaml");
+      tableCreationResult =
+          bootstrapHybridTable(setupTableTmpDir, tableName, schemaFile, offlineTableConfigFile, ingestionJobSpecFile, realtimeTableConfigFile);
+    } else if (offlineTableConfigFile.exists()) {
       File ingestionJobSpecFile = new File(tableDir, "ingestionJobSpec.yaml");
       tableCreationResult =
           bootstrapOfflineTable(setupTableTmpDir, tableName, schemaFile, offlineTableConfigFile, ingestionJobSpecFile);
-    }
-    File realtimeTableConfigFile = new File(tableDir, String.format("%s_realtime_table_config.json", tableName));
-    if (realtimeTableConfigFile.exists()) {
+    } else if (realtimeTableConfigFile.exists()) {
       tableCreationResult = bootstrapRealtimeTable(tableName, schemaFile, realtimeTableConfigFile);
     }
     if (!tableCreationResult) {
@@ -125,8 +132,44 @@ public class BootstrapTableTool {
         .setAuthProvider(_authProvider).execute();
   }
 
+  private boolean createTable(File schemaFile, File offlineTableConfigFile, File realtimeTableConfigFile)
+      throws Exception {
+    return new AddTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
+        .setOfflineTableConfigFile(offlineTableConfigFile.getAbsolutePath()).setRealtimeTableConfigFile(realtimeTableConfigFile.getAbsolutePath())
+        .setControllerProtocol(_controllerProtocol)
+        .setControllerHost(_controllerHost).setControllerPort(String.valueOf(_controllerPort)).setExecute(true)
+        .setAuthProvider(_authProvider).execute();
+  }
+
+  private boolean bootstrapHybridTable(File setupTableTmpDir, String tableName, File schemaFile,
+                                       File offlineTableConfigFile, File ingestionJobSpecFile, File realtimeTableConfig) throws Exception {
+    TableConfig tableConfig =
+        JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile), TableConfig.class);
+    if (tableConfig.getIngestionConfig() != null
+        && tableConfig.getIngestionConfig().getBatchIngestionConfig() != null) {
+      updatedTableConfig(tableConfig, setupTableTmpDir);
+    }
+
+    LOGGER.info("Adding offline table: {}", tableName);
+    File updatedTableConfigFile =
+        new File(setupTableTmpDir, String.format("%s_%d.config", tableName, System.currentTimeMillis()));
+    FileOutputStream outputStream = new FileOutputStream(updatedTableConfigFile);
+    outputStream.write(JsonUtils.objectToPrettyString(tableConfig).getBytes());
+    outputStream.close();
+    // this function is separated from bootstrap offline/realtime to create both tables at the same time in
+    // order to avoid a "table already exists error"
+    // TODO: it's unclear why this broke as it's been working, but using the PUT API would solve this
+    boolean tableCreationResult = createTable(schemaFile, updatedTableConfigFile, realtimeTableConfig);
+    if (!tableCreationResult) {
+      throw new RuntimeException(String
+          .format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].", tableName,
+              schemaFile, offlineTableConfigFile));
+    }
+    return setupOfflineData(setupTableTmpDir, tableConfig, tableName, ingestionJobSpecFile);
+  }
+
   private boolean bootstrapOfflineTable(File setupTableTmpDir, String tableName, File schemaFile,
-      File offlineTableConfigFile, File ingestionJobSpecFile)
+                                        File offlineTableConfigFile, File ingestionJobSpecFile)
       throws Exception {
     TableConfig tableConfig =
         JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile), TableConfig.class);
@@ -147,6 +190,10 @@ public class BootstrapTableTool {
           .format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].", tableName,
               schemaFile, offlineTableConfigFile));
     }
+    return setupOfflineData(setupTableTmpDir, tableConfig, tableName, ingestionJobSpecFile);
+  }
+
+  private boolean setupOfflineData(File setupTableTmpDir, TableConfig tableConfig, String tableName, File ingestionJobSpecFile) throws IOException {
     if (tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
         .isTaskTypeEnabled(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE)) {
       final Map<String, String> scheduledTasks = _minionClient

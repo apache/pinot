@@ -869,6 +869,7 @@ public class PinotTableRestletResource {
   @Path("tables/{tableName}/timeBoundary")
   @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata", notes = "Set "
       + "hybrid table query time boundary based on offline segments' metadata")
+  @Produces(MediaType.APPLICATION_JSON)
   public SuccessResponse setTimeBoundary(
       @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
       String tableName)
@@ -907,6 +908,7 @@ public class PinotTableRestletResource {
   @DELETE
   @Path("tables/{tableName}/timeBoundary")
   @ApiOperation(value = "Delete hybrid table query time boundary", notes = "Delete hybrid table query time boundary")
+  @Produces(MediaType.APPLICATION_JSON)
   public SuccessResponse deleteTimeBoundary(
       @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
       String tableName) {
