@@ -67,10 +67,11 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
-        return;
+      if (nullBitmap == null) {
+        nullBitmap = new RoaringBitmap();
       }
+      aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
+      return;
     }
 
     if (blockValSet.getValueType() != DataType.BYTES) {
@@ -144,10 +145,11 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateGroupBySVNullHandlingEnabled(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
-        return;
+      if (nullBitmap == null) {
+        nullBitmap = new RoaringBitmap();
       }
+      aggregateGroupBySVNullHandlingEnabled(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
+      return;
     }
 
     if (blockValSet.getValueType() != DataType.BYTES) {
