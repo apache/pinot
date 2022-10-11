@@ -72,6 +72,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (_nullHandlingEnabled) {
+      // TODO: avoid the null bitmap check when it is null or empty for better performance.
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap == null) {
         nullBitmap = new RoaringBitmap();
