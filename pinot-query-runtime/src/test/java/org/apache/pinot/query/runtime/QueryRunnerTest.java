@@ -119,7 +119,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       } else if (l instanceof String) {
         return ((String) l).compareTo((String) r);
       } else {
-        throw new RuntimeException("non supported type");
+        throw new RuntimeException("non supported type " + l.getClass());
       }
     };
     Comparator<Object[]> rowComp = (l, r) -> {

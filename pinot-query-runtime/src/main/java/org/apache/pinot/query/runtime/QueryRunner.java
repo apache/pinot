@@ -23,21 +23,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.datablock.MetadataBlock;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Mailbox;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -48,6 +45,8 @@ import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
+import org.apache.pinot.query.runtime.leaf.LeafDistinctCompatibilityOperator;
+import org.apache.pinot.query.runtime.leaf.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.utils.ServerRequestUtils;
@@ -125,9 +124,21 @@ public class QueryRunner {
 
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
+
+      BaseOperator<TransferableBlock> inputOperator
+          = new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema());
+
+      // hack this for now, we should be creating a "real" operator tree - this makes sure that we properly
+      // handle the SELECT DISTINCT rewrite
+      AggregationFunction[] aggFunctions = serverQueryRequests.get(0).getQueryContext().getAggregationFunctions();
+      if (aggFunctions != null && aggFunctions[0] instanceof DistinctAggregationFunction) {
+        inputOperator = new LeafDistinctCompatibilityOperator(inputOperator,
+            serverQueryRequests.get(0).getQueryContext(), distributedStagePlan.getStageRoot().getDataSchema());
+      }
+
       MailboxSendOperator mailboxSendOperator =
           new MailboxSendOperator(_mailboxService, sendNode.getDataSchema(),
-              new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema()),
+              inputOperator,
               receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
               sendNode.getPartitionKeySelector(), _hostname, _port, serverQueryRequests.get(0).getRequestId(),
               sendNode.getStageId());
@@ -156,63 +167,6 @@ public class QueryRunner {
       dataBlock = DataBlockUtils.getErrorDataBlock(e);
     }
     return dataBlock;
-  }
-
-  /**
-   * Leaf-stage transfer block opreator is used to wrap around the leaf stage process results. They are passed to the
-   * Pinot server to execute query thus only one {@link DataTable} were returned. However, to conform with the
-   * intermediate stage operators. an additional {@link MetadataBlock} needs to be transfer after the data block.
-   *
-   * <p>In order to achieve this:
-   * <ul>
-   *   <li>The leaf-stage result is split into data payload block and metadata payload block.</li>
-   *   <li>In case the leaf-stage result contains error or only metadata, we skip the data payload block.</li>
-   * </ul>
-   */
-  private static class LeafStageTransferableBlockOperator extends BaseOperator<TransferableBlock> {
-    private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
-
-    private final BaseDataBlock _errorBlock;
-    private final List<BaseDataBlock> _baseDataBlocks;
-    private final DataSchema _dataSchema;
-    private boolean _hasTransferred;
-    private int _currentIndex;
-
-    private LeafStageTransferableBlockOperator(List<BaseDataBlock> baseDataBlocks, DataSchema dataSchema) {
-      _baseDataBlocks = baseDataBlocks;
-      _dataSchema = dataSchema;
-      _errorBlock = baseDataBlocks.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
-      _currentIndex = 0;
-    }
-
-    @Override
-    public List<Operator> getChildOperators() {
-      return null;
-    }
-
-    @Nullable
-    @Override
-    public String toExplainString() {
-      return EXPLAIN_NAME;
-    }
-
-    @Override
-    protected TransferableBlock getNextBlock() {
-      if (_currentIndex < 0) {
-        throw new RuntimeException("Leaf transfer terminated. next block should no longer be called.");
-      }
-      if (_errorBlock != null) {
-        _currentIndex = -1;
-        return new TransferableBlock(_errorBlock);
-      } else {
-        if (_currentIndex < _baseDataBlocks.size()) {
-          return new TransferableBlock(_baseDataBlocks.get(_currentIndex++));
-        } else {
-          _currentIndex = -1;
-          return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(_dataSchema));
-        }
-      }
-    }
   }
 
   private boolean isLeafStage(DistributedStagePlan distributedStagePlan) {

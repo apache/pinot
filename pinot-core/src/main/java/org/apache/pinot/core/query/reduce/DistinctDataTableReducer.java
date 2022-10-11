@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.reduce;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
@@ -31,7 +30,6 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -94,27 +92,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
       for (DistinctTable distinctTable : nonEmptyDistinctTables) {
         mainDistinctTable.mergeTable(distinctTable);
       }
-      brokerResponseNative.setResultTable(reduceToResultTable(mainDistinctTable));
+      brokerResponseNative.setResultTable(mainDistinctTable.reduceToResultTable());
     }
-  }
-
-  private ResultTable reduceToResultTable(DistinctTable distinctTable) {
-    List<Object[]> rows = new ArrayList<>(distinctTable.size());
-    DataSchema dataSchema = distinctTable.getDataSchema();
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
-    Iterator<Record> iterator = distinctTable.getFinalResult();
-    while (iterator.hasNext()) {
-      Object[] values = iterator.next().getValues();
-      Object[] row = new Object[numColumns];
-      for (int i = 0; i < numColumns; i++) {
-        Object value = values[i];
-        if (value != null) {
-          row[i] = columnDataTypes[i].convertAndFormat(value);
-        }
-      }
-      rows.add(row);
-    }
-    return new ResultTable(dataSchema, rows);
   }
 }

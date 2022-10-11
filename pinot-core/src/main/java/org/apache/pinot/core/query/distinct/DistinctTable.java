@@ -35,6 +35,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -405,5 +406,25 @@ public class DistinctTable {
       }
     }
     return new DistinctTable(dataSchema, records);
+  }
+
+  public ResultTable reduceToResultTable() {
+    List<Object[]> rows = new ArrayList<>(size());
+    DataSchema dataSchema = getDataSchema();
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
+    Iterator<Record> iterator = getFinalResult();
+    while (iterator.hasNext()) {
+      Object[] values = iterator.next().getValues();
+      Object[] row = new Object[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        Object value = values[i];
+        if (value != null) {
+          row[i] = columnDataTypes[i].convertAndFormat(value);
+        }
+      }
+      rows.add(row);
+    }
+    return new ResultTable(dataSchema, rows);
   }
 }
