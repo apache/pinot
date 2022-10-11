@@ -18,14 +18,11 @@
  */
 package org.apache.pinot.query.planner.stage;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
-import org.apache.pinot.query.planner.serde.ProtoSerializationUtils;
 
 
 public class MailboxReceiveNode extends AbstractStageNode {
