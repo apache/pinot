@@ -67,7 +67,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
                                            @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
-                                           TlsProtocols tlsProtocols, String appId) {
+                                           TlsProtocols tlsProtocols, @Nullable String appId) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
@@ -87,7 +87,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
                                            @Nullable SslContext sslContext, ConnectionTimeouts connectionTimeouts,
-                                           TlsProtocols tlsProtocols, String appId) {
+                                           TlsProtocols tlsProtocols, @Nullable String appId) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;

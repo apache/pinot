@@ -22,8 +22,10 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.MapConfiguration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.TlsUtils;
@@ -37,6 +39,7 @@ public class ConnectionUtils {
 
   public static final String INFO_HEADERS = "headers";
   public static final String PINOT_JAVA_TLS_PREFIX = "pinot.java_client.tls";
+  public static final int APP_ID_MAX_CHARS = 256;
 
   private ConnectionUtils() {
   }
@@ -56,7 +59,7 @@ public class ConnectionUtils {
   }
 
 
-  public static String getUserAgentVersionFromClassPath(String userAgentKey, String appId) {
+  public static String getUserAgentVersionFromClassPath(String userAgentKey, @Nullable String appId) {
     Properties userAgentProperties = new Properties();
     try {
       userAgentProperties.load(ConnectionUtils.class.getClassLoader()
@@ -65,8 +68,8 @@ public class ConnectionUtils {
       LOGGER.warn("Unable to set user agent version");
     }
     String userAgentFromProperties = userAgentProperties.getProperty(userAgentKey, "unknown");
-    if (appId != null && appId.length() > 0) {
-      return appId + "-" + userAgentFromProperties;
+    if (StringUtils.isNotEmpty(appId)) {
+      return appId.substring(0, Math.min(APP_ID_MAX_CHARS, appId.length())) + "-" + userAgentFromProperties;
     }
     return userAgentFromProperties;
   }

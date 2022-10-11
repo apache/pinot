@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.client.ConnectionTimeouts;
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.TlsProtocols;
@@ -53,7 +54,7 @@ public class PinotControllerTransport {
 
   public PinotControllerTransport(Map<String, String> headers, String scheme,
                                   @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
-                                  TlsProtocols tlsProtocols, String appId) {
+                                  TlsProtocols tlsProtocols, @Nullable String appId) {
     _headers = headers;
     _scheme = scheme;
 
@@ -71,7 +72,7 @@ public class PinotControllerTransport {
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
-  private String getUserAgentVersionFromClassPath(String appId) {
+  private String getUserAgentVersionFromClassPath(@Nullable String appId) {
     Properties userAgentProperties = new Properties();
     try {
       userAgentProperties.load(PinotControllerTransport.class.getClassLoader()
@@ -80,8 +81,9 @@ public class PinotControllerTransport {
       LOGGER.warn("Unable to set user agent version");
     }
     String userAgentFromProperties = userAgentProperties.getProperty("ua", "unknown");
-    if (appId != null && appId.length() > 0) {
-      return appId + "-" + userAgentFromProperties;
+    if (StringUtils.isNotEmpty(appId)) {
+      return appId.substring(0, Math.min(org.apache.pinot.client.utils.ConnectionUtils.APP_ID_MAX_CHARS,
+          appId.length())) + "-" + userAgentFromProperties;
     }
     return userAgentFromProperties;
   }

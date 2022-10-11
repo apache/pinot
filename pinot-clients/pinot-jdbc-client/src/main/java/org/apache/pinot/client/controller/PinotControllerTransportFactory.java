@@ -41,7 +41,7 @@ public class PinotControllerTransportFactory {
   private int _readTimeoutMs = Integer.parseInt(DEFAULT_CONTROLLER_READ_TIMEOUT_MS);
   private int _connectTimeoutMs = Integer.parseInt(DEFAULT_CONTROLLER_CONNECT_TIMEOUT_MS);
   private int _handshakeTimeoutMs = Integer.parseInt(DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS);
-  private String _appId = "";
+  private String _appId = null;
 
   public PinotControllerTransport buildTransport() {
     ConnectionTimeouts connectionTimeouts = ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs,

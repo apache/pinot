@@ -43,7 +43,7 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
   private int _readTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
   private int _connectTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
   private int _handshakeTimeoutMs = Integer.parseInt(DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS);
-  private String _appId = "";
+  private String _appId = null;
 
   @Override
   public PinotClientTransport buildTransport() {
