@@ -64,7 +64,7 @@ public class LeafDistinctCompatibilityOperator extends BaseOperator<Transferable
 
     DistinctTable distinctTable = ObjectSerDeUtils.deserialize(transferableBlock.getDataBlock().getCustomObject(0, 0));
     DistinctTable mainTable = new DistinctTable(distinctTable.getDataSchema(), null,
-        DistinctExecutor.MAX_INITIAL_CAPACITY, false);
+        DistinctExecutor.MAX_INITIAL_CAPACITY, _queryContext.isNullHandlingEnabled());
 
     mainTable.mergeTable(distinctTable);
 
