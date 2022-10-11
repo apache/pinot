@@ -1614,7 +1614,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         7, 6});
     result4.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
-    result4.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
+    result4.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
   }
 
@@ -1776,7 +1776,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result1.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
+    result1.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
     result1.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
@@ -1955,7 +1955,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result10.add(new Object[]{"BROKER_REDUCE(limit:100)", 1, 0});
     result10.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
-    result10.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
+    result10.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
     check(query10, new ResultTable(DATA_SCHEMA, result10));
   }
 
@@ -2129,7 +2129,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result8.add(new Object[]{"FILTER_EMPTY", 4, 3});
     result8.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
-    result8.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
+    result8.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
     check(query8, new ResultTable(DATA_SCHEMA, result8));
 
     // Segment 1 is pruned because 'minnie' and 'pluto' are outside the range of min-max values of the segment
@@ -2165,7 +2165,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result10.add(new Object[]{"BROKER_REDUCE(limit:100)", 1, 0});
     result10.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
-    result10.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
+    result10.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
     check(query10, new ResultTable(DATA_SCHEMA, result10));
   }
 
