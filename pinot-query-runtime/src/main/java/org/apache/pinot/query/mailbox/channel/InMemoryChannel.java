@@ -21,6 +21,10 @@ package org.apache.pinot.query.mailbox.channel;
 import java.util.concurrent.ArrayBlockingQueue;
 
 
+/**
+ * Used by {@link org.apache.pinot.query.mailbox.InMemoryMailboxService} for passing data between stages when sender
+ * and receiver are in the same process.
+ */
 public class InMemoryChannel<T> {
   private final ArrayBlockingQueue<T> _channel;
   private final String _hostname;

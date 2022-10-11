@@ -18,15 +18,22 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.clearspring.analytics.util.Preconditions;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
+/**
+ * A wrapper over {@link GrpcMailboxService} and {@link InMemoryMailboxService} that can delegate the data-transfer
+ * to the in-memory mailbox service whenever possible.
+ */
 public class MultiplexingMailboxService implements MailboxService<TransferableBlock> {
   private final GrpcMailboxService _grpcMailboxService;
   private final InMemoryMailboxService _inMemoryMailboxService;
 
   public MultiplexingMailboxService(GrpcMailboxService grpcMailboxService,
       InMemoryMailboxService inMemoryReceivingMailbox) {
+    Preconditions.checkState(grpcMailboxService.getHostname().equals(inMemoryReceivingMailbox.getHostname()));
+    Preconditions.checkState(grpcMailboxService.getMailboxPort() == inMemoryReceivingMailbox.getMailboxPort());
     _grpcMailboxService = grpcMailboxService;
     _inMemoryMailboxService = inMemoryReceivingMailbox;
   }

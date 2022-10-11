@@ -41,11 +41,12 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   public void send(TransferableBlock data)
       throws UnsupportedOperationException {
     try {
-      if (!_channel.getChannel().offer(data, 120, TimeUnit.SECONDS)) {
+      if (!_channel.getChannel().offer(
+          data, InMemoryMailboxService.DEFAULT_CHANNEL_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
         throw new RuntimeException(String.format("Timed out when sending block in mailbox=%s", _mailboxId));
       }
     } catch (InterruptedException e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("Interrupted trying to send data through the channel", e);
     }
   }
 

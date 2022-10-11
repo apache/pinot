@@ -19,10 +19,12 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.util.TestUtils;
@@ -31,6 +33,10 @@ import org.testng.annotations.Test;
 
 
 public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
+
+  private static final DataSchema testDataSchema = new DataSchema(new String[]{"foo", "bar"},
+      new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+  private static final int capacity = 1_000_000;
 
   @Test
   public void testHappyPath()
@@ -62,19 +68,23 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
     }, 5000L, "Receiving mailbox is not closed properly!");
   }
 
-  // @Test TODO: Fix this. Need to know what we are testing here.
+  /**
+   * Simulates a case where the sender tries to send a very large message. The receiver should receive a
+   * MetadataBlock with an exception to indicate failure.
+   */
+  @Test
   public void testGrpcException()
       throws Exception {
     Preconditions.checkState(_mailboxServices.size() >= 2);
     Map.Entry<Integer, GrpcMailboxService> sender = _mailboxServices.firstEntry();
     Map.Entry<Integer, GrpcMailboxService> receiver = _mailboxServices.lastEntry();
     StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
-        "happypath", "localhost", sender.getKey(), "localhost", receiver.getKey());
-    SendingMailbox<TransferableBlock> sendingMailbox = sender.getValue().getSendingMailbox(mailboxId);
-    ReceivingMailbox<TransferableBlock> receivingMailbox = receiver.getValue().getReceivingMailbox(mailboxId);
+        "exception", "localhost", sender.getKey(), "localhost", receiver.getKey());
+    GrpcSendingMailbox sendingMailbox = (GrpcSendingMailbox) sender.getValue().getSendingMailbox(mailboxId);
+    GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) receiver.getValue().getReceivingMailbox(mailboxId);
 
     // create mock object
-    TransferableBlock testContent = getTooLargeMailboxContent();
+    TransferableBlock testContent = getTooLargeTransferableBlock();
     sendingMailbox.send(testContent);
 
     // wait for receiving mailbox to be created.
@@ -84,17 +94,23 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
 
     TransferableBlock receivedContent = receivingMailbox.receive();
     Assert.assertNotNull(receivedContent);
-    Assert.assertTrue(receivedContent.isEndOfStreamBlock());
+    BaseDataBlock receivedDataBlock = receivedContent.getDataBlock();
+    Assert.assertTrue(receivedDataBlock instanceof MetadataBlock);
+    Assert.assertFalse(receivedDataBlock.getExceptions().isEmpty());
   }
 
   private TransferableBlock getTestTransferableBlock() {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(new DataSchema(
-        new String[]{"foo", "bar"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING})));
+    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(testDataSchema));
   }
 
-  private TransferableBlock getTooLargeMailboxContent()
-      throws IOException {
-    return new TransferableBlock(DataBlockUtils.getDataBlock(ByteBuffer.allocate(16_000_000)));
+  private TransferableBlock getTooLargeTransferableBlock() {
+    List<Object[]> rows = new ArrayList<>(capacity);
+    for (int i = 0; i < capacity; i++) {
+      Object[] row = new Object[2];
+      row[0] = 0;
+      row[1] = "test_string";
+      rows.add(row);
+    }
+    return new TransferableBlock(rows, testDataSchema, BaseDataBlock.Type.ROW);
   }
 }

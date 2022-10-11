@@ -40,7 +40,8 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
   @Override
   public TransferableBlock receive()
       throws Exception {
-    TransferableBlock block = _channel.getChannel().poll(120, TimeUnit.SECONDS);
+    TransferableBlock block = _channel.getChannel().poll(
+        InMemoryMailboxService.DEFAULT_CHANNEL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     if (block == null) {
       throw new RuntimeException(String.format("Timed out waiting for data block on mailbox=%s", _mailboxId));
     }

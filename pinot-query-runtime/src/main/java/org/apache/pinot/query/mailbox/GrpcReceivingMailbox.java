@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
@@ -57,6 +58,10 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
     }
   }
 
+  /**
+   * Polls the underlying channel and converts the sent data into a TransferableBlock. This may return null if the
+   * underlying channel is completed and there was no new data sent by the sender.
+   */
   @Override
   public TransferableBlock receive()
       throws Exception {
@@ -93,7 +98,15 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
     return _mailboxId;
   }
 
-  private TransferableBlock fromMailboxContent(MailboxContent mailboxContent)
+  /**
+   * Converts the data sent by a {@link GrpcSendingMailbox} to a {@link TransferableBlock}.
+   *
+   * @param mailboxContent data sent by a GrpcSendingMailbox.
+   * @return null if the mailboxContent passed is null or empty. Will return an error block if the returned DataBlock
+   *         contains exceptions.
+   * @throws IOException if the MailboxContent cannot be converted to a TransferableBlock.
+   */
+  private TransferableBlock fromMailboxContent(@Nullable MailboxContent mailboxContent)
       throws IOException {
     if (mailboxContent == null) {
       return null;
