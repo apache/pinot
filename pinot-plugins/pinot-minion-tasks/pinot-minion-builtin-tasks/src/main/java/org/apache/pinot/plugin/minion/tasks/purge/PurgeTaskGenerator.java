@@ -23,11 +23,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -36,6 +38,7 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,9 +62,13 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
     for (TableConfig tableConfig : tableConfigs) {
 
       String tableName = tableConfig.getTableName();
+      List<SegmentZKMetadata> completedSegmentsZKMetadata = new ArrayList<>();
       if (tableConfig.getTableType() == TableType.REALTIME) {
-        LOGGER.warn("Skip generating task: {} for real-time table: {}", taskType, tableName);
-        continue;
+        completedSegmentsZKMetadata = new ArrayList<>();
+        Map<Integer, String> partitionToLatestLLCSegmentName = new HashMap<>();
+        Set<Integer> allPartitions = new HashSet<>();
+        getCompletedSegmentsInfo(tableName, completedSegmentsZKMetadata, partitionToLatestLLCSegmentName,
+            allPartitions);
       }
 
       Map<String, String> taskConfigs;
@@ -92,18 +99,24 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       } else {
         tableMaxNumTasks = Integer.MAX_VALUE;
       }
-      List<SegmentZKMetadata> offlineSegmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
+      List<SegmentZKMetadata> segmentsZKMetadata;
+      if (tableConfig.getTableType() == TableType.REALTIME) {
+        segmentsZKMetadata = completedSegmentsZKMetadata;
+      } else {
+        segmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
+      }
+
       List<SegmentZKMetadata> purgedSegmentsZKMetadata = new ArrayList<>();
       List<SegmentZKMetadata> notpurgedSegmentsZKMetadata = new ArrayList<>();
 
-      for (SegmentZKMetadata segmentMetadata: offlineSegmentsZKMetadata) {
+      for (SegmentZKMetadata segmentMetadata : segmentsZKMetadata) {
 
-       if (segmentMetadata.getCustomMap() != null && segmentMetadata.getCustomMap().containsKey(
-           MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
-         purgedSegmentsZKMetadata.add(segmentMetadata);
-       } else {
-         notpurgedSegmentsZKMetadata.add(segmentMetadata);
-       }
+        if (segmentMetadata.getCustomMap() != null && segmentMetadata.getCustomMap()
+            .containsKey(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
+          purgedSegmentsZKMetadata.add(segmentMetadata);
+        } else {
+          notpurgedSegmentsZKMetadata.add(segmentMetadata);
+        }
       }
       Collections.sort(purgedSegmentsZKMetadata, Comparator.comparing(
           segmentZKMetadata -> segmentZKMetadata.getCustomMap()
@@ -111,7 +124,6 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
           Comparator.nullsFirst(Comparator.naturalOrder())));
       //add already purged segment at the end
       notpurgedSegmentsZKMetadata.addAll(purgedSegmentsZKMetadata);
-
       int tableNumTasks = 0;
       Set<Segment> runningSegments =
           TaskGeneratorUtils.getRunningSegments(MinionConstants.PurgeTask.TASK_TYPE, _clusterInfoAccessor);
@@ -149,5 +161,47 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
           taskType);
     }
     return pinotTaskConfigs;
+  }
+
+  /**
+   * Fetch completed (DONE/UPLOADED) segment and partition information
+   *
+   * @param realtimeTableName the realtime table name
+   * @param completedSegmentsZKMetadata list for collecting the completed (DONE/UPLOADED) segments ZK metadata
+   * @param partitionToLatestLLCSegmentName map for collecting the partitionId to the latest LLC segment name
+   * @param allPartitions set for collecting all partition ids
+   */
+  private void getCompletedSegmentsInfo(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
+      Map<Integer, String> partitionToLatestLLCSegmentName, Set<Integer> allPartitions) {
+    List<SegmentZKMetadata> segmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(realtimeTableName);
+
+    Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      CommonConstants.Segment.Realtime.Status status = segmentZKMetadata.getStatus();
+      if (status.isCompleted()) {
+        completedSegmentsZKMetadata.add(segmentZKMetadata);
+      }
+
+      // Skip UPLOADED segments that don't conform to the LLC segment name
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName());
+      if (llcSegmentName != null) {
+        int partitionId = llcSegmentName.getPartitionGroupId();
+        allPartitions.add(partitionId);
+        if (status.isCompleted()) {
+          latestLLCSegmentNameMap.compute(partitionId, (k, latestLLCSegmentName) -> {
+            if (latestLLCSegmentName == null
+                || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
+              return llcSegmentName;
+            } else {
+              return latestLLCSegmentName;
+            }
+          });
+        }
+      }
+    }
+
+    for (Map.Entry<Integer, LLCSegmentName> entry : latestLLCSegmentNameMap.entrySet()) {
+      partitionToLatestLLCSegmentName.put(entry.getKey(), entry.getValue().getSegmentName());
+    }
   }
 }
