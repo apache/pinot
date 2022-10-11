@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -65,7 +65,7 @@ public class BootstrapTableTool {
   private final MinionClient _minionClient;
 
   public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir,
-                            AuthProvider authProvider) {
+      AuthProvider authProvider) {
     Preconditions.checkNotNull(controllerProtocol);
     Preconditions.checkNotNull(controllerHost);
     Preconditions.checkNotNull(tableDir);
@@ -73,8 +73,8 @@ public class BootstrapTableTool {
     _controllerHost = controllerHost;
     _controllerPort = controllerPort;
     _tableDir = tableDir;
-    _minionClient = new MinionClient(String.format("%s://%s:%s", controllerProtocol, controllerHost, controllerPort),
-        authProvider);
+    _minionClient =
+        new MinionClient(String.format("%s://%s:%s", controllerProtocol, controllerHost, controllerPort), authProvider);
     _authProvider = authProvider;
   }
 
@@ -97,7 +97,8 @@ public class BootstrapTableTool {
     if (offlineTableConfigFile.exists() && realtimeTableConfigFile.exists()) {
       File ingestionJobSpecFile = new File(tableDir, "ingestionJobSpec.yaml");
       tableCreationResult =
-          bootstrapHybridTable(setupTableTmpDir, tableName, schemaFile, offlineTableConfigFile, ingestionJobSpecFile, realtimeTableConfigFile);
+          bootstrapHybridTable(setupTableTmpDir, tableName, schemaFile, offlineTableConfigFile, ingestionJobSpecFile,
+              realtimeTableConfigFile);
     } else if (offlineTableConfigFile.exists()) {
       File ingestionJobSpecFile = new File(tableDir, "ingestionJobSpec.yaml");
       tableCreationResult =
@@ -106,8 +107,8 @@ public class BootstrapTableTool {
       tableCreationResult = bootstrapRealtimeTable(tableName, schemaFile, realtimeTableConfigFile);
     }
     if (!tableCreationResult) {
-      throw new RuntimeException(String
-          .format("Unable to find config files for table - %s, at location [%s] or [%s].", tableName,
+      throw new RuntimeException(
+          String.format("Unable to find config files for table - %s, at location [%s] or [%s].", tableName,
               offlineTableConfigFile.getAbsolutePath(), realtimeTableConfigFile.getAbsolutePath()));
     }
     return true;
@@ -117,9 +118,9 @@ public class BootstrapTableTool {
       throws Exception {
     LOGGER.info("Adding realtime table {}", tableName);
     if (!createTable(schemaFile, realtimeTableConfigFile)) {
-      throw new RuntimeException(String
-          .format("Unable to create realtime table - %s from schema file [%s] and table conf file [%s].", tableName,
-              schemaFile, realtimeTableConfigFile));
+      throw new RuntimeException(
+          String.format("Unable to create realtime table - %s from schema file [%s] and table conf file [%s].",
+              tableName, schemaFile, realtimeTableConfigFile));
     }
     return true;
   }
@@ -135,14 +136,15 @@ public class BootstrapTableTool {
   private boolean createTable(File schemaFile, File offlineTableConfigFile, File realtimeTableConfigFile)
       throws Exception {
     return new AddTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
-        .setOfflineTableConfigFile(offlineTableConfigFile.getAbsolutePath()).setRealtimeTableConfigFile(realtimeTableConfigFile.getAbsolutePath())
-        .setControllerProtocol(_controllerProtocol)
-        .setControllerHost(_controllerHost).setControllerPort(String.valueOf(_controllerPort)).setExecute(true)
-        .setAuthProvider(_authProvider).execute();
+        .setOfflineTableConfigFile(offlineTableConfigFile.getAbsolutePath())
+        .setRealtimeTableConfigFile(realtimeTableConfigFile.getAbsolutePath())
+        .setControllerProtocol(_controllerProtocol).setControllerHost(_controllerHost)
+        .setControllerPort(String.valueOf(_controllerPort)).setExecute(true).setAuthProvider(_authProvider).execute();
   }
 
   private boolean bootstrapHybridTable(File setupTableTmpDir, String tableName, File schemaFile,
-                                       File offlineTableConfigFile, File ingestionJobSpecFile, File realtimeTableConfig) throws Exception {
+      File offlineTableConfigFile, File ingestionJobSpecFile, File realtimeTableConfig)
+      throws Exception {
     TableConfig tableConfig =
         JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile), TableConfig.class);
     if (tableConfig.getIngestionConfig() != null
@@ -161,15 +163,15 @@ public class BootstrapTableTool {
     // TODO: it's unclear why this broke as it's been working, but using the PUT API would solve this
     boolean tableCreationResult = createTable(schemaFile, updatedTableConfigFile, realtimeTableConfig);
     if (!tableCreationResult) {
-      throw new RuntimeException(String
-          .format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].", tableName,
-              schemaFile, offlineTableConfigFile));
+      throw new RuntimeException(
+          String.format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].",
+              tableName, schemaFile, offlineTableConfigFile));
     }
     return setupOfflineData(setupTableTmpDir, tableConfig, tableName, ingestionJobSpecFile);
   }
 
   private boolean bootstrapOfflineTable(File setupTableTmpDir, String tableName, File schemaFile,
-                                        File offlineTableConfigFile, File ingestionJobSpecFile)
+      File offlineTableConfigFile, File ingestionJobSpecFile)
       throws Exception {
     TableConfig tableConfig =
         JsonUtils.inputStreamToObject(new FileInputStream(offlineTableConfigFile), TableConfig.class);
@@ -186,18 +188,20 @@ public class BootstrapTableTool {
     outputStream.close();
     boolean tableCreationResult = createTable(schemaFile, updatedTableConfigFile);
     if (!tableCreationResult) {
-      throw new RuntimeException(String
-          .format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].", tableName,
-              schemaFile, offlineTableConfigFile));
+      throw new RuntimeException(
+          String.format("Unable to create offline table - %s from schema file [%s] and table conf file [%s].",
+              tableName, schemaFile, offlineTableConfigFile));
     }
     return setupOfflineData(setupTableTmpDir, tableConfig, tableName, ingestionJobSpecFile);
   }
 
-  private boolean setupOfflineData(File setupTableTmpDir, TableConfig tableConfig, String tableName, File ingestionJobSpecFile) throws IOException {
+  private boolean setupOfflineData(File setupTableTmpDir, TableConfig tableConfig, String tableName,
+      File ingestionJobSpecFile)
+      throws IOException {
     if (tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
         .isTaskTypeEnabled(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE)) {
-      final Map<String, String> scheduledTasks = _minionClient
-          .scheduleMinionTasks(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+      final Map<String, String> scheduledTasks =
+          _minionClient.scheduleMinionTasks(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
               TableNameBuilder.OFFLINE.tableNameWithType(tableName));
       if (scheduledTasks.isEmpty()) {
         LOGGER.info("No scheduled tasks.");
