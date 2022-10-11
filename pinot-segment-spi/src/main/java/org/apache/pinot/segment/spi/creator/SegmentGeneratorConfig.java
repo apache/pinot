@@ -115,7 +115,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _onHeap = false;
   private boolean _nullHandlingEnabled = false;
   private boolean _continueOnError = false;
-  private boolean _rowTimeValueCheck = true;
+  private boolean _rowTimeValueCheck = false;
   private boolean _segmentTimeValueCheck = true;
   private boolean _failOnEmptySegment = false;
   private boolean _optimizeDictionaryForMetrics = false;
