@@ -59,6 +59,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -79,7 +80,10 @@ import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -1034,5 +1038,69 @@ public class PinotSegmentRestletResource {
           String.format("Failed to get consuming segments info for table %s. %s", realtimeTableName, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  @POST
+  @Path("/segments/{tableNameWithType}/updateZKTimeInterval")
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update the start and end time of the segments based on latest schema",
+      notes = "Update the start and end time of the segments based on latest schema")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public SuccessResponse updateTimeIntervalZK(
+      @ApiParam(value = "Table name with type", required = true,
+          example = "myTable_REALTIME") @PathParam("tableNameWithType") String tableNameWithType) {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      if (tableType == null) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Table type not provided with table name %s", tableNameWithType),
+            Status.BAD_REQUEST);
+      }
+      return updateZKTimeIntervalInternal(tableNameWithType);
+  }
+
+  /**
+   * Internal method to update schema
+   * @param tableNameWithType  name of the table
+   * @return
+   */
+  private SuccessResponse updateZKTimeIntervalInternal(String tableNameWithType) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find table config for table: " + tableNameWithType, Status.NOT_FOUND);
+      }
+
+      Schema tableSchema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+      if (tableSchema == null) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find schema for table: " + tableNameWithType, Status.NOT_FOUND);
+      }
+
+      String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      if (StringUtils.isEmpty(timeColumn)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find time column for table : " + tableNameWithType, Status.NOT_FOUND);
+      }
+
+      DateTimeFieldSpec timeColumnFieldSpec = tableSchema.getSpecForTimeColumn(timeColumn);
+      if (timeColumnFieldSpec == null) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Failed to find field spec for column: %s and table: %s", timeColumn, tableNameWithType),
+            Status.NOT_FOUND);
+      }
+
+      try {
+        _pinotHelixResourceManager.updateSegmentsZKTimeInterval(tableNameWithType, timeColumnFieldSpec);
+      } catch (Exception e) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Failed to update time interval zk metadata for table %s", tableNameWithType),
+            Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
+      return new SuccessResponse("Successfully updated time interval zk metadata for table: " + tableNameWithType);
   }
 }

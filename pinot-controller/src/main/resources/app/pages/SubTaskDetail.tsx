@@ -20,9 +20,11 @@
 import React, { useEffect, useState } from 'react';
 import { get, find } from 'lodash';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { Grid, makeStyles, Box } from '@material-ui/core';
+import { Grid, makeStyles, Box, List, ListItem, ListItemText, Typography, Divider } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
+import { TaskProgressStatus } from 'Models';
+import moment from 'moment';
 
 const jsonoptions = {
   lineNumbers: true,
@@ -64,27 +66,35 @@ const useStyles = makeStyles(() => ({
   },
   queryOutput: {
     border: '1px solid #BDCCD9',
-    '& .CodeMirror': { height: 532 },
+    '& .CodeMirror': { maxHeight: 400 },
   },
+  taskDetailContainer: {
+    overflow: "auto", 
+    whiteSpace: "pre", 
+    height: 600
+  }
 }));
 
 const TaskDetail = (props) => {
   const classes = useStyles();
   const { subTaskID, taskID } = props.match.params;
-
-  const [fetching, setFetching] = useState(true);
   const [taskDebugData, setTaskDebugData] = useState({});
+  const [taskProgressData, setTaskProgressData] = useState<TaskProgressStatus[] | string>("");
 
-  const fetchData = async () => {
-    setFetching(true);
+  const fetchTaskDebugData = async () => {
     const debugRes = await PinotMethodUtils.getTaskDebugData(taskID);
     const subTaskData = find(debugRes.data.subtaskInfos, (subTask) => get(subTask, 'taskId', '') === subTaskID);
     setTaskDebugData(subTaskData);
-    setFetching(false);
   };
 
+  const fetchTaskProgressData = async () => {
+      const taskProgressData = await PinotMethodUtils.getTaskProgressData(taskID, subTaskID);
+      setTaskProgressData(get(taskProgressData, subTaskID, "No Status"));
+  }
+
   useEffect(() => {
-    fetchData();
+    fetchTaskDebugData();
+    fetchTaskProgressData();
   }, []);
 
   return (
@@ -109,7 +119,7 @@ const TaskDetail = (props) => {
         </Grid>
       </div>
       <Grid container spacing={2}>
-        <Grid item xs={6}>
+        <Grid item xs={12}>
           <div className={classes.sqlDiv}>
             <SimpleAccordion
               headerTitle="Task Config"
@@ -130,9 +140,38 @@ const TaskDetail = (props) => {
               headerTitle="Info"
               showSearchBox={false}
             >
-              <Box p={3}>
+              <Box p={3} className={classes.taskDetailContainer}>
                 {get(taskDebugData, `info`, '')}
               </Box>
+            </SimpleAccordion>
+          </div>
+        </Grid>
+        <Grid item xs={6}>
+          <div className={classes.sqlDiv}>
+            <SimpleAccordion
+              headerTitle="Progress"
+              showSearchBox={false}
+            >
+              <div style={{overflow: "auto"}}>
+                <List style={{width: "max-content"}} className={classes.taskDetailContainer}>
+                  {typeof taskProgressData === "string" && (
+                    <ListItem >
+                      <ListItemText>{taskProgressData}</ListItemText>
+                    </ListItem>
+                  )}
+                  {typeof taskProgressData !== "string" && taskProgressData.map((data, index) => (
+                    <div key={index}>
+                      <ListItem >
+                        <ListItemText 
+                          primary={moment(+data.ts).format('YYYY-MM-DD HH:mm:ss')} 
+                          secondary={<Typography variant='body2'>{data.status}</Typography>} 
+                        />
+                      </ListItem>
+                      <Divider />
+                    </div>
+                  ))}
+                </List>
+              </div>
             </SimpleAccordion>
           </div>
         </Grid>

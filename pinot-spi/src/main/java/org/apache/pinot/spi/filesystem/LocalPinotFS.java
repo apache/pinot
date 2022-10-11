@@ -30,6 +30,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -113,6 +115,23 @@ public class LocalPinotFS extends BasePinotFS {
       return Files.walk(Paths.get(fileUri)).
           filter(s -> !s.equals(file.toPath())).map(Path::toString).toArray(String[]::new);
     }
+  }
+
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
+      throws IOException {
+    File file = toFile(fileUri);
+    if (!recursive) {
+      return Arrays.stream(file.list()).map(s -> getFileMetadata(new File(file, s))).collect(Collectors.toList());
+    } else {
+      return Files.walk(Paths.get(fileUri)).filter(s -> !s.equals(file.toPath())).map(p -> getFileMetadata(p.toFile()))
+          .collect(Collectors.toList());
+    }
+  }
+
+  private static FileMetadata getFileMetadata(File file) {
+    return new FileMetadata.Builder().setFilePath(file.getAbsolutePath()).setLastModifiedTime(file.lastModified())
+        .setLength(file.length()).setIsDirectory(file.isDirectory()).build();
   }
 
   @Override

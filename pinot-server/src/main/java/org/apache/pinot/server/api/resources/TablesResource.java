@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
@@ -56,13 +58,18 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
+import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -77,9 +84,11 @@ import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.HttpRequesterIdentity;
 import org.apache.pinot.server.access.RequesterIdentity;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,6 +110,10 @@ public class TablesResource {
 
   @Inject
   private AccessControlFactory _accessControlFactory;
+
+  @Inject
+  @Named(AdminApiApplication.SERVER_INSTANCE_ID)
+  private String _instanceId;
 
   @GET
   @Path("/tables")
@@ -513,5 +526,61 @@ public class TablesResource {
       }
     }
     return segmentConsumerInfoList;
+  }
+
+  @GET
+  @Path("tables/{tableNameWithType}/allSegmentsLoaded")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Validates if the ideal state matches with the segment state on this server", notes =
+      "Validates if the ideal state matches with the segment state on this server")
+  public TableSegmentValidationInfo validateTableSegmentState(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableNameWithType")
+      String tableNameWithType) {
+    // Get table current ideal state
+    IdealState tableIdealState = HelixHelper.getTableIdealState(_serverInstance.getHelixManager(), tableNameWithType);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+
+    // Validate segments in ideal state which belong to this server
+    long maxEndTimeMs = -1;
+    Map<String, Map<String, String>> instanceStatesMap = tableIdealState.getRecord().getMapFields();
+    for (Map.Entry<String, Map<String, String>> entry : instanceStatesMap.entrySet()) {
+      String segmentState = entry.getValue().get(_instanceId);
+      if (segmentState != null) {
+        // Segment hosted by this server. Validate segment state
+        String segmentName = entry.getKey();
+        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+        try {
+          switch (segmentState) {
+            case SegmentStateModel.CONSUMING:
+              // Only validate presence of segment
+              if (segmentDataManager == null) {
+                return new TableSegmentValidationInfo(false, -1);
+              }
+              break;
+            case SegmentStateModel.ONLINE:
+              // Validate segment CRC
+              SegmentZKMetadata zkMetadata =
+                  ZKMetadataProvider.getSegmentZKMetadata(_serverInstance.getHelixManager().getHelixPropertyStore(),
+                      tableNameWithType, segmentName);
+              Preconditions.checkState(zkMetadata != null,
+                  "Segment zk metadata not found for segment : " + segmentName);
+              if (segmentDataManager == null || !segmentDataManager.getSegment().getSegmentMetadata().getCrc()
+                  .equals(String.valueOf(zkMetadata.getCrc()))) {
+                return new TableSegmentValidationInfo(false, -1);
+              }
+              maxEndTimeMs = Math.max(maxEndTimeMs, zkMetadata.getEndTimeMs());
+              break;
+            default:
+              break;
+          }
+        } finally {
+          if (segmentDataManager != null) {
+            tableDataManager.releaseSegment(segmentDataManager);
+          }
+        }
+      }
+    }
+    return new TableSegmentValidationInfo(true, maxEndTimeMs);
   }
 }

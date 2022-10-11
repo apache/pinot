@@ -97,13 +97,13 @@ public enum TimestampIndexGranularity {
 
   /**
    * Generate the dateTrunc expression to convert the base time column to the time column with granularity value
-   * E.g. $ts$DAY -> dateTrunc('DAY', ts)
+   * E.g. $ts$DAY -> dateTrunc('DAY',"ts")
    *
    * @param timeColumn
    * @param granularity
    * @return Time conversion expression
    */
   public static String getTransformExpression(String timeColumn, TimestampIndexGranularity granularity) {
-    return "dateTrunc('" + granularity + "', " + timeColumn + ")";
+    return "dateTrunc('" + granularity + "',\"" + timeColumn + "\")";
   }
 }

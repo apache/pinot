@@ -76,10 +76,10 @@ public class TimestampIndexGranularityTest {
   @Test
   public void testGetTransformExpression() {
     Assert.assertEquals(TimestampIndexGranularity.getTransformExpression("ts", TimestampIndexGranularity.DAY),
-        "dateTrunc('DAY', ts)");
+        "dateTrunc('DAY',\"ts\")");
     Assert.assertEquals(TimestampIndexGranularity.getTransformExpression("ts", TimestampIndexGranularity.WEEK),
-        "dateTrunc('WEEK', ts)");
+        "dateTrunc('WEEK',\"ts\")");
     Assert.assertEquals(TimestampIndexGranularity.getTransformExpression("ts", TimestampIndexGranularity.MONTH),
-        "dateTrunc('MONTH', ts)");
+        "dateTrunc('MONTH',\"ts\")");
   }
 }

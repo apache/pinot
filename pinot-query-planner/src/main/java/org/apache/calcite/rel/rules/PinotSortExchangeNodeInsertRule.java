@@ -29,7 +29,7 @@ import org.apache.calcite.tools.RelBuilderFactory;
 
 
 /**
- * Special rule for Pinot, this rule is fixed to always insert exchange after JOIN node.
+ * Special rule for Pinot, this rule is fixed to always insert exchange after SORT node.
  */
 public class PinotSortExchangeNodeInsertRule extends RelOptRule {
   public static final PinotSortExchangeNodeInsertRule INSTANCE =
@@ -46,7 +46,7 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
     }
     if (call.rel(0) instanceof Sort) {
       Sort sort = call.rel(0);
-      return sort.getCollation().getFieldCollations().size() > 0 && !PinotRuleUtils.isExchange(sort.getInput());
+      return !PinotRuleUtils.isExchange(sort.getInput());
     }
     return false;
   }

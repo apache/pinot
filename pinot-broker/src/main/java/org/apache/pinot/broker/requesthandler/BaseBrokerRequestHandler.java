@@ -21,7 +21,6 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,7 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -48,6 +46,7 @@ import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -121,13 +120,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final String _brokerId;
   protected final long _brokerTimeoutMs;
   protected final int _queryResponseLimit;
-  protected final int _queryLogLength;
 
-  private final RateLimiter _queryLogRateLimiter;
-
-  private final RateLimiter _numDroppedLogRateLimiter;
-  private final AtomicInteger _numDroppedLog;
-
+  private final QueryLogger _queryLogger;
   private final boolean _disableGroovy;
   private final boolean _useApproximateFunction;
   private final int _defaultHllLog2m;
@@ -156,19 +150,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
-    _queryLogLength =
-        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH, Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH);
-    _queryLogRateLimiter = RateLimiter.create(config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND,
-        Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND));
-    _numDroppedLog = new AtomicInteger(0);
-    _numDroppedLogRateLimiter = RateLimiter.create(1.0);
+    _queryLogger = new QueryLogger(config);
     boolean enableQueryCancellation =
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
     _queriesById = enableQueryCancellation ? new ConcurrentHashMap<>() : null;
     LOGGER.info(
         "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps, "
-            + "enabling query cancellation: {}", _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength,
-        _queryLogRateLimiter.getRate(), enableQueryCancellation);
+            + "enabling query cancellation: {}", _brokerId, _brokerTimeoutMs, _queryResponseLimit,
+        _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(), enableQueryCancellation);
   }
 
   private String getDefaultBrokerId() {
@@ -560,8 +549,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Send empty response since we don't need to evaluate either offline or realtime request.
       BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
       // Extract source info from incoming request
-      logBrokerResponse(requestId, query, requestContext, tableName, 0, new ServerStats(), brokerResponse,
-          System.nanoTime(), requesterIdentity);
+      _queryLogger.log(new QueryLogger.QueryLogParams(
+          requestId, query, requestContext, tableName, 0, new ServerStats(),
+          brokerResponse, System.nanoTime(), requesterIdentity));
       return brokerResponse;
     }
 
@@ -694,9 +684,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         LOGGER.debug("Remove track of running query: {}", requestId);
       }
     } else {
-      brokerResponse =
-          processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest, offlineRoutingTable,
-              realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
+      brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
+          offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
+          requestContext);
     }
 
     brokerResponse.setExceptions(exceptions);
@@ -719,8 +709,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         TimeUnit.MILLISECONDS);
 
     // Extract source info from incoming request
-    logBrokerResponse(requestId, query, requestContext, tableName, numUnavailableSegments, serverStats, brokerResponse,
-        totalTimeMs, requesterIdentity);
+    _queryLogger.log(
+        new QueryLogger.QueryLogParams(
+            requestId, query, requestContext, tableName, numUnavailableSegments, serverStats, brokerResponse,
+            totalTimeMs, requesterIdentity));
     return brokerResponse;
   }
 
@@ -788,61 +780,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /** Given a {@link PinotQuery}, check if the WHERE clause will always evaluate to true. */
   private boolean isFilterAlwaysTrue(PinotQuery pinotQuery) {
     return TRUE.equals(pinotQuery.getFilterExpression());
-  }
-
-  private void logBrokerResponse(long requestId, String query, RequestContext requestContext, String tableName,
-      int numUnavailableSegments, ServerStats serverStats, BrokerResponseNative brokerResponse, long totalTimeMs,
-      @Nullable RequesterIdentity requesterIdentity) {
-    LOGGER.debug("Broker Response: {}", brokerResponse);
-
-    boolean enableClientIpLogging = _config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
-        Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING);
-    String clientIp = CommonConstants.UNKNOWN;
-    if (enableClientIpLogging && requesterIdentity != null) {
-      clientIp = requesterIdentity.getClientIp();
-    }
-
-    // Please keep the format as name=value comma-separated with no spaces
-    // Please keep all the name value pairs together, then followed by the query. To add a new entry, please add it to
-    // the end of existing pairs, but before the query.
-    if (_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
-      // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
-      LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
-              + "segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/unavailable):"
-              + "{}/{}/{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
-              + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},"
-              + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},"
-              + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},clientIp={},query={}", requestId,
-          tableName, totalTimeMs, brokerResponse.getNumDocsScanned(), brokerResponse.getTotalDocs(),
-          brokerResponse.getNumEntriesScannedInFilter(), brokerResponse.getNumEntriesScannedPostFilter(),
-          brokerResponse.getNumSegmentsQueried(), brokerResponse.getNumSegmentsProcessed(),
-          brokerResponse.getNumSegmentsMatched(), brokerResponse.getNumConsumingSegmentsQueried(),
-          brokerResponse.getNumConsumingSegmentsProcessed(), brokerResponse.getNumConsumingSegmentsMatched(),
-          numUnavailableSegments, brokerResponse.getMinConsumingFreshnessTimeMs(),
-          brokerResponse.getNumServersResponded(), brokerResponse.getNumServersQueried(),
-          brokerResponse.isNumGroupsLimitReached(), requestContext.getReduceTimeMillis(),
-          brokerResponse.getExceptionsSize(), serverStats.getServerStats(), brokerResponse.getOfflineTotalCpuTimeNs(),
-          brokerResponse.getOfflineThreadCpuTimeNs(), brokerResponse.getOfflineSystemActivitiesCpuTimeNs(),
-          brokerResponse.getOfflineResponseSerializationCpuTimeNs(), brokerResponse.getRealtimeTotalCpuTimeNs(),
-          brokerResponse.getRealtimeThreadCpuTimeNs(), brokerResponse.getRealtimeSystemActivitiesCpuTimeNs(),
-          brokerResponse.getRealtimeResponseSerializationCpuTimeNs(), clientIp,
-          StringUtils.substring(query, 0, _queryLogLength));
-
-      // Limit the dropping log message at most once per second.
-      if (_numDroppedLogRateLimiter.tryAcquire()) {
-        // NOTE: the reported number may not be accurate since we will be missing some increments happened between
-        // get() and set().
-        int numDroppedLog = _numDroppedLog.get();
-        if (numDroppedLog > 0) {
-          LOGGER.info("{} logs were dropped. (log max rate per second: {})", numDroppedLog,
-              _queryLogRateLimiter.getRate());
-          _numDroppedLog.set(0);
-        }
-      }
-    } else {
-      // Increment the count for dropped log
-      _numDroppedLog.incrementAndGet();
-    }
   }
 
   private String getServerTenant(String tableNameWithType) {
@@ -1716,7 +1653,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Helper class to pass the per server statistics.
    */
-  protected static class ServerStats {
+  public static class ServerStats {
     private String _serverStats;
 
     public String getServerStats() {

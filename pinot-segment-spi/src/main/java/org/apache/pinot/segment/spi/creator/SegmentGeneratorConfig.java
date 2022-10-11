@@ -42,6 +42,7 @@ import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -80,7 +81,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private final List<String> _rangeIndexCreationColumns = new ArrayList<>();
   private final List<String> _textIndexCreationColumns = new ArrayList<>();
   private final List<String> _fstIndexCreationColumns = new ArrayList<>();
-  private final List<String> _jsonIndexCreationColumns = new ArrayList<>();
+  private final Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
   private final Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private final Map<String, List<TimestampIndexGranularity>> _timestampIndexConfigs = new HashMap<>();
   private final List<String> _columnSortOrder = new ArrayList<>();
@@ -207,8 +208,17 @@ public class SegmentGeneratorConfig implements Serializable {
         _rangeIndexCreationColumns.addAll(indexingConfig.getRangeIndexColumns());
       }
 
-      if (indexingConfig.getJsonIndexColumns() != null) {
-        _jsonIndexCreationColumns.addAll(indexingConfig.getJsonIndexColumns());
+      // Ignore jsonIndexColumns when jsonIndexConfigs is configured
+      Map<String, JsonIndexConfig> jsonIndexConfigs = indexingConfig.getJsonIndexConfigs();
+      if (jsonIndexConfigs != null) {
+        _jsonIndexConfigs.putAll(jsonIndexConfigs);
+      } else {
+        List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
+        if (jsonIndexColumns != null) {
+          for (String jsonIndexColumn : jsonIndexColumns) {
+            _jsonIndexConfigs.put(jsonIndexColumn, new JsonIndexConfig());
+          }
+        }
       }
 
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
@@ -412,8 +422,8 @@ public class SegmentGeneratorConfig implements Serializable {
     return _fstIndexCreationColumns;
   }
 
-  public List<String> getJsonIndexCreationColumns() {
-    return _jsonIndexCreationColumns;
+  public Map<String, JsonIndexConfig> getJsonIndexConfigs() {
+    return _jsonIndexConfigs;
   }
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {

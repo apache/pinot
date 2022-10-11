@@ -57,6 +57,7 @@ import {
   getTenantTableDetails,
   getSegmentMetadata,
   reloadSegment,
+  getTableJobs,
   getClusterInfo,
   zookeeperGetList,
   zookeeperGetData,
@@ -89,7 +90,9 @@ import {
   requestUserList,
   requestAddUser,
   requestDeleteUser,
-  requestUpdateUser
+  requestUpdateUser,
+  getTaskProgress,
+  getSegmentReloadStatus
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -830,6 +833,12 @@ const getTaskDebugData = async (taskName) => {
   return debugRes;
 };
 
+const getTaskProgressData = async (taskName, subTaskName) => {
+  const progressData = await getTaskProgress(taskName, subTaskName);
+
+  return progressData.data;
+}
+
 const getTaskGeneratorDebugData = async (taskName, taskType) => {
   const debugRes = await getTaskGeneratorDebug(taskName, taskType);
   return debugRes;
@@ -858,6 +867,18 @@ const deleteSegmentOp = (tableName, segmentName) => {
     return response.data;
   });
 };
+
+const fetchTableJobs = async (tableName: string) => {
+  const response = await getTableJobs(tableName);
+  
+  return response.data;
+}
+
+const fetchSegmentReloadStatus = async (jobId: string) => {
+  const response = await getSegmentReloadStatus(jobId);
+  
+  return response.data;
+}
 
 const updateTable = (tableName: string, table: string) => {
   return putTable(tableName, table).then((res)=>{
@@ -1093,6 +1114,8 @@ export default {
   deleteInstance,
   getAllPeriodicTaskNames,
   getAllTaskTypes,
+  fetchTableJobs,
+  fetchSegmentReloadStatus,
   getTaskTypeDebugData,
   getTableData,
   getTaskInfo,
@@ -1107,6 +1130,7 @@ export default {
   getElapsedTime,
   getTasksList,
   getTaskDebugData,
+  getTaskProgressData,
   getTaskGeneratorDebugData,
   deleteSegmentOp,
   reloadSegmentOp,

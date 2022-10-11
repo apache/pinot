@@ -42,13 +42,13 @@ public class LogicalFunctionsTest {
   }
 
   @Test(dataProvider = "logicalFunctionDataProvider")
-  public void testArithmeticFunctions(String functionExpression, List<String> expectedArguments, GenericRow row,
+  public void testLogicalFunctions(String functionExpression, List<String> expectedArguments, GenericRow row,
       Object expectedResult) {
     testFunction(functionExpression, expectedArguments, row, expectedResult);
   }
 
   @DataProvider(name = "logicalFunctionDataProvider")
-  public Object[][] arithmeticFunctionsDataProvider() {
+  public Object[][] logicalFunctionsDataProvider() {
     List<Object[]> inputs = new ArrayList<>();
 
     GenericRow row0 = new GenericRow();

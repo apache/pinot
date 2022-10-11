@@ -66,7 +66,7 @@ public class RequestContextUtils {
   public static ExpressionContext getExpression(Expression thriftExpression) {
     switch (thriftExpression.getType()) {
       case LITERAL:
-        return ExpressionContext.forLiteral(thriftExpression.getLiteral().getFieldValue().toString());
+        return ExpressionContext.forLiteralContext(thriftExpression.getLiteral());
       case IDENTIFIER:
         return ExpressionContext.forIdentifier(thriftExpression.getIdentifier().getName());
       case FUNCTION:
@@ -352,10 +352,10 @@ public class RequestContextUtils {
   }
 
   private static String getStringValue(ExpressionContext expressionContext) {
-    if (expressionContext.getType() != ExpressionContext.Type.LITERAL) {
+    if(expressionContext.getType() != ExpressionContext.Type.LITERAL){
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
-    return expressionContext.getLiteral();
+    return expressionContext.getLiteralString();
   }
 }

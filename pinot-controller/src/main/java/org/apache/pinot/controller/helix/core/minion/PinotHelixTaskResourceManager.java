@@ -83,10 +83,17 @@ public class PinotHelixTaskResourceManager {
 
   private final TaskDriver _taskDriver;
   private final PinotHelixResourceManager _helixResourceManager;
+  private final long _taskExpireTimeMs;
 
   public PinotHelixTaskResourceManager(PinotHelixResourceManager helixResourceManager, TaskDriver taskDriver) {
+    this(helixResourceManager, taskDriver, TimeUnit.HOURS.toMillis(24));
+  }
+
+  public PinotHelixTaskResourceManager(PinotHelixResourceManager helixResourceManager, TaskDriver taskDriver,
+      long taskExpireTimeMs) {
     _helixResourceManager = helixResourceManager;
     _taskDriver = taskDriver;
+    _taskExpireTimeMs = taskExpireTimeMs;
   }
 
   /**
@@ -288,7 +295,8 @@ public class PinotHelixTaskResourceManager {
     JobConfig.Builder jobBuilder =
         new JobConfig.Builder().addTaskConfigs(helixTaskConfigs).setInstanceGroupTag(minionInstanceTag)
             .setTimeoutPerTask(taskTimeoutMs).setNumConcurrentTasksPerInstance(numConcurrentTasksPerInstance)
-            .setIgnoreDependentJobFailure(true).setMaxAttemptsPerTask(1).setFailureThreshold(Integer.MAX_VALUE);
+            .setIgnoreDependentJobFailure(true).setMaxAttemptsPerTask(1).setFailureThreshold(Integer.MAX_VALUE)
+            .setExpiry(_taskExpireTimeMs);
     _taskDriver.enqueueJob(getHelixJobQueueName(taskType), parentTaskName, jobBuilder);
 
     // Wait until task state is available
@@ -426,7 +434,7 @@ public class PinotHelixTaskResourceManager {
    * @param taskName Task name
    * @return List of child task configs
    */
-  public synchronized List<PinotTaskConfig> getTaskConfigs(String taskName) {
+  public synchronized List<PinotTaskConfig> getSubtaskConfigs(String taskName) {
     Collection<TaskConfig> helixTaskConfigs =
         _taskDriver.getJobConfig(getHelixJobName(taskName)).getTaskConfigMap().values();
     List<PinotTaskConfig> taskConfigs = new ArrayList<>(helixTaskConfigs.size());
@@ -434,6 +442,23 @@ public class PinotHelixTaskResourceManager {
       taskConfigs.add(PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig));
     }
     return taskConfigs;
+  }
+
+  /**
+   * Get the task runtime config for the given task name. A task can have multiple subtasks, whose configs can be
+   * retrieved via the getSubtaskConfigs() method instead.
+   *
+   * @param taskName Task name
+   * @return Configs for the task returned as a Map.
+   */
+  public synchronized Map<String, String> getTaskRuntimeConfig(String taskName) {
+    JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
+    HashMap<String, String> configs = new HashMap<>();
+    configs.put("ConcurrentTasksPerWorker", String.valueOf(jobConfig.getNumConcurrentTasksPerInstance()));
+    configs.put("TaskTimeoutMs", String.valueOf(jobConfig.getTimeoutPerTask()));
+    configs.put("TaskExpireTimeMs", String.valueOf(jobConfig.getExpiry()));
+    configs.put("MinionWorkerGroupTag", jobConfig.getInstanceGroupTag());
+    return configs;
   }
 
   /**
@@ -516,6 +541,10 @@ public class PinotHelixTaskResourceManager {
       }
     }
     // Check if any subtask missed their progress from the worker.
+    // And simply check all subtasks if no subtasks are specified.
+    if (selectedSubtasks.isEmpty()) {
+      selectedSubtasks = allSubtasks.keySet();
+    }
     for (String subtaskName : selectedSubtasks) {
       if (subtaskProgressMap.containsKey(subtaskName)) {
         continue;
@@ -530,12 +559,11 @@ public class PinotHelixTaskResourceManager {
             String.format("No status from worker: %s. Got status: %s from Helix", taskWorker, helixState));
       }
     }
-    // Raise error if any worker failed to report progress, with partial result.
     if (serviceResponse._failedResponseCount > 0) {
-      // TODO: track detailed worker failure via CompletionServiceHelper and send them back in response.
-      throw new RuntimeException(String
-          .format("There were %d workers failed to report task progress. Got partial progress info: %s",
-              serviceResponse._failedResponseCount, subtaskProgressMap));
+      // Subtasks without worker side progress are filled with status tracked by Helix so return them back.
+      // The detailed worker failure response is logged as error by CompletionServiceResponse for debugging.
+      LOGGER.warn("There were {} workers failed to report task progress. Got partial progress info: {}",
+          serviceResponse._failedResponseCount, subtaskProgressMap);
     }
     return subtaskProgressMap;
   }
@@ -556,7 +584,7 @@ public class PinotHelixTaskResourceManager {
       String taskName = taskState.getKey();
 
       // Iterate through all task configs associated with this task name
-      for (PinotTaskConfig taskConfig : getTaskConfigs(taskName)) {
+      for (PinotTaskConfig taskConfig : getSubtaskConfigs(taskName)) {
         Map<String, String> pinotConfigs = taskConfig.getConfigs();
 
         // Filter task configs that matches this table name
@@ -639,7 +667,7 @@ public class PinotHelixTaskResourceManager {
       String pinotTaskName = getPinotTaskName(helixJobName);
 
       // Iterate through all task configs associated with this task name
-      for (PinotTaskConfig taskConfig : getTaskConfigs(pinotTaskName)) {
+      for (PinotTaskConfig taskConfig : getSubtaskConfigs(pinotTaskName)) {
         Map<String, String> pinotConfigs = taskConfig.getConfigs();
 
         // Filter task configs that matches this table name
@@ -692,6 +720,10 @@ public class PinotHelixTaskResourceManager {
       long jobExecutionStartTimeMs = jobContext.getExecutionStartTime();
       if (jobExecutionStartTimeMs > 0) {
         taskDebugInfo.setExecutionStartTime(DateTimeUtils.epochToDefaultDateFormat(jobExecutionStartTimeMs));
+      }
+      long jobFinishTimeMs = jobContext.getFinishTime();
+      if (jobFinishTimeMs > 0) {
+        taskDebugInfo.setFinishTime(DateTimeUtils.epochToDefaultDateFormat(jobFinishTimeMs));
       }
       Set<Integer> partitionSet = jobContext.getPartitionSet();
       TaskCount subtaskCount = new TaskCount();
@@ -795,11 +827,15 @@ public class PinotHelixTaskResourceManager {
     MinionTaskMetadataUtils.deleteTaskMetadata(propertyStore, taskType, tableNameWithType);
   }
 
-  @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "subtaskInfos"})
+  @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "finishTime", "subtaskInfos"})
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class TaskDebugInfo {
+    // Time at which the task (which may have multiple subtasks) got created.
     private String _startTime;
+    // Time at which the first subtask of the task got scheduled.
     private String _executionStartTime;
+    // Time at which the task has ended.
+    private String _finishTime;
     private TaskState _taskState;
     private TaskCount _subtaskCount;
     private List<SubtaskDebugInfo> _subtaskInfos;
@@ -813,6 +849,10 @@ public class PinotHelixTaskResourceManager {
 
     public void setExecutionStartTime(String executionStartTime) {
       _executionStartTime = executionStartTime;
+    }
+
+    public void setFinishTime(String finishTime) {
+      _finishTime = finishTime;
     }
 
     public void setTaskState(TaskState taskState) {
@@ -836,6 +876,10 @@ public class PinotHelixTaskResourceManager {
 
     public String getExecutionStartTime() {
       return _executionStartTime;
+    }
+
+    public String getFinishTime() {
+      return _finishTime;
     }
 
     public TaskState getTaskState() {

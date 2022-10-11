@@ -82,6 +82,11 @@ public class VarLengthValueReader implements ValueReader {
   }
 
   @Override
+  public byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
+    return getBytes(index, numBytesPerValue);
+  }
+
+  @Override
   public String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
     assert buffer.length >= numBytesPerValue;
 

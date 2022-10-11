@@ -176,12 +176,11 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    */
   protected Object convertSingleValue(Object value) {
     if (value instanceof ByteBuffer) {
-      ByteBuffer byteBufferValue = (ByteBuffer) value;
-
-      // Use byteBufferValue.remaining() instead of byteBufferValue.capacity() so that it still works when buffer is
-      // over-sized
-      byte[] bytesValue = new byte[byteBufferValue.remaining()];
-      byteBufferValue.get(bytesValue);
+      // NOTE: ByteBuffer might be reused in some record reader implementation. Make a slice to ensure nothing is
+      //       modified in the original buffer
+      ByteBuffer slice = ((ByteBuffer) value).slice();
+      byte[] bytesValue = new byte[slice.limit()];
+      slice.get(bytesValue);
       return bytesValue;
     }
     if (value instanceof Number || value instanceof byte[]) {

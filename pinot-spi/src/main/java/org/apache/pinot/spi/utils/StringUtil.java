@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.spi.utils;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang.ArrayUtils;
@@ -86,16 +84,5 @@ public class StringUtil {
       return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
     return value.substring(0, Math.min(index, maxLength));
-  }
-
-  /**
-   * Get the exception full stack track as String.
-   */
-  public static String getStackTraceAsString(Exception exp) {
-    StringWriter expStr = new StringWriter();
-    try (PrintWriter pw = new PrintWriter(expStr)) {
-      exp.printStackTrace(pw);
-    }
-    return expStr.toString();
   }
 }

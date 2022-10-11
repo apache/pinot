@@ -19,18 +19,15 @@
 package org.apache.calcite.rel.rules;
 
 import com.google.common.collect.ImmutableList;
-import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
-import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.pinot.query.planner.hints.PinotRelationalHints;
 
 
 /**
@@ -58,21 +55,20 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
 
   @Override
   public void onMatch(RelOptRuleCall call) {
-    // TODO: this only works for single equality JOIN. add generic condition parser
     Join join = call.rel(0);
     RelNode leftInput = join.getInput(0);
     RelNode rightInput = join.getInput(1);
 
     RelNode leftExchange;
     RelNode rightExchange;
-    List<RelHint> hints = join.getHints();
-    if (hints.contains(PinotRelationalHints.USE_BROADCAST_DISTRIBUTE)) {
-      // TODO: determine which side should be the broadcast table based on table metadata
-      // TODO: support SINGLETON exchange if the non-broadcast table size is small enough to stay local.
-      leftExchange = LogicalExchange.create(leftInput, RelDistributions.RANDOM_DISTRIBUTED);
+    JoinInfo joinInfo = join.analyzeCondition();
+
+    if (joinInfo.leftKeys.isEmpty()) {
+      // when there's no JOIN key, use broadcast.
+      leftExchange = LogicalExchange.create(leftInput, RelDistributions.SINGLETON);
       rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
-    } else { // if (hints.contains(PinotRelationalHints.USE_HASH_DISTRIBUTE)) {
-      JoinInfo joinInfo = join.analyzeCondition();
+    } else {
+      // when join key exists, use hash distribution.
       leftExchange = LogicalExchange.create(leftInput, RelDistributions.hash(joinInfo.leftKeys));
       rightExchange = LogicalExchange.create(rightInput, RelDistributions.hash(joinInfo.rightKeys));
     }

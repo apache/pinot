@@ -588,4 +588,28 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
     return _stringValuesMV;
   }
+
+  @Override
+  public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    if (_bytesValuesMV == null) {
+      _bytesValuesMV = new byte[length][][];
+    }
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
+      int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
+      for (int i = 0; i < length; i++) {
+        int[] dictIds = dictIdsMV[i];
+        int numValues = dictIds.length;
+        byte[][] bytesValues = new byte[numValues][];
+        dictionary.readBytesValues(dictIds, numValues, bytesValues);
+        _bytesValuesMV[i] = bytesValues;
+      }
+    } else {
+      assert getResultMetadata().getDataType().getStoredType() == DataType.STRING;
+      String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
+      ArrayCopyUtils.copy(stringValuesMV, _bytesValuesMV, length);
+    }
+    return _bytesValuesMV;
+  }
 }

@@ -27,6 +27,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FSTType;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -281,8 +282,8 @@ public interface IndexCreationContext {
       return new Inverted(this);
     }
 
-    public Json forJsonIndex() {
-      return new Json(this);
+    public Json forJsonIndex(JsonIndexConfig jsonIndexConfig) {
+      return new Json(this, jsonIndexConfig);
     }
 
     public Range forRangeIndex(int rangeIndexVersion) {
@@ -426,9 +427,15 @@ public interface IndexCreationContext {
   }
 
   class Json extends Wrapper {
+    private final JsonIndexConfig _jsonIndexConfig;
 
-    Json(IndexCreationContext delegate) {
+    public Json(IndexCreationContext delegate, JsonIndexConfig jsonIndexConfig) {
       super(delegate);
+      _jsonIndexConfig = jsonIndexConfig;
+    }
+
+    public JsonIndexConfig getJsonIndexConfig() {
+      return _jsonIndexConfig;
     }
   }
 

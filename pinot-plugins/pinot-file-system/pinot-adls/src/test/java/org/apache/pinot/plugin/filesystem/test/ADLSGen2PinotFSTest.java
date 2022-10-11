@@ -36,10 +36,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import org.apache.pinot.plugin.filesystem.ADLSGen2PinotFS;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -199,6 +204,49 @@ public class ADLSGen2PinotFSTest {
     verify(_mockFileSystemClient).listPaths(any(), any());
     verify(_mockPagedIterable).stream();
     verify(_mockPathItem).getName();
+  }
+
+  @Test
+  public void testListFilesWithMetadata()
+      throws IOException {
+    when(_mockFileSystemClient.listPaths(any(), any())).thenReturn(_mockPagedIterable);
+    when(_mockPagedIterable.stream()).thenReturn(Collections.singletonList(_mockPathItem).stream());
+    when(_mockPathItem.getName()).thenReturn("foo");
+    when(_mockPathItem.isDirectory()).thenReturn(false);
+    when(_mockPathItem.getContentLength()).thenReturn(1024L);
+    OffsetDateTime mtime = OffsetDateTime.now();
+    when(_mockPathItem.getLastModified()).thenReturn(mtime);
+
+    List<FileMetadata> actual = _adlsGen2PinotFsUnderTest.listFilesWithMetadata(_mockURI, true);
+    FileMetadata fm = actual.get(0);
+    Assert.assertEquals(fm.getFilePath(), "/foo");
+    Assert.assertFalse(fm.isDirectory());
+    Assert.assertEquals(fm.getLength(), 1024);
+    Assert.assertEquals(fm.getLastModifiedTime(), mtime.toInstant().toEpochMilli());
+
+    verify(_mockFileSystemClient).listPaths(any(), any());
+    verify(_mockPagedIterable).stream();
+    verify(_mockPathItem).getName();
+    verify(_mockPathItem).isDirectory();
+    verify(_mockPathItem).getContentLength();
+    verify(_mockPathItem).getLastModified();
+  }
+
+  @Test
+  public void testLastModified()
+      throws IOException {
+    when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
+    when(_mockDirectoryClient.getProperties()).thenReturn(_mockPathProperties);
+    Instant now = Instant.now();
+    OffsetDateTime mtime = Instant.now().atOffset(ZoneOffset.UTC);
+    when(_mockPathProperties.getLastModified()).thenReturn(mtime);
+
+    long actual = _adlsGen2PinotFsUnderTest.lastModified(_mockURI);
+    Assert.assertEquals(actual, now.toEpochMilli());
+
+    verify(_mockFileSystemClient).getDirectoryClient(any());
+    verify(_mockDirectoryClient).getProperties();
+    verify(_mockPathProperties).getLastModified();
   }
 
   @Test

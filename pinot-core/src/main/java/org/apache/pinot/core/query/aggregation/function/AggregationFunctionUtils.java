@@ -26,10 +26,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -120,6 +121,8 @@ public class AggregationFunctionUtils {
 
   /**
    * Reads the intermediate result from the {@link DataTable}.
+   *
+   * TODO: Move ser/de into AggregationFunction interface
    */
   public static Object getIntermediateResult(DataTable dataTable, ColumnDataType columnDataType, int rowId, int colId) {
     switch (columnDataType) {
@@ -128,7 +131,8 @@ public class AggregationFunctionUtils {
       case DOUBLE:
         return dataTable.getDouble(rowId, colId);
       case OBJECT:
-        return dataTable.getObject(rowId, colId);
+        DataTable.CustomObject customObject = dataTable.getCustomObject(rowId, colId);
+        return customObject != null ? ObjectSerDeUtils.deserialize(customObject) : null;
       default:
         throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);
     }

@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
+import java.io.IOException;
 import java.util.Collection;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
@@ -46,11 +47,18 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   }
 
   @Override
+  public DataSchema getDataSchema(QueryContext queryContext) {
+    return _dataSchema;
+  }
+
+  @Override
+  public Collection<Object[]> getRows(QueryContext queryContext) {
+    return _rows;
+  }
+
+  @Override
   public DataTable getDataTable(QueryContext queryContext)
-      throws Exception {
-    DataTable dataTable =
-        SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, queryContext.isNullHandlingEnabled());
-    attachMetadataToDataTable(dataTable);
-    return dataTable;
+      throws IOException {
+    return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, queryContext.isNullHandlingEnabled());
   }
 }

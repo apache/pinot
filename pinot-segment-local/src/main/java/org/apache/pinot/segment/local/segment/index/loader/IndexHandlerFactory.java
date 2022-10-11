@@ -63,6 +63,8 @@ public class IndexHandlerFactory {
         return new H3IndexHandler(segmentMetadata, indexLoadingConfig);
       case BLOOM_FILTER:
         return new BloomFilterHandler(segmentMetadata, indexLoadingConfig);
+      case FORWARD_INDEX:
+        return new ForwardIndexHandler(segmentMetadata, indexLoadingConfig);
       default:
         return NO_OP_HANDLER;
     }

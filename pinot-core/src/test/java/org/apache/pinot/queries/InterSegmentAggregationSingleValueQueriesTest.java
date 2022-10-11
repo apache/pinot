@@ -53,7 +53,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResults[0] = 24516L;
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 0L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 0L, 120000L, expectedResultTable);
 
     String groupBy = " GROUP BY column9 ORDER BY COUNT(*) DESC LIMIT 1";
     brokerResponse = getBrokerResponse(query + groupBy);
@@ -62,7 +62,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     brokerResponse = getBrokerResponse(query + FILTER + groupBy);
     expectedResults[0] = 17080L;
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 24516L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 24516L, 120000L, expectedResultTable);
 
     query = "SELECT COUNT(*) AS v1 FROM testTable";
 
@@ -74,7 +74,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResults[0] = 24516L;
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 0L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 0L, 120000L, expectedResultTable);
 
     groupBy = " GROUP BY column9 ORDER BY v1 DESC LIMIT 1";
     brokerResponse = getBrokerResponse(query + groupBy);
@@ -83,7 +83,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     brokerResponse = getBrokerResponse(query + FILTER + groupBy);
     expectedResults[0] = 17080L;
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 24516L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 24516L, 120000L, expectedResultTable);
   }
 
   @Test
@@ -101,7 +101,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146952047.0, 999813884.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable =
@@ -111,7 +111,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146952047.0, 999813884.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
@@ -129,7 +129,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{101116473.0, 20396372.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     String groupBy = " GROUP BY column9 ORDER BY v1, v2 LIMIT 1";
     brokerResponse = getBrokerResponse(query + groupBy);
@@ -140,7 +140,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + groupBy);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{101116473.0, 91804599.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
@@ -157,7 +157,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable = new ResultTable(expectedDataSchema,
         Collections.singletonList(new Object[]{27503790384288.0, 12429178874916.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable = new ResultTable(expectedDataSchema,
@@ -167,7 +167,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{19058003631876.0, 8606725456500.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
@@ -184,7 +184,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1121871038.68037, 506982332.96280}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable,
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable,
         1e-5);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
@@ -195,7 +195,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699.0, 334963174.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
@@ -213,7 +213,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2045835574.0, 979417512.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable =
@@ -223,7 +223,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2044094181.0, 979417512.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
@@ -240,7 +240,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1872, 4556}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{3495, 11961}));
@@ -248,7 +248,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1272, 3289}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
@@ -265,7 +265,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1886L, 4492L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{3592L, 11889L}));
@@ -273,7 +273,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1324L, 3197L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
@@ -293,7 +293,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1886L, 4492L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable,
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable,
         cardinalityExtractor);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
@@ -303,7 +303,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1324L, 3197L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable,
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable,
         cardinalityExtractor);
   }
 
@@ -324,7 +324,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
       brokerResponse = getBrokerResponse(query + FILTER);
       expectedResultTable =
           new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1139674505.0, 505053732.0}));
-      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
       brokerResponse = getBrokerResponse(query + GROUP_BY);
       expectedResultTable =
@@ -334,7 +334,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
       brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
       expectedResultTable =
           new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699.0, 334963174.0}));
-      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
     }
 
     String query = "SELECT PERCENTILE90(column1) AS v1, PERCENTILE90(column3) AS v2 FROM testTable";
@@ -347,7 +347,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1936730975.0, 899534534.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable =
@@ -357,7 +357,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699.0, 334963174.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
 
     query = "SELECT PERCENTILE95(column1) AS v1, PERCENTILE95(column3) AS v2 FROM testTable";
 
@@ -369,7 +369,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2096857943.0, 947763150.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable =
@@ -379,7 +379,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699.0, 334963174.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
 
     query = "SELECT PERCENTILE99(column1) AS v1, PERCENTILE99(column3) AS v2 FROM testTable";
 
@@ -391,7 +391,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146232405.0, 990669195.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable =
@@ -401,7 +401,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146232405.0, 990259756.0}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test
@@ -418,7 +418,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1139674505L, 509607935L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable =
@@ -428,7 +428,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699L, 334963174L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
 
     query = "SELECT PERCENTILEEST90(column1) AS v1, PERCENTILEEST90(column3) AS v2 FROM testTable";
 
@@ -440,7 +440,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1939865599L, 902299647L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable =
@@ -450,7 +450,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699L, 334963174L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
 
     query = "SELECT PERCENTILEEST95(column1) AS v1, PERCENTILEEST95(column3) AS v2 FROM testTable";
 
@@ -462,7 +462,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2109734911L, 950009855L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable =
@@ -472,7 +472,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2142595699L, 334963174L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
 
     query = "SELECT PERCENTILEEST99(column1) AS v1, PERCENTILEEST99(column3) AS v2 FROM testTable";
 
@@ -484,7 +484,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146232405L, 991952895L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 49032L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
     expectedResultTable =
@@ -494,7 +494,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
     expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2146232405L, 993001471L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 336536L, 73548L, 120000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
   }
 
   @Test

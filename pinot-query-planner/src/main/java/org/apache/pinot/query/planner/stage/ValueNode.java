@@ -51,4 +51,9 @@ public class ValueNode extends AbstractStageNode {
   public List<List<RexExpression>> getLiteralRows() {
     return _literalRows;
   }
+
+  @Override
+  public String explain() {
+    return "LITERAL";
+  }
 }

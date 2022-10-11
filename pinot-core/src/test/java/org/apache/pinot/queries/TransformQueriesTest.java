@@ -26,8 +26,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.customobject.AvgPair;
@@ -228,7 +228,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
   }
 
   private void verifyDateTruncationResult(String query, Object[] expectedGroupKey) {
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    GroupByOperator groupByOperator = getOperator(query);
     AggregationGroupByResult aggregationGroupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     List<GroupKeyGenerator.GroupKey> groupKeys = ImmutableList.copyOf(aggregationGroupByResult.getGroupKeyIterator());

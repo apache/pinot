@@ -28,9 +28,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -130,7 +130,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     _upsertIndexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     ((ImmutableSegmentImpl) _upsertIndexSegment).enableUpsert(
         new ConcurrentMapPartitionUpsertMetadataManager("testTable_REALTIME", 0, Collections.singletonList("column6"),
-            "daysSinceEpoch", HashFunction.NONE, null, serverMetrics), new ThreadSafeMutableRoaringBitmap());
+            "daysSinceEpoch", HashFunction.NONE, null, false, serverMetrics), new ThreadSafeMutableRoaringBitmap());
   }
 
   @AfterClass
@@ -203,8 +203,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     });
     // Aggregation group-by
     entries.add(new Object[]{
-        "select sum(column1) from testTable group by daysSinceEpoch", AggregationGroupByOrderByOperator.class,
-        AggregationGroupByOrderByOperator.class
+        "select sum(column1) from testTable group by daysSinceEpoch", GroupByOperator.class, GroupByOperator.class
     });
     // COUNT from metadata, MIN from dictionary
     entries.add(new Object[]{
@@ -212,8 +211,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     });
     // Aggregation group-by
     entries.add(new Object[]{
-        "select count(*),min(daysSinceEpoch) from testTable group by daysSinceEpoch",
-        AggregationGroupByOrderByOperator.class, AggregationGroupByOrderByOperator.class
+        "select count(*),min(daysSinceEpoch) from testTable group by daysSinceEpoch", GroupByOperator.class,
+        GroupByOperator.class
     });
 
     return entries.toArray(new Object[entries.size()][]);

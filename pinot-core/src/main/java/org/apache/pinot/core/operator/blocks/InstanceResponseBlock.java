@@ -18,26 +18,132 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
-import org.apache.pinot.common.utils.DataTable;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
- * InstanceResponseBlock is just a holder to get InstanceResponse from InstanceResponseBlock.
+ * The {@code InstanceResponseBlock} is the holder of the server side results.
  */
 public class InstanceResponseBlock implements Block {
-  private final DataTable _instanceResponseDataTable;
+  private final BaseResultsBlock _resultsBlock;
+  private final QueryContext _queryContext;
+  private final Map<Integer, String> _exceptions;
+  private final Map<String, String> _metadata;
 
-  public InstanceResponseBlock(DataTable dataTable) {
-    _instanceResponseDataTable = dataTable;
+  public InstanceResponseBlock(BaseResultsBlock resultsBlock, QueryContext queryContext) {
+    _resultsBlock = resultsBlock;
+    _queryContext = queryContext;
+    _exceptions = new HashMap<>();
+    List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
+    if (processingExceptions != null) {
+      for (ProcessingException processingException : processingExceptions) {
+        _exceptions.put(processingException.getErrorCode(), processingException.getMessage());
+      }
+    }
+    _metadata = resultsBlock.getResultsMetadata();
   }
 
-  public DataTable getInstanceResponseDataTable() {
-    return _instanceResponseDataTable;
+  /**
+   * Metadata only instance response.
+   */
+  public InstanceResponseBlock() {
+    _resultsBlock = null;
+    _queryContext = null;
+    _exceptions = new HashMap<>();
+    _metadata = new HashMap<>();
+  }
+
+  private InstanceResponseBlock(Map<Integer, String> exceptions, Map<String, String> metadata) {
+    _resultsBlock = null;
+    _queryContext = null;
+    _exceptions = exceptions;
+    _metadata = metadata;
+  }
+
+  public InstanceResponseBlock toMetadataOnlyResponseBlock() {
+    return new InstanceResponseBlock(_exceptions, _metadata);
+  }
+
+  public void addException(ProcessingException processingException) {
+    _exceptions.put(processingException.getErrorCode(), processingException.getMessage());
+  }
+
+  public void addException(int errorCode, String exceptionMessage) {
+    _exceptions.put(errorCode, exceptionMessage);
+  }
+
+  public void addMetadata(String key, String value) {
+    _metadata.put(key, value);
+  }
+
+  @Nullable
+  public BaseResultsBlock getResultsBlock() {
+    return _resultsBlock;
+  }
+
+  @Nullable
+  public QueryContext getQueryContext() {
+    return _queryContext;
+  }
+
+  public Map<Integer, String> getExceptions() {
+    return _exceptions;
+  }
+
+  public Map<String, String> getResponseMetadata() {
+    return _metadata;
+  }
+
+  @Nullable
+  public DataSchema getDataSchema() {
+    return _resultsBlock != null ? _resultsBlock.getDataSchema(_queryContext) : null;
+  }
+
+  @Nullable
+  public Collection<Object[]> getRows() {
+    return _resultsBlock != null ? _resultsBlock.getRows(_queryContext) : null;
+  }
+
+  public DataTable toDataTable()
+      throws IOException {
+    DataTable dataTable = toDataOnlyDataTable();
+    attachMetadata(dataTable);
+    return dataTable;
+  }
+
+  public DataTable toDataOnlyDataTable()
+      throws IOException {
+    return _resultsBlock != null ? _resultsBlock.getDataTable(_queryContext)
+        : DataTableBuilderFactory.getEmptyDataTable();
+  }
+
+  public DataTable toMetadataOnlyDataTable() {
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    attachMetadata(dataTable);
+    return dataTable;
+  }
+
+  private void attachMetadata(DataTable dataTable) {
+    for (Map.Entry<Integer, String> entry : _exceptions.entrySet()) {
+      dataTable.addException(entry.getKey(), entry.getValue());
+    }
+    dataTable.getMetadata().putAll(_metadata);
   }
 
   @Override

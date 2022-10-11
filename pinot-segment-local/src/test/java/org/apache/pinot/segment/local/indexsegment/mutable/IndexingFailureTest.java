@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -52,19 +53,18 @@ public class IndexingFailureTest {
   public void setup() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
         .addSingleValueDimension(STRING_COL, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(JSON_COL, FieldSpec.DataType.JSON)
-        .setSchemaName(TABLE_NAME)
-        .build();
+        .addSingleValueDimension(JSON_COL, FieldSpec.DataType.JSON).setSchemaName(TABLE_NAME).build();
     _serverMetrics = mock(ServerMetrics.class);
-    _mutableSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema,
-        Collections.emptySet(), Collections.emptySet(), new HashSet<>(Arrays.asList(INT_COL, STRING_COL)),
-        Collections.singleton(JSON_COL), _serverMetrics);
+    _mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.emptySet(), Collections.emptySet(),
+            new HashSet<>(Arrays.asList(INT_COL, STRING_COL)),
+            Collections.singletonMap(JSON_COL, new JsonIndexConfig()), _serverMetrics);
   }
 
   @Test
   public void testIndexingFailures()
       throws IOException {
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
     GenericRow goodRow = new GenericRow();
     goodRow.putValue(INT_COL, 0);
     goodRow.putValue(STRING_COL, "a");
@@ -125,7 +125,6 @@ public class IndexingFailureTest {
     assertTrue(_mutableSegment.getDataSource(STRING_COL).getNullValueVector().isNull(3));
     // null string value skipped
     verify(_serverMetrics, times(1)).addMeteredTableValue(matches("DICTIONARY-indexingError$"),
-        eq(ServerMeter.INDEXING_FAILURES),
-        eq(1L));
+        eq(ServerMeter.INDEXING_FAILURES), eq(1L));
   }
 }

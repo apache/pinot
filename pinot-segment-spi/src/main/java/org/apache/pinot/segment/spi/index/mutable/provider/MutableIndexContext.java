@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.index.mutable.provider;
 
 import java.util.Objects;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -144,8 +145,8 @@ public interface MutableIndexContext {
       return new Inverted(this);
     }
 
-    public Json forJsonIndex() {
-      return new Json(this);
+    public Json forJsonIndex(JsonIndexConfig jsonIndexConfig) {
+      return new Json(this, jsonIndexConfig);
     }
 
     public Text forTextIndex() {
@@ -234,9 +235,15 @@ public interface MutableIndexContext {
   }
 
   class Json extends Wrapper {
+    private final JsonIndexConfig _jsonIndexConfig;
 
-    public Json(MutableIndexContext wrapped) {
+    public Json(MutableIndexContext wrapped, JsonIndexConfig jsonIndexConfig) {
       super(wrapped);
+      _jsonIndexConfig = jsonIndexConfig;
+    }
+
+    public JsonIndexConfig getJsonIndexConfig() {
+      return _jsonIndexConfig;
     }
   }
 

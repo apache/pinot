@@ -26,12 +26,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
@@ -197,10 +198,10 @@ public abstract class BaseQueriesTest {
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     Plan plan = planMaker.makeInstancePlan(getIndexSegments(), serverQueryContext, EXECUTOR_SERVICE, null);
-    DataTable instanceResponse;
+    InstanceResponseBlock instanceResponse;
     try {
       instanceResponse =
-          queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
+          queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeExplainQuery(plan, queryContext) : plan.execute();
     } catch (TimeoutException e) {
       throw new RuntimeException(e);
     }
@@ -212,7 +213,7 @@ public abstract class BaseQueriesTest {
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
-      byte[] serializedResponse = instanceResponse.toBytes();
+      byte[] serializedResponse = instanceResponse.toDataTable().toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
           DataTableFactory.getDataTable(serializedResponse));
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
@@ -270,17 +271,17 @@ public abstract class BaseQueriesTest {
     Plan plan1 = planMaker.makeInstancePlan(instances.get(0), serverQueryContext, EXECUTOR_SERVICE, null);
     Plan plan2 = planMaker.makeInstancePlan(instances.get(1), serverQueryContext, EXECUTOR_SERVICE, null);
 
-    DataTable instanceResponse1;
+    InstanceResponseBlock instanceResponse1;
     try {
-      instanceResponse1 =
-          queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan1) : plan1.execute();
+      instanceResponse1 = queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeExplainQuery(plan1, queryContext)
+          : plan1.execute();
     } catch (TimeoutException e) {
       throw new RuntimeException(e);
     }
-    DataTable instanceResponse2;
+    InstanceResponseBlock instanceResponse2;
     try {
-      instanceResponse2 =
-          queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan2) : plan2.execute();
+      instanceResponse2 = queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeExplainQuery(plan2, queryContext)
+          : plan2.execute();
     } catch (TimeoutException e) {
       throw new RuntimeException(e);
     }
@@ -292,8 +293,8 @@ public abstract class BaseQueriesTest {
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
-      byte[] serializedResponse1 = instanceResponse1.toBytes();
-      byte[] serializedResponse2 = instanceResponse2.toBytes();
+      byte[] serializedResponse1 = instanceResponse1.toDataTable().toBytes();
+      byte[] serializedResponse2 = instanceResponse2.toDataTable().toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
           DataTableFactory.getDataTable(serializedResponse1));
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),

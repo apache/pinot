@@ -44,4 +44,13 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
    * iteration. This method should be called after the iteration is done.
    */
   long getNumEntriesScanned();
+
+  /**
+   * Returns the estimated (effective) cardinality of the underlying data source
+   */
+
+  default float getEstimatedCardinality(boolean isAndDocIdSet) {
+    //default N/A behavior so that it always get picked in the end
+    return isAndDocIdSet ? Float.NEGATIVE_INFINITY : Float.POSITIVE_INFINITY;
+  }
 }

@@ -301,7 +301,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
       eqOperands = operands.get(1).getFunctionCall().getOperands();
       Assert.assertEquals(eqOperands.get(0).getIdentifier().getName(), "f");
-      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.stringValue("true"));
+      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
     }
 
     {
@@ -324,7 +324,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(operands.get(0).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       List<Expression> eqOperands = operands.get(0).getFunctionCall().getOperands();
       Assert.assertEquals(eqOperands.get(0).getFunctionCall().getOperator(), "startswith");
-      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.stringValue("true"));
+      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
 
       Assert.assertEquals(operands.get(1).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       eqOperands = operands.get(1).getFunctionCall().getOperands();
@@ -343,7 +343,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(operands.get(0).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       List<Expression> eqOperands = operands.get(0).getFunctionCall().getOperands();
       Assert.assertEquals(eqOperands.get(0).getFunctionCall().getOperator(), "startswith");
-      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.stringValue("true"));
+      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
 
       Assert.assertEquals(operands.get(1).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       eqOperands = operands.get(1).getFunctionCall().getOperands();
@@ -358,7 +358,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(operands.get(3).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       eqOperands = operands.get(3).getFunctionCall().getOperands();
       Assert.assertEquals(eqOperands.get(0).getIdentifier().getName(), "d");
-      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.stringValue("true"));
+      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
     }
   }
 
@@ -2325,7 +2325,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(operands.get(3).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       eqOperands = operands.get(3).getFunctionCall().getOperands();
       Assert.assertEquals(eqOperands.get(0).getIdentifier(), new Identifier("col4"));
-      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.stringValue("true"));
+      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
     }
     {
       String query = "SELECT * FROM foo WHERE col1 <= 0 OR col2 <= 0 OR (col3 <= 0 OR col4 <= 0)";
@@ -2679,6 +2679,63 @@ public class CalciteSqlCompilerTest {
     SqlNodeAndOptions sqlNodeAndOptions = testSqlWithCustomSqlParser(customSql);
     Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlInsertFromFile);
     Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+  }
+
+
+  @Test
+  public void shouldParseBasicAtTimeZoneExtension() {
+    // Given:
+    String sql = "SELECT ts AT TIME ZONE 'pst' FROM myTable;";
+
+    // When:
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+
+    // Then:
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Function fun = pinotQuery.getSelectList().get(0).getFunctionCall();
+    Assert.assertEquals(fun.operator, "attimezone");
+    Assert.assertEquals(fun.operands.size(), 2);
+    Assert.assertEquals(fun.operands.get(0).getIdentifier().name, "ts");
+    Assert.assertEquals(fun.operands.get(1).getLiteral().getStringValue(), "pst");
+  }
+
+  @Test
+  public void shouldParseNestedTimeExprAtTimeZoneExtension() {
+    // Given:
+    String sql = "SELECT ts + 123 AT TIME ZONE 'pst' FROM myTable;";
+
+    // When:
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+
+    // Then:
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Function fun = pinotQuery.getSelectList().get(0).getFunctionCall();
+    Assert.assertEquals(fun.operator, "attimezone");
+    Assert.assertEquals(fun.operands.size(), 2);
+    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operator, "plus");
+    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.size(), 2);
+    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(1).getLiteral().getLongValue(), 123L);
+    Assert.assertEquals(fun.operands.get(1).getLiteral().getStringValue(), "pst");
+  }
+
+  @Test
+  public void shouldParseOutsideExprAtTimeZoneExtension() {
+    // Given:
+    String sql = "SELECT ts AT TIME ZONE 'pst' > 123 FROM myTable;";
+
+    // When:
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+
+    // Then:
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Function fun = pinotQuery.getSelectList().get(0).getFunctionCall();
+    Assert.assertEquals(fun.operator, "GREATER_THAN");
+    Assert.assertEquals(fun.operands.size(), 2);
+    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operator, "attimezone");
+    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.size(), 2);
+    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(1).getLiteral().getStringValue(), "pst");
   }
 
   private static SqlNodeAndOptions testSqlWithCustomSqlParser(String sqlString) {

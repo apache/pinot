@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelNode;
@@ -126,9 +125,9 @@ public final class RelToStageConverter {
     JoinInfo joinInfo = node.analyzeCondition();
     FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(joinInfo.leftKeys);
     FieldSelectionKeySelector rightFieldSelectionKeySelector = new FieldSelectionKeySelector(joinInfo.rightKeys);
-    Preconditions.checkState(joinInfo.nonEquiConditions.isEmpty());
-    return new JoinNode(currentStageId, toDataSchema(node.getRowType()), joinType, Collections.singletonList(
-        new JoinNode.JoinClause(leftFieldSelectionKeySelector, rightFieldSelectionKeySelector)));
+    return new JoinNode(currentStageId, toDataSchema(node.getRowType()), joinType,
+        new JoinNode.JoinKeys(leftFieldSelectionKeySelector, rightFieldSelectionKeySelector),
+        joinInfo.nonEquiConditions.stream().map(RexExpression::toRexExpression).collect(Collectors.toList()));
   }
 
   private static DataSchema toDataSchema(RelDataType rowType) {

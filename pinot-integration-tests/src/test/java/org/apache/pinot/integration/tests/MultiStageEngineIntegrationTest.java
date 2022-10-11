@@ -21,8 +21,12 @@ package org.apache.pinot.integration.tests;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.List;
+import java.util.Properties;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.client.Connection;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -77,7 +81,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     waitForAllDocsLoaded(600_000L);
 
     // Setting data table version to 4
-    DataTableFactory.setDataTableVersion(4);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
   }
 
   @Test
@@ -93,6 +97,16 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     // test multistage engine, currently we don't support MV columns.
     super.testGeneratedQueries(false, true);
+  }
+
+  @Override
+  protected Connection getPinotConnection() {
+    Properties properties = new Properties();
+    properties.put("queryOptions", "useMultistageEngine=true");
+    if (_pinotConnection == null) {
+      _pinotConnection = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName());
+    }
+    return _pinotConnection;
   }
 
   @Override
@@ -118,9 +132,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @AfterClass
   public void tearDown()
       throws Exception {
-    // Setting data table version to 4
-    DataTableFactory.setDataTableVersion(3);
-
     dropOfflineTable(DEFAULT_TABLE_NAME);
 
     stopServer();

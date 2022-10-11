@@ -135,6 +135,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
         segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
   }
 
+  // TODO: This test fails when using `llc` consumer mode. Needs investigation
   @Test
   public void testSegmentListApi()
       throws Exception {

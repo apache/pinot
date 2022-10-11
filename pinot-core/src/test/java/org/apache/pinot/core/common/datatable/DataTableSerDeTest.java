@@ -31,12 +31,14 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
-import org.apache.pinot.core.query.request.context.ThreadTimer;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
@@ -85,15 +87,15 @@ public class DataTableSerDeTest {
           .put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(200L))
           .put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true")
           .put(MetadataKey.TIME_USED_MS.getName(), String.valueOf(20000L)).put(MetadataKey.TRACE_INFO.getName(),
-          "StudentException: Error finding students\n"
-              + "        at StudentManager.findStudents(StudentManager.java:13)\n"
-              + "        at StudentProgram.main(StudentProgram.java:9)\n"
-              + "Caused by: DAOException: Error querying students from database\n"
-              + "        at StudentDAO.list(StudentDAO.java:11)\n"
-              + "        at StudentManager.findStudents(StudentManager.java:11)\n" + "        ... 1 more\n"
-              + "Caused by: java.sql.SQLException: Syntax Error\n"
-              + "        at DatabaseUtils.executeQuery(DatabaseUtils.java:5)\n"
-              + "        at StudentDAO.list(StudentDAO.java:8)\n" + "        ... 2 more")
+              "StudentException: Error finding students\n"
+                  + "        at StudentManager.findStudents(StudentManager.java:13)\n"
+                  + "        at StudentProgram.main(StudentProgram.java:9)\n"
+                  + "Caused by: DAOException: Error querying students from database\n"
+                  + "        at StudentDAO.list(StudentDAO.java:11)\n"
+                  + "        at StudentManager.findStudents(StudentManager.java:11)\n" + "        ... 1 more\n"
+                  + "Caused by: java.sql.SQLException: Syntax Error\n"
+                  + "        at DatabaseUtils.executeQuery(DatabaseUtils.java:5)\n"
+                  + "        at StudentDAO.list(StudentDAO.java:8)\n" + "        ... 2 more")
           .put(MetadataKey.REQUEST_ID.getName(), String.valueOf(90181881818L))
           .put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(900L))
           .put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(1919199L)).build();
@@ -106,7 +108,7 @@ public class DataTableSerDeTest {
         QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, exception);
     String expected = processingException.getMessage();
 
-    DataTable dataTable = DataTableFactory.getEmptyDataTable();
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.addException(processingException);
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     Assert.assertNull(newDataTable.getDataSchema());
@@ -124,7 +126,7 @@ public class DataTableSerDeTest {
 
     DataSchema dataSchema = new DataSchema(new String[]{"SV", "MV"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING_ARRAY});
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
       dataTableBuilder.startRow();
       dataTableBuilder.setColumn(0, emptyString);
@@ -154,7 +156,7 @@ public class DataTableSerDeTest {
     }
 
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
 
     DataTable dataTable = dataTableBuilder.build();
@@ -181,8 +183,8 @@ public class DataTableSerDeTest {
 
     // Verify V4 broker can deserialize data table (has data, but has no metadata) send by V3 server
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
-    DataTableBuilder dataTableBuilderV3WithDataOnly = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
+    DataTableBuilder dataTableBuilderV3WithDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns);
 
     DataTable dataTableV3 = dataTableBuilderV3WithDataOnly.build(); // create a V3 data table
@@ -204,7 +206,7 @@ public class DataTableSerDeTest {
     Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
 
     // Verify V4 broker can deserialize data table (only has metadata) send by V3 server
-    DataTableBuilder dataTableBuilderV3WithMetadataDataOnly = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilder dataTableBuilderV3WithMetadataDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     dataTableV3 = dataTableBuilderV3WithMetadataDataOnly.build(); // create a V3 data table
     for (String key : EXPECTED_METADATA.keySet()) {
       dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
@@ -217,8 +219,8 @@ public class DataTableSerDeTest {
     // Verify V4 broker can deserialize (has data, but has no metadata) send by V4 server(with ThreadCpuTimeMeasurement
     // disabled)
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    DataTableBuilder dataTableBuilderV4WithDataOnly = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    DataTableBuilder dataTableBuilderV4WithDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV4WithDataOnly, columnDataTypes, numColumns);
     DataTable dataTableV4 = dataTableBuilderV4WithDataOnly.build(); // create a V4 data table
     // Deserialize data table bytes as V4
@@ -242,7 +244,7 @@ public class DataTableSerDeTest {
 
     // Verify V4 broker can deserialize data table (only has metadata) send by V4 server(with
     // ThreadCpuTimeMeasurement disabled)
-    DataTableBuilder dataTableBuilderV4WithMetadataDataOnly = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilder dataTableBuilderV4WithMetadataDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     dataTableV4 = dataTableBuilderV4WithMetadataDataOnly.build(); // create a V4 data table
     for (String key : EXPECTED_METADATA.keySet()) {
       dataTableV4.getMetadata().put(key, EXPECTED_METADATA.get(key));
@@ -255,7 +257,7 @@ public class DataTableSerDeTest {
     // Verify V4 broker can deserialize (has data, but has no metadata) send by V4 server(with ThreadCpuTimeMeasurement
     // enabled)
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     dataTableV4 = dataTableBuilderV4WithDataOnly.build(); // create a V4 data table
     // Deserialize data table bytes as V4
     newDataTable = DataTableFactory.getDataTable(dataTableV4.toBytes());
@@ -311,8 +313,8 @@ public class DataTableSerDeTest {
 
     // Verify V3 broker can deserialize data table (has data, but has no metadata) send by V2 server
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_2);
-    DataTableBuilder dataTableBuilderV2WithDataOnly = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_2);
+    DataTableBuilder dataTableBuilderV2WithDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV2WithDataOnly, columnDataTypes, numColumns);
 
     DataTable dataTableV2 = dataTableBuilderV2WithDataOnly.build(); // create a V2 data table
@@ -334,7 +336,7 @@ public class DataTableSerDeTest {
     Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
 
     // Verify V3 broker can deserialize data table (only has metadata) send by V2 server
-    DataTableBuilder dataTableBuilderV2WithMetadataDataOnly = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilder dataTableBuilderV2WithMetadataDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     dataTableV2 = dataTableBuilderV2WithMetadataDataOnly.build(); // create a V2 data table
     for (String key : EXPECTED_METADATA.keySet()) {
       dataTableV2.getMetadata().put(key, EXPECTED_METADATA.get(key));
@@ -347,8 +349,8 @@ public class DataTableSerDeTest {
     // Verify V3 broker can deserialize (has data, but has no metadata) send by V3 server(with ThreadCpuTimeMeasurement
     // disabled)
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
-    DataTableBuilder dataTableBuilderV3WithDataOnly = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
+    DataTableBuilder dataTableBuilderV3WithDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns);
     DataTable dataTableV3 = dataTableBuilderV3WithDataOnly.build(); // create a V3 data table
     // Deserialize data table bytes as V3
@@ -372,7 +374,7 @@ public class DataTableSerDeTest {
 
     // Verify V3 broker can deserialize data table (only has metadata) send by V3 server(with
     // ThreadCpuTimeMeasurement disabled)
-    DataTableBuilder dataTableBuilderV3WithMetadataDataOnly = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilder dataTableBuilderV3WithMetadataDataOnly = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     dataTableV3 = dataTableBuilderV3WithMetadataDataOnly.build(); // create a V3 data table
     for (String key : EXPECTED_METADATA.keySet()) {
       dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
@@ -385,7 +387,7 @@ public class DataTableSerDeTest {
     // Verify V3 broker can deserialize (has data, but has no metadata) send by V3 server(with ThreadCpuTimeMeasurement
     // enabled)
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
     dataTableV3 = dataTableBuilderV3WithDataOnly.build(); // create a V3 data table
     // Deserialize data table bytes as V3
     newDataTable = DataTableFactory.getDataTable(dataTableV3.toBytes());
@@ -438,7 +440,7 @@ public class DataTableSerDeTest {
     }
 
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
 
     DataTable dataTable = dataTableBuilder.build();
@@ -474,8 +476,8 @@ public class DataTableSerDeTest {
 
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
 
     DataTable dataTable = dataTableBuilder.build();
@@ -542,7 +544,7 @@ public class DataTableSerDeTest {
       DataSchema.ColumnDataType[] columnDataTypes, int numColumns)
       throws IOException {
     RoaringBitmap[] nullBitmaps = null;
-    if (DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4) {
+    if (DataTableBuilderFactory.getDataTableVersion() >= DataTableFactory.VERSION_4) {
       nullBitmaps = new RoaringBitmap[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
         nullBitmaps[colId] = new RoaringBitmap();
@@ -703,8 +705,8 @@ public class DataTableSerDeTest {
             Assert.assertEquals(newDataTable.getDouble(rowId, colId), isNull ? 0.0 : DOUBLES[rowId], ERROR_MESSAGE);
             break;
           case BIG_DECIMAL:
-            Assert.assertEquals(newDataTable.getBigDecimal(rowId, colId), isNull ? BigDecimal.ZERO
-                : BIG_DECIMALS[rowId], ERROR_MESSAGE);
+            Assert.assertEquals(newDataTable.getBigDecimal(rowId, colId),
+                isNull ? BigDecimal.ZERO : BIG_DECIMALS[rowId], ERROR_MESSAGE);
             break;
           case BOOLEAN:
             Assert.assertEquals(newDataTable.getInt(rowId, colId), isNull ? 0 : BOOLEANS[rowId], ERROR_MESSAGE);
@@ -723,7 +725,13 @@ public class DataTableSerDeTest {
                 ERROR_MESSAGE);
             break;
           case OBJECT:
-            Assert.assertEquals(newDataTable.getObject(rowId, colId), isNull ? null : OBJECTS[rowId], ERROR_MESSAGE);
+            DataTable.CustomObject customObject = newDataTable.getCustomObject(rowId, colId);
+            if (isNull) {
+              Assert.assertNull(customObject, ERROR_MESSAGE);
+            } else {
+              Assert.assertNotNull(customObject);
+              Assert.assertEquals(ObjectSerDeUtils.deserialize(customObject), OBJECTS[rowId], ERROR_MESSAGE);
+            }
             break;
           case INT_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), INT_ARRAYS[rowId]), ERROR_MESSAGE);

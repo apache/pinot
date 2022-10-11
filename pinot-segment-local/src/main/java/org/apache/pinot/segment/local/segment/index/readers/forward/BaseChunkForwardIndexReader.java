@@ -48,6 +48,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   protected final int _numDocsPerChunk;
   protected final int _lengthOfLongestEntry;
   protected final boolean _isCompressed;
+  protected final ChunkCompressionType _compressionType;
   protected final ChunkDecompressor _chunkDecompressor;
   protected final PinotDataBuffer _dataHeader;
   protected final int _headerEntryChunkOffsetSize;
@@ -79,15 +80,16 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
       _dataBuffer.getInt(headerOffset); // Total docs
       headerOffset += Integer.BYTES;
 
-      ChunkCompressionType compressionType = ChunkCompressionType.valueOf(_dataBuffer.getInt(headerOffset));
-      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(compressionType);
-      _isCompressed = !compressionType.equals(ChunkCompressionType.PASS_THROUGH);
+      _compressionType = ChunkCompressionType.valueOf(_dataBuffer.getInt(headerOffset));
+      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_compressionType);
+      _isCompressed = !_compressionType.equals(ChunkCompressionType.PASS_THROUGH);
 
       headerOffset += Integer.BYTES;
       dataHeaderStart = _dataBuffer.getInt(headerOffset);
     } else {
       _isCompressed = true;
-      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.SNAPPY);
+      _compressionType = ChunkCompressionType.SNAPPY;
+      _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_compressionType);
     }
 
     _headerEntryChunkOffsetSize = BaseChunkSVForwardIndexWriter.getHeaderEntryChunkOffsetSize(version);
@@ -172,6 +174,16 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   @Override
   public DataType getStoredType() {
     return _storedType;
+  }
+
+  @Override
+  public ChunkCompressionType getCompressionType() {
+    return _compressionType;
+  }
+
+  @Override
+  public int getLengthOfLongestEntry() {
+    return _lengthOfLongestEntry;
   }
 
   @Override

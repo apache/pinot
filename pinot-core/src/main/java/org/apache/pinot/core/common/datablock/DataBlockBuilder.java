@@ -27,7 +27,13 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.ColumnarDataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.RowDataBlock;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -81,7 +87,7 @@ public class DataBlockBuilder {
     if (nullRowIds == null || nullRowIds.isEmpty()) {
       _fixedSizeDataOutputStream.writeInt(0);
     } else {
-      byte[] bitmapBytes = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.serialize(nullRowIds);
+      byte[] bitmapBytes = RoaringBitmapUtils.serialize(nullRowIds);
       _fixedSizeDataOutputStream.writeInt(bitmapBytes.length);
       _variableSizeDataByteArrayOutputStream.write(bitmapBytes);
     }
@@ -443,14 +449,15 @@ public class DataBlockBuilder {
     builder._variableSizeDataByteArrayOutputStream.write(bytes);
   }
 
-  private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, Object value)
+  // TODO: Move ser/de into AggregationFunction interface
+  private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, @Nullable Object value)
       throws IOException {
     byteBuffer.putInt(builder._variableSizeDataByteArrayOutputStream.size());
-    int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
-    if (objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue()) {
+    if (value == null) {
       byteBuffer.putInt(0);
-      builder._variableSizeDataOutputStream.writeInt(objectTypeValue);
+      builder._variableSizeDataOutputStream.writeInt(DataTable.CustomObject.NULL_TYPE_VALUE);
     } else {
+      int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
       byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
       byteBuffer.putInt(bytes.length);
       builder._variableSizeDataOutputStream.writeInt(objectTypeValue);

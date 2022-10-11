@@ -19,19 +19,18 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
 import java.util.List;
+import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.ColumnarDataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.datablock.BaseDataBlock;
-import org.apache.pinot.core.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-import org.apache.pinot.core.common.datablock.DataBlockUtils;
-import org.apache.pinot.core.common.datablock.RowDataBlock;
 
 
 /**
@@ -43,6 +42,7 @@ public class TransferableBlock implements Block {
   private final BaseDataBlock.Type _type;
   private final DataSchema _dataSchema;
   private final boolean _isErrorBlock;
+  private final int _numRows;
 
   private BaseDataBlock _dataBlock;
   private List<Object[]> _container;
@@ -58,6 +58,7 @@ public class TransferableBlock implements Block {
     _dataSchema = dataSchema;
     _type = containerType;
     _isErrorBlock = isErrorBlock;
+    _numRows = _container.size();
   }
 
   public TransferableBlock(BaseDataBlock dataBlock) {
@@ -66,6 +67,11 @@ public class TransferableBlock implements Block {
     _type = dataBlock instanceof ColumnarDataBlock ? BaseDataBlock.Type.COLUMNAR
         : dataBlock instanceof RowDataBlock ? BaseDataBlock.Type.ROW : BaseDataBlock.Type.METADATA;
     _isErrorBlock = !_dataBlock.getExceptions().isEmpty();
+    _numRows = _dataBlock.getNumberOfRows();
+  }
+
+  public int getNumRows() {
+    return _numRows;
   }
 
   public DataSchema getDataSchema() {
@@ -86,6 +92,7 @@ public class TransferableBlock implements Block {
           _container = DataBlockUtils.extractRows(_dataBlock);
           break;
         case COLUMNAR:
+        case METADATA:
         default:
           throw new UnsupportedOperationException("Unable to extract from container with type: " + _type);
       }
@@ -154,9 +161,12 @@ public class TransferableBlock implements Block {
     return _isErrorBlock;
   }
 
-  public byte[] toBytes()
-      throws IOException {
-    return _dataBlock.toBytes();
+  boolean isContainerBlock() {
+    return _container != null;
+  }
+
+  boolean isDataBlock() {
+    return _dataBlock != null;
   }
 
   @Override

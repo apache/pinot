@@ -27,11 +27,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -180,7 +181,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
   }
 
   public void testQueries() {
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     HashSet<Integer> trueIndices = new HashSet<Integer>(Arrays.asList(1, 3, 5));
@@ -449,7 +450,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       assertEquals(thirdRow[0], (long) _nullValuesCount * 4);
       assertNull(thirdRow[1]);
     }
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
   @AfterClass

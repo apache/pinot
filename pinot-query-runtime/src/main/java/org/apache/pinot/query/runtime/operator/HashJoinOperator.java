@@ -24,15 +24,17 @@ import java.util.HashMap;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.common.datablock.BaseDataBlock;
-import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
 
 
 /**
@@ -54,6 +56,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private final DataSchema _leftTableSchema;
   private final DataSchema _rightTableSchema;
   private final int _resultRowSize;
+  private final List<FilterOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
   private TransferableBlock _upstreamErrorBlock;
   private KeySelector<Object[], Object[]> _leftKeySelector;
@@ -61,14 +64,18 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   public HashJoinOperator(BaseOperator<TransferableBlock> leftTableOperator, DataSchema leftSchema,
       BaseOperator<TransferableBlock> rightTableOperator, DataSchema rightSchema, DataSchema outputSchema,
-      List<JoinNode.JoinClause> criteria, JoinRelType joinType) {
-    _leftKeySelector = criteria.get(0).getLeftJoinKeySelector();
-    _rightKeySelector = criteria.get(0).getRightJoinKeySelector();
+      JoinNode.JoinKeys joinKeys, List<RexExpression> joinClauses, JoinRelType joinType) {
+    _leftKeySelector = joinKeys.getLeftJoinKeySelector();
+    _rightKeySelector = joinKeys.getRightJoinKeySelector();
     _leftTableOperator = leftTableOperator;
     _rightTableOperator = rightTableOperator;
     _resultSchema = outputSchema;
     _leftTableSchema = leftSchema;
     _rightTableSchema = rightSchema;
+    _joinClauseEvaluators = new ArrayList<>(joinClauses.size());
+    for (RexExpression joinClause : joinClauses) {
+      _joinClauseEvaluators.add(FilterOperand.toFilterOperand(joinClause, _resultSchema));
+    }
     _joinType = joinType;
     _resultRowSize = _resultSchema.size();
     _isHashTableBuilt = false;
@@ -131,8 +138,16 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       for (Object[] leftRow : container) {
         List<Object[]> hashCollection = _broadcastHashTable.getOrDefault(
             _leftKeySelector.computeHash(leftRow), Collections.emptyList());
-        for (Object[] rightRow : hashCollection) {
-          rows.add(joinRow(leftRow, rightRow));
+        if (hashCollection.isEmpty() && _joinType == JoinRelType.LEFT) {
+          rows.add(joinRow(leftRow, null));
+        } else {
+          for (Object[] rightRow : hashCollection) {
+            Object[] resultRow = joinRow(leftRow, rightRow);
+            if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
+              evaluator -> evaluator.apply(resultRow))) {
+              rows.add(resultRow);
+            }
+          }
         }
       }
       return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
@@ -144,13 +159,13 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
-  private Object[] joinRow(Object[] leftRow, Object[] rightRow) {
+  private Object[] joinRow(Object[] leftRow, @Nullable Object[] rightRow) {
     Object[] resultRow = new Object[_resultRowSize];
     int idx = 0;
     for (Object obj : leftRow) {
       resultRow[idx++] = obj;
     }
-    if (_joinType != JoinRelType.SEMI) {
+    if (_joinType != JoinRelType.SEMI && rightRow != null) {
       for (Object obj : rightRow) {
         resultRow[idx++] = obj;
       }

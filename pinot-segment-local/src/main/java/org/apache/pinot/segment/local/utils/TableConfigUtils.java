@@ -754,10 +754,17 @@ public final class TableConfigUtils {
         columnNameToConfigMap.put(columnName, "Segment Partition Config");
       }
     }
-    if (indexingConfig.getJsonIndexColumns() != null) {
-      for (String columnName : indexingConfig.getJsonIndexColumns()) {
-        columnNameToConfigMap.put(columnName, "Json Index Config");
+    Set<String> jsonIndexColumns = new HashSet<>();
+    // Ignore jsonIndexColumns when jsonIndexConfigs is configured
+    if (indexingConfig.getJsonIndexConfigs() != null) {
+      jsonIndexColumns.addAll(indexingConfig.getJsonIndexConfigs().keySet());
+    } else {
+      if (indexingConfig.getJsonIndexColumns() != null) {
+        jsonIndexColumns.addAll(indexingConfig.getJsonIndexColumns());
       }
+    }
+    for (String columnName : jsonIndexColumns) {
+      columnNameToConfigMap.put(columnName, "Json Index Config");
     }
 
     List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
@@ -828,13 +835,11 @@ public final class TableConfigUtils {
       }
     }
 
-    if (indexingConfig.getJsonIndexColumns() != null) {
-      for (String jsonIndexCol : indexingConfig.getJsonIndexColumns()) {
-        FieldSpec fieldSpec = schema.getFieldSpecFor(jsonIndexCol);
-        Preconditions.checkState(
-            fieldSpec.isSingleValueField() && fieldSpec.getDataType().getStoredType() == DataType.STRING,
-            "Json index can only be created for single value String column. Invalid for column: %s", jsonIndexCol);
-      }
+    for (String jsonIndexColumn : jsonIndexColumns) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(jsonIndexColumn);
+      Preconditions.checkState(
+          fieldSpec.isSingleValueField() && fieldSpec.getDataType().getStoredType() == DataType.STRING,
+          "Json index can only be created for single value String column. Invalid for column: %s", jsonIndexColumn);
     }
   }
 

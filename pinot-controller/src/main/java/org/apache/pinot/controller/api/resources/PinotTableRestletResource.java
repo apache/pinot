@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -67,6 +69,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -75,12 +78,13 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
-import org.apache.pinot.controller.api.access.ManualAuthorization;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
@@ -89,8 +93,10 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
+import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.controller.util.TableMetadataReader;
+import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -102,6 +108,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.zookeeper.data.Stat;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
@@ -821,6 +828,21 @@ public class PinotTableRestletResource {
     return segmentsMetadata;
   }
 
+  /**
+   * This is a helper method to get the metadata for all segments for a given table name.
+   * @param tableNameWithType name of the table along with its type
+   * @param columns name of the columns
+   * @param numReplica num or replica for the table
+   * @return aggregated metadata of the table segments
+   */
+  private JsonNode getAggregateMetadataFromServer(String tableNameWithType, List<String> columns, int numReplica)
+      throws InvalidConfigException, IOException {
+    TableMetadataReader tableMetadataReader =
+        new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+    return tableMetadataReader.getAggregateTableMetadata(tableNameWithType, columns, numReplica,
+        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+  }
+
   @GET
   @Path("table/{tableName}/jobs")
   @Produces(MediaType.APPLICATION_JSON)
@@ -843,18 +865,107 @@ public class PinotTableRestletResource {
     return result;
   }
 
-  /**
-   * This is a helper method to get the metadata for all segments for a given table name.
-   * @param tableNameWithType name of the table along with its type
-   * @param columns name of the columns
-   * @param numReplica num or replica for the table
-   * @return aggregated metadata of the table segments
-   */
-  private JsonNode getAggregateMetadataFromServer(String tableNameWithType, List<String> columns, int numReplica)
-      throws InvalidConfigException, IOException {
-    TableMetadataReader tableMetadataReader =
-        new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    return tableMetadataReader.getAggregateTableMetadata(tableNameWithType, columns, numReplica,
-        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+  @POST
+  @Path("tables/{tableName}/timeBoundary")
+  @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata", notes = "Set "
+      + "hybrid table query time boundary based on offline segments' metadata")
+  public SuccessResponse setTimeBoundary(
+      @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
+      String tableName)
+      throws Exception {
+    // Validate its a hybrid table
+    if (!_pinotHelixResourceManager.hasRealtimeTable(tableName) || !_pinotHelixResourceManager.hasOfflineTable(
+        tableName)) {
+      throw new ControllerApplicationException(LOGGER, "Table isn't a hybrid table", Response.Status.NOT_FOUND);
+    }
+
+    // Call all servers to validate all segments loaded and return the time boundary (max end time of all segments)
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    long timeBoundaryMs = validateSegmentStateForTable(offlineTableName);
+    if (timeBoundaryMs < 0) {
+      throw new ControllerApplicationException(LOGGER,
+          "No segments found for offline table : " + offlineTableName + ". Could not update time boundary.",
+          Response.Status.SERVICE_UNAVAILABLE);
+    }
+
+    // Set the timeBoundary in tableIdealState
+    IdealState idealState =
+        HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
+          is.getRecord()
+              .setSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY, Long.toString(timeBoundaryMs));
+          return is;
+        }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+
+    if (idealState == null) {
+      throw new ControllerApplicationException(LOGGER, "Could not update time boundary",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    return new SuccessResponse("Time boundary successfully updated to: " + timeBoundaryMs);
+  }
+
+  @DELETE
+  @Path("tables/{tableName}/timeBoundary")
+  @ApiOperation(value = "Delete hybrid table query time boundary", notes = "Delete hybrid table query time boundary")
+  public SuccessResponse deleteTimeBoundary(
+      @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
+      String tableName) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (!_pinotHelixResourceManager.hasTable(offlineTableName)) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find table: " + offlineTableName,
+          Response.Status.NOT_FOUND);
+    }
+
+    // Delete the timeBoundary in tableIdealState
+    IdealState idealState =
+        HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
+          is.getRecord().getSimpleFields().remove(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
+          return is;
+        }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+
+    if (idealState == null) {
+      throw new ControllerApplicationException(LOGGER, "Could not remove time boundary",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    return new SuccessResponse("Time boundary successfully removed");
+  }
+
+  private long validateSegmentStateForTable(String offlineTableName)
+      throws InvalidConfigException, JsonProcessingException {
+    // Call all servers to validate offline table state
+    Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(offlineTableName);
+    BiMap<String, String> serverEndPoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+    List<String> serverUrls = new ArrayList<>();
+    BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
+    for (String endpoint : endpointsToServers.keySet()) {
+      String reloadTaskStatusEndpoint = endpoint + "/tables/" + offlineTableName + "/allSegmentsLoaded";
+      serverUrls.add(reloadTaskStatusEndpoint);
+    }
+
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
+
+    if (serviceResponse._failedResponseCount > 0) {
+      throw new ControllerApplicationException(LOGGER, "Could not validate table segment status",
+          Response.Status.SERVICE_UNAVAILABLE);
+    }
+
+    long timeBoundaryMs = -1;
+    // Validate all responses
+    for (String response : serviceResponse._httpResponses.values()) {
+      TableSegmentValidationInfo tableSegmentValidationInfo =
+          JsonUtils.stringToObject(response, TableSegmentValidationInfo.class);
+      if (!tableSegmentValidationInfo.isValid()) {
+        throw new ControllerApplicationException(LOGGER, "Table segment validation failed",
+            Response.Status.PRECONDITION_FAILED);
+      }
+      timeBoundaryMs = Math.max(timeBoundaryMs, tableSegmentValidationInfo.getMaxEndTimeMs());
+    }
+
+    return timeBoundaryMs;
   }
 }

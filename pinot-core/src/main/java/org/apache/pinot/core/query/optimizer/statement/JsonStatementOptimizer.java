@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -37,6 +38,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -436,12 +438,18 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       return false;
     }
 
-    List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
-    if (jsonIndexColumns == null) {
-      return false;
+    // Ignore jsonIndexColumns when jsonIndexConfigs is configured
+    Map<String, JsonIndexConfig> jsonIndexConfigs = indexingConfig.getJsonIndexConfigs();
+    if (jsonIndexConfigs != null) {
+      return jsonIndexConfigs.containsKey(columnName);
     }
 
-    return jsonIndexColumns.contains(columnName);
+    List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
+    if (jsonIndexColumns != null) {
+      return jsonIndexColumns.contains(columnName);
+    }
+
+    return false;
   }
 
   /** @return symbolic representation of function operator delimited by spaces. */

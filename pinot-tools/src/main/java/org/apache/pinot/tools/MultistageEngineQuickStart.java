@@ -30,6 +30,13 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
 public class MultistageEngineQuickStart extends Quickstart {
+  private static final String[] MULTI_STAGE_TABLE_DIRECTORIES = new String[]{
+      "examples/batch/ssb/customer",
+      "examples/batch/ssb/dates",
+      "examples/batch/ssb/lineorder",
+      "examples/batch/ssb/part",
+      "examples/batch/ssb/supplier",
+  };
 
   @Override
   public List<String> types() {
@@ -70,6 +77,13 @@ public class MultistageEngineQuickStart extends Quickstart {
     printStatus(Quickstart.Color.GREEN, "***************************************************");
     printStatus(Quickstart.Color.YELLOW, "Example query run completed.");
     printStatus(Quickstart.Color.GREEN, "***************************************************");
+  }
+
+  @Override
+  public String[] getDefaultBatchTableDirectories() {
+    List<String> tableDirs = new ArrayList<>(Arrays.asList(MULTI_STAGE_TABLE_DIRECTORIES));
+    tableDirs.addAll(Arrays.asList(DEFAULT_OFFLINE_TABLE_DIRECTORIES));
+    return tableDirs.toArray(new String[]{});
   }
 
   @Override

@@ -40,14 +40,15 @@ import org.apache.pinot.spi.data.FieldSpec;
 @SuppressWarnings("rawtypes")
 public class MutableDataSource extends BaseDataSource {
 
-  public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
+  public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry, int cardinality,
       @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
       @Nullable Comparable maxValue, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
       @Nullable InvertedIndexReader invertedIndex, @Nullable RangeIndexReader rangeIndex,
       @Nullable TextIndexReader textIndex, @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex,
       @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {
-    super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
+    super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, cardinality,
+            partitionFunction,
             partitions, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, fstIndex,
         jsonIndex, h3Index, bloomFilter, nullValueVector);
   }
@@ -57,14 +58,15 @@ public class MutableDataSource extends BaseDataSource {
     final int _numDocs;
     final int _numValues;
     final int _maxNumValuesPerMVEntry;
+    final int _cardinality;
     final PartitionFunction _partitionFunction;
     final Set<Integer> _partitions;
     final Comparable _minValue;
     final Comparable _maxValue;
 
     MutableDataSourceMetadata(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
-        @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
-        @Nullable Comparable maxValue) {
+        int cardinality, @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions,
+        @Nullable Comparable minValue, @Nullable Comparable maxValue) {
       _fieldSpec = fieldSpec;
       _numDocs = numDocs;
       _numValues = numValues;
@@ -78,6 +80,7 @@ public class MutableDataSource extends BaseDataSource {
       }
       _minValue = minValue;
       _maxValue = maxValue;
+      _cardinality = cardinality;
     }
 
     @Override
@@ -128,6 +131,11 @@ public class MutableDataSource extends BaseDataSource {
     @Override
     public Set<Integer> getPartitions() {
       return _partitions;
+    }
+
+    @Override
+    public int getCardinality() {
+      return _cardinality;
     }
   }
 }

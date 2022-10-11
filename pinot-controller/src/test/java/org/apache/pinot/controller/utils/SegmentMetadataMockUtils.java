@@ -46,8 +46,11 @@ public class SegmentMetadataMockUtils {
     Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
     Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(numTotalDocs);
     Mockito.when(segmentMetadata.getCrc()).thenReturn(crc);
+    Mockito.when(segmentMetadata.getStartTime()).thenReturn(1L);
     Mockito.when(segmentMetadata.getEndTime()).thenReturn(10L);
-    Mockito.when(segmentMetadata.getTimeInterval()).thenReturn(new Interval(0, 20));
+    Mockito.when(segmentMetadata.getTimeInterval()).thenReturn(
+        new Interval(TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS),
+            TimeUnit.MILLISECONDS.convert(10, TimeUnit.DAYS)));
     Mockito.when(segmentMetadata.getTimeUnit()).thenReturn(TimeUnit.DAYS);
     return segmentMetadata;
   }
@@ -96,8 +99,11 @@ public class SegmentMetadataMockUtils {
     Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
     Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(10);
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
+    Mockito.when(segmentMetadata.getStartTime()).thenReturn(endTime - 10);
     Mockito.when(segmentMetadata.getEndTime()).thenReturn(endTime);
-    Mockito.when(segmentMetadata.getTimeInterval()).thenReturn(new Interval(endTime - 10, endTime + 10));
+    Mockito.when(segmentMetadata.getTimeInterval()).thenReturn(
+        new Interval(TimeUnit.MILLISECONDS.convert(endTime - 10, TimeUnit.DAYS),
+            TimeUnit.MILLISECONDS.convert(endTime, TimeUnit.DAYS)));
     Mockito.when(segmentMetadata.getTimeUnit()).thenReturn(TimeUnit.DAYS);
     return segmentMetadata;
   }

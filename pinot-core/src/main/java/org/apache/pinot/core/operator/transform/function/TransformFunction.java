@@ -185,4 +185,12 @@ public interface TransformFunction {
    * @return Transformation result
    */
   String[][] transformToStringValuesMV(ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to multi-valued bytes values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock);
 }
