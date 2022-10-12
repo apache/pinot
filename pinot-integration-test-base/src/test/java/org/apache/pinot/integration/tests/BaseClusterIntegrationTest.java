@@ -586,11 +586,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * Get current result for "SELECT COUNT(*)".
    *
    * @return Current count start result
-   * @throws Exception
    */
-  protected long getCurrentCountStarResult()
-      throws Exception {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName()).getResultSet(0).getLong(0);
+  protected long getCurrentCountStarResult() {
+    return getCurrentCountStarResult(getTableName());
+  }
+
+  protected long getCurrentCountStarResult(String tableName) {
+    return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getResultSet(0).getLong(0);
   }
 
   /**
