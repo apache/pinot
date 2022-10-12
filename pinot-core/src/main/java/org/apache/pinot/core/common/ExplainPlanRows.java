@@ -26,7 +26,6 @@ import java.util.Objects;
  * Class to hold all the rows for a given Explain Plan
  */
 public class ExplainPlanRows implements Comparable<ExplainPlanRows> {
-  public static final String COMBINE_PASSTHROUGH = "COMBINE_PASSTHROUGH";
   public static final String ALL_SEGMENTS_PRUNED_ON_SERVER = "ALL_SEGMENTS_PRUNED_ON_SERVER";
   public static final String PLAN_START = "PLAN_START(numSegmentsForThisPlan:";
   public static final String PLAN_START_FORMAT = PLAN_START + "%d" + ")";
