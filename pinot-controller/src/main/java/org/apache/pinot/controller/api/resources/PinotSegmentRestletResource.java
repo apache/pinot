@@ -466,9 +466,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
       @DefaultValue("false") boolean forceDownload) {
     segmentName = URIUtils.decode(segmentName);
-    TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    String tableNameWithType = getExistingTable(tableName, segmentName);
     Pair<Integer, String> msgInfo =
         _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload);
     boolean zkJobMetaWriteSuccess = false;
@@ -492,6 +490,19 @@ public class PinotSegmentRestletResource {
       throw new ControllerApplicationException(LOGGER,
           "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
     }
+  }
+
+  /**
+   * Helper method to find the existing table based on the given table name (with or without type suffix) and segment
+   * name.
+   */
+  private String getExistingTable(String tableName, String segmentName) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == null) {
+      // Derive table type from segment name if the given table name doesn't have type suffix
+      tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
+    }
+    return ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
   }
 
   /**
@@ -796,9 +807,7 @@ public class PinotSegmentRestletResource {
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod) {
     segmentName = URIUtils.decode(segmentName);
-    TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    String tableNameWithType = getExistingTable(tableName, segmentName);
     deleteSegmentsInternal(tableNameWithType, Collections.singletonList(segmentName), retentionPeriod);
     return new SuccessResponse("Segment deleted");
   }
@@ -843,16 +852,7 @@ public class PinotSegmentRestletResource {
     if (numSegments == 0) {
       throw new ControllerApplicationException(LOGGER, "Segments must be provided", Status.BAD_REQUEST);
     }
-    boolean isRealtimeSegment = SegmentName.isRealtimeSegmentName(segments.get(0));
-    for (int i = 1; i < numSegments; i++) {
-      if (SegmentName.isRealtimeSegmentName(segments.get(i)) != isRealtimeSegment) {
-        throw new ControllerApplicationException(LOGGER, "All segments must be of the same type (OFFLINE|REALTIME)",
-            Status.BAD_REQUEST);
-      }
-    }
-    TableType tableType = isRealtimeSegment ? TableType.REALTIME : TableType.OFFLINE;
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    String tableNameWithType = getExistingTable(tableName, segments.get(0));
     deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod);
     if (numSegments <= 5) {
       return new SuccessResponse("Deleted segments: " + segments + " from table: " + tableNameWithType);
