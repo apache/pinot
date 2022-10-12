@@ -71,17 +71,19 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
   private static final boolean DEFAULT_IPv4_CONTAINS = true;
   private static final boolean DEFAULT_IPv6_CONTAINS = false;
 
-  private static final Schema SCHEMA = new Schema.SchemaBuilder().
-      addSingleValueDimension(IPv4_PREFIX_COLUMN_STRING, FieldSpec.DataType.STRING)
-      .addSingleValueDimension(IPv6_PREFIX_COLUMN_STRING, FieldSpec.DataType.STRING)
-      .addSingleValueDimension(IPv4_ADDRESS_COLUMN, FieldSpec.DataType.STRING)
-      .addSingleValueDimension(IPv6_ADDRESS_COLUMN, FieldSpec.DataType.STRING)
-      .addSingleValueDimension(IPv4_CONTAINS_COLUMN, FieldSpec.DataType.BOOLEAN)
-      .addSingleValueDimension(IPv6_CONTAINS_COLUMN, FieldSpec.DataType.BOOLEAN).build();
+  private static final Schema SCHEMA =
+      new Schema.SchemaBuilder().addSingleValueDimension(IPv4_PREFIX_COLUMN_STRING, FieldSpec.DataType.STRING)
+          .addSingleValueDimension(IPv6_PREFIX_COLUMN_STRING, FieldSpec.DataType.STRING)
+          .addSingleValueDimension(IPv4_ADDRESS_COLUMN, FieldSpec.DataType.STRING)
+          .addSingleValueDimension(IPv6_ADDRESS_COLUMN, FieldSpec.DataType.STRING)
+          .addSingleValueDimension(IPv4_CONTAINS_COLUMN, FieldSpec.DataType.BOOLEAN)
+          .addSingleValueDimension(IPv6_CONTAINS_COLUMN, FieldSpec.DataType.BOOLEAN).build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
+  private long _expectedNumberIpv4Contains = 0L;
+  private long _expectedNumberIpv6Contains = 0L;
 
   @BeforeClass
   public void setUp()
@@ -97,11 +99,17 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
     addIPv4Row(records, "144.2.15.0/26", "144.2.15.28", true);
     addIPv4Row(records, "10.252.186.64/26", "10.252.186.79", true);
     addIPv4Row(records, "10.187.84.128/26", "10.187.84.178", true);
+    addIPv4Row(records, "10.3.168.0/22", "1.2.3.1", false);
+    addIPv4Row(records, "1.2.3.128/26", "1.2.5.1", false);
+    addIPv4Row(records, "1.2.3.128/26", "1.1.3.1", false);
 
     // add IPv6 test cases
     addIPv6Row(records, "2a04:f547:255:1::/64", "2a04:f547:255:1::2050", true);
     addIPv6Row(records, "2620:119:50e7:101::/64", "2620:119:50e7:101::9002:e15", true);
     addIPv6Row(records, "2001:db8:85a3::8a2e:370:7334/62", "2001:0db8:85a3:0003:ffff:ffff:ffff:ffff", true);
+    addIPv6Row(records, "7890:db8:113::8a2e:370:7334/127", "7890:db8:113::8a2e:370:7336", false);
+    addIPv6Row(records, "64:ff9b::17/64", "64:ffff::17", false);
+    addIPv6Row(records, "123:db8:85a3::8a2e:370:7334/72", "124:db8:85a3::8a2e:370:7334", false);
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
@@ -119,7 +127,6 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testIsSubnetOf() {
-
     // called in select
     String query = String.format(
         "select isSubnetOf(%s, %s) as IPv4Result, isSubnetOf(%s, %s) as IPv6Result, %s, %s from %s limit 100",
@@ -128,9 +135,10 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     DataSchema dataSchema = resultTable.getDataSchema();
-    assertEquals(dataSchema.getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.BOOLEAN,
-            DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.BOOLEAN});
+    assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.BOOLEAN,
+        DataSchema.ColumnDataType.BOOLEAN
+    });
     List<Object[]> rows = resultTable.getRows();
     for (int i = 0; i < rows.size(); i++) {
       Object[] row = rows.get(i);
@@ -141,11 +149,32 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
       assertEquals(iPv4Result, expectedIPv4Result);
       assertEquals(iPv6Result, expectedIPv6Result);
     }
+
+    // called in filter
+    query = String.format("select count(*) from %s where isSubnetOf(%s, %s)", RAW_TABLE_NAME, IPv4_PREFIX_COLUMN_STRING,
+        IPv4_ADDRESS_COLUMN);
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], _expectedNumberIpv4Contains * 4);
+
+    query = String.format("select count(*) from %s where isSubnetOf(%s, %s)", RAW_TABLE_NAME, IPv6_PREFIX_COLUMN_STRING,
+        IPv6_ADDRESS_COLUMN);
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], _expectedNumberIpv6Contains * 4);
   }
 
-
   private void addIPv4Row(List<GenericRow> records, String prefix, String address, boolean expectedBool) {
-    // add lib call assertEquals(expectedBool, );
+    if (expectedBool) {
+      _expectedNumberIpv4Contains += 1;
+    }
+    if (DEFAULT_IPv6_CONTAINS) {
+      _expectedNumberIpv6Contains += 1;
+    }
     GenericRow record = new GenericRow();
     record.putValue(IPv4_PREFIX_COLUMN_STRING, prefix);
     record.putValue(IPv4_ADDRESS_COLUMN, address);
@@ -158,7 +187,12 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
   }
 
   private void addIPv6Row(List<GenericRow> records, String prefix, String address, boolean expectedBool) {
-    // add lib call assertEquals(expectedBool, );
+    if (expectedBool) {
+      _expectedNumberIpv6Contains += 1;
+    }
+    if (DEFAULT_IPv4_CONTAINS) {
+      _expectedNumberIpv4Contains += 1;
+    }
     GenericRow record = new GenericRow();
     record.putValue(IPv6_PREFIX_COLUMN_STRING, prefix);
     record.putValue(IPv6_ADDRESS_COLUMN, address);
@@ -169,7 +203,6 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
     record.putValue(IPv4_CONTAINS_COLUMN, DEFAULT_IPv4_CONTAINS);
     records.add(record);
   }
-
 
   @Override
   protected String getFilter() {

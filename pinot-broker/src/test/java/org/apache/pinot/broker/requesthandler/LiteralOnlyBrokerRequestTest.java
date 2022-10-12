@@ -143,21 +143,21 @@ public class LiteralOnlyBrokerRequestTest {
             + "\"m\")  = "
             + "\"fooXarYXazY\"")));
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(
-        CalciteSqlParser.compileToPinotQuery("select is_subnet_of('1.2.3.128/0', '192.168.5.1') from mytable")));
+        CalciteSqlParser.compileToPinotQuery("select isSubnetOf('1.2.3.128/0', '192.168.5.1') from mytable")));
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
-        "select is_subnet_of('1.2.3.128/0', rtrim('192.168.5.1      ')) from mytable")));
+        "select isSubnetOf('1.2.3.128/0', rtrim('192.168.5.1      ')) from mytable")));
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
-        "select is_subnet_of('123:db8:85a3::8a2e:370:7334/72', '124:db8:85a3::8a2e:370:7334') from mytable")));
+        "select isSubnetOf('123:db8:85a3::8a2e:370:7334/72', '124:db8:85a3::8a2e:370:7334') from mytable")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
-        CalciteSqlParser.compileToPinotQuery("select is_subnet_of('1.2.3.128/0', foo) from mytable")));
+        CalciteSqlParser.compileToPinotQuery("select isSubnetOf('1.2.3.128/0', foo) from mytable")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
-        "select count(*) from mytable where is_subnet_of('7890:db8:113::8a2e:370:7334/127', ltrim('   "
+        "select count(*) from mytable where isSubnetOf('7890:db8:113::8a2e:370:7334/127', ltrim('   "
             + "7890:db8:113::8a2e:370:7336'))")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
-        "select count(*) from mytable where is_subnet_of('7890:db8:113::8a2e:370:7334/127', "
+        "select count(*) from mytable where isSubnetOf('7890:db8:113::8a2e:370:7334/127', "
             + "'7890:db8:113::8a2e:370:7336')")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
-        CalciteSqlParser.compileToPinotQuery("select count(*) from mytable where is_subnet_of(foo, bar)")));
+        CalciteSqlParser.compileToPinotQuery("select count(*) from mytable where isSubnetOf(foo, bar)")));
   }
 
   @Test
@@ -174,7 +174,7 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
         "SELECT toBase64(toUtf8('hello!')) AS encoded, " + "fromBase64('aGVsbG8h') AS decoded")));
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
-        "select is_subnet_of('1.2.3.128/0', '192.168.5.1') AS booleanCol from mytable")));
+        "select isSubnetOf('1.2.3.128/0', '192.168.5.1') AS booleanCol from mytable")));
   }
 
   @Test
@@ -344,7 +344,7 @@ public class LiteralOnlyBrokerRequestTest {
         brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
 
     request = JsonUtils.stringToJsonNode(
-        "{\"sql\":\"SELECT is_subnet_of('2001:db8:85a3::8a2e:370:7334/62', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff')"
+        "{\"sql\":\"SELECT isSubnetOf('2001:db8:85a3::8a2e:370:7334/62', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff')"
             + " as booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
@@ -359,7 +359,7 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
     request = JsonUtils.stringToJsonNode(
-        "{\"sql\":\"SELECT is_subnet_of('2001:db8:85a3::8a2e:370:7334', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') as"
+        "{\"sql\":\"SELECT isSubnetOf('2001:db8:85a3::8a2e:370:7334', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') as"
             + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);

@@ -20,8 +20,10 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.google.common.net.InetAddresses;
+import inet.ipaddr.AddressStringException;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
+import inet.ipaddr.PrefixLenException;
 import java.math.BigInteger;
 import java.net.UnknownHostException;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -43,6 +45,46 @@ public class IpAddressFunctions {
   private IpAddressFunctions() {
   }
 
+  /**
+   * Validates IP prefix prefixStr and returns IPAddress if validated
+   */
+  private static IPAddress getPrefix(String prefixStr) {
+    IPAddressString prefix = new IPAddressString(prefixStr);
+    IPAddress prefixAddr;
+    try {
+      prefixAddr = prefix.toAddress();
+    } catch (AddressStringException e) {
+      throw new IllegalArgumentException("Invalid IP Address format for " + prefix);
+    }
+    if (!prefixAddr.isPrefixed()) {
+      throw new IllegalArgumentException("IP Address " + prefixStr + " should be prefixed.");
+    }
+    try {
+      return prefixAddr.toPrefixBlock();
+    } catch (PrefixLenException e) {
+      throw e;
+    }
+  }
+
+  /**
+   * Validates IP address ipString and returns IPAddress if validated
+   */
+  private static IPAddress getAddress(String ipString) {
+    try {
+      return new IPAddressString(ipString).toAddress();
+    } catch (AddressStringException e) {
+      throw new IllegalArgumentException("Invalid IP Address format for " + ipString);
+    }
+  }
+
+  @ScalarFunction
+  public static boolean isSubnetOf(String ipPrefix, String ipAddress) {
+    IPAddress prefix = getPrefix(ipPrefix);
+    IPAddress ip = getAddress(ipAddress);
+    return prefix.contains(ip);
+  }
+
+  // -------------- IN HOUSE IMPLEMENTATION STARTS HERE --------------
   private static String[] fromPrefixToPair(String ipPrefix) {
     if (!ipPrefix.contains("/")) {
       throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
@@ -87,15 +129,6 @@ public class IpAddressFunctions {
     return addr;
   }
 
-  @ScalarFunction
-  public static boolean isSubnetOf(String ipPrefix, String ipAddress) {
-    IPAddressString prefix = new IPAddressString(ipPrefix);
-    if (!prefix.isPrefixed()) {
-      throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
-    }
-    IPAddress address = prefix.getAddress().toPrefixBlock();
-    return address.contains(new IPAddressString(ipAddress).getAddress());
-  }
   /**
    * Returns true if ipAddress is in the subnet of ipPrefix (IPv4 or IPv6)
    */
