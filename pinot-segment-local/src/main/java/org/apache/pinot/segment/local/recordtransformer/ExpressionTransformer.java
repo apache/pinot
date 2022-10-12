@@ -123,6 +123,11 @@ public class ExpressionTransformer implements RecordTransformer {
   }
 
   @Override
+  public boolean isNoOp() {
+    return _expressionEvaluators.isEmpty();
+  }
+
+  @Override
   public GenericRow transform(GenericRow record) {
     for (Map.Entry<String, FunctionEvaluator> entry : _expressionEvaluators.entrySet()) {
       String column = entry.getKey();
