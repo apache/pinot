@@ -81,14 +81,21 @@ public class ForwardIndexHandlerTest {
   private static final String DIM_ZSTANDARD_INTEGER = "DIM_ZSTANDARD_INTEGER";
   private static final String DIM_LZ4_INTEGER = "DIM_LZ4_INTEGER";
 
+  // Dictionary columns
   private static final String DIM_DICT_INTEGER = "DIM_DICT_INTEGER";
   private static final String DIM_DICT_STRING = "DIM_DICT_STRING";
   private static final String DIM_DICT_LONG = "DIM_DICT_LONG";
 
-  private static final String METRIC_PASSTHROUGH_INTEGER = "METRIC_PASSTHROUGH_INTEGER";
+  // Metric columns
+  private static final String METRIC_PASS_THROUGH_INTEGER = "METRIC_PASS_THROUGH_INTEGER";
   private static final String METRIC_SNAPPY_INTEGER = "METRIC_SNAPPY_INTEGER";
   private static final String METRIC_ZSTANDARD_INTEGER = "METRIC_ZSTANDARD_INTEGER";
   private static final String METRIC_LZ4_INTEGER = "METRIC_LZ4_INTEGER";
+
+  // Multivalue columns
+  private static final String DIM_MV_PASS_THROUGH_INTEGER = "DIM_MV_PASS_THROUGH_INTEGER";
+  private static final String DIM_MV_PASS_THROUGH_STRING = "DIM_MV_PASS_THROUGH_STRING";
+  private static final String DIM_MV_PASS_THROUGH_BYTES = "DIM_MV_PASS_THROUGH_BYTES";
 
   private static final List<String> RAW_SNAPPY_INDEX_COLUMNS =
       Arrays.asList(DIM_SNAPPY_STRING, DIM_SNAPPY_LONG, DIM_SNAPPY_INTEGER, METRIC_SNAPPY_INTEGER);
@@ -98,7 +105,8 @@ public class ForwardIndexHandlerTest {
 
   private static final List<String> RAW_PASS_THROUGH_INDEX_COLUMNS =
       Arrays.asList(DIM_PASS_THROUGH_STRING, DIM_PASS_THROUGH_LONG, DIM_PASS_THROUGH_INTEGER,
-          METRIC_PASSTHROUGH_INTEGER);
+          METRIC_PASS_THROUGH_INTEGER, DIM_MV_PASS_THROUGH_INTEGER, DIM_MV_PASS_THROUGH_STRING,
+          DIM_MV_PASS_THROUGH_BYTES);
 
   private static final List<String> RAW_LZ4_INDEX_COLUMNS =
       Arrays.asList(DIM_LZ4_STRING, DIM_LZ4_LONG, DIM_LZ4_INTEGER, METRIC_LZ4_INTEGER);
@@ -171,11 +179,12 @@ public class ForwardIndexHandlerTest {
         .addSingleValueDimension(DIM_DICT_INTEGER, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIM_DICT_LONG, FieldSpec.DataType.LONG)
         .addSingleValueDimension(DIM_DICT_STRING, FieldSpec.DataType.STRING)
-        .addMetric(METRIC_PASSTHROUGH_INTEGER, FieldSpec.DataType.INT)
+        .addMetric(METRIC_PASS_THROUGH_INTEGER, FieldSpec.DataType.INT)
         .addMetric(METRIC_SNAPPY_INTEGER, FieldSpec.DataType.INT).addMetric(METRIC_LZ4_INTEGER, FieldSpec.DataType.INT)
         .addMetric(METRIC_ZSTANDARD_INTEGER, FieldSpec.DataType.INT)
-
-        .build();
+        .addMultiValueDimension(DIM_MV_PASS_THROUGH_INTEGER, FieldSpec.DataType.INT)
+        .addMultiValueDimension(DIM_MV_PASS_THROUGH_STRING, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(DIM_MV_PASS_THROUGH_BYTES, FieldSpec.DataType.BYTES).build();
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
     config.setOutDir(INDEX_DIR.getPath());
@@ -200,16 +209,37 @@ public class ForwardIndexHandlerTest {
     Integer[] tempIntRows = new Integer[rowLength];
     Long[] tempLongRows = new Long[rowLength];
 
+    int maxNumberOfMVEntries = random.nextInt(500);
+    String[][] tempMVStringRows = new String[rowLength][maxNumberOfMVEntries];
+    Integer[][] tempMVIntRows = new Integer[rowLength][maxNumberOfMVEntries];
+    byte[][][] tempMVByteRows = new byte[rowLength][maxNumberOfMVEntries][];
+
     for (int i = 0; i < rowLength; i++) {
       //Adding a fixed value to check for filter queries
       if (i % 10 == 0) {
         tempStringRows[i] = "testRow";
         tempIntRows[i] = 1001;
         tempLongRows[i] = 1001L;
+
+        int numMVElements = random.nextInt(maxNumberOfMVEntries);
+        for (int j = 0; j < numMVElements; j++) {
+          tempMVIntRows[i][j] = 1001;
+          String str = "testRow";
+          tempMVStringRows[i][j] = str;
+          tempMVByteRows[i][j] = (byte[]) str.getBytes();
+        }
       } else {
         tempStringRows[i] = "n" + i;
         tempIntRows[i] = i;
         tempLongRows[i] = (long) i;
+
+        int numMVElements = random.nextInt(maxNumberOfMVEntries);
+        for (int j = 0; j < numMVElements; j++) {
+          tempMVIntRows[i][j] = j;
+          String str = "n" + i;
+          tempMVStringRows[i][j] = str;
+          tempMVByteRows[i][j] = (byte[]) str.getBytes();
+        }
       }
     }
 
@@ -228,7 +258,7 @@ public class ForwardIndexHandlerTest {
       row.putValue(DIM_PASS_THROUGH_INTEGER, tempIntRows[i]);
       row.putValue(DIM_LZ4_INTEGER, tempIntRows[i]);
       row.putValue(METRIC_LZ4_INTEGER, tempIntRows[i]);
-      row.putValue(METRIC_PASSTHROUGH_INTEGER, tempIntRows[i]);
+      row.putValue(METRIC_PASS_THROUGH_INTEGER, tempIntRows[i]);
       row.putValue(METRIC_ZSTANDARD_INTEGER, tempIntRows[i]);
       row.putValue(METRIC_SNAPPY_INTEGER, tempIntRows[i]);
 
@@ -242,6 +272,11 @@ public class ForwardIndexHandlerTest {
       row.putValue(DIM_DICT_INTEGER, tempIntRows[i]);
       row.putValue(DIM_DICT_LONG, tempLongRows[i]);
       row.putValue(DIM_DICT_STRING, tempStringRows[i]);
+
+      // MV columns
+      row.putValue(DIM_MV_PASS_THROUGH_INTEGER, tempMVIntRows[i]);
+      row.putValue(DIM_MV_PASS_THROUGH_STRING, tempMVStringRows[i]);
+      row.putValue(DIM_MV_PASS_THROUGH_BYTES, tempMVByteRows[i]);
 
       rows.add(row);
     }
@@ -278,7 +313,7 @@ public class ForwardIndexHandlerTest {
     operationMap = fwdIndexHandler.computeOperation(writer);
     assertEquals(operationMap, Collections.EMPTY_MAP);
 
-    // TEST4: Add random index. ForwardIndexHandler should be a No-Op.
+    // TEST4: Add an additional text index. ForwardIndexHandler should be a No-Op.
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
     indexLoadingConfig.getTextIndexColumns().add(DIM_DICT_INTEGER);
     indexLoadingConfig.getTextIndexColumns().add(DIM_LZ4_INTEGER);
@@ -287,12 +322,21 @@ public class ForwardIndexHandlerTest {
     assertEquals(operationMap, Collections.EMPTY_MAP);
 
     // TEST5: Change compression
+    Random rand = new Random();
 
     // Create new tableConfig with the modified fieldConfigs.
     List<FieldConfig> fieldConfigs = new ArrayList<>(_tableConfig.getFieldConfigList());
-    FieldConfig config = fieldConfigs.remove(0);
-    FieldConfig newConfig = new FieldConfig(config.getName(), FieldConfig.EncodingType.RAW, Collections.emptyList(),
-        FieldConfig.CompressionCodec.ZSTANDARD, null);
+    int randIdx = rand.nextInt(fieldConfigs.size());
+    FieldConfig config = fieldConfigs.remove(randIdx);
+    FieldConfig.CompressionCodec newCompressionType = null;
+    for (FieldConfig.CompressionCodec type : _allCompressionTypes) {
+      if (config.getCompressionCodec() != type) {
+        newCompressionType = type;
+      }
+    }
+    FieldConfig newConfig =
+        new FieldConfig(config.getName(), FieldConfig.EncodingType.RAW, Collections.emptyList(), newCompressionType,
+            null);
     fieldConfigs.add(newConfig);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(_noDictionaryColumns)
@@ -339,7 +383,6 @@ public class ForwardIndexHandlerTest {
   public void testRewriteRawForwardIndexForSingleColumn()
       throws Exception {
     for (int i = 0; i < _noDictionaryColumns.size(); i++) {
-
       // For every noDictionaryColumn, change the compressionType to all available types, one by one.
       for (FieldConfig.CompressionCodec compressionType : _allCompressionTypes) {
         // Setup
@@ -434,6 +477,7 @@ public class ForwardIndexHandlerTest {
         new SegmentLocalFSDirectory(_segmentDirectory, existingSegmentMetadata, ReadMode.mmap);
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
     ColumnMetadata columnMetadata = existingSegmentMetadata.getColumnMetadataFor(columnName);
+    boolean isSingleValue = columnMetadata.isSingleValue();
 
     // Check Compression type in header
     ForwardIndexReader fwdIndexReader = LoaderUtils.getForwardIndexReader(writer, columnMetadata);
@@ -449,12 +493,60 @@ public class ForwardIndexHandlerTest {
           Object val = columnReader.getValue(rowIdx);
 
           FieldSpec.DataType dataType = forwardIndexReader.getStoredType();
-          if (dataType == FieldSpec.DataType.STRING) {
-            assertEquals((String) val, "testRow");
-          } else if (dataType == FieldSpec.DataType.INT) {
-            assertEquals((int) val, 1001, columnName + " " + rowIdx + " " + expectedCompressionType);
-          } else if (dataType == FieldSpec.DataType.LONG) {
-            assertEquals((long) val, 1001L, columnName + " " + rowIdx + " " + expectedCompressionType);
+
+          switch (dataType) {
+            case STRING: {
+              if (isSingleValue) {
+                assertEquals((String) val, "testRow");
+              } else {
+                Object[] values = (Object[]) val;
+                int length = values.length;
+                for (int i = 0; i < length; i++) {
+                  assertEquals((String) values[i], "testRow");
+                }
+              }
+              break;
+            }
+            case INT: {
+              if (isSingleValue) {
+                assertEquals((int) val, 1001, columnName + " " + rowIdx + " " + expectedCompressionType);
+              } else {
+                Object[] values = (Object[]) val;
+                int length = values.length;
+                for (int i = 0; i < length; i++) {
+                  assertEquals((int) values[i], 1001);
+                }
+              }
+              break;
+            }
+            case LONG: {
+              if (isSingleValue) {
+                assertEquals((long) val, 1001L, columnName + " " + rowIdx + " " + expectedCompressionType);
+              } else {
+                Object[] values = (Object[]) val;
+                int length = values.length;
+                for (int i = 0; i < length; i++) {
+                  assertEquals((long) values[i], 1001);
+                }
+              }
+              break;
+            }
+            case BYTES: {
+              byte[] expectedVal = "testRow".getBytes();
+              if (isSingleValue) {
+                assertEquals((byte[]) val, expectedVal, columnName + " " + rowIdx + " " + expectedCompressionType);
+              } else {
+                Object[] values = (Object[]) val;
+                int length = values.length;
+                for (int i = 0; i < length; i++) {
+                  assertEquals((byte[]) values[i], expectedVal);
+                }
+              }
+              break;
+            }
+            default:
+              // Unreachable code.
+              throw new IllegalStateException("Invalid datatype for column=" + columnName);
           }
         }
       }
