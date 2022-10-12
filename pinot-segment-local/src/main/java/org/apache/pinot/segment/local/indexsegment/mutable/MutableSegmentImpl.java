@@ -90,6 +90,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
@@ -244,7 +245,7 @@ public class MutableSegmentImpl implements MutableSegment {
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
     Set<String> textIndexColumns = config.getTextIndexColumns();
     Set<String> fstIndexColumns = config.getFSTIndexColumns();
-    Set<String> jsonIndexColumns = config.getJsonIndexColumns();
+    Map<String, JsonIndexConfig> jsonIndexConfigs = config.getJsonIndexConfigs();
     Map<String, H3IndexConfig> h3IndexConfigs = config.getH3IndexConfigs();
 
     int avgNumMultiValues = config.getAvgNumMultiValues();
@@ -354,8 +355,9 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Json index
+      JsonIndexConfig jsonIndexConfig = jsonIndexConfigs.get(column);
       MutableJsonIndex jsonIndex =
-          jsonIndexColumns.contains(column) ? indexProvider.newJsonIndex(context.forJsonIndex()) : null;
+          jsonIndexConfig != null ? indexProvider.newJsonIndex(context.forJsonIndex(jsonIndexConfig)) : null;
 
       // H3 index
       // TODO consider making this overridable
@@ -1408,7 +1410,7 @@ public class MutableSegmentImpl implements MutableSegment {
           AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
 
       columnNameToAggregator.put(config.getColumnName(),
-          Pair.of(argument.getLiteral(), ValueAggregatorFactory.getValueAggregator(functionType)));
+          Pair.of(argument.getIdentifier(), ValueAggregatorFactory.getValueAggregator(functionType)));
     }
 
     return columnNameToAggregator;

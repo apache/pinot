@@ -1,0 +1,37 @@
+{
+  "schemaName": "supplier",
+  "metricFieldSpecs": [
+
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "S_SUPPKEY"
+    },
+    {
+      "dataType": "STRING",
+      "name": "S_NAME"
+    },
+    {
+      "dataType": "STRING",
+      "name": "S_ADDRESS"
+    },
+    {
+      "dataType": "STRING",
+      "name": "S_CITY"
+    },
+    {
+      "dataType": "STRING",
+      "name": "S_NATION"
+    },
+    {
+      "dataType": "STRING",
+      "name": "S_REGION"
+    },
+    {
+      "dataType": "STRING",
+      "name": "S_PHONE"
+    }
+  ],
+  "primaryKeyColumns": ["S_SUPPKEY"]
+}

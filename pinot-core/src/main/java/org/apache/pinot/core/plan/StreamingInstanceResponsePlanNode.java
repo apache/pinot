@@ -22,7 +22,7 @@ import io.grpc.stub.StreamObserver;
 import java.util.List;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
-import org.apache.pinot.core.operator.StreamingInstanceResponseOperator;
+import org.apache.pinot.core.operator.streaming.StreamingInstanceResponseOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;

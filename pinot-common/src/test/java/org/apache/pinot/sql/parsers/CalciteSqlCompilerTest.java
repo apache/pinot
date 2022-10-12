@@ -301,7 +301,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
       eqOperands = operands.get(1).getFunctionCall().getOperands();
       Assert.assertEquals(eqOperands.get(0).getIdentifier().getName(), "f");
-      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.stringValue("true"));
+      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
     }
 
     {
@@ -324,7 +324,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(operands.get(0).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       List<Expression> eqOperands = operands.get(0).getFunctionCall().getOperands();
       Assert.assertEquals(eqOperands.get(0).getFunctionCall().getOperator(), "startswith");
-      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.stringValue("true"));
+      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
 
       Assert.assertEquals(operands.get(1).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       eqOperands = operands.get(1).getFunctionCall().getOperands();
@@ -343,7 +343,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(operands.get(0).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       List<Expression> eqOperands = operands.get(0).getFunctionCall().getOperands();
       Assert.assertEquals(eqOperands.get(0).getFunctionCall().getOperator(), "startswith");
-      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.stringValue("true"));
+      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
 
       Assert.assertEquals(operands.get(1).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       eqOperands = operands.get(1).getFunctionCall().getOperands();
@@ -358,7 +358,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(operands.get(3).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       eqOperands = operands.get(3).getFunctionCall().getOperands();
       Assert.assertEquals(eqOperands.get(0).getIdentifier().getName(), "d");
-      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.stringValue("true"));
+      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
     }
   }
 
@@ -2325,7 +2325,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(operands.get(3).getFunctionCall().getOperator(), FilterKind.EQUALS.name());
       eqOperands = operands.get(3).getFunctionCall().getOperands();
       Assert.assertEquals(eqOperands.get(0).getIdentifier(), new Identifier("col4"));
-      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.stringValue("true"));
+      Assert.assertEquals(eqOperands.get(1).getLiteral(), Literal.boolValue(true));
     }
     {
       String query = "SELECT * FROM foo WHERE col1 <= 0 OR col2 <= 0 OR (col3 <= 0 OR col4 <= 0)";

@@ -108,7 +108,7 @@ public class DataTableSerDeTest {
         QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, exception);
     String expected = processingException.getMessage();
 
-    DataTable dataTable = DataTableBuilderUtils.getEmptyDataTable();
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.addException(processingException);
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     Assert.assertNull(newDataTable.getDataSchema());

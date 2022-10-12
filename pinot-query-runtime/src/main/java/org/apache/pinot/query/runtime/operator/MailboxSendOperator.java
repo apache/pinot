@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -30,13 +31,10 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.BaseDataBlock;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
@@ -59,6 +57,9 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
       ImmutableSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
           RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED);
   private static final Random RANDOM = new Random();
+  // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
+  // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
+  private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
 
   private final List<ServerInstance> _receivingStageInstances;
   private final RelDistribution.Type _exchangeType;
@@ -115,41 +116,35 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    BaseDataBlock dataBlock;
-    TransferableBlock transferableBlock = null;
-    boolean isEndOfStream;
-    transferableBlock = _dataTableBlockBaseOperator.nextBlock();
-    dataBlock = transferableBlock.getDataBlock();
-    isEndOfStream = TransferableBlockUtils.isEndOfStream(transferableBlock);
-
+    TransferableBlock transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+    boolean isEndOfStream = TransferableBlockUtils.isEndOfStream(transferableBlock);
+    BaseDataBlock.Type type = transferableBlock.getType();
     try {
       switch (_exchangeType) {
         case SINGLETON:
-          sendDataTableBlock(_receivingStageInstances.get(0), dataBlock);
+          sendDataTableBlockToServers(Arrays.asList(_receivingStageInstances.get(0)), transferableBlock, type,
+              isEndOfStream);
           break;
         case RANDOM_DISTRIBUTED:
           if (isEndOfStream) {
-            for (ServerInstance serverInstance : _receivingStageInstances) {
-              sendDataTableBlock(serverInstance, dataBlock);
-            }
+            sendDataTableBlockToServers(_receivingStageInstances, transferableBlock, type, true);
           } else {
-            int randomInstanceIdx = _exchangeType == RelDistribution.Type.SINGLETON ? 0
-                : RANDOM.nextInt(_receivingStageInstances.size());
+            int randomInstanceIdx =
+                _exchangeType == RelDistribution.Type.SINGLETON ? 0 : RANDOM.nextInt(_receivingStageInstances.size());
             ServerInstance randomInstance = _receivingStageInstances.get(randomInstanceIdx);
-            sendDataTableBlock(randomInstance, dataBlock);
+            sendDataTableBlockToServers(Arrays.asList(randomInstance), transferableBlock, type, false);
           }
           break;
         case BROADCAST_DISTRIBUTED:
-          for (ServerInstance serverInstance : _receivingStageInstances) {
-            sendDataTableBlock(serverInstance, dataBlock);
-          }
+          sendDataTableBlockToServers(_receivingStageInstances, transferableBlock, type, isEndOfStream);
           break;
         case HASH_DISTRIBUTED:
           // TODO: ensure that server instance list is sorted using same function in sender.
-          List<BaseDataBlock> dataTableList = constructPartitionedDataBlock(dataBlock, _keySelector,
+          List<TransferableBlock> dataTableList = constructPartitionedDataBlock(transferableBlock, _keySelector,
               _receivingStageInstances.size(), isEndOfStream);
           for (int i = 0; i < _receivingStageInstances.size(); i++) {
-            sendDataTableBlock(_receivingStageInstances.get(i), dataTableList.get(i));
+            sendDataTableBlockToServers(Arrays.asList(_receivingStageInstances.get(i)), dataTableList.get(i), type,
+                isEndOfStream);
           }
           break;
         case RANGE_DISTRIBUTED:
@@ -164,50 +159,69 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     return transferableBlock;
   }
 
-  private static List<BaseDataBlock> constructPartitionedDataBlock(BaseDataBlock dataBlock,
-      KeySelector<Object[], Object[]> keySelector, int partitionSize, boolean isEndOfStream)
-      throws Exception {
+  private static List<TransferableBlock> constructPartitionedDataBlock(TransferableBlock transferableBlock,
+      KeySelector<Object[], Object[]> keySelector, int partitionSize, boolean isEndOfStream) {
+    List<TransferableBlock> transferableBlockList = new ArrayList<>(partitionSize);
     if (isEndOfStream) {
-      List<BaseDataBlock> dataTableList = new ArrayList<>(partitionSize);
       for (int i = 0; i < partitionSize; i++) {
-        dataTableList.add(dataBlock);
+        transferableBlockList.add(transferableBlock);
       }
-      return dataTableList;
     } else {
       List<List<Object[]>> temporaryRows = new ArrayList<>(partitionSize);
       for (int i = 0; i < partitionSize; i++) {
         temporaryRows.add(new ArrayList<>());
       }
-      for (int rowId = 0; rowId < dataBlock.getNumberOfRows(); rowId++) {
-        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
+      for (int rowId = 0; rowId < transferableBlock.getNumRows(); rowId++) {
+        Object[] row = TransferableBlockUtils.getRow(transferableBlock, rowId);
         int partitionId = keySelector.computeHash(row) % partitionSize;
         temporaryRows.get(partitionId).add(row);
       }
-      List<BaseDataBlock> dataTableList = new ArrayList<>(partitionSize);
       for (int i = 0; i < partitionSize; i++) {
-        List<Object[]> objects = temporaryRows.get(i);
-        dataTableList.add(DataBlockBuilder.buildFromRows(objects, dataBlock.getDataSchema()));
+        List<Object[]> container = temporaryRows.get(i);
+        transferableBlockList.add(new TransferableBlock(
+            container, transferableBlock.getDataSchema(), transferableBlock.getType()));
       }
-      return dataTableList;
+    }
+    return transferableBlockList;
+  }
+
+  private void sendDataTableBlockToServers(List<ServerInstance> servers, TransferableBlock transferableBlock,
+      BaseDataBlock.Type type, boolean isEndOfStream)
+      throws IOException {
+    if (isEndOfStream) {
+      for (ServerInstance server : servers) {
+        sendDataTableBlock(server, transferableBlock, true);
+      }
+    } else {
+      // Split the block only when it is not end of stream block.
+      List<TransferableBlock> chunks = TransferableBlockUtils.splitBlock(transferableBlock, type,
+          MAX_MAILBOX_CONTENT_SIZE_BYTES);
+      for (ServerInstance server : servers) {
+        for (TransferableBlock chunk : chunks) {
+          sendDataTableBlock(server, chunk, false);
+        }
+      }
     }
   }
 
-  private void sendDataTableBlock(ServerInstance serverInstance, BaseDataBlock dataBlock)
+  private void sendDataTableBlock(ServerInstance serverInstance, TransferableBlock transferableBlock,
+      boolean isEndOfStream)
       throws IOException {
     String mailboxId = toMailboxId(serverInstance);
     SendingMailbox<Mailbox.MailboxContent> sendingMailbox = _mailboxService.getSendingMailbox(mailboxId);
-    Mailbox.MailboxContent mailboxContent = toMailboxContent(mailboxId, dataBlock);
+    Mailbox.MailboxContent mailboxContent = toMailboxContent(mailboxId, transferableBlock.getDataBlock().toBytes(),
+        isEndOfStream);
     sendingMailbox.send(mailboxContent);
-    if (mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY)) {
+    if (isEndOfStream) {
       sendingMailbox.complete();
     }
   }
 
-  private Mailbox.MailboxContent toMailboxContent(String mailboxId, BaseDataBlock dataBlock)
+  private Mailbox.MailboxContent toMailboxContent(String mailboxId, byte[] dataBlockBytes, boolean isMetadataBlock)
       throws IOException {
-    Mailbox.MailboxContent.Builder builder = Mailbox.MailboxContent.newBuilder().setMailboxId(mailboxId)
-        .setPayload(ByteString.copyFrom(new TransferableBlock(dataBlock).toBytes()));
-    if (dataBlock instanceof MetadataBlock) {
+    Mailbox.MailboxContent.Builder builder =
+        Mailbox.MailboxContent.newBuilder().setMailboxId(mailboxId).setPayload(ByteString.copyFrom(dataBlockBytes));
+    if (isMetadataBlock) {
       builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
     }
     return builder.build();

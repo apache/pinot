@@ -434,7 +434,7 @@ public class PinotHelixTaskResourceManager {
    * @param taskName Task name
    * @return List of child task configs
    */
-  public synchronized List<PinotTaskConfig> getTaskConfigs(String taskName) {
+  public synchronized List<PinotTaskConfig> getSubtaskConfigs(String taskName) {
     Collection<TaskConfig> helixTaskConfigs =
         _taskDriver.getJobConfig(getHelixJobName(taskName)).getTaskConfigMap().values();
     List<PinotTaskConfig> taskConfigs = new ArrayList<>(helixTaskConfigs.size());
@@ -442,6 +442,23 @@ public class PinotHelixTaskResourceManager {
       taskConfigs.add(PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig));
     }
     return taskConfigs;
+  }
+
+  /**
+   * Get the task runtime config for the given task name. A task can have multiple subtasks, whose configs can be
+   * retrieved via the getSubtaskConfigs() method instead.
+   *
+   * @param taskName Task name
+   * @return Configs for the task returned as a Map.
+   */
+  public synchronized Map<String, String> getTaskRuntimeConfig(String taskName) {
+    JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
+    HashMap<String, String> configs = new HashMap<>();
+    configs.put("ConcurrentTasksPerWorker", String.valueOf(jobConfig.getNumConcurrentTasksPerInstance()));
+    configs.put("TaskTimeoutMs", String.valueOf(jobConfig.getTimeoutPerTask()));
+    configs.put("TaskExpireTimeMs", String.valueOf(jobConfig.getExpiry()));
+    configs.put("MinionWorkerGroupTag", jobConfig.getInstanceGroupTag());
+    return configs;
   }
 
   /**
@@ -567,7 +584,7 @@ public class PinotHelixTaskResourceManager {
       String taskName = taskState.getKey();
 
       // Iterate through all task configs associated with this task name
-      for (PinotTaskConfig taskConfig : getTaskConfigs(taskName)) {
+      for (PinotTaskConfig taskConfig : getSubtaskConfigs(taskName)) {
         Map<String, String> pinotConfigs = taskConfig.getConfigs();
 
         // Filter task configs that matches this table name
@@ -650,7 +667,7 @@ public class PinotHelixTaskResourceManager {
       String pinotTaskName = getPinotTaskName(helixJobName);
 
       // Iterate through all task configs associated with this task name
-      for (PinotTaskConfig taskConfig : getTaskConfigs(pinotTaskName)) {
+      for (PinotTaskConfig taskConfig : getSubtaskConfigs(pinotTaskName)) {
         Map<String, String> pinotConfigs = taskConfig.getConfigs();
 
         // Filter task configs that matches this table name

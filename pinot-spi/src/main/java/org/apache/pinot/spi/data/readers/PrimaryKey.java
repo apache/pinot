@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import org.apache.commons.lang3.SerializationUtils;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -37,7 +41,85 @@ public class PrimaryKey {
   }
 
   public byte[] asBytes() {
-    return SerializationUtils.serialize(_values);
+    if (_values.length == 1) {
+      return asBytesSingleVal(_values[0]);
+    }
+
+    int sizeInBytes = 0;
+    byte[][] cache = new byte[_values.length][];
+    for (int i = 0; i < _values.length; i++) {
+      Object value = _values[i];
+
+      if (value instanceof Integer) {
+        sizeInBytes += Integer.BYTES;
+      } else if (value instanceof Long) {
+        sizeInBytes += Long.BYTES;
+      } else if (value instanceof String) {
+        cache[i] = ((String) value).getBytes(StandardCharsets.UTF_8);
+        sizeInBytes += cache[i].length + Integer.BYTES;
+      } else if (value instanceof ByteArray) {
+        cache[i] = ((ByteArray) value).getBytes();
+        sizeInBytes += cache[i].length + Integer.BYTES;
+      } else if (value instanceof Float) {
+        sizeInBytes += Float.BYTES;
+      } else if (value instanceof Double) {
+        sizeInBytes += Double.BYTES;
+      } else if (value instanceof BigDecimal) {
+        cache[i] = BigDecimalUtils.serialize((BigDecimal) value);
+        sizeInBytes += cache[i].length + Integer.BYTES;
+      } else {
+        throw new IllegalStateException(
+            String.format("Unsupported value: %s of type: %s", value, value != null ? value.getClass() : null));
+      }
+    }
+
+    ByteBuffer byteBuffer = ByteBuffer.allocate(sizeInBytes);
+    for (int i = 0; i < _values.length; i++) {
+      Object value = _values[i];
+
+      if (value instanceof Integer) {
+        byteBuffer.putInt((Integer) value);
+      } else if (value instanceof Long) {
+        byteBuffer.putLong((Long) value);
+      } else if (value instanceof Float) {
+        byteBuffer.putFloat((Float) value);
+      } else if (value instanceof Double) {
+        byteBuffer.putDouble((Double) value);
+      } else {
+        byteBuffer.putInt(cache[i].length);
+        byteBuffer.put(cache[i]);
+      }
+    }
+    return byteBuffer.array();
+  }
+
+  private byte[] asBytesSingleVal(Object value) {
+    if (value instanceof Integer) {
+      ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES);
+      byteBuffer.putInt((Integer) value);
+      return byteBuffer.array();
+    } else if (value instanceof Long) {
+      ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES);
+      byteBuffer.putLong((Long) value);
+      return byteBuffer.array();
+    } else if (value instanceof String) {
+      return ((String) value).getBytes(StandardCharsets.UTF_8);
+    } else if (value instanceof ByteArray) {
+      return ((ByteArray) value).getBytes();
+    } else if (value instanceof Float) {
+      ByteBuffer byteBuffer = ByteBuffer.allocate(Float.BYTES);
+      byteBuffer.putFloat((Float) value);
+      return byteBuffer.array();
+    } else if (value instanceof Double) {
+      ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES);
+      byteBuffer.putDouble((Double) value);
+      return byteBuffer.array();
+    } else if (value instanceof BigDecimal) {
+      return BigDecimalUtils.serialize((BigDecimal) value);
+    } else {
+      throw new IllegalStateException(
+          String.format("Unsupported value: %s of type: %s", value, value != null ? value.getClass() : null));
+    }
   }
 
   @Override

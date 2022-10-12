@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -33,8 +34,12 @@ public class LiteralTransformFunctionTest {
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("1.2"), DataType.FLOAT);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("41241241.2412"), DataType.DOUBLE);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("1.7976931348623159e+308"), DataType.BIG_DECIMAL);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("true"), DataType.BOOLEAN);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("false"), DataType.BOOLEAN);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("2020-02-02 20:20:20.20"), DataType.TIMESTAMP);
+    LiteralTransformFunction trueBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, true));
+    Assert.assertEquals(trueBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
+    Assert.assertEquals(trueBoolean.getLiteral(), "true");
+    LiteralTransformFunction falseBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, false));
+    Assert.assertEquals(falseBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
+    Assert.assertEquals(falseBoolean.getLiteral(), "false");
   }
 }

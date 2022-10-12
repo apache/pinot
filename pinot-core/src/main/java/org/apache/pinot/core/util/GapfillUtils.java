@@ -172,7 +172,8 @@ public class GapfillUtils {
         "The second argument of Gapfill should be TimeFormatter.");
     Preconditions.checkArgument(args.get(2).getLiteral() != null,
         "The third argument of Gapfill should be start time.");
-    Preconditions.checkArgument(args.get(3).getLiteral() != null, "The fourth argument of Gapfill should be end time.");
+    Preconditions.checkArgument(args.get(3).getLiteral() != null,
+        "The fourth argument of Gapfill should be end time.");
     Preconditions.checkArgument(args.get(4).getLiteral() != null,
         "The fifth argument of Gapfill should be time bucket size.");
 

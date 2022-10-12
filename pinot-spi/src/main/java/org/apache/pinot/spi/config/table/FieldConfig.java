@@ -47,6 +47,9 @@ public class FieldConfig extends BaseJsonConfig {
   // "native" for native, default is Lucene
   public static final String TEXT_FST_TYPE = "fstType";
   public static final String TEXT_NATIVE_FST_LITERAL = "native";
+  // Config to disable forward index
+  public static final String FORWARD_INDEX_DISABLED = "forwardIndexDisabled";
+  public static final String DEFAULT_FORWARD_INDEX_DISABLED = Boolean.FALSE.toString();
 
   private final String _name;
   private final EncodingType _encodingType;

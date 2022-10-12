@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
@@ -38,9 +39,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 public class OnHeapJsonIndexCreator extends BaseJsonIndexCreator {
 
-  public OnHeapJsonIndexCreator(File indexDir, String columnName)
+  public OnHeapJsonIndexCreator(File indexDir, String columnName, JsonIndexConfig jsonIndexConfig)
       throws IOException {
-    super(indexDir, columnName);
+    super(indexDir, columnName, jsonIndexConfig);
   }
 
   @Override

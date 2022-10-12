@@ -104,6 +104,7 @@ public class RequestUtils {
     Expression expression = new Expression(ExpressionType.LITERAL);
     Literal literal = new Literal();
     if (node instanceof SqlNumericLiteral) {
+      // TODO: support different integer and floating point type.
       // Mitigate calcite NPE bug, we need to check if SqlNumericLiteral.getScale() is null before calling
       // SqlNumericLiteral.isInteger(). TODO: Undo this fix once a Calcite release that contains CALCITE-4199 is
       // available and Pinot has been upgraded to use such a release.
@@ -114,7 +115,15 @@ public class RequestUtils {
         literal.setDoubleValue(node.bigDecimalValue().doubleValue());
       }
     } else {
-      literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
+      // TODO: Support null literal and other types.
+      switch (node.getTypeName()) {
+        case BOOLEAN:
+          literal.setBoolValue(node.booleanValue());
+          break;
+        default:
+          literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
+          break;
+      }
     }
     expression.setLiteral(literal);
     return expression;
@@ -166,6 +175,9 @@ public class RequestUtils {
     }
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
+    }
+    if (object instanceof Boolean) {
+      return RequestUtils.getLiteralExpression(((Boolean) object).booleanValue());
     }
     return RequestUtils.getLiteralExpression(object.toString());
   }

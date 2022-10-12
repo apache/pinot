@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.selection;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -231,11 +232,11 @@ public class SelectionOperatorUtils {
    * @param dataSchema data schema.
    * @param nullHandlingEnabled whether null handling is enabled.
    * @return data table.
-   * @throws Exception
+   * @throws IOException
    */
   public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema,
       boolean nullHandlingEnabled)
-      throws Exception {
+      throws IOException {
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
 

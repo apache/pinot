@@ -148,7 +148,7 @@ public class ClusterInfoAccessor {
    * @return List of child task configs
    */
   public List<PinotTaskConfig> getTaskConfigs(String taskName) {
-    return _pinotHelixTaskResourceManager.getTaskConfigs(taskName);
+    return _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName);
   }
 
   /**

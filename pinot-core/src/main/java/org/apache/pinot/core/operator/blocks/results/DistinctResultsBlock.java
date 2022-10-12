@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -49,8 +54,22 @@ public class DistinctResultsBlock extends BaseResultsBlock {
   }
 
   @Override
+  public DataSchema getDataSchema(QueryContext queryContext) {
+    return _distinctTable.getDataSchema();
+  }
+
+  @Override
+  public Collection<Object[]> getRows(QueryContext queryContext) {
+    List<Object[]> rows = new ArrayList<>(_distinctTable.size());
+    for (Record record : _distinctTable.getRecords()) {
+      rows.add(record.getValues());
+    }
+    return rows;
+  }
+
+  @Override
   public DataTable getDataTable(QueryContext queryContext)
-      throws Exception {
+      throws IOException {
     String[] columnNames = new String[]{_distinctFunction.getColumnName()};
     ColumnDataType[] columnDataTypes = new ColumnDataType[]{ColumnDataType.OBJECT};
     DataTableBuilder dataTableBuilder =
@@ -58,8 +77,6 @@ public class DistinctResultsBlock extends BaseResultsBlock {
     dataTableBuilder.startRow();
     dataTableBuilder.setColumn(0, _distinctTable);
     dataTableBuilder.finishRow();
-    DataTable dataTable = dataTableBuilder.build();
-    attachMetadataToDataTable(dataTable);
-    return dataTable;
+    return dataTableBuilder.build();
   }
 }

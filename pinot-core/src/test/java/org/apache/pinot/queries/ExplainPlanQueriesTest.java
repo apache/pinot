@@ -44,6 +44,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
@@ -316,11 +317,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     InstanceRequest instanceRequest1 = new InstanceRequest(0L, brokerRequest);
     instanceRequest1.setSearchSegments(indexSegmentsForServer1);
-    DataTable instanceResponse1 = _queryExecutor.processQuery(getQueryRequest(instanceRequest1), QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse1 = _queryExecutor.execute(getQueryRequest(instanceRequest1), QUERY_RUNNERS);
 
     InstanceRequest instanceRequest2 = new InstanceRequest(0L, brokerRequest);
     instanceRequest2.setSearchSegments(indexSegmentsForServer2);
-    DataTable instanceResponse2 = _queryExecutor.processQuery(getQueryRequest(instanceRequest2), QUERY_RUNNERS);
+    InstanceResponseBlock instanceResponse2 = _queryExecutor.execute(getQueryRequest(instanceRequest2), QUERY_RUNNERS);
 
     // Broker side
     // Use 2 Threads for 2 data-tables
@@ -329,10 +330,10 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
-      byte[] serializedResponse1 = instanceResponse1.toBytes();
+      byte[] serializedResponse1 = instanceResponse1.toDataTable().toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
           DataTableFactory.getDataTable(serializedResponse1));
-      byte[] serializedResponse2 = instanceResponse2.toBytes();
+      byte[] serializedResponse2 = instanceResponse2.toDataTable().toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
           DataTableFactory.getDataTable(serializedResponse2));
     } catch (Exception e) {
@@ -1613,7 +1614,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         7, 6});
     result4.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
-    result4.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
+    result4.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
   }
 
@@ -1775,7 +1776,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result1.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
+    result1.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
     result1.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
@@ -2128,7 +2129,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result8.add(new Object[]{"FILTER_EMPTY", 4, 3});
     result8.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
-    result8.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
+    result8.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
     check(query8, new ResultTable(DATA_SCHEMA, result8));
 
     // Segment 1 is pruned because 'minnie' and 'pluto' are outside the range of min-max values of the segment

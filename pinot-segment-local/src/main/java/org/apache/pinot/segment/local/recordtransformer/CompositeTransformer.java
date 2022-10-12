@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -39,30 +40,36 @@ public class CompositeTransformer implements RecordTransformer {
    * <p>NOTE: DO NOT CHANGE THE ORDER OF THE RECORD TRANSFORMERS
    * <ul>
    *   <li>
-   *     {@link ExpressionTransformer} before everyone else, so that we get the real columns for other transformers to
-   *     work on
+   *     Optional {@link ExpressionTransformer} before everyone else, so that we get the real columns for other
+   *     transformers to work on
    *   </li>
    *   <li>
-   *     {@link FilterTransformer} after ExpressionTransformer, so that we have source as well as destination columns
+   *     Optional {@link FilterTransformer} after {@link ExpressionTransformer}, so that we have source as well as
+   *     destination columns
    *   </li>
    *   <li>
-   *     {@link DataTypeTransformer} after FilterTransformer to convert values to comply with the schema
+   *     {@link DataTypeTransformer} after {@link FilterTransformer} to convert values to comply with the schema
    *   </li>
    *   <li>
-   *     {@link NullValueTransformer} after {@link DataTypeTransformer} because empty Collection/Map/Object[] will be
-   *     replaced with null in DataTypeTransformer
+   *     Optional {@link TimeValidationTransformer} after {@link DataTypeTransformer} so that time value is converted to
+   *     the correct type
    *   </li>
    *   <li>
-   *     {@link SanitizationTransformer} after {@link NullValueTransformer} so that before sanitation, all values are
-   *     non-null and follow the data types defined in the schema
+   *     {@link NullValueTransformer} after {@link DataTypeTransformer} and {@link TimeValidationTransformer} because
+   *     empty Collection/Map/Object[] and invalid values can be replaced with null
+   *   </li>
+   *   <li>
+   *     Optional {@link SanitizationTransformer} after {@link NullValueTransformer} so that before sanitation, all
+   *     values are non-null and follow the data types defined in the schema
    *   </li>
    * </ul>
    */
   public static CompositeTransformer getDefaultTransformer(TableConfig tableConfig, Schema schema) {
-    return new CompositeTransformer(Arrays
-        .asList(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
-            new DataTypeTransformer(tableConfig, schema), new NullValueTransformer(tableConfig, schema),
-            new SanitizationTransformer(schema)));
+    return new CompositeTransformer(
+        Stream.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
+                new DataTypeTransformer(tableConfig, schema), new TimeValidationTransformer(tableConfig, schema),
+                new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(schema))
+            .filter(t -> !t.isNoOp()).collect(Collectors.toList()));
   }
 
   /**

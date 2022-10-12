@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
@@ -66,12 +67,13 @@ public class IndexLoadingConfig {
   private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _fstIndexColumns = new HashSet<>();
   private FSTType _fstIndexType = FSTType.LUCENE;
-  private Set<String> _jsonIndexColumns = new HashSet<>();
+  private Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
   private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
-  private Map<String, String> _noDictionaryConfig = new HashMap<>();
-  private Set<String> _varLengthDictionaryColumns = new HashSet<>();
+  private final Map<String, String> _noDictionaryConfig = new HashMap<>();
+  private final Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
+  private Set<String> _forwardIndexDisabledColumns = new HashSet<>();
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
@@ -118,9 +120,18 @@ public class IndexLoadingConfig {
       _invertedIndexColumns.addAll(invertedIndexColumns);
     }
 
-    List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
-    if (jsonIndexColumns != null) {
-      _jsonIndexColumns.addAll(jsonIndexColumns);
+    // Ignore jsonIndexColumns when jsonIndexConfigs is configured
+    Map<String, JsonIndexConfig> jsonIndexConfigs = indexingConfig.getJsonIndexConfigs();
+    if (jsonIndexConfigs != null) {
+      _jsonIndexConfigs = jsonIndexConfigs;
+    } else {
+      List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
+      if (jsonIndexColumns != null) {
+        _jsonIndexConfigs = new HashMap<>();
+        for (String jsonIndexColumn : jsonIndexColumns) {
+          _jsonIndexConfigs.put(jsonIndexColumn, new JsonIndexConfig());
+        }
+      }
     }
 
     List<String> rangeIndexColumns = indexingConfig.getRangeIndexColumns();
@@ -159,6 +170,7 @@ public class IndexLoadingConfig {
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
     extractH3IndexConfigsFromTableConfig(tableConfig);
+    extractForwardIndexDisabledColumnsFromTableConfig(tableConfig);
 
     Map<String, List<TimestampIndexGranularity>> timestampIndexConfigs =
         SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig);
@@ -320,6 +332,30 @@ public class IndexLoadingConfig {
   }
 
   /**
+   * Forward index disabled info for each column is specified
+   * using {@link FieldConfig} model of indicating per column
+   * encoding and indexing information. Since IndexLoadingConfig
+   * is created from TableConfig, we extract the no forward index info
+   * from fieldConfigList in TableConfig via the properties bag.
+   * @param tableConfig table config
+   */
+  private void extractForwardIndexDisabledColumnsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
+        if (fieldConfigProperties != null) {
+          boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties
+              .getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
+          if (forwardIndexDisabled) {
+            _forwardIndexDisabledColumns.add(fieldConfig.getName());
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * For tests only.
    */
   public IndexLoadingConfig() {
@@ -338,6 +374,19 @@ public class IndexLoadingConfig {
 
   public List<String> getSortedColumns() {
     return _sortedColumns;
+  }
+
+  /**
+   * For tests only.
+   */
+  @VisibleForTesting
+  public void setSortedColumn(String sortedColumn) {
+    if (sortedColumn != null) {
+      _sortedColumns = new ArrayList<>();
+      _sortedColumns.add(sortedColumn);
+    } else {
+      _sortedColumns = Collections.emptyList();
+    }
   }
 
   public Set<String> getInvertedIndexColumns() {
@@ -372,8 +421,8 @@ public class IndexLoadingConfig {
     return _fstIndexColumns;
   }
 
-  public Set<String> getJsonIndexColumns() {
-    return _jsonIndexColumns;
+  public Map<String, JsonIndexConfig> getJsonIndexConfigs() {
+    return _jsonIndexConfigs;
   }
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
@@ -445,7 +494,14 @@ public class IndexLoadingConfig {
 
   @VisibleForTesting
   public void setJsonIndexColumns(Set<String> jsonIndexColumns) {
-    _jsonIndexColumns = jsonIndexColumns;
+    if (jsonIndexColumns != null) {
+      _jsonIndexConfigs = new HashMap<>();
+      for (String jsonIndexColumn : jsonIndexColumns) {
+        _jsonIndexConfigs.put(jsonIndexColumn, new JsonIndexConfig());
+      }
+    } else {
+      _jsonIndexConfigs = null;
+    }
   }
 
   @VisibleForTesting
@@ -461,6 +517,14 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setOnHeapDictionaryColumns(Set<String> onHeapDictionaryColumns) {
     _onHeapDictionaryColumns = onHeapDictionaryColumns;
+  }
+
+  /**
+   * For tests only.
+   */
+  @VisibleForTesting
+  public void setForwardIndexDisabledColumns(Set<String> forwardIndexDisabledColumns) {
+    _forwardIndexDisabledColumns = forwardIndexDisabledColumns;
   }
 
   public Set<String> getNoDictionaryColumns() {
@@ -479,7 +543,7 @@ public class IndexLoadingConfig {
     return _compressionConfigs;
   }
 
-  public Map<String, String> getnoDictionaryConfig() {
+  public Map<String, String> getNoDictionaryConfig() {
     return _noDictionaryConfig;
   }
 
@@ -489,6 +553,10 @@ public class IndexLoadingConfig {
 
   public Set<String> getOnHeapDictionaryColumns() {
     return _onHeapDictionaryColumns;
+  }
+
+  public Set<String> getForwardIndexDisabledColumns() {
+    return _forwardIndexDisabledColumns;
   }
 
   public Map<String, BloomFilterConfig> getBloomFilterConfigs() {
