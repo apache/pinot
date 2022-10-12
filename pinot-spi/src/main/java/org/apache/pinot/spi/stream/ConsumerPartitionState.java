@@ -29,13 +29,15 @@ public class ConsumerPartitionState {
   private final StreamPartitionMsgOffset _currentOffset;
   private final long _lastProcessedTimeMs;
   private final StreamPartitionMsgOffset _upstreamLatestOffset;
+  private final RowMetadata _lastProcessedRowMetadata;
 
   public ConsumerPartitionState(String partitionId, StreamPartitionMsgOffset currentOffset, long lastProcessedTimeMs,
-      @Nullable StreamPartitionMsgOffset upstreamLatestOffset) {
+      @Nullable StreamPartitionMsgOffset upstreamLatestOffset, @Nullable RowMetadata lastProcessedRowMetadata) {
     _partitionId = partitionId;
     _currentOffset = currentOffset;
     _lastProcessedTimeMs = lastProcessedTimeMs;
     _upstreamLatestOffset = upstreamLatestOffset;
+    _lastProcessedRowMetadata = lastProcessedRowMetadata;
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {
@@ -52,5 +54,9 @@ public class ConsumerPartitionState {
 
   public StreamPartitionMsgOffset getUpstreamLatestOffset() {
     return _upstreamLatestOffset;
+  }
+
+  public RowMetadata getLastProcessedRowMetadata() {
+    return _lastProcessedRowMetadata;
   }
 }

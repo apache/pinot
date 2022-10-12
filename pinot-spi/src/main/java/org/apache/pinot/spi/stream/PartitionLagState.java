@@ -35,4 +35,13 @@ public class PartitionLagState {
   }
 
   // TODO: Define record availability lag ($latest_record_consumption_time - $latest_record_ingestion_time)
+
+  /**
+   * Defines how soon after record ingestion was the record consumed by Pinot. That is, the difference between the
+   * time the record was consumed and the time at which the record was ingested upstream.
+   * @return
+   */
+  public String getRecordAvailabilityLag() {
+    return NOT_CALCULATED;
+  }
 }
