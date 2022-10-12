@@ -20,10 +20,12 @@ package org.apache.pinot.integration.tests;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.io.InputStream;
 import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.io.FileUtils;
@@ -46,6 +48,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import org.yaml.snakeyaml.Yaml;
 
 
 public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
@@ -57,6 +60,7 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
       "lineorder", "examples/batch/ssb/lineorder",
       "part", "examples/batch/ssb/part",
       "supplier", "examples/batch/ssb/supplier");
+  private static final String SSB_QUERY_SET_RESOURCE_NAME = "ssb/ssb_query_set.yaml";
 
   @BeforeClass
   public void setUp()
@@ -100,13 +104,13 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
   }
 
-  @Test(dataProvider = "ssbQueryDataProvider")
+  @Test(dataProvider = "QueryDataProvider")
   public void testSSBQueries(String query)
       throws Exception {
-    testSSBQuery(query);
+    testQueriesValidateAgainstH2(query);
   }
 
-  private void testSSBQuery(String query)
+  protected void testQueriesValidateAgainstH2(String query)
       throws Exception {
     // connection response
     ResultSetGroup pinotResultSetGroup = getPinotConnection().execute(query);
@@ -192,68 +196,13 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  @DataProvider(name = "ssbQueryDataProvider")
-  public static Object[][] ssbQueryDataProvider() {
-    // TODO: refactor these out to .sql files
-    return new Object[][]{
-        new Object[]{"select sum(CAST(LO_EXTENDEDPRICE AS DOUBLE) * LO_DISCOUNT) as revenue "
-            + " from lineorder, dates where LO_ORDERDATE = D_DATEKEY and D_YEAR = 1993 "
-            + " and LO_DISCOUNT between 1 and 3 and LO_QUANTITY < 25; \n"},
-        new Object[]{"select sum(CAST(LO_EXTENDEDPRICE AS DOUBLE) * LO_DISCOUNT) as revenue "
-            + " from lineorder, dates where LO_ORDERDATE = D_DATEKEY and D_YEARMONTHNUM = 199401 "
-            + " and LO_DISCOUNT between 4 and 6 and LO_QUANTITY between 26 and 35; \n"},
-        new Object[]{"select sum(CAST(LO_EXTENDEDPRICE AS DOUBLE) * LO_DISCOUNT) as revenue "
-            + " from lineorder, dates where LO_ORDERDATE = D_DATEKEY and D_WEEKNUMINYEAR = 6 and D_YEAR = 1994 "
-            + " and LO_DISCOUNT between 5 and 7 and LO_QUANTITY between 26 and 35; \n"},
-        new Object[]{"select sum(CAST(LO_REVENUE AS DOUBLE)), D_YEAR, P_BRAND1 "
-            + " from lineorder, dates, part, supplier where LO_ORDERDATE = D_DATEKEY and LO_PARTKEY = P_PARTKEY "
-            + " and LO_SUPPKEY = S_SUPPKEY and P_CATEGORY = 'MFGR#12' and S_REGION = 'AMERICA' "
-            + " group by D_YEAR, P_BRAND1 order by D_YEAR, P_BRAND1; \n"},
-        new Object[]{"select sum(CAST(LO_REVENUE AS DOUBLE)), D_YEAR, P_BRAND1 "
-            + " from lineorder, dates, part, supplier where LO_ORDERDATE = D_DATEKEY and LO_PARTKEY = P_PARTKEY "
-            + " and LO_SUPPKEY = S_SUPPKEY and P_BRAND1 between 'MFGR#2221' and 'MFGR#2228' and S_REGION = 'ASIA' "
-            + " group by D_YEAR, P_BRAND1 order by D_YEAR, P_BRAND1; \n"},
-        new Object[]{"select sum(CAST(LO_REVENUE AS DOUBLE)), D_YEAR, P_BRAND1 "
-            + " from lineorder, dates, part, supplier where LO_ORDERDATE = D_DATEKEY and LO_PARTKEY = P_PARTKEY "
-            + " and LO_SUPPKEY = S_SUPPKEY and P_BRAND1 = 'MFGR#2221' and S_REGION = 'EUROPE' "
-            + " group by D_YEAR, P_BRAND1 order by D_YEAR, P_BRAND1\n"},
-        new Object[]{"select C_NATION, S_NATION, D_YEAR, sum(LO_REVENUE) as revenue "
-            + " from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY "
-            + " and LO_ORDERDATE = D_DATEKEY and C_REGION = 'ASIA' and S_REGION = 'ASIA' and D_YEAR >= 1992 "
-            + " and D_YEAR <= 1997 "
-            + " group by C_NATION, S_NATION, D_YEAR order by D_YEAR asc, revenue desc; \n"},
-        new Object[]{"select C_CITY, S_CITY, D_YEAR, sum(LO_REVENUE) as revenue "
-            + " from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY "
-            + " and LO_ORDERDATE = D_DATEKEY and C_NATION = 'UNITED STATES' and S_NATION = 'UNITED STATES' "
-            + " and D_YEAR >= 1992 and D_YEAR <= 1997 "
-            + " group by C_CITY, S_CITY, D_YEAR order by D_YEAR asc, revenue desc; \n"},
-        new Object[]{"select C_CITY, S_CITY, D_YEAR, sum(LO_REVENUE) as revenue "
-            + " from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY "
-            + " and LO_ORDERDATE = D_DATEKEY and (C_CITY='UNITED KI1' or C_CITY='UNITED KI5') "
-            + " and (S_CITY='UNITED KI1' or S_CITY='UNITED KI5') and D_YEAR >= 1992 and D_YEAR <= 1997 "
-            + " group by C_CITY, S_CITY, D_YEAR order by D_YEAR asc, revenue desc;\n"},
-        new Object[]{"select C_CITY, S_CITY, D_YEAR, sum(LO_REVENUE) as revenue "
-            + " from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY "
-            + " and LO_ORDERDATE = D_DATEKEY and (C_CITY='UNITED KI1' or C_CITY='UNITED KI5') "
-            + " and (S_CITY='UNITED KI1' or S_CITY='UNITED KI5') and D_YEARMONTH = 'Jul1995' "
-            + " group by C_CITY, S_CITY, D_YEAR order by D_YEAR asc, revenue desc; \n"},
-        new Object[]{"select D_YEAR, C_NATION, sum(LO_REVENUE - LO_SUPPLYCOST) as profit "
-            + " from  lineorder, customer, supplier, part,  dates where LO_CUSTKEY = C_CUSTKEY "
-            + " and LO_SUPPKEY = S_SUPPKEY and LO_PARTKEY = P_PARTKEY and LO_ORDERDATE = D_DATEKEY "
-            + " and C_REGION = 'AMERICA' and S_REGION = 'AMERICA' and (P_MFGR = 'MFGR#1' or P_MFGR = 'MFGR#2') "
-            + " group by D_YEAR, C_NATION order by D_YEAR, C_NATION\n"},
-        new Object[]{"select D_YEAR, S_NATION, P_CATEGORY, sum(LO_REVENUE - LO_SUPPLYCOST) as profit "
-            + " from lineorder, dates, customer, supplier, part where LO_CUSTKEY = C_CUSTKEY "
-            + " and LO_SUPPKEY = S_SUPPKEY and LO_PARTKEY = P_PARTKEY and LO_ORDERDATE = D_DATEKEY "
-            + " and C_REGION = 'AMERICA' and S_REGION = 'AMERICA' and (D_YEAR = 1997 or D_YEAR = 1998) "
-            + " and (P_MFGR = 'MFGR#1' or P_MFGR = 'MFGR#2') "
-            + " group by D_YEAR, S_NATION, P_CATEGORY order by D_YEAR, S_NATION, P_CATEGORY\n"},
-        new Object[]{"select D_YEAR, S_CITY, P_BRAND1, sum(LO_REVENUE - LO_SUPPLYCOST) as profit "
-            + " from lineorder, dates, customer, supplier, part where LO_CUSTKEY = C_CUSTKEY "
-            + " and LO_SUPPKEY = S_SUPPKEY and LO_PARTKEY = P_PARTKEY and LO_ORDERDATE = D_DATEKEY "
-            + " and C_REGION = 'AMERICA' and S_NATION = 'UNITED STATES' and (D_YEAR = 1997 or D_YEAR = 1998) "
-            + " and P_CATEGORY = 'MFGR#14' "
-            + " group by D_YEAR, S_CITY, P_BRAND1 order by D_YEAR, S_CITY, P_BRAND1 \n"},
-    };
+  @DataProvider(name = "QueryDataProvider")
+  public static Object[][] queryDataProvider() {
+    Yaml yaml = new Yaml();
+    InputStream inputStream = SSBQueryIntegrationTest.class.getClassLoader()
+        .getResourceAsStream(SSB_QUERY_SET_RESOURCE_NAME);
+    Map<String, List<String>> ssbQuerySet = yaml.load(inputStream);
+    List<String> ssbQueryList = ssbQuerySet.get("sqls");
+    return ssbQueryList.stream().map(s -> new Object[]{s}).toArray(Object[][]::new);
   }
 }
