@@ -385,6 +385,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private static InstanceResponseBlock getExplainResponseForNoMatchingSegment(int numTotalSegments,
       QueryContext queryContext) {
     ExplainResultsBlock explainResults = new ExplainResultsBlock();
+    explainResults.addOperator(ExplainPlanRows.COMBINE_PASSTHROUGH, 2, 1);
     explainResults.addOperator(String.format(ExplainPlanRows.PLAN_START_FORMAT, numTotalSegments),
         ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS);
     explainResults.addOperator(ExplainPlanRows.ALL_SEGMENTS_PRUNED_ON_SERVER, 3, 2);

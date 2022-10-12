@@ -1953,6 +1953,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         + "noIndexCol1 = 100 LIMIT 100";
     List<Object[]> result10 = new ArrayList<>();
     result10.add(new Object[]{"BROKER_REDUCE(limit:100)", 1, 0});
+    result10.add(new Object[]{"COMBINE_PASSTHROUGH", 2, 1});
     result10.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result10.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
@@ -2163,6 +2164,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         + "invertedIndexCol3 = 'roadrunner' AND noIndexCol1 = 100 LIMIT 100";
     List<Object[]> result10 = new ArrayList<>();
     result10.add(new Object[]{"BROKER_REDUCE(limit:100)", 1, 0});
+    result10.add(new Object[]{"COMBINE_PASSTHROUGH", 2, 1});
     result10.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result10.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});

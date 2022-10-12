@@ -109,20 +109,24 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
     }
 
     Object[] combineRow = null;
+    Object[] combineRowPassthrough = null;
     for (Map.Entry<ServerRoutingInstance, DataTable> entry : dataTableMap.entrySet()) {
       DataTable dataTable = entry.getValue();
       int numRows = dataTable.getNumberOfRows();
       if (numRows > 0) {
-        // First row should be the combine row data, unless all segments were pruned from the Server side
+        // First row should be the combine row data, unless all segments were pruned from the Server side in which case
+        // it can be COMBINE_PASSTHROUGH. Return the correct COMBINE node if both are present
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, 0);
         String rowName = row[0].toString();
-        if (rowName.contains(COMBINE)) {
+        if (rowName.contains(ExplainPlanRows.COMBINE_PASSTHROUGH)) {
+          combineRowPassthrough = row;
+        } else if (rowName.contains(COMBINE)) {
           combineRow = row;
           break;
         }
       }
     }
-    return combineRow;
+    return combineRow == null ? combineRowPassthrough : combineRow;
   }
 
   /**

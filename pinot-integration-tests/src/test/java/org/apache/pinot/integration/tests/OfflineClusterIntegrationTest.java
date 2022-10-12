@@ -2480,7 +2480,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     assertEquals(response2, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
         + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(limit:10)\",1,0],"
-        + "[\"PLAN_START(numSegmentsForThisPlan:12)\",-1,-1],[\"ALL_SEGMENTS_PRUNED_ON_SERVER\",3,2]]}");
+        + "[\"COMBINE_PASSTHROUGH\",2,1],[\"PLAN_START(numSegmentsForThisPlan:12)\",-1,-1],"
+        + "[\"ALL_SEGMENTS_PRUNED_ON_SERVER\",3,2]]}");
   }
 
   /** Test to make sure we are properly handling string comparisons in predicates. */
