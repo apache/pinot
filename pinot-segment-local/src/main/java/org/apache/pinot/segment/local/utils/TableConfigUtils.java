@@ -42,6 +42,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -847,6 +848,7 @@ public final class TableConfigUtils {
    * Validates the Field Config List in the given TableConfig
    * Ensures that every referred column name exists in the corresponding schema
    * Additional checks for TEXT and FST index types
+   * Validates index compatibility for forward index disabled columns
    */
   private static void validateFieldConfigList(@Nullable List<FieldConfig> fieldConfigList,
       @Nullable IndexingConfig indexingConfigs, @Nullable Schema schema) {
@@ -874,6 +876,10 @@ public final class TableConfigUtils {
           default:
             break;
         }
+
+        // Validate the forward index disabled compatibility with other indexes if enabled for this column
+        validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfigs, noDictionaryColumns,
+            schema);
       }
 
       if (CollectionUtils.isNotEmpty(fieldConfig.getIndexTypes())) {
@@ -899,6 +905,44 @@ public final class TableConfigUtils {
           }
         }
       }
+    }
+  }
+
+  /**
+   * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
+   * compatibility mismatch. The checks performed are:
+   *     - Validate dictionary is enabled.
+   *     - Validate inverted index is enabled.
+   *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
+   *       multi-value column (since mulit-value defaults to index v1).
+   */
+  private static void validateForwardIndexDisabledIndexCompatibility(String columnName, FieldConfig fieldConfig,
+      IndexingConfig indexingConfigs, List<String> noDictionaryColumns, Schema schema) {
+    Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
+    if (fieldConfigProperties == null) {
+      return;
+    }
+
+    boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties.get(FieldConfig.FORWARD_INDEX_DISABLED));
+    if (!forwardIndexDisabled) {
+      return;
+    }
+
+    FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+    Preconditions.checkState(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
+            || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName),
+        String.format("Forward index disabled column %s must have dictionary enabled", columnName));
+    Preconditions.checkState(indexingConfigs.getInvertedIndexColumns() != null
+            && indexingConfigs.getInvertedIndexColumns().contains(columnName),
+        String.format("Forward index disabled column %s must have inverted index enabled", columnName));
+    if (indexingConfigs.getRangeIndexColumns() != null && indexingConfigs.getRangeIndexColumns().contains(columnName)) {
+      Preconditions.checkState(fieldSpec.isSingleValueField(), String.format("Feature not supported for multi-value "
+          + "columns with range index. Cannot disable forward index for column %s. Disable range index on this "
+          + "column to use this feature", columnName));
+      Preconditions.checkState(indexingConfigs.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION,
+          String.format("Feature not supported for single-value columns with range index version < 2. Cannot disable "
+              + "forward index for column %s. Either disable range index or create range index with"
+              + " version >= 2 to use this feature", columnName));
     }
   }
 

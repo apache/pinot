@@ -42,6 +42,7 @@ public class PinotSegmentColumnReader implements Closeable {
     DataSource dataSource = indexSegment.getDataSource(column);
     Preconditions.checkArgument(dataSource != null, "Failed to find data source for column: %s", column);
     _forwardIndexReader = dataSource.getForwardIndex();
+    Preconditions.checkArgument(_forwardIndexReader != null, "Forward index disabled for column: %s", column);
     _forwardIndexReaderContext = _forwardIndexReader.createContext();
     _dictionary = dataSource.getDictionary();
     _nullValueVectorReader = dataSource.getNullValueVector();

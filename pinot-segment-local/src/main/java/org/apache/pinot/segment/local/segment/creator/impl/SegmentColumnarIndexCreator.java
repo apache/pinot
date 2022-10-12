@@ -35,6 +35,7 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
@@ -174,6 +175,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           "Cannot create json index for column: %s because it is not in schema", columnName);
     }
 
+    Set<String> forwardIndexDisabledColumns = new HashSet<>();
+    for (String columnName : _config.getForwardIndexDisabledColumns()) {
+      Preconditions.checkState(schema.hasColumn(columnName), String.format("Invalid config. Can't disable "
+          + "forward index creation for a column: %s that does not exist in schema", columnName));
+      forwardIndexDisabledColumns.add(columnName);
+    }
+
     Map<String, H3IndexConfig> h3IndexConfigs = _config.getH3IndexConfigs();
     for (String columnName : h3IndexConfigs.keySet()) {
       Preconditions.checkState(schema.hasColumn(columnName),
@@ -196,6 +204,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Preconditions.checkState(dictEnabledColumn || !invertedIndexColumns.contains(columnName),
           "Cannot create inverted index for raw index column: %s", columnName);
 
+      boolean forwardIndexDisabled = forwardIndexDisabledColumns.contains(columnName);
+      validateForwardIndexDisabledIndexCompatibility(columnName, forwardIndexDisabled, dictEnabledColumn,
+          columnIndexCreationInfo, invertedIndexColumns, rangeIndexColumns, rangeIndexVersion, fieldSpec);
+
       IndexCreationContext.Common context = IndexCreationContext.builder()
           .withIndexDir(_indexDir)
           .withCardinality(columnIndexCreationInfo.getDistinctValueCount())
@@ -208,6 +220,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withColumnIndexCreationInfo(columnIndexCreationInfo)
           .sorted(columnIndexCreationInfo.isSorted())
           .onHeap(segmentCreationSpec.isOnHeap())
+          .withforwardIndexDisabled(forwardIndexDisabled)
           .build();
       // Initialize forward index creator
       ChunkCompressionType chunkCompressionType =
@@ -295,6 +308,45 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Initialize Null value vector map
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
       }
+    }
+  }
+
+  /**
+   * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
+   * compatibility mismatch. The checks performed are:
+   *     - Validate dictionary is enabled.
+   *     - Validate inverted index is enabled.
+   *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
+   *       multi-value column (since multi-value defaults to index v1).
+   *
+   * @param columnName Name of the column
+   * @param forwardIndexDisabled Whether the forward index is disabled for column or not
+   * @param dictEnabledColumn Whether the column is dictionary enabled or not
+   * @param columnIndexCreationInfo Column index creation info
+   * @param invertedIndexColumns Set of columns with inverted index enabled
+   * @param rangeIndexColumns Set of columns with range index enabled
+   * @param rangeIndexVersion Range index version
+   * @param fieldSpec FieldSpec of column
+   */
+  private void validateForwardIndexDisabledIndexCompatibility(String columnName, boolean forwardIndexDisabled,
+      boolean dictEnabledColumn, ColumnIndexCreationInfo columnIndexCreationInfo, Set<String> invertedIndexColumns,
+      Set<String> rangeIndexColumns, int rangeIndexVersion, FieldSpec fieldSpec) {
+    if (!forwardIndexDisabled) {
+      return;
+    }
+
+    Preconditions.checkState(dictEnabledColumn,
+        String.format("Cannot disable forward index for column %s without dictionary", columnName));
+    Preconditions.checkState(invertedIndexColumns.contains(columnName),
+        String.format("Cannot disable forward index for column %s without inverted index enabled", columnName));
+    if (rangeIndexColumns.contains(columnName)) {
+      Preconditions.checkState(fieldSpec.isSingleValueField(),
+          String.format("Feature not supported for multi-value columns with range index. Cannot disable forward index "
+              + "for column %s. Disable range index on this column to use this feature", columnName));
+      Preconditions.checkState(rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION,
+          String.format("Feature not supported for single-value columns with range index version < 2. Cannot disable "
+              + "forward index for column %s. Either disable range index or create range index with version >= 2 to "
+              + "use this feature", columnName));
     }
   }
 

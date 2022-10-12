@@ -133,7 +133,10 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _rangeIndex = null;
     }
 
-    PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+    // Setting the 'fwdIndexBuffer' to null if forward index is disabled
+    PinotDataBuffer fwdIndexBuffer = segmentReader.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)
+        ? segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX) : null;
+
     if (metadata.hasDictionary()) {
       // Dictionary-based index
       _dictionary = loadDictionary(segmentReader.getIndexFor(columnName, ColumnIndexType.DICTIONARY), metadata,
@@ -142,6 +145,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         // Single-value
         if (metadata.isSorted()) {
           // Sorted
+          // No need to check for null 'fwdIndexBuffer' as for sorted columns this is a no-op
           SortedIndexReader<?> sortedIndexReader = indexReaderProvider.newSortedIndexReader(fwdIndexBuffer, metadata);
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;
@@ -149,7 +153,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
           return;
         }
       }
-      _forwardIndex = indexReaderProvider.newForwardIndexReader(fwdIndexBuffer, metadata);
+      if (fwdIndexBuffer != null) {
+        _forwardIndex = indexReaderProvider.newForwardIndexReader(fwdIndexBuffer, metadata);
+      } else {
+        // Forward index disabled
+        _forwardIndex = null;
+      }
       if (loadInvertedIndex) {
         _invertedIndex = indexReaderProvider.newInvertedIndexReader(
             segmentReader.getIndexFor(columnName, ColumnIndexType.INVERTED_INDEX), metadata);
@@ -266,7 +275,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public void close()
       throws IOException {
-    _forwardIndex.close();
+    if (_forwardIndex != null) {
+      _forwardIndex.close();
+    }
     if (_invertedIndex != null) {
       _invertedIndex.close();
     }
