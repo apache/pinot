@@ -1,0 +1,94 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# This function defines the test set of SSB queries
+# see also: https://www.cs.umb.edu/~poneil/StarSchemaB.PDF
+sqls:
+  # SSB Q1
+  - |
+    select sum(CAST(LO_EXTENDEDPRICE AS DOUBLE) * LO_DISCOUNT) as revenue
+    from lineorder, dates where LO_ORDERDATE = D_DATEKEY and D_YEAR = 1993
+    and LO_DISCOUNT between 1 and 3 and LO_QUANTITY < 25;
+  - |
+    select sum(CAST(LO_EXTENDEDPRICE AS DOUBLE) * LO_DISCOUNT) as revenue
+    from lineorder, dates where LO_ORDERDATE = D_DATEKEY and D_YEARMONTHNUM = 199401
+    and LO_DISCOUNT between 4 and 6 and LO_QUANTITY between 26 and 35;
+  - |
+    select sum(CAST(LO_EXTENDEDPRICE AS DOUBLE) * LO_DISCOUNT) as revenue
+    from lineorder, dates where LO_ORDERDATE = D_DATEKEY and D_WEEKNUMINYEAR = 6 and D_YEAR = 1994
+    and LO_DISCOUNT between 5 and 7 and LO_QUANTITY between 26 and 35;
+  # SSB Q2
+  - |
+    select sum(CAST(LO_REVENUE AS DOUBLE)), D_YEAR, P_BRAND1
+    from lineorder, dates, part, supplier where LO_ORDERDATE = D_DATEKEY and LO_PARTKEY = P_PARTKEY
+    and LO_SUPPKEY = S_SUPPKEY and P_CATEGORY = 'MFGR#12' and S_REGION = 'AMERICA'
+    group by D_YEAR, P_BRAND1 order by D_YEAR, P_BRAND1;
+  - |
+    select sum(CAST(LO_REVENUE AS DOUBLE)), D_YEAR, P_BRAND1
+    from lineorder, dates, part, supplier where LO_ORDERDATE = D_DATEKEY and LO_PARTKEY = P_PARTKEY
+    and LO_SUPPKEY = S_SUPPKEY and P_BRAND1 between 'MFGR#2221' and 'MFGR#2228' and S_REGION = 'ASIA'
+    group by D_YEAR, P_BRAND1 order by D_YEAR, P_BRAND1;
+  - |
+    select sum(CAST(LO_REVENUE AS DOUBLE)), D_YEAR, P_BRAND1
+    from lineorder, dates, part, supplier where LO_ORDERDATE = D_DATEKEY and LO_PARTKEY = P_PARTKEY
+    and LO_SUPPKEY = S_SUPPKEY and P_BRAND1 = 'MFGR#2221' and S_REGION = 'EUROPE'
+    group by D_YEAR, P_BRAND1 order by D_YEAR, P_BRAND1;
+  # SSB Q3
+  - |
+    select C_NATION, S_NATION, D_YEAR, sum(LO_REVENUE) as revenue
+    from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY
+    and LO_ORDERDATE = D_DATEKEY and C_REGION = 'ASIA' and S_REGION = 'ASIA' and D_YEAR >= 1992
+    and D_YEAR <= 1997 group by C_NATION, S_NATION, D_YEAR order by D_YEAR asc, revenue desc;
+  - |
+    select C_CITY, S_CITY, D_YEAR, sum(LO_REVENUE) as revenue
+    from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY
+    and LO_ORDERDATE = D_DATEKEY and C_NATION = 'UNITED STATES' and S_NATION = 'UNITED STATES'
+    and D_YEAR >= 1992 and D_YEAR <= 1997group by C_CITY, S_CITY, D_YEAR order by D_YEAR asc, revenue desc;
+  - |
+    select C_CITY, S_CITY, D_YEAR, sum(LO_REVENUE) as revenue
+    from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY
+    and LO_ORDERDATE = D_DATEKEY and (C_CITY='UNITED KI1' or C_CITY='UNITED KI5')
+    and (S_CITY='UNITED KI1' or S_CITY='UNITED KI5') and D_YEAR >= 1992 and D_YEAR <= 1997
+    group by C_CITY, S_CITY, D_YEAR order by D_YEAR asc, revenue desc;;
+  - |
+    select C_CITY, S_CITY, D_YEAR, sum(LO_REVENUE) as revenue
+    from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY
+    and LO_ORDERDATE = D_DATEKEY and (C_CITY='UNITED KI1' or C_CITY='UNITED KI5')
+    and (S_CITY='UNITED KI1' or S_CITY='UNITED KI5') and D_YEARMONTH = 'Jul1995'
+    group by C_CITY, S_CITY, D_YEAR order by D_YEAR asc, revenue desc;
+  # SSB Q4
+  - |
+    select D_YEAR, C_NATION, sum(LO_REVENUE - LO_SUPPLYCOST) as profit
+    from  lineorder, customer, supplier, part,  dates where LO_CUSTKEY = C_CUSTKEY
+    and LO_SUPPKEY = S_SUPPKEY and LO_PARTKEY = P_PARTKEY and LO_ORDERDATE = D_DATEKEY
+    and C_REGION = 'AMERICA' and S_REGION = 'AMERICA' and (P_MFGR = 'MFGR#1' or P_MFGR = 'MFGR#2')
+    group by D_YEAR, C_NATION order by D_YEAR, C_NATION;
+  - |
+    select D_YEAR, S_NATION, P_CATEGORY, sum(LO_REVENUE - LO_SUPPLYCOST) as profit
+    from lineorder, dates, customer, supplier, part where LO_CUSTKEY = C_CUSTKEY
+    and LO_SUPPKEY = S_SUPPKEY and LO_PARTKEY = P_PARTKEY and LO_ORDERDATE = D_DATEKEY
+    and C_REGION = 'AMERICA' and S_REGION = 'AMERICA' and (D_YEAR = 1997 or D_YEAR = 1998)
+    and (P_MFGR = 'MFGR#1' or P_MFGR = 'MFGR#2') group by D_YEAR, S_NATION, P_CATEGORY
+    order by D_YEAR, S_NATION, P_CATEGORY;
+  - |
+    select D_YEAR, S_CITY, P_BRAND1, sum(LO_REVENUE - LO_SUPPLYCOST) as profit
+    from lineorder, dates, customer, supplier, part where LO_CUSTKEY = C_CUSTKEY
+    and LO_SUPPKEY = S_SUPPKEY and LO_PARTKEY = P_PARTKEY and LO_ORDERDATE = D_DATEKEY
+    and C_REGION = 'AMERICA' and S_NATION = 'UNITED STATES' and (D_YEAR = 1997 or D_YEAR = 1998)
+    and P_CATEGORY = 'MFGR#14' group by D_YEAR, S_CITY, P_BRAND1 order by D_YEAR, S_CITY, P_BRAND1 ;
