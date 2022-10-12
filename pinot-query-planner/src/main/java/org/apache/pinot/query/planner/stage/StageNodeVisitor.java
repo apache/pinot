@@ -31,7 +31,9 @@ import org.apache.pinot.query.planner.QueryPlan;
  * as an example of a usage of this pattern.
  *
  * @param <T> the return type for all visits
- * @param <C> a Context that will be passed as the second parameter to {@code StageNode#visit}
+ * @param <C> a Context that will be passed as the second parameter to {@code StageNode#visit},
+ *            implementors can decide how they want to use this context (e.g. whether or not
+ *            it can be modified in place or whether it's an immutable context)
  */
 public interface StageNodeVisitor<T, C> {
 
