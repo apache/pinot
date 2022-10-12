@@ -24,6 +24,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.logical.LogicalExchange;
+import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
@@ -40,10 +41,12 @@ import org.apache.pinot.query.routing.WorkerManager;
  * This class is non-threadsafe. Do not reuse the stage planner for multiple query plans.
  */
 public class StagePlanner {
+  private PlannerContext _plannerContext;
   private final WorkerManager _workerManager;
   private int _stageIdCounter;
 
-  public StagePlanner(WorkerManager workerManager) {
+  public StagePlanner(PlannerContext plannerContext, WorkerManager workerManager) {
+    _plannerContext = plannerContext;
     _workerManager = workerManager;
   }
 
@@ -60,7 +63,7 @@ public class StagePlanner {
 
     // walk the plan and create stages.
     StageNode globalStageRoot = walkRelPlan(relRootNode, getNewStageId());
-    new ShuffleRewriter().removeShuffles(globalStageRoot);
+    ShuffleRewriter.removeShuffles(globalStageRoot);
 
     // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
     // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
@@ -72,7 +75,7 @@ public class StagePlanner {
         new MailboxReceiveNode(0, globalStageRoot.getDataSchema(), globalStageRoot.getStageId(),
             RelDistribution.Type.RANDOM_DISTRIBUTED, null, globalSenderNode);
 
-    QueryPlan queryPlan = new GenerateQueryPlan().generate(relRoot.fields, globalReceiverNode);
+    QueryPlan queryPlan = AttachStageMetadata.attachMetadata(relRoot.fields, globalReceiverNode);
 
     // assign workers to each stage.
     for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {

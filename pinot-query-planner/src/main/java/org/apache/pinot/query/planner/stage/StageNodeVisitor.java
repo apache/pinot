@@ -18,6 +18,21 @@
  */
 package org.apache.pinot.query.planner.stage;
 
+import org.apache.pinot.query.planner.QueryPlan;
+
+
+/**
+ * {@code StageNodeVisitor} is a skeleton class that allows for implementations of {@code StageNode}
+ * tree traversals using the {@link StageNode#visit(StageNodeVisitor, Object)} method. There is no
+ * enforced traversal order, and should be implemented by subclasses.
+ *
+ * <p>It is recommended that implementors use private constructors and static methods to access main
+ * functionality (see {@link org.apache.pinot.query.planner.ExplainPlanStageVisitor#explain(QueryPlan)}
+ * as an example of a usage of this pattern.
+ *
+ * @param <T> the return type for all visits
+ * @param <C> a Context that will be passed as the second parameter to {@code StageNode#visit}
+ */
 public interface StageNodeVisitor<T, C> {
 
   T visitAggregate(AggregateNode node, C context);

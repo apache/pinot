@@ -32,7 +32,7 @@ public class MailboxReceiveNode extends AbstractStageNode {
   private RelDistribution.Type _exchangeType;
   @ProtoProperties
   private KeySelector<Object[], Object[]> _partitionKeySelector;
-  @ProtoProperties
+
   private StageNode _sender;
 
   public MailboxReceiveNode(int stageId) {

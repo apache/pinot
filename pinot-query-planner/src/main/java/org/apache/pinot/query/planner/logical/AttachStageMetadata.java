@@ -36,12 +36,22 @@ import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 
 
-public class GenerateQueryPlan implements StageNodeVisitor<Void, QueryPlan> {
+/**
+ * {@code AttachStageMetadata} computes the {@link StageMetadata} for a {@link StageNode}
+ * tree and attaches it in the form of a {@link QueryPlan}.
+ */
+public class AttachStageMetadata implements StageNodeVisitor<Void, QueryPlan> {
 
-  public QueryPlan generate(List<Pair<Integer, String>> fields, StageNode root) {
+  public static QueryPlan attachMetadata(List<Pair<Integer, String>> fields, StageNode root) {
     QueryPlan queryPlan = new QueryPlan(fields, new HashMap<>(), new HashMap<>());
-    root.visit(this, queryPlan);
+    root.visit(new AttachStageMetadata(), queryPlan);
     return queryPlan;
+  }
+
+  /**
+   * Usage of this class should only come through {@link #attachMetadata(List, StageNode)}.
+   */
+  private AttachStageMetadata() {
   }
 
   private void visit(StageNode node, QueryPlan queryPlan) {

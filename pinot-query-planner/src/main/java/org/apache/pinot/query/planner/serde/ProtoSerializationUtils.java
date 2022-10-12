@@ -147,8 +147,6 @@ public class ProtoSerializationUtils {
       builder.setListField(serializeListMemberVariable(fieldObject));
     } else if (fieldObject instanceof Map) {
       builder.setMapField(serializeMapMemberVariable(fieldObject));
-    } else if (fieldObject instanceof AbstractStageNode) {
-      builder.setStageNode(StageNodeSerDeUtils.serializeStageNode((AbstractStageNode) fieldObject));
     } else {
       builder.setObjectField(convertObjectToObjectField(fieldObject));
     }
@@ -188,8 +186,6 @@ public class ProtoSerializationUtils {
         return constructMap(memberVariableField.getMapField());
       case OBJECTFIELD:
         return constructObject(memberVariableField.getObjectField());
-      case STAGENODE:
-        return StageNodeSerDeUtils.deserializeStageNode(memberVariableField.getStageNode());
       case MEMBERVARIABLEFIELD_NOT_SET:
       default:
         return null;

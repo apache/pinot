@@ -36,10 +36,31 @@ import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 
 
+/**
+ * {@code ShuffleRewriter} removes unnecessary shuffles from a stage node plan by
+ * inspecting whether all data required by a specific subtree already resides on
+ * a single host. It gathers the information recursively by checking which partitioned
+ * data is selected by each node in the tree.
+ *
+ * <p>The only method that should be used externally is {@link #removeShuffles(StageNode)},
+ * other public methods are used only by {@link StageNode#visit(StageNodeVisitor, Object)}.
+ */
 public class ShuffleRewriter implements StageNodeVisitor<Set<Integer>, Void> {
 
-  public void removeShuffles(StageNode root) {
-    root.visit(this, null);
+  /**
+   * This method rewrites {@code root} <b>in place</b>, removing any unnecessary shuffles
+   * by replacing the distribution type with {@link RelDistribution.Type#SINGLETON}.
+   *
+   * @param root the root node of the tree to rewrite
+   */
+  public static void removeShuffles(StageNode root) {
+    root.visit(new ShuffleRewriter(), null);
+  }
+
+  /**
+   * Access to this class should only be used via {@link #removeShuffles(StageNode)}
+   */
+  private ShuffleRewriter() {
   }
 
   @Override

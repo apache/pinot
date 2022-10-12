@@ -36,14 +36,23 @@ import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 
 
+/**
+ * A visitor that converts a {@code QueryPlan} into a human-readable string representation.
+ *
+ * <p>It is currently not used programmatically and cannot be accessed by the user. Instead,
+ * it is intended for use in manual debugging (e.g. setting breakpoints and calling QueryPlan#explain()).
+ */
 public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, ExplainPlanStageVisitor.Context> {
 
   private final QueryPlan _queryPlan;
 
-  private ExplainPlanStageVisitor(QueryPlan queryPlan) {
-    _queryPlan = queryPlan;
-  }
-
+  /**
+   * Explains the query plan.
+   *
+   * @see QueryPlan#explain()
+   * @param queryPlan the queryPlan to explain
+   * @return a String representation of the query plan tree
+   */
   public static String explain(QueryPlan queryPlan) {
     if (queryPlan.getQueryStageMap().isEmpty()) {
       return "EMPTY";
@@ -54,11 +63,27 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     return explainFrom(queryPlan, queryPlan.getQueryStageMap().get(0), rootServer);
   }
 
+  /**
+   * Explains the query plan from a specific point in the subtree, taking {@code rootServer}
+   * as the node that is executing this sub-tree. This is helpful for debugging what is happening
+   * at a given point in time (for example, printing the tree that will be executed on a
+   * local node right before it is executed).
+   *
+   * @param queryPlan the entire query plan, including non-executed portions
+   * @param node the node to begin traversal
+   * @param rootServer the server instance that is executing this plan (should execute {@code node})
+   *
+   * @return a query plan associated with
+   */
   public static String explainFrom(QueryPlan queryPlan, StageNode node, ServerInstance rootServer) {
     final ExplainPlanStageVisitor visitor = new ExplainPlanStageVisitor(queryPlan);
     return node
         .visit(visitor, new Context(rootServer, "", "", new StringBuilder()))
         .toString();
+  }
+
+  private ExplainPlanStageVisitor(QueryPlan queryPlan) {
+    _queryPlan = queryPlan;
   }
 
   private StringBuilder appendInfo(StageNode node, Context context) {
@@ -67,8 +92,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
         .append(context._prefix)
         .append('[')
         .append(stage)
-        .append(']')
-        .append('@')
+        .append("]@")
         .append(context._host.getHostname())
         .append(':')
         .append(context._host.getPort())
@@ -175,21 +199,20 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     return appendInfo(node, context);
   }
 
-  public static class Context {
+  static class Context {
     final ServerInstance _host;
     final String _prefix;
     final String _childPrefix;
+    final StringBuilder _builder;
 
-    public Context(ServerInstance host, String prefix, String childPrefix, StringBuilder builder) {
+    Context(ServerInstance host, String prefix, String childPrefix, StringBuilder builder) {
       _host = host;
       _prefix = prefix;
       _childPrefix = childPrefix;
       _builder = builder;
     }
 
-    StringBuilder _builder;
-
-    public Context next(boolean hasMoreChildren, ServerInstance host) {
+    Context next(boolean hasMoreChildren, ServerInstance host) {
       return new Context(
           host,
           hasMoreChildren ? _childPrefix + "├── " : _childPrefix + "└── ",

@@ -126,7 +126,7 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      return toDispatchablePlan(relRoot);
+      return toDispatchablePlan(relRoot, plannerContext);
     } catch (Exception e) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, e);
     }
@@ -213,9 +213,9 @@ public class QueryEnvironment {
     }
   }
 
-  private QueryPlan toDispatchablePlan(RelRoot relRoot) {
+  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext) {
     // 5. construct a dispatchable query plan.
-    StagePlanner queryStagePlanner = new StagePlanner(_workerManager);
+    StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager);
     return queryStagePlanner.makePlan(relRoot);
   }
 
