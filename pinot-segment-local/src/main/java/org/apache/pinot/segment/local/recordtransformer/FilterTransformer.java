@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import java.util.Map;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,14 +39,16 @@ public class FilterTransformer implements RecordTransformer {
   private final FunctionEvaluator _evaluator;
   private final boolean _continueOnError;
 
-  public FilterTransformer(TableConfig tableConfig) {
+  public FilterTransformer(TableConfig tableConfig, Map<String, FieldSpec> schema) {
     _filterFunction = null;
     _continueOnError = tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().isContinueOnError();
 
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getFilterConfig() != null) {
       _filterFunction = tableConfig.getIngestionConfig().getFilterConfig().getFilterFunction();
     }
-    _evaluator = (_filterFunction != null) ? FunctionEvaluatorFactory.getExpressionEvaluator(_filterFunction) : null;
+    _evaluator = (_filterFunction != null)
+        ? FunctionEvaluatorFactory.getExpressionEvaluator(_filterFunction, schema)
+        : null;
   }
 
   @Override

@@ -27,6 +27,8 @@ import org.apache.pinot.core.segment.processing.transformer.RecordTransformer;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerConfig;
 import org.apache.pinot.core.segment.processing.transformer.RecordTransformerFactory;
 import org.apache.pinot.core.segment.processing.transformer.TransformFunctionRecordTransformer;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
@@ -40,26 +42,32 @@ import static org.testng.Assert.fail;
  */
 public class RecordTransformerTest {
 
+  final Schema _schema = new Schema.SchemaBuilder()
+      .addSingleValueDimension("foo", FieldSpec.DataType.LONG)
+      .addSingleValueDimension("bar", FieldSpec.DataType.STRING)
+      .addSingleValueDimension("zoo", FieldSpec.DataType.STRING)
+      .build();
+
   @Test
   public void testRecordTransformerFactory() {
     RecordTransformerConfig config = new RecordTransformerConfig.Builder().build();
-    RecordTransformer recordTransformer = RecordTransformerFactory.getRecordTransformer(config);
+    RecordTransformer recordTransformer = RecordTransformerFactory.getRecordTransformer(config, _schema);
     assertEquals(recordTransformer.getClass(), NoOpRecordTransformer.class);
 
     Map<String, String> transformFunctionMap = new HashMap<>();
     config = new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build();
-    recordTransformer = RecordTransformerFactory.getRecordTransformer(config);
+    recordTransformer = RecordTransformerFactory.getRecordTransformer(config, _schema);
     assertEquals(recordTransformer.getClass(), TransformFunctionRecordTransformer.class);
 
     transformFunctionMap.put("foo", "toEpochDays(foo)");
     config = new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build();
-    recordTransformer = RecordTransformerFactory.getRecordTransformer(config);
+    recordTransformer = RecordTransformerFactory.getRecordTransformer(config, _schema);
     assertEquals(recordTransformer.getClass(), TransformFunctionRecordTransformer.class);
 
     transformFunctionMap.put("bar", "badFunction()");
     config = new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build();
     try {
-      RecordTransformerFactory.getRecordTransformer(config);
+      RecordTransformerFactory.getRecordTransformer(config, _schema);
       fail("Should not create record transformer with invalid transform function");
     } catch (IllegalStateException e) {
       // expected
@@ -74,7 +82,7 @@ public class RecordTransformerTest {
     transformFunctionMap.put("dMv", "Groovy({dMv.findAll { it > 1}}, dMv)");
     RecordTransformerConfig config =
         new RecordTransformerConfig.Builder().setTransformFunctionsMap(transformFunctionMap).build();
-    RecordTransformer recordTransformer = RecordTransformerFactory.getRecordTransformer(config);
+    RecordTransformer recordTransformer = RecordTransformerFactory.getRecordTransformer(config, _schema);
     GenericRow row = new GenericRow();
     row.putValue("foo", 1587410614000L);
     row.putValue("bar", "dimValue1");

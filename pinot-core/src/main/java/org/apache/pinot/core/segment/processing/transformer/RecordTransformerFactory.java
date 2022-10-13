@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.segment.processing.transformer;
 
+import org.apache.pinot.spi.data.Schema;
+
+
 /**
  * Factory for RecordTransformer
  */
@@ -28,9 +31,9 @@ public final class RecordTransformerFactory {
   /**
    * Construct a RecordTransformer from the config
    */
-  public static RecordTransformer getRecordTransformer(RecordTransformerConfig recordTransformerConfig) {
+  public static RecordTransformer getRecordTransformer(RecordTransformerConfig recordTransformerConfig, Schema schema) {
     if (recordTransformerConfig.getTransformFunctionsMap() != null) {
-      return new TransformFunctionRecordTransformer(recordTransformerConfig.getTransformFunctionsMap());
+      return new TransformFunctionRecordTransformer(recordTransformerConfig.getTransformFunctionsMap(), schema);
     }
     return new NoOpRecordTransformer();
   }

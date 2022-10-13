@@ -18,13 +18,20 @@
  */
 package org.apache.pinot.core.data.function;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Method;
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -34,42 +41,44 @@ import static org.testng.Assert.assertTrue;
 
 public class InbuiltFunctionEvaluatorTest {
 
+  private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
+      Object expectedResult) {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression,
+        GenericRowToFieldSchemaMap.inferFieldMap(row));
+    Assert.assertEquals(evaluator.getArguments(), expectedArguments);
+    Assert.assertEquals(evaluator.evaluate(row), expectedResult);
+  }
+
   @Test
   public void testColumnExpression() {
     String expression = "testColumn";
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
       String value = "testValue" + i;
       row.putValue("testColumn", value);
-      assertEquals(evaluator.evaluate(row), value);
+      testFunction(expression, ImmutableList.of("testColumn"), row, value);
     }
   }
 
   @Test
   public void testLiteralExpression() {
     String expression = "'testValue'";
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertTrue(evaluator.getArguments().isEmpty());
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
-      assertEquals(evaluator.evaluate(row), "testValue");
+      testFunction(expression, ImmutableList.of(), row, "testValue");
     }
   }
 
   @Test
   public void testScalarWrapperWithReservedKeywordExpression() {
     String expression = "dateTrunc('MONTH', \"date\")";
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(evaluator.getArguments(), Collections.singletonList("date"));
     GenericRow row = new GenericRow();
     for (int i = 1; i < 9; i++) {
       DateTime dt = new DateTime(String.format("2020-0%d-15T12:00:00", i));
       long millis = dt.getMillis();
       DateTime truncDt = dt.withZone(DateTimeZone.UTC).withDayOfMonth(1).withHourOfDay(0).withMillisOfDay(0);
       row.putValue("date", millis);
-      assertEquals(evaluator.evaluate(row), truncDt.getMillis());
+      testFunction(expression, ImmutableList.of("date"), row, truncDt.getMillis());
     }
   }
 
@@ -78,50 +87,41 @@ public class InbuiltFunctionEvaluatorTest {
     String expr = String.format("regexp_extract(testColumn, '%s')", "(.*)([\\d]+)");
     String exprWithGroup = String.format("regexp_extract(testColumn, '%s', 2)", "(.*)([\\d]+)");
     String exprWithGroupAndDefault = String.format("regexp_extract(testColumn, '%s', 3, 'null')", "(.*)([\\d]+)");
+
     GenericRow row = new GenericRow();
     row.putValue("testColumn", "testValue0");
-    InbuiltFunctionEvaluator evaluator;
-    evaluator = new InbuiltFunctionEvaluator(expr);
-    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
-    assertEquals(evaluator.evaluate(row), "testValue0");
-    evaluator = new InbuiltFunctionEvaluator(exprWithGroup);
-    assertEquals(evaluator.evaluate(row), "0");
-    evaluator = new InbuiltFunctionEvaluator(exprWithGroupAndDefault);
-    assertEquals(evaluator.evaluate(row), "null");
+
+    testFunction(expr, ImmutableList.of("testColumn"), row, "testValue0");
+    testFunction(exprWithGroup, ImmutableList.of("testColumn"), row, "0");
+    testFunction(exprWithGroupAndDefault, ImmutableList.of("testColumn"), row, "null");
   }
 
   @Test
   public void testFunctionWithColumn() {
     String expression = "reverse(testColumn)";
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
       String value = "testValue" + i;
       row.putValue("testColumn", value);
-      assertEquals(evaluator.evaluate(row), new StringBuilder(value).reverse().toString());
+      testFunction(expression, ImmutableList.of("testColumn"), row, new StringBuilder(value).reverse().toString());
     }
   }
 
   @Test
   public void testFunctionWithLiteral() {
-    String expression = "reverse(12345)";
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertTrue(evaluator.getArguments().isEmpty());
+    String expression = "reverse('12345')";
     GenericRow row = new GenericRow();
-    assertEquals(evaluator.evaluate(row), "54321");
+    testFunction(expression, ImmutableList.of(), row, "54321");
   }
 
   @Test
   public void testNestedFunction() {
     String expression = "reverse(reverse(testColumn))";
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertEquals(evaluator.getArguments(), Collections.singletonList("testColumn"));
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
       String value = "testValue" + i;
       row.putValue("testColumn", value);
-      assertEquals(evaluator.evaluate(row), value);
+      testFunction(expression, ImmutableList.of("testColumn"), row, value);
     }
   }
 
@@ -130,11 +130,13 @@ public class InbuiltFunctionEvaluatorTest {
       throws Exception {
     MyFunc myFunc = new MyFunc();
     Method method = myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class);
-    FunctionRegistry.registerFunction(method, false);
+    FunctionRegistry.registerFunction(method, false, false, false);
     String expression = "appendToStringAndReturn('test ')";
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    assertTrue(evaluator.getArguments().isEmpty());
     GenericRow row = new GenericRow();
+
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression,
+        GenericRowToFieldSchemaMap.inferFieldMap(row));
+    assertTrue(evaluator.getArguments().isEmpty());
     assertEquals(evaluator.evaluate(row), "test ");
     assertEquals(evaluator.evaluate(row), "test test ");
     assertEquals(evaluator.evaluate(row), "test test test ");
@@ -144,17 +146,33 @@ public class InbuiltFunctionEvaluatorTest {
   public void testNullReturnedByInbuiltFunctionEvaluatorThatCannotTakeNull() {
     String[] expressions = {
         "fromDateTime(\"NULL\", 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')",
-        "fromDateTime(\"invalid_identifier\", 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')",
-        "toDateTime(1648010797, \"invalid_identifier\", \"invalid_identifier\")",
-        "toDateTime(\"invalid_identifier\", \"invalid_identifier\", \"invalid_identifier\")",
-        "toDateTime(\"NULL\", \"invalid_identifier\", \"invalid_identifier\")",
-        "toDateTime(\"invalid_identifier\", \"NULL\", \"invalid_identifier\")"
+        "toDateTime(1648010797, \"NULL\", \"NULL\")",
+        "toDateTime(\"NULL\", 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', 'UTC')"
     };
     for (String expression : expressions) {
-      InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
       GenericRow row = new GenericRow();
+      Map<String, FieldSpec> specMap = new HashMap<>(GenericRowToFieldSchemaMap.inferFieldMap(row));
+      specMap.put("NULL", new DimensionFieldSpec("invalid_identifier", FieldSpec.DataType.LONG, true));
+      InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression, specMap);
       assertNull(evaluator.evaluate(row));
     }
+  }
+
+  @Test
+  public void shouldHandleNullInputsIfFunctionHasNullableParams() {
+    // Given:
+    String expression = "isNull(foo)";
+    GenericRow row = new GenericRow();
+    row.putValue("foo", null);
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression,
+        ImmutableMap.of("foo", new DimensionFieldSpec("foo", FieldSpec.DataType.INT, true)));
+
+    // When:
+    Object result = evaluator.evaluate(row);
+
+    // Then:
+    Assert.assertEquals(result, true);
+    Assert.assertEquals(evaluator.getArguments(), ImmutableList.of("foo"));
   }
 
   public static class MyFunc {

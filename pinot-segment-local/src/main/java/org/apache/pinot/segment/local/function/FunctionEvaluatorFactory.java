@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.segment.local.function;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 
@@ -46,7 +49,7 @@ public class FunctionEvaluatorFactory {
    * 4. Return null, if none of the above
    */
   @Nullable
-  public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
+  public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec, Schema schema) {
     FunctionEvaluator functionEvaluator = null;
 
     String columnName = fieldSpec.getName();
@@ -58,11 +61,11 @@ public class FunctionEvaluatorFactory {
 
       // if transform function expression present, use it to generate function evaluator
       try {
-        functionEvaluator = getExpressionEvaluator(transformExpression);
+        functionEvaluator = getExpressionEvaluator(transformExpression, schema.getFieldSpecMap());
       } catch (Exception e) {
         throw new IllegalStateException(
             "Caught exception while constructing expression evaluator for transform expression:" + transformExpression
-                + ", of column:" + columnName);
+                + ", of column:" + columnName, e);
       }
     } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
 
@@ -85,22 +88,24 @@ public class FunctionEvaluatorFactory {
       // for backward compatible handling of Map type (currently only in Avro)
       String sourceMapName = columnName.substring(0, columnName.length() - SchemaUtils.MAP_KEY_COLUMN_SUFFIX.length());
       String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
-      functionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
+      functionEvaluator = getExpressionEvaluator(
+          defaultMapKeysTransformExpression, ImmutableMap.of(fieldSpec.getName(), fieldSpec));
     } else if (columnName.endsWith(SchemaUtils.MAP_VALUE_COLUMN_SUFFIX)) {
       // for backward compatible handling of Map type in avro (currently only in Avro)
       String sourceMapName =
           columnName.substring(0, columnName.length() - SchemaUtils.MAP_VALUE_COLUMN_SUFFIX.length());
       String defaultMapValuesTransformExpression = getDefaultMapValuesTransformExpression(sourceMapName);
-      functionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
+      functionEvaluator = getExpressionEvaluator(
+          defaultMapValuesTransformExpression, ImmutableMap.of(fieldSpec.getName(), fieldSpec));
     }
     return functionEvaluator;
   }
 
-  public static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
+  public static FunctionEvaluator getExpressionEvaluator(String transformExpression, Map<String, FieldSpec> schema) {
     if (isGroovyExpression(transformExpression)) {
       return new GroovyFunctionEvaluator(transformExpression);
     } else {
-      return new InbuiltFunctionEvaluator(transformExpression);
+      return new InbuiltFunctionEvaluator(transformExpression, schema);
     }
   }
 

@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.postaggregation;
 
-import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -37,31 +39,27 @@ public class PostAggregationFunction {
 
   public PostAggregationFunction(String functionName, ColumnDataType[] argumentTypes) {
     int numArguments = argumentTypes.length;
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+    _argumentTypes = new PinotDataType[numArguments];
+    for (int i = 0; i < numArguments; i++) {
+      _argumentTypes[i] = PinotDataType.getPinotDataTypeForExecution(argumentTypes[i]);
+    }
+
+    List<Class<?>> argJavaTypes =
+        Arrays.stream(_argumentTypes)
+            .map(PinotDataType::getJavaClass)
+            .collect(Collectors.toList());
+
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, argJavaTypes);
     if (functionInfo == null) {
       if (FunctionRegistry.containsFunction(functionName)) {
         throw new IllegalArgumentException(
-          String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+          String.format("Unsupported function: %s with %s parameters", functionName, argJavaTypes));
       } else {
         throw new IllegalArgumentException(
           String.format("Unsupported function: %s not found", functionName));
       }
     }
     _functionInvoker = new FunctionInvoker(functionInfo);
-    Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
-    PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
-    int numParameters = parameterClasses.length;
-    Preconditions.checkArgument(numArguments == numParameters,
-        "Wrong number of arguments for method: %s, expected: %s, actual: %s", functionInfo.getMethod(), numParameters,
-        numArguments);
-    for (int i = 0; i < numParameters; i++) {
-      Preconditions.checkArgument(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
-          parameterClasses[i], functionInfo.getMethod());
-    }
-    _argumentTypes = new PinotDataType[numArguments];
-    for (int i = 0; i < numArguments; i++) {
-      _argumentTypes[i] = PinotDataType.getPinotDataTypeForExecution(argumentTypes[i]);
-    }
     ColumnDataType resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
     // Handle unrecognized result class with STRING
     _resultType = resultType != null ? resultType : ColumnDataType.STRING;

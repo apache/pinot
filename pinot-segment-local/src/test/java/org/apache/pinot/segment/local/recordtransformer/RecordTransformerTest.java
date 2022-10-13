@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.google.common.collect.ImmutableSet;
 import java.sql.Timestamp;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
@@ -50,7 +51,10 @@ public class RecordTransformerTest {
       // For sanitation
       .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
       .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING)
-      .addMultiValueDimension("mvString1", DataType.STRING).addMultiValueDimension("mvString2", DataType.STRING)
+      .addSingleValueDimension("svNullString", DataType.STRING)
+      .addMultiValueDimension("mvNullFloat", DataType.FLOAT)
+      .addMultiValueDimension("mvString1", DataType.STRING)
+      .addMultiValueDimension("mvString2", DataType.STRING)
       .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
@@ -95,28 +99,28 @@ public class RecordTransformerTest {
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({svInt > 123}, svInt)"));
     GenericRow genericRow = getRecord();
     tableConfig.setIngestionConfig(ingestionConfig);
-    RecordTransformer transformer = new FilterTransformer(tableConfig);
+    RecordTransformer transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({svInt <= 123}, svInt)"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // value not found
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({notPresent == 123}, notPresent)"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // invalid function
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy(svInt == 123)"));
     try {
-      new FilterTransformer(tableConfig);
+      new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
       Assert.fail("Should have failed constructing FilterTransformer");
     } catch (Exception e) {
       // expected
@@ -125,7 +129,7 @@ public class RecordTransformerTest {
     // multi value column
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({svFloat.max() < 500}, svFloat)"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
   }
@@ -274,56 +278,56 @@ public class RecordTransformerTest {
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svInt = 123"));
     GenericRow genericRow = getRecord();
-    RecordTransformer transformer = new FilterTransformer(tableConfig);
+    RecordTransformer transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svDouble > 120"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svDouble >= 123"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svDouble < 200"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svDouble <= 123"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svLong != 125"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svLong = 123"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("between(svLong, 100, 125)"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
   }
@@ -347,28 +351,28 @@ public class RecordTransformerTest {
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svNullString is null"));
     GenericRow genericRow = getNullColumnsRecord();
-    RecordTransformer transformer = new FilterTransformer(tableConfig);
+    RecordTransformer transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svInt is not null"));
     genericRow = getNullColumnsRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("mvLong is not null"));
     genericRow = getNullColumnsRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("mvNullFloat is null"));
     genericRow = getNullColumnsRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
   }
@@ -382,14 +386,14 @@ public class RecordTransformerTest {
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svInt = 123 AND svDouble <= 200"));
     GenericRow genericRow = getRecord();
-    RecordTransformer transformer = new FilterTransformer(tableConfig);
+    RecordTransformer transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     ingestionConfig.setFilterConfig(new FilterConfig("svInt = 125 OR svLong <= 200"));
     genericRow = getRecord();
-    transformer = new FilterTransformer(tableConfig);
+    transformer = new FilterTransformer(tableConfig, SCHEMA.getFieldSpecMap());
     transformer.transform(genericRow);
     Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
   }
@@ -540,7 +544,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString1"), new Object[]{"123", "123", "123", "123.0", "123.0"});
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
-      assertTrue(record.getNullValueFields().isEmpty());
+      assertEquals(record.getNullValueFields(), ImmutableSet.of("svNullString", "mvNullFloat"));
     }
 
     // Test empty record

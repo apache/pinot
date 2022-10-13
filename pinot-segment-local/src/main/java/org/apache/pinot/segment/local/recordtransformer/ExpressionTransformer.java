@@ -57,7 +57,8 @@ public class ExpressionTransformer implements RecordTransformer {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
       for (TransformConfig transformConfig : tableConfig.getIngestionConfig().getTransformConfigs()) {
         FunctionEvaluator previous = expressionEvaluators.put(transformConfig.getColumnName(),
-            FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()));
+            FunctionEvaluatorFactory.getExpressionEvaluator(
+                transformConfig.getTransformFunction(), schema.getFieldSpecMap()));
         Preconditions
             .checkState(previous == null, "Cannot set more than one ingestion transform function on column: %s.",
                 transformConfig.getColumnName());
@@ -66,7 +67,7 @@ public class ExpressionTransformer implements RecordTransformer {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       String fieldName = fieldSpec.getName();
       if (!fieldSpec.isVirtualColumn() && !expressionEvaluators.containsKey(fieldName)) {
-        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec, schema);
         if (functionEvaluator != null) {
           expressionEvaluators.put(fieldName, functionEvaluator);
         }
@@ -80,7 +81,8 @@ public class ExpressionTransformer implements RecordTransformer {
             expressionEvaluators.put(
                 TimestampIndexGranularity.getColumnNameWithGranularity(fieldConfig.getName(), granularity),
                 FunctionEvaluatorFactory.getExpressionEvaluator(
-                    TimestampIndexGranularity.getTransformExpression(fieldConfig.getName(), granularity)));
+                    TimestampIndexGranularity.getTransformExpression(fieldConfig.getName(), granularity),
+                    schema.getFieldSpecMap()));
           }
         }
       }

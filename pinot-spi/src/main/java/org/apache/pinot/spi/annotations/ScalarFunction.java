@@ -46,10 +46,31 @@ public @interface ScalarFunction {
 
   boolean enabled() default true;
 
-  // If empty, FunctionsRegistry registers the method name as function name;
-  // If not empty, FunctionsRegistry only registers the function names specified here, the method name is ignored.
+  /**
+   * If empty, FunctionsRegistry registers the method name as function name;
+   * If not empty, FunctionsRegistry only registers the function names specified here, the method name is ignored.
+   */
   String[] names() default {};
 
-  // Whether the scalar function expects and can handle null arguments.
+  /**
+   * @return whether the scalar function expects and can handle null arguments.
+   */
+   // TODO: consider implementing this by checking the method signature at each parameter so it isn't all or nothing
   boolean nullableParameters() default false;
+
+  /**
+   * @return whether or not to allow narrowing (e.g. the input requires and int,
+   *         but parameter passed in is a double)
+   * @apiNote the default return value is {@code true} for backwards compatibility,
+   *         but SQL standard does not support type narrowing
+   */
+  boolean supportsNarrowing() default true;
+
+  /**
+   * @return whether or not to accept parameters that are not {@code String} for
+   *         parameters specified as {@code String}
+   * @apiNote the default return value is {@code true} for backwards compatibility,
+   *          but SQL standard does not support implicit string casts
+   */
+  boolean supportsImplicitStringCast() default true;
 }

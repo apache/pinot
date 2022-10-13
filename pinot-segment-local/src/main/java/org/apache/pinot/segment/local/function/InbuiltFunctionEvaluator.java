@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.function;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
@@ -28,6 +30,8 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.types.ExpressionTypeUtil;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -45,9 +49,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   // Root of the execution tree
   private final ExecutableNode _rootNode;
   private final List<String> _arguments;
+  private final Map<String, FieldSpec> _schema;
 
-  public InbuiltFunctionEvaluator(String functionExpression) {
+  public InbuiltFunctionEvaluator(String functionExpression, Map<String, FieldSpec> schema) {
     _arguments = new ArrayList<>();
+    _schema = schema;
     _rootNode = planExecution(RequestContextUtils.getExpression(functionExpression));
   }
 
@@ -79,7 +85,12 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
             Preconditions.checkState(numArguments == 1, "NOT function expects 1 argument, got: %s", numArguments);
             return new NotExecutionNode(childNodes[0]);
           default:
-            FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+            List<Class<?>> types =
+                arguments.stream()
+                    .map(ec -> ExpressionTypeUtil.getType(ec, _schema))
+                    .map(pdt -> pdt == null ? null : pdt.getJavaClass())
+                    .collect(Collectors.toList());
+            FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, types);
             if (functionInfo == null) {
               if (FunctionRegistry.containsFunction(functionName)) {
                 throw new IllegalStateException(

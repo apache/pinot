@@ -230,7 +230,10 @@ public class TableConfigUtilsTest {
 
   @Test
   public void validateIngestionConfig() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("columnX", FieldSpec.DataType.STRING)
+        .build();
+
     // null ingestion config
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(null).build();
@@ -246,7 +249,7 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validate(tableConfig, schema);
 
     // valid filterFunction
-    ingestionConfig.setFilterConfig(new FilterConfig("startsWith(columnX, \"myPrefix\")"));
+    ingestionConfig.setFilterConfig(new FilterConfig("startsWith(columnX, 'myPrefix')"));
     TableConfigUtils.validate(tableConfig, schema);
 
     // valid filterFunction
@@ -286,14 +289,19 @@ public class TableConfigUtilsTest {
 
     // using a transformation column in an aggregation
     schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("twiceSum", FieldSpec.DataType.DOUBLE).build();
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+            .addSingleValueDimension("col", FieldSpec.DataType.DOUBLE)
+            .addMetric("twiceSum", FieldSpec.DataType.DOUBLE)
+            .build();
     ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("twice", "col * 2")));
     ingestionConfig.setAggregationConfigs(Collections.singletonList(new AggregationConfig("twiceSum", "SUM(twice)")));
     TableConfigUtils.validate(tableConfig, schema);
 
     // valid transform configs
     schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+            .addSingleValueDimension("anotherCol", FieldSpec.DataType.STRING)
+            .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .build();
     ingestionConfig.setAggregationConfigs(null);
     ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol", "reverse(anotherCol)")));
@@ -301,7 +309,10 @@ public class TableConfigUtilsTest {
 
     // valid transform configs
     schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+            .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addSingleValueDimension("anotherCol", FieldSpec.DataType.STRING)
+            .addSingleValueDimension("x", FieldSpec.DataType.STRING)
             .addMetric("transformedCol", FieldSpec.DataType.LONG).build();
     ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("myCol", "reverse(anotherCol)"),
         new TransformConfig("transformedCol", "Groovy({x+y}, x, y)")));

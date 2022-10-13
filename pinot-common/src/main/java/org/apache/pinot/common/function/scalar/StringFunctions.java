@@ -50,7 +50,7 @@ public class StringFunctions {
    * @param input
    * @return reversed input in from end to start
    */
-  @ScalarFunction
+  @ScalarFunction(supportsImplicitStringCast = true)
   public static String reverse(String input) {
     return StringUtils.reverse(input);
   }

@@ -19,18 +19,29 @@
 package org.apache.pinot.common.function;
 
 import java.lang.reflect.Method;
+import java.util.List;
 
 
 public class FunctionInfo {
   private final Method _method;
   private final Class<?> _clazz;
   private final boolean _nullableParameters;
+  private final List<Class<?>> _parameterTypes;
+  private final Class<?> _returnType;
+  private final boolean _narrowing;
+  private final boolean _implicitStrings;
 
-  public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters) {
+  public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters, boolean narrowing,
+      boolean implicitStrings) {
     _method = method;
     _clazz = clazz;
     _nullableParameters = nullableParameters;
+    _parameterTypes = List.of(_method.getParameterTypes());
+    _returnType = method.getReturnType();
+    _narrowing = narrowing;
+    _implicitStrings = implicitStrings;
   }
+
 
   public Method getMethod() {
     return _method;
@@ -40,7 +51,19 @@ public class FunctionInfo {
     return _clazz;
   }
 
+  public List<Class<?>> getParameterTypes() {
+    return _parameterTypes;
+  }
+
   public boolean hasNullableParameters() {
     return _nullableParameters;
+  }
+
+  public boolean isNarrowing() {
+    return _narrowing;
+  }
+
+  public boolean isImplicitStrings() {
+    return _implicitStrings;
   }
 }

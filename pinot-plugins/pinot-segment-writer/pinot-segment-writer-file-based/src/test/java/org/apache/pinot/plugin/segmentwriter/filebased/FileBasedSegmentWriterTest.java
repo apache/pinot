@@ -81,7 +81,9 @@ public class FileBasedSegmentWriterTest {
             .setTimeColumnName(TIME_COLUMN_NAME).build();
     _schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("aString", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("aSimpleMap", FieldSpec.DataType.JSON)
         .addSingleValueDimension("aSimpleMap_str", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("anAdvancedMap", FieldSpec.DataType.JSON)
         .addSingleValueDimension("anAdvancedMap_str", FieldSpec.DataType.STRING)
         .addSingleValueDimension("nullString", FieldSpec.DataType.STRING)
         .addSingleValueDimension("aBoolean", FieldSpec.DataType.BOOLEAN)

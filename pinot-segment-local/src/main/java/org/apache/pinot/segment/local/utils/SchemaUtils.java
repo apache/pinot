@@ -109,7 +109,7 @@ public class SchemaUtils {
         String transformFunction = fieldSpec.getTransformFunction();
         if (transformFunction != null) {
           try {
-            List<String> arguments = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec).getArguments();
+            List<String> arguments = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec, schema).getArguments();
             Preconditions.checkState(!arguments.contains(column),
                 "The arguments of transform function %s should not contain the destination column %s",
                 transformFunction, column);

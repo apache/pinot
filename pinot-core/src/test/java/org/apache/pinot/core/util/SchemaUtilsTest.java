@@ -105,7 +105,10 @@ public class SchemaUtilsTest {
     }
 
     schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("colA", DataType.STRING).build();
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+            .addSingleValueDimension("colA", DataType.STRING)
+            .addSingleValueDimension("colB", DataType.STRING)
+            .build();
     SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
 
     // realtime table
@@ -153,6 +156,7 @@ public class SchemaUtilsTest {
 
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
+        .addSingleValueDimension("colB", DataType.STRING)
         .addSingleValueDimension("colA", DataType.STRING).build();
     SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
   }

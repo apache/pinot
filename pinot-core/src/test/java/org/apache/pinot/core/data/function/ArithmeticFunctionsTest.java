@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.core.data.function;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -33,9 +37,14 @@ import org.testng.annotations.Test;
  */
 public class ArithmeticFunctionsTest {
 
+  Map<String, FieldSpec> _schema = ImmutableMap.of(
+      "a", new DimensionFieldSpec("a", FieldSpec.DataType.INT, true),
+      "b", new DimensionFieldSpec("b", FieldSpec.DataType.INT, true)
+  );
+
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
       Object expectedResult) {
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression, _schema);
     Assert.assertEquals(evaluator.getArguments(), expectedArguments);
     Assert.assertEquals(evaluator.evaluate(row), expectedResult);
   }

@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.core.segment.processing.partitioner;
 
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -30,8 +34,9 @@ public class TransformFunctionPartitioner implements Partitioner {
 
   private final FunctionEvaluator _functionEvaluator;
 
-  public TransformFunctionPartitioner(String transformFunction) {
-    _functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+  public TransformFunctionPartitioner(String transformFunction, List<FieldSpec> fieldSpecs) {
+    _functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(
+        transformFunction, fieldSpecs.stream().collect(Collectors.toMap(FieldSpec::getName, Function.identity())));
   }
 
   @Override

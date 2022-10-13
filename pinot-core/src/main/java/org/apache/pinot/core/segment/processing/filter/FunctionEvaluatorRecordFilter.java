@@ -32,7 +32,8 @@ public class FunctionEvaluatorRecordFilter implements RecordFilter {
   private final FunctionEvaluator _filterFunctionEvaluator;
 
   public FunctionEvaluatorRecordFilter(String filterFunction) {
-    _filterFunctionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
+    // TODO: is this used anywhere?
+    _filterFunctionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction, null);
   }
 
   @Override

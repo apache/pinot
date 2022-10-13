@@ -320,8 +320,11 @@ public final class TableConfigUtils {
             throw new IllegalStateException(
                 "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
           }
+          if (schema == null) {
+            throw new IllegalStateException("Expected non-null schema to validate function call");
+          }
           try {
-            FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
+            FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction, schema.getFieldSpecMap());
           } catch (Exception e) {
             throw new IllegalStateException("Invalid filter function " + filterFunction, e);
           }
@@ -408,8 +411,12 @@ public final class TableConfigUtils {
                 "Groovy transform functions are disabled for table config. Found '" + transformFunction
                     + "' for column '" + columnName + "'");
           }
+          if (schema == null) {
+            throw new IllegalStateException("Expected non-null schema to validate function call");
+          }
           try {
-            expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+            expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(
+                transformFunction, schema.getFieldSpecMap());
           } catch (Exception e) {
             throw new IllegalStateException(
                 "Invalid transform function '" + transformFunction + "' for column '" + columnName + "'", e);

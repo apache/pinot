@@ -63,7 +63,7 @@ public class SanitizationTransformer implements RecordTransformer {
         if (sanitizedValue != stringValue) {
           record.putValue(stringColumn, sanitizedValue);
         }
-      } else {
+      } else if (value != null) {
         // Multi-valued column
         Object[] values = (Object[]) value;
         int numValues = values.length;

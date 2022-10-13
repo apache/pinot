@@ -39,7 +39,8 @@ public class JsonFunctionsTest {
 
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
       Object expectedResult) {
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression,
+        GenericRowToFieldSchemaMap.inferFieldMap(row));
     Assert.assertEquals(evaluator.getArguments(), expectedArguments);
     Assert.assertEquals(evaluator.evaluate(row), expectedResult);
   }

@@ -367,7 +367,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       for (TransformConfig transformConfig : transformConfigs) {
         if (transformConfig.getColumnName().equals(column)) {
           String transformFunction = transformConfig.getTransformFunction();
-          FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+          Map<String, FieldSpec> completeSchema = new HashMap<>(_schema.getFieldSpecMap());
+          completeSchema.putAll(_segmentMetadata.getSchema().getFieldSpecMap());
+          FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(
+              transformFunction, completeSchema);
 
           // Check if all arguments exist in the segment
           // TODO: Support chained derived column

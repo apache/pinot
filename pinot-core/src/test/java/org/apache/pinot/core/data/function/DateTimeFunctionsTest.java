@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.core.data.function;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -47,7 +51,13 @@ public class DateTimeFunctionsTest {
 
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
       Object expectedResult) {
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    testFunction(functionExpression, expectedArguments, row,
+        expectedResult, GenericRowToFieldSchemaMap.inferFieldMap(row));
+  }
+
+  private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
+      Object expectedResult, Map<String, FieldSpec> schema) {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression, schema);
     assertEquals(evaluator.getArguments(), expectedArguments);
     assertEquals(evaluator.evaluate(row), expectedResult);
   }
@@ -234,12 +244,6 @@ public class DateTimeFunctionsTest {
     inputs.add(new Object[]{"fromDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
         "dateTime"), row112, 1251142606000L});
 
-    // fromDateTime with null
-    GenericRow row113 = new GenericRow();
-    row113.putValue("dateTime", null);
-    inputs.add(new Object[]{
-        "fromDateTime(dateTime, 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')", Lists.newArrayList("dateTime"), row113, null
-    });
 
     // timezone_hour and timezone_minute
     List<String> expectedArguments = Collections.singletonList("tz");
@@ -316,15 +320,31 @@ public class DateTimeFunctionsTest {
     inputs.add(new Object[]{"second(millis, tz)", expectedArguments, row131, 13});
     inputs.add(new Object[]{"millisecond(millis, tz)", expectedArguments, row131, 123});
 
+
+    return inputs.toArray(new Object[0][]);
+  }
+
+  @Test
+  public void testWithNulls() {
+    // fromDateTime with null
+    GenericRow row113 = new GenericRow();
+    row113.putValue("dateTime", null);
+    testFunction(
+        "fromDateTime(dateTime, 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')", Lists.newArrayList("dateTime"), row113, null,
+        ImmutableMap.of("dateTime", new DimensionFieldSpec("dateTime", FieldSpec.DataType.STRING, true))
+    );
+
     GenericRow row140 = new GenericRow();
     row140.putValue("duration", null);
-    inputs.add(new Object[]{"ago(duration)", Lists.newArrayList("duration"), row140, null});
+    testFunction("ago(duration)", Lists.newArrayList("duration"), row140, null, ImmutableMap.of(
+        "duration", new DimensionFieldSpec("duration", FieldSpec.DataType.LONG, true)
+    ));
 
     GenericRow row141 = new GenericRow();
     row141.putValue("timezoneId", null);
-    inputs.add(new Object[]{"timezoneHour(timezoneId)", Lists.newArrayList("timezoneId"), row141, null});
-
-    return inputs.toArray(new Object[0][]);
+    testFunction("timezoneHour(timezoneId)", Lists.newArrayList("timezoneId"), row141, null, ImmutableMap.of(
+        "timezoneId", new DimensionFieldSpec("duration", FieldSpec.DataType.STRING, true)
+    ));
   }
 
   @Test
@@ -565,12 +585,17 @@ public class DateTimeFunctionsTest {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timeValue);
     List<String> arguments = Collections.singletonList("timeCol");
+
+    // declare the schema inline to handle nulls
+    Map<String, FieldSpec> schema = ImmutableMap.of("timeCol",
+        new DimensionFieldSpec("timeCol", FieldSpec.DataType.LONG, true));
     testFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
-        outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult.toString());
+        outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult.toString(), schema);
   }
 
   private void testMultipleInvocations(String functionExpression, List<GenericRow> rows, List<Object> expectedResults) {
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    Map<String, FieldSpec> spec = GenericRowToFieldSchemaMap.inferFieldMap(rows.get(0));
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression, spec);
     int numInvocations = rows.size();
     assertEquals(expectedResults.size(), numInvocations);
     for (int i = 0; i < numInvocations; i++) {

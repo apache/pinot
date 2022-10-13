@@ -308,7 +308,7 @@ public final class IngestionUtils {
    */
   public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
-    extractFieldsFromIngestionConfig(ingestionConfig, fieldsForRecordExtractor);
+    extractFieldsFromIngestionConfig(ingestionConfig, fieldsForRecordExtractor, schema);
     extractFieldsFromSchema(schema, fieldsForRecordExtractor);
     fieldsForRecordExtractor = getFieldsToReadWithComplexType(fieldsForRecordExtractor, ingestionConfig);
     return fieldsForRecordExtractor;
@@ -342,7 +342,7 @@ public final class IngestionUtils {
   private static void extractFieldsFromSchema(Schema schema, Set<String> fields) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
-        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec, schema);
         if (functionEvaluator != null) {
           fields.addAll(functionEvaluator.getArguments());
         }
@@ -354,13 +354,15 @@ public final class IngestionUtils {
   /**
    * Extracts the fields needed by a RecordExtractor from given {@link IngestionConfig}
    */
-  private static void extractFieldsFromIngestionConfig(@Nullable IngestionConfig ingestionConfig, Set<String> fields) {
+  private static void extractFieldsFromIngestionConfig(@Nullable IngestionConfig ingestionConfig, Set<String> fields,
+      Schema schema) {
     if (ingestionConfig != null) {
       FilterConfig filterConfig = ingestionConfig.getFilterConfig();
       if (filterConfig != null) {
         String filterFunction = filterConfig.getFilterFunction();
         if (filterFunction != null) {
-          FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
+          FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(
+              filterFunction, schema.getFieldSpecMap());
           fields.addAll(functionEvaluator.getArguments());
         }
       }
@@ -376,7 +378,8 @@ public final class IngestionUtils {
       if (transformConfigs != null) {
         for (TransformConfig transformConfig : transformConfigs) {
           FunctionEvaluator expressionEvaluator =
-              FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
+              FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction(),
+                  schema.getFieldSpecMap());
           fields.addAll(expressionEvaluator.getArguments());
           fields.add(transformConfig
               .getColumnName()); // add the column itself too, so that if it is already transformed, we won't

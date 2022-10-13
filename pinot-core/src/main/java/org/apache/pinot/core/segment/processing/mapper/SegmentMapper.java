@@ -93,7 +93,7 @@ public class SegmentMapper {
     int numPartitioners = partitionerConfigs.size();
     _partitioners = new Partitioner[numPartitioners];
     for (int i = 0; i < numPartitioners; i++) {
-      _partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
+      _partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i), _fieldSpecs);
     }
     // Time partition + partition from partitioners
     _partitionsBuffer = new String[numPartitioners + 1];

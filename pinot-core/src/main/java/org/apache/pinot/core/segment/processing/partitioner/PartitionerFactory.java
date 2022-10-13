@@ -19,6 +19,8 @@
 package org.apache.pinot.core.segment.processing.partitioner;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -51,7 +53,7 @@ public final class PartitionerFactory {
   /**
    * Construct a Partitioner using the PartitioningConfig
    */
-  public static Partitioner getPartitioner(PartitionerConfig config) {
+  public static Partitioner getPartitioner(PartitionerConfig config, List<FieldSpec> fieldSpecs) {
 
     Partitioner partitioner = null;
     switch (config.getPartitionerType()) {
@@ -71,7 +73,7 @@ public final class PartitionerFactory {
       case TRANSFORM_FUNCTION:
         Preconditions.checkState(config.getTransformFunction() != null,
             "Must provide transformFunction for TRANSFORM_FUNCTION partitioner");
-        partitioner = new TransformFunctionPartitioner(config.getTransformFunction());
+        partitioner = new TransformFunctionPartitioner(config.getTransformFunction(), fieldSpecs);
         break;
       case TABLE_PARTITION_CONFIG:
         Preconditions.checkState(config.getColumnName() != null,

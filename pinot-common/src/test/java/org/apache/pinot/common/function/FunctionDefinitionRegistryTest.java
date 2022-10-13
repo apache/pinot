@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.common.function;
 
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class FunctionDefinitionRegistryTest {
@@ -64,12 +66,124 @@ public class FunctionDefinitionRegistryTest {
     return null;
   }
 
+  @ScalarFunction(names = {"testFunc1", "testFunc2"})
+  public static String testScalarFunction(long randomArg1) {
+    return null;
+  }
+
+  @ScalarFunction(names = {"testFunc1", "testFunc2"})
+  public static String testScalarFunction(int randomArg1) {
+    return null;
+  }
+
+  @ScalarFunction(nullableParameters = true)
+  public static String testNullableFun(Long randomArg1, String randomArg2) {
+    return null;
+  }
+
+  @ScalarFunction(nullableParameters = true)
+  public static String testNullableFun(Long randomArg1, Double randomArg2) {
+    return null;
+  }
+
   @Test
-  public void testScalarFunctionNames() {
-    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc1", 2));
-    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc2", 2));
-    assertNull(FunctionRegistry.getFunctionInfo("testScalarFunction", 2));
-    assertNull(FunctionRegistry.getFunctionInfo("testFunc1", 1));
-    assertNull(FunctionRegistry.getFunctionInfo("testFunc2", 1));
+  public void shouldRespectCustomFunctionNames() {
+    // Given:
+    List<Class<?>> types = ImmutableList.of(long.class, String.class);
+
+    // Then:
+    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc1", types));
+    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc2", types));
+    assertNull(FunctionRegistry.getFunctionInfo("testScalarFunction", types));
+  }
+
+  @Test
+  public void shouldReturnCorrectFunctionWithPolymorphism() {
+    // Given:
+    List<Class<?>> types = ImmutableList.of(long.class, String.class);
+
+    // When:
+    FunctionInfo fun = FunctionRegistry.getFunctionInfo("testFunc1", types);
+
+    // Then:
+    assertNotNull(fun);
+    assertEquals(fun.getParameterTypes(), types);
+  }
+
+  @Test
+  public void shouldReturnCorrectFunctionWithPrimitiveTypeCasts() {
+    // Given:
+    List<Class<?>> types = ImmutableList.of(Long.class, String.class);
+
+    // When:
+    FunctionInfo fun = FunctionRegistry.getFunctionInfo("testFunc1", types);
+
+    // Then:
+    assertNotNull(fun);
+    assertEquals(fun.getParameterTypes(), ImmutableList.of(long.class, String.class));
+  }
+
+  @Test
+  public void shouldReturnCorrectFunctionWithPrimitiveWidening() {
+    // Given:
+    List<Class<?>> types = ImmutableList.of(int.class, String.class);
+
+    // When:
+    FunctionInfo fun = FunctionRegistry.getFunctionInfo("testFunc1", types);
+
+    // Then:
+    assertNotNull(fun);
+    assertEquals(fun.getParameterTypes(), ImmutableList.of(long.class, String.class));
+  }
+
+  @Test
+  public void shouldReturnExactMatchIfMultipleCouldMatch() {
+    // Given:
+    List<Class<?>> types = ImmutableList.of(long.class);
+
+    // When:
+    FunctionInfo fun = FunctionRegistry.getFunctionInfo("testFunc1", types);
+
+    // Then:
+    assertNotNull(fun);
+    assertEquals(fun.getParameterTypes(), types);
+  }
+
+  @Test
+  public void shouldThrowIfMultipleMatches() {
+    // Given:
+    List<Class<?>> types = ImmutableList.of(short.class); // widens to both int/long
+
+    // When:
+    Assert.assertThrows(BadQueryRequestException.class,
+        () -> FunctionRegistry.getFunctionInfo("testFunc1", types));
+  }
+
+  @Test
+  public void shouldReturnCorrectFunctionWithPrimitiveWideningAndUnwrapping() {
+    // Given:
+    List<Class<?>> types = ImmutableList.of(Integer.class, String.class);
+
+    // When:
+    FunctionInfo fun = FunctionRegistry.getFunctionInfo("testFunc1", types);
+
+    // Then:
+    assertNotNull(fun);
+    assertEquals(fun.getParameterTypes(), ImmutableList.of(long.class, String.class));
+  }
+
+  @Test
+  public void shouldRespectNullableParams() {
+    // Given:
+    List<Class<?>> types = new ArrayList<>();
+    types.add(null);
+    types.add(String.class);
+
+    // When:
+    FunctionInfo fun = FunctionRegistry.getFunctionInfo("testNullableFun", types);
+
+    // Then:
+    assertNotNull(fun);
+    assertEquals(fun.getParameterTypes(), ImmutableList.of(Long.class, String.class));
   }
 }

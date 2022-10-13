@@ -245,6 +245,7 @@ public class ExpressionTransformerTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.STRING)
         .addSingleValueDimension("b", FieldSpec.DataType.STRING).addSingleValueDimension("c", FieldSpec.DataType.STRING)
         .addSingleValueDimension("d", FieldSpec.DataType.STRING).addSingleValueDimension("e", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("x", FieldSpec.DataType.STRING)
         .addSingleValueDimension("f", FieldSpec.DataType.STRING).build();
     List<TransformConfig> transformConfigs = Arrays.asList(
         new TransformConfig("d", "plus(x, 10)"),
@@ -295,6 +296,7 @@ public class ExpressionTransformerTest {
   public void testNonCyclicTransformFunctionSortOrder() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("a", FieldSpec.DataType.INT)
         .addSingleValueDimension("b", FieldSpec.DataType.INT).addSingleValueDimension("c", FieldSpec.DataType.INT)
+        .addSingleValueDimension("d", FieldSpec.DataType.INT).addSingleValueDimension("e", FieldSpec.DataType.INT)
         .build();
 
     // Define transform function dependencies: a -> (b,c), b -> d, d -> e, c -> (d,e)

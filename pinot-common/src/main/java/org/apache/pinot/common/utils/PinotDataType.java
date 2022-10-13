@@ -65,7 +65,7 @@ public enum PinotDataType {
    *   - "1" -> true (for backward-compatibility where we used to use integer 1 to represent true)
    *   - Others ->  false
    */
-  BOOLEAN {
+  BOOLEAN(boolean.class) {
     @Override
     public int toInt(Object value) {
       return ((Boolean) value) ? 1 : 0;
@@ -122,7 +122,7 @@ public enum PinotDataType {
     }
   },
 
-  BYTE {
+  BYTE(byte.class) {
     @Override
     public int toInt(Object value) {
       return ((Number) value).intValue();
@@ -169,7 +169,7 @@ public enum PinotDataType {
     }
   },
 
-  CHARACTER {
+  CHARACTER(char.class) {
     @Override
     public int toInt(Object value) {
       return (int) ((Character) value);
@@ -216,7 +216,7 @@ public enum PinotDataType {
     }
   },
 
-  SHORT {
+  SHORT(short.class) {
     @Override
     public int toInt(Object value) {
       return ((Number) value).intValue();
@@ -263,7 +263,7 @@ public enum PinotDataType {
     }
   },
 
-  INTEGER {
+  INTEGER(int.class) {
     @Override
     public int toInt(Object value) {
       return (Integer) value;
@@ -315,7 +315,7 @@ public enum PinotDataType {
     }
   },
 
-  LONG {
+  LONG(long.class) {
     @Override
     public int toInt(Object value) {
       return ((Number) value).intValue();
@@ -370,7 +370,7 @@ public enum PinotDataType {
     }
   },
 
-  FLOAT {
+  FLOAT(float.class) {
     @Override
     public int toInt(Object value) {
       return ((Number) value).intValue();
@@ -422,7 +422,7 @@ public enum PinotDataType {
     }
   },
 
-  DOUBLE {
+  DOUBLE(double.class) {
     @Override
     public int toInt(Object value) {
       return ((Number) value).intValue();
@@ -478,7 +478,7 @@ public enum PinotDataType {
     }
   },
 
-  BIG_DECIMAL {
+  BIG_DECIMAL(BigDecimal.class) {
     @Override
     public int toInt(Object value) {
       return ((Number) value).intValue();
@@ -541,7 +541,7 @@ public enum PinotDataType {
    *   - SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
    *   - Millis since epoch value (e.g. "1609491661001")
    */
-  TIMESTAMP {
+  TIMESTAMP(Timestamp.class) {
     @Override
     public int toInt(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to INTEGER");
@@ -598,7 +598,7 @@ public enum PinotDataType {
     }
   },
 
-  STRING {
+  STRING(String.class) {
     @Override
     public int toInt(Object value) {
       return Integer.parseInt(value.toString().trim());
@@ -652,7 +652,7 @@ public enum PinotDataType {
     }
   },
 
-  JSON {
+  JSON(String.class) {
     @Override
     public int toInt(Object value) {
       return Integer.parseInt(value.toString().trim());
@@ -711,7 +711,7 @@ public enum PinotDataType {
     }
   },
 
-  BYTES {
+  BYTES(byte[].class) {
     @Override
     public int toInt(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BYTES to INTEGER");
@@ -763,7 +763,7 @@ public enum PinotDataType {
     }
   },
 
-  OBJECT {
+  OBJECT(Object.class) {
     @Override
     public int toInt(Object value) {
       return ((Number) value).intValue();
@@ -815,7 +815,7 @@ public enum PinotDataType {
     }
   },
 
-  BYTE_ARRAY {
+  BYTE_ARRAY(byte[].class) {
     @Override
     public byte[] toBytes(Object value) {
       Object[] valueArray = (Object[]) value;
@@ -828,9 +828,9 @@ public enum PinotDataType {
     }
   },
 
-  CHARACTER_ARRAY,
+  CHARACTER_ARRAY(char[].class),
 
-  SHORT_ARRAY,
+  SHORT_ARRAY(short[].class),
 
   /*
     NOTE:
@@ -839,91 +839,101 @@ public enum PinotDataType {
       We need to keep them separately because they cannot automatically cast to the other type.
    */
 
-  PRIMITIVE_INT_ARRAY {
+  PRIMITIVE_INT_ARRAY(int[].class) {
     @Override
     public int[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toPrimitiveIntArray(value);
     }
   },
 
-  INTEGER_ARRAY {
+  INTEGER_ARRAY(Integer[].class) {
     @Override
     public Integer[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toIntegerArray(value);
     }
   },
 
-  PRIMITIVE_LONG_ARRAY {
+  PRIMITIVE_LONG_ARRAY(long[].class) {
     @Override
     public long[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toPrimitiveLongArray(value);
     }
   },
 
-  LONG_ARRAY {
+  LONG_ARRAY(Long[].class) {
     @Override
     public Long[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toLongArray(value);
     }
   },
 
-  PRIMITIVE_FLOAT_ARRAY {
+  PRIMITIVE_FLOAT_ARRAY(float[].class) {
     @Override
     public float[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toPrimitiveFloatArray(value);
     }
   },
 
-  FLOAT_ARRAY {
+  FLOAT_ARRAY(Float[].class) {
     @Override
     public Float[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toFloatArray(value);
     }
   },
 
-  PRIMITIVE_DOUBLE_ARRAY {
+  PRIMITIVE_DOUBLE_ARRAY(double[].class) {
     @Override
     public double[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toPrimitiveDoubleArray(value);
     }
   },
 
-  DOUBLE_ARRAY {
+  DOUBLE_ARRAY(Double[].class) {
     @Override
     public Double[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toDoubleArray(value);
     }
   },
 
-  BOOLEAN_ARRAY {
+  BOOLEAN_ARRAY(boolean[].class) {
     @Override
     public boolean[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toBooleanArray(value);
     }
   },
 
-  TIMESTAMP_ARRAY {
+  TIMESTAMP_ARRAY(Timestamp[].class) {
     @Override
     public Object convert(Object value, PinotDataType sourceType) {
       return sourceType.toTimestampArray(value);
     }
   },
 
-  STRING_ARRAY {
+  STRING_ARRAY(String[].class) {
     @Override
     public String[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toStringArray(value);
     }
   },
 
-  BYTES_ARRAY {
+  BYTES_ARRAY(byte[][].class) {
     @Override
     public byte[][] convert(Object value, PinotDataType sourceType) {
       return sourceType.toBytesArray(value);
     }
   },
 
-  OBJECT_ARRAY;
+  OBJECT_ARRAY(Object[].class);
+
+  private final Class<?> _clazz;
+
+  PinotDataType(Class<?> clazz) {
+    _clazz = clazz;
+  }
+
+  public Class<?> getJavaClass() {
+    return _clazz;
+  }
 
   /**
    * NOTE: override toInt(), toLong(), toFloat(), toDouble(), toBoolean(), toTimestamp(), toString(), and
@@ -1311,17 +1321,49 @@ public enum PinotDataType {
     }
   }
 
+  private PinotDataType getMultiValueType(boolean primitive) {
+    switch (this) {
+      case BOOLEAN:
+        return BOOLEAN_ARRAY;
+      case BYTE:
+        return BYTE_ARRAY;
+      case CHARACTER:
+        return CHARACTER_ARRAY;
+      case SHORT:
+        return SHORT_ARRAY;
+      case INTEGER:
+        return primitive ? PRIMITIVE_INT_ARRAY : INTEGER_ARRAY;
+      case LONG:
+        return primitive ? PRIMITIVE_LONG_ARRAY : LONG_ARRAY;
+      case FLOAT:
+        return primitive ? PRIMITIVE_FLOAT_ARRAY : FLOAT_ARRAY;
+      case DOUBLE:
+        return primitive ? PRIMITIVE_DOUBLE_ARRAY : DOUBLE_ARRAY;
+      case TIMESTAMP:
+        return TIMESTAMP_ARRAY;
+      case STRING:
+        return STRING_ARRAY;
+      case BYTES:
+        return BYTES_ARRAY;
+      case OBJECT:
+        return OBJECT_ARRAY;
+      default:
+      case OBJECT_ARRAY:
+        throw new IllegalStateException("There is no multi-value type for " + this);
+    }
+  }
+
   public static PinotDataType getSingleValueType(Class<?> cls) {
-    if (cls == Integer.class) {
+    if (cls == Integer.class || cls == int.class) {
       return INTEGER;
     }
-    if (cls == Long.class) {
+    if (cls == Long.class || cls == long.class) {
       return LONG;
     }
-    if (cls == Float.class) {
+    if (cls == Float.class || cls == float.class) {
       return FLOAT;
     }
-    if (cls == Double.class) {
+    if (cls == Double.class || cls == double.class) {
       return DOUBLE;
     }
     if (cls == BigDecimal.class) {
@@ -1333,59 +1375,26 @@ public enum PinotDataType {
     if (cls == byte[].class) {
       return BYTES;
     }
-    if (cls == Boolean.class) {
+    if (cls == Boolean.class || cls == boolean.class) {
       return BOOLEAN;
     }
     if (cls == Timestamp.class) {
       return TIMESTAMP;
     }
-    if (cls == Byte.class) {
+    if (cls == Byte.class || cls == byte.class) {
       return BYTE;
     }
-    if (cls == Character.class) {
+    if (cls == Character.class || cls == char.class) {
       return CHARACTER;
     }
-    if (cls == Short.class) {
+    if (cls == Short.class || cls == short.class) {
       return SHORT;
     }
     return OBJECT;
   }
 
   public static PinotDataType getMultiValueType(Class<?> cls) {
-    if (cls == Integer.class) {
-      return INTEGER_ARRAY;
-    }
-    if (cls == Long.class) {
-      return LONG_ARRAY;
-    }
-    if (cls == Float.class) {
-      return FLOAT_ARRAY;
-    }
-    if (cls == Double.class) {
-      return DOUBLE_ARRAY;
-    }
-    if (cls == String.class) {
-      return STRING_ARRAY;
-    }
-    if (cls == Byte.class) {
-      return BYTE_ARRAY;
-    }
-    if (cls == Character.class) {
-      return CHARACTER_ARRAY;
-    }
-    if (cls == Short.class) {
-      return SHORT_ARRAY;
-    }
-    if (cls == byte[].class) {
-      return BYTES_ARRAY;
-    }
-    if (cls == Boolean.class) {
-      return BOOLEAN_ARRAY;
-    }
-    if (cls == Timestamp.class) {
-      return TIMESTAMP_ARRAY;
-    }
-    return OBJECT_ARRAY;
+    return getSingleValueType(cls).getMultiValueType(cls != null && cls.isPrimitive());
   }
 
   private static int anyToInt(Object val) {
@@ -1479,6 +1488,8 @@ public enum PinotDataType {
         return PRIMITIVE_DOUBLE_ARRAY;
       case STRING_ARRAY:
         return STRING_ARRAY;
+      case OBJECT:
+        return OBJECT;
       default:
         throw new IllegalStateException("Cannot convert ColumnDataType: " + columnDataType + " to PinotDataType");
     }

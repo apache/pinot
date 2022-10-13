@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -34,9 +35,11 @@ public class TransformFunctionRecordTransformer implements RecordTransformer {
 
   private final Map<String, FunctionEvaluator> _functionEvaluatorMap = new HashMap<>();
 
-  public TransformFunctionRecordTransformer(Map<String, String> transformFunctionMap) {
+  public TransformFunctionRecordTransformer(Map<String, String> transformFunctionMap, Schema schema) {
+    // TODO: doesn't seem to be used?
     transformFunctionMap.forEach(
-        (key, value) -> _functionEvaluatorMap.put(key, FunctionEvaluatorFactory.getExpressionEvaluator(value)));
+        (key, value) -> _functionEvaluatorMap.put(
+            key, FunctionEvaluatorFactory.getExpressionEvaluator(value, schema.getFieldSpecMap())));
   }
 
   @Override

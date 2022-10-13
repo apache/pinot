@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -31,7 +32,9 @@ import org.testng.annotations.Test;
 public class ObjectFunctionsTest {
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
       Object expectedResult) {
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(
+        functionExpression, GenericRowToFieldSchemaMap.inferFieldMapWithDefaultType(
+            row, FieldSpec.DataType.STRING, false));
     Assert.assertEquals(evaluator.getArguments(), expectedArguments);
     Assert.assertEquals(evaluator.evaluate(row), expectedResult);
   }

@@ -104,7 +104,9 @@ public class IngestionUtilsTest {
     Assert.assertTrue(extract.containsAll(Arrays.asList("in", "out")));
 
     // inbuilt functions
-    schema = new Schema();
+    schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("timestamp", FieldSpec.DataType.LONG)
+        .build();
     dimensionFieldSpec = new DimensionFieldSpec("hoursSinceEpoch", FieldSpec.DataType.LONG, true);
     dimensionFieldSpec.setTransformFunction("toEpochHours(\"timestamp\")");
     schema.addField(dimensionFieldSpec);
@@ -113,7 +115,9 @@ public class IngestionUtilsTest {
     Assert.assertTrue(extract.containsAll(Arrays.asList("timestamp", "hoursSinceEpoch")));
 
     // inbuilt functions with literal
-    schema = new Schema();
+    schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("timestamp", FieldSpec.DataType.LONG)
+        .build();
     dimensionFieldSpec = new DimensionFieldSpec("tenMinutesSinceEpoch", FieldSpec.DataType.LONG, true);
     dimensionFieldSpec.setTransformFunction("toEpochMinutesBucket(\"timestamp\", 10)");
     schema.addField(dimensionFieldSpec);
@@ -122,7 +126,9 @@ public class IngestionUtilsTest {
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestamp")));
 
     // inbuilt functions on DateTimeFieldSpec
-    schema = new Schema();
+    schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("timestamp", FieldSpec.DataType.LONG)
+        .build();
     DateTimeFieldSpec dateTimeFieldSpec =
         new DateTimeFieldSpec("date", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS");
     dateTimeFieldSpec.setTransformFunction("toDateTime(\"timestamp\", 'yyyy-MM-dd')");
@@ -164,7 +170,7 @@ public class IngestionUtilsTest {
     Assert.assertTrue(extract.contains("d1"));
 
     // inbuilt functions
-    schema = new Schema.SchemaBuilder().addSingleValueDimension("hoursSinceEpoch", FieldSpec.DataType.LONG).build();
+    schema = new Schema.SchemaBuilder().addSingleValueDimension("timestampColumn", FieldSpec.DataType.LONG).build();
     ingestionConfig.setTransformConfigs(
         Collections.singletonList(new TransformConfig("hoursSinceEpoch", "toEpochHours(timestampColumn)")));
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
@@ -173,7 +179,7 @@ public class IngestionUtilsTest {
 
     // inbuilt functions with literal
     schema =
-        new Schema.SchemaBuilder().addSingleValueDimension("tenMinutesSinceEpoch", FieldSpec.DataType.LONG).build();
+        new Schema.SchemaBuilder().addSingleValueDimension("timestampColumn", FieldSpec.DataType.LONG).build();
     ingestionConfig.setTransformConfigs(Collections.singletonList(
         new TransformConfig("tenMinutesSinceEpoch", "toEpochMinutesBucket(timestampColumn, 10)")));
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
@@ -181,7 +187,7 @@ public class IngestionUtilsTest {
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestampColumn")));
 
     // inbuilt functions on DateTimeFieldSpec
-    schema = new Schema.SchemaBuilder().addDateTime("dateColumn", FieldSpec.DataType.STRING,
+    schema = new Schema.SchemaBuilder().addDateTime("timestampColumn", FieldSpec.DataType.STRING,
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
     ingestionConfig.setTransformConfigs(
         Collections.singletonList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')")));
@@ -190,8 +196,12 @@ public class IngestionUtilsTest {
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("dateColumn", "timestampColumn")));
 
     // filter + transform configs + schema fields  + schema transform
-    schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("d2", FieldSpec.DataType.STRING).addMetric("m1", FieldSpec.DataType.INT)
+    schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("d1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("d2", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("xy", FieldSpec.DataType.STRING)
+        .addMetric("m1", FieldSpec.DataType.INT)
+        .addDateTime("timestampColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS")
         .addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
     schema.getFieldSpecFor("d2").setTransformFunction("reverse(xy)");
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({d1 == \"10\"}, d1)"));
@@ -200,9 +210,14 @@ public class IngestionUtilsTest {
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("d1", "d2", "m1", "dateColumn", "xy", "timestampColumn")));
 
     // filter + transform configs + schema fields  + schema transform + complex type configs
-    schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("d2", FieldSpec.DataType.STRING).addMetric("m1", FieldSpec.DataType.INT)
-        .addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
+    schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("d1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("d2", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("xy", FieldSpec.DataType.STRING)
+        .addMetric("m1", FieldSpec.DataType.INT)
+        .addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS")
+        .addDateTime("timestampColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS")
+        .build();
     schema.getFieldSpecFor("d2").setTransformFunction("reverse(xy)");
     ingestionConfig.setComplexTypeConfig(new ComplexTypeConfig(Arrays.asList("before.test", "after.test"), ".",
         ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, Collections.singletonMap("before", "after")));

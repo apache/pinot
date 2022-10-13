@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
+import com.google.common.collect.ImmutableList;
+import java.util.List;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.core.segment.processing.partitioner.ColumnValuePartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.NoOpPartitioner;
@@ -28,6 +30,8 @@ import org.apache.pinot.core.segment.processing.partitioner.RoundRobinPartitione
 import org.apache.pinot.core.segment.processing.partitioner.TableConfigPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.TransformFunctionPartitioner;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
@@ -41,10 +45,15 @@ import static org.testng.Assert.fail;
  */
 public class PartitionerTest {
 
+  List<FieldSpec> _fieldSpecs = ImmutableList.of(
+      new DimensionFieldSpec("foo", FieldSpec.DataType.INT, true),
+      new DimensionFieldSpec("timestamp", FieldSpec.DataType.TIMESTAMP, true)
+  );
+
   @Test
   public void testNoOpPartitioner() {
     PartitionerConfig partitionerConfig = new PartitionerConfig.Builder().build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
     assertEquals(partitioner.getClass(), NoOpPartitioner.class);
 
     GenericRow row = new GenericRow();
@@ -60,7 +69,7 @@ public class PartitionerTest {
     PartitionerConfig partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE).build();
     try {
-      PartitionerFactory.getPartitioner(partitionerConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
       fail("Should not create COLUMN_VALUE Partitioner without column name");
     } catch (IllegalStateException e) {
       // expected
@@ -68,7 +77,7 @@ public class PartitionerTest {
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
             .setColumnName("foo").build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
     assertEquals(partitioner.getClass(), ColumnValuePartitioner.class);
 
     GenericRow row = new GenericRow();
@@ -82,7 +91,7 @@ public class PartitionerTest {
     PartitionerConfig partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN).build();
     try {
-      PartitionerFactory.getPartitioner(partitionerConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
       fail("Should not create ROUND_ROBIN Partitioner without num partitions");
     } catch (IllegalStateException e) {
       // expected
@@ -91,7 +100,7 @@ public class PartitionerTest {
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
             .setNumPartitions(0).build();
     try {
-      PartitionerFactory.getPartitioner(partitionerConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
       fail("Should not create ROUND_ROBIN Partitioner without num partitions <=0");
     } catch (IllegalStateException e) {
       // expected
@@ -100,7 +109,7 @@ public class PartitionerTest {
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.ROUND_ROBIN)
             .setNumPartitions(numPartitions).build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
     assertEquals(partitioner.getClass(), RoundRobinPartitioner.class);
 
     GenericRow row = new GenericRow();
@@ -119,7 +128,7 @@ public class PartitionerTest {
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
             .build();
     try {
-      PartitionerFactory.getPartitioner(partitionerConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
       fail("Should not create TABLE_PARTITION_CONFIG Partitioner without column name");
     } catch (IllegalStateException e) {
       // expected
@@ -128,7 +137,7 @@ public class PartitionerTest {
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
             .setColumnName("foo").build();
     try {
-      PartitionerFactory.getPartitioner(partitionerConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
       fail("Should not create TABLE_PARTITION_CONFIG Partitioner without columnPartitionConfig");
     } catch (IllegalStateException e) {
       // expected
@@ -136,7 +145,7 @@ public class PartitionerTest {
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
             .setColumnName("foo").setColumnPartitionConfig(new ColumnPartitionConfig("MURMUR", 3)).build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
     assertEquals(partitioner.getClass(), TableConfigPartitioner.class);
 
     GenericRow row = new GenericRow();
@@ -153,7 +162,7 @@ public class PartitionerTest {
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .build();
     try {
-      PartitionerFactory.getPartitioner(partitionerConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
       fail("Should not create TRANSFORM_FUNCTION Partitioner without transform function");
     } catch (IllegalStateException e) {
       // expected
@@ -162,7 +171,7 @@ public class PartitionerTest {
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("badFunction()").build();
     try {
-      PartitionerFactory.getPartitioner(partitionerConfig);
+      PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
       fail("Should not create TRANSFORM_FUNCTION Partitioner for invalid transform function");
     } catch (IllegalStateException e) {
       // expected
@@ -171,7 +180,7 @@ public class PartitionerTest {
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("toEpochDays(\"timestamp\")").build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
     assertEquals(partitioner.getClass(), TransformFunctionPartitioner.class);
     GenericRow row = new GenericRow();
     row.putValue("timestamp", 1587410614000L);
@@ -180,7 +189,7 @@ public class PartitionerTest {
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("Groovy({a+b},a,b)").build();
-    partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
+    partitioner = PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
     row.putValue("a", 10);
     row.putValue("b", 20);
     assertEquals(partitioner.getPartition(row), "30");
@@ -189,7 +198,7 @@ public class PartitionerTest {
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("Groovy({dMv[1]},dMv)").build();
-    partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
+    partitioner = PartitionerFactory.getPartitioner(partitionerConfig, _fieldSpecs);
     row.putValue("dMv", new Object[]{1, 2, 3});
     assertEquals(partitioner.getPartition(row), "2");
   }

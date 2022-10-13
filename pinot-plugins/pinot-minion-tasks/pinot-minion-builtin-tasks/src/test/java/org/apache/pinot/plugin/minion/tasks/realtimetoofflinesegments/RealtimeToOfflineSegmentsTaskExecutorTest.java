@@ -118,11 +118,13 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
             .addDateTime(T, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     Schema schemaEpochHours =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
+            .addSingleValueDimension(T, FieldSpec.DataType.LONG)
             .addMetric(M1, FieldSpec.DataType.INT)
             .addDateTime(T_TRX, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     Schema schemaSDF =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
             .addMetric(M1, FieldSpec.DataType.INT)
+            .addSingleValueDimension(T, FieldSpec.DataType.LONG)
             .addDateTime(T_TRX, FieldSpec.DataType.INT, "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH", "1:HOURS").build();
 
     List<String> d1 = Lists.newArrayList("foo", "bar", "foo", "foo", "bar");

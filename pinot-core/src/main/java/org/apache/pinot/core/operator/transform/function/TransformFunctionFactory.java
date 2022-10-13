@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.types.ExpressionTypeUtil;
 import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
@@ -292,7 +294,12 @@ public class TransformFunctionFactory {
           }
         } else {
           // Scalar function
-          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+          List<Class<?>> types =
+              arguments.stream()
+                  .map(ec -> ExpressionTypeUtil.getTypeDS(ec, dataSourceMap))
+                  .map(pdt -> pdt == null ? null : pdt.getJavaClass())
+                  .collect(Collectors.toList());
+          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, types);
           if (functionInfo == null) {
             if (FunctionRegistry.containsFunction(functionName)) {
               throw new BadQueryRequestException(
