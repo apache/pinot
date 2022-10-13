@@ -39,7 +39,7 @@ public interface SegmentDirectoryLoader {
    * Clean up the segment data from the server.
    * @param segmentDirectoryLoaderContext context for cleaning up segment data
    */
-  default void drop(SegmentDirectoryLoaderContext segmentDirectoryLoaderContext)
+  default void delete(SegmentDirectoryLoaderContext segmentDirectoryLoaderContext)
       throws Exception {
   }
 }

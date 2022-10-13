@@ -60,7 +60,7 @@ public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
   }
 
   @Override
-  public void drop(SegmentDirectoryLoaderContext segmentLoaderContext)
+  public void delete(SegmentDirectoryLoaderContext segmentLoaderContext)
       throws Exception {
     File indexDir = new File(segmentLoaderContext.getTableDataDir(), segmentLoaderContext.getSegmentName());
     if (indexDir.exists()) {

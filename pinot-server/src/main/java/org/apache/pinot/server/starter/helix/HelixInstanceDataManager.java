@@ -221,7 +221,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void removeSegment(String tableNameWithType, String segmentName) {
+  public void offloadSegment(String tableNameWithType, String segmentName) {
     LOGGER.info("Removing segment: {} from table: {}", segmentName, tableNameWithType);
     _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
       v.removeSegment(segmentName);
@@ -231,7 +231,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void dropSegment(String tableNameWithType, String segmentName)
+  public void deleteSegment(String tableNameWithType, String segmentName)
       throws Exception {
     // This method might modify the file on disk. Use segment lock to prevent race condition
     Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
@@ -244,25 +244,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         FileUtils.deleteQuietly(segmentDir);
         LOGGER.info("Deleted segment directory {} on default tier", segmentDir);
       }
-      // Note that this method usually happens after removeSegment, which removes the segment object from the
-      // tableDataManager object already, so we can't check segment info from there. In addition, tableDataManager
-      // object itself might not be present for the given table on the server either. So the locations of segment data
-      // are derived from configs and cached info at best effort.
-      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-      if (tableConfig == null) {
-        // Not much we can do without table config.
-        return;
-      }
-      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig);
-      SegmentDirectoryLoader segmentLoader =
-          SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
+      // We might clean up further more with the specific segment loader. But note that tableDataManager object or
+      // even the TableConfig might not be present any more at this point.
+      SegmentDirectoryLoader segmentLoader = SegmentDirectoryLoaderRegistry
+          .getSegmentDirectoryLoader(_instanceDataManagerConfig.getSegmentDirectoryLoader());
       if (segmentLoader != null) {
-        // We might clean up further more with the specific segment loader.
-        SegmentDirectoryLoaderContext ctx =
-            new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
-                .setTableDataDir(_instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType)
-                .setSegmentName(segmentName).build();
-        segmentLoader.drop(ctx);
+        LOGGER.info("Deleting segment: {} further with segment loader: {}", segmentName,
+            _instanceDataManagerConfig.getSegmentDirectoryLoader());
+        SegmentDirectoryLoaderContext ctx = new SegmentDirectoryLoaderContext.Builder().setSegmentName(segmentName)
+            .setTableDataDir(_instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType).build();
+        segmentLoader.delete(ctx);
       }
     } finally {
       segmentLock.unlock();

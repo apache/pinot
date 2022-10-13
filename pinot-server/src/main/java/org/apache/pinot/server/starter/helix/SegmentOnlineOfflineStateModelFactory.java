@@ -127,7 +127,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       String realtimeTableName = message.getResourceName();
       String segmentName = message.getPartitionName();
       try {
-        _instanceDataManager.removeSegment(realtimeTableName, segmentName);
+        _instanceDataManager.offloadSegment(realtimeTableName, segmentName);
       } catch (Exception e) {
         _logger.error("Caught exception in state transition from CONSUMING -> OFFLINE for resource: {}, partition: {}",
             realtimeTableName, segmentName, e);
@@ -182,7 +182,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       String tableNameWithType = message.getResourceName();
       String segmentName = message.getPartitionName();
       try {
-        _instanceDataManager.removeSegment(tableNameWithType, segmentName);
+        _instanceDataManager.offloadSegment(tableNameWithType, segmentName);
       } catch (Exception e) {
         _logger.error("Caught exception in state transition from ONLINE -> OFFLINE for resource: {}, partition: {}",
             tableNameWithType, segmentName, e);
@@ -197,7 +197,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       String tableNameWithType = message.getResourceName();
       String segmentName = message.getPartitionName();
       try {
-        _instanceDataManager.dropSegment(tableNameWithType, segmentName);
+        _instanceDataManager.deleteSegment(tableNameWithType, segmentName);
       } catch (final Exception e) {
         _logger.error("Cannot drop the segment : " + segmentName + " from server!\n" + e.getMessage(), e);
         Utils.rethrowException(e);
