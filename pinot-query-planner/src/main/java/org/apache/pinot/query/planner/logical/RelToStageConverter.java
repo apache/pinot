@@ -118,8 +118,6 @@ public final class RelToStageConverter {
 
   private static StageNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
     JoinRelType joinType = node.getJoinType();
-    Preconditions.checkState(node.getCondition() instanceof RexCall);
-    RexCall joinCondition = (RexCall) node.getCondition();
 
     // Parse out all equality JOIN conditions
     JoinInfo joinInfo = node.analyzeCondition();
