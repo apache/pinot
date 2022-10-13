@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -653,6 +654,21 @@ public class ControllerTest {
   public void dropRealtimeTable(String tableName)
       throws IOException {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+  }
+
+  public List<String> listSegments(String tableName)
+    throws IOException {
+    return listSegments(tableName, null, false);
+  }
+
+  public List<String> listSegments(String tableName, @Nullable String tableType, boolean excludeReplacedSegments)
+      throws IOException {
+    return getControllerRequestClient().listSegments(tableName, tableType, excludeReplacedSegments);
+  }
+
+  public void dropSegment(String tableName, String segmentName)
+      throws IOException {
+    getControllerRequestClient().deleteSegment(tableName, segmentName);
   }
 
   public void dropAllSegments(String tableName, TableType tableType)
