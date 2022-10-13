@@ -33,7 +33,9 @@ public class MailboxReceiveNode extends AbstractStageNode {
   @ProtoProperties
   private KeySelector<Object[], Object[]> _partitionKeySelector;
 
-  private StageNode _sender;
+  // this is only available during planning and should not be relied
+  // on in any post-serialization code
+  private transient StageNode _sender;
 
   public MailboxReceiveNode(int stageId) {
     super(stageId);

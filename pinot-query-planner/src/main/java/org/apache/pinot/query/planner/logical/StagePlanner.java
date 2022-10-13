@@ -41,7 +41,7 @@ import org.apache.pinot.query.routing.WorkerManager;
  * This class is non-threadsafe. Do not reuse the stage planner for multiple query plans.
  */
 public class StagePlanner {
-  private PlannerContext _plannerContext;
+  private final PlannerContext _plannerContext;
   private final WorkerManager _workerManager;
   private int _stageIdCounter;
 
@@ -63,7 +63,7 @@ public class StagePlanner {
 
     // walk the plan and create stages.
     StageNode globalStageRoot = walkRelPlan(relRootNode, getNewStageId());
-    ShuffleRewriter.removeShuffles(globalStageRoot);
+    ShuffleRewriteVisitor.optimizeShuffles(globalStageRoot);
 
     // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
     // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
@@ -75,7 +75,7 @@ public class StagePlanner {
         new MailboxReceiveNode(0, globalStageRoot.getDataSchema(), globalStageRoot.getStageId(),
             RelDistribution.Type.RANDOM_DISTRIBUTED, null, globalSenderNode);
 
-    QueryPlan queryPlan = AttachStageMetadata.attachMetadata(relRoot.fields, globalReceiverNode);
+    QueryPlan queryPlan = StageMetadataVisitor.attachMetadata(relRoot.fields, globalReceiverNode);
 
     // assign workers to each stage.
     for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {

@@ -47,7 +47,7 @@ import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
 
 
-public class PhysicalPlanBuilder implements StageNodeVisitor<Operator<TransferableBlock>, Void> {
+public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<TransferableBlock>, Void> {
 
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
   private final String _hostName;
@@ -55,7 +55,7 @@ public class PhysicalPlanBuilder implements StageNodeVisitor<Operator<Transferab
   private final long _requestId;
   private final Map<Integer, StageMetadata> _metadataMap;
 
-  public PhysicalPlanBuilder(MailboxService<Mailbox.MailboxContent> mailboxService, String hostName, int port,
+  public PhysicalPlanVisitor(MailboxService<Mailbox.MailboxContent> mailboxService, String hostName, int port,
       long requestId, Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _hostName = hostName;

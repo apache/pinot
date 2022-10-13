@@ -87,7 +87,7 @@ public class QueryRunner {
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config, instanceDataManager, serverMetrics);
       _workerExecutor = new WorkerQueryExecutor();
-      _workerExecutor.init(_mailboxService, _hostname, _port);
+      _workerExecutor.init(config, serverMetrics, _mailboxService, _hostname, _port);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

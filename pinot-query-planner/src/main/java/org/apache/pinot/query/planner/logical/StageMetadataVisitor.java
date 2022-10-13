@@ -37,21 +37,21 @@ import org.apache.pinot.query.planner.stage.ValueNode;
 
 
 /**
- * {@code AttachStageMetadata} computes the {@link StageMetadata} for a {@link StageNode}
+ * {@code StageMetadataVisitor} computes the {@link StageMetadata} for a {@link StageNode}
  * tree and attaches it in the form of a {@link QueryPlan}.
  */
-public class AttachStageMetadata implements StageNodeVisitor<Void, QueryPlan> {
+public class StageMetadataVisitor implements StageNodeVisitor<Void, QueryPlan> {
 
   public static QueryPlan attachMetadata(List<Pair<Integer, String>> fields, StageNode root) {
     QueryPlan queryPlan = new QueryPlan(fields, new HashMap<>(), new HashMap<>());
-    root.visit(new AttachStageMetadata(), queryPlan);
+    root.visit(new StageMetadataVisitor(), queryPlan);
     return queryPlan;
   }
 
   /**
    * Usage of this class should only come through {@link #attachMetadata(List, StageNode)}.
    */
-  private AttachStageMetadata() {
+  private StageMetadataVisitor() {
   }
 
   private void visit(StageNode node, QueryPlan queryPlan) {

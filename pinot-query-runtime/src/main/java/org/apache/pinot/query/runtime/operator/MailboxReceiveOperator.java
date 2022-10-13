@@ -85,6 +85,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
       // joins for inequality conditions). This causes NPEs in the logs, but actually works
       // because the side that hits the NPE doesn't expect to get any data anyway (that's the
       // side that gets the broadcast from one side but nothing from the SINGLETON)
+      // FIXME: https://github.com/apache/pinot/issues/9592
       _sendingStageInstances = Collections.singletonList(singletonInstance);
     } else {
       _sendingStageInstances = sendingStageInstances;
