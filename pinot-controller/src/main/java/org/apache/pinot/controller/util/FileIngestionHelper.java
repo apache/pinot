@@ -70,16 +70,16 @@ public class FileIngestionHelper {
   private final Schema _schema;
   private final Map<String, String> _batchConfigMap;
   private final URI _controllerUri;
-  private final File _uploadDir;
+  private final File _localTempDir;
   private final AuthProvider _authProvider;
 
   public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap,
-      URI controllerUri, File uploadDir, AuthProvider authProvider) {
+      URI controllerUri, File localTempDir, AuthProvider authProvider) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfigMap = batchConfigMap;
     _controllerUri = controllerUri;
-    _uploadDir = uploadDir;
+    _localTempDir = localTempDir;
     _authProvider = authProvider;
   }
 
@@ -89,7 +89,7 @@ public class FileIngestionHelper {
   public SuccessResponse buildSegmentAndPush(DataPayload payload)
       throws Exception {
     String tableNameWithType = _tableConfig.getTableName();
-    File workingDir = new File(_uploadDir,
+    File workingDir = new File(_localTempDir,
         String.format("%s_%s_%d", WORKING_DIR_PREFIX, tableNameWithType, System.currentTimeMillis()));
     LOGGER.info("Starting ingestion of {} payload to table: {} using working dir: {}", payload._payloadType,
         tableNameWithType, workingDir.getAbsolutePath());
