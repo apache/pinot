@@ -54,6 +54,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -534,6 +535,24 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, null);
       Assert.fail("Should fail for invalid stream configs map");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // validate the proto decoder
+    streamConfigs = getStreamConfigs();
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
+    streamConfigs.put("stream.kafka.decoder.prop.descriptorFile", "file://test");
+    try {
+      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    } catch (IllegalStateException e) {
+      // expected
+    }
+    streamConfigs.remove("stream.kafka.decoder.prop.descriptorFile");
+    streamConfigs.put("stream.kafka.decoder.prop.protoClassName", "test");
+    try {
+      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
     } catch (IllegalStateException e) {
       // expected
     }

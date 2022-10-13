@@ -303,12 +303,15 @@ public final class TableConfigUtils {
             "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
         List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
         Preconditions.checkState(streamConfigMaps.size() == 1, "Only 1 stream is supported in REALTIME table");
+
+        StreamConfig streamConfig;
         try {
           // Validate that StreamConfig can be created
-          new StreamConfig(tableNameWithType, streamConfigMaps.get(0));
+          streamConfig = new StreamConfig(tableNameWithType, streamConfigMaps.get(0));
         } catch (Exception e) {
           throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
         }
+        validateDecoder(streamConfig);
       }
 
       // Filter config
@@ -456,6 +459,18 @@ public final class TableConfigUtils {
     }
     throw new IllegalStateException(
         String.format("aggregation function %s must be one of %s", name, SUPPORTED_INGESTION_AGGREGATIONS));
+  }
+
+  static void validateDecoder(StreamConfig streamConfig) {
+    if (streamConfig.getDecoderClass().equals("org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder")) {
+      // check the existence of the needed decoder props
+      if (!streamConfig.getDecoderProperties().containsKey("stream.kafka.decoder.prop.descriptorFile")) {
+        throw new IllegalStateException("Missing property of descriptorFile for ProtoBufMessageDecoder");
+      }
+      if (!streamConfig.getDecoderProperties().containsKey("stream.kafka.decoder.prop.protoClassName")) {
+        throw new IllegalStateException("Missing property of protoClassName for ProtoBufMessageDecoder");
+      }
+    }
   }
 
   @VisibleForTesting
