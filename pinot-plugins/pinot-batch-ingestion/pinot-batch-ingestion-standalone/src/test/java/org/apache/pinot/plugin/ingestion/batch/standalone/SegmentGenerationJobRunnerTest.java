@@ -37,6 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.Schema.SchemaBuilder;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
@@ -199,7 +200,7 @@ public class SegmentGenerationJobRunnerTest {
     // Set up for a segment name that matches our input filename, so we can validate
     // that only the first input file gets processed.
     SegmentNameGeneratorSpec nameSpec = new SegmentNameGeneratorSpec();
-    nameSpec.setType(SegmentGenerationTaskRunner.INPUT_FILE_SEGMENT_NAME_GENERATOR);
+    nameSpec.setType(BatchConfigProperties.SegmentNameGeneratorType.INPUT_FILE);
     nameSpec.getConfigs().put(SegmentGenerationTaskRunner.FILE_PATH_PATTERN, ".+/(.+)\\.csv");
     nameSpec.getConfigs().put(SegmentGenerationTaskRunner.SEGMENT_NAME_TEMPLATE, "${filePathPattern:\\1}");
     jobSpec.setSegmentNameGeneratorSpec(nameSpec);
