@@ -110,6 +110,32 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
     return segmentDirectory;
   }
 
+  @Override
+  public void drop(SegmentDirectoryLoaderContext segmentLoaderContext)
+      throws Exception {
+    String segmentName = segmentLoaderContext.getSegmentName();
+    String targetTier = segmentLoaderContext.getSegmentTier();
+    if (targetTier != null) {
+      // Drop segment data on certain tier, mainly used to clean up orphan segments.
+      File segmentDir = getSegmentDataDir(targetTier, segmentLoaderContext);
+      if (segmentDir != null && segmentDir.exists()) {
+        FileUtils.deleteQuietly(segmentDir);
+        LOGGER.info("Deleted segment directory {} on specified tier: {}", segmentDir,
+            TierConfigUtils.normalizeTierName(targetTier));
+      }
+    } else {
+      // Drop segment data on the last known tier.
+      String lastTier = getSegmentTierPersistedLocally(segmentName, segmentLoaderContext);
+      File segmentDir = getSegmentDataDirOrDefault(lastTier, segmentLoaderContext);
+      if (segmentDir.exists()) {
+        FileUtils.deleteQuietly(segmentDir);
+        LOGGER.info("Deleted segment directory {} on last known tier: {}", segmentDir,
+            TierConfigUtils.normalizeTierName(lastTier));
+      }
+      deleteSegmentTierPersistedLocally(segmentName, segmentLoaderContext);
+    }
+  }
+
   // Note that there is no need to synchronize the r/w on the segment tier track file, as the whole load() method is
   // called while holding a segmentLock, so at any time, only one thread is accessing the track file for a segment.
   private void persistSegmentTierLocally(String segmentName, String segmentTier,
@@ -136,6 +162,12 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
       LOGGER.info("No tier track file: {} so using default segment tier", trackFile);
     }
     return segmentTier;
+  }
+
+  private void deleteSegmentTierPersistedLocally(String segmentName, SegmentDirectoryLoaderContext loaderContext) {
+    File trackFile = new File(loaderContext.getTableDataDir(), segmentName + SEGMENT_TIER_TRACK_FILE_SUFFIX);
+    LOGGER.info("Delete tier track file: {}", trackFile);
+    FileUtils.deleteQuietly(trackFile);
   }
 
   private File getSegmentDataDirOrDefault(String segmentTier, SegmentDirectoryLoaderContext loaderContext) {

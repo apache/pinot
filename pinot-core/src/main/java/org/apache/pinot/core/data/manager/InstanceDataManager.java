@@ -86,9 +86,15 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
-   * Removes a segment from a table.
+   * Removes a segment from a table but not dropping its data from server.
    */
   void removeSegment(String tableNameWithType, String segmentName)
+      throws Exception;
+
+  /**
+   * Delete segment data from the server.
+   */
+  void dropSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
   /**

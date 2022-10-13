@@ -38,6 +38,7 @@ import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -63,6 +64,9 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -224,6 +228,45 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Removed segment: {} from table: {}", segmentName, k);
       return v;
     });
+  }
+
+  @Override
+  public void dropSegment(String tableNameWithType, String segmentName)
+      throws Exception {
+    // This method might modify the file on disk. Use segment lock to prevent race condition
+    Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
+    try {
+      segmentLock.lock();
+
+      // Clean up the segment data on default tier unconditionally.
+      File segmentDir = getSegmentDataDirectory(tableNameWithType, segmentName);
+      if (segmentDir.exists()) {
+        FileUtils.deleteQuietly(segmentDir);
+        LOGGER.info("Deleted segment directory {} on default tier", segmentDir);
+      }
+      // Note that this method usually happens after removeSegment, which removes the segment object from the
+      // tableDataManager object already, so we can't check segment info from there. In addition, tableDataManager
+      // object itself might not be present for the given table on the server either. So the locations of segment data
+      // are derived from configs and cached info at best effort.
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      if (tableConfig == null) {
+        // Not much we can do without table config.
+        return;
+      }
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig);
+      SegmentDirectoryLoader segmentLoader =
+          SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
+      if (segmentLoader != null) {
+        // We might clean up further more with the specific segment loader.
+        SegmentDirectoryLoaderContext ctx =
+            new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
+                .setTableDataDir(_instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType)
+                .setSegmentName(segmentName).build();
+        segmentLoader.drop(ctx);
+      }
+    } finally {
+      segmentLock.unlock();
+    }
   }
 
   @Override
