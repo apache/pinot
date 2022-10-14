@@ -89,6 +89,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
           singletonInstance = serverInstance;
         }
       }
+      Preconditions.checkNotNull(singletonInstance, "couldn't find eligible receiver for Singleton distribution");
       _receivingStageInstances = Collections.singletonList(singletonInstance);
     } else {
       _receivingStageInstances = receivingStageInstances;
