@@ -114,6 +114,8 @@ public class QueryTestSet {
 
         // Inequality JOIN & partial filter pushdown
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3"},
+        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND "
+            + "((a.col1 <> 'foo' AND b.col2 <> 'bar') or (a.col1 <> 'bar' AND b.col2 <> 'foo'))"},
 
         new Object[]{"SELECT * FROM a, b WHERE a.col1 > b.col2 AND a.col3 > b.col3"},
 
