@@ -89,6 +89,10 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     List<String> segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     Assert.assertEquals(segments.size(), 0);
 
+    // the ingestion dir does not exist before ingesting files
+    File ingestionDir = new File(_controllerConfig.getLocalTempDir() + "/ingestion_dir");
+    Assert.assertFalse(ingestionDir.exists());
+
     // ingest from file
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, "csv");
@@ -102,6 +106,10 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
         String.format("file://%s", _inputFile.getAbsolutePath())));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     Assert.assertEquals(segments.size(), 2);
+
+    // the ingestion dir exists after ingesting files. We check the existence to make sure this dir is created under
+    // _controllerConfig.getLocalTempDir()
+    Assert.assertTrue(ingestionDir.exists());
   }
 
   private void sendHttpPost(String uri)
