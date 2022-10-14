@@ -18,20 +18,21 @@
  */
 package org.apache.pinot.common.function;
 
-import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.apache.calcite.util.NameMultimap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,21 +40,15 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Registry for scalar functions.
- * <p>TODO: Merge FunctionRegistry and FunctionDefinitionRegistry to provide one single registry for all functions.
  */
 public class FunctionRegistry {
   private FunctionRegistry() {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
-
-  // TODO: consolidate the following 2
-  // This FUNCTION_INFO_MAP is used by Pinot server to look up function by # of arguments
-  private static final Map<String, Map<Integer, FunctionInfo>> FUNCTION_INFO_MAP = new HashMap<>();
-  // This FUNCTION_MAP is used by Calcite function catalog tolook up function by function signature.
   private static final NameMultimap<Function> FUNCTION_MAP = new NameMultimap<>();
 
-  /**
+  /*
    * Registers the scalar functions via reflection.
    * NOTE: In order to plugin methods using reflection, the methods should be inside a class that includes ".function."
    *       in its class path. This convention can significantly reduce the time of class scanning.
@@ -69,18 +64,17 @@ public class FunctionRegistry {
       if (scalarFunction.enabled()) {
         // Annotated function names
         String[] scalarFunctionNames = scalarFunction.names();
-        boolean nullableParameters = scalarFunction.nullableParameters();
-        if (scalarFunctionNames.length > 0) {
-          for (String name : scalarFunctionNames) {
-            FunctionRegistry.registerFunction(name, method, nullableParameters);
-          }
-        } else {
-          FunctionRegistry.registerFunction(method, nullableParameters);
+        if (scalarFunctionNames.length == 0) {
+          registerFunction(method);
+        }
+
+        for (String name : scalarFunctionNames) {
+          FunctionRegistry.registerFunction(name, method);
         }
       }
     }
-    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_INFO_MAP.size(),
-        FUNCTION_INFO_MAP.keySet(), System.currentTimeMillis() - startTimeMs);
+    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_MAP.map().size(),
+        FUNCTION_MAP.map().keySet(), System.currentTimeMillis() - startTimeMs);
   }
 
   /**
@@ -91,27 +85,26 @@ public class FunctionRegistry {
   public static void init() {
   }
 
-  /**
-   * Registers a method with the name of the method.
-   */
-  public static void registerFunction(Method method, boolean nullableParameters) {
-    registerFunction(method.getName(), method, nullableParameters);
-
-    // Calcite ScalarFunctionImpl doesn't allow customized named functions. TODO: fix me.
-    if (method.getAnnotation(Deprecated.class) == null) {
-      FUNCTION_MAP.put(method.getName(), ScalarFunctionImpl.create(method));
-    }
+  public static void registerFunction(Method method) {
+    registerFunction(method.getName(), method);
   }
 
   /**
-   * Registers a method with the given function name.
+   * Registers a method with the name of the method.
    */
-  public static void registerFunction(String functionName, Method method, boolean nullableParameters) {
-    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
-    String canonicalName = canonicalize(functionName);
-    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
-    Preconditions.checkState(functionInfoMap.put(method.getParameterCount(), functionInfo) == null,
-        "Function: %s with %s parameters is already registered", functionName, method.getParameterCount());
+  public static void registerFunction(String name, Method method) {
+    if (method.getAnnotation(Deprecated.class) == null) {
+      Function function = ScalarFunctionImpl.create(method);
+      FUNCTION_MAP.put(name, function);
+      if (!canonicalize(name).equals(name)) {
+        // this is for backwards compatibility with V1 engine, which
+        // always looks up case-insensitive names for functions but
+        // case sensitive names for other identifiers (calcite does
+        // not have an option to do that, it is either entirely case
+        // sensitive or insensitive)
+        FUNCTION_MAP.put(canonicalize(name), function);
+      }
+    }
   }
 
   public static Map<String, List<Function>> getRegisteredCalciteFunctionMap() {
@@ -130,7 +123,7 @@ public class FunctionRegistry {
    * Returns {@code true} if the given function name is registered, {@code false} otherwise.
    */
   public static boolean containsFunction(String functionName) {
-    return FUNCTION_INFO_MAP.containsKey(canonicalize(functionName));
+    return FUNCTION_MAP.containsKey(canonicalize(functionName), true);
   }
 
   /**
@@ -140,8 +133,30 @@ public class FunctionRegistry {
    */
   @Nullable
   public static FunctionInfo getFunctionInfo(String functionName, int numParameters) {
-    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.get(canonicalize(functionName));
-    return functionInfoMap != null ? functionInfoMap.get(numParameters) : null;
+    Collection<Map.Entry<String, Function>> allFunctions = FUNCTION_MAP.range(canonicalize(functionName), true);
+    if (allFunctions.isEmpty()) {
+      return null;
+    }
+
+    List<Function> matchingFunctions = allFunctions
+        .stream()
+        .map(Map.Entry::getValue)
+        .filter(fun -> fun.getParameters().size() == numParameters)
+        .collect(Collectors.toList());
+    if (matchingFunctions.size() > 1) {
+      // this should never happen (yet) because we restrict the registering of multiple methods
+      // with the same number of arguments and the same name
+      throw new BadQueryRequestException(
+          String.format("Could not resolve function %s with %s parameters as multiple were registered: %s",
+              functionName,
+              numParameters,
+              matchingFunctions.stream().map(fun -> ((ScalarFunctionImpl) fun).method)
+                  .map(Method::toString).collect(Collectors.joining(","))));
+    } else if (matchingFunctions.isEmpty()) {
+      return null;
+    }
+
+    return new FunctionInfo(Iterables.getOnlyElement(matchingFunctions));
   }
 
   private static String canonicalize(String functionName) {

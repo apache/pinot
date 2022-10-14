@@ -130,7 +130,7 @@ public class InbuiltFunctionEvaluatorTest {
       throws Exception {
     MyFunc myFunc = new MyFunc();
     Method method = myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class);
-    FunctionRegistry.registerFunction(method, false);
+    FunctionRegistry.registerFunction(method);
     String expression = "appendToStringAndReturn('test ')";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertTrue(evaluator.getArguments().isEmpty());

@@ -19,6 +19,9 @@
 package org.apache.pinot.common.function;
 
 import java.lang.reflect.Method;
+import org.apache.calcite.schema.Function;
+import org.apache.calcite.schema.impl.ScalarFunctionImpl;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 public class FunctionInfo {
@@ -26,10 +29,17 @@ public class FunctionInfo {
   private final Class<?> _clazz;
   private final boolean _nullableParameters;
 
-  public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters) {
-    _method = method;
-    _clazz = clazz;
-    _nullableParameters = nullableParameters;
+  public FunctionInfo(Function calciteFunction) {
+    if (!(calciteFunction instanceof ScalarFunctionImpl)) {
+      throw new IllegalArgumentException("Can only create FunctionInfo based on ScalarFunctionImpl. Got: "
+          + calciteFunction.getClass());
+    }
+
+    ScalarFunctionImpl scalarFunction = ((ScalarFunctionImpl) calciteFunction);
+    _method = scalarFunction.method;
+    _clazz = scalarFunction.method.getDeclaringClass();
+    _nullableParameters = _method.isAnnotationPresent(ScalarFunction.class)
+        && _method.getAnnotation(ScalarFunction.class).nullableParameters();
   }
 
   public Method getMethod() {
