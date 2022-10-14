@@ -120,39 +120,39 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
 
   /**
    * The actual content in an MV array is prepended with 2 prefixes:
-   * 1. elementLengthStoragePrefix - bytes required to store the length of each array element
-   * 2. numberOfElementsStoragePrefix - Number of elements in the array
+   * 1. elementLengthStoragePrefixInBytes - bytes required to store the length of each element in the largest array
+   * 2. numElementsStoragePrefixInBytes - Number of elements in the array
    *
-   * This function returns the total bytes needed to store (1) elementLengthStoragePrefix
+   * This function returns the total bytes needed to store (1) elementLengthStoragePrefixInBytes
    */
-  public static int getElementLengthStoragePrefix(int maxNumberOfElements) {
+  public static int getElementLengthStoragePrefixInBytes(int maxNumberOfElements) {
     return Integer.BYTES * maxNumberOfElements;
   }
 
   /**
    * The actual content in an MV array is prepended with 2 prefixes:
-   * 1. elementLengthStoragePrefix - bytes required to store the length of each array element
-   * 2. numberOfElementsStoragePrefix - Number of elements in the array
+   * 1. elementLengthStoragePrefixInBytes - bytes required to store the length of each element in the largest array
+   * 2. numElementsStoragePrefixInBytes - Number of elements in the array
    *
-   * This function returns the bytes needed to store (2) numberOfElementsStoragePrefix
+   * This function returns the bytes needed to store (2) numElementsStoragePrefixInBytes
    */
-  public static int getNumberOfElementsStoragePrefix() {
+  public static int getNumElementsStoragePrefix() {
     return Integer.BYTES;
   }
 
   /**
    * The actual content in an MV array is prepended with 2 prefixes:
-   * 1. elementLengthStoragePrefix - bytes required to store the length of each array element
-   * 2. numberOfElementsStoragePrefix - Number of elements in the array
+   * 1. elementLengthStoragePrefixInBytes - bytes required to store the length of each element in the largest array
+   * 2. numElementsStoragePrefixInBytes - Number of elements in the array
    *
    * This function returns the bytes needed to store the (1), (2) and the actual content.
    */
   public static int getTotalRowStorageBytes(int maxNumberOfElements, int maxRowDataLengthInBytes) {
-    int elementLengthStoragePrefix = getElementLengthStoragePrefix(maxNumberOfElements);
-    int numberOfElementsStoragePrefix = getNumberOfElementsStoragePrefix();
-    int totalMaxLength = elementLengthStoragePrefix + numberOfElementsStoragePrefix + maxRowDataLengthInBytes;
+    int elementLengthStoragePrefixInBytes = getElementLengthStoragePrefixInBytes(maxNumberOfElements);
+    int numElementsStoragePrefixInBytes = getNumElementsStoragePrefix();
+    int totalMaxLength = elementLengthStoragePrefixInBytes + numElementsStoragePrefixInBytes + maxRowDataLengthInBytes;
     Preconditions.checkArgument(
-        (elementLengthStoragePrefix | maxRowDataLengthInBytes | totalMaxLength | maxNumberOfElements) > 0,
+        (elementLengthStoragePrefixInBytes | maxRowDataLengthInBytes | totalMaxLength | maxNumberOfElements) > 0,
         "integer overflow detected");
 
     return totalMaxLength;
@@ -160,12 +160,12 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
 
   /**
    * The actual content in an MV array is prepended with 2 prefixes:
-   * 1. elementLengthStoragePrefix - bytes required to store the length of each array element
+   * 1. elementLengthStoragePrefixInBytes - bytes required to store the length of each element in the largest array
    * 2. numberOfElementsStoragePrefix - Number of elements in the array
    *
    * This function returns the bytes needed to store the actual content.
    */
   public static int getMaxRowDataLengthInBytes(int totalMaxLength, int maxNumberOfElements) {
-    return totalMaxLength - getNumberOfElementsStoragePrefix() - getElementLengthStoragePrefix(maxNumberOfElements);
+    return totalMaxLength - getNumElementsStoragePrefix() - getElementLengthStoragePrefixInBytes(maxNumberOfElements);
   }
 }
