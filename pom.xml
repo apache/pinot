@@ -437,7 +437,7 @@
       <dependency>
         <groupId>org.testng</groupId>
         <artifactId>testng</artifactId>
-        <version>6.11</version>
+        <version>7.0.0-beta4</version>
       </dependency>
       <dependency>
         <groupId>org.roaringbitmap</groupId>
