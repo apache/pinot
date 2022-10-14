@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -73,6 +74,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private ThreadSafeMutableRoaringBitmap _validDocIds;
   private PinotSegmentRecordReader _pinotSegmentRecordReader;
+  private Map<String, PinotSegmentColumnReader> _pinotSegmentColumnReaderMap;
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
@@ -82,6 +84,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _indexContainerMap = columnIndexContainerMap;
     _starTreeIndexContainer = starTreeIndexContainer;
     _dataSources = new HashMap<>(HashUtil.getHashMapCapacity(segmentMetadata.getColumnMetadataMap().size()));
+    _pinotSegmentColumnReaderMap = new HashMap<>();
 
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
       String colName = entry.getKey();
@@ -268,6 +271,17 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         LOGGER.error("Failed to close record reader. Continuing with error.", e);
       }
     }
+
+    if (_pinotSegmentColumnReaderMap != null) {
+      for(Map.Entry<String, PinotSegmentColumnReader> columnReaderEntry: _pinotSegmentColumnReaderMap.entrySet()) {
+        try {
+          columnReaderEntry.getValue().close();
+        } catch (IOException e) {
+          LOGGER.error("Failed to close column reader for col {}. Continuing with error.",
+              columnReaderEntry.getKey(), e);
+        }
+      }
+    }
   }
 
   @Override
@@ -299,14 +313,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public Object getValue(int docId, String column) {
     try {
-      if (_pinotSegmentRecordReader == null) {
-        _pinotSegmentRecordReader = new PinotSegmentRecordReader();
-        _pinotSegmentRecordReader.init(this);
+      if (!_pinotSegmentColumnReaderMap.containsKey(column)) {
+        _pinotSegmentColumnReaderMap.put(column, new PinotSegmentColumnReader(this, column));
       }
-      return _pinotSegmentRecordReader.getValue(docId, column);
+      return _pinotSegmentColumnReaderMap.get(column).getValue(docId);
     } catch (Exception e) {
       throw new RuntimeException(
-          String.format("Failed to use PinotSegmentRecordReader to read value from immutable segment"
+          String.format("Failed to use PinotSegmentColumnReader to read value from immutable segment"
               + " for docId: %d, column: %s", docId, column), e);
     }
   }
