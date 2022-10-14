@@ -184,6 +184,10 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtimeSegmentRelocation.initialDelayInSeconds";
     public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
         "controller.segmentRelocator.initialDelayInSeconds";
+    public static final String SEGMENT_TIER_ASSIGNER_FREQUENCY_PERIOD =
+        "controller.segmentTierAssigner.frequencyPeriod";
+    public static final String SEGMENT_TIER_ASSIGNER_INITIAL_DELAY_IN_SECONDS =
+        "controller.segmentTierAssigner.initialDelayInSeconds";
 
     // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
     // Default value is false.
@@ -214,6 +218,7 @@ public class ControllerConf extends PinotConfiguration {
 
     private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
     private static final int DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
+    private static final int DEFAULT_SEGMENT_TIER_ASSIGNER_FREQUENCY_IN_SECONDS = 60 * 60;
   }
 
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
@@ -847,6 +852,17 @@ public class ControllerConf extends PinotConfiguration {
               ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
     }
     return segmentRelocatorInitialDelaySeconds;
+  }
+
+  public int getSegmentTierAssignerFrequencyInSeconds() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_TIER_ASSIGNER_FREQUENCY_PERIOD))
+        .map(period -> (int) convertPeriodToSeconds(period))
+        .orElse(ControllerPeriodicTasksConf.DEFAULT_SEGMENT_TIER_ASSIGNER_FREQUENCY_IN_SECONDS);
+  }
+
+  public long getSegmentTierAssignerInitialDelayInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_TIER_ASSIGNER_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
   public long getPeriodicTaskInitialDelayInSeconds() {

@@ -910,9 +910,11 @@ public class PinotSegmentRestletResource {
   })
   public TableTierReader.TableTierDetails getTableTiers(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Whether to include target tier") @QueryParam("includeTargetTier") @DefaultValue("false")
+          boolean includeTargetTier) {
     LOGGER.info("Received a request to get storage tier for all segments for table {}", tableName);
-    return getTableTierInternal(tableName, null, tableTypeStr);
+    return getTableTierInternal(tableName, null, tableTypeStr, includeTargetTier);
   }
 
   @GET
@@ -926,14 +928,16 @@ public class PinotSegmentRestletResource {
   public TableTierReader.TableTierDetails getSegmentTiers(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Whether to include target tier") @QueryParam("includeTargetTier") @DefaultValue("false")
+          boolean includeTargetTier) {
     segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to get storage tier for segment {} in table {}", segmentName, tableName);
-    return getTableTierInternal(tableName, segmentName, tableTypeStr);
+    return getTableTierInternal(tableName, segmentName, tableTypeStr, includeTargetTier);
   }
 
   private TableTierReader.TableTierDetails getTableTierInternal(String tableName, @Nullable String segmentName,
-      @Nullable String tableTypeStr) {
+      @Nullable String tableTypeStr, boolean includeTargetTier) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     Preconditions.checkNotNull(tableType, "Table type is required to get table tiers");
     String tableNameWithType =
@@ -942,7 +946,7 @@ public class PinotSegmentRestletResource {
     TableTierReader.TableTierDetails tableTierDetails;
     try {
       tableTierDetails = tableTierReader.getTableTierDetails(tableNameWithType, segmentName,
-          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, includeTargetTier);
     } catch (Throwable t) {
       throw new ControllerApplicationException(LOGGER, String
           .format("Failed to get tier info for segment: %s in table: %s of type: %s", segmentName, tableName,

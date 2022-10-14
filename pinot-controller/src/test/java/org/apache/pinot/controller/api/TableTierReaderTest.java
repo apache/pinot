@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableTierReader;
@@ -226,7 +227,7 @@ public class TableTierReaderTest {
     when(_helix.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet()))
         .thenAnswer(invocationOnMock -> serverEndpoints(servers));
     TableTierReader reader = new TableTierReader(_executor, _connectionManager, _helix);
-    return reader.getTableTierDetails(tableName, segmentName, TIMEOUT_MSEC);
+    return reader.getTableTierDetails(tableName, segmentName, TIMEOUT_MSEC, true);
   }
 
   @Test
@@ -295,11 +296,15 @@ public class TableTierReaderTest {
   @Test
   public void testGetSegmentTierInfoFromAllServers()
       throws InvalidConfigException {
+    SegmentZKMetadata segZKMeta = mock(SegmentZKMetadata.class);
+    when(segZKMeta.getTier()).thenReturn("coolTier");
+    when(_helix.getSegmentZKMetadata(ArgumentMatchers.anyString(), ArgumentMatchers.anyString())).thenReturn(segZKMeta);
     final String[] servers = {"server6", "server7", "server8", "server9"};
     TableTierReader.TableTierDetails tableTierDetails = testRunner(servers, "myTable_OFFLINE", "segX");
     assertEquals(tableTierDetails.getSegmentTiers().size(), 1);
     Map<String, String> tiersByServer = tableTierDetails.getSegmentTiers().get("segX");
-    assertEquals(tiersByServer.size(), 4);
+    assertEquals(tiersByServer.size(), 5);
+    assertEquals(tiersByServer.get("targetTier"), "coolTier");
     assertEquals(tiersByServer.get("server6"), "someTier");
     assertEquals(tiersByServer.get("server7"), "SEGMENT_MISSED_ON_SERVER");
     assertEquals(tiersByServer.get("server8"), "NO_RESPONSE_FROM_SERVER");
