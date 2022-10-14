@@ -30,8 +30,19 @@ public abstract class FilterOperand extends TransformOperand {
 
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static FilterOperand toFilterOperand(RexExpression rexExpression, DataSchema dataSchema) {
-    Preconditions.checkState(rexExpression instanceof RexExpression.FunctionCall);
-    RexExpression.FunctionCall functionCall = (RexExpression.FunctionCall) rexExpression;
+    if (rexExpression instanceof RexExpression.FunctionCall) {
+      return toFilterOperand((RexExpression.FunctionCall) rexExpression, dataSchema);
+    } else {
+      return toFilterOperand((RexExpression.InputRef) rexExpression, dataSchema);
+    }
+  }
+
+  public static FilterOperand toFilterOperand(RexExpression.InputRef inputRef, DataSchema dataSchema) {
+    return new BooleanInputRef(inputRef, dataSchema);
+  }
+
+  public static FilterOperand toFilterOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
+
     switch (OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName())) {
       case "AND":
         return new And(functionCall.getFunctionOperands(), dataSchema);
@@ -94,6 +105,22 @@ public abstract class FilterOperand extends TransformOperand {
 
   @Override
   public abstract Boolean apply(Object[] row);
+
+  private static class BooleanInputRef extends FilterOperand {
+    private final RexExpression.InputRef _inputRef;
+
+    public BooleanInputRef(RexExpression.InputRef inputRef, DataSchema dataSchema) {
+      Preconditions.checkState(dataSchema.getColumnDataType(inputRef.getIndex())
+          == DataSchema.ColumnDataType.BOOLEAN);
+      _inputRef = inputRef;
+    }
+
+    @Override
+    public Boolean apply(Object[] row) {
+      // DataSchema.ColumnDataType.BOOLEAN.getStoredType() == INT
+      return (int) row[_inputRef.getIndex()] != 0;
+    }
+  }
 
   private static class And extends FilterOperand {
     List<FilterOperand> _childOperands;
