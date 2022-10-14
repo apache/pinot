@@ -273,12 +273,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     }
 
     if (_pinotSegmentColumnReaderMap != null) {
-      for(Map.Entry<String, PinotSegmentColumnReader> columnReaderEntry: _pinotSegmentColumnReaderMap.entrySet()) {
+      for (Map.Entry<String, PinotSegmentColumnReader> columnReaderEntry : _pinotSegmentColumnReaderMap.entrySet()) {
         try {
           columnReaderEntry.getValue().close();
         } catch (IOException e) {
-          LOGGER.error("Failed to close column reader for col {}. Continuing with error.",
-              columnReaderEntry.getKey(), e);
+          LOGGER.error("Failed to close column reader for col {}. Continuing with error.", columnReaderEntry.getKey(),
+              e);
         }
       }
     }
@@ -313,14 +313,18 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public Object getValue(int docId, String column) {
     try {
+      if (_pinotSegmentRecordReader != null) {
+        return _pinotSegmentRecordReader.getValue(docId, column);
+      }
+
       if (!_pinotSegmentColumnReaderMap.containsKey(column)) {
         _pinotSegmentColumnReaderMap.put(column, new PinotSegmentColumnReader(this, column));
       }
       return _pinotSegmentColumnReaderMap.get(column).getValue(docId);
     } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Failed to use PinotSegmentColumnReader to read value from immutable segment"
-              + " for docId: %d, column: %s", docId, column), e);
+      throw new RuntimeException(String.format(
+          "Failed to use PinotSegmentColumnReader to read value from immutable segment" + " for docId: %d, column: %s",
+          docId, column), e);
     }
   }
 }
