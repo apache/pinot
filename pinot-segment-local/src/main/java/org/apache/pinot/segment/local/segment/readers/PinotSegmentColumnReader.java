@@ -52,6 +52,7 @@ public class PinotSegmentColumnReader implements Closeable {
       _maxNumValuesPerMVEntry = -1;
     } else {
       _maxNumValuesPerMVEntry = dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
+      Preconditions.checkState(_maxNumValuesPerMVEntry >= 0, "maxNumValuesPerMVEntry is negative for an MV column.");
       _dictIdBuffer = new int[_maxNumValuesPerMVEntry];
     }
   }
@@ -119,8 +120,6 @@ public class PinotSegmentColumnReader implements Closeable {
             throw new IllegalStateException();
         }
       } else {
-        Preconditions.checkState(_maxNumValuesPerMVEntry >= 0, "maxNumValuesPerMVEntry is negative for an MV column.");
-
         switch (_forwardIndexReader.getStoredType()) {
           case INT: {
             int[] buffer = new int[_maxNumValuesPerMVEntry];

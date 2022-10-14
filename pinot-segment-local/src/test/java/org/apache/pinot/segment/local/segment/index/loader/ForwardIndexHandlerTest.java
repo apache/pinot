@@ -94,6 +94,7 @@ public class ForwardIndexHandlerTest {
 
   // Multivalue columns
   private static final String DIM_MV_PASS_THROUGH_INTEGER = "DIM_MV_PASS_THROUGH_INTEGER";
+  private static final String DIM_MV_PASS_THROUGH_LONG = "DIM_MV_PASS_THROUGH_LONG";
   private static final String DIM_MV_PASS_THROUGH_STRING = "DIM_MV_PASS_THROUGH_STRING";
   private static final String DIM_MV_PASS_THROUGH_BYTES = "DIM_MV_PASS_THROUGH_BYTES";
 
@@ -105,8 +106,8 @@ public class ForwardIndexHandlerTest {
 
   private static final List<String> RAW_PASS_THROUGH_INDEX_COLUMNS =
       Arrays.asList(DIM_PASS_THROUGH_STRING, DIM_PASS_THROUGH_LONG, DIM_PASS_THROUGH_INTEGER,
-          METRIC_PASS_THROUGH_INTEGER, DIM_MV_PASS_THROUGH_INTEGER, DIM_MV_PASS_THROUGH_STRING,
-          DIM_MV_PASS_THROUGH_BYTES);
+          METRIC_PASS_THROUGH_INTEGER, DIM_MV_PASS_THROUGH_INTEGER, DIM_MV_PASS_THROUGH_LONG,
+          DIM_MV_PASS_THROUGH_STRING, DIM_MV_PASS_THROUGH_BYTES);
 
   private static final List<String> RAW_LZ4_INDEX_COLUMNS =
       Arrays.asList(DIM_LZ4_STRING, DIM_LZ4_LONG, DIM_LZ4_INTEGER, METRIC_LZ4_INTEGER);
@@ -183,6 +184,7 @@ public class ForwardIndexHandlerTest {
         .addMetric(METRIC_SNAPPY_INTEGER, FieldSpec.DataType.INT).addMetric(METRIC_LZ4_INTEGER, FieldSpec.DataType.INT)
         .addMetric(METRIC_ZSTANDARD_INTEGER, FieldSpec.DataType.INT)
         .addMultiValueDimension(DIM_MV_PASS_THROUGH_INTEGER, FieldSpec.DataType.INT)
+        .addMultiValueDimension(DIM_MV_PASS_THROUGH_LONG, FieldSpec.DataType.LONG)
         .addMultiValueDimension(DIM_MV_PASS_THROUGH_STRING, FieldSpec.DataType.STRING)
         .addMultiValueDimension(DIM_MV_PASS_THROUGH_BYTES, FieldSpec.DataType.BYTES).build();
 
@@ -212,6 +214,7 @@ public class ForwardIndexHandlerTest {
     int maxNumberOfMVEntries = random.nextInt(500);
     String[][] tempMVStringRows = new String[rowLength][maxNumberOfMVEntries];
     Integer[][] tempMVIntRows = new Integer[rowLength][maxNumberOfMVEntries];
+    Long[][] tempMVLongRows = new Long[rowLength][maxNumberOfMVEntries];
     byte[][][] tempMVByteRows = new byte[rowLength][maxNumberOfMVEntries][];
 
     for (int i = 0; i < rowLength; i++) {
@@ -221,9 +224,11 @@ public class ForwardIndexHandlerTest {
         tempIntRows[i] = 1001;
         tempLongRows[i] = 1001L;
 
-        int numMVElements = random.nextInt(maxNumberOfMVEntries);
+        // Avoid creating empty arrays.
+        int numMVElements = random.nextInt(maxNumberOfMVEntries - 1) + 1;
         for (int j = 0; j < numMVElements; j++) {
           tempMVIntRows[i][j] = 1001;
+          tempMVLongRows[i][j] = 1001L;
           String str = "testRow";
           tempMVStringRows[i][j] = str;
           tempMVByteRows[i][j] = (byte[]) str.getBytes();
@@ -233,9 +238,11 @@ public class ForwardIndexHandlerTest {
         tempIntRows[i] = i;
         tempLongRows[i] = (long) i;
 
-        int numMVElements = random.nextInt(maxNumberOfMVEntries);
+        // Avoid creating empty arrays.
+        int numMVElements = random.nextInt(maxNumberOfMVEntries - 1) + 1;
         for (int j = 0; j < numMVElements; j++) {
           tempMVIntRows[i][j] = j;
+          tempMVLongRows[i][j] = (long) j;
           String str = "n" + i;
           tempMVStringRows[i][j] = str;
           tempMVByteRows[i][j] = (byte[]) str.getBytes();
@@ -275,6 +282,7 @@ public class ForwardIndexHandlerTest {
 
       // MV columns
       row.putValue(DIM_MV_PASS_THROUGH_INTEGER, tempMVIntRows[i]);
+      row.putValue(DIM_MV_PASS_THROUGH_LONG, tempMVLongRows[i]);
       row.putValue(DIM_MV_PASS_THROUGH_STRING, tempMVStringRows[i]);
       row.putValue(DIM_MV_PASS_THROUGH_BYTES, tempMVByteRows[i]);
 
@@ -408,6 +416,9 @@ public class ForwardIndexHandlerTest {
         IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
         IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
         ForwardIndexHandler fwdIndexHandler = new ForwardIndexHandler(existingSegmentMetadata, indexLoadingConfig);
+        boolean val = fwdIndexHandler.needUpdateIndices(writer);
+
+
 
         fwdIndexHandler.updateIndices(writer, indexCreatorProvider);
 
@@ -514,7 +525,7 @@ public class ForwardIndexHandlerTest {
                 Object[] values = (Object[]) val;
                 int length = values.length;
                 for (int i = 0; i < length; i++) {
-                  assertEquals((int) values[i], 1001);
+                  assertEquals((int) values[i], 1001, columnName + " " + rowIdx + " " + expectedCompressionType);
                 }
               }
               break;
@@ -526,7 +537,7 @@ public class ForwardIndexHandlerTest {
                 Object[] values = (Object[]) val;
                 int length = values.length;
                 for (int i = 0; i < length; i++) {
-                  assertEquals((long) values[i], 1001);
+                  assertEquals((long) values[i], 1001, columnName + " " + rowIdx + " " + expectedCompressionType);
                 }
               }
               break;
@@ -539,7 +550,8 @@ public class ForwardIndexHandlerTest {
                 Object[] values = (Object[]) val;
                 int length = values.length;
                 for (int i = 0; i < length; i++) {
-                  assertEquals((byte[]) values[i], expectedVal);
+                  assertEquals((byte[]) values[i], expectedVal,
+                      columnName + " " + rowIdx + " " + expectedCompressionType);
                 }
               }
               break;
