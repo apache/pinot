@@ -23,11 +23,11 @@ import io.grpc.ManagedChannel;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
-import org.apache.pinot.core.common.datablock.BaseDataBlock;
-import org.apache.pinot.core.common.datablock.MetadataBlock;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -89,7 +89,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   private MailboxContent toMailboxContent(BaseDataBlock dataBlock) {
     try {
       Mailbox.MailboxContent.Builder builder = Mailbox.MailboxContent.newBuilder().setMailboxId(_mailboxId)
-          .setPayload(ByteString.copyFrom(new TransferableBlock(dataBlock).toBytes()));
+          .setPayload(ByteString.copyFrom(dataBlock.toBytes()));
       if (dataBlock instanceof MetadataBlock) {
         builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
       }

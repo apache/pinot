@@ -34,9 +34,8 @@ import org.testng.annotations.Test;
 
 public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
 
-  private static final DataSchema testDataSchema = new DataSchema(new String[]{"foo", "bar"},
+  private static final DataSchema TEST_DATA_SCHEMA = new DataSchema(new String[]{"foo", "bar"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
-  private static final int capacity = 1_000_000;
 
   @Test
   public void testHappyPath()
@@ -100,17 +99,18 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
   }
 
   private TransferableBlock getTestTransferableBlock() {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(testDataSchema));
+    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(TEST_DATA_SCHEMA));
   }
 
   private TransferableBlock getTooLargeTransferableBlock() {
-    List<Object[]> rows = new ArrayList<>(capacity);
-    for (int i = 0; i < capacity; i++) {
+    final int size = 1_000_000;
+    List<Object[]> rows = new ArrayList<>(size);
+    for (int i = 0; i < size; i++) {
       Object[] row = new Object[2];
       row[0] = 0;
       row[1] = "test_string";
       rows.add(row);
     }
-    return new TransferableBlock(rows, testDataSchema, BaseDataBlock.Type.ROW);
+    return new TransferableBlock(rows, TEST_DATA_SCHEMA, BaseDataBlock.Type.ROW);
   }
 }
