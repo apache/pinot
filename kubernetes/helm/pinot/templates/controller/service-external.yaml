@@ -34,6 +34,8 @@ spec:
       port: {{ .Values.controller.external.port }}
   selector:
     {{- include "pinot.controllerMatchLabels" . | nindent 4 }}
+{{- with .Values.controller.service.loadBalancerSourceRanges }}
   loadBalancerSourceRanges:
-{{ toYaml .Values.controller.service.loadBalancerSourceRanges | indent 4 }}
+{{ toYaml . | indent 4 }}
+{{- end }}
 {{- end }}
