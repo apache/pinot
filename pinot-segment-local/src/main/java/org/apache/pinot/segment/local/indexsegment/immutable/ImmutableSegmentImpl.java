@@ -264,22 +264,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         LOGGER.error("Failed to close star-tree. Continuing with error.", e);
       }
     }
+
+    closeColumnReaders();
+
     if (_pinotSegmentRecordReader != null) {
       try {
         _pinotSegmentRecordReader.close();
       } catch (IOException e) {
         LOGGER.error("Failed to close record reader. Continuing with error.", e);
-      }
-    }
-
-    if (_pinotSegmentColumnReaderMap != null) {
-      for (Map.Entry<String, PinotSegmentColumnReader> columnReaderEntry : _pinotSegmentColumnReaderMap.entrySet()) {
-        try {
-          columnReaderEntry.getValue().close();
-        } catch (IOException e) {
-          LOGGER.error("Failed to close column reader for col {}. Continuing with error.", columnReaderEntry.getKey(),
-              e);
-        }
       }
     }
   }
@@ -299,6 +291,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public GenericRow getRecord(int docId, GenericRow reuse) {
     try {
       if (_pinotSegmentRecordReader == null) {
+        // Use segment reader, no need for individual column readers
+        // should be closed before init to clear up memory
+        closeColumnReaders();
         _pinotSegmentRecordReader = new PinotSegmentRecordReader();
         _pinotSegmentRecordReader.init(this);
       }
@@ -325,6 +320,20 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       throw new RuntimeException(String.format(
           "Failed to use PinotSegmentColumnReader to read value from immutable segment" + " for docId: %d, column: %s",
           docId, column), e);
+    }
+  }
+
+  private void closeColumnReaders() {
+    if (_pinotSegmentColumnReaderMap != null) {
+      for (Map.Entry<String, PinotSegmentColumnReader> columnReaderEntry : _pinotSegmentColumnReaderMap.entrySet()) {
+        try {
+          columnReaderEntry.getValue().close();
+        } catch (IOException e) {
+          LOGGER.error("Failed to close column reader for col {}. Continuing with error.", columnReaderEntry.getKey(),
+              e);
+        }
+      }
+      _pinotSegmentColumnReaderMap.clear();
     }
   }
 }
