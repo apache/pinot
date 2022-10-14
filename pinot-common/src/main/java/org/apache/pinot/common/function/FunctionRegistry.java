@@ -18,17 +18,35 @@
  */
 package org.apache.pinot.common.function;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
+import org.apache.calcite.config.CalciteConnectionConfigImpl;
+import org.apache.calcite.config.CalciteConnectionProperty;
+import org.apache.calcite.jdbc.CalciteSchema;
+import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
+import org.apache.calcite.prepare.CalciteCatalogReader;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.impl.ScalarFunctionImpl;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.SqlOperatorTable;
+import org.apache.calcite.sql.SqlSyntax;
+import org.apache.calcite.sql.SqlUtil;
+import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.validate.SqlNameMatchers;
+import org.apache.calcite.sql.validate.SqlUserDefinedFunction;
 import org.apache.calcite.util.NameMultimap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -46,7 +64,8 @@ public class FunctionRegistry {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
-  private static final NameMultimap<Function> FUNCTION_MAP = new NameMultimap<>();
+  private static final FunctionsSchema FUNCTIONS_SCHEMA;
+  private static final SqlOperatorTable FUNCTIONS_OP_TABLE;
 
   /*
    * Registers the scalar functions via reflection.
@@ -54,6 +73,8 @@ public class FunctionRegistry {
    *       in its class path. This convention can significantly reduce the time of class scanning.
    */
   static {
+    NameMultimap<Function> functions = new NameMultimap<>();
+
     long startTimeMs = System.currentTimeMillis();
     Set<Method> methods = PinotReflectionUtils.getMethodsThroughReflection(".*\\.function\\..*", ScalarFunction.class);
     for (Method method : methods) {
@@ -65,16 +86,28 @@ public class FunctionRegistry {
         // Annotated function names
         String[] scalarFunctionNames = scalarFunction.names();
         if (scalarFunctionNames.length == 0) {
-          registerFunction(method);
+          registerFunction(functions, method);
         }
 
         for (String name : scalarFunctionNames) {
-          FunctionRegistry.registerFunction(name, method);
+          FunctionRegistry.registerFunction(functions, name, method);
         }
       }
     }
-    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_MAP.map().size(),
-        FUNCTION_MAP.map().keySet(), System.currentTimeMillis() - startTimeMs);
+    FUNCTIONS_SCHEMA = new FunctionsSchema(functions);
+
+    Properties catalogReaderConfigProperties = new Properties();
+    catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
+
+    CalciteSchema schema = CalciteSchema.createRootSchema(false, true, "functionSchema", FUNCTIONS_SCHEMA);
+    FUNCTIONS_OP_TABLE = new CalciteCatalogReader(
+        schema,
+        ImmutableList.of(),
+        new JavaTypeFactoryImpl(),
+        new CalciteConnectionConfigImpl(catalogReaderConfigProperties));
+
+    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", functions.map().size(),
+        functions.map().keySet(), System.currentTimeMillis() - startTimeMs);
   }
 
   /**
@@ -85,78 +118,89 @@ public class FunctionRegistry {
   public static void init() {
   }
 
-  public static void registerFunction(Method method) {
-    registerFunction(method.getName(), method);
+  public static void registerFunction(NameMultimap<Function> functions, Method method) {
+    registerFunction(functions, method.getName(), method);
   }
 
   /**
    * Registers a method with the name of the method.
    */
-  public static void registerFunction(String name, Method method) {
+  public static void registerFunction(NameMultimap<Function> functions, String name, Method method) {
     if (method.getAnnotation(Deprecated.class) == null) {
       Function function = ScalarFunctionImpl.create(method);
-      FUNCTION_MAP.put(name, function);
+      functions.put(name, function);
       if (!canonicalize(name).equals(name)) {
         // this is for backwards compatibility with V1 engine, which
         // always looks up case-insensitive names for functions but
         // case sensitive names for other identifiers (calcite does
         // not have an option to do that, it is either entirely case
         // sensitive or insensitive)
-        FUNCTION_MAP.put(canonicalize(name), function);
+        functions.put(canonicalize(name), function);
       }
     }
   }
 
-  public static Map<String, List<Function>> getRegisteredCalciteFunctionMap() {
-    return FUNCTION_MAP.map();
-  }
-
-  public static Collection<Function> getRegisteredCalciteFunctions(String name) {
-    return FUNCTION_MAP.map().get(name);
-  }
-
-  public static Set<String> getRegisteredCalciteFunctionNames() {
-    return FUNCTION_MAP.map().keySet();
+  public static Map<String, Collection<Function>> getRegisteredCalciteFunctionMap() {
+    return FUNCTIONS_SCHEMA.getFunctionNames().stream().collect(Collectors.toMap(
+        name -> name, FUNCTIONS_SCHEMA::getFunctions
+    ));
   }
 
   /**
    * Returns {@code true} if the given function name is registered, {@code false} otherwise.
    */
   public static boolean containsFunction(String functionName) {
-    return FUNCTION_MAP.containsKey(canonicalize(functionName), true);
+    return FUNCTIONS_SCHEMA.getFunctionNames().contains(canonicalize(functionName));
   }
 
   /**
-   * Returns the {@link FunctionInfo} associated with the given function name and number of parameters, or {@code null}
+   * Returns the {@link FunctionInfo} associated with the given function name and parameters, or {@code null}
    * if there is no matching method. This method should be called after the FunctionRegistry is initialized and all
    * methods are already registered.
    */
-  @Nullable
-  public static FunctionInfo getFunctionInfo(String functionName, int numParameters) {
-    Collection<Map.Entry<String, Function>> allFunctions = FUNCTION_MAP.range(canonicalize(functionName), true);
-    if (allFunctions.isEmpty()) {
-      return null;
+  public static FunctionInfo getFunctionInfo(String functionName, List<RelDataType> parameters) {
+    SqlIdentifier functionIdentifier = new SqlIdentifier(functionName, SqlParserPos.ZERO);
+    List<SqlUserDefinedFunction> functionList = getFunctionInfo(functionIdentifier, parameters, false);
+
+    if (functionList.isEmpty()) {
+      // couldn't find anything without coercion, try coercing
+      functionList = getFunctionInfo(functionIdentifier, parameters, true);
     }
 
-    List<Function> matchingFunctions = allFunctions
-        .stream()
-        .map(Map.Entry::getValue)
-        .filter(fun -> fun.getParameters().size() == numParameters)
-        .collect(Collectors.toList());
-    if (matchingFunctions.size() > 1) {
-      // this should never happen (yet) because we restrict the registering of multiple methods
-      // with the same number of arguments and the same name
+    if (functionList.isEmpty()) {
+      return null;
+    } else if (functionList.size() > 1) {
       throw new BadQueryRequestException(
-          String.format("Could not resolve function %s with %s parameters as multiple were registered: %s",
-              functionName,
-              numParameters,
-              matchingFunctions.stream().map(fun -> ((ScalarFunctionImpl) fun).method)
-                  .map(Method::toString).collect(Collectors.joining(","))));
-    } else if (matchingFunctions.isEmpty()) {
-      return null;
+          String.format("Multiple functions match the desired name(%s)/parameter(%s) pairing): %s",
+              functionName, parameters, functionList));
+    } else {
+      // the only type of functions we register here are scalar functions, which means
+      // all operators will be of type SqlUserDefinedFunction. we may need to make this
+      // more robust if we support UDAFs
+      SqlUserDefinedFunction fun = Iterables.getOnlyElement(functionList);
+      return new FunctionInfo(fun.getFunction());
+    }
+  }
+
+  private static List<SqlUserDefinedFunction> getFunctionInfo(SqlIdentifier functionName, List<RelDataType> parameters,
+      boolean coerce) {
+    Iterator<SqlOperator> functions =
+        SqlUtil.lookupSubjectRoutines(FUNCTIONS_OP_TABLE, new JavaTypeFactoryImpl(), functionName, parameters, null,
+            SqlSyntax.FUNCTION, SqlKind.ALL, null, SqlNameMatchers.withCaseSensitive(true), coerce);
+
+    ArrayList<SqlUserDefinedFunction> functionList = new ArrayList<>();
+    while (functions.hasNext()) {
+      SqlOperator op = functions.next();
+      if (!(op instanceof SqlUserDefinedFunction)) {
+        // this shouldn't happen, so we'll just log a warning and continue in case
+        // we find a sql function that does match
+        LOGGER.warn("Unexpected operator type {} returned when searching for {}", op.getClass(), functionName);
+      } else {
+        functionList.add(((SqlUserDefinedFunction) op));
+      }
     }
 
-    return new FunctionInfo(Iterables.getOnlyElement(matchingFunctions));
+    return functionList;
   }
 
   private static String canonicalize(String functionName) {

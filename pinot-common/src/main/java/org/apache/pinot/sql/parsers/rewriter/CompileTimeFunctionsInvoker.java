@@ -20,10 +20,13 @@ package org.apache.pinot.sql.parsers.rewriter;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.FunctionTypeUtil;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
@@ -68,9 +71,11 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       }
       operands.set(i, operand);
     }
+
     String functionName = function.getOperator();
     if (compilable) {
-      FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numOperands);
+      List<RelDataType> types = operands.stream().map(FunctionTypeUtil::fromExpression).collect(Collectors.toList());
+      FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, types);
       if (functionInfo != null) {
         Object[] arguments = new Object[numOperands];
         for (int i = 0; i < numOperands; i++) {

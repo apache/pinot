@@ -18,32 +18,22 @@
  */
 package org.apache.pinot.query.catalog;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Set;
-import javax.annotation.Nullable;
-import org.apache.calcite.linq4j.tree.Expression;
-import org.apache.calcite.rel.type.RelProtoDataType;
-import org.apache.calcite.schema.Function;
-import org.apache.calcite.schema.Schema;
-import org.apache.calcite.schema.SchemaPlus;
-import org.apache.calcite.schema.SchemaVersion;
-import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.FunctionsSchema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
 
 
 /**
- * Simple Catalog that only contains list of tables. Backed by {@link TableCache}.
+ * Simple Catalog that only contains list of tables and functions. Backed by {@link TableCache}.
  *
  * <p>Catalog is needed for utilizing Apache Calcite's validator, which requires a root schema to store the
  * entire catalog. In Pinot, since we don't have nested sub-catalog concept, we just return a flat list of schemas.
  */
-public class PinotCatalog implements Schema {
+public class PinotCatalog extends FunctionsSchema {
 
   private final TableCache _tableCache;
 
@@ -52,6 +42,7 @@ public class PinotCatalog implements Schema {
    * table available for query and processes table/segment metadata updates when cluster status changes.
    */
   public PinotCatalog(TableCache tableCache) {
+    super(functions);
     _tableCache = tableCache;
   }
 
@@ -73,51 +64,5 @@ public class PinotCatalog implements Schema {
   @Override
   public Set<String> getTableNames() {
     return _tableCache.getTableNameMap().keySet();
-  }
-
-  @Override
-  public RelProtoDataType getType(String name) {
-    return null;
-  }
-
-  @Override
-  public Set<String> getTypeNames() {
-    return Collections.emptySet();
-  }
-
-  @Override
-  public Collection<Function> getFunctions(String name) {
-    return FunctionRegistry.getRegisteredCalciteFunctions(name);
-  }
-
-  @Override
-  public Set<String> getFunctionNames() {
-    return FunctionRegistry.getRegisteredCalciteFunctionNames();
-  }
-
-  @Override
-  public Schema getSubSchema(String name) {
-    return null;
-  }
-
-  @Override
-  public Set<String> getSubSchemaNames() {
-    return Collections.emptySet();
-  }
-
-  @Override
-  public Expression getExpression(@Nullable SchemaPlus parentSchema, String name) {
-    requireNonNull(parentSchema, "parentSchema");
-    return Schemas.subSchemaExpression(parentSchema, name, getClass());
-  }
-
-  @Override
-  public boolean isMutable() {
-    return false;
-  }
-
-  @Override
-  public Schema snapshot(SchemaVersion version) {
-    return this;
   }
 }

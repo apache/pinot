@@ -21,10 +21,13 @@ package org.apache.pinot.segment.local.function;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.FunctionTypeUtil;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -79,7 +82,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
             Preconditions.checkState(numArguments == 1, "NOT function expects 1 argument, got: %s", numArguments);
             return new NotExecutionNode(childNodes[0]);
           default:
-            FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+            List<RelDataType> types =
+                arguments.stream().map(FunctionTypeUtil::fromExpression).collect(Collectors.toList());
+            FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, types);
             if (functionInfo == null) {
               if (FunctionRegistry.containsFunction(functionName)) {
                 throw new IllegalStateException(

@@ -21,9 +21,12 @@ package org.apache.pinot.query.runtime.operator.operands;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.FunctionTypeUtil;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -42,9 +45,16 @@ public class FunctionOperand extends TransformOperand {
     for (RexExpression childRexExpression : operandExpressions) {
       _childOperandList.add(toTransformOperand(childRexExpression, dataSchema));
     }
+
+    List<RelDataType> types =
+        _childOperandList.stream()
+            .map(TransformOperand::getResultType)
+            .map(FunctionTypeUtil::fromColumnDataType)
+            .collect(Collectors.toList());
+
     FunctionInfo functionInfo =
-        FunctionRegistry.getFunctionInfo(OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName()),
-            operandExpressions.size());
+        FunctionRegistry.getFunctionInfo(
+            OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName()), types);
     Preconditions.checkNotNull(functionInfo, "Cannot find function with Name: " + functionCall.getFunctionName());
     _functionInvoker = new FunctionInvoker(functionInfo);
     _resultName = computeColumnName(functionCall.getFunctionName(), _childOperandList);

@@ -19,9 +19,14 @@
 package org.apache.pinot.core.query.postaggregation;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.FunctionTypeUtil;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
@@ -37,7 +42,9 @@ public class PostAggregationFunction {
 
   public PostAggregationFunction(String functionName, ColumnDataType[] argumentTypes) {
     int numArguments = argumentTypes.length;
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+    List<RelDataType> types =
+        Arrays.stream(argumentTypes).map(FunctionTypeUtil::fromColumnDataType).collect(Collectors.toList());
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, types);
     if (functionInfo == null) {
       if (FunctionRegistry.containsFunction(functionName)) {
         throw new IllegalArgumentException(

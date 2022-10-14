@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.common.function;
 
+import com.google.common.collect.ImmutableList;
+import java.util.List;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class FunctionDefinitionRegistryTest {
@@ -64,12 +64,105 @@ public class FunctionDefinitionRegistryTest {
     return null;
   }
 
+  @ScalarFunction(names = {"testFunc1", "testFunc2"})
+  public static String testScalarFunction(String randomArg1, long randomArg2) {
+    return null;
+  }
+
+  @ScalarFunction
+  public static String testCoercionFunction(long randomArg) {
+    return null;
+  }
+
   @Test
-  public void testScalarFunctionNames() {
-    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc1", 2));
-    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc2", 2));
-    assertNull(FunctionRegistry.getFunctionInfo("testScalarFunction", 2));
-    assertNull(FunctionRegistry.getFunctionInfo("testFunc1", 1));
-    assertNull(FunctionRegistry.getFunctionInfo("testFunc2", 1));
+  public void shouldMatchWithCorrectTypesAndName()
+      throws NoSuchMethodException {
+    // Given:
+    String name = "testFunc1";
+    List<RelDataType> types = FunctionTypeUtil.fromClass(long.class, String.class);
+
+    // When:
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(name, types);
+
+    // Then:
+    assertNotNull(functionInfo);
+    assertEquals(functionInfo.getMethod(),
+        FunctionDefinitionRegistryTest.class.getMethod("testScalarFunction", long.class, String.class));
+  }
+
+  @Test
+  public void shouldMatchWithAlternateName()
+      throws NoSuchMethodException {
+    // Given:
+    String name = "testFunc2";
+    List<RelDataType> types = FunctionTypeUtil.fromClass(long.class, String.class);
+
+    // When:
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(name, types);
+
+    // Then:
+    assertNotNull(functionInfo);
+    assertEquals(functionInfo.getMethod(),
+        FunctionDefinitionRegistryTest.class.getMethod("testScalarFunction", long.class, String.class));
+  }
+
+  @Test
+  public void shouldSupportTypeCoercion()
+      throws NoSuchMethodException {
+    // Given:
+    String name = "testCoercionFunction";
+    List<RelDataType> types = FunctionTypeUtil.fromClass(new Class[]{double.class});
+
+    // When:
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(name, types);
+
+    // Then:
+    assertNotNull(functionInfo);
+    assertEquals(functionInfo.getMethod(),
+        FunctionDefinitionRegistryTest.class.getMethod("testCoercionFunction", long.class));
+  }
+
+  @Test
+  public void shouldMatchCorrectSignature()
+      throws NoSuchMethodException {
+    // Given:
+    String name = "testFunc1";
+    List<RelDataType> types = FunctionTypeUtil.fromClass(String.class, long.class);
+
+    // When:
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(name, types);
+
+    // Then:
+    assertNotNull(functionInfo);
+    assertEquals(functionInfo.getMethod(),
+        FunctionDefinitionRegistryTest.class.getMethod("testScalarFunction", String.class, long.class));
+  }
+
+  @Test
+  public void shouldNotMatchWithInvalidName()
+      throws NoSuchMethodException {
+    // Given:
+    String name = "invalidFunc";
+    List<RelDataType> types = FunctionTypeUtil.fromClass(long.class, String.class);
+
+    // When:
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(name, types);
+
+    // Then:
+    assertNull(functionInfo);
+  }
+
+  @Test
+  public void shouldNotMatchWithInvalidNumberParameters()
+      throws NoSuchMethodException {
+    // Given:
+    String name = "testFunc1";
+    List<RelDataType> types = ImmutableList.of(FunctionTypeUtil.fromClass(long.class));
+
+    // When:
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(name, types);
+
+    // Then:
+    assertNull(functionInfo);
   }
 }

@@ -19,9 +19,12 @@
 package org.apache.pinot.core.query.optimizer.statement;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.FunctionTypeUtil;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -115,8 +118,10 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
     if (expressionType == ExpressionType.FUNCTION) {
       // Check if the function returns STRING as output.
       Function function = expression.getFunctionCall();
+      List<RelDataType> types =
+          function.getOperands().stream().map(FunctionTypeUtil::fromExpression).collect(Collectors.toList());
       FunctionInfo functionInfo =
-          FunctionRegistry.getFunctionInfo(function.getOperator(), function.getOperands().size());
+          FunctionRegistry.getFunctionInfo(function.getOperator(), types);
       return functionInfo != null && functionInfo.getMethod().getReturnType() == String.class;
     }
 

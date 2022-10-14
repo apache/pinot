@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -382,40 +383,44 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT(Integer.BYTES, true, true),
-    LONG(Long.BYTES, true, true),
-    FLOAT(Float.BYTES, true, true),
-    DOUBLE(Double.BYTES, true, true),
-    BIG_DECIMAL(true, true),
-    BOOLEAN(INT, false, true),
-    TIMESTAMP(LONG, false, true),
-    STRING(false, true),
-    JSON(STRING, false, false),
-    BYTES(false, false),
-    STRUCT(false, false),
-    MAP(false, false),
-    LIST(false, false);
+    INT(int.class, Integer.BYTES, true, true),
+    LONG(long.class, Long.BYTES, true, true),
+    FLOAT(float.class, Float.BYTES, true, true),
+    DOUBLE(double.class, Double.BYTES, true, true),
+    BIG_DECIMAL(BigDecimal.class, true, true),
+    BOOLEAN(int.class, INT, false, true),
+    TIMESTAMP(long.class, LONG, false, true),
+    STRING(String.class, false, true),
+    JSON(String.class, STRING, false, false),
+    BYTES(ByteArray.class, false, false),
+    STRUCT(Object.class, false, false),
+    MAP(Object.class, false, false),
+    LIST(Object.class, false, false);
 
     private final DataType _storedType;
     private final int _size;
     private final boolean _sortable;
     private final boolean _numeric;
+    private final Class<?> _javaClass;
 
-    DataType(boolean numeric, boolean sortable) {
+    DataType(Class<?> javaClass, boolean numeric, boolean sortable) {
+      _javaClass = javaClass;
       _storedType = this;
       _size = -1;
       _sortable = sortable;
       _numeric = numeric;
     }
 
-    DataType(DataType storedType, boolean numeric, boolean sortable) {
+    DataType(Class<?> javaClass, DataType storedType, boolean numeric, boolean sortable) {
+      _javaClass = javaClass;
       _storedType = storedType;
       _size = storedType._size;
       _sortable = sortable;
       _numeric = numeric;
     }
 
-    DataType(int size, boolean numeric, boolean sortable) {
+    DataType(Class<?> javaClass, int size, boolean numeric, boolean sortable) {
+      _javaClass = javaClass;
       _storedType = this;
       _size = size;
       _sortable = sortable;
@@ -456,6 +461,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
      */
     public boolean isNumeric() {
       return _numeric;
+    }
+
+    /**
+     * @return a Java type that will be used to interpret this data type
+     */
+    public Class<?> getJavaClass() {
+      return _javaClass;
     }
 
     /**
