@@ -65,6 +65,12 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     _isEnabledFeedback = isEnabledFeedback;
   }
 
+  /**
+   * This method may return null. It can happen if there's a large enough gap between the time the receiver received
+   * the last block and the StreamObserver was detected as complete. In that case, the MailboxReceiveOperator would
+   * try to call this method again but since there's no new content to be received, we'll exit the loop. Returning
+   * null here means that MailboxReceiveOperator won't consider this as an error.
+   */
   public Mailbox.MailboxContent poll() {
     while (!isCompleted()) {
       try {

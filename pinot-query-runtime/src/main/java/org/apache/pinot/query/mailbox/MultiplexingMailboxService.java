@@ -20,6 +20,7 @@ package org.apache.pinot.query.mailbox;
 
 import com.clearspring.analytics.util.Preconditions;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -28,9 +29,10 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  */
 public class MultiplexingMailboxService implements MailboxService<TransferableBlock> {
   private final GrpcMailboxService _grpcMailboxService;
+  // TODO: Add config to disable in memory mailbox.
   private final InMemoryMailboxService _inMemoryMailboxService;
 
-  public MultiplexingMailboxService(GrpcMailboxService grpcMailboxService,
+  MultiplexingMailboxService(GrpcMailboxService grpcMailboxService,
       InMemoryMailboxService inMemoryReceivingMailbox) {
     Preconditions.checkState(grpcMailboxService.getHostname().equals(inMemoryReceivingMailbox.getHostname()));
     Preconditions.checkState(grpcMailboxService.getMailboxPort() == inMemoryReceivingMailbox.getMailboxPort());
@@ -74,5 +76,11 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
       return _inMemoryMailboxService.getSendingMailbox(mailboxId);
     }
     return _grpcMailboxService.getSendingMailbox(mailboxId);
+  }
+
+  public static MultiplexingMailboxService newInstance(String hostname, int port,
+      PinotConfiguration pinotConfiguration) {
+    return new MultiplexingMailboxService(new GrpcMailboxService(hostname, port, pinotConfiguration),
+        new InMemoryMailboxService(hostname, port));
   }
 }

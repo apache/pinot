@@ -59,8 +59,13 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   }
 
   /**
-   * Polls the underlying channel and converts the sent data into a TransferableBlock. This may return null if the
-   * underlying channel is completed and there was no new data sent by the sender.
+   * Polls the underlying channel and converts the received data into a TransferableBlock. This may return null in the
+   * following cases:
+   *
+   * <p>
+   *  1. If the mailbox hasn't initialized yet. This means we haven't received any data yet.
+   *  2. If the received block from the sender didn't have any rows.
+   * </p>
    */
   @Override
   public TransferableBlock receive()
@@ -69,6 +74,8 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
     if (waitForInitialize()) {
       mailboxContent = _contentStreamObserver.poll();
       _totalMsgReceived.incrementAndGet();
+    } else {
+      return null;
     }
     return fromMailboxContent(mailboxContent);
   }
@@ -102,22 +109,21 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
    * Converts the data sent by a {@link GrpcSendingMailbox} to a {@link TransferableBlock}.
    *
    * @param mailboxContent data sent by a GrpcSendingMailbox.
-   * @return null if the mailboxContent passed is null or empty. Will return an error block if the returned DataBlock
-   *         contains exceptions.
+   * @return null if the received MailboxContent didn't have any rows.
    * @throws IOException if the MailboxContent cannot be converted to a TransferableBlock.
    */
-  private TransferableBlock fromMailboxContent(@Nullable MailboxContent mailboxContent)
+  @Nullable
+  private TransferableBlock fromMailboxContent(MailboxContent mailboxContent)
       throws IOException {
-    if (mailboxContent == null) {
-      return null;
-    }
     ByteBuffer byteBuffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
     if (byteBuffer.hasRemaining()) {
       BaseDataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
       if (dataBlock instanceof MetadataBlock && !dataBlock.getExceptions().isEmpty()) {
         return TransferableBlockUtils.getErrorTransferableBlock(dataBlock.getExceptions());
       }
-      return new TransferableBlock(dataBlock);
+      if (dataBlock.getNumberOfRows() > 0) {
+        return new TransferableBlock(dataBlock);
+      }
     }
     return null;
   }

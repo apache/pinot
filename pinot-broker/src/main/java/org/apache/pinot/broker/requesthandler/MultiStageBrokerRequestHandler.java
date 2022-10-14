@@ -43,8 +43,6 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
-import org.apache.pinot.query.mailbox.InMemoryMailboxService;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -93,8 +91,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager(_reducerHostname, _reducerPort, routingManager));
     _queryDispatcher = new QueryDispatcher();
-    _mailboxService = new MultiplexingMailboxService(new GrpcMailboxService(_reducerHostname, _reducerPort, config),
-        new InMemoryMailboxService(_reducerHostname, _reducerPort));
+    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config);
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();

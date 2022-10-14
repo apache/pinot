@@ -40,8 +40,6 @@ import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
-import org.apache.pinot.query.mailbox.InMemoryMailboxService;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -85,8 +83,7 @@ public class QueryRunner {
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
     _helixManager = helixManager;
     try {
-      _mailboxService = new MultiplexingMailboxService(new GrpcMailboxService(_hostname, _port, config),
-          new InMemoryMailboxService(_hostname, _port));
+      _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config, instanceDataManager, serverMetrics);
       _workerExecutor = new WorkerQueryExecutor();
