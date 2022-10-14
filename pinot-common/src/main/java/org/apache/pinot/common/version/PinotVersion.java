@@ -26,8 +26,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Reads the maven-setting {@code pinot-version.properties} file to extract the
- * maven version that this code was compiled against.
+ * Reads the {@code pinot-version.properties} file to extract the
+ * project version that this code was compiled against.
  */
 public class PinotVersion {
 
