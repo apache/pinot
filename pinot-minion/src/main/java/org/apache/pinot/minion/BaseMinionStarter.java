@@ -38,6 +38,7 @@ import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.metrics.MinionGauge;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
@@ -46,6 +47,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
@@ -164,7 +166,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   @Override
   public void start()
       throws Exception {
-    LOGGER.info("Starting Pinot minion: {}", _instanceId);
+    LOGGER.info("Starting Pinot minion: {} (Version: {})", _instanceId, PinotVersion.VERSION);
     Utils.logVersions();
     MinionContext minionContext = MinionContext.getInstance();
 
@@ -186,6 +188,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
     MinionMetrics minionMetrics = new MinionMetrics(_config.getMetricsPrefix(), metricsRegistry);
     minionMetrics.initializeGlobalMeters();
+    minionMetrics.setValueOfGlobalGauge(MinionGauge.VERSION, PinotVersion.VERSION, 1);
     minionContext.setMinionMetrics(minionMetrics);
 
     // Install default SSL context if necessary (even if not force-enabled everywhere)
