@@ -50,7 +50,7 @@ public class UpsertUtils {
 
       @Override
       public RecordInfo next() {
-        return getRecordInfo(recordInfoReader, _docId++);
+        return recordInfoReader.getRecordInfo(_docId++);
       }
     };
   }
@@ -70,35 +70,9 @@ public class UpsertUtils {
 
       @Override
       public RecordInfo next() {
-        return getRecordInfo(recordInfoReader, _docIdIterator.next());
+        return recordInfoReader.getRecordInfo(_docIdIterator.next());
       }
     };
-  }
-
-  /**
-   * Reads a {@link RecordInfo} from the segment.
-   */
-  public static RecordInfo getRecordInfo(RecordInfoReader recordInfoReader, int docId) {
-    PrimaryKey primaryKey = new PrimaryKey(new Object[recordInfoReader.getNumPrimaryKeys()]);
-    getPrimaryKey(recordInfoReader._primaryKeyReader, docId, primaryKey);
-    Object comparisonValue = getValue(recordInfoReader._comparisonColumnReader, docId);
-    return new RecordInfo(primaryKey, docId, (Comparable) comparisonValue);
-  }
-
-  /**
-   * Reads a primary key from the segment.
-   */
-  public static void getPrimaryKey(PrimaryKeyReader primaryKeyReader, int docId, PrimaryKey buffer) {
-    Object[] values = buffer.getValues();
-    int numPrimaryKeyColumns = values.length;
-    for (int i = 0; i < numPrimaryKeyColumns; i++) {
-      values[i] = getValue(primaryKeyReader._primaryKeyColumnReaders.get(i), docId);
-    }
-  }
-
-  private static Object getValue(PinotSegmentColumnReader columnReader, int docId) {
-    Object value = columnReader.getValue(docId);
-    return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
   }
 
   public static class RecordInfoReader implements Closeable {
@@ -110,8 +84,10 @@ public class UpsertUtils {
       _comparisonColumnReader = new PinotSegmentColumnReader(segment, comparisonColumn);
     }
 
-    public int getNumPrimaryKeys() {
-      return _primaryKeyReader.getNumPrimaryKeys();
+    public RecordInfo getRecordInfo(int docId) {
+      PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
+      Comparable comparisonValue = (Comparable) getValue(_comparisonColumnReader, docId);
+      return new RecordInfo(primaryKey, docId, comparisonValue);
     }
 
     @Override
@@ -132,8 +108,21 @@ public class UpsertUtils {
       }
     }
 
-    public int getNumPrimaryKeys() {
-      return _primaryKeyColumnReaders.size();
+    public PrimaryKey getPrimaryKey(int docId) {
+      int numPrimaryKeys = _primaryKeyColumnReaders.size();
+      Object[] values = new Object[numPrimaryKeys];
+      for (int i = 0; i < numPrimaryKeys; i++) {
+        values[i] = getValue(_primaryKeyColumnReaders.get(i), docId);
+      }
+      return new PrimaryKey(values);
+    }
+
+    public void getPrimaryKey(int docId, PrimaryKey buffer) {
+      Object[] values = buffer.getValues();
+      int numPrimaryKeys = values.length;
+      for (int i = 0; i < numPrimaryKeys; i++) {
+        values[i] = getValue(_primaryKeyColumnReaders.get(i), docId);
+      }
     }
 
     @Override
@@ -143,5 +132,10 @@ public class UpsertUtils {
         primaryKeyColumnReader.close();
       }
     }
+  }
+
+  private static Object getValue(PinotSegmentColumnReader columnReader, int docId) {
+    Object value = columnReader.getValue(docId);
+    return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
   }
 }

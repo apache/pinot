@@ -165,7 +165,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     try (
         UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment, _primaryKeyColumns)) {
       while (iterator.hasNext()) {
-        UpsertUtils.getPrimaryKey(primaryKeyReader, iterator.next(), primaryKey);
+        primaryKeyReader.getPrimaryKey(iterator.next(), primaryKey);
         _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
             (pk, recordLocation) -> {
               if (recordLocation.getSegment() == segment) {
