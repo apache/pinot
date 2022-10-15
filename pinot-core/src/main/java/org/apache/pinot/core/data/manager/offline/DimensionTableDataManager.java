@@ -29,6 +29,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -141,10 +142,18 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       for (SegmentDataManager segmentManager : segmentManagers) {
         IndexSegment indexSegment = segmentManager.getSegment();
         int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
-        for (int i = 0; i < numTotalDocs; i++) {
-          GenericRow row = new GenericRow();
-          indexSegment.getRecord(i, row);
-          lookupTable.put(row.getPrimaryKey(primaryKeyColumns), row);
+        if (numTotalDocs > 0) {
+          try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+            recordReader.init(indexSegment);
+            for (int i = 0; i < numTotalDocs; i++) {
+              GenericRow row = new GenericRow();
+              recordReader.getRecord(i, row);
+              lookupTable.put(row.getPrimaryKey(primaryKeyColumns), row);
+            }
+          } catch (Exception e) {
+            throw new RuntimeException(
+                "Caught exception while reading records from segment: " + indexSegment.getSegmentName());
+          }
         }
       }
       return new DimensionTable(schema, primaryKeyColumns, lookupTable);

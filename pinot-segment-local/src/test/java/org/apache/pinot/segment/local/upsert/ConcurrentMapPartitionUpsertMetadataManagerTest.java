@@ -31,9 +31,12 @@ import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadat
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -41,6 +44,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -110,7 +114,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       // segment2 snapshot: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
       // segment1 snapshot: 1 -> {4, 120}
       MutableRoaringBitmap validDocIdsSnapshot2 = new MutableRoaringBitmap();
-      validDocIdsSnapshot2.add(new int[]{0, 2, 3});
+      validDocIdsSnapshot2.add(0, 2, 3);
       recordInfoList2 = getRecordInfoList(validDocIdsSnapshot2, primaryKeys, timestamps);
     } else {
       // get recordInfo by iterating all records.
@@ -227,8 +231,14 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
     when(segment.getSegmentName()).thenReturn(getSegmentName(sequenceNumber));
     when(segment.getValidDocIds()).thenReturn(validDocIds);
-    when(segment.getValue(anyInt(), anyString())).thenAnswer(
+    DataSource dataSource = mock(DataSource.class);
+    when(segment.getDataSource(anyString())).thenReturn(dataSource);
+    ForwardIndexReader forwardIndex = mock(ForwardIndexReader.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    when(forwardIndex.getStoredType()).thenReturn(DataType.INT);
+    when(forwardIndex.getInt(anyInt(), any())).thenAnswer(
         invocation -> primaryKeys.get(invocation.getArgument(0)).getValues()[0]);
+    when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
     return segment;
   }
 

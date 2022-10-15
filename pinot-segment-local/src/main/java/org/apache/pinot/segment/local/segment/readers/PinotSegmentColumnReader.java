@@ -22,12 +22,14 @@ import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import javax.annotation.Nullable;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -89,6 +91,7 @@ public class PinotSegmentColumnReader implements Closeable {
 
   public Object getValue(int docId) {
     if (_dictionary != null) {
+      // Dictionary based
       if (_forwardIndexReader.isSingleValue()) {
         return _dictionary.get(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
       } else {
@@ -100,8 +103,10 @@ public class PinotSegmentColumnReader implements Closeable {
         return values;
       }
     } else {
+      // Raw index based
+      DataType storedType = _forwardIndexReader.getStoredType();
       if (_forwardIndexReader.isSingleValue()) {
-        switch (_forwardIndexReader.getStoredType()) {
+        switch (storedType) {
           case INT:
             return _forwardIndexReader.getInt(docId, _forwardIndexReaderContext);
           case LONG:
@@ -117,72 +122,24 @@ public class PinotSegmentColumnReader implements Closeable {
           case BYTES:
             return _forwardIndexReader.getBytes(docId, _forwardIndexReaderContext);
           default:
-            throw new IllegalStateException();
+            throw new IllegalStateException("Unsupported SV type: " + storedType);
         }
       } else {
-        switch (_forwardIndexReader.getStoredType()) {
-          case INT: {
-            int[] buffer = new int[_maxNumValuesPerMVEntry];
-            int length = _forwardIndexReader.getIntMV(docId, buffer, _forwardIndexReaderContext);
-            Object[] values = new Object[length];
-            for (int i = 0; i < length; i++) {
-              values[i] = buffer[i];
-            }
-
-            return values;
-          }
-          case LONG: {
-            long[] buffer = new long[_maxNumValuesPerMVEntry];
-            int length = _forwardIndexReader.getLongMV(docId, buffer, _forwardIndexReaderContext);
-            Object[] values = new Object[length];
-            for (int i = 0; i < length; i++) {
-              values[i] = buffer[i];
-            }
-
-            return values;
-          }
-          case FLOAT: {
-            float[] buffer = new float[_maxNumValuesPerMVEntry];
-            int length = _forwardIndexReader.getFloatMV(docId, buffer, _forwardIndexReaderContext);
-            Object[] values = new Object[length];
-            for (int i = 0; i < length; i++) {
-              values[i] = buffer[i];
-            }
-
-            return values;
-          }
-          case DOUBLE: {
-            double[] buffer = new double[_maxNumValuesPerMVEntry];
-            int length = _forwardIndexReader.getDoubleMV(docId, buffer, _forwardIndexReaderContext);
-            Object[] values = new Object[length];
-            for (int i = 0; i < length; i++) {
-              values[i] = buffer[i];
-            }
-
-            return values;
-          }
-          case STRING: {
-            String[] buffer = new String[_maxNumValuesPerMVEntry];
-            int length = _forwardIndexReader.getStringMV(docId, buffer, _forwardIndexReaderContext);
-            Object[] values = new Object[length];
-            for (int i = 0; i < length; i++) {
-              values[i] = buffer[i];
-            }
-
-            return values;
-          }
-          case BYTES: {
-            byte[][] buffer = new byte[_maxNumValuesPerMVEntry][];
-            int length = _forwardIndexReader.getBytesMV(docId, buffer, _forwardIndexReaderContext);
-            Object[] values = new Object[length];
-            for (int i = 0; i < length; i++) {
-              values[i] = buffer[i];
-            }
-
-            return values;
-          }
+        switch (storedType) {
+          case INT:
+            return ArrayUtils.toObject(_forwardIndexReader.getIntMV(docId, _forwardIndexReaderContext));
+          case LONG:
+            return ArrayUtils.toObject(_forwardIndexReader.getLongMV(docId, _forwardIndexReaderContext));
+          case FLOAT:
+            return ArrayUtils.toObject(_forwardIndexReader.getFloatMV(docId, _forwardIndexReaderContext));
+          case DOUBLE:
+            return ArrayUtils.toObject(_forwardIndexReader.getDoubleMV(docId, _forwardIndexReaderContext));
+          case STRING:
+            return _forwardIndexReader.getStringMV(docId, _forwardIndexReaderContext);
+          case BYTES:
+            return _forwardIndexReader.getBytesMV(docId, _forwardIndexReaderContext);
           default:
-            throw new IllegalStateException("Invalid stored type=" + _forwardIndexReader.getStoredType());
+            throw new IllegalStateException("Unsupported MV type: " + storedType);
         }
       }
     }
