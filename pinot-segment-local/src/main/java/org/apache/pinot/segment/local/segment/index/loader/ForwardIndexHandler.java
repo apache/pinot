@@ -298,11 +298,11 @@ public class ForwardIndexHandler implements IndexHandler {
     ForwardIndexReaderContext readerContext = reader.createContext();
     boolean isSVColumn = reader.isSingleValue();
 
-    for (int i = 0; i < numDocs; i++) {
+    switch (reader.getStoredType()) {
       // JSON fields are either stored as string or bytes. No special handling is needed because we make this
       // decision based on the storedType of the reader.
-      switch (reader.getStoredType()) {
-        case INT: {
+      case INT: {
+        for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
             int val = reader.getInt(i, readerContext);
             creator.putInt(val);
@@ -310,9 +310,11 @@ public class ForwardIndexHandler implements IndexHandler {
             int[] ints = reader.getIntMV(i, readerContext);
             creator.putIntMV(ints);
           }
-          break;
         }
-        case LONG: {
+        break;
+      }
+      case LONG: {
+        for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
             long val = reader.getLong(i, readerContext);
             creator.putLong(val);
@@ -320,9 +322,11 @@ public class ForwardIndexHandler implements IndexHandler {
             long[] longs = reader.getLongMV(i, readerContext);
             creator.putLongMV(longs);
           }
-          break;
         }
-        case FLOAT: {
+        break;
+      }
+      case FLOAT: {
+        for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
             float val = reader.getFloat(i, readerContext);
             creator.putFloat(val);
@@ -330,9 +334,11 @@ public class ForwardIndexHandler implements IndexHandler {
             float[] floats = reader.getFloatMV(i, readerContext);
             creator.putFloatMV(floats);
           }
-          break;
         }
-        case DOUBLE: {
+        break;
+      }
+      case DOUBLE: {
+        for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
             double val = reader.getDouble(i, readerContext);
             creator.putDouble(val);
@@ -340,9 +346,11 @@ public class ForwardIndexHandler implements IndexHandler {
             double[] doubles = reader.getDoubleMV(i, readerContext);
             creator.putDoubleMV(doubles);
           }
-          break;
         }
-        case STRING: {
+        break;
+      }
+      case STRING: {
+        for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
             String val = reader.getString(i, readerContext);
             creator.putString(val);
@@ -350,9 +358,11 @@ public class ForwardIndexHandler implements IndexHandler {
             String[] strings = reader.getStringMV(i, readerContext);
             creator.putStringMV(strings);
           }
-          break;
         }
-        case BYTES: {
+        break;
+      }
+      case BYTES: {
+        for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
             byte[] val = reader.getBytes(i, readerContext);
             creator.putBytes(val);
@@ -360,17 +370,19 @@ public class ForwardIndexHandler implements IndexHandler {
             byte[][] bytesArray = reader.getBytesMV(i, readerContext);
             creator.putBytesMV(bytesArray);
           }
-          break;
         }
-        case BIG_DECIMAL: {
+        break;
+      }
+      case BIG_DECIMAL: {
+        for (int i = 0; i < numDocs; i++) {
           Preconditions.checkState(isSVColumn, "BigDecimal is not supported for MV columns");
           BigDecimal val = reader.getBigDecimal(i, readerContext);
           creator.putBigDecimal(val);
-          break;
         }
-        default:
-          throw new IllegalStateException();
+        break;
       }
+      default:
+        throw new IllegalStateException();
     }
   }
 }
