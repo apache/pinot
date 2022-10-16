@@ -21,6 +21,7 @@ package org.apache.pinot.common.function;
 import com.google.common.collect.Iterables;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -138,11 +139,14 @@ public class FunctionRegistry {
       return null;
     }
 
-    List<Function> matchingFunctions = allFunctions
-        .stream()
-        .map(Map.Entry::getValue)
-        .filter(fun -> fun.getParameters().size() == numParameters)
-        .collect(Collectors.toList());
+    List<Function> matchingFunctions = new ArrayList<>();
+    for (Map.Entry<String, Function> allFunction : allFunctions) {
+      Function candidate = allFunction.getValue();
+      if (candidate.getParameters().size() == numParameters) {
+        matchingFunctions.add(candidate);
+      }
+    }
+
     if (matchingFunctions.size() > 1) {
       // this should never happen (yet) because we restrict the registering of multiple methods
       // with the same number of arguments and the same name
