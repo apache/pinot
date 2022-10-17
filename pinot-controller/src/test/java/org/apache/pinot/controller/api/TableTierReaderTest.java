@@ -227,7 +227,7 @@ public class TableTierReaderTest {
     when(_helix.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet()))
         .thenAnswer(invocationOnMock -> serverEndpoints(servers));
     TableTierReader reader = new TableTierReader(_executor, _connectionManager, _helix);
-    return reader.getTableTierDetails(tableName, segmentName, TIMEOUT_MSEC, true);
+    return reader.getTableTierDetails(tableName, segmentName, TIMEOUT_MSEC);
   }
 
   @Test

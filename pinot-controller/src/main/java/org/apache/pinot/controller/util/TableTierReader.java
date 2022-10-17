@@ -65,11 +65,9 @@ public class TableTierReader {
    *
    * @param tableNameWithType table name with type
    * @param timeoutMs timeout for reading segment tiers from servers
-   * @param includeTargetTier whether to return target tier as well
    * @return details of segment storage tiers for the given table
    */
-  public TableTierDetails getTableTierDetails(String tableNameWithType, @Nullable String segmentName, int timeoutMs,
-      boolean includeTargetTier)
+  public TableTierDetails getTableTierDetails(String tableNameWithType, @Nullable String segmentName, int timeoutMs)
       throws InvalidConfigException {
     Map<String, List<String>> serverToSegmentsMap = new HashMap<>();
     if (segmentName == null) {
@@ -94,9 +92,6 @@ public class TableTierReader {
         tableTierDetails._segmentCurrentTiers.computeIfAbsent(expectedSegment, (k) -> new HashMap<>()).put(server,
             (tableTierInfo == null) ? ERROR_RESP_NO_RESPONSE : getSegmentTier(expectedSegment, tableTierInfo));
       }
-    }
-    if (!includeTargetTier) {
-      return tableTierDetails;
     }
     if (segmentName == null) {
       for (SegmentZKMetadata segmentZKMetadata : _helixResourceManager.getSegmentsZKMetadata(tableNameWithType)) {
