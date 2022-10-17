@@ -72,8 +72,8 @@ public class WorkerQueryExecutor {
     long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
     StageNode stageRoot = queryRequest.getStageRoot();
 
-    Operator<TransferableBlock> rootOperator = new PhysicalPlanVisitor(
-        _mailboxService, _hostName, _port, requestId, queryRequest.getMetadataMap()).build(stageRoot);
+    Operator<TransferableBlock> rootOperator = PhysicalPlanVisitor.build(
+        _mailboxService, _hostName, _port, requestId, queryRequest.getMetadataMap(), stageRoot);
 
     executorService.submit(new TraceRunnable() {
       @Override

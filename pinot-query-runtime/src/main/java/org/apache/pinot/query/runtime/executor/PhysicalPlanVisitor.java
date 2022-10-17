@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.executor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -45,8 +46,18 @@ import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 
 
+/**
+ * This visitor constructs a physical plan of operators from a {@link StageNode} tree. Note that
+ * this works only for the intermediate stage nodes, leaf stage nodes are expected to compile into
+ * v1 operators at this point in time.
+ *
+ * <p>This class should be used statically via {@link #build(MailboxService, String, int, long, Map, StageNode)}
+ *
+ * @see org.apache.pinot.query.runtime.QueryRunner#processQuery(DistributedStagePlan, ExecutorService, Map)
+ */
 public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<TransferableBlock>, Void> {
 
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
@@ -55,17 +66,18 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
   private final long _requestId;
   private final Map<Integer, StageMetadata> _metadataMap;
 
-  public PhysicalPlanVisitor(MailboxService<Mailbox.MailboxContent> mailboxService, String hostName, int port,
+  public static Operator<TransferableBlock> build(MailboxService<Mailbox.MailboxContent> mailboxService,
+      String hostName, int port, long requestId, Map<Integer, StageMetadata> metadataMap, StageNode node) {
+    return node.visit(new PhysicalPlanVisitor(mailboxService, hostName, port, requestId, metadataMap), null);
+  }
+
+  private PhysicalPlanVisitor(MailboxService<Mailbox.MailboxContent> mailboxService, String hostName, int port,
       long requestId, Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _hostName = hostName;
     _port = port;
     _requestId = requestId;
     _metadataMap = metadataMap;
-  }
-
-  public Operator<TransferableBlock> build(StageNode node) {
-    return node.visit(this, null);
   }
 
   @Override

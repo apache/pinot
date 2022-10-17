@@ -38,7 +38,7 @@ import org.apache.pinot.query.planner.stage.ValueNode;
 
 /**
  * {@code ShuffleRewriteVisitor} removes unnecessary shuffles from a stage node plan by
- * inspecting whether all data required by a specific subtree already resides on
+ * inspecting whether all data required by a specific subtree are already colocated.
  * a single host. It gathers the information recursively by checking which partitioned
  * data is selected by each node in the tree.
  *
