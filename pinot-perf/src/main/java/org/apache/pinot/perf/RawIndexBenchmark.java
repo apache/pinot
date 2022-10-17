@@ -96,7 +96,7 @@ public class RawIndexBenchmark {
       description = "Number of consecutive docIds to lookup")
   private int _numConsecutiveLookups = DEFAULT_NUM_CONSECUTIVE_LOOKUP;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
       description = "print this message")
   private boolean _help = false;
 
@@ -303,6 +303,10 @@ public class RawIndexBenchmark {
     RawIndexBenchmark benchmark = new RawIndexBenchmark();
     CommandLine commandLine = new CommandLine(benchmark);
     commandLine.parseArgs(args);
+    if (commandLine.isUsageHelpRequested() || commandLine.parseArgs(args).matchedArgs().size() == 0) {
+      commandLine.usage(System.out);
+      return;
+    }
     benchmark.run();
   }
 }

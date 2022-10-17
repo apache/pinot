@@ -20,6 +20,7 @@ package org.apache.pinot.tools;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.log4j.PropertyConfigurator;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.filesystem.PinotFSBenchmarkRunner;
 import org.apache.pinot.tools.perf.PerfBenchmarkRunner;
@@ -43,7 +44,7 @@ public class PinotToolLauncher {
     SUBCOMMAND_MAP.put("SegmentDump", new SegmentDumpTool());
   }
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
       description = "Print this message.")
   boolean _help = false;
 

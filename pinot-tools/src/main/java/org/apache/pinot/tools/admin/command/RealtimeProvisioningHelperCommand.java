@@ -100,7 +100,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
       description = "Maximum memory per host that can be used for pinot data (e.g. 250G, 100M). Default 48g")
   private String _maxUsableHostMemory = "48G";
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true)
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, usageHelp = true)
   private boolean _help = false;
 
   public RealtimeProvisioningHelperCommand setTableConfigFile(String tableConfigFile) {
@@ -186,7 +186,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @Override
   public void printExamples() {
     StringBuilder builder = new StringBuilder();
-    builder.append("\n\nThis command allows you to estimate the capacity needed for provisioning realtime hosts")
+    builder.append("\n\nThis command allows you to estimate the capacity needed for provisioning realtime hosts. ")
         .append("It assumes that there is no upper limit to the amount of memory you can mmap").append(
         "\nIf you have a hybrid table, then consult the push frequency setting in your offline table specify it in "
             + "the -pushFrequency argument").append(
@@ -197,7 +197,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
         "\nDoing so will let this program assume that you are willing to take a page hit when querying older data")
         .append("\nand optimize memory and number of hosts accordingly.")
         .append("\n See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime for details");
-    System.out.println(builder.toString());
+    System.out.println(builder);
   }
 
   @Override
@@ -343,6 +343,19 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Cannot read schema file '%s' to '%s' object.", file, clazz.getSimpleName()), e);
+    }
+  }
+
+  public static void main(String[] args)
+      throws IOException {
+    RealtimeProvisioningHelperCommand rtProvisioningHelper = new RealtimeProvisioningHelperCommand();
+    CommandLine cmdLine = new CommandLine(rtProvisioningHelper);
+    cmdLine.parseArgs(args);
+    if (rtProvisioningHelper.getHelp()) {
+      cmdLine.usage(System.out);
+      rtProvisioningHelper.printUsage();
+    } else {
+      rtProvisioningHelper.execute();
     }
   }
 }

@@ -66,23 +66,18 @@ public class AutoAddInvertedIndexTool extends AbstractBaseCommand implements Com
           + AutoAddInvertedIndex.DEFAULT_MAX_NUM_INVERTED_INDEX_ADDED)
   private int _maxNumInvertedIndex = AutoAddInvertedIndex.DEFAULT_MAX_NUM_INVERTED_INDEX_ADDED;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
       description = "Print this message.")
   private boolean _help = false;
 
   @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  @Override
-  public String getName() {
-    return getClass().getSimpleName();
-  }
-
-  @Override
   public String description() {
     return "Automatically add inverted index to tables based on the settings. Currently only support 'QUERY' strategy";
+  }
+
+  @Override
+  public boolean getHelp() {
+    return _help;
   }
 
   @Override
