@@ -190,6 +190,9 @@ public class QueryTestSet {
         //   - distinct value done via GROUP BY with empty expr aggregation list.
         new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
             + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3"},
+        new Object[]{"SELECT col3 FROM a GROUP BY col3, col1"},
+        new Object[]{"SELECT col1 FROM a GROUP BY col3, col1"},
+        new Object[]{"SELECT AVG(col3) FROM (SELECT col1, col3 FROM a WHERE col3 > 1 GROUP BY col1, col3)"},
 
         // Test optimized constant literal.
         new Object[]{"SELECT col1 FROM a WHERE col3 > 0 AND col3 < -5"},

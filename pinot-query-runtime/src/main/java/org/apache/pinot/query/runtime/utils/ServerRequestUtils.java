@@ -55,6 +55,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
+import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -69,7 +70,10 @@ import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 public class ServerRequestUtils {
   private static final int DEFAULT_LEAF_NODE_LIMIT = 10_000_000;
   private static final List<String> QUERY_REWRITERS_CLASS_NAMES =
-      ImmutableList.of(PredicateComparisonRewriter.class.getName());
+      ImmutableList.of(
+          PredicateComparisonRewriter.class.getName(),
+          NonAggregationGroupByToDistinctQueryRewriter.class.getName()
+      );
   private static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(
       QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
   private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
@@ -182,12 +186,12 @@ public class ServerRequestUtils {
       pinotQuery.setSelectList(CalciteRexExpressionParser.overwriteSelectList(
           ((ProjectNode) node).getProjects(), pinotQuery));
     } else if (node instanceof AggregateNode) {
-      // set agg list
-      pinotQuery.setSelectList(CalciteRexExpressionParser.addSelectList(pinotQuery.getSelectList(),
-          ((AggregateNode) node).getAggCalls(), pinotQuery));
       // set group-by list
       pinotQuery.setGroupByList(CalciteRexExpressionParser.convertGroupByList(
           ((AggregateNode) node).getGroupSet(), pinotQuery));
+      // set agg list
+      pinotQuery.setSelectList(CalciteRexExpressionParser.addSelectList(pinotQuery.getGroupByList(),
+          ((AggregateNode) node).getAggCalls(), pinotQuery));
     } else if (node instanceof SortNode) {
       if (((SortNode) node).getCollationKeys().size() > 0) {
         pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(((SortNode) node).getCollationKeys(),
