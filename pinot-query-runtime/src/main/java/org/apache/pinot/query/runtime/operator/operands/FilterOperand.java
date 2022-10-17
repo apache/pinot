@@ -24,17 +24,25 @@ import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.OperatorUtils;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public abstract class FilterOperand extends TransformOperand {
 
-  @SuppressWarnings({"unchecked", "rawtypes"})
   public static FilterOperand toFilterOperand(RexExpression rexExpression, DataSchema dataSchema) {
     if (rexExpression instanceof RexExpression.FunctionCall) {
       return toFilterOperand((RexExpression.FunctionCall) rexExpression, dataSchema);
-    } else {
+    } else if (rexExpression instanceof RexExpression.InputRef) {
       return toFilterOperand((RexExpression.InputRef) rexExpression, dataSchema);
+    } else if (rexExpression instanceof RexExpression.Literal) {
+      return toFilterOperand((RexExpression.Literal) rexExpression);
+    } else {
+      throw new UnsupportedOperationException("Unsupported expression on filter conversion: " + rexExpression);
     }
+  }
+
+  public static FilterOperand toFilterOperand(RexExpression.Literal literal) {
+    return new BooleanLiteral(literal);
   }
 
   public static FilterOperand toFilterOperand(RexExpression.InputRef inputRef, DataSchema dataSchema) {
@@ -117,8 +125,22 @@ public abstract class FilterOperand extends TransformOperand {
 
     @Override
     public Boolean apply(Object[] row) {
-      // DataSchema.ColumnDataType.BOOLEAN.getStoredType() == INT
-      return (int) row[_inputRef.getIndex()] != 0;
+      return row[_inputRef.getIndex()] instanceof Integer ? (Integer) row[_inputRef.getIndex()] > 0
+          : (Boolean) row[_inputRef.getIndex()];
+    }
+  }
+
+  private static class BooleanLiteral extends FilterOperand {
+    private final Object _literalValue;
+
+    public BooleanLiteral(RexExpression.Literal literal) {
+      Preconditions.checkState(literal.getDataType() == FieldSpec.DataType.BOOLEAN);
+      _literalValue = literal.getValue();
+    }
+
+    @Override
+    public Boolean apply(Object[] row) {
+      return (boolean) _literalValue;
     }
   }
 
