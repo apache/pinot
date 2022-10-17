@@ -79,6 +79,13 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
           singletonInstance = serverInstance;
         }
       }
+
+      // FIXME: there's a bug where singletonInstance may be null in the case of a JOIN where
+      // one side is BROADCAST and the other is SINGLETON (this is the case with nested loop
+      // joins for inequality conditions). This causes NPEs in the logs, but actually works
+      // because the side that hits the NPE doesn't expect to get any data anyway (that's the
+      // side that gets the broadcast from one side but nothing from the SINGLETON)
+      // FIXME: https://github.com/apache/pinot/issues/9592
       _sendingStageInstances = Collections.singletonList(singletonInstance);
     } else {
       _sendingStageInstances = sendingStageInstances;

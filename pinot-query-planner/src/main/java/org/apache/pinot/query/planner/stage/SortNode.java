@@ -72,4 +72,9 @@ public class SortNode extends AbstractStageNode {
   public String explain() {
     return "SORT" + (_fetch > 0 ? " (LIMIT " + _fetch + ")" : "");
   }
+
+  @Override
+  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitSort(this, context);
+  }
 }

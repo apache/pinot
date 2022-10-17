@@ -70,10 +70,10 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   private final int _stageId;
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
   private final DataSchema _dataSchema;
-  private BaseOperator<TransferableBlock> _dataTableBlockBaseOperator;
+  private Operator<TransferableBlock> _dataTableBlockBaseOperator;
 
   public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
-      BaseOperator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
+      Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
       long jobId, int stageId) {
     _dataSchema = dataSchema;

@@ -34,12 +34,12 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
 
 public class FilterOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "FILTER";
-  private final BaseOperator<TransferableBlock> _upstreamOperator;
+  private final Operator<TransferableBlock> _upstreamOperator;
   private final FilterOperand _filterOperand;
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public FilterOperator(BaseOperator<TransferableBlock> upstreamOperator, DataSchema dataSchema, RexExpression filter) {
+  public FilterOperator(Operator<TransferableBlock> upstreamOperator, DataSchema dataSchema, RexExpression filter) {
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = FilterOperand.toFilterOperand(filter, dataSchema);

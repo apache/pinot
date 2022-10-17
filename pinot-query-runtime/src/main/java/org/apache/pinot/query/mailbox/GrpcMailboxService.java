@@ -99,4 +99,9 @@ public class GrpcMailboxService implements MailboxService<MailboxContent> {
   public ManagedChannel getChannel(String mailboxId) {
     return _channelManager.getChannel(Utils.constructChannelId(mailboxId));
   }
+
+  @Override
+  public String toString() {
+    return "GrpcMailboxService{" + "_hostname='" + _hostname + '\'' + ", _mailboxPort=" + _mailboxPort + '}';
+  }
 }
