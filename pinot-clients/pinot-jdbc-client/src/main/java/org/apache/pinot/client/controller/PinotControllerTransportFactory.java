@@ -44,8 +44,8 @@ public class PinotControllerTransportFactory {
   private String _appId = null;
 
   public PinotControllerTransport buildTransport() {
-    ConnectionTimeouts connectionTimeouts = ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs,
-            _handshakeTimeoutMs);
+    ConnectionTimeouts connectionTimeouts =
+        ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs, _handshakeTimeoutMs);
     TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
     return new PinotControllerTransport(_headers, _scheme, _sslContext, connectionTimeouts, tlsProtocols, _appId);
   }
@@ -75,17 +75,17 @@ public class PinotControllerTransportFactory {
   }
 
   public PinotControllerTransportFactory withConnectionProperties(Properties properties) {
-    _readTimeoutMs = Integer.parseInt(properties.getProperty("controllerReadTimeoutMs",
-            DEFAULT_CONTROLLER_READ_TIMEOUT_MS));
-    _connectTimeoutMs = Integer.parseInt(properties.getProperty("controllerConnectTimeoutMs",
-            DEFAULT_CONTROLLER_CONNECT_TIMEOUT_MS));
-    _handshakeTimeoutMs = Integer.parseInt(properties.getProperty("controllerHandshakeTimeoutMs",
-            DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS));
-    _appId = properties.getProperty("appId", "");
-    _tlsV10Enabled = Boolean.parseBoolean(properties.getProperty("controllerTlsV10Enabled",
-            DEFAULT_CONTROLLER_TLS_V10_ENABLED))
-            || Boolean.parseBoolean(System.getProperties().getProperty("controller.tlsV10Enabled",
-            DEFAULT_CONTROLLER_TLS_V10_ENABLED));
+    _readTimeoutMs =
+        Integer.parseInt(properties.getProperty("controllerReadTimeoutMs", DEFAULT_CONTROLLER_READ_TIMEOUT_MS));
+    _connectTimeoutMs =
+        Integer.parseInt(properties.getProperty("controllerConnectTimeoutMs", DEFAULT_CONTROLLER_CONNECT_TIMEOUT_MS));
+    _handshakeTimeoutMs = Integer.parseInt(
+        properties.getProperty("controllerHandshakeTimeoutMs", DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS));
+    _appId = properties.getProperty("appId");
+    _tlsV10Enabled =
+        Boolean.parseBoolean(properties.getProperty("controllerTlsV10Enabled", DEFAULT_CONTROLLER_TLS_V10_ENABLED))
+            || Boolean.parseBoolean(
+            System.getProperties().getProperty("controller.tlsV10Enabled", DEFAULT_CONTROLLER_TLS_V10_ENABLED));
     return this;
   }
 }

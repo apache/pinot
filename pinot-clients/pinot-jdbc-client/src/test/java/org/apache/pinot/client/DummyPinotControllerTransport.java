@@ -31,9 +31,8 @@ public class DummyPinotControllerTransport extends PinotControllerTransport {
 
   public DummyPinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
       @Nullable String appId) {
-    super(headers, scheme, sslContext,
-            ConnectionTimeouts.create(1000, 1000, 1000),
-            TlsProtocols.defaultProtocols(true), appId);
+    super(headers, scheme, sslContext, ConnectionTimeouts.create(1000, 1000, 1000), TlsProtocols.defaultProtocols(true),
+        appId);
   }
 
   @Override

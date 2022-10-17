@@ -104,7 +104,7 @@ public class BrokerCache {
         DEFAULT_CONTROLLER_CONNECT_TIMEOUT_MS));
     int handshakeTimeoutMs = Integer.parseInt(properties.getProperty("controllerHandshakeTimeoutMs",
         DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS));
-    String appId = properties.getProperty("appId", DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS);
+    String appId = properties.getProperty("appId");
     boolean tlsV10Enabled = Boolean.parseBoolean(properties.getProperty("controllerTlsV10Enabled",
         DEFAULT_CONTROLLER_TLS_V10_ENABLED))
         || Boolean.parseBoolean(System.getProperties().getProperty("controller.tlsV10Enabled",

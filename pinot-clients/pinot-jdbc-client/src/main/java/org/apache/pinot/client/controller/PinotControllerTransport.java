@@ -51,10 +51,8 @@ public class PinotControllerTransport {
   private final String _scheme;
   private final AsyncHttpClient _httpClient;
 
-
-  public PinotControllerTransport(Map<String, String> headers, String scheme,
-                                  @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
-                                  TlsProtocols tlsProtocols, @Nullable String appId) {
+  public PinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
+      ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols, @Nullable String appId) {
     _headers = headers;
     _scheme = scheme;
 
@@ -64,10 +62,10 @@ public class PinotControllerTransport {
     }
 
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
-            .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
-            .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-            .setUserAgent(getUserAgentVersionFromClassPath(appId))
-            .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
+        .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
+        .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
+        .setUserAgent(getUserAgentVersionFromClassPath(appId))
+        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
 
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
@@ -75,15 +73,16 @@ public class PinotControllerTransport {
   private String getUserAgentVersionFromClassPath(@Nullable String appId) {
     Properties userAgentProperties = new Properties();
     try {
-      userAgentProperties.load(PinotControllerTransport.class.getClassLoader()
-              .getResourceAsStream("version.properties"));
+      userAgentProperties.load(
+          PinotControllerTransport.class.getClassLoader().getResourceAsStream("version.properties"));
     } catch (IOException e) {
       LOGGER.warn("Unable to set user agent version");
     }
     String userAgentFromProperties = userAgentProperties.getProperty("ua", "unknown");
     if (StringUtils.isNotEmpty(appId)) {
-      return appId.substring(0, Math.min(org.apache.pinot.client.utils.ConnectionUtils.APP_ID_MAX_CHARS,
-          appId.length())) + "-" + userAgentFromProperties;
+      return
+          appId.substring(0, Math.min(org.apache.pinot.client.utils.ConnectionUtils.APP_ID_MAX_CHARS, appId.length()))
+              + "-" + userAgentFromProperties;
     }
     return userAgentFromProperties;
   }
