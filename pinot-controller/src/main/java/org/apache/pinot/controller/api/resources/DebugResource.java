@@ -223,8 +223,8 @@ public class DebugResource {
         new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager);
     TableSizeReader.TableSizeDetails tableSizeDetails;
     try {
-      tableSizeDetails = tableSizeReader.getTableSizeDetails(tableNameWithType,
-          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      tableSizeDetails = tableSizeReader
+          .getTableSizeDetails(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Throwable t) {
       tableSizeDetails = null;
     }

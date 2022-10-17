@@ -72,8 +72,8 @@ public class DebugResource {
   @GET
   @Path("tables/{tableName}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get segments debug info for this table", notes = "This is a debug endpoint, and won't "
-      + "maintain backward compatibility")
+  @ApiOperation(value = "Get segments debug info for this table",
+      notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public List<SegmentServerDebugInfo> getSegmentsDebugInfo(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableNameWithType) {
 
@@ -84,8 +84,8 @@ public class DebugResource {
   @GET
   @Path("segments/{tableName}/{segmentName}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get segment debug info", notes = "This is a debug endpoint, and won't maintain backward "
-      + "compatibility")
+  @ApiOperation(value = "Get segment debug info",
+      notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public SegmentServerDebugInfo getSegmentDebugInfo(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName) {
