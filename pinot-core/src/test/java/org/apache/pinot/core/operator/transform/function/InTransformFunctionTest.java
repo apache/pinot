@@ -51,6 +51,24 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
       assertEquals(intValues[i], inValues.contains(_intSVValues[i]) ? 1 : 0);
     }
   }
+  @Test
+  public void testIntNotInTransformFunction() {
+    String expressionStr =
+        String.format("%s NOT IN (%d, %d, %d)", INT_SV_COLUMN, _intSVValues[2], _intSVValues[5], _intSVValues[9]);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof InTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.NOT_IN.getName());
+
+    Set<Integer> inValues = Sets.newHashSet(_intSVValues[2], _intSVValues[5], _intSVValues[9]);
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (i != 2 && i != 5 && i != 9) {
+        assertEquals(intValues[i], 1);
+      }
+      assertEquals(intValues[i], inValues.contains(_intSVValues[i]) ? 0 : 1);
+    }
+  }
 
   @Test
   public void testIntMVInTransformFunction() {
