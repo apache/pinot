@@ -44,7 +44,7 @@ public class NotInTransformFunction extends InTransformFunction {
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int[] intValuesSV = super.transformToIntValuesSV(projectionBlock);
     for (int i = 0; i < intValuesSV.length; i++) {
-      intValuesSV[i] = intValuesSV[i] == 0 ? 1 : 0;
+      intValuesSV[i] = 1 - intValuesSV[i];
     }
     return intValuesSV;
   }
