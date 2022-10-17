@@ -26,6 +26,7 @@ import org.apache.pinot.common.Utils;
  *
  */
 public enum ServerGauge implements AbstractMetrics.Gauge {
+  VERSION("version", true),
   DOCUMENT_COUNT("documents", false),
   SEGMENT_COUNT("segments", false),
   LLC_PARTITION_CONSUMING("state", false),

@@ -91,7 +91,11 @@ public class ControllerTest {
   public static final String LOCAL_HOST = "localhost";
   public static final int DEFAULT_CONTROLLER_PORT = 18998;
   public static final String DEFAULT_DATA_DIR =
-      new File(FileUtils.getTempDirectoryPath(), "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
+      new File(FileUtils.getTempDirectoryPath(), "test-controller-data-dir" + System.currentTimeMillis())
+          .getAbsolutePath();
+  public static final String DEFAULT_LOCAL_TEMP_DIR =
+      new File(FileUtils.getTempDirectoryPath(), "test-controller-local-temp-dir" + System.currentTimeMillis())
+          .getAbsolutePath();
   public static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   public static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
@@ -204,6 +208,7 @@ public class ControllerTest {
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
     properties.put(ControllerConf.CONTROLLER_PORT, NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT));
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
+    properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
     properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
     // Enable groovy on the controller

@@ -420,6 +420,24 @@ public class SelectionOperatorUtils {
   }
 
   /**
+   * Extract a selection row from {@link DataTable} with potential null values. (Broker side)
+   *
+   * @param dataTable data table.
+   * @param rowId row id.
+   * @return selection row.
+   */
+  public static Object[] extractRowFromDataTableWithNullHandling(DataTable dataTable, int rowId,
+      RoaringBitmap[] nullBitmaps) {
+    Object[] row = extractRowFromDataTable(dataTable, rowId);
+    for (int colId = 0; colId < nullBitmaps.length; colId++) {
+      if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+        row[colId] = null;
+      }
+    }
+    return row;
+  }
+
+  /**
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries without <code>ORDER BY</code>.
    * (Broker side)
    */
@@ -436,13 +454,7 @@ public class SelectionOperatorUtils {
         }
         for (int rowId = 0; rowId < numRows; rowId++) {
           if (rows.size() < limit) {
-            Object[] row = extractRowFromDataTable(dataTable, rowId);
-            for (int colId = 0; colId < numColumns; colId++) {
-              if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-                row[colId] = null;
-              }
-            }
-            rows.add(row);
+            rows.add(extractRowFromDataTableWithNullHandling(dataTable, rowId, nullBitmaps));
           } else {
             break;
           }

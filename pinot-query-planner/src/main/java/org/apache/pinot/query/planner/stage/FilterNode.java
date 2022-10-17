@@ -45,4 +45,9 @@ public class FilterNode extends AbstractStageNode {
   public String explain() {
     return "FILTER";
   }
+
+  @Override
+  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitFilter(this, context);
+  }
 }

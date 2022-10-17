@@ -75,7 +75,14 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
           singletonInstance = serverInstance;
         }
       }
-      _sendingStageInstances = Collections.singletonList(singletonInstance);
+
+      if (singletonInstance == null) {
+        // TODO: fix WorkerManager assignment, this should not happen if we properly assign workers.
+        // see: https://github.com/apache/pinot/issues/9592
+        _sendingStageInstances = Collections.emptyList();
+      } else {
+        _sendingStageInstances = Collections.singletonList(singletonInstance);
+      }
     } else {
       _sendingStageInstances = sendingStageInstances;
     }
