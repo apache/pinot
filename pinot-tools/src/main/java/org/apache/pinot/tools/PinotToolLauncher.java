@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.log4j.PropertyConfigurator;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.filesystem.PinotFSBenchmarkRunner;
 import org.apache.pinot.tools.perf.PerfBenchmarkRunner;
