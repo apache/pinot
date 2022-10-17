@@ -249,9 +249,9 @@ public class DataFetcherTest {
   @Test
   public void testFetchBytesValues() {
     testFetchBytesValues(BYTES_COLUMN);
-    testFetchBytesValues(HEX_STRING_COLUMN);
     testFetchBytesValues(NO_DICT_BYTES_COLUMN);
-    testFetchBytesValues(NO_DICT_HEX_STRING_COLUMN);
+    testFetchBytesValues(STRING_COLUMN);
+    testFetchBytesValues(NO_DICT_STRING_COLUMN);
   }
 
   @Test

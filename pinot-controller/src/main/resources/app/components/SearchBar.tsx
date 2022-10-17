@@ -70,7 +70,7 @@ const SearchBar = (props) => {
         <SearchIcon />
       </div>
       <InputBase
-        placeholder="Search…"
+        placeholder={props.placeholder || "Search…"}
         value={props.value}
         onChange={props.onChange}
         classes={{

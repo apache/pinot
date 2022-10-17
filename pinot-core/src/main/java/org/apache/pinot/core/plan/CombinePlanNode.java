@@ -29,11 +29,11 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.combine.AggregationOnlyCombineOperator;
+import org.apache.pinot.core.operator.combine.AggregationCombineOperator;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
-import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
+import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
@@ -179,10 +179,10 @@ public class CombinePlanNode implements PlanNode {
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
       if (_queryContext.getGroupByExpressions() == null) {
         // Aggregation only
-        return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService);
+        return new AggregationCombineOperator(operators, _queryContext, _executorService);
       } else {
         // Aggregation group-by
-        return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService);
+        return new GroupByCombineOperator(operators, _queryContext, _executorService);
       }
     } else if (QueryContextUtils.isSelectionQuery(_queryContext)) {
       if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {

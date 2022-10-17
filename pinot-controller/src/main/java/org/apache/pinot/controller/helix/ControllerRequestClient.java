@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
@@ -175,6 +180,37 @@ public class ControllerRequestClient {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
           _controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceReload)).toURI(), null));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public List<String> listSegments(String tableName, @Nullable String tableType, boolean excludeReplacedSegments)
+      throws IOException {
+    String url = _controllerRequestURLBuilder.forSegmentListAPI(tableName, tableType, excludeReplacedSegments);
+    try {
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(url).toURI()));
+      // Example response: (list of map from table type to segments)
+      // [{"REALTIME":["mytable__0__0__20221012T1952Z","mytable__1__0__20221012T1952Z"]}]
+      JsonNode jsonNode = JsonUtils.stringToJsonNode(resp.getResponse());
+      List<String> segments = new ArrayList<>();
+      for (JsonNode tableNode : jsonNode) {
+        ArrayNode segmentsNode = (ArrayNode) tableNode.elements().next();
+        for (JsonNode segmentNode : segmentsNode) {
+          segments.add(segmentNode.asText());
+        }
+      }
+      return segments;
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void deleteSegment(String tableName, String segmentName)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
+          new URL(_controllerRequestURLBuilder.forSegmentDelete(tableName, segmentName)).toURI()));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

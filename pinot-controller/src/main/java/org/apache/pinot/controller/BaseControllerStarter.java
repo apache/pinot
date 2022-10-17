@@ -53,6 +53,7 @@ import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
@@ -66,6 +67,7 @@ import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
@@ -311,7 +313,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   @Override
   public void start() {
-    LOGGER.info("Starting Pinot controller in mode: {}.", _controllerMode.name());
+    LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
     Utils.logVersions();
 
     // Set up controller metrics
@@ -402,7 +404,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager =
-        new PinotHelixTaskResourceManager(_helixResourceManager, new TaskDriver(_helixParticipantManager));
+        new PinotHelixTaskResourceManager(_helixResourceManager, new TaskDriver(_helixParticipantManager),
+            _config.getPinotTaskExpireTimeInMs());
 
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
@@ -544,6 +547,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(_config.subset(METRICS_REGISTRY_NAME));
     _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
     _controllerMetrics.initializeGlobalMeters();
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.VERSION, PinotVersion.VERSION, 1);
   }
 
   private void initPinotFSFactory() {

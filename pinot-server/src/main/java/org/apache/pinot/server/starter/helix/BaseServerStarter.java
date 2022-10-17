@@ -53,6 +53,7 @@ import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -61,10 +62,10 @@ import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
-import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
@@ -181,13 +182,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Set data table version send to broker.
     int dataTableVersion =
-        _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, Server.DEFAULT_CURRENT_DATA_TABLE_VERSION);
-    if (dataTableVersion > Server.DEFAULT_CURRENT_DATA_TABLE_VERSION) {
+        _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, DataTableBuilderFactory.DEFAULT_VERSION);
+    if (dataTableVersion > DataTableBuilderFactory.DEFAULT_VERSION) {
       LOGGER.warn("Setting experimental DataTable version newer than default via config could result in"
           + " backward-compatibility issues. Current default DataTable version: "
-          + Server.DEFAULT_CURRENT_DATA_TABLE_VERSION);
+          + DataTableBuilderFactory.DEFAULT_VERSION);
     }
-    DataTableFactory.setDataTableVersion(dataTableVersion);
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
@@ -494,7 +495,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   @Override
   public void start()
       throws Exception {
-    LOGGER.info("Starting Pinot server");
+    LOGGER.info("Starting Pinot server (Version: {})", PinotVersion.VERSION);
     long startTimeMs = System.currentTimeMillis();
 
     // install default SSL context if necessary (even if not force-enabled everywhere)

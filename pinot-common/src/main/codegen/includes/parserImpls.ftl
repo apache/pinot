@@ -102,3 +102,20 @@ SqlNodeList SqlStmtsEof() :
         return stmts;
     }
 }
+
+void SqlAtTimeZone(List<Object> list, ExprContext exprContext, Span s) :
+{
+    List<Object> list2;
+    SqlOperator op;
+}
+{
+    {
+        checkNonQueryExpression(exprContext);
+        s.clear().add(this);
+    }
+    <AT> <TIME> <ZONE> { op = SqlAtTimeZone.INSTANCE; }
+    list2 = Expression2(ExprContext.ACCEPT_SUB_QUERY) {
+        list.add(new SqlParserUtil.ToTreeListItem(op, s.pos()));
+        list.addAll(list2);
+    }
+}

@@ -34,4 +34,12 @@ public interface SegmentDirectoryLoader {
    */
   SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentDirectoryLoaderContext)
       throws Exception;
+
+  /**
+   * Clean up the segment data from the server.
+   * @param segmentDirectoryLoaderContext context for cleaning up segment data
+   */
+  default void delete(SegmentDirectoryLoaderContext segmentDirectoryLoaderContext)
+      throws Exception {
+  }
 }

@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyPathBuilder;
@@ -66,10 +67,15 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.DateTimeFormatterBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -101,6 +107,10 @@ public class PinotHelixResourceManagerTest {
   private static final String SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME = "segmentsReplaceTestRefreshTable";
   private static final String OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME =
       TableNameBuilder.OFFLINE.tableNameWithType(SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME);
+
+  private static final String SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME = "segmentsMetadataUpdateTestTable";
+  private static final String OFFLINE_SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME =
+      TableNameBuilder.OFFLINE.tableNameWithType(SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME);
 
   private static final int CONNECTION_TIMEOUT_IN_MILLISECOND = 10_000;
   private static final int MAXIMUM_NUMBER_OF_CONTROLLER_INSTANCES = 10;
@@ -306,6 +316,42 @@ public class PinotHelixResourceManagerTest {
       Assert.assertEquals(realtimeMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
       Assert.assertEquals(retrievedSegmentsZKMetadata.size(), 1);
     }
+  }
+
+  @Test
+  public void testUpdateSchemaDateTime()
+      throws Exception {
+    String segmentName = "testSegmentDateTime";
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+
+    long curr = System.currentTimeMillis();
+    DateTimeFormatter dateTimeFormat =
+        new DateTimeFormatterBuilder().appendPattern("yyyy-MM-dd'T'HH:mm:ss.SSS").toFormatter();
+    segmentZKMetadata.setRawStartTime(dateTimeFormat.withZone(DateTimeZone.UTC).print(curr));
+    segmentZKMetadata.setRawEndTime(dateTimeFormat.withZone(DateTimeZone.UTC).print(curr));
+    segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+    ZKMetadataProvider.setSegmentZKMetadata(TEST_INSTANCE.getPropertyStore(),
+        OFFLINE_SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME, segmentZKMetadata);
+    List<SegmentZKMetadata> retrievedSegmentZKMetadataList =
+        TEST_INSTANCE.getHelixResourceManager().getSegmentsZKMetadata(OFFLINE_SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME);
+    SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentZKMetadataList.get(0);
+    Assert.assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
+    Assert.assertEquals(retrievedSegmentZKMetadataList.size(), 1);
+    Assert.assertEquals(retrievedSegmentZKMetadata.getStartTimeMs(), -1);
+    Assert.assertEquals(retrievedSegmentZKMetadata.getEndTimeMs(), -1);
+
+    DateTimeFieldSpec timeColumnFieldSpec = new DateTimeFieldSpec("timestamp",
+        FieldSpec.DataType.STRING, "SIMPLE_DATE_FORMAT|yyyy-MM-dd'T'HH:mm:ss.SSS", "1:MILLISECONDS");
+
+    TEST_INSTANCE.getHelixResourceManager()
+        .updateSegmentsZKTimeInterval(OFFLINE_SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME, timeColumnFieldSpec);
+    retrievedSegmentZKMetadataList =
+        TEST_INSTANCE.getHelixResourceManager().getSegmentsZKMetadata(OFFLINE_SEGMENTS_METADATA_UPDATE_TEST_TABLE_NAME);
+    retrievedSegmentZKMetadata = retrievedSegmentZKMetadataList.get(0);
+    Assert.assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
+    Assert.assertEquals(retrievedSegmentZKMetadataList.size(), 1);
+    Assert.assertEquals(retrievedSegmentZKMetadata.getStartTimeMs(), curr);
+    Assert.assertEquals(retrievedSegmentZKMetadata.getEndTimeMs(), curr);
   }
 
   @Test

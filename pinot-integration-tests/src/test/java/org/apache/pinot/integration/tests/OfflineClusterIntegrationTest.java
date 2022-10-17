@@ -2466,11 +2466,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response1 = response1.replaceAll("docs:[0-9]+", "docs:*");
 
     assertEquals(response1, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
-        + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)"
-        + "\",1,0],[\"COMBINE_GROUPBY_ORDERBY\",2,1],[\"PLAN_START(numSegmentsForThisPlan:1)\",-1,-1],"
-        + "[\"AGGREGATE_GROUPBY_ORDERBY(groupKeys:Carrier, aggregations:count(*))\",3,2],"
-        + "[\"TRANSFORM_PASSTHROUGH(Carrier)\",4,3],[\"PROJECT(Carrier)\",5,4],"
-        + "[\"DOC_ID_SET\",6,5],[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",7,6]]}");
+        + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},"
+        + "\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)\",1,0],[\"COMBINE_GROUP_BY\",2,1],"
+        + "[\"PLAN_START(numSegmentsForThisPlan:1)\",-1,-1],"
+        + "[\"GROUP_BY(groupKeys:Carrier, aggregations:count(*))\",3,2],"
+        + "[\"TRANSFORM_PASSTHROUGH(Carrier)\",4,3],[\"PROJECT(Carrier)\",5,4],[\"DOC_ID_SET\",6,5],"
+        + "[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",7,6]]}");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.
@@ -2790,5 +2791,38 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
     assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
     return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
+  }
+
+  @Test
+  public void testBooleanLiteralsFunc()
+      throws Exception {
+    // Test boolean equal true case.
+    String sqlQuery = "SELECT (true = true) = true FROM mytable where true = true";
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertTrue(rows.get(0).get(0).asBoolean());
+    // Test boolean equal false case.
+    sqlQuery = "SELECT (true = true) = false FROM mytable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertFalse(rows.get(0).get(0).asBoolean());
+    // Test boolean not equal true case.
+    sqlQuery = "SELECT true != false FROM mytable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertTrue(rows.get(0).get(0).asBoolean());
+    // Test boolean not equal false case.
+    sqlQuery = "SELECT true != true FROM mytable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertFalse(rows.get(0).get(0).asBoolean());
   }
 }

@@ -106,6 +106,15 @@ public interface PredicateEvaluator {
    */
 
   /**
+   * return the number of matching items specified by predicate
+   * negative number indicates exclusive (not eq, not in) match
+   * return {@code Integer.MIN_VALUE} for not applicable
+   */
+  default int getNumMatchingItems() {
+    return Integer.MIN_VALUE;
+  };
+
+  /**
    * Get the number of matching dictionary ids.
    */
   int getNumMatchingDictIds();

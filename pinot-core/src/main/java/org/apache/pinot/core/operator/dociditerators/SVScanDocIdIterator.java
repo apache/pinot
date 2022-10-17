@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.dociditerators;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
@@ -46,10 +47,26 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final int[] _batch = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
   private int _firstMismatch;
   private int _cursor;
+  private final int _cardinality;
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
+  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+      @Nullable NullValueVectorReader nullValueReader) {
+    _predicateEvaluator = predicateEvaluator;
+    _reader = dataSource.getForwardIndex();
+    _readerContext = _reader.createContext();
+    _numDocs = numDocs;
+    ImmutableRoaringBitmap nullBitmap = nullValueReader != null ? nullValueReader.getNullBitmap() : null;
+    if (nullBitmap != null && nullBitmap.isEmpty()) {
+      nullBitmap = null;
+    }
+    _valueMatcher = getValueMatcher(nullBitmap);
+    _cardinality = dataSource.getDataSourceMetadata().getCardinality();
+  }
+
+  // for testing
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
       @Nullable NullValueVectorReader nullValueReader) {
     _predicateEvaluator = predicateEvaluator;
@@ -61,6 +78,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       nullBitmap = null;
     }
     _valueMatcher = getValueMatcher(nullBitmap);
+    _cardinality = -1;
   }
 
   @Override
@@ -127,6 +145,20 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   @Override
   public long getNumEntriesScanned() {
     return _numEntriesScanned;
+  }
+
+  /**
+   * This is an approximation of probability calculation in
+   * org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
+   */
+  @Override
+  public float getEstimatedCardinality(boolean isAndDocIdSet) {
+    int numMatchingItems = _predicateEvaluator.getNumMatchingItems();
+    if (numMatchingItems == Integer.MIN_VALUE || _cardinality < 0) {
+      return ScanBasedDocIdIterator.super.getEstimatedCardinality(isAndDocIdSet);
+    }
+    numMatchingItems = numMatchingItems > 0 ? numMatchingItems : (numMatchingItems + _cardinality);
+    return ((float) _cardinality) / numMatchingItems;
   }
 
   private ValueMatcher getValueMatcher(@Nullable ImmutableRoaringBitmap nullBitmap) {

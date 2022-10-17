@@ -28,11 +28,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -91,7 +92,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  public void createRecords(Number baseValue)
+  public void createRecords(Number baseValue, boolean generateNulls)
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
@@ -114,11 +115,12 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           record.putValue(KEY_COLUMN, 2);
           _sumKey2 += value;
         }
-      } else {
+        _records.add(record);
+      } else if (generateNulls) {
         // Key column value here is null.
         record.putValue(COLUMN_NAME, null);
+        _records.add(record);
       }
-      _records.add(record);
     }
   }
 
@@ -159,12 +161,13 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       throws Exception {
     ColumnDataType columnDataType = ColumnDataType.FLOAT;
     float baseValue = RANDOM.nextFloat();
-    createRecords(baseValue);
+    boolean generateNulls = true;
+    createRecords(baseValue, generateNulls);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .build();
     setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType);
+    testQueries(baseValue, columnDataType, generateNulls);
   }
 
   @Test(priority = 1)
@@ -172,7 +175,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       throws Exception {
     ColumnDataType columnDataType = ColumnDataType.FLOAT;
     float baseValue = RANDOM.nextFloat();
-    createRecords(baseValue);
+    boolean generateNulls = true;
+    createRecords(baseValue, generateNulls);
     List<String> noDictionaryColumns = new ArrayList<String>();
     noDictionaryColumns.add(COLUMN_NAME);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
@@ -180,7 +184,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         .setNoDictionaryColumns(noDictionaryColumns)
         .build();
     setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType);
+    testQueries(baseValue, columnDataType, generateNulls);
   }
 
   @Test(priority = 2)
@@ -188,12 +192,13 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       throws Exception {
     ColumnDataType columnDataType = ColumnDataType.DOUBLE;
     double baseValue = RANDOM.nextDouble();
-    createRecords(baseValue);
+    boolean generateNulls = true;
+    createRecords(baseValue, generateNulls);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .build();
     setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType);
+    testQueries(baseValue, columnDataType, generateNulls);
   }
 
   @Test(priority = 3)
@@ -201,7 +206,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       throws Exception {
     ColumnDataType columnDataType = ColumnDataType.DOUBLE;
     double baseValue = RANDOM.nextDouble();
-    createRecords(baseValue);
+    boolean generateNulls = true;
+    createRecords(baseValue, generateNulls);
     List<String> noDictionaryColumns = new ArrayList<String>();
     noDictionaryColumns.add(COLUMN_NAME);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
@@ -209,11 +215,73 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         .setNoDictionaryColumns(noDictionaryColumns)
         .build();
     setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType);
+    testQueries(baseValue, columnDataType, generateNulls);
   }
 
-  public void testQueries(Number baseValue, ColumnDataType dataType) {
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+  @Test(priority = 4)
+  public void testQueriesWithDictFloatColumnNoNullValues()
+          throws Exception {
+    ColumnDataType columnDataType = ColumnDataType.FLOAT;
+    float baseValue = RANDOM.nextFloat();
+    boolean generateNulls = false;
+    createRecords(baseValue, generateNulls);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+            .setTableName(RAW_TABLE_NAME)
+            .build();
+    setUp(tableConfig, columnDataType.toDataType());
+    testQueries(baseValue, columnDataType, generateNulls);
+  }
+
+  @Test(priority = 5)
+  public void testQueriesWithNoDictFloatColumnNoNullValues()
+          throws Exception {
+    ColumnDataType columnDataType = ColumnDataType.FLOAT;
+    float baseValue = RANDOM.nextFloat();
+    boolean generateNulls = false;
+    createRecords(baseValue, generateNulls);
+    List<String> noDictionaryColumns = new ArrayList<String>();
+    noDictionaryColumns.add(COLUMN_NAME);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+            .setTableName(RAW_TABLE_NAME)
+            .setNoDictionaryColumns(noDictionaryColumns)
+            .build();
+    setUp(tableConfig, columnDataType.toDataType());
+    testQueries(baseValue, columnDataType, generateNulls);
+  }
+
+  @Test(priority = 6)
+  public void testQueriesWithDictDoubleColumnNoNullValues()
+          throws Exception {
+    ColumnDataType columnDataType = ColumnDataType.DOUBLE;
+    double baseValue = RANDOM.nextDouble();
+    boolean generateNulls = false;
+    createRecords(baseValue, generateNulls);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+            .setTableName(RAW_TABLE_NAME)
+            .build();
+    setUp(tableConfig, columnDataType.toDataType());
+    testQueries(baseValue, columnDataType, generateNulls);
+  }
+
+  @Test(priority = 7)
+  public void testQueriesWithNoDictDoubleColumnNoNullValues()
+          throws Exception {
+    ColumnDataType columnDataType = ColumnDataType.DOUBLE;
+    double baseValue = RANDOM.nextDouble();
+    boolean generateNulls = false;
+    createRecords(baseValue, generateNulls);
+    List<String> noDictionaryColumns = new ArrayList<String>();
+    noDictionaryColumns.add(COLUMN_NAME);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+            .setTableName(RAW_TABLE_NAME)
+            .setNoDictionaryColumns(noDictionaryColumns)
+            .build();
+    setUp(tableConfig, columnDataType.toDataType());
+    testQueries(baseValue, columnDataType, generateNulls);
+  }
+
+  public void testQueries(Number baseValue, ColumnDataType dataType, boolean nullValuesExist) {
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     {
@@ -227,8 +295,9 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.LONG, ColumnDataType.INT
       }));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 3);
-      for (int index = 0; index < 3; index++) {
+      int resultCount = nullValuesExist ? 3 : 2;
+      assertEquals(rows.size(), resultCount);
+      for (int index = 0; index < resultCount; index++) {
         Object[] row = rows.get(index);
         assertEquals(row.length, 5);
         int keyColumnIdx = 4;
@@ -276,7 +345,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       Object[] row = rows.get(0);
       assertEquals(row.length, 4);
       // Note: count(*) returns total number of docs (nullable and non-nullable).
-      assertEquals((long) row[0], 1000 * 4);
+      int totalDocs = nullValuesExist ? 1000 : 500;
+      assertEquals((long) row[0], totalDocs * 4);
       // count(col) returns the count of non-nullable docs.
       assertEquals((long) row[1], 500 * 4);
       assertEquals(row[2], baseValue.doubleValue());
@@ -295,7 +365,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         Object[] row = rows.get(i);
         assertEquals(row.length, 2);
         if (row[0] != null) {
-          assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
+          int incValue = nullValuesExist ? i : i * 2;
+          assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + incValue)) < 1e-1);
           assertEquals(row[1], 1);
         } else {
           assertNull(row[1]);
@@ -312,7 +383,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema,
           new DataSchema(new String[]{COLUMN_NAME, KEY_COLUMN}, new ColumnDataType[]{dataType, ColumnDataType.INT}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 4000);
+      int rowsCount = nullValuesExist ? 4000 : 2000;
+      assertEquals(rows.size(), rowsCount);
       int k = 0;
       for (int i = 0; i < 2000; i += 4) {
         // Null values are inserted at indices where: index % 2 equals 1. Skip null values.
@@ -330,7 +402,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       // Note 1: we inserted 500 nulls in _records, and since we query 4 identical index segments, the number of null
       //  values is: 500 * 4 = 2000.
       // Note 2: The default null ordering is 'NULLS LAST', regardless of the ordering direction.
-      for (int i = 2000; i < 4000; i++) {
+      for (int i = 2000; i < rowsCount; i++) {
         Object[] values = rows.get(i);
         assertEquals(values.length, 2);
         assertNull(values[0]);
@@ -360,7 +432,9 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         index++;
       }
       // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
-      assertNull(rows.get(rows.size() - 1)[0]);
+      if (nullValuesExist) {
+        assertNull(rows.get(rows.size() - 1)[0]);
+      }
     }
     {
       int limit = 40;
@@ -387,7 +461,9 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         index++;
       }
       // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
-      assertNull(rows.get(rows.size() - 1)[0]);
+      if (nullValuesExist) {
+        assertNull(rows.get(rows.size() - 1)[0]);
+      }
     }
     {
       // This test case was added to validate path-code for distinct w/o order by.
@@ -433,8 +509,10 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
       // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
-      assertNull(rows.get(0)[0]);
-      int index = 1;
+      if (nullValuesExist) {
+        assertNull(rows.get(0)[0]);
+      }
+      int index = nullValuesExist ? 1 : 0;
       int i = 0;
       while (index < rows.size()) {
         if ((NUM_RECORDS - i - 1) % 2 == 1) {
@@ -458,7 +536,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema, new DataSchema(new String[]{"count", COLUMN_NAME},
           new ColumnDataType[]{ColumnDataType.LONG, dataType}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 501);
+      int rowsCount = nullValuesExist ? 501 : 500;
+      assertEquals(rows.size(), rowsCount);
       int i = 0;
       for (int index = 0; index < 500; index++) {
         Object[] row = rows.get(index);
@@ -473,9 +552,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         i++;
       }
       // The default null ordering is 'NULLS LAST'.
-      Object[] row = rows.get(500);
-      assertEquals(row[0], 2000L);
-      assertNull(row[1]);
+      if (nullValuesExist) {
+        Object[] row = rows.get(500);
+        assertEquals(row[0], 2000L);
+        assertNull(row[1]);
+      }
     }
     {
       String query = String.format("SELECT SUMPRECISION(%s) AS sum FROM testTable", COLUMN_NAME);
@@ -637,9 +718,10 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema, new DataSchema(new String[]{"max", COLUMN_NAME},
           new ColumnDataType[]{ColumnDataType.DOUBLE, dataType}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 501);
+      int rowsCount = 500;
+      assertEquals(rows.size(), rowsCount + (nullValuesExist ? 1 : 0));
       int i = 0;
-      for (int index = 0; index < 500; index++) {
+      for (int index = 0; index < rowsCount; index++) {
         if (i % 2 == 1) {
           // Null values are inserted at: index % 2 == 1.
           i++;
@@ -650,9 +732,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         assertTrue(Math.abs(((Number) row[1]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
         i++;
       }
-      assertNull(rows.get(rows.size() - 1)[0]);
+      if (nullValuesExist) {
+        assertNull(rows.get(rows.size() - 1)[0]);
+      }
     }
-    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
   @AfterClass

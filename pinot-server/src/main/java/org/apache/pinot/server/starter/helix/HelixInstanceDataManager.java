@@ -38,6 +38,7 @@ import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -63,6 +64,9 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
+import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -217,13 +221,43 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void removeSegment(String tableNameWithType, String segmentName) {
+  public void offloadSegment(String tableNameWithType, String segmentName) {
     LOGGER.info("Removing segment: {} from table: {}", segmentName, tableNameWithType);
     _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
       v.removeSegment(segmentName);
       LOGGER.info("Removed segment: {} from table: {}", segmentName, k);
       return v;
     });
+  }
+
+  @Override
+  public void deleteSegment(String tableNameWithType, String segmentName)
+      throws Exception {
+    // This method might modify the file on disk. Use segment lock to prevent race condition
+    Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
+    try {
+      segmentLock.lock();
+
+      // Clean up the segment data on default tier unconditionally.
+      File segmentDir = getSegmentDataDirectory(tableNameWithType, segmentName);
+      if (segmentDir.exists()) {
+        FileUtils.deleteQuietly(segmentDir);
+        LOGGER.info("Deleted segment directory {} on default tier", segmentDir);
+      }
+      // We might clean up further more with the specific segment loader. But note that tableDataManager object or
+      // even the TableConfig might not be present any more at this point.
+      SegmentDirectoryLoader segmentLoader = SegmentDirectoryLoaderRegistry
+          .getSegmentDirectoryLoader(_instanceDataManagerConfig.getSegmentDirectoryLoader());
+      if (segmentLoader != null) {
+        LOGGER.info("Deleting segment: {} further with segment loader: {}", segmentName,
+            _instanceDataManagerConfig.getSegmentDirectoryLoader());
+        SegmentDirectoryLoaderContext ctx = new SegmentDirectoryLoaderContext.Builder().setSegmentName(segmentName)
+            .setTableDataDir(_instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType).build();
+        segmentLoader.delete(ctx);
+      }
+    } finally {
+      segmentLock.unlock();
+    }
   }
 
   @Override

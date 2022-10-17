@@ -28,8 +28,10 @@ import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
@@ -69,6 +71,7 @@ public class ServerInstance {
   private final QueryServer _nettyTlsQueryServer;
   private final GrpcQueryServer _grpcQueryServer;
   private final AccessControl _accessControl;
+  private final HelixManager _helixManager;
 
   private final WorkerQueryServer _workerQueryServer;
   private ChannelHandler _instanceRequestHandler;
@@ -79,6 +82,7 @@ public class ServerInstance {
   public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory)
       throws Exception {
     LOGGER.info("Initializing server instance");
+    _helixManager = helixManager;
 
     LOGGER.info("Initializing server metrics");
     PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(serverConf.getMetricsConfig());
@@ -86,6 +90,7 @@ public class ServerInstance {
         new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
             serverConf.getAllowedTablesForEmittingMetrics());
     _serverMetrics.initializeGlobalMeters();
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION, 1);
 
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);
@@ -277,5 +282,9 @@ public class ServerInstance {
     Preconditions.checkState(_instanceRequestHandler instanceof InstanceRequestHandler,
         "Unexpected type of instance request handler");
     return (InstanceRequestHandler) _instanceRequestHandler;
+  }
+
+  public HelixManager getHelixManager() {
+    return _helixManager;
   }
 }

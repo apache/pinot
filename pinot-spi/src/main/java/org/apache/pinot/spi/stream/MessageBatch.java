@@ -47,8 +47,23 @@ public interface MessageBatch<T> {
    * @param index
    * @return
    */
+  @Deprecated
   T getMessageAtIndex(int index);
 
+  // for backward-compatibility
+  default byte[] getMessageBytesAtIndex(int index) {
+    return (byte[]) getMessageAtIndex(index);
+  }
+
+  default StreamMessage<T> getStreamMessage(int index) {
+    return new LegacyStreamMessage(getMessageBytesAtIndex(index));
+  }
+
+  class LegacyStreamMessage extends StreamMessage {
+    public LegacyStreamMessage(byte[] value) {
+      super(value, value.length);
+    }
+  }
   /**
    * Returns the offset of the message at a particular index inside a set of messages returned from the stream.
    * @param index

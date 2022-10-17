@@ -96,7 +96,7 @@ public class PinotRealtimeSource implements AutoCloseable {
         } else {
           _rateLimiter.acquire(rows.size());
           if (!_shutdown) {
-            _producer.produceKeyedBatch(_topicName, rows);
+            _producer.produceKeyedBatch(_topicName, rows, true);
           }
         }
       }

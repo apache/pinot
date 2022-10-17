@@ -177,6 +177,11 @@ public class InPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return getNumMatchingDictIds();
+    }
+
+    @Override
     public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
         _matchingDictIds = _matchingDictIdSet.toIntArray();
@@ -204,6 +209,11 @@ public class InPredicateEvaluatorFactory {
     IntRawValueBasedInPredicateEvaluator(InPredicate inPredicate, IntSet matchingValues) {
       super(inPredicate);
       _matchingValues = matchingValues;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return _matchingValues.size();
     }
 
     @Override
@@ -239,6 +249,11 @@ public class InPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return _matchingValues.size();
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.LONG;
     }
@@ -271,6 +286,11 @@ public class InPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return _matchingValues.size();
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.FLOAT;
     }
@@ -300,6 +320,11 @@ public class InPredicateEvaluatorFactory {
     DoubleRawValueBasedInPredicateEvaluator(InPredicate inPredicate, DoubleSet matchingValues) {
       super(inPredicate);
       _matchingValues = matchingValues;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return _matchingValues.size();
     }
 
     @Override
@@ -341,6 +366,11 @@ public class InPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return _matchingValues.size();
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.BIG_DECIMAL;
     }
@@ -360,6 +390,11 @@ public class InPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return _matchingValues.size();
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.STRING;
     }
@@ -376,6 +411,11 @@ public class InPredicateEvaluatorFactory {
     BytesRawValueBasedInPredicateEvaluator(InPredicate inPredicate, Set<ByteArray> matchingValues) {
       super(inPredicate);
       _matchingValues = matchingValues;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return _matchingValues.size();
     }
 
     @Override

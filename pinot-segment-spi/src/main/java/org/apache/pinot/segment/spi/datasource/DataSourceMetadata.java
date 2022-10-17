@@ -95,4 +95,9 @@ public interface DataSourceMetadata {
    */
   @Nullable
   Set<Integer> getPartitions();
+
+  /**
+   * Returns the cardinality of the column, {@code -1} if not applicable
+   */
+  int getCardinality();
 }

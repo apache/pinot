@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -36,18 +37,18 @@ public class ListenerConfigUtilTest {
    * Asserts that the protocol listeners properties are Opt-In and not initialized when nothing but controler.port is
    * used.
    */
-  @Test
-  public void assertControllerPortConfig() {
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testControllerPortConfig() {
     ControllerConf controllerConf = new ControllerConf();
 
     controllerConf.setProperty("controller.port", "9000");
     controllerConf.setProperty("controller.query.console.useHttps", "true");
 
     List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
-
     Assert.assertEquals(listenerConfigs.size(), 1);
-
     assertLegacyListener(listenerConfigs.get(0));
+
+    ListenerConfigUtil.buildControllerConfigs(new ControllerConf());
   }
 
   /**
@@ -55,7 +56,7 @@ public class ListenerConfigUtilTest {
    * TLS settings.
    */
   @Test
-  public void assertLegacyAndHttps() {
+  public void testLegacyAndHttps() {
     ControllerConf controllerConf = new ControllerConf();
 
     controllerConf.setProperty("controller.port", "9000");
@@ -78,7 +79,7 @@ public class ListenerConfigUtilTest {
    * Asserts that controller.port can be opt-out and both http and https can be configured with seperate ports.
    */
   @Test
-  public void assertHttpAndHttpsConfigs() {
+  public void testHttpAndHttpsConfigs() {
     ControllerConf controllerConf = new ControllerConf();
 
     controllerConf.setProperty("controller.access.protocols", "http,https");
@@ -104,7 +105,7 @@ public class ListenerConfigUtilTest {
    * Asserts that a single listener configuration is generated with a secured TLS port.
    */
   @Test
-  public void assertHttpsOnly() {
+  public void testHttpsOnly() {
     ControllerConf controllerConf = new ControllerConf();
 
     controllerConf.setProperty("controller.access.protocols", "https");
@@ -122,7 +123,7 @@ public class ListenerConfigUtilTest {
    * Tests behavior when an invalid host is provided.
    */
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void assertInvalidHost() {
+  public void testInvalidHost() {
     ControllerConf controllerConf = new ControllerConf();
 
     controllerConf.setProperty("controller.access.protocols", "https");
@@ -136,7 +137,7 @@ public class ListenerConfigUtilTest {
    * Tests behavior when an invalid port is provided
    */
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void assertInvalidPort() {
+  public void testInvalidPort() {
     ControllerConf controllerConf = new ControllerConf();
 
     controllerConf.setProperty("controller.access.protocols", "https");
@@ -151,7 +152,7 @@ public class ListenerConfigUtilTest {
    * Tests behavior when an empty http port is provided.
    */
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void assertEmptyHttpPort() {
+  public void testEmptyHttpPort() {
     ControllerConf controllerConf = new ControllerConf();
 
     controllerConf.setProperty("controller.access.protocols", "http");
@@ -164,7 +165,7 @@ public class ListenerConfigUtilTest {
    * Tests behavior when an empty https port is provided.
    */
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void assertEmptyHttpsPort() {
+  public void testEmptyHttpsPort() {
     ControllerConf controllerConf = new ControllerConf();
 
     controllerConf.setProperty("controller.access.protocols", "https");
@@ -175,34 +176,59 @@ public class ListenerConfigUtilTest {
 
   @Test
   public void testFindLastTlsPort() {
-    List<ListenerConfig> configs = ImmutableList.of(
-        new ListenerConfig("conf1", "host1", 9000, "http", null),
+    List<ListenerConfig> configs = ImmutableList.of(new ListenerConfig("conf1", "host1", 9000, "http", null),
         new ListenerConfig("conf2", "host2", 9001, "https", null),
         new ListenerConfig("conf3", "host3", 9002, "http", null),
         new ListenerConfig("conf4", "host4", 9003, "https", null),
-        new ListenerConfig("conf5", "host5", 9004, "http", null)
-    );
+        new ListenerConfig("conf5", "host5", 9004, "http", null));
     int tlsPort = ListenerConfigUtil.findLastTlsPort(configs, -1);
     Assert.assertEquals(tlsPort, 9003);
   }
 
   @Test
   public void testFindLastTlsPortMissing() {
-    List<ListenerConfig> configs = ImmutableList.of(
-        new ListenerConfig("conf1", "host1", 9000, "http", null),
+    List<ListenerConfig> configs = ImmutableList.of(new ListenerConfig("conf1", "host1", 9000, "http", null),
         new ListenerConfig("conf2", "host2", 9001, "http", null),
         new ListenerConfig("conf3", "host3", 9002, "http", null),
-        new ListenerConfig("conf4", "host4", 9004, "http", null)
-    );
+        new ListenerConfig("conf4", "host4", 9004, "http", null));
     int tlsPort = ListenerConfigUtil.findLastTlsPort(configs, -1);
     Assert.assertEquals(tlsPort, -1);
   }
 
+  @Test
+  public void testBuildMinionConfigs() {
+    PinotConfiguration conf = new PinotConfiguration();
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildMinionConfigs(conf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    assertHttpListener(listenerConfigs.get(0), "0.0.0.0", 9514);
+
+    conf = new PinotConfiguration();
+    conf.setProperty("pinot.minion.port", "9513");
+    listenerConfigs = ListenerConfigUtil.buildMinionConfigs(conf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    assertHttpListener(listenerConfigs.get(0), "0.0.0.0", 9513);
+
+    conf = new PinotConfiguration();
+    conf.setProperty("pinot.minion.adminapi.access.protocols", "https");
+    conf.setProperty("pinot.minion.adminapi.access.protocols.https.port", "9512");
+    setTlsProperties("pinot.minion.", conf);
+    listenerConfigs = ListenerConfigUtil.buildMinionConfigs(conf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    assertHttpsListener(listenerConfigs.get(0), "0.0.0.0", 9512);
+
+    conf = new PinotConfiguration();
+    conf.setProperty("pinot.minion.port", "9511");
+    conf.setProperty("pinot.minion.adminapi.access.protocols", "https");
+    conf.setProperty("pinot.minion.adminapi.access.protocols.https.port", "9510");
+    setTlsProperties("pinot.minion.", conf);
+    listenerConfigs = ListenerConfigUtil.buildMinionConfigs(conf);
+    Assert.assertEquals(listenerConfigs.size(), 2);
+    assertHttpListener(listenerConfigs.get(0), "0.0.0.0", 9511);
+    assertHttpsListener(listenerConfigs.get(1), "0.0.0.0", 9510);
+  }
+
   private void assertLegacyListener(ListenerConfig legacyListener) {
-    Assert.assertEquals(legacyListener.getName(), "http");
-    Assert.assertEquals(legacyListener.getHost(), "0.0.0.0");
-    Assert.assertEquals(legacyListener.getPort(), 9000);
-    Assert.assertEquals(legacyListener.getProtocol(), "http");
+    assertHttpListener(legacyListener, "0.0.0.0", 9000);
   }
 
   private void assertHttpListener(ListenerConfig httpsListener, String host, int port) {
@@ -225,21 +251,24 @@ public class ListenerConfigUtilTest {
     Assert.assertEquals(httpsListener.getTlsConfig().getTrustStorePath(), "/some-truststore-path");
   }
 
-  private void configureHttpsProperties(ControllerConf controllerConf, String host, int port) {
-    if (host != null) {
-      controllerConf.setProperty("controller.access.protocols.https.host", host);
-    }
-    controllerConf.setProperty("controller.access.protocols.https.port", String.valueOf(port));
-
-    controllerConf.setProperty("controller.tls.client.auth.enabled", "true");
-    controllerConf.setProperty("controller.tls.keystore.password", "a-password");
-    controllerConf.setProperty("controller.tls.keystore.path", "/some-keystore-path");
-    controllerConf.setProperty("controller.tls.truststore.password", "a-password");
-    controllerConf.setProperty("controller.tls.truststore.path", "/some-truststore-path");
+  private void configureHttpsProperties(PinotConfiguration config, int port) {
+    configureHttpsProperties(config, null, port);
   }
 
-  private void configureHttpsProperties(ControllerConf controllerConf, int port) {
-    configureHttpsProperties(controllerConf, null, port);
+  private void configureHttpsProperties(PinotConfiguration config, String host, int port) {
+    if (host != null) {
+      config.setProperty("controller.access.protocols.https.host", host);
+    }
+    config.setProperty("controller.access.protocols.https.port", String.valueOf(port));
+    setTlsProperties("controller.", config);
+  }
+
+  private void setTlsProperties(String prefix, PinotConfiguration config) {
+    config.setProperty(prefix + "tls.client.auth.enabled", "true");
+    config.setProperty(prefix + "tls.keystore.password", "a-password");
+    config.setProperty(prefix + "tls.keystore.path", "/some-keystore-path");
+    config.setProperty(prefix + "tls.truststore.password", "a-password");
+    config.setProperty(prefix + "tls.truststore.path", "/some-truststore-path");
   }
 
   private ListenerConfig getListener(String name, List<ListenerConfig> listenerConfigs) {

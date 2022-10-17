@@ -93,5 +93,10 @@ public class StarTreeDataSource extends BaseDataSource {
     public Set<Integer> getPartitions() {
       return null;
     }
+
+    @Override
+    public int getCardinality() {
+      return -1;
+    }
   }
 }

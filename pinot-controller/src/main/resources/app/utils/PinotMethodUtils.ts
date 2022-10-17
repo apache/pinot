@@ -57,6 +57,7 @@ import {
   getTenantTableDetails,
   getSegmentMetadata,
   reloadSegment,
+  getTableJobs,
   getClusterInfo,
   zookeeperGetList,
   zookeeperGetData,
@@ -89,7 +90,9 @@ import {
   requestUserList,
   requestAddUser,
   requestDeleteUser,
-  requestUpdateUser
+  requestUpdateUser,
+  getTaskProgress,
+  getSegmentReloadStatus
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -806,12 +809,11 @@ const getTasksList = async (tableName, taskType) => {
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
         const debugData = await getTaskDebugData(taskID);
-        const startTime = moment(get(debugData, 'data.subtaskInfos.0.startTime'), 'YYYY-MM-DD hh:mm:ss');
         finalResponse.records.push([
           taskID,
           status,
-          get(debugData, 'data.subtaskInfos.0.startTime'),
-          get(debugData, 'data.subtaskInfos.0.finishTime', ''),
+          get(debugData, 'data.startTime', ''),
+          get(debugData, 'data.finishTime', ''),
           get(debugData, 'data.subtaskCount.total', 0)
         ]);
       };
@@ -829,6 +831,12 @@ const getTaskDebugData = async (taskName) => {
   const debugRes = await getTaskDebug(taskName);
   return debugRes;
 };
+
+const getTaskProgressData = async (taskName, subTaskName) => {
+  const progressData = await getTaskProgress(taskName, subTaskName);
+
+  return progressData.data;
+}
 
 const getTaskGeneratorDebugData = async (taskName, taskType) => {
   const debugRes = await getTaskGeneratorDebug(taskName, taskType);
@@ -858,6 +866,18 @@ const deleteSegmentOp = (tableName, segmentName) => {
     return response.data;
   });
 };
+
+const fetchTableJobs = async (tableName: string) => {
+  const response = await getTableJobs(tableName);
+  
+  return response.data;
+}
+
+const fetchSegmentReloadStatus = async (jobId: string) => {
+  const response = await getSegmentReloadStatus(jobId);
+  
+  return response.data;
+}
 
 const updateTable = (tableName: string, table: string) => {
   return putTable(tableName, table).then((res)=>{
@@ -1093,6 +1113,8 @@ export default {
   deleteInstance,
   getAllPeriodicTaskNames,
   getAllTaskTypes,
+  fetchTableJobs,
+  fetchSegmentReloadStatus,
   getTaskTypeDebugData,
   getTableData,
   getTaskInfo,
@@ -1107,6 +1129,7 @@ export default {
   getElapsedTime,
   getTasksList,
   getTaskDebugData,
+  getTaskProgressData,
   getTaskGeneratorDebugData,
   deleteSegmentOp,
   reloadSegmentOp,

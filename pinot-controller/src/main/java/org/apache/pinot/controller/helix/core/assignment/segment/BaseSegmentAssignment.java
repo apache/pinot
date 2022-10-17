@@ -20,19 +20,18 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,11 +67,13 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
   protected String _tableNameWithType;
   protected int _replication;
   protected String _partitionColumn;
+  protected TableConfig _tableConfig;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
     _helixManager = helixManager;
     _tableNameWithType = tableConfig.getTableName();
+    _tableConfig = tableConfig;
     _replication = getReplication(tableConfig);
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
         tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
@@ -93,62 +94,12 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
   protected abstract int getReplication(TableConfig tableConfig);
 
   /**
-   * Helper method to check whether the number of replica-groups matches the table replication for replica-group based
-   * instance partitions. Log a warning if they do not match and use the one inside the instance partitions. The
-   * mismatch can happen when table is not configured correctly (table replication and numReplicaGroups does not match
-   * or replication changed without reassigning instances).
-   */
-  protected void checkReplication(InstancePartitions instancePartitions) {
-    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
-    if (numReplicaGroups != _replication) {
-      _logger.warn(
-          "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for "
-              + "table: {}, using: {}", instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication,
-          _tableNameWithType, numReplicaGroups);
-    }
-  }
-
-  /**
-   * Helper method to assign instances based on the current assignment and instance partitions.
-   */
-  protected List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
-      InstancePartitions instancePartitions) {
-    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
-    int numPartitions = instancePartitions.getNumPartitions();
-
-    if (numReplicaGroups == 1 && numPartitions == 1) {
-      // Non-replica-group based assignment
-
-      return SegmentAssignmentUtils.assignSegmentWithoutReplicaGroup(currentAssignment, instancePartitions,
-          _replication);
-    } else {
-      // Replica-group based assignment
-
-      checkReplication(instancePartitions);
-
-      int partitionId;
-      if (_partitionColumn == null || numPartitions == 1) {
-        partitionId = 0;
-      } else {
-        // Uniformly spray the segment partitions over the instance partitions
-        partitionId = getSegmentPartitionId(segmentName) % numPartitions;
-      }
-
-      return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);
-    }
-  }
-
-  /**
-   * Returns the partition id of the segment.
-   */
-  protected abstract int getSegmentPartitionId(String segmentName);
-
-  /**
    * Rebalances tiers and returns a pair of tier assignments and non-tier assignment.
    */
   protected Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> rebalanceTiers(
       Map<String, Map<String, String>> currentAssignment, @Nullable List<Tier> sortedTiers,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, boolean bootstrap) {
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, boolean bootstrap,
+      SegmentAssignmentStrategy segmentAssignmentStrategy, InstancePartitionsType instancePartitionsType) {
     if (sortedTiers == null) {
       return Pair.of(null, currentAssignment);
     }
@@ -175,7 +126,8 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
 
       _logger.info("Rebalancing tier: {} for table: {} with bootstrap: {}, instance partitions: {}", tierName,
           _tableNameWithType, bootstrap, tierInstancePartitions);
-      newTierAssignments.add(reassignSegments(tierName, tierCurrentAssignment, tierInstancePartitions, bootstrap));
+      newTierAssignments.add(reassignSegments(tierName, tierCurrentAssignment, tierInstancePartitions, bootstrap,
+          segmentAssignmentStrategy, instancePartitionsType));
     }
 
     return Pair.of(newTierAssignments, tierSegmentAssignment.getNonTierSegmentAssignment());
@@ -185,7 +137,8 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
    * Rebalances segments in the current assignment using the instancePartitions and returns new assignment
    */
   protected Map<String, Map<String, String>> reassignSegments(String instancePartitionType,
-      Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions, boolean bootstrap) {
+      Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions, boolean bootstrap,
+      SegmentAssignmentStrategy segmentAssignmentStrategy, InstancePartitionsType instancePartitionsType) {
     Map<String, Map<String, String>> newAssignment;
     if (bootstrap) {
       _logger.info("Bootstrapping segment assignment for {} segments of table: {}", instancePartitionType,
@@ -194,60 +147,16 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
       // When bootstrap is enabled, start with an empty assignment and reassign all segments
       newAssignment = new TreeMap<>();
       for (String segment : currentAssignment.keySet()) {
-        List<String> assignedInstances = assignSegment(segment, newAssignment, instancePartitions);
-        newAssignment.put(segment,
-            SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
+        List<String> assignedInstances =
+            segmentAssignmentStrategy.assignSegment(segment, newAssignment, instancePartitions, instancePartitionsType);
+        newAssignment
+            .put(segment, SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
       }
     } else {
-      int numReplicaGroups = instancePartitions.getNumReplicaGroups();
-      int numPartitions = instancePartitions.getNumPartitions();
-
-      if (numReplicaGroups == 1 && numPartitions == 1) {
-        // Non-replica-group based assignment
-
-        List<String> instances =
-            SegmentAssignmentUtils.getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, _replication);
-        newAssignment =
-            SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, instances,
-                _replication);
-      } else {
-        // Replica-group based assignment
-
-        checkReplication(instancePartitions);
-
-        if (_partitionColumn == null || numPartitions == 1) {
-          // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
-          //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the
-          //       table name hash as the random seed for the shuffle so that the result is deterministic.
-          List<String> segments = new ArrayList<>(currentAssignment.keySet());
-          Collections.shuffle(segments, new Random(_tableNameWithType.hashCode()));
-
-          newAssignment = new TreeMap<>();
-          SegmentAssignmentUtils.rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions, 0, segments,
-              newAssignment);
-        } else {
-          Map<Integer, List<String>> instancePartitionIdToSegmentsMap =
-              getInstancePartitionIdToSegmentsMap(currentAssignment.keySet(), instancePartitions.getNumPartitions());
-
-          // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
-          //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the
-          //       table name hash as the random seed for the shuffle so that the result is deterministic.
-          Random random = new Random(_tableNameWithType.hashCode());
-          for (List<String> segments : instancePartitionIdToSegmentsMap.values()) {
-            Collections.shuffle(segments, random);
-          }
-
-          return SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions,
-              instancePartitionIdToSegmentsMap);
-        }
-      }
+      // Use segment assignment strategy
+      newAssignment =
+          segmentAssignmentStrategy.reassignSegments(currentAssignment, instancePartitions, instancePartitionsType);
     }
     return newAssignment;
   }
-
-  /**
-   * Returns the instance partitions for the given segments.
-   */
-  protected abstract Map<Integer, List<String>> getInstancePartitionIdToSegmentsMap(Set<String> segments,
-      int numInstancePartitions);
 }

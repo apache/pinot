@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.segment.converter;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -295,7 +296,9 @@ public class DictionaryToRawIndexConverter {
   private void convertOneColumn(IndexSegment segment, String column, File newSegment)
       throws IOException {
     DataSource dataSource = segment.getDataSource(column);
-    ForwardIndexReader reader = dataSource.getForwardIndex();
+    ForwardIndexReader forwardIndexReader = dataSource.getForwardIndex();
+    Preconditions.checkState(forwardIndexReader != null,
+        "Forward index disabled for column: %s, cannot convert column!", column);
     Dictionary dictionary = dataSource.getDictionary();
 
     if (dictionary == null) {
@@ -317,36 +320,36 @@ public class DictionaryToRawIndexConverter {
     try (ForwardIndexCreator rawIndexCreator = DefaultIndexCreatorProvider
         .getRawIndexCreatorForSVColumn(newSegment, compressionType, column, storedType, numDocs, lengthOfLongestEntry,
             false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-        ForwardIndexReaderContext readerContext = reader.createContext()) {
+        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
       switch (storedType) {
         case INT:
           for (int docId = 0; docId < numDocs; docId++) {
-            rawIndexCreator.putInt(dictionary.getIntValue(reader.getDictId(docId, readerContext)));
+            rawIndexCreator.putInt(dictionary.getIntValue(forwardIndexReader.getDictId(docId, readerContext)));
           }
           break;
         case LONG:
           for (int docId = 0; docId < numDocs; docId++) {
-            rawIndexCreator.putLong(dictionary.getLongValue(reader.getDictId(docId, readerContext)));
+            rawIndexCreator.putLong(dictionary.getLongValue(forwardIndexReader.getDictId(docId, readerContext)));
           }
           break;
         case FLOAT:
           for (int docId = 0; docId < numDocs; docId++) {
-            rawIndexCreator.putFloat(dictionary.getFloatValue(reader.getDictId(docId, readerContext)));
+            rawIndexCreator.putFloat(dictionary.getFloatValue(forwardIndexReader.getDictId(docId, readerContext)));
           }
           break;
         case DOUBLE:
           for (int docId = 0; docId < numDocs; docId++) {
-            rawIndexCreator.putDouble(dictionary.getDoubleValue(reader.getDictId(docId, readerContext)));
+            rawIndexCreator.putDouble(dictionary.getDoubleValue(forwardIndexReader.getDictId(docId, readerContext)));
           }
           break;
         case STRING:
           for (int docId = 0; docId < numDocs; docId++) {
-            rawIndexCreator.putString(dictionary.getStringValue(reader.getDictId(docId, readerContext)));
+            rawIndexCreator.putString(dictionary.getStringValue(forwardIndexReader.getDictId(docId, readerContext)));
           }
           break;
         case BYTES:
           for (int docId = 0; docId < numDocs; docId++) {
-            rawIndexCreator.putBytes(dictionary.getBytesValue(reader.getDictId(docId, readerContext)));
+            rawIndexCreator.putBytes(dictionary.getBytesValue(forwardIndexReader.getDictId(docId, readerContext)));
           }
           break;
         default:

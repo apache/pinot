@@ -286,6 +286,8 @@ public class CommonConstants {
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
+        // Reorder scan based predicates based on cardinality and number of selected values
+        public static final String AND_SCAN_REORDERING = "AndScanReordering";
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
@@ -597,7 +599,6 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
 
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
-    public static final int DEFAULT_CURRENT_DATA_TABLE_VERSION = 3;
 
     // Environment Provider Configs
     public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY =
@@ -740,10 +741,13 @@ public class CommonConstants {
 
     public static final String START_TIME = "segment.start.time";
     public static final String END_TIME = "segment.end.time";
+    public static final String RAW_START_TIME = "segment.start.time.raw";
+    public static final String RAW_END_TIME = "segment.end.time.raw";
     public static final String TIME_UNIT = "segment.time.unit";
     public static final String INDEX_VERSION = "segment.index.version";
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
+    public static final String TIER = "segment.tier";
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String PUSH_TIME = "segment.push.time";
     public static final String REFRESH_TIME = "segment.refresh.time";
@@ -768,8 +772,9 @@ public class CommonConstants {
     public static final String METADATA_URI_FOR_PEER_DOWNLOAD = "";
 
     public static class AssignmentStrategy {
-      public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
-      public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "ReplicaGroupSegmentAssignmentStrategy";
+      public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "balanced";
+      public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "replicagroup";
+      public static final String DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY = "allservers";
     }
 
     public static class BuiltInVirtualColumn {
@@ -777,6 +782,10 @@ public class CommonConstants {
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
     }
+  }
+
+  public static class Tier {
+    public static final String BACKEND_PROP_DATA_DIR = "dataDir";
   }
 
   public static class Query {
@@ -810,6 +819,10 @@ public class CommonConstants {
       }
     }
 
+    public static class OptimizationConstants {
+      public static final int DEFAULT_AVG_MV_ENTRIES_DENOMINATOR = 2;
+    }
+
     public static class Range {
       public static final char DELIMITER = '\0';
       public static final char LOWER_EXCLUSIVE = '(';
@@ -820,5 +833,9 @@ public class CommonConstants {
       public static final String LOWER_UNBOUNDED = LOWER_EXCLUSIVE + UNBOUNDED + DELIMITER;
       public static final String UPPER_UNBOUNDED = DELIMITER + UNBOUNDED + UPPER_EXCLUSIVE;
     }
+  }
+
+  public static class IdealState {
+    public static final String HYBRID_TABLE_TIME_BOUNDARY = "HYBRID_TABLE_TIME_BOUNDARY";
   }
 }

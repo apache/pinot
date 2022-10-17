@@ -23,6 +23,9 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -162,5 +165,53 @@ public class SegmentGeneratorConfigTest {
     Assert.assertTrue(timestampIndexGranularityMap.get("f2").contains(TimestampIndexGranularity.WEEK));
     Assert.assertTrue(timestampIndexGranularityMap.containsKey("f3"));
     Assert.assertTrue(timestampIndexGranularityMap.get("f3").contains(TimestampIndexGranularity.MONTH));
+  }
+
+  @Test
+  public void inferNameGeneratorType() {
+    // Time column is data type STRING and in SDF
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("date").build();
+    Schema schema = new Schema.SchemaBuilder().addDateTime("date", FieldSpec.DataType.STRING,
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS").build();
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof NormalizedDateSegmentNameGenerator);
+
+    // Use name generator if defined
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setSegmentNameGenerator(new FixedSegmentNameGenerator("test"));
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof FixedSegmentNameGenerator);
+
+    // Use fixed segment generator if segment name defined
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setSegmentName("test");
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof FixedSegmentNameGenerator);
+
+    // Default to simple name generator with prefix when time column is not in SDF
+    schema = new Schema.SchemaBuilder().addDateTime("date", FieldSpec.DataType.STRING,
+        "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setSegmentNamePrefix("prefix");
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof SimpleSegmentNameGenerator);
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator().toString().contains("tableName=prefix"));
+
+    // Default to simple name generator with table prefix
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof SimpleSegmentNameGenerator);
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator().toString().contains("tableName=testTable"));
+
+    // Table config has no time column defined
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof SimpleSegmentNameGenerator);
   }
 }

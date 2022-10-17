@@ -73,10 +73,11 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
-        return;
+      if (nullBitmap == null) {
+        nullBitmap = new RoaringBitmap();
       }
+      aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
+      return;
     }
 
     double sum = aggregationResultHolder.getDoubleResult();
@@ -207,26 +208,27 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        if (nullBitmap.getCardinality() < length) {
-          double[] valueArray = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              int groupKey = groupKeyArray[i];
-              Double result = groupByResultHolder.getResult(groupKey);
-              groupByResultHolder.setValueForKey(groupKey, result == null ? valueArray[i] : result + valueArray[i]);
-              // In presto:
-              // SELECT sum (cast(id AS DOUBLE)) as sum,  min(id) as min, max(id) as max, key FROM (VALUES (null, 1),
-              // (null, 2)) AS t(id, key)  GROUP BY key ORDER BY max DESC;
-              // sum  | min  | max  | key
-              //------+------+------+-----
-              // NULL | NULL | NULL |   2
-              // NULL | NULL | NULL |   1
-            }
+      if (nullBitmap == null) {
+        nullBitmap = new RoaringBitmap();
+      }
+      if (nullBitmap.getCardinality() < length) {
+        double[] valueArray = blockValSet.getDoubleValuesSV();
+        for (int i = 0; i < length; i++) {
+          if (!nullBitmap.contains(i)) {
+            int groupKey = groupKeyArray[i];
+            Double result = groupByResultHolder.getResult(groupKey);
+            groupByResultHolder.setValueForKey(groupKey, result == null ? valueArray[i] : result + valueArray[i]);
+            // In presto:
+            // SELECT sum (cast(id AS DOUBLE)) as sum,  min(id) as min, max(id) as max, key FROM (VALUES (null, 1),
+            // (null, 2)) AS t(id, key)  GROUP BY key ORDER BY max DESC;
+            // sum  | min  | max  | key
+            //------+------+------+-----
+            // NULL | NULL | NULL |   2
+            // NULL | NULL | NULL |   1
           }
         }
-        return;
       }
+      return;
     }
 
     double[] valueArray = blockValSet.getDoubleValuesSV();

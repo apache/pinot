@@ -34,6 +34,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.Container;
 import org.roaringbitmap.RoaringBitmap;
@@ -61,20 +62,21 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   static final String DICTIONARY_FILE_NAME = "dictionary.buf";
   static final String INVERTED_INDEX_FILE_NAME = "inverted.index.buf";
 
+  final JsonIndexConfig _jsonIndexConfig;
   final File _indexFile;
   final File _tempDir;
   final File _dictionaryFile;
   final File _invertedIndexFile;
   final IntList _numFlattenedRecordsList = new IntArrayList();
   final Map<String, RoaringBitmapWriter<RoaringBitmap>> _postingListMap = new TreeMap<>();
-  final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard =
-      RoaringBitmapWriter.writer();
+  final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard = RoaringBitmapWriter.writer();
 
   int _nextFlattenedDocId;
   int _maxValueLength;
 
-  BaseJsonIndexCreator(File indexDir, String columnName)
+  BaseJsonIndexCreator(File indexDir, String columnName, JsonIndexConfig jsonIndexConfig)
       throws IOException {
+    _jsonIndexConfig = jsonIndexConfig;
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, columnName + TEMP_DIR_SUFFIX);
     if (_tempDir.exists()) {
@@ -89,7 +91,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   @Override
   public void add(String jsonString)
       throws IOException {
-    addFlattenedRecords(JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString)));
+    addFlattenedRecords(JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString), _jsonIndexConfig));
   }
 
   /**
@@ -98,8 +100,8 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   void addFlattenedRecords(List<Map<String, String>> records)
       throws IOException {
     int numRecords = records.size();
-    Preconditions
-        .checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records", Integer.MAX_VALUE);
+    Preconditions.checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records",
+        Integer.MAX_VALUE);
     _numFlattenedRecordsList.add(numRecords);
     for (Map<String, String> record : records) {
       for (Map.Entry<String, String> entry : record.entrySet()) {

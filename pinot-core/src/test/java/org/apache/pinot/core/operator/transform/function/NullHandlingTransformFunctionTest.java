@@ -86,10 +86,10 @@ public class NullHandlingTransformFunctionTest {
   protected final double[] _doubleSVValues = new double[NUM_ROWS];
   protected final String[] _stringSVValues = new String[NUM_ROWS];
   protected final byte[][] _bytesSVValues = new byte[NUM_ROWS][];
+  protected final boolean[] _nullValues = new boolean[NUM_ROWS];
 
   protected Map<String, DataSource> _dataSourceMap;
   protected ProjectionBlock _projectionBlock;
-  protected static final int NULL_VALUE_MOD = 10;
 
   @BeforeClass
   public void setup()
@@ -97,6 +97,7 @@ public class NullHandlingTransformFunctionTest {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
     DecimalFormat df = new DecimalFormat("0", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
     df.setMaximumFractionDigits(340); // 340 = DecimalFormat.DOUBLE_FRACTION_DIGITS
+    Random nullValueRandom = new Random(42);
     long currentTimeMs = System.currentTimeMillis();
     for (int i = 0; i < NUM_ROWS; i++) {
       _intSVValues[i] = RANDOM.nextInt();
@@ -107,12 +108,13 @@ public class NullHandlingTransformFunctionTest {
       _bytesSVValues[i] = RandomStringUtils.randomAlphanumeric(26).getBytes();
 
       _timeValues[i] = currentTimeMs - RANDOM.nextInt(365 * 24 * 3600) * 1000L;
+      _nullValues[i] = nullValueRandom.nextInt(2) > 0;
     }
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       Map<String, Object> map = new HashMap<>();
-      if (i % NULL_VALUE_MOD != 0) {
+      if (!_nullValues[i]) {
         map.put(INT_SV_COLUMN, _intSVValues[i]);
         map.put(LONG_SV_COLUMN, _longSVValues[i]);
         map.put(FLOAT_SV_COLUMN, _floatSVValues[i]);
@@ -186,7 +188,7 @@ public class NullHandlingTransformFunctionTest {
     assertFalse(resultMetadata.hasDictionary());
     boolean[] expectedValues = new boolean[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = i % NULL_VALUE_MOD == 0;
+      expectedValues[i] = _nullValues[i];
     }
     testTransformFunction(expression, expectedValues);
   }
@@ -214,7 +216,7 @@ public class NullHandlingTransformFunctionTest {
     assertFalse(resultMetadata.hasDictionary());
     boolean[] expectedValues = new boolean[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = i % NULL_VALUE_MOD != 0;
+      expectedValues[i] = !_nullValues[i];
     }
     testTransformFunction(expression, expectedValues);
   }

@@ -35,6 +35,7 @@ import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -69,9 +70,9 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
   private int _numPostingListsInLastChunk;
   private int _numPostingLists;
 
-  public OffHeapJsonIndexCreator(File indexDir, String columnName)
+  public OffHeapJsonIndexCreator(File indexDir, String columnName, JsonIndexConfig jsonIndexConfig)
       throws IOException {
-    super(indexDir, columnName);
+    super(indexDir, columnName, jsonIndexConfig);
     _postingListFile = new File(_tempDir, POSTING_LIST_FILE_NAME);
     _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
   }
@@ -133,9 +134,8 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
     }
 
     // Read the final posting list file and create the dictionary and inverted index file
-    try (PinotDataBuffer finalPostingListBuffer = PinotDataBuffer
-        .mapFile(finalPostingListFile, true, 0, finalPostingListFile.length(), ByteOrder.BIG_ENDIAN,
-            "Json index final posting list");
+    try (PinotDataBuffer finalPostingListBuffer = PinotDataBuffer.mapFile(finalPostingListFile, true, 0,
+        finalPostingListFile.length(), ByteOrder.BIG_ENDIAN, "Json index final posting list");
         VarLengthValueWriter dictionaryWriter = new VarLengthValueWriter(_dictionaryFile, _numPostingLists);
         BitmapInvertedIndexWriter invertedIndexWriter = new BitmapInvertedIndexWriter(_invertedIndexFile,
             _numPostingLists)) {
@@ -162,9 +162,8 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
   private File createFinalPostingListFile(byte[] valueBytesBuffer)
       throws IOException {
     File finalPostingListFile = new File(_tempDir, FINAL_POSTING_LIST_FILE_NAME);
-    try (PinotDataBuffer postingListBuffer = PinotDataBuffer
-        .mapFile(_postingListFile, true, 0, _postingListFile.length(), ByteOrder.BIG_ENDIAN,
-            "Json index posting list")) {
+    try (PinotDataBuffer postingListBuffer = PinotDataBuffer.mapFile(_postingListFile, true, 0,
+        _postingListFile.length(), ByteOrder.BIG_ENDIAN, "Json index posting list")) {
       // Create chunk iterators from the posting list file
       int numChunks = _postingListChunkEndOffsets.size();
       List<ChunkIterator> chunkIterators = new ArrayList<>(numChunks);

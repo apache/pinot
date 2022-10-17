@@ -24,12 +24,13 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
@@ -66,7 +67,9 @@ public class DistinctDataTableReducer implements DataTableReducer {
     // Gather all non-empty DistinctTables
     List<DistinctTable> nonEmptyDistinctTables = new ArrayList<>(dataTableMap.size());
     for (DataTable dataTable : dataTableMap.values()) {
-      DistinctTable distinctTable = dataTable.getObject(0, 0);
+      DataTable.CustomObject customObject = dataTable.getCustomObject(0, 0);
+      assert customObject != null;
+      DistinctTable distinctTable = ObjectSerDeUtils.deserialize(customObject);
       if (!distinctTable.isEmpty()) {
         nonEmptyDistinctTables.add(distinctTable);
       }

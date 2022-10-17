@@ -25,10 +25,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -204,7 +204,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
             ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       // COUNT(*) is rewritten to SUM(1)
       case "COUNT":
-        return new SumAggregationFunction(ExpressionContext.forLiteral("1"));
+        return new SumAggregationFunction(ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, 1));
       default:
         throw new IllegalStateException(
             "Unexpected value: " + ((RexExpression.FunctionCall) aggCall).getFunctionName());

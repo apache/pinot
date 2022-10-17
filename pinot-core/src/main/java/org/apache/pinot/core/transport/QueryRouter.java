@@ -27,12 +27,12 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -154,7 +154,7 @@ public class QueryRouter {
     LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
         serverRoutingInstance, e);
     _serverRoutingStatsManager.recordStatsUponResponseArrival(requestId, serverRoutingInstance.getInstanceId(),
-        (int) asyncQueryResponse.getTimeOutMs());
+        (int) asyncQueryResponse.getTimeoutMs());
     asyncQueryResponse.markQueryFailed(serverRoutingInstance, e);
   }
 
@@ -201,7 +201,7 @@ public class QueryRouter {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
       asyncQueryResponse.markServerDown(serverRoutingInstance, exception);
       _serverRoutingStatsManager.recordStatsUponResponseArrival(asyncQueryResponse.getRequestId(),
-          serverRoutingInstance.getInstanceId(), (int) asyncQueryResponse.getTimeOutMs());
+          serverRoutingInstance.getInstanceId(), (int) asyncQueryResponse.getTimeoutMs());
     }
   }
 

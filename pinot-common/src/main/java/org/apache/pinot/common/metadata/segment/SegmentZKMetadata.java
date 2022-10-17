@@ -94,6 +94,14 @@ public class SegmentZKMetadata implements ZKMetadata {
     return _endTimeMs;
   }
 
+  public String getRawStartTime() {
+    return _simpleFields.get(Segment.RAW_START_TIME);
+  }
+
+  public String getRawEndTime() {
+    return _simpleFields.get(Segment.RAW_END_TIME);
+  }
+
   public void setStartTime(long startTime) {
     setNonNegativeValue(Segment.START_TIME, startTime);
     _startTimeMsCached = false;
@@ -102,6 +110,14 @@ public class SegmentZKMetadata implements ZKMetadata {
   public void setEndTime(long endTime) {
     setNonNegativeValue(Segment.END_TIME, endTime);
     _endTimeMsCached = false;
+  }
+
+  public void setRawStartTime(String startTime) {
+    setValue(Segment.RAW_START_TIME, startTime);
+  }
+
+  public void setRawEndTime(String endTime) {
+    setValue(Segment.RAW_END_TIME, endTime);
   }
 
   public void setTimeUnit(TimeUnit timeUnit) {
@@ -140,6 +156,14 @@ public class SegmentZKMetadata implements ZKMetadata {
 
   public void setCrc(long crc) {
     setNonNegativeValue(Segment.CRC, crc);
+  }
+
+  public String getTier() {
+    return _simpleFields.get(Segment.TIER);
+  }
+
+  public void setTier(String tier) {
+    setValue(Segment.TIER, tier);
   }
 
   public long getCreationTime() {

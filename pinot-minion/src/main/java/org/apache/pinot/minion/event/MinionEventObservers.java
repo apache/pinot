@@ -58,10 +58,11 @@ public class MinionEventObservers {
   }
 
   private void startCleanup() {
-    if (_cleanupExecutor == null) {
-      LOGGER.info("No executor to cleanup task event observer");
+    if (_cleanupExecutor == null || _eventObserverCleanupDelayMs == 0) {
+      LOGGER.info("Configured to clean up task event observers immediately");
       return;
     }
+    LOGGER.info("Configured to clean up task event observers with cleanupDelayMs: {}", _eventObserverCleanupDelayMs);
     _cleanupExecutor.submit(() -> {
       LOGGER.info("Start to cleanup task event observers with cleanupDelayMs: {}", _eventObserverCleanupDelayMs);
       while (!Thread.interrupted()) {
@@ -97,7 +98,13 @@ public class MinionEventObservers {
   }
 
   public static MinionEventObservers getInstance() {
-    return _customInstance != null ? _customInstance : DEFAULT_INSTANCE;
+    if (_customInstance != null) {
+      return _customInstance;
+    }
+    // Test code might reach here, but this should never happen in prod case, as instance is created upon worker
+    // starts before any tasks can run. But log something for debugging just in case.
+    LOGGER.warn("Using default MinionEventObservers instance");
+    return DEFAULT_INSTANCE;
   }
 
   public MinionEventObserver getMinionEventObserver(String taskId) {

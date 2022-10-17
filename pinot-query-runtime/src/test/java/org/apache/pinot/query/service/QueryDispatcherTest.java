@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestUtils;
+import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.runtime.QueryRunner;
@@ -32,11 +33,10 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class QueryDispatcherTest {
+public class QueryDispatcherTest extends QueryTestSet {
   private static final Random RANDOM_REQUEST_ID_GEN = new Random();
   private static final int QUERY_SERVER_COUNT = 2;
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
@@ -70,23 +70,13 @@ public class QueryDispatcherTest {
     }
   }
 
-  @Test(dataProvider = "testDataWithSqlToCompiledAsWorkerRequest")
+  @Test(dataProvider = "testSql")
   public void testQueryDispatcherCanSendCorrectPayload(String sql)
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     int reducerStageId = dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan);
     Assert.assertTrue(PlannerUtils.isRootStage(reducerStageId));
-  }
-
-  @DataProvider(name = "testDataWithSqlToCompiledAsWorkerRequest")
-  private Object[][] provideTestSqlToCompiledToWorkerRequest() {
-    return new Object[][] {
-        new Object[]{"SELECT * FROM b"},
-        new Object[]{"SELECT * FROM a"},
-        new Object[]{"SELECT * FROM a JOIN b ON a.col3 = b.col3"},
-        new Object[]{"SELECT a.col1, a.ts, c.col2, c.col3 FROM a JOIN c ON a.col1 = c.col2 "
-            + " WHERE (a.col3 >= 0 OR a.col2 = 'foo') AND c.col3 >= 0"},
-    };
+    dispatcher.shutdown();
   }
 }

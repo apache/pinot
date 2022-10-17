@@ -31,6 +31,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
 
+
 /**
  * Numerical expressions of form "column <operator> literal", where operator can be '=', '!=', '>', '>=', '<', or '<=',
  * can compare a column of one datatype (say INT) with a literal of different datatype (say DOUBLE). These expressions
@@ -93,18 +94,21 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
         // Verify that LHS is a numeric column and RHS is a numeric literal before rewriting.
         Expression lhs = operands.get(0);
         Expression rhs = operands.get(1);
-        if (isNumericColumn(lhs, schema) && isNumericLiteral(rhs)) {
-          switch (kind) {
-            case EQUALS:
-            case NOT_EQUALS:
-              return rewriteEqualsExpression(expression, kind, lhs, rhs, schema);
-            case GREATER_THAN:
-            case GREATER_THAN_OR_EQUAL:
-            case LESS_THAN:
-            case LESS_THAN_OR_EQUAL:
-              return rewriteRangeExpression(expression, kind, lhs, rhs, schema);
-            default:
-              break;
+        if (isNumericLiteral(rhs)) {
+          FieldSpec.DataType dataType = getDataType(lhs, schema);
+          if (dataType != null && dataType.isNumeric()) {
+            switch (kind) {
+              case EQUALS:
+              case NOT_EQUALS:
+                return rewriteEqualsExpression(expression, kind, dataType, rhs);
+              case GREATER_THAN:
+              case GREATER_THAN_OR_EQUAL:
+              case LESS_THAN:
+              case LESS_THAN_OR_EQUAL:
+                return rewriteRangeExpression(expression, kind, lhs, rhs, schema);
+              default:
+                break;
+            }
           }
         }
         break;
@@ -165,13 +169,10 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
    * Rewrite expressions of form "column = literal" or "column != literal" to ensure that RHS literal is the same
    * datatype as LHS column.
    */
-  private static Expression rewriteEqualsExpression(Expression equals, FilterKind kind, Expression lhs, Expression rhs,
-      Schema schema) {
+  private static Expression rewriteEqualsExpression(Expression equals, FilterKind kind, FieldSpec.DataType dataType,
+      Expression rhs) {
     // Get expression operator
     boolean result = kind == FilterKind.NOT_EQUALS;
-
-    // Get column data type.
-    FieldSpec.DataType dataType = schema.getFieldSpecFor(lhs.getIdentifier().getName()).getDataType();
 
     switch (rhs.getLiteral().getSetField()) {
       case SHORT_VALUE:
@@ -448,21 +449,31 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
     }
   }
 
-  /** @return true if expression is a column of numeric type */
-  private static boolean isNumericColumn(Expression expression, Schema schema) {
-    if (expression.getType() != ExpressionType.IDENTIFIER) {
-      // Expression can not be a column.
-      return false;
+  /** @return field data type extracted from the expression. null if we can't determine the type. */
+  @Nullable
+  private static FieldSpec.DataType getDataType(Expression expression, Schema schema) {
+    if (expression.getType() == ExpressionType.IDENTIFIER) {
+      String column = expression.getIdentifier().getName();
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      if (fieldSpec != null && fieldSpec.isSingleValueField()) {
+        return fieldSpec.getDataType();
+      }
+    } else if (expression.getType() == ExpressionType.FUNCTION
+        && "cast".equalsIgnoreCase(expression.getFunctionCall().getOperator())) {
+      // expression is not identifier but we can also determine the data type.
+      String targetTypeLiteral = expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue()
+          .toUpperCase();
+      FieldSpec.DataType dataType;
+      if ("INTEGER".equals(targetTypeLiteral)) {
+        dataType = FieldSpec.DataType.INT;
+      } else if ("VARCHAR".equals(targetTypeLiteral)) {
+        dataType = FieldSpec.DataType.STRING;
+      } else {
+        dataType = FieldSpec.DataType.valueOf(targetTypeLiteral);
+      }
+      return dataType;
     }
-
-    String column = expression.getIdentifier().getName();
-    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
-    if (fieldSpec == null || !fieldSpec.isSingleValueField()) {
-      // Expression can not be a column name.
-      return false;
-    }
-
-    return schema.getFieldSpecFor(column).getDataType().isNumeric();
+    return null;
   }
 
   /** @return true if expression is a numeric literal; otherwise, false. */

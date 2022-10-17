@@ -88,6 +88,7 @@ public abstract class BaseTransformFunctionTest {
   protected static final String TIME_COLUMN = "timeColumn";
   protected static final String TIMESTAMP_COLUMN = "timestampColumn";
   protected static final String JSON_COLUMN = "json";
+  protected static final String DEFAULT_JSON_COLUMN = "defaultJson";
   protected final int[] _intSVValues = new int[NUM_ROWS];
   protected final long[] _longSVValues = new long[NUM_ROWS];
   protected final float[] _floatSVValues = new float[NUM_ROWS];
@@ -184,7 +185,8 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
-        .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.STRING, Integer.MAX_VALUE, null)
+        .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
+        .addSingleValueDimension(DEFAULT_JSON_COLUMN, FieldSpec.DataType.JSON)
         .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
         .addMultiValueDimension(LONG_MV_COLUMN, FieldSpec.DataType.LONG)
         .addMultiValueDimension(FLOAT_MV_COLUMN, FieldSpec.DataType.FLOAT)

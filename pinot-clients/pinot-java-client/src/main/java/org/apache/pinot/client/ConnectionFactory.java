@@ -59,6 +59,21 @@ public class ConnectionFactory {
   }
 
   /**
+   * Creates a connection to a Pinot cluster, given its Zookeeper URL and properties.
+   *
+   * @param properties connection properties
+   * @param zkUrl zookeeper URL.
+   * @return A connection that connects to the brokers in the given Helix cluster
+   */
+  public static Connection fromZookeeper(Properties properties, String zkUrl) {
+    try {
+      return fromZookeeper(properties, new DynamicBrokerSelector(zkUrl), getDefault(properties));
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
    *
    * @param scheme controller URL scheme
    * @param controllerHost controller host

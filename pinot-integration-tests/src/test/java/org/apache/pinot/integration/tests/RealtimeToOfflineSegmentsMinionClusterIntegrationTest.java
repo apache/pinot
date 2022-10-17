@@ -211,7 +211,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
 
   @Test(enabled = false)
   @Override
-  public void testGeneratedQueriesWithMultiValues() {
+  public void testGeneratedQueries() {
   }
 
   @Test(enabled = false)

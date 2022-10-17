@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.Collections;
+import java.util.Map;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
@@ -31,13 +34,40 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface RowMetadata {
+  GenericRow EMPTY_ROW = new GenericRow();
+  Map<String, String> EMPTY_COLLECTION = Collections.emptyMap();
 
   /**
-   * Return the timestamp associated with when the row was ingested upstream.
-   * Expected to be mainly used for stream-based sources.
+   * Returns the timestamp associated with the record. This typically refers to the time it was ingested into the
+   * upstream source. In some cases, it may be the time at which the record was created, aka event time (eg. in kafka,
+   * a topic may be configured to use record `CreateTime` instead of `LogAppendTime`).
+   *
+   * Expected to be used for stream-based sources.
    *
    * @return timestamp (epoch in milliseconds) when the row was ingested upstream
    *         Long.MIN_VALUE if not available
    */
-  long getIngestionTimeMs();
+  long getRecordIngestionTimeMs();
+
+  /**
+   * Returns the stream message headers
+   *
+   * @return A {@link GenericRow} that encapsulates the headers in the ingested row
+   */
+  default GenericRow getHeaders() {
+    EMPTY_ROW.clear();
+    return EMPTY_ROW;
+  }
+
+  /**
+   * Returns the metadata associated with the stream record
+   *
+   * Kafka's record offset would be an example of a metadata associated with the record. Record metadata is typically
+   * stream specific and hence, it is defined as a Map of strings.
+   *
+   * @return A Map of record metadata entries.
+   */
+  default Map<String, String> getRecordMetadata() {
+    return EMPTY_COLLECTION;
+  }
 }

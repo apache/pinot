@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
@@ -43,6 +44,9 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     _dataSource = dataSource;
     _numDocs = numDocs;
     _nullHandlingEnabled = nullHandlingEnabled;
+    Preconditions.checkState(_dataSource.getForwardIndex() != null,
+        "Forward index disabled for column: %s, scan based filtering not supported!",
+        _dataSource.getDataSourceMetadata().getFieldSpec().getName());
   }
 
   @Override
@@ -51,8 +55,7 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     if (dataSourceMetadata.isSingleValue()) {
       return new FilterBlock(new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _nullHandlingEnabled));
     } else {
-      return new FilterBlock(new MVScanDocIdSet(_predicateEvaluator, _dataSource.getForwardIndex(), _numDocs,
-          dataSourceMetadata.getMaxNumValuesPerMVEntry()));
+      return new FilterBlock(new MVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs));
     }
   }
 

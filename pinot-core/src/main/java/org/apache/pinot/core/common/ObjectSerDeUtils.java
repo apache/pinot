@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import com.tdunning.math.stats.MergingDigest;
@@ -54,9 +55,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
@@ -120,8 +121,8 @@ public class ObjectSerDeUtils {
     FloatLongPair(29),
     DoubleLongPair(30),
     StringLongPair(31),
-    CovarianceTuple(32),
-    Null(100);
+    CovarianceTuple(32);
+
     private final int _value;
 
     ObjectType(int value) {
@@ -132,11 +133,7 @@ public class ObjectSerDeUtils {
       return _value;
     }
 
-    public static ObjectType getObjectType(@Nullable Object value) {
-      if (value == null) {
-        return ObjectType.Null;
-      }
-
+    public static ObjectType getObjectType(Object value) {
       if (value instanceof String) {
         return ObjectType.String;
       } else if (value instanceof Long) {
@@ -358,8 +355,7 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<IntLongPair> INT_LONG_PAIR_SER_DE
-      = new ObjectSerDe<IntLongPair>() {
+  public static final ObjectSerDe<IntLongPair> INT_LONG_PAIR_SER_DE = new ObjectSerDe<IntLongPair>() {
 
     @Override
     public byte[] serialize(IntLongPair intLongPair) {
@@ -377,8 +373,7 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<LongLongPair> LONG_LONG_PAIR_SER_DE
-      = new ObjectSerDe<LongLongPair>() {
+  public static final ObjectSerDe<LongLongPair> LONG_LONG_PAIR_SER_DE = new ObjectSerDe<LongLongPair>() {
 
     @Override
     public byte[] serialize(LongLongPair longLongPair) {
@@ -396,8 +391,7 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<FloatLongPair> FLOAT_LONG_PAIR_SER_DE
-      = new ObjectSerDe<FloatLongPair>() {
+  public static final ObjectSerDe<FloatLongPair> FLOAT_LONG_PAIR_SER_DE = new ObjectSerDe<FloatLongPair>() {
 
     @Override
     public byte[] serialize(FloatLongPair floatLongPair) {
@@ -414,8 +408,7 @@ public class ObjectSerDeUtils {
       return FloatLongPair.fromByteBuffer(byteBuffer);
     }
   };
-  public static final ObjectSerDe<DoubleLongPair> DOUBLE_LONG_PAIR_SER_DE
-      = new ObjectSerDe<DoubleLongPair>() {
+  public static final ObjectSerDe<DoubleLongPair> DOUBLE_LONG_PAIR_SER_DE = new ObjectSerDe<DoubleLongPair>() {
 
     @Override
     public byte[] serialize(DoubleLongPair doubleLongPair) {
@@ -432,8 +425,7 @@ public class ObjectSerDeUtils {
       return DoubleLongPair.fromByteBuffer(byteBuffer);
     }
   };
-  public static final ObjectSerDe<StringLongPair> STRING_LONG_PAIR_SER_DE
-      = new ObjectSerDe<StringLongPair>() {
+  public static final ObjectSerDe<StringLongPair> STRING_LONG_PAIR_SER_DE = new ObjectSerDe<StringLongPair>() {
 
     @Override
     public byte[] serialize(StringLongPair stringLongPair) {
@@ -608,11 +600,11 @@ public class ObjectSerDeUtils {
       }
 
       // De-serialize each key-value pair
-      int keyTypeValue = byteBuffer.getInt();
-      int valueTypeValue = byteBuffer.getInt();
+      ObjectSerDe keySerDe = SER_DES[byteBuffer.getInt()];
+      ObjectSerDe valueSerDe = SER_DES[byteBuffer.getInt()];
       for (int i = 0; i < size; i++) {
-        Object key = ObjectSerDeUtils.deserialize(sliceByteBuffer(byteBuffer, byteBuffer.getInt()), keyTypeValue);
-        Object value = ObjectSerDeUtils.deserialize(sliceByteBuffer(byteBuffer, byteBuffer.getInt()), valueTypeValue);
+        Object key = keySerDe.deserialize(sliceByteBuffer(byteBuffer, byteBuffer.getInt()));
+        Object value = valueSerDe.deserialize(sliceByteBuffer(byteBuffer, byteBuffer.getInt()));
         map.put(key, value);
       }
       return map;
@@ -1000,12 +992,12 @@ public class ObjectSerDeUtils {
 
       // De-serialize the values
       if (size != 0) {
-        int valueType = byteBuffer.getInt();
+        ObjectSerDe serDe = SER_DES[byteBuffer.getInt()];
         for (int i = 0; i < size; i++) {
           int numBytes = byteBuffer.getInt();
           ByteBuffer slice = byteBuffer.slice();
           slice.limit(numBytes);
-          list.add(ObjectSerDeUtils.deserialize(slice, valueType));
+          list.add(serDe.deserialize(slice));
           byteBuffer.position(byteBuffer.position() + numBytes);
         }
       }
@@ -1197,31 +1189,21 @@ public class ObjectSerDeUtils {
   };
   //@formatter:on
 
-  public static byte[] serialize(Object value) {
-    return serialize(value, ObjectType.getObjectType(value)._value);
-  }
-
-  public static byte[] serialize(Object value, ObjectType objectType) {
-    return serialize(value, objectType._value);
-  }
-
   public static byte[] serialize(Object value, int objectTypeValue) {
     return SER_DES[objectTypeValue].serialize(value);
   }
 
+  public static <T> T deserialize(DataTable.CustomObject customObject) {
+    return (T) SER_DES[customObject.getType()].deserialize(customObject.getBuffer());
+  }
+
+  @VisibleForTesting
+  public static byte[] serialize(Object value) {
+    return serialize(value, ObjectType.getObjectType(value)._value);
+  }
+
+  @VisibleForTesting
   public static <T> T deserialize(byte[] bytes, ObjectType objectType) {
-    return deserialize(bytes, objectType._value);
-  }
-
-  public static <T> T deserialize(byte[] bytes, int objectTypeValue) {
-    return (T) SER_DES[objectTypeValue].deserialize(bytes);
-  }
-
-  public static <T> T deserialize(ByteBuffer byteBuffer, ObjectType objectType) {
-    return deserialize(byteBuffer, objectType._value);
-  }
-
-  public static <T> T deserialize(ByteBuffer byteBuffer, int objectTypeValue) {
-    return (T) SER_DES[objectTypeValue].deserialize(byteBuffer);
+    return (T) SER_DES[objectType._value].deserialize(bytes);
   }
 }

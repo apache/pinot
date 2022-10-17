@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.avro.Conversions;
 import org.apache.avro.Schema;
 import org.apache.avro.data.TimeConversions;
@@ -229,5 +231,16 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     Assert.assertEquals(genericRow.getValue(timestampMillisColName).getClass().getSimpleName(), "Timestamp");
     Assert.assertEquals(genericRow.getValue(timestampMicrosColName), timestampMicrosColValue);
     Assert.assertEquals(genericRow.getValue(timestampMicrosColName).getClass().getSimpleName(), "Timestamp");
+  }
+
+  @Test
+  public void testReusedByteBuffer() {
+    byte[] content = new byte[100];
+    ThreadLocalRandom.current().nextBytes(content);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(content);
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    for (int i = 0; i < 10; i++) {
+      Assert.assertEquals(avroRecordExtractor.convertSingleValue(byteBuffer), content);
+    }
   }
 }

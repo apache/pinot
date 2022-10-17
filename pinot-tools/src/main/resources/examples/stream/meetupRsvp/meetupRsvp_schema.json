@@ -8,6 +8,18 @@
   "dimensionFieldSpecs": [
     {
       "dataType": "STRING",
+      "name": "__key"
+    },
+    {
+      "dataType": "STRING",
+      "name": "__metadata$offset"
+    },
+    {
+      "dataType": "STRING",
+      "name": "__metadata$recordTimestamp"
+    },
+    {
+      "dataType": "STRING",
       "name": "venue_name"
     },
     {

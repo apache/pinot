@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -90,7 +91,11 @@ public class ControllerTest {
   public static final String LOCAL_HOST = "localhost";
   public static final int DEFAULT_CONTROLLER_PORT = 18998;
   public static final String DEFAULT_DATA_DIR =
-      new File(FileUtils.getTempDirectoryPath(), "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
+      new File(FileUtils.getTempDirectoryPath(), "test-controller-data-dir" + System.currentTimeMillis())
+          .getAbsolutePath();
+  public static final String DEFAULT_LOCAL_TEMP_DIR =
+      new File(FileUtils.getTempDirectoryPath(), "test-controller-local-temp-dir" + System.currentTimeMillis())
+          .getAbsolutePath();
   public static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   public static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
@@ -203,6 +208,7 @@ public class ControllerTest {
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
     properties.put(ControllerConf.CONTROLLER_PORT, NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT));
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
+    properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
     properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
     // Enable groovy on the controller
@@ -653,6 +659,21 @@ public class ControllerTest {
   public void dropRealtimeTable(String tableName)
       throws IOException {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+  }
+
+  public List<String> listSegments(String tableName)
+    throws IOException {
+    return listSegments(tableName, null, false);
+  }
+
+  public List<String> listSegments(String tableName, @Nullable String tableType, boolean excludeReplacedSegments)
+      throws IOException {
+    return getControllerRequestClient().listSegments(tableName, tableType, excludeReplacedSegments);
+  }
+
+  public void dropSegment(String tableName, String segmentName)
+      throws IOException {
+    getControllerRequestClient().deleteSegment(tableName, segmentName);
   }
 
   public void dropAllSegments(String tableName, TableType tableType)

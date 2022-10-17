@@ -30,8 +30,8 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.customobject.AvgPair;
@@ -382,7 +382,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentGroupBySV()
       throws Exception {
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(getGroupBySVQuery());
+    GroupByOperator groupByOperator = getOperator(getGroupBySVQuery());
     AggregationGroupByResult groupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(groupByResult);
 
@@ -551,7 +551,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentGroupByMV()
       throws Exception {
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(getGroupByMVQuery());
+    GroupByOperator groupByOperator = getOperator(getGroupByMVQuery());
     AggregationGroupByResult groupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(groupByResult);
 

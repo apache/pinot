@@ -116,7 +116,7 @@ public class AggregationPlanNode implements PlanNode {
         }
         Pair<FilterPlanNode, BaseFilterOperator> pair = buildFilterOperator(currentFilterExpression);
         BaseFilterOperator wrappedFilterOperator =
-            new CombinedFilterOperator(mainPredicateFilterOperator, pair.getRight());
+            new CombinedFilterOperator(mainPredicateFilterOperator, pair.getRight(), _queryContext.getQueryOptions());
         TransformOperator newTransformOperator = buildTransformOperatorForFilteredAggregates(wrappedFilterOperator);
         // For each transform operator, associate it with the underlying expression. This allows
         // fetching the relevant TransformOperator when resolving blocks during aggregation

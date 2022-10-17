@@ -73,7 +73,7 @@ public abstract class QuickStartBase {
       "examples/batch/starbucksStores",
       "examples/batch/githubEvents",
       "examples/batch/githubComplexTypeEvents",
-      "examples/batch/billing"
+      "examples/batch/billing",
   };
 
   protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = ImmutableMap.<String, String>builder()
@@ -399,7 +399,7 @@ public abstract class QuickStartBase {
         case "meetupRsvp":
           kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(10));
           printStatus(Quickstart.Color.CYAN, "***** Starting meetup data stream and publishing to Kafka *****");
-          MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream();
+          MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream(true);
           meetupRSVPProvider.run();
           Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {

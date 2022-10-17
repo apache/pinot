@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.datatable.DataTable;
 
 
 /**
@@ -42,7 +42,7 @@ public class AsyncQueryResponse implements QueryResponse {
   private final ConcurrentHashMap<ServerRoutingInstance, ServerResponse> _responseMap;
   private final CountDownLatch _countDownLatch;
   private final long _maxEndTimeMs;
-  private final long _queryTimeoutMs;
+  private final long _timeoutMs;
 
   private volatile ServerRoutingInstance _failedServer;
   private volatile Exception _exception;
@@ -57,7 +57,7 @@ public class AsyncQueryResponse implements QueryResponse {
       _responseMap.put(serverRoutingInstance, new ServerResponse(startTimeMs));
     }
     _countDownLatch = new CountDownLatch(numServersQueried);
-    _queryTimeoutMs = timeoutMs;
+    _timeoutMs = timeoutMs;
     _maxEndTimeMs = startTimeMs + timeoutMs;
   }
 
@@ -120,8 +120,8 @@ public class AsyncQueryResponse implements QueryResponse {
   }
 
   @Override
-  public long getTimeOutMs() {
-    return _queryTimeoutMs;
+  public long getTimeoutMs() {
+    return _timeoutMs;
   }
 
   void markRequestSubmitted(ServerRoutingInstance serverRoutingInstance) {

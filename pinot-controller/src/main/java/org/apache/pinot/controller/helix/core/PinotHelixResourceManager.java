@@ -152,6 +152,7 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -820,7 +821,7 @@ public class PinotHelixResourceManager {
   public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
       @Nullable String retentionPeriod) {
     try {
-        LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
+      LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
       HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
@@ -1281,6 +1282,17 @@ public class PinotHelixResourceManager {
       // Add new schema
       ZKMetadataProvider.setSchema(_propertyStore, schema);
       LOGGER.info("Added schema: {}", schemaName);
+    }
+  }
+
+  public void updateSegmentsZKTimeInterval(String tableNameWithType, DateTimeFieldSpec timeColumnFieldSpec) {
+    LOGGER.info("Updating segment time interval in ZK metadata for table: {}", tableNameWithType);
+
+    List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      int version = segmentZKMetadata.toZNRecord().getVersion();
+      updateZkTimeInterval(segmentZKMetadata, timeColumnFieldSpec);
+      updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
     }
   }
 
@@ -2265,6 +2277,11 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public void updateZkTimeInterval(SegmentZKMetadata segmentZKMetadata,
+      DateTimeFieldSpec timeColumnFieldSpec) {
+    ZKMetadataUtils.updateSegmentZKTimeInterval(segmentZKMetadata, timeColumnFieldSpec);
+  }
+
   @VisibleForTesting
   public void refreshSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
       SegmentZKMetadata segmentZKMetadata, int expectedVersion, String downloadUrl) {
@@ -2753,7 +2770,8 @@ public class PinotHelixResourceManager {
   }
 
   public boolean hasTable(String tableNameWithType) {
-    return getAllResources().contains(tableNameWithType);
+    return _helixDataAccessor.getBaseDataAccessor()
+        .exists(_keyBuilder.idealStates(tableNameWithType).getPath(), AccessOption.PERSISTENT);
   }
 
   public boolean hasOfflineTable(String tableName) {

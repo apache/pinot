@@ -34,4 +34,71 @@ public class ObjectFunctions {
   public static boolean isNotNull(@Nullable Object obj) {
     return !isNull(obj);
   }
+
+  @ScalarFunction(nullableParameters = true)
+  public static boolean isDistinctFrom(@Nullable Object obj1, @Nullable Object obj2) {
+    if (obj1 == null && obj2 == null) {
+      return false;
+    }
+    if (obj1 == null || obj2 == null) {
+      return true;
+    }
+    return !obj1.equals(obj2);
+  }
+
+  @ScalarFunction(nullableParameters = true)
+  public static boolean isNotDistinctFrom(@Nullable Object obj1, @Nullable Object obj2) {
+    return !isDistinctFrom(obj1, obj2);
+  }
+
+  @Nullable
+  public static Object coalesce(@Nullable Object obj) {
+    return coalesceVar(obj);
+  }
+
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2) {
+    return coalesceVar(obj1, obj2);
+  }
+
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3) {
+    return coalesceVar(obj1, obj2, obj3);
+  }
+
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
+      @Nullable Object obj4) {
+    return coalesceVar(obj1, obj2, obj3, obj4);
+  }
+
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
+      @Nullable Object obj4, @Nullable Object obj5) {
+    return coalesceVar(obj1, obj2, obj3, obj4, obj5);
+  }
+
+  @Nullable
+  private static Object coalesceVar(Object... objects) {
+    for (Object o : objects) {
+      if (o != null) {
+        return o;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private static Object coalesce(Object... objects) {
+    for (Object o : objects) {
+      if (o != null) {
+        return o;
+      }
+    }
+    return null;
+  }
 }

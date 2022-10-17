@@ -219,6 +219,14 @@ public class TransformBlockValSet implements BlockValSet {
   }
 
   @Override
+  public byte[][][] getBytesValuesMV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
+      recordTransformValues(scope, DataType.BYTES, false);
+      return _transformFunction.transformToBytesValuesMV(_projectionBlock);
+    }
+  }
+
+  @Override
   public int[] getNumMVEntries() {
     if (_numMVEntries == null) {
       _numMVEntries = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];

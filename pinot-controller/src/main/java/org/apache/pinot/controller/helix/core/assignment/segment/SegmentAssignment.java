@@ -31,16 +31,11 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 /**
  * Interface for segment assignment and table rebalance.
- * <p>
- * TODO: Add SegmentAssignmentStrategy interface and support custom segment assignment strategy (e.g. cost based segment
- *       assignment). SegmentAssignmentStrategy should not be coupled with SegmentAssignment, and SegmentAssignment
- *       should be able to choose the segment assignment strategy based on the configuration.
  */
 public interface SegmentAssignment {
 
   /**
    * Initializes the segment assignment.
-   *
    * @param helixManager Helix manager
    * @param tableConfig Table config
    */

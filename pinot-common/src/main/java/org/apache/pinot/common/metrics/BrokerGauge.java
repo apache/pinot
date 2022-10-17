@@ -26,13 +26,15 @@ import org.apache.pinot.common.Utils;
  *
  */
 public enum BrokerGauge implements AbstractMetrics.Gauge {
+  VERSION("version", true),
   QUERY_QUOTA_CAPACITY_UTILIZATION_RATE("tables", false),
   MAX_BURST_QPS("tables", false),
   QUERY_RATE_LIMIT_DISABLED("queryQuota", true),
   NETTY_CONNECTION_CONNECT_TIME_MS("nettyConnection", true),
   REQUEST_SIZE("requestSize", false),
   RESIZE_TIME_MS("milliseconds", false),
-  UNHEALTHY_SERVERS("servers", true);
+  UNHEALTHY_SERVERS("servers", true),
+  TIME_BOUNDARY_DIFFERENCE("milliseconds", false);
 
   private final String _brokerGaugeName;
   private final String _unit;

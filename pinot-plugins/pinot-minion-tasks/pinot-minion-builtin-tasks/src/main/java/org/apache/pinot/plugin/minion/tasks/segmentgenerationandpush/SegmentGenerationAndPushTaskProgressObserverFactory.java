@@ -19,27 +19,15 @@
 package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.event.MinionEventObserver;
-import org.apache.pinot.minion.event.MinionEventObserverFactory;
-import org.apache.pinot.minion.event.MinionProgressObserver;
-import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
+import org.apache.pinot.minion.event.BaseMinionProgressObserverFactory;
 import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
 
 
 @EventObserverFactory
-public class SegmentGenerationAndPushTaskProgressObserverFactory implements MinionEventObserverFactory {
-
-  @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager) {
-  }
+public class SegmentGenerationAndPushTaskProgressObserverFactory extends BaseMinionProgressObserverFactory {
 
   @Override
   public String getTaskType() {
     return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
-  }
-
-  @Override
-  public MinionEventObserver create() {
-    return new MinionProgressObserver();
   }
 }

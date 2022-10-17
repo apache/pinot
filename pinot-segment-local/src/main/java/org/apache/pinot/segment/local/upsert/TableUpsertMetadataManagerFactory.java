@@ -51,8 +51,8 @@ public class TableUpsertMetadataManagerFactory {
             (TableUpsertMetadataManager) Class.forName(metadataManagerClass).getConstructor().newInstance();
       } catch (Exception e) {
         throw new RuntimeException(
-            String.format("Caught exception constructing TableUpsertMetadataManager with class: %s for table: %s",
-                metadataManagerClass, tableNameWithType));
+            String.format("Caught exception while constructing TableUpsertMetadataManager with class: %s for table: %s",
+                metadataManagerClass, tableNameWithType), e);
       }
     } else {
       LOGGER.info("Creating ConcurrentMapTableUpsertMetadataManager for table: {}", tableNameWithType);

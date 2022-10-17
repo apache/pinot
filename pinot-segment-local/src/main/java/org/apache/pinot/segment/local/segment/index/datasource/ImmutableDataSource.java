@@ -46,6 +46,7 @@ public class ImmutableDataSource extends BaseDataSource {
     final int _numDocs;
     final int _numValues;
     final int _maxNumValuesPerMVEntry;
+    final int _cardinality;
     final Comparable _minValue;
     final Comparable _maxValue;
     final PartitionFunction _partitionFunction;
@@ -65,6 +66,7 @@ public class ImmutableDataSource extends BaseDataSource {
       _maxValue = columnMetadata.getMaxValue();
       _partitionFunction = columnMetadata.getPartitionFunction();
       _partitions = columnMetadata.getPartitions();
+      _cardinality = columnMetadata.getCardinality();
     }
 
     @Override
@@ -114,6 +116,11 @@ public class ImmutableDataSource extends BaseDataSource {
     @Override
     public Set<Integer> getPartitions() {
       return _partitions;
+    }
+
+    @Override
+    public int getCardinality() {
+      return _cardinality;
     }
   }
 }

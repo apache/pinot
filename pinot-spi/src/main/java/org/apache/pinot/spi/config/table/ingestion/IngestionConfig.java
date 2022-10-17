@@ -52,7 +52,7 @@ public class IngestionConfig extends BaseJsonConfig {
   private boolean _continueOnError;
 
   @JsonPropertyDescription("Configs related to validate time value for each record during ingestion")
-  private boolean _rowTimeValueCheck = true;
+  private boolean _rowTimeValueCheck;
 
   @JsonPropertyDescription("Configs related to check time value for segment")
   private boolean _segmentTimeValueCheck = true;
