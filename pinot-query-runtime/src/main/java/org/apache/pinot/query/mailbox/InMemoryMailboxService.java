@@ -21,7 +21,6 @@ package org.apache.pinot.query.mailbox;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.pinot.query.mailbox.channel.InMemoryChannel;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
@@ -38,7 +37,8 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
       new ConcurrentHashMap<>();
   private final ConcurrentHashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap =
       new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<String, InMemoryChannel<TransferableBlock>> _channelMap = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, ArrayBlockingQueue<TransferableBlock>> _channelMap =
+      new ConcurrentHashMap<>();
 
   public InMemoryMailboxService(String hostname, int mailboxPort) {
     _hostname = hostname;
@@ -66,7 +66,7 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    _channelMap.computeIfAbsent(mId, (x) -> createDefaultChannel(_hostname, _mailboxPort));
+    _channelMap.computeIfAbsent(mId, (x) -> createDefaultChannel());
     return _sendingMailboxMap.computeIfAbsent(mId, (x) -> new InMemorySendingMailbox(x,
         _channelMap.get(x)));
   }
@@ -74,12 +74,12 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    _channelMap.computeIfAbsent(mId, (x) -> createDefaultChannel(_hostname, _mailboxPort));
+    _channelMap.computeIfAbsent(mId, (x) -> createDefaultChannel());
     return _receivingMailboxMap.computeIfAbsent(mId, (x) -> new InMemoryReceivingMailbox(mId,
         _channelMap.get(x)));
   }
 
-  private InMemoryChannel<TransferableBlock> createDefaultChannel(String hostname, int port) {
-    return new InMemoryChannel<>(new ArrayBlockingQueue<>(DEFAULT_CHANNEL_CAPACITY), hostname, port);
+  private ArrayBlockingQueue<TransferableBlock> createDefaultChannel() {
+    return new ArrayBlockingQueue<>(DEFAULT_CHANNEL_CAPACITY);
   }
 }

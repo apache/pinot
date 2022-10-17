@@ -64,19 +64,17 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
    *
    * <p>
    *  1. If the mailbox hasn't initialized yet. This means we haven't received any data yet.
-   *  2. If the received block from the sender didn't have any rows.
+   *  2. If the received block from the sender is a data-block with 0 rows.
    * </p>
    */
   @Override
   public TransferableBlock receive()
       throws Exception {
-    MailboxContent mailboxContent = null;
-    if (waitForInitialize()) {
-      mailboxContent = _contentStreamObserver.poll();
-      _totalMsgReceived.incrementAndGet();
-    } else {
+    if (!waitForInitialize()) {
       return null;
     }
+    MailboxContent mailboxContent = _contentStreamObserver.poll();
+    _totalMsgReceived.incrementAndGet();
     return fromMailboxContent(mailboxContent);
   }
 
@@ -109,7 +107,7 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
    * Converts the data sent by a {@link GrpcSendingMailbox} to a {@link TransferableBlock}.
    *
    * @param mailboxContent data sent by a GrpcSendingMailbox.
-   * @return null if the received MailboxContent didn't have any rows.
+   * @return null if the received MailboxContent is a data-block with 0 rows.
    * @throws IOException if the MailboxContent cannot be converted to a TransferableBlock.
    */
   @Nullable

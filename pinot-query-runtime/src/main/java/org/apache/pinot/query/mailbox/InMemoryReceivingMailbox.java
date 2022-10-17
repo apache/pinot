@@ -18,18 +18,20 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.query.mailbox.channel.InMemoryChannel;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
   private final String _mailboxId;
-  private final InMemoryChannel<TransferableBlock> _channel;
+  private final BlockingQueue<TransferableBlock> _queue;
+  private boolean _closed;
 
-  public InMemoryReceivingMailbox(String mailboxId, InMemoryChannel<TransferableBlock> channel) {
+  public InMemoryReceivingMailbox(String mailboxId, BlockingQueue<TransferableBlock> queue) {
     _mailboxId = mailboxId;
-    _channel = channel;
+    _queue = queue;
+    _closed = false;
   }
 
   @Override
@@ -40,10 +42,13 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
   @Override
   public TransferableBlock receive()
       throws Exception {
-    TransferableBlock block = _channel.getChannel().poll(
+    TransferableBlock block = _queue.poll(
         InMemoryMailboxService.DEFAULT_CHANNEL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     if (block == null) {
       throw new RuntimeException(String.format("Timed out waiting for data block on mailbox=%s", _mailboxId));
+    }
+    if (block.isEndOfStreamBlock()) {
+      _closed = true;
     }
     return block;
   }
@@ -55,6 +60,6 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
 
   @Override
   public boolean isClosed() {
-    return _channel.isCompleted() && _channel.getChannel().size() == 0;
+    return _closed && _queue.size() == 0;
   }
 }
