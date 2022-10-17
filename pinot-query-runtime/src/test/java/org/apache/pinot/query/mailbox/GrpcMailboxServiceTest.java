@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.BaseDataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -99,18 +98,24 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
   }
 
   private TransferableBlock getTestTransferableBlock() {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(TEST_DATA_SCHEMA));
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(createRow(0, "test_string"));
+    return new TransferableBlock(rows, TEST_DATA_SCHEMA, BaseDataBlock.Type.ROW);
   }
 
   private TransferableBlock getTooLargeTransferableBlock() {
     final int size = 1_000_000;
     List<Object[]> rows = new ArrayList<>(size);
     for (int i = 0; i < size; i++) {
-      Object[] row = new Object[2];
-      row[0] = 0;
-      row[1] = "test_string";
-      rows.add(row);
+      rows.add(createRow(0, "test_string"));
     }
     return new TransferableBlock(rows, TEST_DATA_SCHEMA, BaseDataBlock.Type.ROW);
+  }
+
+  private Object[] createRow(int intValue, String stringValue) {
+    Object[] row = new Object[2];
+    row[0] = intValue;
+    row[1] = stringValue;
+    return row;
   }
 }
