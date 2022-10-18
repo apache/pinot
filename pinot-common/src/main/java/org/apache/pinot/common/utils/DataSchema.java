@@ -48,7 +48,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class DataSchema {
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
-  private ColumnDataType[] _storedColumnDataTypes;
+  private final ColumnDataType[] _storedColumnDataTypes;
 
   /** Used by both Broker and Server to generate results for EXPLAIN PLAN queries. */
   public static final DataSchema EXPLAIN_RESULT_SCHEMA =
@@ -61,6 +61,7 @@ public class DataSchema {
       @JsonProperty("columnDataTypes") ColumnDataType[] columnDataTypes) {
     _columnNames = columnNames;
     _columnDataTypes = columnDataTypes;
+    _storedColumnDataTypes = computeStoredColumnDataType(columnDataTypes);
   }
 
   public int size() {
@@ -85,13 +86,6 @@ public class DataSchema {
 
   @JsonIgnore
   public ColumnDataType[] getStoredColumnDataTypes() {
-    if (_storedColumnDataTypes == null) {
-      int numColumns = _columnDataTypes.length;
-      _storedColumnDataTypes = new ColumnDataType[numColumns];
-      for (int i = 0; i < numColumns; i++) {
-        _storedColumnDataTypes[i] = _columnDataTypes[i].getStoredType();
-      }
-    }
     return _storedColumnDataTypes;
   }
 
@@ -238,6 +232,15 @@ public class DataSchema {
   @Override
   public int hashCode() {
     return EqualityUtils.hashCodeOf(Arrays.hashCode(_columnNames), Arrays.hashCode(_columnDataTypes));
+  }
+
+  private static ColumnDataType[] computeStoredColumnDataType(ColumnDataType[] columnDataTypes) {
+    int numColumns = columnDataTypes.length;
+    ColumnDataType[] storedColumnDataTypes = new ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      storedColumnDataTypes[i] = columnDataTypes[i].getStoredType();
+    }
+    return storedColumnDataTypes;
   }
 
   public enum ColumnDataType {
