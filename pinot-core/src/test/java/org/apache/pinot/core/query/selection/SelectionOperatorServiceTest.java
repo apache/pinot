@@ -208,7 +208,7 @@ public class SelectionOperatorServiceTest {
     rows.add(_compatibleRow1);
     DataSchema dataSchema = _dataSchema.clone();
     assertTrue(dataSchema.isTypeCompatibleWith(_compatibleDataSchema));
-    dataSchema.upgradeToCover(_compatibleDataSchema);
+    dataSchema = DataSchema.upgradeToCover(dataSchema, _compatibleDataSchema);
     assertEquals(dataSchema, _upgradedDataSchema);
     DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, false);
     Object[] expectedRow1 = {
