@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -49,6 +50,8 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -134,11 +137,23 @@ public class DebugResource {
     SegmentConsumerInfo segmentConsumerInfo = null;
     if (tableType == TableType.REALTIME) {
       RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-      String segmentName = segmentDataManager.getSegmentName();
+      Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState();
+      Map<String, PartitionLagState> partitionLagStateMap =
+          realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap);
+      Map<String, String> partitionToCurrentOffsetMap = realtimeSegmentDataManager.getPartitionToCurrentOffset();
       segmentConsumerInfo =
-          new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
+          new SegmentConsumerInfo(
+              segmentDataManager.getSegmentName(),
+              realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(),
-              realtimeSegmentDataManager.getPartitionToCurrentOffset());
+              partitionToCurrentOffsetMap,
+              new SegmentConsumerInfo.PartitionOffsetInfo(partitionToCurrentOffsetMap,
+                  partitionStateMap.entrySet().stream().collect(
+                      Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
+                  ),
+                  partitionLagStateMap.entrySet().stream().collect(
+                      Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getRecordsLag())
+                  )));
     }
     return segmentConsumerInfo;
   }

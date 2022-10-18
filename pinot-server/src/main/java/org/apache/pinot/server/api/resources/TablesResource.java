@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.DefaultValue;
@@ -88,6 +89,8 @@ import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -492,11 +495,12 @@ public class TablesResource {
   @Path("tables/{realtimeTableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the info for consumers of this REALTIME table",
-      notes = "Get consumers info from the table data manager")
+      notes = "Get consumers info from the table data manager. Note that the partitionToOffsetMap has been deprecated "
+          + "and will be removed in the next release. The info is now embedded within each partition's state as "
+          + "currentOffsetsMap")
   public List<SegmentConsumerInfo> getConsumingSegmentsInfo(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
           String realtimeTableName) {
-
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
     if (TableType.OFFLINE == tableType) {
       throw new WebApplicationException("Cannot get consuming segment info for OFFLINE table: " + realtimeTableName);
@@ -511,11 +515,26 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          String segmentName = segmentDataManager.getSegmentName();
+          Map<String, ConsumerPartitionState> partitionStateMap =
+              realtimeSegmentDataManager.getConsumerPartitionState();
+          Map<String, PartitionLagState> partitionLagStateMap =
+              realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap);
+          @Deprecated Map<String, String> partitiionToOffsetMap =
+              realtimeSegmentDataManager.getPartitionToCurrentOffset();
           segmentConsumerInfoList.add(
-              new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
+              new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
+                  realtimeSegmentDataManager.getConsumerState().toString(),
                   realtimeSegmentDataManager.getLastConsumedTimestamp(),
-                  realtimeSegmentDataManager.getPartitionToCurrentOffset()));
+                  partitiionToOffsetMap,
+                  new SegmentConsumerInfo.PartitionOffsetInfo(
+                      partitiionToOffsetMap,
+                      partitionStateMap.entrySet().stream().collect(
+                          Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
+                      ),
+                      partitionLagStateMap.entrySet().stream().collect(
+                          Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getRecordsLag())
+                      )))
+          );
         }
       }
     } catch (Exception e) {
