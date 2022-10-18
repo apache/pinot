@@ -44,7 +44,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -160,9 +159,6 @@ public class PinotTableRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
-
-  @Inject
-  Executor _executor;
 
   @Inject
   HttpConnectionManager _connectionManager;
@@ -622,30 +618,30 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebalance")
-  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
-      notes = "Rebalances a table (reassign instances and segments for a table)")
+  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)", notes = "Rebalances a "
+      + "table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun")
-          boolean dryRun,
+      boolean dryRun,
       @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false")
       @QueryParam("reassignInstances") boolean reassignInstances,
       @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("false")
-      @QueryParam("includeConsuming") boolean includeConsuming, @ApiParam(
-      value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all "
+      @QueryParam("includeConsuming") boolean includeConsuming, @ApiParam(value =
+      "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all "
           + "segments in a round-robin fashion as if adding new segments to an empty table)") @DefaultValue("false")
   @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
-          boolean downtime, @ApiParam(
-      value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
+      boolean downtime, @ApiParam(value =
+      "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
           + "number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
-  @QueryParam("minAvailableReplicas") int minAvailableReplicas, @ApiParam(
-      value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
-          + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
-
+  @QueryParam("minAvailableReplicas") int minAvailableReplicas, @ApiParam(value =
+      "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
+          + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
+      @ApiParam(value = "Whether to migrate segments acros storage tiers on their hosting server locally")
+      @DefaultValue("false") @QueryParam("enableLocalTierMigration") boolean enableLocalTierMigration) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
-
     Configuration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
     rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, reassignInstances);
@@ -654,22 +650,28 @@ public class PinotTableRestletResource {
     rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, downtime);
     rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, minAvailableReplicas);
     rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, bestEfforts);
-
+    rebalanceConfig.addProperty(RebalanceConfigConstants.ENABLE_LOCAL_TIER_MIGRATION, enableLocalTierMigration);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.SERVER_ADMIN_REQUEST_TIMEOUT_MS,
+        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     try {
       if (dryRun || downtime) {
         // For dry-run or rebalance with downtime, directly return the rebalance result as it should return immediately
-        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
+        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, _executorService,
+            _connectionManager);
       } else {
         // Make a dry-run first to get the target assignment
         rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, true);
-        RebalanceResult dryRunResult = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
+        RebalanceResult dryRunResult =
+            _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, _executorService,
+                _connectionManager);
 
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
           rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, false);
           _executorService.submit(() -> {
             try {
-              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
+              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, _executorService,
+                  _connectionManager);
             } catch (Throwable t) {
               LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
             }
@@ -780,7 +782,7 @@ public class PinotTableRestletResource {
                 _pinotHelixTaskResourceManager);
       } else {
         ingestionStatus = TableIngestionStatusHelper.getRealtimeTableIngestionStatus(tableNameWithType,
-            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, _executor, _connectionManager,
+            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, _executorService, _connectionManager,
             _pinotHelixResourceManager);
       }
       TableStatus tableStatus = new TableStatus(ingestionStatus);
@@ -838,7 +840,7 @@ public class PinotTableRestletResource {
   private JsonNode getAggregateMetadataFromServer(String tableNameWithType, List<String> columns, int numReplica)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
-        new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+        new TableMetadataReader(_executorService, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader.getAggregateTableMetadata(tableNameWithType, columns, numReplica,
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
@@ -940,7 +942,7 @@ public class PinotTableRestletResource {
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+        new CompletionServiceHelper(_executorService, _connectionManager, serverEndPoints);
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {

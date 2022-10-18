@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.List;
 import java.util.Set;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
@@ -111,11 +113,13 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   private class SegmentReloadMessageHandler extends DefaultMessageHandler {
     private final boolean _forceDownload;
+    private final List<String> _segmentList;
 
     SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
       _forceDownload = segmentReloadMessage.shouldForceDownload();
+      _segmentList = segmentReloadMessage.getSegmentList();
     }
 
     @Override
@@ -124,12 +128,14 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
       try {
-        if (_segmentName.equals("")) {
+        if (CollectionUtils.isNotEmpty(_segmentList)) {
+          _instanceDataManager
+              .reloadSegments(_tableNameWithType, _segmentList, _forceDownload, _segmentRefreshSemaphore);
+        } else if (_segmentName.equals("")) {
           // NOTE: the method aborts if any segment reload encounters an unhandled exception,
           // and can lead to inconsistent state across segments.
           //we don't acquire any permit here as they'll be acquired by worked threads later
-          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload,
-              _segmentRefreshSemaphore);
+          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _segmentRefreshSemaphore);
         } else {
           // Reload one segment
           _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);

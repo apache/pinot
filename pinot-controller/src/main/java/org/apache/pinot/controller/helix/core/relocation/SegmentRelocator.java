@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
@@ -50,14 +51,20 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentRelocator.class);
 
   private final ExecutorService _executorService;
+  private final HttpConnectionManager _connectionManager;
+  private final boolean _enableLocalTierMigration;
+  private final int _timeoutMs;
 
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
-      ExecutorService executorService) {
+      ExecutorService executorService, HttpConnectionManager connectionManager) {
     super(SegmentRelocator.class.getSimpleName(), config.getSegmentRelocatorFrequencyInSeconds(),
         config.getSegmentRelocatorInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
     _executorService = executorService;
+    _connectionManager = connectionManager;
+    _enableLocalTierMigration = config.enableSegmentRelocatorLocalTierMigration();
+    _timeoutMs = config.getServerAdminRequestTimeoutSeconds() * 1000;
   }
 
   @Override
@@ -81,6 +88,10 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       relocate = true;
       LOGGER.info("Relocating COMPLETED segments for table: {}", tableNameWithType);
     }
+    if (_enableLocalTierMigration) {
+      relocate = true;
+      LOGGER.info("Migrating segment tiers on servers locally for table: {}", tableNameWithType);
+    }
     if (!relocate) {
       LOGGER.debug("No need to relocate segments of table: {}", tableNameWithType);
       return;
@@ -89,11 +100,14 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     // Allow at most one replica unavailable during relocation
     Configuration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, -1);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.ENABLE_LOCAL_TIER_MIGRATION, _enableLocalTierMigration);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.SERVER_ADMIN_REQUEST_TIMEOUT_MS, _timeoutMs);
     // Run rebalance asynchronously
     _executorService.submit(() -> {
       try {
         RebalanceResult rebalance =
-            new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager()).rebalance(tableConfig, rebalanceConfig);
+            new TableRebalancer(_pinotHelixResourceManager).rebalance(tableConfig, rebalanceConfig, _executorService,
+                _connectionManager);
         switch (rebalance.getStatus()) {
           case NO_OP:
             LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);

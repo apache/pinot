@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.loader;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.util.TestUtils;
@@ -49,7 +48,7 @@ public class TierBasedSegmentDirectoryLoaderTest {
   }
 
   @Test
-  public void testDropSegmentOnDefaultTier()
+  public void testDeleteSegmentOnDefaultTier()
       throws Exception {
     TierBasedSegmentDirectoryLoader loader = new TierBasedSegmentDirectoryLoader();
     SegmentDirectoryLoaderContext loaderCtx = new SegmentDirectoryLoaderContext.Builder().setSegmentName("seg01")
@@ -63,7 +62,7 @@ public class TierBasedSegmentDirectoryLoaderTest {
   }
 
   @Test
-  public void testDropSegmentOnLastKnownTier()
+  public void testDeleteSegmentOnLastKnownTier()
       throws Exception {
     String tierName = "tier01";
     TierBasedSegmentDirectoryLoader loader = new TierBasedSegmentDirectoryLoader();
@@ -77,10 +76,21 @@ public class TierBasedSegmentDirectoryLoaderTest {
 
     // Put the tier name and tier data path into the tier track file.
     File tierTrackFile = new File(TEMP_DIR.getAbsolutePath() + "/" + TABLE_NAME_WITH_TYPE, "seg01.tier");
-    FileUtils.writeLines(tierTrackFile, StandardCharsets.UTF_8.name(),
-        Arrays.asList(tierName, segDataDir.getAbsolutePath()));
+    TierBasedSegmentDirectoryLoader.writeTo(tierTrackFile, tierName, segDataDir.getAbsolutePath());
     loader.delete(loaderCtx);
     assertFalse(segDataDir.exists());
     assertFalse(tierTrackFile.exists());
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*unexpected version.*")
+  public void testDeleteSegmentBadTrackFile()
+      throws Exception {
+    TierBasedSegmentDirectoryLoader loader = new TierBasedSegmentDirectoryLoader();
+    SegmentDirectoryLoaderContext loaderCtx = new SegmentDirectoryLoaderContext.Builder().setSegmentName("seg01")
+        .setTableDataDir(TEMP_DIR.getAbsolutePath() + "/" + TABLE_NAME_WITH_TYPE).build();
+    // Corrupt the tier track file.
+    File tierTrackFile = new File(TEMP_DIR.getAbsolutePath() + "/" + TABLE_NAME_WITH_TYPE, "seg01.tier");
+    FileUtils.write(tierTrackFile, "a lot of bad data", StandardCharsets.UTF_8);
+    loader.delete(loaderCtx);
   }
 }

@@ -184,6 +184,9 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtimeSegmentRelocation.initialDelayInSeconds";
     public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
         "controller.segmentRelocator.initialDelayInSeconds";
+    public static final String SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION =
+        "controller.segmentRelocator.enableLocalTierMigration";
+
     public static final String SEGMENT_TIER_ASSIGNER_FREQUENCY_PERIOD =
         "controller.segmentTierAssigner.frequencyPeriod";
     public static final String SEGMENT_TIER_ASSIGNER_INITIAL_DELAY_IN_SECONDS =
@@ -615,11 +618,9 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * RealtimeSegmentRelocator has been rebranded to SegmentRelocator. Returns
-   * <code>controller.segment.relocator.frequencyInSeconds</code> or <code>controller.segment.relocator
-   * .frequencyInSeconds</code>
-   * or REALTIME_SEGMENT_RELOCATOR_FREQUENCY, in the order of decreasing perference (left ->
-   * right).
+   * RealtimeSegmentRelocator has been rebranded to SegmentRelocator. Returns <code>controller.segment.relocator
+   * .frequencyPeriod</code> or <code>controller.segment.relocator .frequencyInSeconds</code> or
+   * REALTIME_SEGMENT_RELOCATOR_FREQUENCY, in the order of decreasing perference (left -> right).
    */
   public int getSegmentRelocatorFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD))
@@ -852,6 +853,10 @@ public class ControllerConf extends PinotConfiguration {
               ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
     }
     return segmentRelocatorInitialDelaySeconds;
+  }
+
+  public boolean enableSegmentRelocatorLocalTierMigration() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION, false);
   }
 
   public int getSegmentTierAssignerFrequencyInSeconds() {

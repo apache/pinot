@@ -19,6 +19,7 @@
 package org.apache.pinot.common.messages;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -34,19 +35,25 @@ public class SegmentReloadMessage extends Message {
   public static final String RELOAD_SEGMENT_MSG_SUB_TYPE = "RELOAD_SEGMENT";
 
   private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
+  private static final String SEGMENT_LIST_KEY = "segmentList";
 
-  public SegmentReloadMessage(@Nonnull String tableNameWithType, @Nullable String segmentName, boolean forceDownload) {
+  public SegmentReloadMessage(@Nonnull String tableNameWithType, @Nullable List<String> segmentNames,
+      boolean forceDownload) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setResourceName(tableNameWithType);
-    if (segmentName != null) {
-      setPartitionName(segmentName);
-    }
     setMsgSubType(RELOAD_SEGMENT_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
 
     ZNRecord znRecord = getRecord();
     znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
+    if (segmentNames != null) {
+      if (segmentNames.size() == 1) {
+        setPartitionName(segmentNames.get(0));
+      } else {
+        znRecord.setListField(SEGMENT_LIST_KEY, segmentNames);
+      }
+    }
   }
 
   public SegmentReloadMessage(Message message) {
@@ -58,5 +65,9 @@ public class SegmentReloadMessage extends Message {
 
   public boolean shouldForceDownload() {
     return getRecord().getBooleanField(FORCE_DOWNLOAD_KEY, false);
+  }
+
+  public List<String> getSegmentList() {
+    return getRecord().getListField(SEGMENT_LIST_KEY);
   }
 }

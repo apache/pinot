@@ -23,22 +23,28 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.AccessOption;
+import org.apache.helix.ClusterMessagingService;
+import org.apache.helix.Criteria;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -46,15 +52,18 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -120,13 +129,26 @@ public class TableRebalancer {
 
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
 
   public TableRebalancer(HelixManager helixManager) {
     _helixManager = helixManager;
     _helixDataAccessor = helixManager.getHelixDataAccessor();
+    _pinotHelixResourceManager = null;
+  }
+
+  public TableRebalancer(PinotHelixResourceManager pinotHelixResourceManager) {
+    _helixManager = pinotHelixResourceManager.getHelixZkManager();
+    _helixDataAccessor = _helixManager.getHelixDataAccessor();
+    _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 
   public RebalanceResult rebalance(TableConfig tableConfig, Configuration rebalanceConfig) {
+    return rebalance(tableConfig, rebalanceConfig, null, null);
+  }
+
+  public RebalanceResult rebalance(TableConfig tableConfig, Configuration rebalanceConfig,
+      ExecutorService executorService, HttpConnectionManager connectionManager) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
 
@@ -227,18 +249,47 @@ public class TableRebalancer {
 
     if (currentAssignment.equals(targetAssignment)) {
       LOGGER.info("Table: {} is already balanced", tableNameWithType);
+      // Once table is balanced, i.e. segments are on their ideal servers, we check if any segment needs to move to a
+      // new tier on its hosting servers, i.e. doing local tier migration for the segments.
+      boolean enableLocalTierMigration =
+          rebalanceConfig.getBoolean(RebalanceConfigConstants.ENABLE_LOCAL_TIER_MIGRATION,
+              RebalanceConfigConstants.DEFAULT_ENABLE_LOCAL_TIER_MIGRATION);
+      String tierMigrationResult = "";
+      if (enableLocalTierMigration && (executorService != null && connectionManager != null
+          && _pinotHelixResourceManager != null)) {
+        LOGGER.info("Migrating segments to new tiers on their hosting servers");
+        try {
+          int timeoutMs = rebalanceConfig.getInt(RebalanceConfigConstants.SERVER_ADMIN_REQUEST_TIMEOUT_MS,
+              RebalanceConfigConstants.DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_MS);
+          TableTierReader.TableTierDetails tableTiers =
+              new TableTierReader(executorService, connectionManager, _pinotHelixResourceManager).getTableTierDetails(
+                  tableNameWithType, null, timeoutMs);
+          triggerLocalTierMigration(tableNameWithType, tableTiers, _helixManager.getMessagingService(), dryRun);
+          tierMigrationResult = ", and triggered local tier migration";
+        } catch (Exception e) {
+          LOGGER.error("Failed to migrate segments to new tiers", e);
+          tierMigrationResult = ", but failed to trigger local tier migration";
+        }
+      } else if (executorService == null || connectionManager == null || _pinotHelixResourceManager == null) {
+        LOGGER.info("Skip migrating segments to new tiers as not able to get tier info");
+        tierMigrationResult = ", but skipped local tier migration as not able to get tier info";
+      } else {
+        LOGGER.info("Skip migrating segments to new tiers on their hosting servers");
+        tierMigrationResult = ", but skipped local tier migration based on config";
+      }
       if (reassignInstances) {
         if (dryRun) {
           return new RebalanceResult(RebalanceResult.Status.DONE,
-              "Instance reassigned in dry-run mode, table is already balanced", instancePartitionsMap,
-              targetAssignment);
-        } else {
-          return new RebalanceResult(RebalanceResult.Status.DONE, "Instance reassigned, table is already balanced",
+              "Instance reassigned in dry-run mode, table is already balanced" + tierMigrationResult,
               instancePartitionsMap, targetAssignment);
+        } else {
+          return new RebalanceResult(RebalanceResult.Status.DONE,
+              "Instance reassigned, table is already balanced" + tierMigrationResult, instancePartitionsMap,
+              targetAssignment);
         }
       } else {
-        return new RebalanceResult(RebalanceResult.Status.NO_OP, "Table is already balanced", instancePartitionsMap,
-            targetAssignment);
+        return new RebalanceResult(RebalanceResult.Status.NO_OP, "Table is already balanced" + tierMigrationResult,
+            instancePartitionsMap, targetAssignment);
       }
     }
 
@@ -383,6 +434,67 @@ public class TableRebalancer {
     }
   }
 
+  @VisibleForTesting
+  static void triggerLocalTierMigration(String tableNameWithType, TableTierReader.TableTierDetails tableTiers,
+      ClusterMessagingService messagingService, boolean dryRun) {
+    Map<String, Map<String, String>> currentTiers = tableTiers.getSegmentCurrentTiers();
+    Map<String, String> targetTiers = tableTiers.getSegmentTargetTiers();
+    LOGGER.debug("Got segment current tiers: {} and target tiers: {}", currentTiers, targetTiers);
+    Map<String, Set<String>> serverToSegmentsToMigrate = new HashMap<>();
+    for (Map.Entry<String, Map<String, String>> segmentTiers : currentTiers.entrySet()) {
+      String segmentName = segmentTiers.getKey();
+      Map<String, String> serverToCurrentTiers = segmentTiers.getValue();
+      String targetTier = targetTiers.get(segmentName);
+      for (Map.Entry<String, String> serverTier : serverToCurrentTiers.entrySet()) {
+        String tier = serverTier.getValue();
+        String server = serverTier.getKey();
+        if ((tier == null && targetTier == null) || (tier != null && tier.equals(targetTier))) {
+          LOGGER.debug("Segment: {} is already on the target tier: {} on server: {}", segmentName,
+              TierConfigUtils.normalizeTierName(tier), server);
+        } else {
+          LOGGER.debug("Segment: {} needs to move from current tier: {} to target tier: {} on server: {}", segmentName,
+              TierConfigUtils.normalizeTierName(tier), TierConfigUtils.normalizeTierName(targetTier), server);
+          serverToSegmentsToMigrate.computeIfAbsent(server, (s) -> new HashSet<>()).add(segmentName);
+        }
+      }
+    }
+    if (serverToSegmentsToMigrate.size() > 0) {
+      LOGGER.info("Notify servers: {} to move segments to new tiers locally", serverToSegmentsToMigrate.keySet());
+      reloadSegmentsForLocalTierMigration(tableNameWithType, serverToSegmentsToMigrate, messagingService, dryRun);
+    } else {
+      LOGGER.info("No server needs to move segments to new tiers locally");
+    }
+  }
+
+  private static void reloadSegmentsForLocalTierMigration(String tableNameWithType,
+      Map<String, Set<String>> serverToSegmentsToMigrate, ClusterMessagingService messagingService, boolean dryRun) {
+    for (Map.Entry<String, Set<String>> entry : serverToSegmentsToMigrate.entrySet()) {
+      String serverName = entry.getKey();
+      Set<String> segmentNames = entry.getValue();
+      if (dryRun) {
+        LOGGER.info("Dry run to notify server: {} to reload segments: {} of table: {}", serverName, segmentNames,
+            tableNameWithType);
+        continue;
+      }
+      // One SegmentReloadMessage per server but takes all segment names.
+      Criteria recipientCriteria = new Criteria();
+      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+      recipientCriteria.setInstanceName(serverName);
+      recipientCriteria.setResource(tableNameWithType);
+      recipientCriteria.setSessionSpecific(true);
+      SegmentReloadMessage segmentReloadMessage =
+          new SegmentReloadMessage(tableNameWithType, new ArrayList<>(segmentNames), false);
+      LOGGER.info("Sending SegmentReloadMessage to server: {} to reload segments: {} of table: {}", serverName,
+          segmentNames, tableNameWithType);
+      int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, -1);
+      if (numMessagesSent > 0) {
+        LOGGER.info("Sent SegmentReloadMessage to server: {} for table: {}", serverName, tableNameWithType);
+      } else {
+        LOGGER.warn("No SegmentReloadMessage sent to server: {} for table: {}", serverName, tableNameWithType);
+      }
+    }
+  }
+
   private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap(TableConfig tableConfig,
       boolean reassignInstances, boolean dryRun) {
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
@@ -421,13 +533,13 @@ public class TableRebalancer {
     if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
       if (reassignInstances) {
         String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-        boolean hasPreConfiguredInstancePartitions = TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
-            instancePartitionsType);
+        boolean hasPreConfiguredInstancePartitions =
+            TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
         if (hasPreConfiguredInstancePartitions) {
           String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
-          InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitionsWithRename(
-              _helixManager.getHelixPropertyStore(), referenceInstancePartitionsName,
-              instancePartitionsType.getInstancePartitionsName(rawTableName));
+          InstancePartitions instancePartitions =
+              InstancePartitionsUtils.fetchInstancePartitionsWithRename(_helixManager.getHelixPropertyStore(),
+                  referenceInstancePartitionsName, instancePartitionsType.getInstancePartitionsName(rawTableName));
           if (!dryRun) {
             LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
                 referenceInstancePartitionsName);

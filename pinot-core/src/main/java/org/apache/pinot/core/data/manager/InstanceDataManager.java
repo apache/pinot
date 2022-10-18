@@ -114,6 +114,15 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
+   * Reload a list of segments in a table.
+   * @param segmentNames is the list of segment to reload
+   * @param segmentRefreshSemaphore semaphore to control concurrent segment reloads/refresh
+   */
+  void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
+      SegmentRefreshSemaphore segmentRefreshSemaphore)
+      throws Exception;
+
+  /**
    * Adds or replaces a segment in a table. Different from segment reloading, this method
    * doesn't assume the existence of TableDataManager object and it can actually initialize
    * the TableDataManager for the segment. A new segment is downloaded if the local one is
