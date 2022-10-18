@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.controller.util;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,6 +32,7 @@ import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 
@@ -86,9 +89,19 @@ public class TableTierReader {
       List<String> expectedSegmentsOnServer = entry.getValue();
       TableTierInfo tableTierInfo = serverToTableTierInfoMap.get(server);
       for (String expectedSegment : expectedSegmentsOnServer) {
-        tableTierDetails._segmentTiers.computeIfAbsent(expectedSegment, (k) -> new HashMap<>()).put(server,
+        tableTierDetails._segmentCurrentTiers.computeIfAbsent(expectedSegment, (k) -> new HashMap<>()).put(server,
             (tableTierInfo == null) ? ERROR_RESP_NO_RESPONSE : getSegmentTier(expectedSegment, tableTierInfo));
       }
+    }
+    if (segmentName == null) {
+      for (SegmentZKMetadata segmentZKMetadata : _helixResourceManager.getSegmentsZKMetadata(tableNameWithType)) {
+        tableTierDetails._segmentTargetTiers.put(segmentZKMetadata.getSegmentName(), segmentZKMetadata.getTier());
+      }
+    } else {
+      SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);
+      Preconditions.checkState(segmentZKMetadata != null,
+          "No segmentZKMetadata for segment: %s of table: %s to find the target tier", segmentName, tableNameWithType);
+      tableTierDetails._segmentTargetTiers.put(segmentName, segmentZKMetadata.getTier());
     }
     return tableTierDetails;
   }
@@ -108,7 +121,9 @@ public class TableTierReader {
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class TableTierDetails {
     private final String _tableName;
-    private final Map<String/*segment*/, Map<String/*server*/, String/*tier or err*/>> _segmentTiers = new HashMap<>();
+    private final Map<String/*segment*/, Map<String/*server*/, String/*tier or err*/>> _segmentCurrentTiers =
+        new HashMap<>();
+    private final Map<String/*segment*/, String/*target tier*/> _segmentTargetTiers = new HashMap<>();
 
     TableTierDetails(String tableName) {
       _tableName = tableName;
@@ -123,7 +138,21 @@ public class TableTierReader {
     @JsonPropertyDescription("Storage tiers of segments for the given table")
     @JsonProperty("segmentTiers")
     public Map<String, Map<String, String>> getSegmentTiers() {
-      return _segmentTiers;
+      HashMap<String, Map<String, String>> segmentTiers = new HashMap<>(_segmentCurrentTiers);
+      for (Map.Entry<String, String> entry : _segmentTargetTiers.entrySet()) {
+        segmentTiers.computeIfAbsent(entry.getKey(), (s) -> new HashMap<>()).put("targetTier", entry.getValue());
+      }
+      return segmentTiers;
+    }
+
+    @JsonIgnore
+    public Map<String, Map<String, String>> getSegmentCurrentTiers() {
+      return _segmentCurrentTiers;
+    }
+
+    @JsonIgnore
+    public Map<String, String> getSegmentTargetTiers() {
+      return _segmentTargetTiers;
     }
   }
 }
