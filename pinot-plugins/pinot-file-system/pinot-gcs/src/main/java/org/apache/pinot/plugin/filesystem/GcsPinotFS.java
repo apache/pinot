@@ -99,7 +99,7 @@ public class GcsPinotFS extends BasePinotFS {
       if (directoryPath.equals(GcsUri.DELIMITER)) {
         return true;
       }
-      if (existsDirectory(gcsUri)) {
+      if (existsDirectoryOrBucket(gcsUri)) {
         return true;
       }
       Blob blob = getBucket(gcsUri).create(directoryPath, new byte[0]);
@@ -231,7 +231,7 @@ public class GcsPinotFS extends BasePinotFS {
   @Override
   public boolean isDirectory(URI uri)
       throws IOException {
-    return existsDirectory(new GcsUri(uri));
+    return existsDirectoryOrBucket(new GcsUri(uri));
   }
 
   @Override
@@ -300,10 +300,10 @@ public class GcsPinotFS extends BasePinotFS {
    * @return true if the directory exists
    * @throws IOException
    */
-  private boolean existsDirectory(GcsUri gcsUri)
+  private boolean existsDirectoryOrBucket(GcsUri gcsUri)
       throws IOException {
     String prefix = gcsUri.getPrefix();
-    if (prefix.equals(GcsUri.DELIMITER)) {
+    if (prefix.isEmpty()) {
       return true;
     }
     Blob blob = getBucket(gcsUri).get(prefix);
@@ -322,7 +322,7 @@ public class GcsPinotFS extends BasePinotFS {
 
   private boolean isEmptyDirectory(GcsUri gcsUri)
       throws IOException {
-    if (!existsDirectory(gcsUri)) {
+    if (!existsDirectoryOrBucket(gcsUri)) {
       return false;
     }
     String prefix = gcsUri.getPrefix();
@@ -363,7 +363,7 @@ public class GcsPinotFS extends BasePinotFS {
 
   private boolean exists(GcsUri gcsUri)
       throws IOException {
-    if (existsDirectory(gcsUri)) {
+    if (existsDirectoryOrBucket(gcsUri)) {
       return true;
     }
     if (isPathTerminatedByDelimiter(gcsUri)) {
@@ -378,7 +378,7 @@ public class GcsPinotFS extends BasePinotFS {
       if (!exists(segmentUri)) {
         return forceDelete;
       }
-      if (existsDirectory(segmentUri)) {
+      if (existsDirectoryOrBucket(segmentUri)) {
         if (!forceDelete && !isEmptyDirectory(segmentUri)) {
           return false;
         }
@@ -441,7 +441,7 @@ public class GcsPinotFS extends BasePinotFS {
       return true;
     }
     // copy directly if source is a single file.
-    if (!existsDirectory(srcUri)) {
+    if (!existsDirectoryOrBucket(srcUri)) {
       return copyFile(srcUri, dstUri);
     }
     // copy directory
@@ -456,7 +456,7 @@ public class GcsPinotFS extends BasePinotFS {
      *
      * @see https://cloud.google.com/storage/docs/gsutil/addlhelp/HowSubdirectoriesWork
      */
-    if (!existsDirectory(dstUri)) {
+    if (!existsDirectoryOrBucket(dstUri)) {
       mkdir(dstUri.getUri());
     }
     boolean copySucceeded = true;
