@@ -34,11 +34,9 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
-import org.apache.pinot.segment.local.segment.creator.IntermediateSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
-import org.apache.pinot.segment.local.segment.readers.IntermediateSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
@@ -142,14 +140,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
-    SegmentCreationDataSource dataSource;
-    if (recordReader instanceof IntermediateSegmentRecordReader) {
-      LOGGER.info("IntermediateSegmentRecordReader is used");
-      dataSource = new IntermediateSegmentSegmentCreationDataSource((IntermediateSegmentRecordReader) recordReader);
-    } else {
-      LOGGER.info("RecordReaderSegmentCreationDataSource is used");
-      dataSource = new RecordReaderSegmentCreationDataSource(recordReader);
-    }
+    SegmentCreationDataSource dataSource = new RecordReaderSegmentCreationDataSource(recordReader);
     init(config, dataSource, new TransformPipeline(config.getTableConfig(), config.getSchema()));
   }
 

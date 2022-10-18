@@ -57,6 +57,8 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLucene
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
@@ -999,120 +1001,22 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
-      String column = entry.getKey();
-      IndexContainer indexContainer = entry.getValue();
-      Object value;
-      try {
-        value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
-            indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
-      } catch (Exception e) {
-        throw new RuntimeException(
-            String.format("Caught exception while reading value for docId: %d, column: %s", docId, column), e);
-      }
-      if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
-        reuse.putDefaultNullValue(column, value);
-      } else {
-        reuse.putValue(column, value);
-      }
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      recordReader.init(this);
+      recordReader.getRecord(docId, reuse);
+      return reuse;
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while reading record for docId: " + docId, e);
     }
-    return reuse;
   }
 
   @Override
   public Object getValue(int docId, String column) {
-    try {
-      IndexContainer indexContainer = _indexContainerMap.get(column);
-      return getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
-          indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
+    try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(this, column)) {
+      return columnReader.getValue(docId);
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while reading value for docId: %d, column: %s", docId, column), e);
-    }
-  }
-
-  /**
-   * Helper method to read the value for the given document id.
-   */
-  private static Object getValue(int docId, MutableForwardIndex forwardIndex, @Nullable MutableDictionary dictionary,
-      int maxNumMultiValues) {
-    if (dictionary != null) {
-      // Dictionary based
-      if (forwardIndex.isSingleValue()) {
-        int dictId = forwardIndex.getDictId(docId);
-        return dictionary.get(dictId);
-      } else {
-        int[] dictIds = new int[maxNumMultiValues];
-        int numValues = forwardIndex.getDictIdMV(docId, dictIds);
-        Object[] value = new Object[numValues];
-        for (int i = 0; i < numValues; i++) {
-          value[i] = dictionary.get(dictIds[i]);
-        }
-        return value;
-      }
-    } else {
-      // Raw index based
-      if (forwardIndex.isSingleValue()) {
-        switch (forwardIndex.getStoredType()) {
-          case INT:
-            return forwardIndex.getInt(docId);
-          case LONG:
-            return forwardIndex.getLong(docId);
-          case FLOAT:
-            return forwardIndex.getFloat(docId);
-          case DOUBLE:
-            return forwardIndex.getDouble(docId);
-          case BIG_DECIMAL:
-            return forwardIndex.getBigDecimal(docId);
-          case STRING:
-            return forwardIndex.getString(docId);
-          case BYTES:
-            return forwardIndex.getBytes(docId);
-          default:
-            throw new IllegalStateException();
-        }
-      } else {
-        // TODO: support multi-valued column for variable length column types (big decimal, string, bytes)
-        int numValues;
-        Object[] value;
-        switch (forwardIndex.getStoredType()) {
-          case INT:
-            int[] intValues = forwardIndex.getIntMV(docId);
-            numValues = intValues.length;
-            value = new Object[numValues];
-            for (int i = 0; i < numValues; i++) {
-              value[i] = intValues[i];
-            }
-            return value;
-          case LONG:
-            long[] longValues = forwardIndex.getLongMV(docId);
-            numValues = longValues.length;
-            value = new Object[numValues];
-            for (int i = 0; i < numValues; i++) {
-              value[i] = longValues[i];
-            }
-            return value;
-          case FLOAT:
-            float[] floatValues = forwardIndex.getFloatMV(docId);
-            numValues = floatValues.length;
-            value = new Object[numValues];
-            for (int i = 0; i < numValues; i++) {
-              value[i] = floatValues[i];
-            }
-            return value;
-          case DOUBLE:
-            double[] doubleValues = forwardIndex.getDoubleMV(docId);
-            numValues = doubleValues.length;
-            value = new Object[numValues];
-            for (int i = 0; i < numValues; i++) {
-              value[i] = doubleValues[i];
-            }
-            return value;
-          default:
-            throw new IllegalStateException(
-                "No support for MV no dictionary column of type " + forwardIndex.getStoredType());
-        }
-      }
     }
   }
 

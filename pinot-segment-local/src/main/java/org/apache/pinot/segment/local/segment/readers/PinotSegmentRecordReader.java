@@ -28,7 +28,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.spi.data.Schema;
@@ -122,18 +121,16 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   /**
-   * Initializes the record reader from an immutable segment.
+   * Initializes the record reader from a segment.
    *
-   * @param immutableSegment Immutable segment
+   * @param indexSegment Index segment to read from
    */
-  public void init(ImmutableSegment immutableSegment) {
-    init(immutableSegment, false, null, null, null, false);
+  public void init(IndexSegment indexSegment) {
+    init(indexSegment, false, null, null, null, false);
   }
 
   /**
-   * Initializes the record reader from a mutable segment.
-   * NOTE: The mutable segment should have already finished consumption and ready to be sealed. In order to read records
-   *       from consuming segment, use {@link MutableSegment#getRecord(int, GenericRow)} instead.
+   * Initializes the record reader from a mutable segment with optional sorted document ids.
    *
    * @param mutableSegment Mutable segment
    * @param sortedDocIds Array of sorted document ids
@@ -210,22 +207,22 @@ public class PinotSegmentRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse) {
     if (_sortedDocIds == null) {
-      getRecord(reuse, _nextDocId);
+      getRecord(_nextDocId, reuse);
     } else {
-      getRecord(reuse, _sortedDocIds[_nextDocId]);
+      getRecord(_sortedDocIds[_nextDocId], reuse);
     }
     _nextDocId++;
     return reuse;
   }
 
-  public void getRecord(GenericRow reuse, int docId) {
+  public void getRecord(int docId, GenericRow buffer) {
     for (Map.Entry<String, PinotSegmentColumnReader> entry : _columnReaderMap.entrySet()) {
       String column = entry.getKey();
       PinotSegmentColumnReader columnReader = entry.getValue();
       if (!columnReader.isNull(docId)) {
-        reuse.putValue(column, columnReader.getValue(docId));
+        buffer.putValue(column, columnReader.getValue(docId));
       } else if (!_skipDefaultNullValues) {
-        reuse.putDefaultNullValue(column, columnReader.getValue(docId));
+        buffer.putDefaultNullValue(column, columnReader.getValue(docId));
       }
     }
   }

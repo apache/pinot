@@ -162,16 +162,22 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     assert !validDocIds.isEmpty();
     PrimaryKey primaryKey = new PrimaryKey(new Object[_primaryKeyColumns.size()]);
     PeekableIntIterator iterator = validDocIds.getIntIterator();
-    while (iterator.hasNext()) {
-      int docId = iterator.next();
-      UpsertUtils.getPrimaryKey(segment, _primaryKeyColumns, docId, primaryKey);
-      _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
-          (pk, recordLocation) -> {
-            if (recordLocation.getSegment() == segment) {
-              return null;
-            }
-            return recordLocation;
-          });
+    try (
+        UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment, _primaryKeyColumns)) {
+      while (iterator.hasNext()) {
+        primaryKeyReader.getPrimaryKey(iterator.next(), primaryKey);
+        _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
+            (pk, recordLocation) -> {
+              if (recordLocation.getSegment() == segment) {
+                return null;
+              }
+              return recordLocation;
+            });
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Caught exception while removing segment: %s, table: %s", segment.getSegmentName(),
+              _tableNameWithType), e);
     }
   }
 
