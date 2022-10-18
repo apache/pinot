@@ -120,29 +120,34 @@ public class DataSchema {
    * <code>LONG</code>.
    * <p>NOTE: The given data schema should be type compatible with this one.
    *
+   * @param originalSchema the original Data schema
    * @param anotherDataSchema Data schema to cover
    */
-  public void upgradeToCover(DataSchema anotherDataSchema) {
-    int numColumns = _columnDataTypes.length;
+  public static DataSchema upgradeToCover(DataSchema originalSchema, DataSchema anotherDataSchema) {
+    int numColumns = originalSchema._columnDataTypes.length;
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      ColumnDataType thisColumnDataType = _columnDataTypes[i];
+      ColumnDataType thisColumnDataType = originalSchema._columnDataTypes[i];
       ColumnDataType thatColumnDataType = anotherDataSchema._columnDataTypes[i];
       if (thisColumnDataType != thatColumnDataType) {
         if (thisColumnDataType.isArray()) {
           if (thisColumnDataType.isWholeNumberArray() && thatColumnDataType.isWholeNumberArray()) {
-            _columnDataTypes[i] = ColumnDataType.LONG_ARRAY;
+            columnDataTypes[i] = ColumnDataType.LONG_ARRAY;
           } else {
-            _columnDataTypes[i] = ColumnDataType.DOUBLE_ARRAY;
+            columnDataTypes[i] = ColumnDataType.DOUBLE_ARRAY;
           }
         } else {
           if (thisColumnDataType.isWholeNumber() && thatColumnDataType.isWholeNumber()) {
-            _columnDataTypes[i] = ColumnDataType.LONG;
+            columnDataTypes[i] = ColumnDataType.LONG;
           } else {
-            _columnDataTypes[i] = ColumnDataType.DOUBLE;
+            columnDataTypes[i] = ColumnDataType.DOUBLE;
           }
         }
+      } else {
+        columnDataTypes[i] = originalSchema._columnDataTypes[i];
       }
     }
+    return new DataSchema(originalSchema._columnNames, columnDataTypes);
   }
 
   public byte[] toBytes()
