@@ -495,7 +495,9 @@ public class TablesResource {
   @Path("tables/{realtimeTableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the info for consumers of this REALTIME table",
-      notes = "Get consumers info from the table data manager")
+      notes = "Get consumers info from the table data manager. Note that the partitionToOffsetMap has been deprecated "
+          + "and will be removed in the next release. The info is now embedded within each partition's state as "
+          + "currentOffsetsMap")
   public List<SegmentConsumerInfo> getConsumingSegmentsInfo(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
           String realtimeTableName) {
@@ -517,12 +519,15 @@ public class TablesResource {
               realtimeSegmentDataManager.getConsumerPartitionState();
           Map<String, PartitionLagState> partitionLagStateMap =
               realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap);
+          @Deprecated Map<String, String> partitiionToOffsetMap =
+              realtimeSegmentDataManager.getPartitionToCurrentOffset();
           segmentConsumerInfoList.add(
               new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
                   realtimeSegmentDataManager.getConsumerState().toString(),
                   realtimeSegmentDataManager.getLastConsumedTimestamp(),
+                  partitiionToOffsetMap,
                   new SegmentConsumerInfo.PartitionOffsetInfo(
-                      realtimeSegmentDataManager.getPartitionToCurrentOffset(),
+                      partitiionToOffsetMap,
                       partitionStateMap.entrySet().stream().collect(
                           Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
                       ),

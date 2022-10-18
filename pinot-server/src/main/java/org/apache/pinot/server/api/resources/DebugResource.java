@@ -140,12 +140,14 @@ public class DebugResource {
       Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState();
       Map<String, PartitionLagState> partitionLagStateMap =
           realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap);
+      Map<String, String> partitionToCurrentOffsetMap = realtimeSegmentDataManager.getPartitionToCurrentOffset();
       segmentConsumerInfo =
           new SegmentConsumerInfo(
               segmentDataManager.getSegmentName(),
               realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(),
-              new SegmentConsumerInfo.PartitionOffsetInfo(realtimeSegmentDataManager.getPartitionToCurrentOffset(),
+              partitionToCurrentOffsetMap,
+              new SegmentConsumerInfo.PartitionOffsetInfo(partitionToCurrentOffsetMap,
                   partitionStateMap.entrySet().stream().collect(
                       Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
                   ),

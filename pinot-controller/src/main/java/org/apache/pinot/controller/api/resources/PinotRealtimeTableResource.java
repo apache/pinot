@@ -153,7 +153,9 @@ public class PinotRealtimeTableResource {
   @GET
   @Path("/tables/{tableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Returns state of consuming segments", notes = "Gets the status of consumers from all servers")
+  @ApiOperation(value = "Returns state of consuming segments", notes = "Gets the status of consumers from all servers."
+      + "Note that the partitionToOffsetMap has been deprecated and will be removed in the next release. The info is "
+      + "now embedded within each partition's state as currentOffsetsMap.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 404, message = "Table not found"),
