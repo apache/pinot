@@ -48,7 +48,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class DataSchema {
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
-  private final ColumnDataType[] _storedColumnDataTypes;
+  private ColumnDataType[] _storedColumnDataTypes;
 
   /** Used by both Broker and Server to generate results for EXPLAIN PLAN queries. */
   public static final DataSchema EXPLAIN_RESULT_SCHEMA =
@@ -61,7 +61,6 @@ public class DataSchema {
       @JsonProperty("columnDataTypes") ColumnDataType[] columnDataTypes) {
     _columnNames = columnNames;
     _columnDataTypes = columnDataTypes;
-    _storedColumnDataTypes = computeStoredColumnDataType(columnDataTypes);
   }
 
   public int size() {
@@ -84,9 +83,21 @@ public class DataSchema {
     return _columnDataTypes;
   }
 
+  /**
+   * Lazy compute the _storeColumnDataTypes field.
+   */
   @JsonIgnore
   public ColumnDataType[] getStoredColumnDataTypes() {
-    return _storedColumnDataTypes;
+    ColumnDataType[] storedColumnDataTypes = _storedColumnDataTypes;
+    if (storedColumnDataTypes == null) {
+      int numColumns = _columnDataTypes.length;
+      storedColumnDataTypes = new ColumnDataType[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        storedColumnDataTypes[i] = _columnDataTypes[i].getStoredType();
+      }
+      _storedColumnDataTypes = storedColumnDataTypes;
+    }
+    return storedColumnDataTypes;
   }
 
   /**
@@ -239,33 +250,24 @@ public class DataSchema {
     return EqualityUtils.hashCodeOf(Arrays.hashCode(_columnNames), Arrays.hashCode(_columnDataTypes));
   }
 
-  private static ColumnDataType[] computeStoredColumnDataType(ColumnDataType[] columnDataTypes) {
-    int numColumns = columnDataTypes.length;
-    ColumnDataType[] storedColumnDataTypes = new ColumnDataType[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      storedColumnDataTypes[i] = columnDataTypes[i].getStoredType();
-    }
-    return storedColumnDataTypes;
-  }
-
   public enum ColumnDataType {
     INT(0),
     LONG(0L),
     FLOAT(0f),
     DOUBLE(0d),
     BIG_DECIMAL(BigDecimal.ZERO),
-    BOOLEAN(0) /* Stored as INT */,
-    TIMESTAMP(0L) /* Stored as LONG */,
+    BOOLEAN(INT, 0),
+    TIMESTAMP(LONG, 0L),
     STRING(""),
-    JSON("") /* Stored as STRING */,
+    JSON(STRING, ""),
     BYTES(new ByteArray(new byte[0])),
     OBJECT(null),
     INT_ARRAY(new int[0]),
     LONG_ARRAY(new long[0]),
     FLOAT_ARRAY(new float[0]),
     DOUBLE_ARRAY(new double[0]),
-    BOOLEAN_ARRAY(new int[0]) /* Stored as INT_ARRAY */,
-    TIMESTAMP_ARRAY(new long[0]) /* Stored as LONG_ARRAY */,
+    BOOLEAN_ARRAY(INT_ARRAY, new int[0]),
+    TIMESTAMP_ARRAY(LONG_ARRAY, new long[0]),
     STRING_ARRAY(new String[0]),
     BYTES_ARRAY(new byte[0][]);
 
@@ -278,10 +280,19 @@ public class DataSchema {
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
 
+    // stored data type.
+    private final ColumnDataType _storedColumnDataType;
+
     // Placeholder for null. We need a placeholder for null so that it can be serialized in the data table
     private final Object _nullPlaceholder;
 
     ColumnDataType(Object nullPlaceHolder) {
+      _storedColumnDataType = this;
+      _nullPlaceholder = nullPlaceHolder;
+    }
+
+    ColumnDataType(ColumnDataType storedColumnDataType, Object nullPlaceHolder) {
+      _storedColumnDataType = storedColumnDataType;
       _nullPlaceholder = nullPlaceHolder;
     }
 
@@ -293,20 +304,7 @@ public class DataSchema {
      * Returns the data type stored in Pinot.
      */
     public ColumnDataType getStoredType() {
-      switch (this) {
-        case BOOLEAN:
-          return INT;
-        case TIMESTAMP:
-          return LONG;
-        case JSON:
-          return STRING;
-        case BOOLEAN_ARRAY:
-          return INT_ARRAY;
-        case TIMESTAMP_ARRAY:
-          return LONG_ARRAY;
-        default:
-          return this;
-      }
+      return _storedColumnDataType;
     }
 
     public boolean isNumber() {
