@@ -33,10 +33,13 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
   public void testQueryRewrite() {
     testQueryRewrite("SELECT A FROM myTable GROUP BY A", "SELECT DISTINCT A FROM myTable");
     testQueryRewrite("SELECT col1, col2 FROM foo GROUP BY col1, col2", "SELECT DISTINCT col1, col2 FROM foo");
+    testQueryRewrite("SELECT col1, col2 FROM foo GROUP BY col2, col1", "SELECT DISTINCT col1, col2 FROM foo");
     testQueryRewrite("SELECT col1+col2*5 FROM foo GROUP BY col1+col2*5", "SELECT DISTINCT col1+col2*5 FROM foo");
     testQueryRewrite("SELECT col1 as col2, col1 as col3 FROM foo GROUP BY col1",
         "SELECT DISTINCT col1 as col2, col1 as col3 FROM foo");
     testQueryRewrite("SELECT col1 as a, col2 as b, concat(col3, col4, '') as c FROM foo GROUP BY a,b,c",
+        "SELECT DISTINCT col1 as a, col2 as b, concat(col3, col4, '') as c FROM foo");
+    testQueryRewrite("SELECT col1 as a, col2 as b, concat(col3, col4, '') as c FROM foo GROUP BY c, b, a",
         "SELECT DISTINCT col1 as a, col2 as b, concat(col3, col4, '') as c FROM foo");
     testQueryRewrite(
         "SELECT col1 as a, col2 as b, concat(col3, col4, '') as c FROM foo GROUP BY col1, col2, CONCAT(col3,col4,'')",
