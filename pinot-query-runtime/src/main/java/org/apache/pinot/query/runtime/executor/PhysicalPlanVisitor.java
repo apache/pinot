@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.executor;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -60,18 +59,18 @@ import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
  */
 public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<TransferableBlock>, Void> {
 
-  private final MailboxService<Mailbox.MailboxContent> _mailboxService;
+  private final MailboxService<TransferableBlock> _mailboxService;
   private final String _hostName;
   private final int _port;
   private final long _requestId;
   private final Map<Integer, StageMetadata> _metadataMap;
 
-  public static Operator<TransferableBlock> build(MailboxService<Mailbox.MailboxContent> mailboxService,
+  public static Operator<TransferableBlock> build(MailboxService<TransferableBlock> mailboxService,
       String hostName, int port, long requestId, Map<Integer, StageMetadata> metadataMap, StageNode node) {
     return node.visit(new PhysicalPlanVisitor(mailboxService, hostName, port, requestId, metadataMap), null);
   }
 
-  private PhysicalPlanVisitor(MailboxService<Mailbox.MailboxContent> mailboxService, String hostName, int port,
+  private PhysicalPlanVisitor(MailboxService<TransferableBlock> mailboxService, String hostName, int port,
       long requestId, Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _hostName = hostName;
