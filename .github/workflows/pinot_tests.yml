@@ -82,7 +82,7 @@ jobs:
       # Step that does that actual cache save and restore
       - uses: actions/cache@v3
         env:
-          SEGMENT_DOWNLOAD_TIMEOUT_MIN: 10
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -126,7 +126,7 @@ jobs:
       # Step that does that actual cache save and restore
       - uses: actions/cache@v3
         env:
-          SEGMENT_DOWNLOAD_TIMEOUT_MIN: 10
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -171,7 +171,7 @@ jobs:
       # Step that does that actual cache save and restore
       - uses: actions/cache@v3
         env:
-          SEGMENT_DOWNLOAD_TIMEOUT_MIN: 10
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -211,7 +211,7 @@ jobs:
       # Step that does that actual cache save and restore
       - uses: actions/cache@v3
         env:
-          SEGMENT_DOWNLOAD_TIMEOUT_MIN: 10
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
