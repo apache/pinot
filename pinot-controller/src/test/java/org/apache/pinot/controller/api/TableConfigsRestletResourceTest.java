@@ -21,7 +21,6 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -382,7 +381,7 @@ public class TableConfigsRestletResourceTest {
     // list
     String getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
+    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
     });
     Assert.assertEquals(configs.size(), 1);
     TableConfigs tableConfigsResponse = JsonUtils.stringToObject(configs.get(0), TableConfigs.class);
@@ -400,7 +399,7 @@ public class TableConfigsRestletResourceTest {
     // list
     getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
+    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
     });
     Assert.assertEquals(configs.size(), 1);
     tableConfigsResponse = JsonUtils.stringToObject(configs.get(0), TableConfigs.class);
@@ -419,7 +418,7 @@ public class TableConfigsRestletResourceTest {
     // list
     getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
+    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
     });
     Assert.assertEquals(configs.size(), 2);
     Map<String, TableConfigs> tableNameToConfigs = new HashMap<>(2);
@@ -429,12 +428,15 @@ public class TableConfigsRestletResourceTest {
     }
     Assert.assertEquals(tableNameToConfigs.get(tableName1).getTableName(), tableConfigs1.getTableName());
     Assert.assertEquals(tableNameToConfigs.get(tableName1).getSchema(), tableConfigs1.getSchema());
-    Assert.assertEquals(tableNameToConfigs.get(tableName1).getOffline().getTableName(), tableConfigs1.getOffline().getTableName());
-    Assert.assertEquals(tableNameToConfigs.get(tableName1).getRealtime().getTableName(), tableConfigs1.getRealtime().getTableName());
+    Assert.assertEquals(tableNameToConfigs.get(tableName1).getOffline().getTableName(),
+        tableConfigs1.getOffline().getTableName());
+    Assert.assertEquals(tableNameToConfigs.get(tableName1).getRealtime().getTableName(),
+        tableConfigs1.getRealtime().getTableName());
 
     Assert.assertEquals(tableNameToConfigs.get(tableName2).getTableName(), tableConfigs2.getTableName());
     Assert.assertEquals(tableNameToConfigs.get(tableName2).getSchema(), tableConfigs2.getSchema());
-    Assert.assertEquals(tableNameToConfigs.get(tableName2).getOffline().getTableName(), tableConfigs2.getOffline().getTableName());
+    Assert.assertEquals(tableNameToConfigs.get(tableName2).getOffline().getTableName(),
+        tableConfigs2.getOffline().getTableName());
     Assert.assertNull(tableNameToConfigs.get(tableName2).getRealtime());
 
     // delete 1
@@ -444,7 +446,7 @@ public class TableConfigsRestletResourceTest {
     // list 1
     getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
+    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
     });
     Assert.assertEquals(configs.size(), 1);
     tableConfigsResponse = JsonUtils.stringToObject(configs.get(0), TableConfigs.class);
@@ -488,7 +490,7 @@ public class TableConfigsRestletResourceTest {
     // list
     String getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
+    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
     });
     Assert.assertEquals(configs.size(), 1);
     tableConfigsResponse = JsonUtils.stringToObject(configs.get(0), TableConfigs.class);
@@ -514,7 +516,7 @@ public class TableConfigsRestletResourceTest {
     // list
     getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
+    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
     });
     Assert.assertEquals(configs.size(), 1);
     tableConfigsResponse = JsonUtils.stringToObject(configs.get(0), TableConfigs.class);
