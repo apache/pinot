@@ -27,19 +27,18 @@ public class PartitionLagState {
   protected final static String NOT_CALCULATED = "NOT_CALCULATED";
 
   /**
-   * Defines how far away the current record's offset / pointer is from upstream latest record
+   * Defines how far behind the current record's offset / pointer is from upstream latest record
    * The distance is based on actual record count.
    */
   public String getRecordsLag() {
     return NOT_CALCULATED;
   }
 
-  // TODO: Define record availability lag ($latest_record_consumption_time - $latest_record_ingestion_time)
-
   /**
    * Defines how soon after record ingestion was the record consumed by Pinot. That is, the difference between the
    * time the record was consumed and the time at which the record was ingested upstream.
-   * @return
+   *
+   * @return Lag value in milliseconds
    */
   public String getRecordAvailabilityLag() {
     return NOT_CALCULATED;
