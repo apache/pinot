@@ -39,8 +39,10 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.testng.Assert;
 import org.testng.SkipException;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static java.lang.String.format;
@@ -75,25 +77,43 @@ import static org.testng.Assert.assertTrue;
 public class GcsPinotFSTest {
   private static final String DATA_DIR_PREFIX = "testing-data";
 
+  private String _keyFile;
+  private String _projectId;
+  private String _bucket;
   private GcsPinotFS _pinotFS;
   private GcsUri _dataDir;
+  private Path _localTmpDir;
   private final Closer _closer = Closer.create();
 
   @BeforeClass
   public void setup() {
-    String keyFile = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
-    String projectId = System.getenv("GCP_PROJECT");
-    String bucket = System.getenv("GCS_BUCKET");
-    if (keyFile != null && projectId != null && bucket != null) {
+    _keyFile = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
+    _projectId = System.getenv("GCP_PROJECT");
+    _bucket = System.getenv("GCS_BUCKET");
+    if (_keyFile != null && _projectId != null && _bucket != null) {
       _pinotFS = new GcsPinotFS();
       _pinotFS.init(new PinotConfiguration(
-          ImmutableMap.<String, Object>builder().put(PROJECT_ID, projectId).put(GCP_KEY, keyFile).build()));
-      _dataDir = createGcsUri(bucket, DATA_DIR_PREFIX + randomUUID());
+          ImmutableMap.<String, Object>builder().put(PROJECT_ID, _projectId).put(GCP_KEY, _keyFile).build()));
+    }
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    _closer.close();
+  }
+
+  @BeforeMethod
+  public void beforeTest()
+      throws Exception {
+    if (_pinotFS != null) {
+      _dataDir = createGcsUri(_bucket, DATA_DIR_PREFIX + randomUUID());
+      _localTmpDir = createLocalTempDirectory();
     }
   }
 
   @AfterMethod
-  public void tearDown()
+  public void afterTest()
       throws Exception {
     if (_pinotFS != null) {
       _pinotFS.delete(_dataDir.getUri(), true);
@@ -157,12 +177,11 @@ public class GcsPinotFSTest {
       throws Exception {
     skipIfNotConfigured();
     // Create empty file
-    Path localTmpDir = createLocalTempDirectory();
-    Path emptyFile = localTmpDir.resolve("empty");
+    Path emptyFile = _localTmpDir.resolve("empty");
     emptyFile.toFile().createNewFile();
 
     // Create non-empty file
-    Path file1 = localTmpDir.resolve("file1");
+    Path file1 = _localTmpDir.resolve("file1");
     List<String> expectedLinesFromFile = writeToFile(file1, 10);
     List<String> actualLinesFromFile = Files.readAllLines(file1, UTF_8);
     // Sanity check
@@ -203,7 +222,7 @@ public class GcsPinotFSTest {
     assertTrue(
         listFilesToStream(createGcsUri(_dataDir.getBucketName(), "")).collect(toSet()).containsAll(expectedElements));
     // Check that the non-empty file has the expected contents
-    Path nonEmptyFileFromGcs = localTmpDir.resolve("nonEmptyFileFromGcs");
+    Path nonEmptyFileFromGcs = _localTmpDir.resolve("nonEmptyFileFromGcs");
     _pinotFS.copyToLocalFile(nonEmptyFileGcsUri.getUri(), nonEmptyFileFromGcs.toFile());
     assertEquals(Files.readAllLines(nonEmptyFileFromGcs), expectedLinesFromFile);
 
@@ -226,8 +245,8 @@ public class GcsPinotFSTest {
     String directoryName = Paths.get(gcsDirectoryUri.getPath()).getFileName().toString();
     String directoryCopyName = Paths.get(gcsDirectoryUriCopy.getPath()).getFileName().toString();
     for (GcsUri element : ImmutableList.copyOf(expectedElements)) {
-      expectedElementsCopy
-          .add(createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
+      expectedElementsCopy.add(
+          createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
     }
     expectedElementsCopy.addAll(expectedElements);
     assertEquals(listFilesToStream(_dataDir).collect(toSet()), expectedElementsCopy);
@@ -253,8 +272,7 @@ public class GcsPinotFSTest {
     skipIfNotConfigured();
 
     // Create empty file
-    Path localTmpDir = createLocalTempDirectory();
-    Path emptyFile = localTmpDir.resolve("empty");
+    Path emptyFile = _localTmpDir.resolve("empty");
     emptyFile.toFile().createNewFile();
 
     // Create 5 subfolders with files inside.
@@ -295,9 +313,8 @@ public class GcsPinotFSTest {
     Assert.assertEquals(fileMetadata.size(), count + 2);
     Assert.assertEquals(fileMetadata.stream().filter(FileMetadata::isDirectory).count(), count + 1);
     Assert.assertEquals(fileMetadata.stream().filter(f -> !f.isDirectory()).count(), 1);
-    Assert.assertTrue(expectedNonRecursive
-            .containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
-        fileMetadata.toString());
+    Assert.assertTrue(expectedNonRecursive.containsAll(
+        fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())), fileMetadata.toString());
     fileMetadata = _pinotFS.listFilesWithMetadata(_dataDir.getUri(), true);
     Assert.assertEquals(fileMetadata.size(), count * 2 + 2);
     Assert.assertEquals(fileMetadata.stream().filter(FileMetadata::isDirectory).count(), count + 1);
