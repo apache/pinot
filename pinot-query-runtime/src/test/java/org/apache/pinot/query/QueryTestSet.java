@@ -95,6 +95,11 @@ public class QueryTestSet {
             + " WHERE a.col1 IN ('foo') AND b.col2 NOT IN ('')"},
 
         // Range conditions with continuous and non-continuous range.
+        // Calcite default compilation will convert multiple `=` and `<>` into range IN and NOT IN search predicates.
+        new Object[]{"SELECT a.col1, SUM(CASE WHEN a.col2 = 'foo' OR a.col2 = 'alice' THEN 1 ELSE 0 END) AS match_sum, "
+            + " SUM(CASE WHEN a.col2 <> 'foo' AND a.col2 <> 'alice' THEN 1 ELSE 0 END) as unmatch_sum "
+            + " FROM a WHERE a.ts >= 1600000000 GROUP BY a.col1"},
+
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
             + " WHERE a.col3 IN (1, 2, 3) OR (a.col3 > 10 AND a.col3 < 50)"},
 

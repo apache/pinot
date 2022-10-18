@@ -157,6 +157,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.LESS_THAN_OR_EQUAL,
         LessThanOrEqualTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IN, InTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.NOT_IN, NotInTransformFunction.class);
 
     // logical functions
     typeToImplementation.put(TransformFunctionType.AND, AndOperatorTransformFunction.class);
