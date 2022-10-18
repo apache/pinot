@@ -280,9 +280,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final StreamPartitionMsgOffset _startOffset;
   private final PartitionLevelStreamConfig _partitionLevelStreamConfig;
 
+  private RowMetadata _lastRowMetadata;
+  private long _lastConsumedTimestampMs = -1;
+
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
-  private RowMetadata _lastRowMetadata;
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
@@ -579,6 +581,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             indexedMessageCount++;
             _lastRowMetadata = msgMetadata;
+            _lastConsumedTimestampMs = now();
             realtimeRowsConsumedMeter =
                 _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
                     realtimeRowsConsumedMeter);
@@ -820,7 +823,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   @Override
   public long getLastConsumedTimestamp() {
-    return _lastLogTime;
+    return _lastConsumedTimestampMs;
   }
 
   @Override

@@ -128,9 +128,9 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       // Compute record-availability
       String recordAvailabilityLag = "UNKNOWN";
       RowMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
-      if (lastProcessedMessageMetadata != null) {
-        long availabilityLag = partitionState.getLastProcessedTimeMs() -
-            lastProcessedMessageMetadata.getRecordIngestionTimeMs();
+      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
+        long availabilityLag = partitionState.getLastProcessedTimeMs()
+            - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
         recordAvailabilityLag = String.valueOf(availabilityLag);
       }
 

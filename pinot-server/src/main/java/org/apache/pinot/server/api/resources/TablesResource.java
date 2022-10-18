@@ -90,7 +90,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
-import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -517,8 +516,12 @@ public class TablesResource {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
           Map<String, ConsumerPartitionState> partitionStateMap =
               realtimeSegmentDataManager.getConsumerPartitionState();
-          Map<String, PartitionLagState> partitionLagStateMap =
-              realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap);
+          Map<String, String> recordsLagMap = new HashMap<>();
+          Map<String, String> availabilityLagMap = new HashMap<>();
+          realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
+            recordsLagMap.put(k, v.getRecordsLag());
+            availabilityLagMap.put(k, v.getRecordAvailabilityLag());
+          });
           @Deprecated Map<String, String> partitiionToOffsetMap =
               realtimeSegmentDataManager.getPartitionToCurrentOffset();
           segmentConsumerInfoList.add(
@@ -530,11 +533,7 @@ public class TablesResource {
                       partitiionToOffsetMap,
                       partitionStateMap.entrySet().stream().collect(
                           Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
-                      ),
-                      partitionLagStateMap.entrySet().stream().collect(
-                          Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getRecordsLag())
-                      )))
-          );
+                      ), recordsLagMap, availabilityLagMap)));
         }
       }
     } catch (Exception e) {
