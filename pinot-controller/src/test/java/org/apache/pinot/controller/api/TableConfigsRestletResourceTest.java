@@ -23,7 +23,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
@@ -374,45 +376,66 @@ public class TableConfigsRestletResourceTest {
     TableConfig offlineTableConfig = getOfflineTableConfig(tableName1);
     TableConfig realtimeTableConfig = getRealtimeTableConfig(tableName1);
     Schema schema = getSchema(tableName1);
-    TableConfigs tableConfigs = new TableConfigs(tableName1, schema, offlineTableConfig, null);
-    ControllerTest.sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
+    TableConfigs tableConfigs1 = new TableConfigs(tableName1, schema, offlineTableConfig, null);
+    ControllerTest.sendPostRequest(_createTableConfigsUrl, tableConfigs1.toPrettyJsonString());
 
     // list
     String getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
+    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
     });
     Assert.assertEquals(configs.size(), 1);
-    Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName1)));
+    TableConfigs tableConfigsResponse = JsonUtils.stringToObject(configs.get(0), TableConfigs.class);
+    Assert.assertEquals(tableConfigsResponse.getTableName(), tableConfigs1.getTableName());
+    Assert.assertEquals(tableConfigsResponse.getSchema(), tableConfigs1.getSchema());
+    Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), tableConfigs1.getOffline().getTableName());
+    Assert.assertNull(tableConfigsResponse.getRealtime());
 
     // update to 2
-    tableConfigs = new TableConfigs(tableName1, schema, offlineTableConfig, realtimeTableConfig);
+    tableConfigs1 = new TableConfigs(tableName1, schema, offlineTableConfig, realtimeTableConfig);
     ControllerTest
         .sendPutRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName1),
-            tableConfigs.toPrettyJsonString());
+            tableConfigs1.toPrettyJsonString());
 
     // list
     getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
+    configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
     });
     Assert.assertEquals(configs.size(), 1);
-    Assert.assertTrue(configs.containsAll(Sets.newHashSet("testList1")));
+    tableConfigsResponse = JsonUtils.stringToObject(configs.get(0), TableConfigs.class);
+    Assert.assertEquals(tableConfigsResponse.getTableName(), tableConfigs1.getTableName());
+    Assert.assertEquals(tableConfigsResponse.getSchema(), tableConfigs1.getSchema());
+    Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), tableConfigs1.getOffline().getTableName());
+    Assert.assertEquals(tableConfigsResponse.getRealtime().getTableName(), tableConfigs1.getRealtime().getTableName());
 
     // create new
     String tableName2 = "testList2";
     offlineTableConfig = getOfflineTableConfig(tableName2);
     schema = getSchema(tableName2);
-    tableConfigs = new TableConfigs(tableName2, schema, offlineTableConfig, null);
-    ControllerTest.sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
+    TableConfigs tableConfigs2 = new TableConfigs(tableName2, schema, offlineTableConfig, null);
+    ControllerTest.sendPostRequest(_createTableConfigsUrl, tableConfigs2.toPrettyJsonString());
 
     // list
     getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
+    configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
     });
     Assert.assertEquals(configs.size(), 2);
-    Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName1, tableName2)));
+    Map<String, TableConfigs> tableNameToConfigs = new HashMap<>(2);
+    for (String conf : configs) {
+      TableConfigs response = JsonUtils.stringToObject(conf, TableConfigs.class);
+      tableNameToConfigs.put(response.getTableName(), response);
+    }
+    Assert.assertEquals(tableNameToConfigs.get(tableName1).getTableName(), tableConfigs1.getTableName());
+    Assert.assertEquals(tableNameToConfigs.get(tableName1).getSchema(), tableConfigs1.getSchema());
+    Assert.assertEquals(tableNameToConfigs.get(tableName1).getOffline().getTableName(), tableConfigs1.getOffline().getTableName());
+    Assert.assertEquals(tableNameToConfigs.get(tableName1).getRealtime().getTableName(), tableConfigs1.getRealtime().getTableName());
+
+    Assert.assertEquals(tableNameToConfigs.get(tableName2).getTableName(), tableConfigs2.getTableName());
+    Assert.assertEquals(tableNameToConfigs.get(tableName2).getSchema(), tableConfigs2.getSchema());
+    Assert.assertEquals(tableNameToConfigs.get(tableName2).getOffline().getTableName(), tableConfigs2.getOffline().getTableName());
+    Assert.assertNull(tableNameToConfigs.get(tableName2).getRealtime());
 
     // delete 1
     ControllerTest
@@ -421,10 +444,14 @@ public class TableConfigsRestletResourceTest {
     // list 1
     getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
+    configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
     });
     Assert.assertEquals(configs.size(), 1);
-    Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName1)));
+    tableConfigsResponse = JsonUtils.stringToObject(configs.get(0), TableConfigs.class);
+    Assert.assertEquals(tableConfigsResponse.getTableName(), tableConfigs1.getTableName());
+    Assert.assertEquals(tableConfigsResponse.getSchema(), tableConfigs1.getSchema());
+    Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), tableConfigs1.getOffline().getTableName());
+    Assert.assertEquals(tableConfigsResponse.getRealtime().getTableName(), tableConfigs1.getRealtime().getTableName());
 
     ControllerTest
         .sendDeleteRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName1));
@@ -461,10 +488,14 @@ public class TableConfigsRestletResourceTest {
     // list
     String getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
+    List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
     });
     Assert.assertEquals(configs.size(), 1);
-    Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName)));
+    tableConfigsResponse = JsonUtils.stringToObject(configs.get(0), TableConfigs.class);
+    Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
+    Assert.assertEquals(tableConfigsResponse.getSchema(), tableConfigs.getSchema());
+    Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), tableConfigs.getOffline().getTableName());
+    Assert.assertNull(tableConfigsResponse.getRealtime());
 
     // update to 2
     tableConfigs = new TableConfigs(tableName, tableConfigsResponse.getSchema(), tableConfigsResponse.getOffline(),
@@ -483,10 +514,14 @@ public class TableConfigsRestletResourceTest {
     // list
     getResponse =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
-    configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
+    configs = JsonUtils.stringToObject(getResponse, new TypeReference<>() {
     });
     Assert.assertEquals(configs.size(), 1);
-    Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName)));
+    tableConfigsResponse = JsonUtils.stringToObject(configs.get(0), TableConfigs.class);
+    Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
+    Assert.assertEquals(tableConfigsResponse.getSchema(), tableConfigs.getSchema());
+    Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), tableConfigs.getOffline().getTableName());
+    Assert.assertEquals(tableConfigsResponse.getRealtime().getTableName(), tableConfigs.getRealtime().getTableName());
 
     // update existing config
     schema.addField(new MetricFieldSpec("newMetric", FieldSpec.DataType.LONG));
