@@ -27,7 +27,6 @@ import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 public final class TransferableBlockUtils {
@@ -81,10 +80,8 @@ public final class TransferableBlockUtils {
   }
 
   public static Object[] getRow(TransferableBlock transferableBlock, int rowId) {
-    if (transferableBlock.isContainerBlock() && transferableBlock.getType() == BaseDataBlock.Type.ROW) {
-      return transferableBlock.getContainer().get(rowId);
-    } else {
-      return SelectionOperatorUtils.extractRowFromDataTable(transferableBlock.getDataBlock(), rowId);
-    }
+    Preconditions.checkState(transferableBlock.getType() == BaseDataBlock.Type.ROW,
+        "TransferableBlockUtils doesn't support get row from non-ROW-based data block type yet!");
+    return transferableBlock.getContainer().get(rowId);
   }
 }
