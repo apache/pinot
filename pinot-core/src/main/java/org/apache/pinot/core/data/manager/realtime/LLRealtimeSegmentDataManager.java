@@ -581,7 +581,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             indexedMessageCount++;
             _lastRowMetadata = msgMetadata;
-            _lastConsumedTimestampMs = now();
+            _lastConsumedTimestampMs = System.currentTimeMillis();
             realtimeRowsConsumedMeter =
                 _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
                     realtimeRowsConsumedMeter);
