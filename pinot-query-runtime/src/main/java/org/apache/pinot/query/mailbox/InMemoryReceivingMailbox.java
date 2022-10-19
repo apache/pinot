@@ -44,8 +44,9 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
       throws Exception {
     TransferableBlock block = _queue.poll(
         InMemoryMailboxService.DEFAULT_CHANNEL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    // If the poll timed out, we return a null since MailboxReceiveOperator can continue to check other mailboxes
     if (block == null) {
-      throw new RuntimeException(String.format("Timed out waiting for data block on mailbox=%s", _mailboxId));
+      return null;
     }
     if (block.isEndOfStreamBlock()) {
       _closed = true;
