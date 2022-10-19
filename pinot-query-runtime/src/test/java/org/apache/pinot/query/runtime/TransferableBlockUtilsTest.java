@@ -37,8 +37,9 @@ import org.testng.annotations.Test;
 
 public class TransferableBlockUtilsTest {
   private static final int TOTAL_ROW_COUNT = 50;
-  private static final List<DataSchema.ColumnDataType> EXCLUDE_DATA_TYPES =
-      ImmutableList.of(DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.BYTES_ARRAY);
+  private static final List<DataSchema.ColumnDataType> EXCLUDE_DATA_TYPES = ImmutableList.of(
+      DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.JSON, DataSchema.ColumnDataType.BYTES,
+      DataSchema.ColumnDataType.BYTES_ARRAY);
 
   private static DataSchema getDataSchema() {
     DataSchema.ColumnDataType[] allDataTypes = DataSchema.ColumnDataType.values();
@@ -110,10 +111,10 @@ public class TransferableBlockUtilsTest {
             continue;
           }
           DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(colId);
-          Object actualVal = columnDataType.getStoredType().convert(row[colId]);
-          Object expectedVal = columnDataType.getStoredType().convert(rows.get(rowId)[colId]);
-            Assert.assertEquals(actualVal, expectedVal, "Error comparing split Block at (" + rowId + "," + colId + ")"
-                + " of Type: " + columnDataType + "! expected: [" + expectedVal + "], actual: [" + actualVal + "]");
+          Object actualVal = row[colId];
+          Object expectedVal = rows.get(rowId)[colId];
+          Assert.assertEquals(actualVal, expectedVal, "Error comparing split Block at (" + rowId + "," + colId + ")"
+              + " of Type: " + columnDataType + "! expected: [" + expectedVal + "], actual: [" + actualVal + "]");
         }
         rowId++;
       }

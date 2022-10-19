@@ -20,6 +20,7 @@ package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -77,15 +78,15 @@ public final class DataBlockUtils {
 
   public static List<Object[]> extractRows(BaseDataBlock dataBlock) {
     DataSchema dataSchema = dataBlock.getDataSchema();
-    DataSchema.ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     int numRows = dataBlock.getNumberOfRows();
-    int numColumns = storedColumnDataTypes.length;
+    int numColumns = columnDataTypes.length;
 
     List<Object[]> rows = new ArrayList<>(numRows);
     for (int i = 0; i < numRows; i++) {
       Object[] row = new Object[numColumns];
       for (int j = 0; j < numColumns; j++) {
-        switch (storedColumnDataTypes[j]) {
+        switch (columnDataTypes[j]) {
           // Single-value column
           case INT:
             row[j] = dataBlock.getInt(i, j);
@@ -101,6 +102,12 @@ public final class DataBlockUtils {
             break;
           case BIG_DECIMAL:
             row[j] = dataBlock.getBigDecimal(i, j);
+            break;
+          case BOOLEAN:
+            row[j] = DataSchema.ColumnDataType.BOOLEAN.convert(dataBlock.getInt(i, j));
+            break;
+          case TIMESTAMP:
+            row[j] = new Timestamp(dataBlock.getLong(i, j));
             break;
           case STRING:
             row[j] = dataBlock.getString(i, j);
@@ -125,10 +132,15 @@ public final class DataBlockUtils {
           case STRING_ARRAY:
             row[j] = dataBlock.getStringArray(i, j);
             break;
-
+          case BOOLEAN_ARRAY:
+            row[j] = DataSchema.ColumnDataType.BOOLEAN_ARRAY.convert(dataBlock.getIntArray(i, j));
+            break;
+          case TIMESTAMP_ARRAY:
+            row[j] = DataSchema.ColumnDataType.TIMESTAMP_ARRAY.convert(dataBlock.getLongArray(i, j));
+            break;
           default:
             throw new IllegalStateException(
-                String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[j],
+                String.format("Unsupported data type: %s for column: %s", columnDataTypes[j],
                     dataSchema.getColumnName(j)));
         }
       }
