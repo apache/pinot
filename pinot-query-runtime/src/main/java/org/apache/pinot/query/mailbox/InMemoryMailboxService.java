@@ -20,6 +20,7 @@ package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -30,15 +31,9 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   private final int _mailboxPort;
   static final int DEFAULT_CHANNEL_CAPACITY = 5;
   // TODO: This should come from a config and should be consistent with the timeout for GrpcMailboxService
-  static final int DEFAULT_CHANNEL_TIMEOUT_SECONDS = 120;
+  static final int DEFAULT_CHANNEL_TIMEOUT_SECONDS = 1;
 
-  // maintaining a list of registered mailboxes.
-  private final ConcurrentHashMap<String, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap =
-      new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap =
-      new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<String, ArrayBlockingQueue<TransferableBlock>> _channelMap =
-      new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, InMemoryMailboxState> _mailboxStateMap = new ConcurrentHashMap<>();
 
   public InMemoryMailboxService(String hostname, int mailboxPort) {
     _hostname = hostname;
@@ -66,20 +61,35 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    _channelMap.computeIfAbsent(mId, (x) -> createDefaultChannel());
-    return _sendingMailboxMap.computeIfAbsent(mId, (x) -> new InMemorySendingMailbox(x,
-        _channelMap.get(x)));
+    return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._sendingMailbox;
   }
 
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    _channelMap.computeIfAbsent(mId, (x) -> createDefaultChannel());
-    return _receivingMailboxMap.computeIfAbsent(mId, (x) -> new InMemoryReceivingMailbox(mId,
-        _channelMap.get(x)));
+    return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._receivingMailbox;
+  }
+
+  InMemoryMailboxState newMailboxState(String mailboxId) {
+    BlockingQueue<TransferableBlock> queue = createDefaultChannel();
+    return new InMemoryMailboxState(new InMemorySendingMailbox(mailboxId, queue),
+        new InMemoryReceivingMailbox(mailboxId, queue), queue);
   }
 
   private ArrayBlockingQueue<TransferableBlock> createDefaultChannel() {
     return new ArrayBlockingQueue<>(DEFAULT_CHANNEL_CAPACITY);
+  }
+
+  static class InMemoryMailboxState {
+    ReceivingMailbox<TransferableBlock> _receivingMailbox;
+    SendingMailbox<TransferableBlock> _sendingMailbox;
+    BlockingQueue<TransferableBlock> _queue;
+
+    InMemoryMailboxState(SendingMailbox<TransferableBlock> sendingMailbox,
+        ReceivingMailbox<TransferableBlock> receivingMailbox, BlockingQueue<TransferableBlock> queue) {
+      _receivingMailbox = receivingMailbox;
+      _sendingMailbox = sendingMailbox;
+      _queue = queue;
+    }
   }
 }

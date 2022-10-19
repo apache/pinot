@@ -26,7 +26,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
   private final String _mailboxId;
   private final BlockingQueue<TransferableBlock> _queue;
-  private boolean _closed;
+  private volatile boolean _closed;
 
   public InMemoryReceivingMailbox(String mailboxId, BlockingQueue<TransferableBlock> queue) {
     _mailboxId = mailboxId;
