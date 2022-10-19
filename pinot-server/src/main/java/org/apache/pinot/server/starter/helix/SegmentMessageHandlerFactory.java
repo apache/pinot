@@ -21,6 +21,7 @@ package org.apache.pinot.server.starter.helix;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
@@ -129,21 +130,22 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       _logger.info("Handling message: {}", _message);
       try {
         if (CollectionUtils.isNotEmpty(_segmentList)) {
-          _instanceDataManager
-              .reloadSegments(_tableNameWithType, _segmentList, _forceDownload, _segmentRefreshSemaphore);
-        } else if (_segmentName.equals("")) {
-          // NOTE: the method aborts if any segment reload encounters an unhandled exception,
-          // and can lead to inconsistent state across segments.
-          //we don't acquire any permit here as they'll be acquired by worked threads later
-          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _segmentRefreshSemaphore);
-        } else {
-          // Reload one segment
+          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload,
+              _segmentRefreshSemaphore);
+        } else if (StringUtils.isNotEmpty(_segmentName)) {
+          // TODO: check _segmentName to be backward compatible. Moving forward, we just need to check the list to
+          //       reload one or more segments. If the list or the segment name is empty, all segments are reloaded.
           _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
           try {
             _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
           } finally {
             _segmentRefreshSemaphore.releaseSema();
           }
+        } else {
+          // NOTE: the method continues if any segment reload encounters an unhandled exception,
+          // and failed segments are logged out in the end. We don't acquire any permit here as they'll be acquired
+          // by worked threads later.
+          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _segmentRefreshSemaphore);
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {

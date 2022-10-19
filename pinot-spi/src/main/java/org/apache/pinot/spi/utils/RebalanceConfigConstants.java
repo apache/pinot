@@ -57,10 +57,4 @@ public class RebalanceConfigConstants {
   // - ExternalView has not converged within the maximum wait time -> continue to the next stage
   public static final String BEST_EFFORTS = "bestEfforts";
   public static final boolean DEFAULT_BEST_EFFORTS = false;
-
-  public static final String ENABLE_LOCAL_TIER_MIGRATION = "enableLocalTierMigration";
-  public static final boolean DEFAULT_ENABLE_LOCAL_TIER_MIGRATION = false;
-
-  public static final String SERVER_ADMIN_REQUEST_TIMEOUT_MS = "serverAdminRequestTimeoutMs";
-  public static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_MS = 30000;
 }

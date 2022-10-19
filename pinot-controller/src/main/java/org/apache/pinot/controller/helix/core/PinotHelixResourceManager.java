@@ -47,7 +47,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -59,7 +58,6 @@ import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -2325,7 +2323,8 @@ public class PinotHelixResourceManager {
     recipientCriteria.setInstanceName("%");
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, null, forceDownload);
+    SegmentReloadMessage segmentReloadMessage =
+        new SegmentReloadMessage(tableNameWithType, Collections.emptyList(), forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient
@@ -3055,14 +3054,13 @@ public class PinotHelixResourceManager {
         "Instance: " + instanceName + (enableInstance ? " enable" : " disable") + " failed, timeout");
   }
 
-  public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig,
-      ExecutorService executorService, HttpConnectionManager connectionManager)
+  public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig)
       throws TableNotFoundException {
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
-    return new TableRebalancer(this).rebalance(tableConfig, rebalanceConfig, executorService, connectionManager);
+    return new TableRebalancer(_helixZkManager).rebalance(tableConfig, rebalanceConfig);
   }
 
   /**
