@@ -42,17 +42,14 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
   private static final String EXPLAIN_NAME = "SELECT_PARTIAL_ORDER_BY_DESC";
 
   private int _numDocsScanned = 0;
-  private long _numEntriesScannedPostFilter = 0;
 
   public SelectionPartiallyOrderedByDescOperation(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator, int sortedExpr) {
-    super(indexSegment, queryContext, expressions, transformOperator, sortedExpr);
+      List<ExpressionContext> expressions, TransformOperator transformOperator, int numSortedExpressions) {
+    super(indexSegment, queryContext, expressions, transformOperator, numSortedExpressions);
     assert queryContext.getOrderByExpressions() != null;
     Preconditions.checkArgument(queryContext.getOrderByExpressions().stream()
-            .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
-            .isDesc(),
+            .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER).findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers")).isDesc(),
         "%s can only be used when the first column in order by is DESC", EXPLAIN_NAME);
   }
 
@@ -64,54 +61,36 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
     // the same DataBlockCache, so they may be ephemeral and being overridden by the next block.
     // The only alternative we have right now is to retrieve the last LIMIT elements from each block
 
-    TransformBlock block;
-    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     int numExpressions = _expressions.size();
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
-
     List<Object[]> localBestRows = new ArrayList<>();
+    TransformBlock transformBlock;
+    while ((transformBlock = _transformOperator.nextBlock()) != null) {
+      IntFunction<Object[]> rowFetcher = fetchBlock(transformBlock, blockValSets);
+      int numDocsFetched = transformBlock.getNumDocs();
+      _numDocsScanned += numDocsFetched;
+      ListBuilder listBuilder = listBuilderSupplier.get();
 
-    try {
-      while ((block = _transformOperator.nextBlock()) != null) {
-        int numDocsFetched = block.getNumDocs();
-        _numDocsScanned += numDocsFetched;
-
-        IntFunction<Object[]> rowFetcher = fetchBlock(block, blockValSets);
-
-        ListBuilder listBuilder = listBuilderSupplier.get();
-
-        if (block.getNumDocs() == 0) {
-          continue;
+      // first, calculate the best rows on this block
+      boolean enoughRowsCollected = false;
+      for (int docId = numDocsFetched - 1; docId >= 0; docId--) {
+        enoughRowsCollected = listBuilder.add(rowFetcher.apply(docId));
+        if (enoughRowsCollected) {
+          break;
         }
-
-        // first, calculate the best rows on this block
-        boolean newPartition = false;
-        for (int docId = block.getNumDocs() - 1; docId >= 0; docId--) {
-          newPartition = listBuilder.add(rowFetcher.apply(docId));
-          if (newPartition && listBuilder.sortedSize() >= _numRowsToKeep) {
-            // We changed to a new partition and we have more values than required.
-            // Therefore, we can stop the execution of this block here.
-            break;
-          }
-        }
-        // then try to add the best rows from previous block
-        Iterator<Object[]> localBestRowIt = localBestRows.iterator();
-        while (localBestRowIt.hasNext() && !newPartition && listBuilder.sortedSize() < _numRowsToKeep) {
-          newPartition = listBuilder.add(localBestRowIt.next());
-        }
-        // finally update bestRowsFromPrevBloc
-        localBestRows = listBuilder.build();
       }
-      // Once we finished, localBestRows contains the global best rows
-      return localBestRows;
-    } finally {
-      _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
+      // then try to add the best rows from previous block
+      if (!enoughRowsCollected) {
+        Iterator<Object[]> localBestRowIt = localBestRows.iterator();
+        while (!enoughRowsCollected && localBestRowIt.hasNext()) {
+          enoughRowsCollected = listBuilder.add(localBestRowIt.next());
+        }
+      }
+      // finally update bestRowsFromPrevBloc
+      localBestRows = listBuilder.build();
     }
-  }
-
-  @Override
-  protected long getNumEntriesScannedPostFilter() {
-    return _numEntriesScannedPostFilter;
+    // Once we finished, localBestRows contains the global best rows
+    return localBestRows;
   }
 
   @Override

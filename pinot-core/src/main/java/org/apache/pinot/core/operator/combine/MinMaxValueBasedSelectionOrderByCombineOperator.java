@@ -213,32 +213,36 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       }
       Collection<Object[]> rows = resultsBlock.getRows();
       if (rows != null && rows.size() >= _numRowsToKeep) {
-        boundaryValue = updateBoundaryValue(boundaryValue, extractBoundaryValue(resultsBlock), asc);
+        // Segment result has enough rows, update the boundary value
+
+        Comparable segmentBoundaryValue;
+        if (rows instanceof PriorityQueue) {
+          // Results from SelectionOrderByOperator
+          assert ((PriorityQueue<Object[]>) rows).peek() != null;
+          segmentBoundaryValue = (Comparable) ((PriorityQueue<Object[]>) rows).peek()[0];
+        } else {
+          // Results from LinearSelectionOrderByOperator
+          assert rows instanceof List;
+          segmentBoundaryValue = (Comparable) ((List<Object[]>) rows).get(rows.size() - 1)[0];
+        }
+
+        if (boundaryValue == null) {
+          boundaryValue = segmentBoundaryValue;
+        } else {
+          if (asc) {
+            if (segmentBoundaryValue.compareTo(boundaryValue) < 0) {
+              boundaryValue = segmentBoundaryValue;
+            }
+          } else {
+            if (segmentBoundaryValue.compareTo(boundaryValue) > 0) {
+              boundaryValue = segmentBoundaryValue;
+            }
+          }
+        }
       }
       threadBoundaryValue = boundaryValue;
       _blockingQueue.offer(resultsBlock);
     }
-  }
-
-  private static Comparable extractBoundaryValue(SelectionResultsBlock block) {
-    return (Comparable) block.getHighestRow()[0];
-  }
-
-  private Comparable updateBoundaryValue(Comparable oldBoundary, Comparable newBoundary, boolean asc) {
-    if (oldBoundary == null) {
-      return newBoundary;
-    } else {
-      if (asc) {
-        if (newBoundary.compareTo(oldBoundary) < 0) {
-          return newBoundary;
-        }
-      } else {
-        if (newBoundary.compareTo(oldBoundary) > 0) {
-          return newBoundary;
-        }
-      }
-    }
-    return oldBoundary;
   }
 
   /**
@@ -280,9 +284,9 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = convertToMergeableBlock(blockToMerge);
+        mergedBlock = convertToMergeableBlock((SelectionResultsBlock) blockToMerge);
       } else {
-        mergeResultsBlocks(mergedBlock, convertToAppendableBlock(blockToMerge));
+        mergeResultsBlocks(mergedBlock, (SelectionResultsBlock) blockToMerge);
       }
       numBlocksMerged++;
 
@@ -297,9 +301,9 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   }
 
   @Override
-  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock newBlock) {
+  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
     DataSchema mergedDataSchema = mergedBlock.getDataSchema();
-    DataSchema dataSchemaToMerge = newBlock.getDataSchema();
+    DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
       String errorMessage =
@@ -313,16 +317,16 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     }
 
     PriorityQueue<Object[]> mergedRows = mergedBlock.getRowsAsPriorityQueue();
-    Collection<Object[]> rowsToMerge = newBlock.getRows();
+    Collection<Object[]> rowsToMerge = blockToMerge.getRows();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
   }
 
   @Override
-  protected SelectionResultsBlock convertToMergeableBlock(BaseResultsBlock block) {
+  protected SelectionResultsBlock convertToMergeableBlock(SelectionResultsBlock resultsBlock) {
     // This may create a copy or return the same instance. Anyway, this operator is the owner of the
     // value now, so it can mutate it.
-    return ((SelectionResultsBlock) block).convertToPriorityQueueBased();
+    return resultsBlock.convertToPriorityQueueBased();
   }
 
   private static class MinMaxValueContext {

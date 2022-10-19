@@ -44,10 +44,10 @@ public class AggregationCombineOperator extends BaseCombineOperator<AggregationR
   }
 
   @Override
-  protected void mergeResultsBlocks(AggregationResultsBlock mergedBlock, AggregationResultsBlock newBlock) {
+  protected void mergeResultsBlocks(AggregationResultsBlock mergedBlock, AggregationResultsBlock blockToMerge) {
     AggregationFunction[] aggregationFunctions = mergedBlock.getAggregationFunctions();
     List<Object> mergedResults = mergedBlock.getResults();
-    List<Object> resultsToMerge = newBlock.getResults();
+    List<Object> resultsToMerge = blockToMerge.getResults();
     assert aggregationFunctions != null && mergedResults != null && resultsToMerge != null;
 
     int numAggregationFunctions = aggregationFunctions.length;

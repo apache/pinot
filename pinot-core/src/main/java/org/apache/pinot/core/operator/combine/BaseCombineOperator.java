@@ -157,23 +157,16 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     int operatorId;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator operator = _operators.get(operatorId);
-      BaseResultsBlock operatorBlock;
+      T resultsBlock;
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
-        operatorBlock = (BaseResultsBlock) operator.nextBlock();
+        resultsBlock = (T) operator.nextBlock();
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
-      }
-
-      T resultsBlock;
-      try {
-        resultsBlock = ((T) operatorBlock);
-      } catch (ClassCastException ex) {
-        resultsBlock = convertToMergeableBlock(operatorBlock);
       }
 
       if (isQuerySatisfied(resultsBlock)) {
@@ -224,9 +217,9 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = convertToMergeableBlock(blockToMerge);
+        mergedBlock = convertToMergeableBlock((T) blockToMerge);
       } else {
-        mergeResultsBlocks(mergedBlock, convertToAppendableBlock(blockToMerge));
+        mergeResultsBlocks(mergedBlock, (T) blockToMerge);
       }
       numBlocksMerged++;
       if (isQuerySatisfied(mergedBlock)) {
@@ -245,49 +238,28 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   }
 
   /**
-   * Can be overridden for early termination.
+   * Can be overridden for early termination. The input results block might not be mergeable.
    */
   protected boolean isQuerySatisfied(T resultsBlock) {
     return false;
   }
 
   /**
-   * Merge an BaseResultsBlock into the main BaseResultsBlock.
-   * <p>NOTE: {@code newBlock} should contain the result for a segment without any exception. The errored segment
+   * Merges a results block into the main mergeable results block.
+   * <p>NOTE: {@code blockToMerge} should contain the result for a segment without any exception. The errored segment
    * result is already handled.
    *
    * @param mergedBlock The block that accumulates previous results. It should be modified to add the information of the
-   *                    other block
-   * @param newBlock the new block that needs to be added into mergedBlock.
+   *                    other block.
+   * @param blockToMerge The new block that needs to be merged into the mergedBlock.
    */
-  protected abstract void mergeResultsBlocks(T mergedBlock, T newBlock);
+  protected abstract void mergeResultsBlocks(T mergedBlock, T blockToMerge);
 
   /**
-   * Converts the given generic BaseResultsBlock into the specific type of BaseResultsBlock that is
-   * supported by this combine operator.
-   *
-   * This operator may return the same object if the runtime type of the given block already matches which what it is
-   * expected.
-   *
-   * The returned object will usually be the one received as first argument of
-   * {@link #mergeResultsBlocks(T, T)}.
+   * Converts the given results block into a mergeable results block if necessary.
    */
-  protected T convertToMergeableBlock(BaseResultsBlock block) {
-    return (T) block;
-  }
-
-  /**
-   * Converts the given generic BaseResultsBlock into the specific type of BaseResultsBlock that is supported by this
-   * operator.
-   *
-   * This operator may return the same object if the runtime type of the given block already matches which what it is
-   * expected.
-   *
-   * The returned object will usually be the one received as second argument of
-   * {@link #mergeResultsBlocks(T, T)}
-   */
-  protected T convertToAppendableBlock(BaseResultsBlock block) {
-    return (T) block;
+  protected T convertToMergeableBlock(T resultsBlock) {
+    return resultsBlock;
   }
 
   @Override

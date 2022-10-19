@@ -54,9 +54,9 @@ public class DistinctCombineOperator extends BaseCombineOperator<DistinctResults
   }
 
   @Override
-  protected void mergeResultsBlocks(DistinctResultsBlock mergedBlock, DistinctResultsBlock newBlock) {
+  protected void mergeResultsBlocks(DistinctResultsBlock mergedBlock, DistinctResultsBlock blockToMerge) {
     DistinctTable mergedDistinctTable = mergedBlock.getDistinctTable();
-    DistinctTable distinctTableToMerge = newBlock.getDistinctTable();
+    DistinctTable distinctTableToMerge = blockToMerge.getDistinctTable();
     assert mergedDistinctTable != null && distinctTableToMerge != null;
 
     // Convert the merged table into a main table if necessary in order to merge other tables

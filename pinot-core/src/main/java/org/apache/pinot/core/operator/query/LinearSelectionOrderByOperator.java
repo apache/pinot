@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,7 +28,6 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -83,14 +83,11 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   protected Comparator<Object[]> _comparator;
 
   /**
-   *
-   * @param expressions order by expressions must be at the head of the list.
-   * @param sortedExpr How many expressions at the head of the expression list are going to be considered sorted by
-   * {@link #fetch(Supplier<ListBuilder>)}
+   * @param expressions Order-by expressions must be at the head of the list.
+   * @param numSortedExpressions Number of expressions in the order-by expressions that are sorted.
    */
   public LinearSelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator,
-      int sortedExpr) {
+      List<ExpressionContext> expressions, TransformOperator transformOperator, int numSortedExpressions) {
     _indexSegment = indexSegment;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _expressions = expressions;
@@ -100,8 +97,8 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     assert _orderByExpressions != null;
     int numOrderByExpressions = _orderByExpressions.size();
 
-    _alreadySorted = expressions.subList(0, sortedExpr);
-    _toSort = expressions.subList(sortedExpr, numOrderByExpressions);
+    _alreadySorted = expressions.subList(0, numSortedExpressions);
+    _toSort = expressions.subList(numSortedExpressions, numOrderByExpressions);
 
     _expressionsMetadata = new TransformResultMetadata[_expressions.size()];
     for (int i = 0; i < _expressionsMetadata.length; i++) {
@@ -112,16 +109,15 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
 
     if (_toSort.isEmpty()) {
-      int expectedSize = Math.min(SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, _numRowsToKeep);
-      _listBuilderSupplier = () -> new TotallySortedListBuilder(expectedSize);
+      _listBuilderSupplier = () -> new TotallySortedListBuilder(_numRowsToKeep);
     } else {
-      int maxSize = Math.min(SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, _numRowsToKeep * 2);
-
-      Comparator<Object[]> sortedComparator = OrderByComparatorFactory.getComparator(_orderByExpressions,
-          _expressionsMetadata, false, _nullHandlingEnabled, 0, sortedExpr);
-      Comparator<Object[]> unsortedComparator = OrderByComparatorFactory.getComparator(_orderByExpressions,
-          _expressionsMetadata, false, _nullHandlingEnabled, sortedExpr, numOrderByExpressions);
-      _listBuilderSupplier = () -> new PartiallySortedListBuilder(maxSize, sortedComparator, unsortedComparator);
+      Comparator<Object[]> sortedComparator =
+          OrderByComparatorFactory.getComparator(_orderByExpressions, _expressionsMetadata, false, _nullHandlingEnabled,
+              0, numSortedExpressions);
+      Comparator<Object[]> unsortedComparator =
+          OrderByComparatorFactory.getComparator(_orderByExpressions, _expressionsMetadata, true, _nullHandlingEnabled,
+              numSortedExpressions, numOrderByExpressions);
+      _listBuilderSupplier = () -> new PartiallySortedListBuilder(_numRowsToKeep, sortedComparator, unsortedComparator);
     }
 
     _comparator =
@@ -136,8 +132,10 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    int numDocsScanned = getNumDocsScanned();
+    long numEntriesScannedPostFilter = (long) numDocsScanned * _transformOperator.getNumColumnsProjected();
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    return new ExecutionStatistics(getNumDocsScanned(), numEntriesScannedInFilter, getNumEntriesScannedPostFilter(),
+    return new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         numTotalDocs);
   }
 
@@ -167,8 +165,6 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
       return row;
     };
   }
-
-  protected abstract long getNumEntriesScannedPostFilter();
 
   protected abstract int getNumDocsScanned();
 
@@ -235,9 +231,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
       list = new ArrayList<>(list.subList(0, _numRowsToKeep));
     }
 
-    SelectionResultsBlock resultsBlock = new SelectionResultsBlock(dataSchema, list, _comparator);
-
-    return resultsBlock;
+    return new SelectionResultsBlock(dataSchema, list, _comparator);
   }
 
   protected DataSchema createDataSchema() {
@@ -264,39 +258,29 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
    * call to {@link #build()}.
    *
    * Rows must be inserted in ascending order accordingly to the partial order specified by a comparator.
-   * This comparator will define <i>partitions</i> of rows. All the rows in the same partition same are considered equal
+   * This comparator will define <i>partitions</i> of rows. All the rows in the same partition are considered equal
    * by that comparator.
    *
    * When calling {@link #add(Object[])} with a row that doesn't belong to the current partition, the previous partition
    * is <em>closed</em> and a new one is started.
-   *
-   * The method {@link #sortedSize()} returns the number of elements stored in all closed partitions.
    */
   protected interface ListBuilder {
 
     /**
      * Adds the given row to this object. The new column must be equal or higher than previous inserted elements
-     * according to the partition comparator.
+     * according to the partition comparator. No more rows should be added once enough rows have been collected.
      *
      * @param row The row to add. The values of the already sorted columns must be equal or higher than the last added
      *           row, if any.
-     * @return true if and only if the previous partition was closed.
+     * @return true if and only if enough rows have been collected
      */
     boolean add(Object[] row);
 
     /**
-     * Builds the sorted list. The current partition will be <em>closed</em>.
-     *
-     * Once this method is called, the builder should not be used. There is no guaranteed on whether
-     * {@link #sortedSize()} is updated or not.
+     * Builds the sorted list. The current partition will be <em>closed</em>. Once this method is called, the builder
+     * should not be used.
      */
     List<Object[]> build();
-
-    /**
-     * How many elements are actually sorted. This number is lower or equal to the number of elements that has been
-     * added.
-     */
-    int sortedSize();
   }
 
   /**
@@ -308,27 +292,25 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
    *
    * This implementation is just a wrapper over an ArrayList and therefore the average costs of its methods is constant.
    */
-  protected static class TotallySortedListBuilder implements ListBuilder {
+  @VisibleForTesting
+  static class TotallySortedListBuilder implements ListBuilder {
     private final ArrayList<Object[]> _list;
+    private final int _maxNumRows;
 
-    public TotallySortedListBuilder(int expectedSize) {
-      _list = new ArrayList<>(expectedSize);
+    public TotallySortedListBuilder(int maxNumRows) {
+      _maxNumRows = maxNumRows;
+      _list = new ArrayList<>(Integer.min(maxNumRows, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     }
 
     @Override
     public boolean add(Object[] row) {
       _list.add(row);
-      return true;
+      return _list.size() == _maxNumRows;
     }
 
     @Override
     public List<Object[]> build() {
       return _list;
-    }
-
-    @Override
-    public int sortedSize() {
-      return _list.size();
     }
   }
 
@@ -351,33 +333,35 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
    * As usual, elements are sorted by partition and there is no order guarantee inside each partition. The second
    * comparator is only used to keep the lower elements in the last partition.
    */
-  private static class PartiallySortedListBuilder implements ListBuilder {
+  @VisibleForTesting
+  static class PartiallySortedListBuilder implements ListBuilder {
     /**
      * A list with all the elements that have been already sorted.
      */
     private final ArrayList<Object[]> _sorted;
     /**
-     * This attribute is used to store the last partition when the builder already contains {@link #_maxSize} elements.
+     * This attribute is used to store the last partition when the builder already contains {@link #_maxNumRows} rows.
      */
-    private PriorityQueue<Object[]> _lastPartitionQueue = null;
+    private PriorityQueue<Object[]> _lastPartitionQueue;
     /**
      * The comparator that defines the partitions and the one that impose in which order add has to be called.
      */
     private final Comparator<Object[]> _partitionComparator;
     /**
-     * The comparator that sorts different rows on each partition.
+     * The comparator that sorts different rows on each partition, which sorts rows in reverse order to the one
+     * specified in the query.
      */
     private final Comparator<Object[]> _unsortedComparator;
-    @Nullable
-    private Object[] _lastPartitionRow;
-    private final int _maxSize;
-    private int _alreadySorted;
 
-    public PartiallySortedListBuilder(int maxSize, Comparator<Object[]> partitionComparator,
+    private final int _maxNumRows;
+
+    private Object[] _lastPartitionRow;
+    private int _numSortedRows;
+
+    public PartiallySortedListBuilder(int maxNumRows, Comparator<Object[]> partitionComparator,
         Comparator<Object[]> unsortedComparator) {
-      Preconditions.checkArgument(maxSize > 0, "Max size must be greater than 0");
-      _maxSize = maxSize;
-      _sorted = new ArrayList<>(maxSize);
+      _maxNumRows = maxNumRows;
+      _sorted = new ArrayList<>(Integer.min(maxNumRows, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
       _partitionComparator = partitionComparator;
       _unsortedComparator = unsortedComparator;
     }
@@ -396,57 +380,47 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
       }
 
       boolean newPartition = cmp > 0;
-      if (_sorted.size() < _maxSize) { // we don't have _maxSize elements yet
+      if (_sorted.size() < _maxNumRows) {
+        // we don't have enough rows yet
         if (newPartition) {
           _lastPartitionRow = row;
-          _alreadySorted = _sorted.size();
+          _numSortedRows = _sorted.size();
         }
         // just add the new row to the result list
         _sorted.add(row);
-        return newPartition;
+        return false;
       }
-      // at least _maxSize have been added
+
+      // enough rows have been collected
+      assert _sorted.size() == _maxNumRows;
       if (newPartition) { // and the new element belongs to a new partition, so we can just ignore it
         return true;
       }
       // new element doesn't belong to a new partition, so we may need to add it
-      if (_lastPartitionQueue == null) { // we have exactly _maxSize elements, and the new belongs to the last partition
+      if (_lastPartitionQueue == null) { // we have exactly _numRows rows, and the new belongs to the last partition
         // we need to prepare the priority queue
-        buildPriorityQueue();
+        int numRowsInPriorityQueue = _maxNumRows - _numSortedRows;
+        _lastPartitionQueue = new PriorityQueue<>(numRowsInPriorityQueue, _unsortedComparator);
+        _lastPartitionQueue.addAll(_sorted.subList(_numSortedRows, _maxNumRows));
       }
       // add the new element if it is lower than the greatest element stored in the partition
+      if (_unsortedComparator.compare(row, _lastPartitionQueue.peek()) > 0) {
+        _lastPartitionQueue.poll();
+        _lastPartitionQueue.offer(row);
+      }
       return false;
     }
 
-    private void buildPriorityQueue() {
-      int maxPriorityQueueValues = _maxSize - _alreadySorted;
-      _lastPartitionQueue = new PriorityQueue<>(maxPriorityQueueValues, _unsortedComparator.reversed());
-      _lastPartitionQueue.addAll(_sorted.subList(_alreadySorted, _sorted.size()));
-    }
-
-    /**
-     * Sorts the rows and returns the sorted list.
-     *
-     * This object should not be used once this method is called.
-     *
-     * @return the list of all added rows, sorted by {@link #_partitionComparator} and then by
-     * {@link #_unsortedComparator}
-     */
     @Override
     public List<Object[]> build() {
       if (_lastPartitionQueue != null) {
-        assert _lastPartitionQueue.size() == _sorted.size() - _alreadySorted;
+        assert _lastPartitionQueue.size() == _maxNumRows - _numSortedRows;
         Iterator<Object[]> lastPartitionIt = _lastPartitionQueue.iterator();
-        for (int i = _alreadySorted; i < _sorted.size(); i++) {
+        for (int i = _numSortedRows; i < _maxNumRows; i++) {
           _sorted.set(i, lastPartitionIt.next());
         }
       }
       return _sorted;
-    }
-
-    @Override
-    public int sortedSize() {
-      return _alreadySorted;
     }
   }
 }

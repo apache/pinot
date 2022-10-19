@@ -101,8 +101,11 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
 
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
+    Comparator<Object[]> comparator =
+        OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByExpressionMetadata, true,
+            _nullHandlingEnabled);
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        getComparator(true));
+        comparator);
   }
 
   @Override
@@ -115,11 +118,6 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       }
     }
     return stringBuilder.append(')').toString();
-  }
-
-  public Comparator<Object[]> getComparator(boolean reverse) {
-    return OrderByComparatorFactory.getComparator(
-        _orderByExpressions, _orderByExpressionMetadata, reverse, _nullHandlingEnabled);
   }
 
   @Override

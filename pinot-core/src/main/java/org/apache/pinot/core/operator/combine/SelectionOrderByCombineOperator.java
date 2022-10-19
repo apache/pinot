@@ -89,9 +89,9 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator<Selecti
   }
 
   @Override
-  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock newBlock) {
+  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
     DataSchema mergedDataSchema = mergedBlock.getDataSchema();
-    DataSchema dataSchemaToMerge = newBlock.getDataSchema();
+    DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
       String errorMessage =
@@ -105,15 +105,15 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator<Selecti
     }
 
     PriorityQueue<Object[]> mergedRows = mergedBlock.getRowsAsPriorityQueue();
-    Collection<Object[]> rowsToMerge = newBlock.getRows();
+    Collection<Object[]> rowsToMerge = blockToMerge.getRows();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
   }
 
   @Override
-  protected SelectionResultsBlock convertToMergeableBlock(BaseResultsBlock block) {
+  protected SelectionResultsBlock convertToMergeableBlock(SelectionResultsBlock resultsBlock) {
     // This may create a copy or return the same instance. Anyway, this operator is the owner of the
     // value now, so it can mutate it.
-    return ((SelectionResultsBlock) block).convertToPriorityQueueBased();
+    return resultsBlock.convertToPriorityQueueBased();
   }
 }

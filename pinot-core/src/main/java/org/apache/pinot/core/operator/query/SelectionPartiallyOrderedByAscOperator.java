@@ -39,11 +39,10 @@ public class SelectionPartiallyOrderedByAscOperator extends LinearSelectionOrder
   private static final String EXPLAIN_NAME = "SELECT_PARTIAL_ORDER_BY_ASC";
 
   private int _numDocsScanned = 0;
-  private long _numEntriesScannedPostFilter = 0;
 
   public SelectionPartiallyOrderedByAscOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator, int sortedExpr) {
-    super(indexSegment, queryContext, expressions, transformOperator, sortedExpr);
+      List<ExpressionContext> expressions, TransformOperator transformOperator, int numSortedExpressions) {
+    super(indexSegment, queryContext, expressions, transformOperator, numSortedExpressions);
     Preconditions.checkArgument(queryContext.getOrderByExpressions().stream()
             .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
             .findFirst()
@@ -56,38 +55,24 @@ public class SelectionPartiallyOrderedByAscOperator extends LinearSelectionOrder
   protected List<Object[]> fetch(Supplier<ListBuilder> listBuilderSupplier) {
     int numExpressions = _expressions.size();
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
-
     ListBuilder listBuilder = listBuilderSupplier.get();
     TransformBlock transformBlock;
-    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
-    try {
-      while ((transformBlock = _transformOperator.nextBlock()) != null) {
-        IntFunction<Object[]> rowFetcher = fetchBlock(transformBlock, blockValSets);
-        int numDocsFetched = transformBlock.getNumDocs();
-        _numDocsScanned += numDocsFetched;
-        for (int i = 0; i < numDocsFetched; i++) {
-          boolean newPartition = listBuilder.add(rowFetcher.apply(i));
-          if (newPartition && listBuilder.sortedSize() >= _numRowsToKeep) {
-            // We changed to a new partition and we have more values than required.
-            // Therefore, we can stop the execution here.
-            return listBuilder.build();
-          }
+    while ((transformBlock = _transformOperator.nextBlock()) != null) {
+      IntFunction<Object[]> rowFetcher = fetchBlock(transformBlock, blockValSets);
+      int numDocsFetched = transformBlock.getNumDocs();
+      _numDocsScanned += numDocsFetched;
+      for (int i = 0; i < numDocsFetched; i++) {
+        if (listBuilder.add(rowFetcher.apply(i))) {
+          return listBuilder.build();
         }
       }
-      return listBuilder.build();
-    } finally {
-      _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
     }
+    return listBuilder.build();
   }
 
   @Override
   public int getNumDocsScanned() {
     return _numDocsScanned;
-  }
-
-  @Override
-  public long getNumEntriesScannedPostFilter() {
-    return _numEntriesScannedPostFilter;
   }
 
   @Override

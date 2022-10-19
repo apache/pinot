@@ -30,6 +30,8 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
+import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByAscOperator;
+import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -260,6 +262,162 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertEquals(lastRow.length, 4);
     assertEquals(((Integer) lastRow[columnIndexMap.get("column6")]).intValue(), 6043515);
     assertEquals(((Integer) lastRow[columnIndexMap.get("column1")]).intValue(), 462769197);
+  }
+
+  @Test
+  public void testSelectionOrderBySortedColumn() {
+    // Test query order by single sorted column in ascending order
+    String orderBy = " ORDER BY column5";
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(SELECTION_QUERY + orderBy);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    assertEquals(executionStatistics.getNumDocsScanned(), 10L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    // 10 * (3 columns)
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30L);
+    assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    DataSchema dataSchema = resultsBlock.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column1", "column11"});
+    assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    PriorityQueue<Object[]> selectionResult = resultsBlock.convertToPriorityQueueBased().getRowsAsPriorityQueue();
+    assertEquals(selectionResult.size(), 10);
+    Object[] lastRow = selectionResult.peek();
+    assertEquals(lastRow.length, 3);
+    assertEquals(lastRow[0], "gFuH");
+
+    // Test query order by single sorted column in descending order
+    orderBy = " ORDER BY column5 DESC";
+    selectionOrderByOperator = getOperator(SELECTION_QUERY + orderBy);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation);
+    resultsBlock = selectionOrderByOperator.nextBlock();
+    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    // 30000 * (3 columns)
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 90000L);
+    assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    dataSchema = resultsBlock.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column1", "column11"});
+    assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    selectionResult = resultsBlock.convertToPriorityQueueBased().getRowsAsPriorityQueue();
+    assertEquals(selectionResult.size(), 10);
+    lastRow = selectionResult.peek();
+    assertEquals(lastRow.length, 3);
+    assertEquals(lastRow[0], "gFuH");
+
+    // Test query order by all sorted columns in ascending order
+    String query = "SELECT column5, daysSinceEpoch FROM testTable ORDER BY column5, daysSinceEpoch";
+    selectionOrderByOperator = getOperator(query);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
+    resultsBlock = selectionOrderByOperator.nextBlock();
+    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    assertEquals(executionStatistics.getNumDocsScanned(), 10L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    // 10 * (2 columns)
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 20L);
+    assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    dataSchema = resultsBlock.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "daysSinceEpoch"});
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
+    selectionResult = resultsBlock.convertToPriorityQueueBased().getRowsAsPriorityQueue();
+    assertEquals(selectionResult.size(), 10);
+    lastRow = selectionResult.peek();
+    assertEquals(lastRow.length, 2);
+    assertEquals(lastRow[0], "gFuH");
+    assertEquals(lastRow[1], 126164076);
+
+    // Test query order by all sorted columns in descending order
+    query = "SELECT column5 FROM testTable ORDER BY column5 DESC, daysSinceEpoch DESC";
+    selectionOrderByOperator = getOperator(query);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation);
+    resultsBlock = selectionOrderByOperator.nextBlock();
+    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    // 30000 * (2 columns)
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 60000L);
+    assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    dataSchema = resultsBlock.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "daysSinceEpoch"});
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
+    selectionResult = resultsBlock.convertToPriorityQueueBased().getRowsAsPriorityQueue();
+    assertEquals(selectionResult.size(), 10);
+    lastRow = selectionResult.peek();
+    assertEquals(lastRow.length, 2);
+    assertEquals(lastRow[0], "gFuH");
+    assertEquals(lastRow[1], 167572854);
+
+    // Test query order by one sorted column in ascending order, the other sorted column in descending order
+    query = "SELECT daysSinceEpoch FROM testTable ORDER BY column5, daysSinceEpoch DESC";
+    selectionOrderByOperator = getOperator(query);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
+    resultsBlock = selectionOrderByOperator.nextBlock();
+    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    // 30000 * (2 columns)
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 60000L);
+    assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    dataSchema = resultsBlock.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "daysSinceEpoch"});
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
+    selectionResult = resultsBlock.convertToPriorityQueueBased().getRowsAsPriorityQueue();
+    assertEquals(selectionResult.size(), 10);
+    lastRow = selectionResult.peek();
+    assertEquals(lastRow.length, 2);
+    assertEquals(lastRow[0], "gFuH");
+    assertEquals(lastRow[1], 167572854);
+
+    // Test query order by one sorted column in ascending order, and some unsorted columns
+    query = "SELECT column1 FROM testTable ORDER BY column5, column6, column1";
+    selectionOrderByOperator = getOperator(query);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
+    resultsBlock = selectionOrderByOperator.nextBlock();
+    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    // 30000 * (3 columns)
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 90000L);
+    assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    dataSchema = resultsBlock.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column6", "column1"});
+    assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT});
+    selectionResult = resultsBlock.convertToPriorityQueueBased().getRowsAsPriorityQueue();
+    assertEquals(selectionResult.size(), 10);
+    lastRow = selectionResult.peek();
+    assertEquals(lastRow.length, 3);
+    assertEquals(lastRow[0], "gFuH");
+    // Unsorted column values should be the same as ordering by their own
+    assertEquals(lastRow[1], 6043515);
+    assertEquals(lastRow[2], 10542595);
+
+    // Test query order by one sorted column in descending order, and some unsorted columns
+    query = "SELECT column6 FROM testTable ORDER BY column5 DESC, column6, column1";
+    selectionOrderByOperator = getOperator(query);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation);
+    resultsBlock = selectionOrderByOperator.nextBlock();
+    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
+    assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    // 30000 * (3 columns)
+    assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 90000L);
+    assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
+    dataSchema = resultsBlock.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"column5", "column6", "column1"});
+    assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT});
+    selectionResult = resultsBlock.convertToPriorityQueueBased().getRowsAsPriorityQueue();
+    assertEquals(selectionResult.size(), 10);
+    lastRow = selectionResult.peek();
+    assertEquals(lastRow.length, 3);
+    assertEquals(lastRow[0], "gFuH");
+    // Unsorted column values should be the same as ordering by their own
+    assertEquals(lastRow[1], 6043515);
+    assertEquals(lastRow[2], 10542595);
   }
 
   @Test

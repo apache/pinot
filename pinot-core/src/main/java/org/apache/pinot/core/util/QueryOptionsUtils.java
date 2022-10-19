@@ -101,7 +101,8 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT));
   }
 
+  @Nullable
   public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
-    return queryOptions.getOrDefault(QueryOptionKey.ORDER_BY_ALGORITHM, null);
+    return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
   }
 }

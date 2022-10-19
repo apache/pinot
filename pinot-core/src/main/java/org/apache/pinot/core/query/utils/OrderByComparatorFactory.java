@@ -34,27 +34,13 @@ import org.apache.pinot.spi.utils.ByteArray;
  * A utility class used to create comparators that should be used by operators that implements order by semantics.
  */
 public class OrderByComparatorFactory {
-
   private OrderByComparatorFactory() {
   }
 
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
       TransformResultMetadata[] orderByExpressionMetadata, boolean reverse, boolean nullHandlingEnabled) {
-    return getComparator(orderByExpressions, orderByExpressionMetadata, reverse, nullHandlingEnabled,
-        0, orderByExpressions.size());
-  }
-
-  public static boolean hasMVSelectionOrderBy(TransformResultMetadata[] orderByExpressionMetadata, int from, int to) {
-    Preconditions.checkArgument(to <= orderByExpressionMetadata.length,
-        "Trying to access %sth position of orderByExpressionMetadata with size %s",
-        to, orderByExpressionMetadata.length);
-    Preconditions.checkArgument(from < to, "FROM (%s) must be lower than TO (%s)", from, to);
-    for (int i = from; i < to; i++) {
-      if (!orderByExpressionMetadata[i].isSingleValue()) {
-        return true;
-      }
-    }
-    return false;
+    return getComparator(orderByExpressions, orderByExpressionMetadata, reverse, nullHandlingEnabled, 0,
+        orderByExpressions.size());
   }
 
   /**
@@ -62,14 +48,13 @@ public class OrderByComparatorFactory {
    * {@link OrderByExpressionContext#isAsc()}. Otherwise, it will be in the opposite direction.
    */
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
-      TransformResultMetadata[] orderByExpressionMetadata, boolean reverse, boolean nullHandlingEnabled,
-      int from, int to) {
+      TransformResultMetadata[] orderByExpressionMetadata, boolean reverse, boolean nullHandlingEnabled, int from,
+      int to) {
     Preconditions.checkArgument(to <= orderByExpressions.size(),
-        "Trying to access %sth position of orderByExpressions with size %s",
-        to, orderByExpressions.size());
+        "Trying to access %sth position of orderByExpressions with size %s", to, orderByExpressions.size());
     Preconditions.checkArgument(to <= orderByExpressionMetadata.length,
-        "Trying to access %sth position of orderByExpressionMetadata with size %s",
-        to, orderByExpressionMetadata.length);
+        "Trying to access %sth position of orderByExpressionMetadata with size %s", to,
+        orderByExpressionMetadata.length);
     Preconditions.checkArgument(from < to, "FROM (%s) must be lower than TO (%s)", from, to);
 
     // Compare all single-value columns

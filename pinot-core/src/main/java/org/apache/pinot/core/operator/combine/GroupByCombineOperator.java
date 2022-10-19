@@ -272,6 +272,6 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
   }
 
   @Override
-  protected void mergeResultsBlocks(GroupByResultsBlock mergedBlock, GroupByResultsBlock newBlock) {
+  protected void mergeResultsBlocks(GroupByResultsBlock mergedBlock, GroupByResultsBlock blockToMerge) {
   }
 }

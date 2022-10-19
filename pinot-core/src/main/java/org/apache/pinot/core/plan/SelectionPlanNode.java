@@ -20,7 +20,6 @@ package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -62,6 +61,7 @@ public class SelectionPlanNode implements PlanNode {
       TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions, 0).run();
       return new EmptySelectionOperator(_indexSegment, expressions, transformOperator);
     }
+
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     if (orderByExpressions == null) {
       // Selection only
@@ -89,8 +89,8 @@ public class SelectionPlanNode implements PlanNode {
         }
         TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
         TransformOperator transformOperator = planNode.run();
-        return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions,
-            transformOperator, sortedColumnsPrefixSize);
+        return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions, transformOperator,
+            sortedColumnsPrefixSize);
       } else {
         TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
         TransformOperator transformOperator = planNode.run();
@@ -173,36 +173,15 @@ public class SelectionPlanNode implements PlanNode {
   }
 
   public enum OrderByAlgorithm {
-    NAIVE("naive");
-
-    /**
-     * The public name of the algorithm. This name can be used by users to specify the algorithm to use. Therefore any
-     * change here must be backward compatible.
-     *
-     * @see #findByPublicName(String)
-     */
-    private final String _publicName;
-
-    OrderByAlgorithm(String publicName) {
-      _publicName = publicName;
-    }
-
-    @Nullable
-    public static OrderByAlgorithm findByPublicName(@Nullable String publicName) {
-      if (publicName == null || publicName.equals("null") || publicName.isEmpty()) {
-        return null;
-      }
-      for (OrderByAlgorithm value : OrderByAlgorithm.values()) {
-        if (value._publicName.toLowerCase(Locale.US).equals(publicName)) {
-          return value;
-        }
-      }
-      throw new IllegalArgumentException("Order by algorithm " + publicName + " is not supported");
-    }
+    NAIVE;
 
     @Nullable
     public static OrderByAlgorithm fromQueryContext(QueryContext queryContext) {
-      return OrderByAlgorithm.findByPublicName(QueryOptionsUtils.getOrderByAlgorithm(queryContext.getQueryOptions()));
+      String orderByAlgorithm = QueryOptionsUtils.getOrderByAlgorithm(queryContext.getQueryOptions());
+      if (orderByAlgorithm == null) {
+        return null;
+      }
+      return OrderByAlgorithm.valueOf(orderByAlgorithm.toUpperCase());
     }
   }
 }
