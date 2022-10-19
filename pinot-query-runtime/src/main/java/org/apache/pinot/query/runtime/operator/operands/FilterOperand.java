@@ -125,8 +125,7 @@ public abstract class FilterOperand extends TransformOperand {
 
     @Override
     public Boolean apply(Object[] row) {
-      return row[_inputRef.getIndex()] instanceof Integer ? (Integer) row[_inputRef.getIndex()] > 0
-          : (Boolean) row[_inputRef.getIndex()];
+      return (boolean) row[_inputRef.getIndex()];
     }
   }
 
