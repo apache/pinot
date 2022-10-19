@@ -58,7 +58,7 @@ public interface MailboxService<T> {
    * @param mailboxId mailbox identifier.
    * @return a receiving mailbox.
    */
-  ReceivingMailbox<T> getReceivingMailbox(String mailboxId);
+  ReceivingMailbox<T> getReceivingMailbox(MailboxIdentifier mailboxId);
 
   /**
    * Look up a sending mailbox by {@link MailboxIdentifier}.
@@ -66,5 +66,5 @@ public interface MailboxService<T> {
    * @param mailboxId mailbox identifier.
    * @return a sending mailbox.
    */
-  SendingMailbox<T> getSendingMailbox(String mailboxId);
+  SendingMailbox<T> getSendingMailbox(MailboxIdentifier mailboxId);
 }

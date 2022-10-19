@@ -54,4 +54,11 @@ public interface MailboxIdentifier {
    * @return receiver port
    */
   int getToPort();
+
+  /**
+   * Checks whether sender and receiver are in the same JVM.
+   *
+   * @return true if sender and receiver are in the same JVM.
+   */
+  boolean isLocal();
 }

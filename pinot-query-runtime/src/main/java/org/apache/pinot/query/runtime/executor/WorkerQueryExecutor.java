@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.executor;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.util.trace.TraceRunnable;
@@ -45,12 +44,12 @@ public class WorkerQueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerQueryExecutor.class);
   private PinotConfiguration _config;
   private ServerMetrics _serverMetrics;
-  private MailboxService<Mailbox.MailboxContent> _mailboxService;
+  private MailboxService<TransferableBlock> _mailboxService;
   private String _hostName;
   private int _port;
 
   public void init(PinotConfiguration config, ServerMetrics serverMetrics,
-      MailboxService<Mailbox.MailboxContent> mailboxService, String hostName, int port) {
+      MailboxService<TransferableBlock> mailboxService, String hostName, int port) {
     _config = config;
     _serverMetrics = serverMetrics;
     _mailboxService = mailboxService;

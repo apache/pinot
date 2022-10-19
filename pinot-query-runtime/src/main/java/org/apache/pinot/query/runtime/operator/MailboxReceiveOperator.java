@@ -19,20 +19,16 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.datablock.BaseDataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
@@ -52,7 +48,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
 
-  private final MailboxService<Mailbox.MailboxContent> _mailboxService;
+  private final MailboxService<TransferableBlock> _mailboxService;
   private final RelDistribution.Type _exchangeType;
   private final KeySelector<Object[], Object[]> _keySelector;
   private final List<ServerInstance> _sendingStageInstances;
@@ -64,7 +60,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private final long _timeout;
   private TransferableBlock _upstreamErrorBlock;
 
-  public MailboxReceiveOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
+  public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService, DataSchema dataSchema,
       List<ServerInstance> sendingStageInstances, RelDistribution.Type exchangeType,
       KeySelector<Object[], Object[]> keySelector, String hostName, int port, long jobId, int stageId) {
     _dataSchema = dataSchema;
@@ -123,26 +119,16 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
       hasOpenedMailbox = false;
       for (ServerInstance sendingInstance : _sendingStageInstances) {
         try {
-          ReceivingMailbox<Mailbox.MailboxContent> receivingMailbox =
+          ReceivingMailbox<TransferableBlock> receivingMailbox =
               _mailboxService.getReceivingMailbox(toMailboxId(sendingInstance));
           // TODO this is not threadsafe.
           // make sure only one thread is checking receiving mailbox and calling receive() then close()
           if (!receivingMailbox.isClosed()) {
             hasOpenedMailbox = true;
-            Mailbox.MailboxContent mailboxContent = receivingMailbox.receive();
-            if (mailboxContent != null) {
-              ByteBuffer byteBuffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
-              if (byteBuffer.hasRemaining()) {
-                BaseDataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
-                if (dataBlock instanceof MetadataBlock && !dataBlock.getExceptions().isEmpty()) {
-                  _upstreamErrorBlock = TransferableBlockUtils.getErrorTransferableBlock(dataBlock.getExceptions());
-                  return _upstreamErrorBlock;
-                }
-                if (dataBlock.getNumberOfRows() > 0) {
-                  // here we only return data table block when it is not empty.
-                  return new TransferableBlock(dataBlock);
-                }
-              }
+            TransferableBlock transferableBlock = receivingMailbox.receive();
+            if (transferableBlock != null && !transferableBlock.isEndOfStreamBlock()) {
+              // Return the block only if it has some valid data
+              return transferableBlock;
             }
           }
         } catch (Exception e) {
@@ -162,8 +148,8 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     return _exchangeType;
   }
 
-  private String toMailboxId(ServerInstance serverInstance) {
+  private MailboxIdentifier toMailboxId(ServerInstance serverInstance) {
     return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), serverInstance.getHostname(),
-        serverInstance.getQueryMailboxPort(), _hostName, _port).toString();
+        serverInstance.getQueryMailboxPort(), _hostName, _port);
   }
 }
