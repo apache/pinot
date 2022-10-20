@@ -771,16 +771,19 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Interval timeInterval =
             new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
         boolean isValidTimeInterval = TimeUtils.isValidTimeInterval(timeInterval);
-        if (!_config.isSkipTimeValueCheck()) {
-          Preconditions.checkState(isValidTimeInterval,
-              "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
-              timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumnName,
-              TimeUtils.VALID_TIME_INTERVAL);
-          setSegmentTimeInterval(properties, startTime, endTime, timeUnit);
-        } else if (isValidTimeInterval) {
+        if (isValidTimeInterval) {
           setSegmentTimeInterval(properties, startTime, endTime, timeUnit);
         } else {
-          // Do not set value
+          if (_config.isSkipTimeValueCheck()) {
+            LOGGER.warn("Invalid segment start/end time: {} (in millis: {}/{}) for time column: {}, must be "
+                    + "between: {}", timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(),
+                timeColumnName, TimeUtils.VALID_TIME_INTERVAL);
+          } else {
+            throw new IllegalStateException(String.format(
+                "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
+                timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumnName,
+                TimeUtils.VALID_TIME_INTERVAL));
+          }
         }
       }
     }
