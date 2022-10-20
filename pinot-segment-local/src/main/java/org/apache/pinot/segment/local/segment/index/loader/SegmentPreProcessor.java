@@ -104,8 +104,14 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Update single-column indices, like inverted index, json index etc.
       IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        IndexHandler handler = IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig);
+        IndexHandler handler =
+            IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig, _schema);
         handler.updateIndices(segmentWriter, indexCreatorProvider);
+        if (type == ColumnIndexType.FORWARD_INDEX) {
+          // ForwardIndexHandler may modify the segment metadata.
+          _segmentMetadata = new SegmentMetadataImpl(indexDir);
+          _segmentDirectory.reloadMetadata();
+        }
       }
 
       // Create/modify/remove star-trees if required.
@@ -149,7 +155,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        if (IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig)
+        if (IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig, _schema)
             .needUpdateIndices(segmentReader)) {
           LOGGER.info("Found index type: {} needs updates", type);
           return true;
