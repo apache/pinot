@@ -2247,6 +2247,10 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
   }
 
+  public boolean removeSegmentZKMetadata(String tableNameWithType, String segmentName) {
+    return ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
+  }
+
   /**
    * Delete the table on servers by sending table deletion message
    */
