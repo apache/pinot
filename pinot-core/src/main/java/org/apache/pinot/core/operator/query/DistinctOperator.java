@@ -72,6 +72,7 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
     return Collections.singletonList(_transformOperator);
   }
 
+  @Override
   public IndexSegment getIndexSegment() {
     return _indexSegment;
   }

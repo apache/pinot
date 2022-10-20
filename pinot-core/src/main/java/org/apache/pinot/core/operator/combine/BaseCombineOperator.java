@@ -168,6 +168,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
+
       if (isQuerySatisfied(resultsBlock)) {
         // Query is satisfied, skip processing the remaining segments
         _blockingQueue.offer(resultsBlock);
@@ -216,7 +217,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = (T) blockToMerge;
+        mergedBlock = convertToMergeableBlock((T) blockToMerge);
       } else {
         mergeResultsBlocks(mergedBlock, (T) blockToMerge);
       }
@@ -237,18 +238,29 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   }
 
   /**
-   * Can be overridden for early termination.
+   * Can be overridden for early termination. The input results block might not be mergeable.
    */
   protected boolean isQuerySatisfied(T resultsBlock) {
     return false;
   }
 
   /**
-   * Merge an IntermediateResultsBlock into the main IntermediateResultsBlock.
+   * Merges a results block into the main mergeable results block.
    * <p>NOTE: {@code blockToMerge} should contain the result for a segment without any exception. The errored segment
    * result is already handled.
+   *
+   * @param mergedBlock The block that accumulates previous results. It should be modified to add the information of the
+   *                    other block.
+   * @param blockToMerge The new block that needs to be merged into the mergedBlock.
    */
   protected abstract void mergeResultsBlocks(T mergedBlock, T blockToMerge);
+
+  /**
+   * Converts the given results block into a mergeable results block if necessary.
+   */
+  protected T convertToMergeableBlock(T resultsBlock) {
+    return resultsBlock;
+  }
 
   @Override
   public List<Operator> getChildOperators() {
