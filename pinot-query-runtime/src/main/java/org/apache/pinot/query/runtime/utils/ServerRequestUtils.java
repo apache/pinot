@@ -170,7 +170,7 @@ public class ServerRequestUtils {
     for (StageNode child : node.getInputs()) {
       walkStageTree(child, pinotQuery, tableType);
     }
-    if (node instanceof TableScanNode) {
+    if (node instanceof TableScanNode) {      // Scan all columns for tableScanNode
       TableScanNode tableScanNode = (TableScanNode) node;
       DataSource dataSource = new DataSource();
       String tableNameWithType = TableNameBuilder.forType(tableType)
@@ -204,7 +204,7 @@ public class ServerRequestUtils {
         pinotQuery.setOffset(((SortNode) node).getOffset());
       }
     } else if (node instanceof MailboxSendNode) {
-      // TODO: MailboxSendNode should be the root of the leaf stage. but ignore for now since it is handle seperately
+      // TODO: MailboxSendNode should be the root of the leaf stage. but ignore for now since it is handle separately
       // in QueryRunner as a single step sender.
     } else {
       throw new UnsupportedOperationException("Unsupported logical plan node: " + node);
