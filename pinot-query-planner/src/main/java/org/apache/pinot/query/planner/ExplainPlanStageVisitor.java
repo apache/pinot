@@ -44,7 +44,7 @@ import org.apache.pinot.query.planner.stage.ValueNode;
  */
 public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, ExplainPlanStageVisitor.Context> {
 
-  private final QueryPlan _queryPlan;
+  private final Map<Integer, StageMetadata> _stageMetadataMap;
 
   /**
    * Explains the query plan.
@@ -60,7 +60,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
 
     // the root of a query plan always only has a single node
     ServerInstance rootServer = queryPlan.getStageMetadataMap().get(0).getServerInstances().get(0);
-    return explainFrom(queryPlan, queryPlan.getQueryStageMap().get(0), rootServer);
+    return explainFrom(queryPlan.getStageMetadataMap(), queryPlan.getQueryStageMap().get(0), rootServer);
   }
 
   /**
@@ -69,21 +69,21 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
    * at a given point in time (for example, printing the tree that will be executed on a
    * local node right before it is executed).
    *
-   * @param queryPlan the entire query plan, including non-executed portions
+   * @param stageMetadataMap stage metadata of the entire query plan, including non-executed portions
    * @param node the node to begin traversal
    * @param rootServer the server instance that is executing this plan (should execute {@code node})
    *
    * @return a query plan associated with
    */
-  public static String explainFrom(QueryPlan queryPlan, StageNode node, ServerInstance rootServer) {
-    final ExplainPlanStageVisitor visitor = new ExplainPlanStageVisitor(queryPlan);
+  public static String explainFrom(Map<Integer, StageMetadata> stageMetadataMap, StageNode node, ServerInstance rootServer) {
+    final ExplainPlanStageVisitor visitor = new ExplainPlanStageVisitor(stageMetadataMap);
     return node
         .visit(visitor, new Context(rootServer, "", "", new StringBuilder()))
         .toString();
   }
 
-  private ExplainPlanStageVisitor(QueryPlan queryPlan) {
-    _queryPlan = queryPlan;
+  private ExplainPlanStageVisitor(Map<Integer, StageMetadata> stageMetadataMap) {
+    _stageMetadataMap = stageMetadataMap;
   }
 
   private StringBuilder appendInfo(StageNode node, Context context) {
@@ -130,7 +130,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
 
     MailboxSendNode sender = (MailboxSendNode) node.getSender();
     int senderStageId = node.getSenderStageId();
-    StageMetadata metadata = _queryPlan.getStageMetadataMap().get(senderStageId);
+    StageMetadata metadata = _stageMetadataMap.get(senderStageId);
     Map<ServerInstance, Map<String, List<String>>> segments = metadata.getServerInstanceToSegmentsMap();
 
     Iterator<ServerInstance> iterator = metadata.getServerInstances().iterator();
@@ -164,7 +164,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     appendInfo(node, context);
 
     int receiverStageId = node.getReceiverStageId();
-    List<ServerInstance> servers = _queryPlan.getStageMetadataMap().get(receiverStageId).getServerInstances();
+    List<ServerInstance> servers = _stageMetadataMap.get(receiverStageId).getServerInstances();
     context._builder.append("->");
     String receivers = servers.stream()
         .map(s -> s.getHostname() + ':' + s.getPort())
@@ -187,7 +187,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
   public StringBuilder visitTableScan(TableScanNode node, Context context) {
     return appendInfo(node, context)
         .append(' ')
-        .append(_queryPlan.getStageMetadataMap()
+        .append(_stageMetadataMap
             .get(node.getStageId())
             .getServerInstanceToSegmentsMap()
             .get(context._host))

@@ -198,6 +198,7 @@ public class QueryTestSet {
         new Object[]{"SELECT col3 FROM a GROUP BY col3, col1"},
         new Object[]{"SELECT col1 FROM a GROUP BY col3, col1"},
         new Object[]{"SELECT AVG(col3) FROM (SELECT col1, col3 FROM a WHERE col3 > 1 GROUP BY col1, col3)"},
+        new Object[]{"SELECT DISTINCT(col1) FROM a"},
 
         // Test optimized constant literal.
         new Object[]{"SELECT col1 FROM a WHERE col3 > 0 AND col3 < -5"},

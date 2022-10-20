@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.plan;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.planner.ExplainPlanStageVisitor;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.StageNode;
 
@@ -73,4 +74,9 @@ public class DistributedStagePlan {
   public void setStageRoot(StageNode stageRoot) {
     _stageRoot = stageRoot;
   }
+
+  public String explain() {
+    return ExplainPlanStageVisitor.explainFrom(_metadataMap, _stageRoot, _serverInstance);
+  }
+
 }
