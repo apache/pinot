@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -89,9 +90,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Api(tags = Constants.CLUSTER_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
-@Path("/")
-public class TableDebugResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableDebugResource.class);
+@Path("/debug/")
+public class DebugResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DebugResource.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -112,7 +113,7 @@ public class TableDebugResource {
   ControllerConf _controllerConf;
 
   @GET
-  @Path("/debug/tables/{tableName}")
+  @Path("tables/{tableName}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for table.", notes = "Debug information for table.")
   @ApiResponses(value = {
@@ -140,6 +141,22 @@ public class TableDebugResource {
     }
 
     return JsonUtils.objectToPrettyString(tableDebugInfos);
+  }
+
+  @GET
+  @Path("segments/{tableName}/{segmentName}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get debug information for segment.", notes = "Debug information for segment.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Segment not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public TableDebugInfo.SegmentDebugInfo getSegmentDebugInfo(
+      @ApiParam(value = "Name of the table (with type)", required = true) @PathParam("tableName")
+          String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName)
+      throws Exception {
+    return debugSegment(tableNameWithType, segmentName);
   }
 
   /**
@@ -215,6 +232,65 @@ public class TableDebugResource {
 
     return (tableSizeDetails != null) ? new TableDebugInfo.TableSizeSummary(tableSizeDetails._reportedSizeInBytes,
         tableSizeDetails._estimatedSizeInBytes) : new TableDebugInfo.TableSizeSummary(-1, -1);
+  }
+
+  private TableDebugInfo.SegmentDebugInfo debugSegment(String tableNameWithType, String segmentName)
+      throws IOException {
+    IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
+    if (idealState == null) {
+      return null;
+    }
+
+    ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
+    Map<String, String> evStateMap = (externalView != null) ? externalView.getStateMap(segmentName) : null;
+
+    Map<String, String> isServerToStateMap = idealState.getRecord().getMapFields().get(segmentName);
+    Set<String> serversHostingSegment = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
+
+    int serverRequestTimeoutMs = _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000;
+    BiMap<String, String> serverToEndpoints;
+    try {
+      serverToEndpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serversHostingSegment);
+    } catch (InvalidConfigException e) {
+      throw new WebApplicationException(
+          "Caught exception when getting segment debug info for table: " + tableNameWithType);
+    }
+
+    List<String> serverUrls = new ArrayList<>(serverToEndpoints.size());
+    BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();
+    for (String endpoint : endpointsToServers.keySet()) {
+      String segmentDebugInfoURI = String.format("%s/debug/segments/%s/%s", endpoint, tableNameWithType, segmentName);
+      serverUrls.add(segmentDebugInfoURI);
+    }
+
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, serverRequestTimeoutMs);
+
+    Map<String, SegmentServerDebugInfo> serverToSegmentDebugInfo = new HashMap<>();
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      SegmentServerDebugInfo segmentDebugInfo =
+          JsonUtils.stringToObject(streamResponse.getValue(), SegmentServerDebugInfo.class);
+      serverToSegmentDebugInfo.put(streamResponse.getKey(), segmentDebugInfo);
+    }
+
+    Map<String, TableDebugInfo.SegmentState> segmentServerState = new HashMap<>();
+    for (String instanceName : isServerToStateMap.keySet()) {
+      String isState = isServerToStateMap.get(instanceName);
+      String evState = (evStateMap != null) ? evStateMap.get(instanceName) : null;
+      SegmentServerDebugInfo segmentServerDebugInfo = serverToSegmentDebugInfo.get(instanceName);
+
+      if (segmentServerDebugInfo != null) {
+        segmentServerState.put(instanceName,
+            new TableDebugInfo.SegmentState(isState, evState, segmentServerDebugInfo.getSegmentSize(),
+                segmentServerDebugInfo.getConsumerInfo(), segmentServerDebugInfo.getErrorInfo()));
+      } else {
+        segmentServerState.put(instanceName, new TableDebugInfo.SegmentState(isState, evState, null, null, null));
+      }
+    }
+
+    return new TableDebugInfo.SegmentDebugInfo(segmentName, segmentServerState);
   }
 
   /**
