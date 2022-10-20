@@ -152,10 +152,11 @@ public class DebugResource {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public TableDebugInfo.SegmentDebugInfo getSegmentDebugInfo(
-      @ApiParam(value = "Name of the table (with type)", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Name of the table (with type)", required = true) @PathParam("tableName")
+          String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName)
       throws Exception {
-    return debugSegment(tableName, segmentName);
+    return debugSegment(tableNameWithType, segmentName);
   }
 
   /**

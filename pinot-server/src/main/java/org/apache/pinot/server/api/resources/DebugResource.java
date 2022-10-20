@@ -75,8 +75,8 @@ public class DebugResource {
   @ApiOperation(value = "Get segments debug info for this table",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public List<SegmentServerDebugInfo> getSegmentsDebugInfo(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableNameWithType) {
-
+      @ApiParam(value = "Name of the table (with type)", required = true) @PathParam("tableName")
+          String tableNameWithType) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     return getSegmentServerDebugInfo(tableNameWithType, tableType);
   }
@@ -87,7 +87,8 @@ public class DebugResource {
   @ApiOperation(value = "Get segment debug info",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public SegmentServerDebugInfo getSegmentDebugInfo(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableNameWithType,
+      @ApiParam(value = "Name of the table (with type)", required = true) @PathParam("tableName")
+          String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     TableDataManager tableDataManager =
