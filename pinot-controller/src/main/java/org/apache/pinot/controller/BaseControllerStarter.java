@@ -83,7 +83,6 @@ import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentMa
 import org.apache.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
-import org.apache.pinot.controller.helix.core.relocation.SegmentTierAssigner;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
@@ -152,7 +151,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected RealtimeSegmentValidationManager _realtimeSegmentValidationManager;
   protected BrokerResourceValidationManager _brokerResourceValidationManager;
   protected SegmentRelocator _segmentRelocator;
-  protected SegmentTierAssigner _segmentTierAssigner;
   protected RetentionManager _retentionManager;
   protected SegmentStatusChecker _segmentStatusChecker;
   protected PinotTaskManager _taskManager;
@@ -683,9 +681,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         _executorService, _connectionManager);
     periodicTasks.add(_segmentRelocator);
-    _segmentTierAssigner =
-        new SegmentTierAssigner(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
-    periodicTasks.add(_segmentTierAssigner);
     _minionInstancesCleanupTask =
         new MinionInstancesCleanupTask(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
     periodicTasks.add(_minionInstancesCleanupTask);

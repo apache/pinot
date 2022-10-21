@@ -21,8 +21,10 @@ package org.apache.pinot.controller.helix.core.relocation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -32,9 +34,13 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.InstanceType;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -44,6 +50,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
@@ -114,16 +121,28 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     // Run rebalance asynchronously
     _executorService.submit(() -> {
       try {
+        // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
+        // Table rebalance moves segments to the new ideal servers, which can change for a segment when its target
+        // tier is updated. New servers can put segments onto the right tier when loading the segments. After that,
+        // all segments are put on the right servers. If any segments are not on their target tier, the server local
+        // tier migration is triggered for them, basically asking the hosting servers to reload them.
+        //
+        // We assume segment target tier is not changed between the two actions, so update target tier here as well,
+        // instead of using a separate task.
+        // TODO: can add some sanity checks on the server side when reloading segments to be more defensive, e.g. only
+        //       migrating segment to new tier when the hosting server is in the server pool configured for that tier.
+        updateTargetTier(tableNameWithType);
+
         RebalanceResult rebalance =
             new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager()).rebalance(tableConfig, rebalanceConfig);
         switch (rebalance.getStatus()) {
           case NO_OP:
             LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);
-            tryMigrateSegmentTierLocally(tableNameWithType);
+            migrateToTargetTier(tableNameWithType);
             break;
           case DONE:
             LOGGER.info("Finished relocating segments for table: {}", tableNameWithType);
-            tryMigrateSegmentTierLocally(tableNameWithType);
+            migrateToTargetTier(tableNameWithType);
             break;
           default:
             LOGGER.error("Relocation failed for table: {}", tableNameWithType);
@@ -136,11 +155,31 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   }
 
   /**
-   * Try to migrate segment tiers on their hosting servers locally. Once table is balanced, i.e. segments are on their
-   * ideal servers, we check if any segment needs to move to a new tier on its hosting servers, i.e. doing local tier
+   * Calculate the target tier the segment belongs to and set it in segment ZK metadata as goal state, which can be
+   * checked by servers when loading the segment to put it onto the target storage tier.
+   */
+  private void updateTargetTier(String tableNameWithType) {
+    if (!_enableLocalTierMigration) {
+      LOGGER.debug("Skipping updating target tier for segments of table: {}", tableNameWithType);
+      return;
+    }
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
+    List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
+    List<Tier> sortedTiers = tierCfgs == null ? Collections.emptyList()
+        : TierConfigUtils.getSortedTiers(tierCfgs, _pinotHelixResourceManager.getHelixZkManager());
+    LOGGER.info("Updating target tiers for segments of table: {} with tierConfigs: {}", tableNameWithType, sortedTiers);
+    for (String segmentName : _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, true)) {
+      updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers, _pinotHelixResourceManager);
+    }
+  }
+
+  /**
+   * Migrate segment tiers on their hosting servers locally. Once table is balanced, i.e. segments are on their ideal
+   * servers, we check if any segment needs to move to a new tier on its hosting servers, i.e. doing local tier
    * migration for the segments.
    */
-  private void tryMigrateSegmentTierLocally(String tableNameWithType) {
+  private void migrateToTargetTier(String tableNameWithType) {
     if (!_enableLocalTierMigration) {
       LOGGER.debug("Skipping migrating segments of table: {} to new tiers on hosting servers", tableNameWithType);
       return;
@@ -156,6 +195,46 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     } catch (Exception e) {
       LOGGER.error("Failed to migrate segments of table: {} to new tiers on hosting servers", tableNameWithType, e);
     }
+  }
+
+  @VisibleForTesting
+  static void updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers,
+      PinotHelixResourceManager pinotHelixResourceManager) {
+    ZNRecord segmentMetadataZNRecord =
+        pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
+    if (segmentMetadataZNRecord == null) {
+      LOGGER.debug("No ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
+      return;
+    }
+    Tier targetTier = null;
+    for (Tier tier : sortedTiers) {
+      TierSegmentSelector tierSegmentSelector = tier.getSegmentSelector();
+      if (tierSegmentSelector.selectSegment(tableNameWithType, segmentName)) {
+        targetTier = tier;
+        break;
+      }
+    }
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataZNRecord);
+    String targetTierName = null;
+    if (targetTier == null) {
+      if (segmentZKMetadata.getTier() == null) {
+        LOGGER.debug("Segment: {} of table: {} is already on the default tier", segmentName, tableNameWithType);
+        return;
+      }
+      LOGGER.info("Segment: {} of table: {} is put back on default tier", segmentName, tableNameWithType);
+    } else {
+      targetTierName = targetTier.getName();
+      if (targetTierName.equals(segmentZKMetadata.getTier())) {
+        LOGGER.debug("Segment: {} of table: {} is already on the target tier: {}", segmentName, tableNameWithType,
+            targetTierName);
+        return;
+      }
+      LOGGER.info("Segment: {} of table: {} is put onto new tier: {}", segmentName, tableNameWithType, targetTierName);
+    }
+    // Update the tier in segment ZK metadata and write it back to ZK.
+    segmentZKMetadata.setTier(targetTierName);
+    pinotHelixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata,
+        segmentMetadataZNRecord.getVersion());
   }
 
   @VisibleForTesting

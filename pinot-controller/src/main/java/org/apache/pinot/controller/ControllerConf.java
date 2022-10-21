@@ -187,11 +187,6 @@ public class ControllerConf extends PinotConfiguration {
     public static final String SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION =
         "controller.segmentRelocator.enableLocalTierMigration";
 
-    public static final String SEGMENT_TIER_ASSIGNER_FREQUENCY_PERIOD =
-        "controller.segmentTierAssigner.frequencyPeriod";
-    public static final String SEGMENT_TIER_ASSIGNER_INITIAL_DELAY_IN_SECONDS =
-        "controller.segmentTierAssigner.initialDelayInSeconds";
-
     // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
     // Default value is false.
     public static final String ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT =
@@ -857,17 +852,6 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean enableSegmentRelocatorLocalTierMigration() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION, false);
-  }
-
-  public int getSegmentTierAssignerFrequencyInSeconds() {
-    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_TIER_ASSIGNER_FREQUENCY_PERIOD))
-        .map(period -> (int) convertPeriodToSeconds(period))
-        .orElse(ControllerPeriodicTasksConf.DEFAULT_SEGMENT_TIER_ASSIGNER_FREQUENCY_IN_SECONDS);
-  }
-
-  public long getSegmentTierAssignerInitialDelayInSeconds() {
-    return getProperty(ControllerPeriodicTasksConf.SEGMENT_TIER_ASSIGNER_INITIAL_DELAY_IN_SECONDS,
-        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
   public long getPeriodicTaskInitialDelayInSeconds() {
