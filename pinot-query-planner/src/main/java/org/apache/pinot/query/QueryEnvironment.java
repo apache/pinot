@@ -43,7 +43,7 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.fun.PinotOperatorTable;
 import org.apache.calcite.sql.util.ChainedSqlOperatorTable;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
@@ -91,7 +91,10 @@ public class QueryEnvironment {
         new CalciteConnectionConfigImpl(catalogReaderConfigProperties));
 
     _config = Frameworks.newConfigBuilder().traitDefs()
-        .operatorTable(new ChainedSqlOperatorTable(Arrays.asList(SqlStdOperatorTable.instance(), _catalogReader)))
+        .operatorTable(new ChainedSqlOperatorTable(Arrays.asList(
+            PinotOperatorTable.instance(),
+//            SqlStdOperatorTable.instance(),
+            _catalogReader)))
         .defaultSchema(_rootSchema.plus())
         .sqlToRelConverterConfig(SqlToRelConverter.config()
             .withHintStrategyTable(getHintStrategyTable())
