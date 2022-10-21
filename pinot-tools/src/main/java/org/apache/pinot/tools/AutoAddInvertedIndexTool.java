@@ -71,13 +71,18 @@ public class AutoAddInvertedIndexTool extends AbstractBaseCommand implements Com
   private boolean _help = false;
 
   @Override
-  public String description() {
-    return "Automatically add inverted index to tables based on the settings. Currently only support 'QUERY' strategy";
+  public boolean getHelp() {
+    return _help;
   }
 
   @Override
-  public boolean getHelp() {
-    return _help;
+  public String getName() {
+    return getClass().getSimpleName();
+  }
+
+  @Override
+  public String description() {
+    return "Automatically add inverted index to tables based on the settings. Currently only support 'QUERY' strategy";
   }
 
   @Override

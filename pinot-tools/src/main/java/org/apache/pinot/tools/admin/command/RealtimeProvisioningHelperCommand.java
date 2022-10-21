@@ -350,12 +350,12 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
       throws IOException {
     RealtimeProvisioningHelperCommand rtProvisioningHelper = new RealtimeProvisioningHelperCommand();
     CommandLine cmdLine = new CommandLine(rtProvisioningHelper);
-    cmdLine.parseArgs(args);
-    if (rtProvisioningHelper.getHelp()) {
+    CommandLine.ParseResult result = cmdLine.parseArgs(args);
+    if (result.isUsageHelpRequested() || result.matchedArgs().size() == 0) {
       cmdLine.usage(System.out);
       rtProvisioningHelper.printUsage();
-    } else {
-      rtProvisioningHelper.execute();
+      return;
     }
+    rtProvisioningHelper.execute();
   }
 }

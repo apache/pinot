@@ -148,12 +148,12 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
       throws Exception {
     SegmentDumpTool tool = new SegmentDumpTool();
     CommandLine commandLine = new CommandLine(tool);
-    commandLine.parseArgs(args);
-    if (commandLine.isUsageHelpRequested()) {
+    CommandLine.ParseResult result = commandLine.parseArgs(args);
+    if (commandLine.isUsageHelpRequested() || result.matchedArgs().size() == 0) {
       commandLine.usage(System.out);
-    } else {
-      tool.execute();
+      return;
     }
+    tool.execute();
   }
 
   public String getName() {

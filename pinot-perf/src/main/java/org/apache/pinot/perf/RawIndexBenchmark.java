@@ -302,8 +302,8 @@ public class RawIndexBenchmark {
       throws Exception {
     RawIndexBenchmark benchmark = new RawIndexBenchmark();
     CommandLine commandLine = new CommandLine(benchmark);
-    commandLine.parseArgs(args);
-    if (commandLine.isUsageHelpRequested() || commandLine.parseArgs(args).matchedArgs().size() == 0) {
+    CommandLine.ParseResult result = commandLine.parseArgs(args);
+    if (commandLine.isUsageHelpRequested() || result.matchedArgs().size() == 0) {
       commandLine.usage(System.out);
       return;
     }
