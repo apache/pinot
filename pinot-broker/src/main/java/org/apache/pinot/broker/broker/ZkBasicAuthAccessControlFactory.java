@@ -101,8 +101,9 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
             Optional<ZkBasicAuthPrincipal> principalOpt =
               password2principal.entrySet().stream()
-                .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
-                .map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
+                      .filter(entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
+                              _userCache.getUserPasswordAuthCache()))
+                      .map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
 
             if (!principalOpt.isPresent()) {
                 // no matching token? reject

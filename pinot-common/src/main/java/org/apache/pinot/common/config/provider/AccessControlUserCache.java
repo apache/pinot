@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.common.config.provider;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
@@ -45,6 +48,7 @@ public class AccessControlUserCache {
     private static final Logger LOGGER = LoggerFactory.getLogger(AccessControlUserCache.class);
     private static final String USER_CONFIG_PARENT_PATH = "/CONFIGS/USER";
     private static final String USER_CONFIG_PATH_PREFIX = "/CONFIGS/USER/";
+    private static final int USER_PASSWORD_EXPIRE_TIME = 60 * 60 * 24;
 
     private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
@@ -54,6 +58,8 @@ public class AccessControlUserCache {
     private final Map<String, UserConfig> _userControllerConfigMap = new ConcurrentHashMap<>();
     private final Map<String, UserConfig> _userBrokerConfigMap = new ConcurrentHashMap<>();
     private final Map<String, UserConfig> _userServerConfigMap = new ConcurrentHashMap<>();
+    private Cache<String, String> _userPasswordAuthCache = CacheBuilder.newBuilder()
+            .expireAfterWrite(USER_PASSWORD_EXPIRE_TIME, TimeUnit.SECONDS).build();
 
     public AccessControlUserCache(ZkHelixPropertyStore<ZNRecord> propertyStore) {
         _propertyStore = propertyStore;
@@ -67,6 +73,10 @@ public class AccessControlUserCache {
             }
             addUserConfigs(pathsToAdd);
         }
+    }
+
+    public Cache<String, String> getUserPasswordAuthCache() {
+        return _userPasswordAuthCache;
     }
 
     @Nullable

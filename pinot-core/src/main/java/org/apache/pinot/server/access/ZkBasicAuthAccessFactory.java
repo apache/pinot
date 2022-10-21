@@ -97,7 +97,8 @@ public class ZkBasicAuthAccessFactory implements AccessControlFactory {
             Map<String, ZkBasicAuthPrincipal> password2principal = name2password.keySet().stream()
               .collect(Collectors.toMap(name2password::get, _name2principal::get));
             return password2principal.entrySet().stream()
-                .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
+                .filter(entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
+                        _userCache.getUserPasswordAuthCache()))
                 .map(u -> u.getValue())
                 .filter(Objects::nonNull)
                 .findFirst()
