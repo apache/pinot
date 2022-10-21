@@ -75,7 +75,7 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
     }
     MailboxContent mailboxContent = _contentStreamObserver.poll();
     _totalMsgReceived.incrementAndGet();
-    return fromMailboxContent(mailboxContent);
+    return mailboxContent == null ? null : fromMailboxContent(mailboxContent);
   }
 
   @Override
