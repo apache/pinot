@@ -768,29 +768,50 @@ public class QueryGenerator {
 
     @Override
     public Query generateQuery() {
-      // Generate at most MAX_NUM_AGGREGATION_COLUMNS columns on which to aggregate, map 0 to 'COUNT(*)'.
-      int aggregationColumnCount = RANDOM.nextInt(MAX_NUM_AGGREGATION_COLUMNS + 1);
-      Set<String> aggregationColumnsAndFunctions = new HashSet<>();
-      if (aggregationColumnCount == 0) {
-        aggregationColumnsAndFunctions.add("COUNT(*)");
-      } else {
-        while (aggregationColumnsAndFunctions.size() < aggregationColumnCount) {
-          aggregationColumnsAndFunctions.add(createRandomAggregationFunction());
-        }
-      }
-      // Generate a predicate.
-      PredicateQueryFragment predicate = generatePredicate();
       // Generate at most MAX_NUM_GROUP_BY_COLUMNS columns on which to group.
       int groupColumnCount = Math.min(RANDOM.nextInt(MAX_NUM_GROUP_BY_COLUMNS + 1), _singleValueColumnNames.size());
       Set<String> groupColumns = new HashSet<>();
       while (groupColumns.size() < groupColumnCount) {
         groupColumns.add(pickRandom(_singleValueColumnNames));
       }
+
+      // Generate at most MAX_NUM_AGGREGATION_COLUMNS columns on which to aggregate
+      int aggregationColumnCount = RANDOM.nextInt(MAX_NUM_AGGREGATION_COLUMNS + 1);
+      Set<String> aggregationColumnsAndFunctions = new HashSet<>();
+      boolean isDistinctQuery = false;
+      if (aggregationColumnCount == 0) {
+        // if no aggregation function being randomly generated, pick the group by columns into the select list
+        // this should generate a distinct query using query rewriter.
+        // TODO: noted that we don't support distinct/agg rewrite with only part of the group by columns. change this
+        // test once we support such queries.
+        if (groupColumnCount != 0) {
+          aggregationColumnsAndFunctions.addAll(groupColumns);
+          isDistinctQuery = true;
+        } else {
+          aggregationColumnsAndFunctions.add("COUNT(*)");
+        }
+      } else {
+        while (aggregationColumnsAndFunctions.size() < aggregationColumnCount) {
+          aggregationColumnsAndFunctions.add(createRandomAggregationFunction());
+        }
+      }
+
+      // Generate a predicate.
+      PredicateQueryFragment predicate = generatePredicate();
+
       //Generate a HAVING predicate
       ArrayList<String> arrayOfAggregationColumnsAndFunctions = new ArrayList<>(aggregationColumnsAndFunctions);
-      HavingQueryFragment havingPredicate = generateHavingPredicate(arrayOfAggregationColumnsAndFunctions);
+      HavingQueryFragment havingPredicate;
+      if (isDistinctQuery) {
+        havingPredicate = new HavingQueryFragment(Collections.emptyList(), Collections.emptyList(),
+            Collections.emptyList());
+      } else {
+        havingPredicate = generateHavingPredicate(arrayOfAggregationColumnsAndFunctions);
+      }
+
       // Generate a result limit of at most MAX_RESULT_LIMIT.
       LimitQueryFragment limit = new LimitQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT + 1));
+
       return new AggregationQuery(arrayOfAggregationColumnsAndFunctions, predicate, groupColumns, havingPredicate,
           limit);
     }

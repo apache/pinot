@@ -612,7 +612,7 @@ public class ClusterIntegrationTestUtils {
       comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet, orderByColumns,
           pinotQuery, h2Query, h2NumRows, pinotNumRecordsSelected);
     } else {
-      if (queryContext.getGroupByExpressions() == null) {
+      if (queryContext.getGroupByExpressions() == null && !QueryContextUtils.isDistinctQuery(queryContext)) {
         // aggregation only
 
         // compare the single row
