@@ -130,11 +130,6 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   }
 
   @Override
-  protected boolean useLlc() {
-    return true;
-  }
-
-  @Override
   protected String getPartitionColumn() {
     return PRIMARY_KEY_COL;
   }

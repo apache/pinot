@@ -37,7 +37,7 @@ import org.testng.annotations.Test;
 /**
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
  */
-public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @BeforeClass
   public void setUp()

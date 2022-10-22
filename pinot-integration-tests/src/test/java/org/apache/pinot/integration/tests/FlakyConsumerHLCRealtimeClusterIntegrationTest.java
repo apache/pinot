@@ -33,7 +33,7 @@ import org.apache.pinot.tools.utils.KafkaStarterUtils;
 /**
  * Integration test that simulates a flaky Kafka consumer.
  */
-public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
+public class FlakyConsumerHLCRealtimeClusterIntegrationTest extends HLCRealtimeClusterIntegrationTest {
 
   @Override
   protected String getStreamConsumerFactoryClassName() {

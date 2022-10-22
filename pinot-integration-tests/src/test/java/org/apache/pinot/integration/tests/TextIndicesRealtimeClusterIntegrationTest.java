@@ -72,12 +72,6 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
     return TIME_COLUMN_NAME;
   }
 
-  // TODO: Support Lucene index on HLC consuming segments
-  @Override
-  protected boolean useLlc() {
-    return true;
-  }
-
   @Nullable
   @Override
   protected String getSortedColumn() {

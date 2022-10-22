@@ -62,11 +62,6 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
   private String _currentSegment;
 
   @Override
-  protected boolean useLlc() {
-    return true;
-  }
-
-  @Override
   protected int getNumKafkaPartitions() {
     return NUM_KAFKA_PARTITIONS;
   }

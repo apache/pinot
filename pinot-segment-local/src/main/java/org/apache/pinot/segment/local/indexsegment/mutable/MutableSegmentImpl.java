@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.io.Closeable;
 import java.io.File;
@@ -161,10 +160,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
   private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
-  // If the table schema is changed before the consuming segment is committed, newly added columns would appear in
-  // _newlyAddedColumnsFieldMap.
-  private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
-  private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
   private final UpsertConfig.Mode _upsertMode;
   private final String _upsertComparisonColumn;
@@ -480,19 +475,6 @@ public class MutableSegmentImpl implements MutableSegment {
       return maxTime;
     }
     return Long.MIN_VALUE;
-  }
-
-  public void addExtraColumns(Schema newSchema) {
-    for (String columnName : newSchema.getColumnNames()) {
-      if (!_schema.getColumnNames().contains(columnName)) {
-        FieldSpec fieldSpec = newSchema.getFieldSpecFor(columnName);
-        _newlyAddedColumnsFieldMap.put(columnName, fieldSpec);
-        if (!fieldSpec.isVirtualColumn()) {
-          _newlyAddedPhysicalColumnsFieldMap.put(columnName, fieldSpec);
-        }
-      }
-    }
-    _logger.info("Newly added columns: " + _newlyAddedColumnsFieldMap);
   }
 
   @Override
@@ -951,40 +933,33 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Override
   public Set<String> getColumnNames() {
-    // Return all column names, virtual and physical.
-    return Sets.union(_schema.getColumnNames(), _newlyAddedColumnsFieldMap.keySet());
+    return _schema.getColumnNames();
   }
 
   @Override
   public Set<String> getPhysicalColumnNames() {
     HashSet<String> physicalColumnNames = new HashSet<>();
-
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       physicalColumnNames.add(fieldSpec.getName());
     }
-    // We should include newly added columns in the physical columns
-    return Sets.union(physicalColumnNames, _newlyAddedPhysicalColumnsFieldMap.keySet());
+    return physicalColumnNames;
   }
 
   @Override
   public DataSource getDataSource(String column) {
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-    if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
-      // Column is either added during ingestion, or was initiated with a virtual column provider
-      if (fieldSpec == null) {
-        // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to
-        // provide values
-        fieldSpec = _newlyAddedColumnsFieldMap.get(column);
-        Preconditions.checkNotNull(fieldSpec,
-            "FieldSpec for " + column + " should not be null. " + "Potentially invalid column name specified.");
-      }
+    IndexContainer indexContainer = _indexContainerMap.get(column);
+    if (indexContainer != null) {
+      // Physical column
+      return indexContainer.toDataSource();
+    } else {
+      // Virtual column
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+      Preconditions.checkState(fieldSpec != null && fieldSpec.isVirtualColumn(), "Failed to find column: %s", column);
       // TODO: Refactor virtual column provider to directly generate data source
       VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
       VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
       return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
           virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
-    } else {
-      return _indexContainerMap.get(column).toDataSource();
     }
   }
 

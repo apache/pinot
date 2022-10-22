@@ -26,15 +26,11 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * Base segment data manager to maintain reference count for the segment.
  */
 public abstract class SegmentDataManager {
+  private final long _loadTimeMs = System.currentTimeMillis();
   private int _referenceCount = 1;
-  private long _loadTimeMs = System.currentTimeMillis();
 
   public long getLoadTimeMs() {
     return _loadTimeMs;
-  }
-
-  public void setLoadTimeMs(long loadTimeMs) {
-    _loadTimeMs = loadTimeMs;
   }
 
   @VisibleForTesting

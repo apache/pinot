@@ -133,7 +133,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected boolean useLlc() {
-    return false;
+    return true;
   }
 
   protected boolean useKafkaTransaction() {
