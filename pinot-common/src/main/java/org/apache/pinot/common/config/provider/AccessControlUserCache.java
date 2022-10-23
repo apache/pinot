@@ -58,7 +58,7 @@ public class AccessControlUserCache {
     private final Map<String, UserConfig> _userControllerConfigMap = new ConcurrentHashMap<>();
     private final Map<String, UserConfig> _userBrokerConfigMap = new ConcurrentHashMap<>();
     private final Map<String, UserConfig> _userServerConfigMap = new ConcurrentHashMap<>();
-    private Cache<String, String> _userPasswordAuthCache = CacheBuilder.newBuilder()
+    private final Cache<String, String> _userPasswordAuthCache = CacheBuilder.newBuilder()
             .expireAfterWrite(USER_PASSWORD_EXPIRE_TIME, TimeUnit.SECONDS).build();
 
     public AccessControlUserCache(ZkHelixPropertyStore<ZNRecord> propertyStore) {
