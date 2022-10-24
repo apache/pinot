@@ -102,12 +102,16 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     }
   }
 
+  protected AvroRecordExtractor createAvroRecordExtractor() {
+    return new AvroRecordExtractor();
+  }
+
   @Test
   public void testDataTypeReturnFromAvroRecordExtractor()
       throws IOException {
     String testColumnName = "column1";
     long columnValue = 999999999L;
-    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    AvroRecordExtractor avroRecordExtractor = createAvroRecordExtractor();
     avroRecordExtractor.init(null, new AvroRecordExtractorConfig());
 
     org.apache.pinot.spi.data.Schema pinotSchema =
@@ -159,7 +163,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     timestampMicrosColValue.setNanos(123987000);
     AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
     config.setEnableLogicalTypes(true);
-    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    AvroRecordExtractor avroRecordExtractor = createAvroRecordExtractor();
     avroRecordExtractor.init(null, config);
 
     String schemaString =
@@ -238,7 +242,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     byte[] content = new byte[100];
     ThreadLocalRandom.current().nextBytes(content);
     ByteBuffer byteBuffer = ByteBuffer.wrap(content);
-    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    AvroRecordExtractor avroRecordExtractor = createAvroRecordExtractor();
     for (int i = 0; i < 10; i++) {
       Assert.assertEquals(avroRecordExtractor.convertSingleValue(byteBuffer), content);
     }
