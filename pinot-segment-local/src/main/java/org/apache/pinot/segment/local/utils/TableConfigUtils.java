@@ -461,6 +461,7 @@ public final class TableConfigUtils {
         String.format("aggregation function %s must be one of %s", name, SUPPORTED_INGESTION_AGGREGATIONS));
   }
 
+  @VisibleForTesting
   static void validateDecoder(StreamConfig streamConfig) {
     if (streamConfig.getDecoderClass().equals("org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder")) {
       // check the existence of the needed decoder props
