@@ -115,8 +115,6 @@ public class RequestUtils {
       } else {
         literal.setDoubleValue(node.bigDecimalValue().doubleValue());
       }
-    } else if (node.getTypeName().equals(SqlTypeName.BOOLEAN)) {
-      literal.setBoolValue(node.booleanValue());
     } else {
       // TODO: Support null literal and other types.
       switch (node.getTypeName()) {
