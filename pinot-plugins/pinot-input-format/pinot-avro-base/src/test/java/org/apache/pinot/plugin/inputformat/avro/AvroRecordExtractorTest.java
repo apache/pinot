@@ -247,4 +247,18 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
       Assert.assertEquals(avroRecordExtractor.convertSingleValue(byteBuffer), content);
     }
   }
+
+  @Test
+  public void testFixedDataType() {
+    Schema avroSchema = createRecord("eventsRecord", null, null, false);
+    Schema fixedSchema = createFixed("fixedSchema", "", "", 4);
+    avroSchema.setFields(Lists.newArrayList(new Schema.Field("fixed_data", fixedSchema)));
+    GenericRecord genericRecord = new GenericData.Record(avroSchema);
+    genericRecord.put("fixed_data", new GenericData.Fixed(fixedSchema, new byte[] {0, 1, 2, 3}));
+    GenericRow genericRow = new GenericRow();
+    AvroRecordExtractor avroRecordExtractor = createAvroRecordExtractor();
+    avroRecordExtractor.init(null, null);
+    avroRecordExtractor.extract(genericRecord, genericRow);
+    Assert.assertEquals(genericRow.getValue("fixed_data"), "[0, 1, 2, 3]");
+  }
 }
