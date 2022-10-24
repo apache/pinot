@@ -80,6 +80,7 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,7 +136,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return executeInternal(queryRequest, executorService, responseObserver);
     }
     try {
-      Tracing.getTracer().register(queryRequest.getRequestId());
+      long requestId = queryRequest.getRequestId();
+      // NOTE: Use negative request id as trace id for REALTIME table to prevent id conflict when the same request
+      //       hitting both OFFLINE and REALTIME table (hybrid table setup)
+      long traceId =
+          TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
+      Tracing.getTracer().register(traceId);
       return executeInternal(queryRequest, executorService, responseObserver);
     } finally {
       Tracing.getTracer().unregister();

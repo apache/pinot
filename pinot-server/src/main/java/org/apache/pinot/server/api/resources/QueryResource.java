@@ -38,6 +38,8 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.core.query.utils.QueryIdUtils;
+import org.apache.pinot.core.transport.InstanceRequestHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -65,10 +67,20 @@ public class QueryResource {
       @ApiResponse(code = 404, message = "Query not found running on the server")
   })
   public String cancelQuery(
-      @ApiParam(value = "QueryId as in the format of <brokerId>_<requestId>", required = true) @PathParam("queryId")
-          String queryId) {
+      @ApiParam(value = "QueryId as in the format of <brokerId>_<requestId> or <brokerId>_<requestId>_(O|R)",
+          required = true)
+      @PathParam("queryId") String queryId) {
     try {
-      if (_serverInstance.getInstanceRequestHandler().cancelQuery(queryId)) {
+      InstanceRequestHandler requestHandler = _serverInstance.getInstanceRequestHandler();
+      boolean queryCancelled;
+      if (QueryIdUtils.hasTypeSuffix(queryId)) {
+        queryCancelled = requestHandler.cancelQuery(queryId);
+      } else {
+        boolean offlineQueryCancelled = requestHandler.cancelQuery(QueryIdUtils.withOfflineSuffix(queryId));
+        boolean realtimeQueryCancelled = requestHandler.cancelQuery(QueryIdUtils.withRealtimeSuffix(queryId));
+        queryCancelled = offlineQueryCancelled | realtimeQueryCancelled;
+      }
+      if (queryCancelled) {
         return "Cancelled query: " + queryId;
       }
     } catch (Exception e) {
@@ -85,7 +97,7 @@ public class QueryResource {
   @Path("/queries/id")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get queryIds of running queries on the server", notes = "QueryIds are in the format of "
-      + "<brokerId>_<requestId>")
+      + "<brokerId>_<requestId>_(O|R)")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
