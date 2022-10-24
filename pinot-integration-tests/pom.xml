@@ -38,6 +38,8 @@
     <awaitility.version>3.0.0</awaitility.version>
     <aws.sdk.version>2.14.28</aws.sdk.version>
     <testcontainers.version>1.17.3</testcontainers.version>
+    <postgres.version>42.1.1</postgres.version>
+    <pg-embedded.version>1.0.1</pg-embedded.version>
   </properties>
 
   <build>
@@ -405,6 +407,11 @@
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>42.3.7</version>
     </dependency>
   </dependencies>
 </project>
