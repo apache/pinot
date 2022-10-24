@@ -810,7 +810,13 @@ public class QueryGenerator {
       }
 
       // Generate a result limit of at most MAX_RESULT_LIMIT.
-      LimitQueryFragment limit = new LimitQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT + 1));
+      LimitQueryFragment limit;
+      if (isDistinctQuery) {
+        // Distinct query must have positive LIMIT
+        limit = new LimitQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT) + 1);
+      } else {
+        limit = new LimitQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT + 1));
+      }
 
       return new AggregationQuery(arrayOfAggregationColumnsAndFunctions, predicate, groupColumns, havingPredicate,
           limit);
