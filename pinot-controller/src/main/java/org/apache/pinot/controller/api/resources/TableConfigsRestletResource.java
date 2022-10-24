@@ -118,7 +118,7 @@ public class TableConfigsRestletResource {
 
       ArrayNode configsList = JsonUtils.newArrayNode();
       for (String rawTableName : rawTableNames) {
-        configsList.add(getConfig(rawTableName));
+        configsList.add(rawTableName);
       }
       return configsList.toString();
     } catch (Exception e) {
