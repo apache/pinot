@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.RegisterSet;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
@@ -50,6 +51,8 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -474,9 +477,23 @@ public class ObjectSerDeUtils {
     @Override
     public HyperLogLog deserialize(byte[] bytes) {
       try {
-        return HyperLogLog.Builder.build(bytes);
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
+        IntBuffer intBuf =
+                ByteBuffer.wrap(bytes)
+                        .order(ByteOrder.BIG_ENDIAN)
+                        .asIntBuffer();
+        // The first 2 bytes are constant headers for the HLL. We only need the first byte, the log2m.
+        // We skip the second byte, array size, as we compare the buffer size to the remaining bytes size.
+        int log2m = intBuf.get(0);
+        intBuf.position(2);
+
+        if (intBuf.remaining() != RegisterSet.getSizeForCount(1 << log2m)) {
+          throw new RuntimeException("Caught exception while deserializing HyperLogLog");
+        }
+        int[] bits = new int[intBuf.remaining()];
+        intBuf.get(bits);
+        return new HyperLogLog(log2m, new RegisterSet(1 << log2m, bits));
+      } catch (RuntimeException e) {
+        throw new RuntimeException("Caught exception while deserializing HyperLogLog", e);
       }
     }
 
@@ -484,11 +501,7 @@ public class ObjectSerDeUtils {
     public HyperLogLog deserialize(ByteBuffer byteBuffer) {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
-      try {
-        return HyperLogLog.Builder.build(bytes);
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
-      }
+      return deserialize(bytes);
     }
   };
 

@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -42,6 +43,7 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -212,6 +214,16 @@ public class ObjectSerDeUtilsTest {
 
       assertEquals(actual.cardinality(), expected.cardinality(), ERROR_MESSAGE);
     }
+  }
+
+  @Test
+  public void testHyperLogLogDeserializeThrowsForSizeMismatch() throws Exception {
+    // We serialize a HLL w/ log2m of 12 and then trim 1024 bytes from the end of it and try to
+    // deserialize it. An exception should occur for this log2m, 2732 bytes are expected after the headers,
+    // but instead it will only find 1078.
+    byte[] bytes = (new HyperLogLog(12)).getBytes();
+    byte[] trimmed = Arrays.copyOfRange(bytes, 0, bytes.length - 1024);
+    Assert.assertThrows(RuntimeException.class, () -> ObjectSerDeUtils.deserialize(trimmed, ObjectSerDeUtils.ObjectType.HyperLogLog));
   }
 
   @Test
