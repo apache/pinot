@@ -100,7 +100,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
     // Rebalance should fail without creating the table
-    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
+    Configuration rebalanceConfig = new BaseConfiguration();
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
 
     // Create the table
@@ -115,8 +116,28 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     Map<String, Map<String, String>> oldSegmentAssignment =
         _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getMapFields();
 
-    // Rebalance should return NO_OP status
+    // Rebalance in dry-run mode should return NO_OP status
+    rebalanceConfig = new BaseConfiguration();
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, true);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+
+    // Rebalance in dry-run mode with reassignInstances should return NO_OP status
+    rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, true);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+
+    // Rebalance should return NO_OP status
+    rebalanceConfig = new BaseConfiguration();
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+
+    // Rebalance with reassignInstances should return NO_OP status
+    rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
 
     // All servers should be assigned to the table
@@ -139,7 +160,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
 
     // Rebalance in dry-run mode
-    Configuration rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
@@ -266,7 +287,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     assertNull(InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
         InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME)));
 

@@ -229,11 +229,11 @@ public class TableRebalancer {
       LOGGER.info("Table: {} is already balanced", tableNameWithType);
       if (reassignInstances) {
         if (dryRun) {
-          return new RebalanceResult(RebalanceResult.Status.DONE,
+          return new RebalanceResult(RebalanceResult.Status.NO_OP,
               "Instance reassigned in dry-run mode, table is already balanced", instancePartitionsMap,
               targetAssignment);
         } else {
-          return new RebalanceResult(RebalanceResult.Status.DONE, "Instance reassigned, table is already balanced",
+          return new RebalanceResult(RebalanceResult.Status.NO_OP, "Instance reassigned, table is already balanced",
               instancePartitionsMap, targetAssignment);
         }
       } else {
