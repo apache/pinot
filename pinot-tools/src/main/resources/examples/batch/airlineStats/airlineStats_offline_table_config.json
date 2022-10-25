@@ -13,7 +13,9 @@
     {
       "name": "ts",
       "encodingType": "DICTIONARY",
-      "indexTypes": ["TIMESTAMP"],
+      "indexTypes": [
+        "TIMESTAMP"
+      ],
       "timestampConfig": {
         "granularities": [
           "DAY",
@@ -40,5 +42,21 @@
         "transformFunction": "fromEpochDays(DaysSinceEpoch)"
       }
     ]
-  }
+  },
+  "tierConfigs": [
+    {
+      "name": "hotTier",
+      "segmentSelectorType": "time",
+      "segmentAge": "3130d",
+      "storageType": "pinot_server",
+      "serverTag": "DefaultTenant_OFFLINE"
+    },
+    {
+      "name": "coldTier",
+      "segmentSelectorType": "time",
+      "segmentAge": "3140d",
+      "storageType": "pinot_server",
+      "serverTag": "DefaultTenant_OFFLINE"
+    }
+  ]
 }

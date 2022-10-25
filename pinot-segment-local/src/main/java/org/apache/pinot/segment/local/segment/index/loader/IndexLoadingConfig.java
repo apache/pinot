@@ -98,6 +98,7 @@ public class IndexLoadingConfig {
   private String _segmentTier;
 
   private String _instanceId;
+  private Map<String, Map<String, String>> _instanceTierConfigs;
 
   /**
    * NOTE: This step might modify the passed in table config and schema.
@@ -655,5 +656,13 @@ public class IndexLoadingConfig {
 
   public String getSegmentTier() {
     return _segmentTier;
+  }
+
+  public void setInstanceTierConfigs(Map<String, Map<String, String>> tierConfigs) {
+    _instanceTierConfigs = tierConfigs;
+  }
+
+  public Map<String, Map<String, String>> getInstanceTierConfigs() {
+    return _instanceTierConfigs;
   }
 }

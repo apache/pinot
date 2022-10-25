@@ -39,25 +39,6 @@
       </Policies>
       <DefaultRolloverStrategy max="10"/>
     </RollingFile>
-    <Routing name="taskLogs" ignoreExceptions="false">
-      <Routes pattern="${ctx:taskId}">
-        <Route>
-          <RollingFile
-              name="minionTaskLogs-${ctx:taskId}"
-              fileName="${env:LOG_ROOT}/minionTaskLogs-${ctx:taskId:-default}.log"
-              filePattern="${env:LOG_ROOT}/minionTaskLogs-%d{yyyy-MM-dd}-%i.log"
-              immediateFlush="true">
-            <PatternLayout pattern="${env:LOG_PATTERN}"/>
-            <Policies>
-              <SizeBasedTriggeringPolicy size="19500KB"/>
-            </Policies>
-            <DefaultRolloverStrategy max="50"/>
-          </RollingFile>
-        </Route>
-      </Routes>
-      <!-- Created appender TTL -->
-      <IdlePurgePolicy timeToLive="15" timeUnit="minutes"/>
-    </Routing>
   </Appenders>
   <Loggers>
     <Root level="info" additivity="false">
@@ -65,6 +46,21 @@
       <AppenderRef ref="console" level="error"/>
     </Root>
     <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <Logger name="org.apache.pinot.segment.local.loader" level="info" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <Logger name="org.apache.pinot.core.data.manager" level="info" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <Logger name="org.apache.pinot.server.starter.helix" level="info" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <Logger name="org.apache.pinot.controller.helix.core.relocation" level="debug" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <Logger name="org.apache.pinot.common.utils.config" level="debug" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>

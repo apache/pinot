@@ -115,6 +115,7 @@ public class ImmutableSegmentLoader {
             .setSchema(schema).setInstanceId(indexLoadingConfig.getInstanceId())
             .setTableDataDir(indexLoadingConfig.getTableDataDir()).setSegmentName(segmentName)
             .setSegmentCrc(segmentMetadata.getCrc()).setSegmentTier(indexLoadingConfig.getSegmentTier())
+            .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
             .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs()).build();
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());

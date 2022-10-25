@@ -188,7 +188,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     try {
       TableTierReader.TableTierDetails tableTiers =
           new TableTierReader(_executorService, _connectionManager, _pinotHelixResourceManager).getTableTierDetails(
-              tableNameWithType, null, _timeoutMs);
+              tableNameWithType, null, _timeoutMs, true);
       triggerLocalTierMigration(tableNameWithType, tableTiers,
           _pinotHelixResourceManager.getHelixZkManager().getMessagingService());
       LOGGER.info("Migrated segments of table: {} to new tiers on hosting servers", tableNameWithType);
@@ -218,14 +218,14 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     String targetTierName = null;
     if (targetTier == null) {
       if (segmentZKMetadata.getTier() == null) {
-        LOGGER.debug("Segment: {} of table: {} is already on the default tier", segmentName, tableNameWithType);
+        LOGGER.debug("Segment: {} of table: {} is already set to go to default tier", segmentName, tableNameWithType);
         return;
       }
       LOGGER.info("Segment: {} of table: {} is put back on default tier", segmentName, tableNameWithType);
     } else {
       targetTierName = targetTier.getName();
       if (targetTierName.equals(segmentZKMetadata.getTier())) {
-        LOGGER.debug("Segment: {} of table: {} is already on the target tier: {}", segmentName, tableNameWithType,
+        LOGGER.debug("Segment: {} of table: {} is already set to go to target tier: {}", segmentName, tableNameWithType,
             targetTierName);
         return;
       }

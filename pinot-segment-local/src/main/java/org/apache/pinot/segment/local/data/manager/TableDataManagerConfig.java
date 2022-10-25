@@ -18,13 +18,19 @@
  */
 package org.apache.pinot.segment.local.data.manager;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,11 +48,15 @@ public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_NAME = "name";
   private static final String TABLE_IS_DIMENSION = "isDimTable";
   private static final String TABLE_DATA_MANAGER_AUTH = "auth";
+
+  private static final String TABLE_DATA_MANAGER_TIER_CONFIGS = "tierConfigs";
+  private static final String TABLE_DATA_MANAGER_TIER_NAME = "tierName";
   private static final String TABLE_DELETED_SEGMENTS_CACHE_SIZE = "deletedSegmentsCacheSize";
   private static final String TABLE_DELETED_SEGMENTS_CACHE_TTL_MINUTES = "deletedSegmentsCacheTTL";
   private static final String TABLE_PEER_DOWNLOAD_SCHEME = "peerDownloadScheme";
 
   private final Configuration _tableDataManagerConfig;
+  private volatile Map<String, Map<String, String>> _instanceTierConfigMaps;
 
   public TableDataManagerConfig(Configuration tableDataManagerConfig) {
     _tableDataManagerConfig = tableDataManagerConfig;
@@ -78,6 +88,51 @@ public class TableDataManagerConfig {
 
   public Configuration getAuthConfig() {
     return _tableDataManagerConfig.subset(TABLE_DATA_MANAGER_AUTH);
+  }
+
+  public Map<String, Map<String, String>> getInstanceTierConfigs() {
+    if (_instanceTierConfigMaps != null) {
+      return _instanceTierConfigMaps;
+    }
+    // Keep it simple and not handle the potential double computes as it's not that costly anyway.
+    _instanceTierConfigMaps = getTierConfigMaps(_tableDataManagerConfig.subset(TABLE_DATA_MANAGER_TIER_CONFIGS));
+    return _instanceTierConfigMaps;
+  }
+
+  @VisibleForTesting
+  static Map<String, Map<String, String>> getTierConfigMaps(Configuration tierCfgs) {
+    List<String> cfgKeys = CommonsConfigurationUtils.getKeys(tierCfgs);
+    Collections.sort(cfgKeys);
+    Map<String, Map<String, String>> tierCfgMaps = new HashMap<>();
+    // Collect the cfgs for each tier into the tierCfgMaps.
+    Map<String, String> cfgMap = new HashMap<>();
+    String lastIdx = null;
+    String tierName = null;
+    for (String key : cfgKeys) {
+      String value = tierCfgs.getString(key);
+      String cfgIdx = key.substring(0, key.indexOf('.'));
+      if (lastIdx == null) {
+        lastIdx = cfgIdx;
+      } else if (!cfgIdx.equals(lastIdx)) {
+        Preconditions.checkNotNull(tierName, "Missing tier name in instance tier configs with index: %s", lastIdx);
+        tierCfgMaps.put(tierName, cfgMap);
+        // Reset to collect cfgs for the next tier.
+        cfgMap = new HashMap<>();
+        lastIdx = cfgIdx;
+        tierName = null;
+      }
+      String cfgName = key.substring(key.indexOf('.') + 1);
+      cfgMap.put(cfgName, value);
+      // All config names are lower cased while being passed down here.
+      if (cfgName.equalsIgnoreCase(TABLE_DATA_MANAGER_TIER_NAME)) {
+        tierName = value;
+      }
+    }
+    if (!cfgMap.isEmpty()) {
+      Preconditions.checkNotNull(tierName, "Missing tier name in instance tier configs with index: %s", lastIdx);
+      tierCfgMaps.put(tierName, cfgMap);
+    }
+    return tierCfgMaps;
   }
 
   public int getTableDeletedSegmentsCacheSize() {
@@ -115,6 +170,10 @@ public class TableDataManagerConfig {
     // copy auth-related configs
     instanceDataManagerConfig.getConfig().subset(TABLE_DATA_MANAGER_AUTH).toMap()
         .forEach((key, value) -> defaultConfig.setProperty(TABLE_DATA_MANAGER_AUTH + "." + key, value));
+
+    // copy tier configs
+    instanceDataManagerConfig.getConfig().subset(TABLE_DATA_MANAGER_TIER_CONFIGS).toMap()
+        .forEach((key, value) -> defaultConfig.setProperty(TABLE_DATA_MANAGER_TIER_CONFIGS + "." + key, value));
 
     return new TableDataManagerConfig(defaultConfig);
   }
