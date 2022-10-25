@@ -27,6 +27,7 @@ import java.util.Base64;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -724,5 +725,17 @@ public class StringFunctions {
   public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
       int occurence) {
     return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, occurence, "");
+  }
+
+  @ScalarFunction
+  public static boolean regexpLike(String inputStr, String regexPatternStr) {
+    Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
+    return pattern.matcher(inputStr).find();
+  }
+
+  @ScalarFunction
+  public static boolean like(String inputStr, String likePatternStr) {
+    String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
+    return regexpLike(inputStr, regexPatternStr);
   }
 }

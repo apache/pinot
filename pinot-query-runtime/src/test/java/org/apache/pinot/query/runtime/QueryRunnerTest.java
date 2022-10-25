@@ -118,6 +118,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         return Double.compare((Double) l, ((Number) r).doubleValue());
       } else if (l instanceof String) {
         return ((String) l).compareTo((String) r);
+      } else if (l instanceof Boolean) {
+        return ((Boolean) l).compareTo((Boolean) r);
       } else {
         throw new RuntimeException("non supported type " + l.getClass());
       }

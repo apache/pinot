@@ -107,12 +107,27 @@ public abstract class FilterOperand extends TransformOperand {
           }
         };
       default:
-        throw new UnsupportedOperationException("Unsupported filter predicate: " + functionCall.getFunctionName());
+        return new BooleanFunction(functionCall, dataSchema);
     }
   }
 
   @Override
   public abstract Boolean apply(Object[] row);
+
+  private static class BooleanFunction extends FilterOperand {
+    private final FunctionOperand _func;
+
+    public BooleanFunction(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
+      FunctionOperand func = (FunctionOperand) TransformOperand.toTransformOperand(functionCall, dataSchema);
+      Preconditions.checkState(func.getResultType() == DataSchema.ColumnDataType.BOOLEAN);
+      _func = func;
+    }
+
+    @Override
+    public Boolean apply(Object[] row) {
+      return (Boolean) _func.apply(row);
+    }
+  }
 
   private static class BooleanInputRef extends FilterOperand {
     private final RexExpression.InputRef _inputRef;
