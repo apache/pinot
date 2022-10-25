@@ -48,9 +48,11 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -63,6 +65,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final Random RANDOM = new Random();
+  private static final double PRECISION = 1;
 
   private static final int NUM_RECORDS = 1000;
   private static List<GenericRow> _records;
@@ -92,7 +95,27 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  public void createRecords(Number baseValue, boolean generateNulls)
+  public void createOtherRecords(Object baseValue, ColumnDataType columnDataType, boolean generateNulls)
+      throws Exception {
+    FileUtils.deleteDirectory(INDEX_DIR);
+    _records = new ArrayList<>(NUM_RECORDS);
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      GenericRow record = new GenericRow();
+      Object value = columnDataType.convert(columnDataType.getStoredType().convert(
+          ((int) ColumnDataType.INT.convert(baseValue)) + i));
+      if (i % 2 == 0) {
+        record.putValue(COLUMN_NAME, value);
+        record.putValue(KEY_COLUMN, i);
+        _records.add(record);
+      } else if (generateNulls) {
+        // Key column value here is null.
+        record.putValue(COLUMN_NAME, null);
+        _records.add(record);
+      }
+    }
+  }
+
+  public void createNumericRecords(Number baseValue, ColumnDataType columnDataType, boolean generateNulls)
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
@@ -105,7 +128,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       GenericRow record = new GenericRow();
       double value = baseValue.doubleValue() + i;
       if (i % 2 == 0) {
-        record.putValue(COLUMN_NAME, value);
+        record.putValue(COLUMN_NAME, columnDataType.convert(value));
         _sumPrecision = _sumPrecision.add(BigDecimal.valueOf(value));
         _sum += value;
         if (i < NUM_RECORDS / 2) {
@@ -156,27 +179,21 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
-  @Test
-  public void testQueriesWithDictFloatColumn()
+  @Test(dataProvider = "numberColumnTypeProvider")
+  public void testQueriesWithDictColumn(ColumnDataType columnDataType, Number baseValue, boolean generateNulls)
       throws Exception {
-    ColumnDataType columnDataType = ColumnDataType.FLOAT;
-    float baseValue = RANDOM.nextFloat();
-    boolean generateNulls = true;
-    createRecords(baseValue, generateNulls);
+    createNumericRecords(baseValue, columnDataType, generateNulls);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .build();
     setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType, generateNulls);
+    testQueriesNumeric(baseValue, columnDataType, generateNulls);
   }
 
-  @Test(priority = 1)
-  public void testQueriesWithNoDictFloatColumn()
+  @Test(dataProvider = "numberColumnTypeProvider")
+  public void testQueriesWithNoDictColumn(ColumnDataType columnDataType, Number baseValue, boolean generateNulls)
       throws Exception {
-    ColumnDataType columnDataType = ColumnDataType.FLOAT;
-    float baseValue = RANDOM.nextFloat();
-    boolean generateNulls = true;
-    createRecords(baseValue, generateNulls);
+    createNumericRecords(baseValue, columnDataType, generateNulls);
     List<String> noDictionaryColumns = new ArrayList<String>();
     noDictionaryColumns.add(COLUMN_NAME);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
@@ -184,30 +201,24 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         .setNoDictionaryColumns(noDictionaryColumns)
         .build();
     setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType, generateNulls);
+    testQueriesNumeric(baseValue, columnDataType, generateNulls);
   }
 
-  @Test(priority = 2)
-  public void testQueriesWithDictDoubleColumn()
+  @Test(dataProvider = "otherColumnTypeProvider")
+  public void testQueriesByTypeWithDictColumn(ColumnDataType columnDataType, Object baseValue, boolean generateNulls)
       throws Exception {
-    ColumnDataType columnDataType = ColumnDataType.DOUBLE;
-    double baseValue = RANDOM.nextDouble();
-    boolean generateNulls = true;
-    createRecords(baseValue, generateNulls);
+    createOtherRecords(baseValue, columnDataType, generateNulls);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .build();
     setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType, generateNulls);
+    testQueriesGeneric(columnDataType, generateNulls);
   }
 
-  @Test(priority = 3)
-  public void testQueriesWithNoDictDoubleColumn()
+  @Test(dataProvider = "otherColumnTypeProvider")
+  public void testQueriesByTypeWithNoDictColumn(ColumnDataType columnDataType, Object baseValue, boolean generateNulls)
       throws Exception {
-    ColumnDataType columnDataType = ColumnDataType.DOUBLE;
-    double baseValue = RANDOM.nextDouble();
-    boolean generateNulls = true;
-    createRecords(baseValue, generateNulls);
+    createOtherRecords(baseValue, columnDataType, generateNulls);
     List<String> noDictionaryColumns = new ArrayList<String>();
     noDictionaryColumns.add(COLUMN_NAME);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
@@ -215,72 +226,139 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         .setNoDictionaryColumns(noDictionaryColumns)
         .build();
     setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType, generateNulls);
+    testQueriesGeneric(columnDataType, generateNulls);
   }
 
-  @Test(priority = 4)
-  public void testQueriesWithDictFloatColumnNoNullValues()
-          throws Exception {
-    ColumnDataType columnDataType = ColumnDataType.FLOAT;
-    float baseValue = RANDOM.nextFloat();
-    boolean generateNulls = false;
-    createRecords(baseValue, generateNulls);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-            .setTableName(RAW_TABLE_NAME)
-            .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType, generateNulls);
+  @DataProvider(name = "numberColumnTypeProvider")
+  public Object[][] provideNumberColumnTypeAndRandomVal() {
+    return new Object[][]{
+        new Object[]{ColumnDataType.FLOAT, RANDOM.nextFloat(), true},
+        new Object[]{ColumnDataType.DOUBLE, RANDOM.nextDouble(), true},
+        new Object[]{ColumnDataType.FLOAT, RANDOM.nextFloat(), false},
+        new Object[]{ColumnDataType.DOUBLE, RANDOM.nextDouble(), false},
+    };
   }
 
-  @Test(priority = 5)
-  public void testQueriesWithNoDictFloatColumnNoNullValues()
-          throws Exception {
-    ColumnDataType columnDataType = ColumnDataType.FLOAT;
-    float baseValue = RANDOM.nextFloat();
-    boolean generateNulls = false;
-    createRecords(baseValue, generateNulls);
-    List<String> noDictionaryColumns = new ArrayList<String>();
-    noDictionaryColumns.add(COLUMN_NAME);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-            .setTableName(RAW_TABLE_NAME)
-            .setNoDictionaryColumns(noDictionaryColumns)
-            .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType, generateNulls);
+  @DataProvider(name = "otherColumnTypeProvider")
+  public Object[][] provideOtherColumnTypeAndRandomVal() {
+    return new Object[][]{
+        new Object[]{ColumnDataType.INT, RANDOM.nextInt(), true},
+        new Object[]{ColumnDataType.LONG, RANDOM.nextInt(), true},
+        new Object[]{ColumnDataType.BOOLEAN, RANDOM.nextInt(2), true},
+        new Object[]{ColumnDataType.STRING, RANDOM.nextInt(), true},
+        new Object[]{ColumnDataType.TIMESTAMP, RANDOM.nextInt(), true},
+        new Object[]{ColumnDataType.INT, RANDOM.nextInt(), false},
+        new Object[]{ColumnDataType.LONG, RANDOM.nextInt(), false},
+        new Object[]{ColumnDataType.BOOLEAN, RANDOM.nextInt(2), false},
+        new Object[]{ColumnDataType.STRING, RANDOM.nextInt(), false},
+        new Object[]{ColumnDataType.TIMESTAMP, RANDOM.nextInt(), false},
+    };
   }
 
-  @Test(priority = 6)
-  public void testQueriesWithDictDoubleColumnNoNullValues()
-          throws Exception {
-    ColumnDataType columnDataType = ColumnDataType.DOUBLE;
-    double baseValue = RANDOM.nextDouble();
-    boolean generateNulls = false;
-    createRecords(baseValue, generateNulls);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-            .setTableName(RAW_TABLE_NAME)
-            .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType, generateNulls);
+  public void testQueriesGeneric(ColumnDataType dataType, boolean nullValuesExist) {
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("enableNullHandling", "true");
+    {
+      String query = "SELECT * FROM testTable";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME, KEY_COLUMN},
+          new ColumnDataType[]{dataType, ColumnDataType.INT}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 10);
+      for (int i = 0; i < 10; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 2);
+        if (row[0] != null) {
+          assertNotNull(row[1]);
+        } else {
+          assertNull(row[1]);
+        }
+      }
+    }
+    {
+      // This test case was added to validate path-code for distinct w/o order by.
+      int limit = 40;
+      String query = String.format("SELECT DISTINCT %s FROM testTable LIMIT %d", COLUMN_NAME, limit);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
+      List<Object[]> rows = resultTable.getRows();
+      // Boolean there's only true or false.
+      if (dataType != ColumnDataType.BOOLEAN) {
+        assertEquals(rows.size(), limit);
+      }
+    }
+    {
+      String query = String.format(
+          "SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC LIMIT 1000", COLUMN_NAME,
+          COLUMN_NAME, COLUMN_NAME);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema, new DataSchema(new String[]{"count", COLUMN_NAME},
+          new ColumnDataType[]{ColumnDataType.LONG, dataType}));
+      List<Object[]> rows = resultTable.getRows();
+
+      if (dataType != ColumnDataType.BOOLEAN) {
+        int rowsCount = nullValuesExist ? 501 : 500;
+        assertEquals(rows.size(), rowsCount);
+        int i = 0;
+        for (int index = 0; index < 500; index++) {
+          Object[] row = rows.get(index);
+          assertEquals(row.length, 2);
+          if ((NUM_RECORDS - i - 1) % 2 == 1) {
+            // Null values are inserted at: index % 2 == 1. All null values are grouped into a single null.
+            i++;
+          }
+          assertEquals(row[0], 4L);
+          i++;
+        }
+      }
+      // The default null ordering is 'NULLS LAST'.
+      if (nullValuesExist) {
+        Object[] row = rows.get(rows.size() - 1);
+        assertEquals(row[0], 2000L);
+        assertNull(row[1]);
+      }
+    }
+    // TODO fix String null value handling
+    if (dataType != ColumnDataType.STRING) {
+      // If updated limit to include all records, I get back results unsorted.
+      String query = String.format("SELECT MAX(%s) AS max, %s FROM testTable GROUP BY %s ORDER BY max LIMIT 501",
+          COLUMN_NAME, COLUMN_NAME, COLUMN_NAME);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema, new DataSchema(new String[]{"max", COLUMN_NAME},
+          new ColumnDataType[]{ColumnDataType.DOUBLE, dataType}));
+      List<Object[]> rows = resultTable.getRows();
+      if (dataType != ColumnDataType.BOOLEAN) {
+        int rowsCount = 500;
+        assertEquals(rows.size(), rowsCount + (nullValuesExist ? 1 : 0));
+        int i = 0;
+        for (int index = 0; index < rowsCount; index++) {
+          if (i % 2 == 1) {
+            // Null values are inserted at: index % 2 == 1.
+            i++;
+          }
+          Object[] row = rows.get(index);
+          assertEquals(row.length, 2);
+          i++;
+        }
+      }
+      if (nullValuesExist) {
+        assertNull(rows.get(rows.size() - 1)[0]);
+      }
+    }
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
-  @Test(priority = 7)
-  public void testQueriesWithNoDictDoubleColumnNoNullValues()
-          throws Exception {
-    ColumnDataType columnDataType = ColumnDataType.DOUBLE;
-    double baseValue = RANDOM.nextDouble();
-    boolean generateNulls = false;
-    createRecords(baseValue, generateNulls);
-    List<String> noDictionaryColumns = new ArrayList<String>();
-    noDictionaryColumns.add(COLUMN_NAME);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-            .setTableName(RAW_TABLE_NAME)
-            .setNoDictionaryColumns(noDictionaryColumns)
-            .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(baseValue, columnDataType, generateNulls);
-  }
-
-  public void testQueries(Number baseValue, ColumnDataType dataType, boolean nullValuesExist) {
+  public void testQueriesNumeric(Number baseValue, ColumnDataType dataType, boolean nullValuesExist) {
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
@@ -317,16 +395,17 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           //(3 rows)
           assertEquals(row[3], 0L);
         } else if ((int) row[keyColumnIdx] == 1) {
-          assertTrue(Math.abs(((Double) row[0]) - 4 * _sumKey1) < 1e-1);
-          assertTrue(Math.abs(((Double) row[1]) - baseValue.doubleValue()) < 1e-1);
+          assertTrue(Math.abs(((Double) row[0]) - 4 * _sumKey1) < PRECISION);
+          assertTrue(Math.abs(((Double) row[1]) - baseValue.doubleValue()) < PRECISION);
           assertTrue(Math.abs(((Double) row[2]) - (baseValue.doubleValue() + Math.ceil(NUM_RECORDS / 2.0) - 2))
-              < 1e-1);
+              < PRECISION);
           assertEquals(row[3], (long) (4 * (Math.ceil(NUM_RECORDS / 2.0) / 2)));
         } else {
           assertEquals(row[keyColumnIdx], 2);
-          assertTrue(Math.abs(((Double) row[0]) - 4 * _sumKey2) < 1e-1);
-          assertTrue(Math.abs(((Double) row[1]) - (baseValue.doubleValue() + Math.ceil(NUM_RECORDS / 2.0))) < 1e-1);
-          assertTrue(Math.abs(((Double) row[2]) - (baseValue.doubleValue() + NUM_RECORDS - 2)) < 1e-1);
+          assertTrue(Math.abs(((Double) row[0]) - 4 * _sumKey2) < PRECISION);
+          assertTrue(Math.abs(((Double) row[1]) - (baseValue.doubleValue() + Math.ceil(NUM_RECORDS / 2.0)))
+              < PRECISION);
+          assertTrue(Math.abs(((Double) row[2]) - (baseValue.doubleValue() + NUM_RECORDS - 2)) < PRECISION);
           assertEquals(row[3], (long) (4 * (Math.ceil(NUM_RECORDS / 2.0) / 2)));
         }
       }
@@ -350,7 +429,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       // count(col) returns the count of non-nullable docs.
       assertEquals((long) row[1], 500 * 4);
       assertEquals(row[2], baseValue.doubleValue());
-      assertTrue(Math.abs((Double) row[3] - (baseValue.doubleValue() + 998)) < 1e-1);
+      assertTrue(Math.abs((Double) row[3] - (baseValue.doubleValue() + 998)) < PRECISION);
     }
     {
       String query = "SELECT * FROM testTable";
@@ -366,7 +445,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         assertEquals(row.length, 2);
         if (row[0] != null) {
           int incValue = nullValuesExist ? i : i * 2;
-          assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + incValue)) < 1e-1);
+          assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + incValue)) < PRECISION);
           assertEquals(row[1], 1);
         } else {
           assertNull(row[1]);
@@ -395,7 +474,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           Object[] values = rows.get(i + j);
           assertEquals(values.length, 2);
           assertTrue(Math.abs(((Number) values[0]).doubleValue() - (baseValue.doubleValue() + (NUM_RECORDS - 1 - k)))
-              < 1e-1);
+              < PRECISION);
         }
         k++;
       }
@@ -427,7 +506,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         if (i % 2 == 1) {
           i++;
         }
-        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
+        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + i)) < PRECISION);
         i++;
         index++;
       }
@@ -456,7 +535,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         if (i % 2 == 1) {
           i++;
         }
-        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
+        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + i)) < PRECISION);
         i++;
         index++;
       }
@@ -492,12 +571,12 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       int count = 4 * 500;
       assertEquals((long) rows.get(0)[0], count);
       double min = baseValue.doubleValue();
-      assertTrue(Math.abs((Double) rows.get(0)[1] - min) < 1e-1);
+      assertTrue(Math.abs((Double) rows.get(0)[1] - min) < PRECISION);
       double max = baseValue.doubleValue() + 998;
-      assertTrue(Math.abs((Double) rows.get(0)[2] - max) < 1e-1);
+      assertTrue(Math.abs((Double) rows.get(0)[2] - max) < PRECISION);
       double avg = _sum / (double) _records.size();
-      assertTrue(Math.abs((Double) rows.get(0)[3] - avg) < 1e-1);
-      assertTrue(Math.abs((Double) rows.get(0)[4] - (4 * _sum)) < 1e-1);
+      assertTrue(Math.abs((Double) rows.get(0)[3] - avg) < PRECISION);
+      assertTrue(Math.abs((Double) rows.get(0)[4] - (4 * _sum)) < PRECISION);
     }
     {
       String query = String.format("SELECT %s FROM testTable GROUP BY %s ORDER BY %s DESC", COLUMN_NAME, COLUMN_NAME,
@@ -521,7 +600,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         Object[] row = rows.get(index);
         assertEquals(row.length, 1);
         assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + (NUM_RECORDS - i - 1)))
-            < 1e-1);
+            < PRECISION);
         index++;
         i++;
       }
@@ -548,7 +627,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         }
         assertEquals(row[0], 4L);
         assertTrue(Math.abs(((Number) row[1]).doubleValue() - (baseValue.doubleValue() + (NUM_RECORDS - i - 1)))
-            < 1e-1);
+            < PRECISION);
         i++;
       }
       // The default null ordering is 'NULLS LAST'.
@@ -567,7 +646,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 1);
       assertTrue(Math.abs((new BigDecimal((String) rows.get(0)[0])).doubleValue()
-          - _sumPrecision.multiply(BigDecimal.valueOf(4)).doubleValue()) < 1e-1);
+          - _sumPrecision.multiply(BigDecimal.valueOf(4)).doubleValue()) < PRECISION);
     }
     {
       // Note: in Presto, inequality, equality, and IN comparison with nulls always returns false:
@@ -604,7 +683,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       //(1 row)
       //
       String query = String.format("SELECT %s FROM testTable WHERE %s > '%s' LIMIT 50", COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 69);
+          dataType.convert(baseValue.doubleValue() + 69));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -620,13 +699,13 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           // Null values are inserted at: index % 2 == 1. However, nulls are not retuned by an comparison operator.
           i++;
         }
-        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + (69 + i + 1))) < 1e-1);
+        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + (69 + i + 1))) < PRECISION);
         i++;
       }
     }
     {
       String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'", COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 68);
+          dataType.convert(baseValue.doubleValue() + 68));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -636,12 +715,12 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       for (int i = 0; i < 4; i++) {
         Object[] row = rows.get(i);
         assertEquals(row.length, 1);
-        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.floatValue() + 68)) < 1e-1);
+        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.floatValue() + 68)) < PRECISION);
       }
     }
     {
       String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'", COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 69);
+          dataType.convert(baseValue.doubleValue() + 69));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -674,11 +753,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
 //        assertEquals(row.length, 4);
 //        assertEquals(row[0], 4L);
 //        System.out.println("min = " + row[1]);
-//        assertTrue(Math.abs(((Double) row[1]) - (baseValue.doubleValue() + i)) < 1e-1);
+//        assertTrue(Math.abs(((Double) row[1]) - (baseValue.doubleValue() + i)) < PRECISION);
 //        System.out.println("max = " + row[2]);
-//        assertTrue(Math.abs((Double) row[2] - (baseValue.doubleValue() + i)) < 1e-1);
+//        assertTrue(Math.abs((Double) row[2] - (baseValue.doubleValue() + i)) < PRECISION);
 //        System.out.println("sum = " + row[3]);
-//        assertTrue(Math.abs((Double) row[3] - (4 * (baseValue.doubleValue() + i))) < 1e-1);
+//        assertTrue(Math.abs((Double) row[3] - (4 * (baseValue.doubleValue() + i))) < PRECISION);
 //        i++;
 //      }
 //    }
@@ -686,7 +765,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT AVG(%s) AS avg, MODE(%s) AS mode, DISTINCTCOUNT(%s) as distinct_count"
               + " FROM testTable GROUP BY %s HAVING avg < %s ORDER BY %s LIMIT 200",
           COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 400, COLUMN_NAME);
+          dataType.convert(baseValue.doubleValue() + 400), COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -702,8 +781,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         }
         Object[] row = rows.get(index);
         assertEquals(row.length, 3);
-        assertTrue(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < 1e-1);
-        assertTrue(Math.abs((Double) row[1] - (baseValue.doubleValue() + i)) < 1e-1);
+        assertTrue(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < PRECISION);
+        assertTrue(Math.abs((Double) row[1] - (baseValue.doubleValue() + i)) < PRECISION);
         assertEquals(row[2], 1);
         i++;
       }
@@ -728,8 +807,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         }
         Object[] row = rows.get(index);
         assertEquals(row.length, 2);
-        assertTrue(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < 1e-1);
-        assertTrue(Math.abs(((Number) row[1]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
+        assertTrue(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < PRECISION);
+        assertTrue(Math.abs(((Number) row[1]).doubleValue() - (baseValue.doubleValue() + i)) < PRECISION);
         i++;
       }
       if (nullValuesExist) {

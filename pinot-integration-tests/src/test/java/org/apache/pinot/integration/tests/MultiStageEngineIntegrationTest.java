@@ -132,6 +132,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @AfterClass
   public void tearDown()
       throws Exception {
+    // Setting data table version back
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
+
     dropOfflineTable(DEFAULT_TABLE_NAME);
 
     stopServer();

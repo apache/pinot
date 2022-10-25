@@ -22,6 +22,8 @@ import java.io.File;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -66,11 +68,17 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(10_000L);
+
+    // Setting data table version to 4
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
+    // Setting data table version back
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
+
     dropRealtimeTable(getTableName());
 
     // Stop the Pinot cluster
@@ -185,5 +193,14 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     testQuery(query);
     query = "SELECT description FROM " + getTableName() + " where description IS NOT DISTINCT FROM description";
     testQuery(query);
+  }
+
+  @Test
+  public void testNullResultReturn()
+      throws Exception {
+    String query = "SELECT SUM(salary) FROM " + getTableName() + " WHERE description BETWEEN 'z' AND 'a'";
+    testQuery(query);
+    String queryWithNullHandling = "SET enableNullHandling = true; " + query;
+    testQuery(queryWithNullHandling, query);
   }
 }
