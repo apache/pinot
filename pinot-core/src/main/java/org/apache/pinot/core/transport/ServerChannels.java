@@ -201,7 +201,7 @@ public class ServerChannels {
         ServerRoutingInstance serverRoutingInstance, byte[] requestBytes) {
       long startTimeMs = System.currentTimeMillis();
       _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
-        long requestSentLatencyMs = System.currentTimeMillis() - startTimeMs;
+        int requestSentLatencyMs = (int) (System.currentTimeMillis() - startTimeMs);
         _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY,
             requestSentLatencyMs, TimeUnit.MILLISECONDS);
         asyncQueryResponse.markRequestSent(serverRoutingInstance, requestSentLatencyMs);
