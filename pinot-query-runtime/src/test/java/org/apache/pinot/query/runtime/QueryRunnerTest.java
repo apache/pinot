@@ -118,6 +118,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         return Double.compare((Double) l, ((Number) r).doubleValue());
       } else if (l instanceof String) {
         return ((String) l).compareTo((String) r);
+      } else if (l instanceof Boolean) {
+        return ((Boolean) l).compareTo((Boolean) r);
       } else {
         throw new RuntimeException("non supported type " + l.getClass());
       }
@@ -159,6 +161,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         //   - on intermediate stage
         new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
             + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+
+        // test regexpLike
+        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLike(a.col2, b.col1)", 9},
+        new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
     };
   }
 }

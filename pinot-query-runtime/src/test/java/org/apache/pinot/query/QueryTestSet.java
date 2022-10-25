@@ -206,6 +206,11 @@ public class QueryTestSet {
         new Object[]{"SELECT COALESCE(SUM(col3), 0) FROM a WHERE col1 = 'foo' AND col1 = 'bar'"},
         new Object[]{"SELECT SUM(CAST(col3 AS INTEGER)) FROM a HAVING MIN(col3) BETWEEN 1 AND 0"},
         new Object[]{"SELECT col1, COUNT(col3) FROM a GROUP BY col1 HAVING SUM(col3) > 40 AND SUM(col3) < 30"},
+
+        // Test functions
+        new Object[]{"SELECT col1 FROM a WHERE col2 LIKE '%o%'"},
+        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE a.col2 LIKE b.col1"},
+        new Object[]{"SELECT a.col1 LIKE b.col1 FROM a JOIN b ON a.col3 = b.col3"},
     };
   }
 }
