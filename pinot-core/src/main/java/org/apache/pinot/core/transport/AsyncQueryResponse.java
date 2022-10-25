@@ -128,7 +128,7 @@ public class AsyncQueryResponse implements QueryResponse {
     _responseMap.get(serverRoutingInstance).markRequestSubmitted();
   }
 
-  void markRequestSent(ServerRoutingInstance serverRoutingInstance, long requestSentLatencyMs) {
+  void markRequestSent(ServerRoutingInstance serverRoutingInstance, int requestSentLatencyMs) {
     _responseMap.get(serverRoutingInstance).markRequestSent(requestSentLatencyMs);
   }
 
