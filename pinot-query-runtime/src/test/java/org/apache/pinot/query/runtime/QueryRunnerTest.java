@@ -161,6 +161,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         //   - on intermediate stage
         new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
             + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+
+        // test regexpLike
+        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLike(a.col2, b.col1)", 9},
+        new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
     };
   }
 }

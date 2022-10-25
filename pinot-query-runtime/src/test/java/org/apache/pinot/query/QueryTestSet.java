@@ -211,9 +211,6 @@ public class QueryTestSet {
         new Object[]{"SELECT col1 FROM a WHERE col2 LIKE '%o%'"},
         new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE a.col2 LIKE b.col1"},
         new Object[]{"SELECT a.col1 LIKE b.col1 FROM a JOIN b ON a.col3 = b.col3"},
-        new Object[]{"SELECT col1 FROM a WHERE REGEXP_LIKE(col2, '.*o.*')"},
-        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE REGEXP_LIKE(a.col2, b.col1)"},
-        new Object[]{"SELECT REGEXP_LIKE(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3"},
     };
   }
 }
