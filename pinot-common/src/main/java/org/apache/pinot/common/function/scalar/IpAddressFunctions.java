@@ -19,13 +19,10 @@
 
 package org.apache.pinot.common.function.scalar;
 
-import com.google.common.net.InetAddresses;
 import inet.ipaddr.AddressStringException;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
 import inet.ipaddr.PrefixLenException;
-import java.math.BigInteger;
-import java.net.UnknownHostException;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -82,113 +79,5 @@ public class IpAddressFunctions {
     IPAddress prefix = getPrefix(ipPrefix);
     IPAddress ip = getAddress(ipAddress);
     return prefix.contains(ip);
-  }
-
-  // -------------- IN HOUSE IMPLEMENTATION STARTS HERE --------------
-  private static String[] fromPrefixToPair(String ipPrefix) {
-    if (!ipPrefix.contains("/")) {
-      throw new IllegalArgumentException("Invalid IP prefix: " + ipPrefix);
-    }
-    return ipPrefix.split("/");
-  }
-
-  private static byte[] fromStringToBytes(String ipAddress) {
-    byte[] address;
-    try {
-      address = InetAddresses.forString(ipAddress).getAddress();
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Invalid IP: " + ipAddress + " due to " + e.getMessage());
-    }
-    if (address.length != 4 && address.length != 16) {
-      throw new IllegalArgumentException(
-          "Valid IP address should have length 32 (IPv4) or 128 (IPv6). Invalid IP " + ipAddress + " has length "
-              + address.length);
-    }
-    return address;
-  }
-
-  private static byte[] getAddrMin(byte[] addr, int subnetSize) {
-    int numRangeBits = addr.length * 8 - subnetSize;
-    for (int i = 0; i < addr.length; i++) {
-      if (numRangeBits > i * 8) {
-        int shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
-        addr[addr.length - 1 - i] &= -0x1 << shift;
-      }
-    }
-    return addr;
-  }
-
-  private static byte[] getAddrMax(byte[] addr, int subnetSize) {
-    int numRangeBits = addr.length * 8 - subnetSize;
-    for (int i = 0; i < addr.length; i++) {
-      if (numRangeBits > i * 8) {
-        int shift = (numRangeBits - i * 8) < 8 ? (numRangeBits - i * 8) : 8;
-        addr[addr.length - 1 - i] |= ~(-0x1 << shift);
-      }
-    }
-    return addr;
-  }
-
-  /**
-   * Returns true if ipAddress is in the subnet of ipPrefix (IPv4 or IPv6)
-   */
-  @ScalarFunction
-  public static boolean isSubnetOfV1(String ipPrefix, String ipAddress)
-      throws UnknownHostException {
-    String[] prefixLengthPair = fromPrefixToPair(ipPrefix);
-    byte[] addr = fromStringToBytes(prefixLengthPair[0]);
-    int subnetSize = Integer.parseInt(prefixLengthPair[1]);
-    if (subnetSize < 0 || addr.length * 8 < subnetSize) {
-      throw new IllegalArgumentException("Invalid subnet size " + subnetSize
-          + ". IPv4 subnet size should be in range [0, 32]. IPv6 subnet size should be in range [0, 128].");
-    }
-    byte[] argAddress = fromStringToBytes(ipAddress);
-    if (argAddress.length != addr.length) {
-      String argType = argAddress.length == 32 ? "IPv4" : "IPv6";
-      String addrType = addr.length == 32 ? "IPv4" : "IPv6";
-      throw new IllegalArgumentException(ipAddress + " is " + argType + ", but " + ipPrefix + " is " + addrType);
-    }
-    if (subnetSize == 0) {
-      // all IPs are in range
-      return true;
-    }
-
-    /**
-     * Alg for checking if IP address arg is in the subnet of IP address addr with subnetSize
-     * which is the number of network bits (= number of 1's in the subnet mask).
-     *
-     * Given
-     * addr: [---network bits---][---random bits---]
-     *
-     * Compute
-     * addrMin: [---network bits---][---all 0's---]
-     *    [---network bits---][---random bits---]
-     *    &
-     *   [-----all 1's------][-----all 0's------]
-     *
-     * addrMax: [---network bits---][---all 1's---]
-     *    [---network bits---][---random bits---]
-     *    |
-     *   [-----all 0's------][-----all 1's------]
-     *
-     * Check
-     * addrMin <= arg <= addMax
-     */
-    // create a copy of addr for computing addrMax
-    byte[] maxBits = new byte[addr.length];
-    byte[] minBits = new byte[addr.length];
-    for (int i = 0; i < maxBits.length; i++) {
-      minBits[i] = addr[i];
-      maxBits[i] = addr[i];
-    }
-    // min
-    minBits = getAddrMin(minBits, subnetSize);
-    BigInteger addrMin = new BigInteger(minBits);
-
-    // max
-    maxBits = getAddrMax(maxBits, subnetSize);
-    BigInteger addrMax = new BigInteger(maxBits);
-    BigInteger arg = new BigInteger(argAddress);
-    return addrMin.compareTo(arg) <= 0 && addrMax.compareTo(arg) >= 0;
   }
 }
