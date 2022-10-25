@@ -92,7 +92,8 @@ import {
   requestDeleteUser,
   requestUpdateUser,
   getTaskProgress,
-  getSegmentReloadStatus
+  getSegmentReloadStatus,
+  getTaskRuntimeConfig
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -827,6 +828,12 @@ const getTasksList = async (tableName, taskType) => {
   return finalResponse;
 };
 
+const getTaskRuntimeConfigData = async (taskName: string) => {
+  const response = await getTaskRuntimeConfig(taskName);
+  
+  return response.data;
+}
+
 const getTaskDebugData = async (taskName) => {
   const debugRes = await getTaskDebug(taskName);
   return debugRes;
@@ -1117,6 +1124,7 @@ export default {
   fetchSegmentReloadStatus,
   getTaskTypeDebugData,
   getTableData,
+  getTaskRuntimeConfigData,
   getTaskInfo,
   stopAllTasks,
   resumeAllTasks,

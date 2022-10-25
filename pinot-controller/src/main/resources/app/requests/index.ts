@@ -20,7 +20,7 @@
 import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
   IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
-  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs
+  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig
 } from 'Models';
 
 const headers = {
@@ -125,6 +125,9 @@ export const getMinionMeta = (tableName: string, taskType: string): Promise<Axio
   
 export const getTasks = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/${tableName}/state`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskRuntimeConfig = (taskName: string): Promise<AxiosResponse<TaskRuntimeConfig>> =>
+  baseApi.get(`/tasks/task/${taskName}/runtime/config`, { headers: { ...headers, Accept: 'application/json' }});
 
 export const getTaskDebug = (taskName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/task/${taskName}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
