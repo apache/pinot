@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.segment.local.loader;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -45,6 +46,7 @@ import org.slf4j.LoggerFactory;
 public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TierBasedSegmentDirectoryLoader.class);
   private static final String SEGMENT_TIER_TRACK_FILE_SUFFIX = ".tier";
+  private static final int TRACK_FILE_VERSION = 1;
 
   /**
    * Creates and loads the {@link SegmentLocalFSDirectory} which is the default implementation of
@@ -100,8 +102,8 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
     if (!destDir.exists()) {
       segmentDirectory = new SegmentLocalFSDirectory(destDir);
     } else {
-      segmentDirectory = new SegmentLocalFSDirectory(destDir, ReadMode
-          .valueOf(segmentLoaderContext.getSegmentDirectoryConfigs().getProperty(IndexLoadingConfig.READ_MODE_KEY)));
+      segmentDirectory = new SegmentLocalFSDirectory(destDir, ReadMode.valueOf(
+          segmentLoaderContext.getSegmentDirectoryConfigs().getProperty(IndexLoadingConfig.READ_MODE_KEY)));
     }
     LOGGER.info("Created segmentDirectory object for segment: {} with dataDir: {} on targetTier: {}", segmentName,
         destDir, targetTierName);
@@ -136,30 +138,54 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
     File trackFile = new File(loaderContext.getTableDataDir(), segmentName + SEGMENT_TIER_TRACK_FILE_SUFFIX);
     if (segmentTier != null) {
       LOGGER.info("Persist segment tier: {} and path: {} in tier track file: {}", segmentTier, segmentPath, trackFile);
-      // This assumes that newline is not part of tier name or data path.
-      FileUtils.writeLines(trackFile, StandardCharsets.UTF_8.name(), Arrays.asList(segmentTier, segmentPath));
+      writeTo(trackFile, segmentTier, segmentPath);
     } else {
       LOGGER.info("Delete tier track file: {} for using default segment tier", trackFile);
       FileUtils.deleteQuietly(trackFile);
     }
   }
 
+  /**
+   * Track version of the track file to be a bit future-proof and avoid worry of escaping separator in tier name
+   * or data path. V1 is like [version][size][tier][size][path]
+   */
+  @VisibleForTesting
+  static void writeTo(File trackFile, String segmentTier, String segmentPath)
+      throws IOException {
+    byte[] tierBytes = segmentTier.getBytes(StandardCharsets.UTF_8);
+    byte[] pathBytes = segmentPath.getBytes(StandardCharsets.UTF_8);
+    ByteBuffer buf = ByteBuffer.allocate(4 + 4 + tierBytes.length + 4 + pathBytes.length);
+    buf.putInt(TRACK_FILE_VERSION);
+    buf.putInt(tierBytes.length);
+    buf.put(tierBytes);
+    buf.putInt(pathBytes.length);
+    buf.put(pathBytes);
+    FileUtils.writeByteArrayToFile(trackFile, buf.array());
+  }
+
   private String[] getSegmentTierPersistedLocally(String segmentName, SegmentDirectoryLoaderContext loaderContext)
       throws IOException {
     File trackFile = new File(loaderContext.getTableDataDir(), segmentName + SEGMENT_TIER_TRACK_FILE_SUFFIX);
-    if (trackFile.exists() && trackFile.length() > 0) {
-      List<String> tierPath = FileUtils.readLines(trackFile, StandardCharsets.UTF_8);
-      if (tierPath.size() == 2) {
-        LOGGER.info("Got segment tier: {} and path: {} from tier track file: {}", tierPath.get(0), tierPath.get(1),
-            trackFile);
-        return tierPath.toArray(new String[2]);
-      } else {
-        LOGGER.warn("Got lines: {} from tier track file: {} but not as expected", tierPath, trackFile);
-      }
-    } else {
+    if (!trackFile.exists()) {
       LOGGER.info("No tier track file: {} so using default segment tier", trackFile);
+      return new String[2];
     }
-    return new String[2];
+    Preconditions.checkState(trackFile.length() > 12, "Track file is too short: %s", trackFile.length());
+    byte[] bytes = FileUtils.readFileToByteArray(trackFile);
+    ByteBuffer buf = ByteBuffer.wrap(bytes);
+    // Check version of the track file.
+    int version = buf.getInt();
+    Preconditions.checkState(version == TRACK_FILE_VERSION, "Track file has unexpected version: %s", version);
+    // Move to [size][tier] to get tier name.
+    int offset = 4;
+    int size = buf.getInt();
+    String segmentTier = new String(bytes, offset + 4, size, StandardCharsets.UTF_8);
+    // Move to [size][path] to get data path.
+    offset += (4 + size);
+    buf.position(offset);
+    size = buf.getInt();
+    String segmentPath = new String(bytes, offset + 4, size, StandardCharsets.UTF_8);
+    return new String[]{segmentTier, segmentPath};
   }
 
   private void deleteSegmentTierPersistedLocally(String segmentName, SegmentDirectoryLoaderContext loaderContext) {

@@ -385,6 +385,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // Load from indexDir and replace the old segment in memory. What's inside indexDir
       // may come from SegmentDirectory.copyTo() or the segment downloaded from deep store.
       indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+      LOGGER.info("Load segment with data from indexDir: {} to tier: {}", indexDir,
+          TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
       ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema);
       addSegment(segment);
 

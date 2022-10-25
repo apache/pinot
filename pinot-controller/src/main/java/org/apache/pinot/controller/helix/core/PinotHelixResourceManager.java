@@ -2323,7 +2323,7 @@ public class PinotHelixResourceManager {
     recipientCriteria.setInstanceName("%");
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, null, forceDownload);
+    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient
@@ -2356,7 +2356,8 @@ public class PinotHelixResourceManager {
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setPartition(segmentName);
     recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, segmentName, forceDownload);
+    SegmentReloadMessage segmentReloadMessage =
+        new SegmentReloadMessage(tableNameWithType, Collections.singletonList(segmentName), forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient
