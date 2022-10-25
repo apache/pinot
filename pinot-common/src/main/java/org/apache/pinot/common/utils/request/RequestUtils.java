@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
