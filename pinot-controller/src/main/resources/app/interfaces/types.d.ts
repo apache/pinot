@@ -197,4 +197,11 @@ declare module 'Models' {
       tableName: string
     }
   }
+  
+  export interface TaskRuntimeConfig {
+    ConcurrentTasksPerWorker: string,
+    TaskTimeoutMs: string,
+    TaskExpireTimeMs: string,
+    MinionWorkerGroupTag: string
+  }
 }
