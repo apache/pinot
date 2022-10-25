@@ -193,7 +193,11 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
       throws Exception {
     PerfBenchmarkRunner perfBenchmarkRunner = new PerfBenchmarkRunner();
     CommandLine commandLine = new CommandLine(perfBenchmarkRunner);
-    commandLine.parseArgs(args);
+    CommandLine.ParseResult result = commandLine.parseArgs(args);
+    if (result.isUsageHelpRequested() || result.matchedArgs().size() == 0) {
+      commandLine.usage(System.out);
+      return;
+    }
     commandLine.execute();
   }
 }
