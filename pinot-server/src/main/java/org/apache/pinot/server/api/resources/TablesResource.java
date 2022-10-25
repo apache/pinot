@@ -520,7 +520,7 @@ public class TablesResource {
           Map<String, String> availabilityLagMap = new HashMap<>();
           realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
             recordsLagMap.put(k, v.getRecordsLag());
-            availabilityLagMap.put(k, v.getRecordAvailabilityLag());
+            availabilityLagMap.put(k, v.getRecordAvailabilityLagMs());
           });
           @Deprecated Map<String, String> partitiionToOffsetMap =
               realtimeSegmentDataManager.getPartitionToCurrentOffset();

@@ -40,7 +40,7 @@ public class PartitionLagState {
    *
    * @return Lag value in milliseconds
    */
-  public String getRecordAvailabilityLag() {
+  public String getRecordAvailabilityLagMs() {
     return NOT_CALCULATED;
   }
 }

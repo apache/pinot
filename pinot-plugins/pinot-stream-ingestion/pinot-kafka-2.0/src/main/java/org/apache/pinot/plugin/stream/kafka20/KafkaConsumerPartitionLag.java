@@ -35,7 +35,7 @@ public class KafkaConsumerPartitionLag extends PartitionLagState {
   }
 
   @Override
-  public String getRecordAvailabilityLag() {
+  public String getRecordAvailabilityLagMs() {
     return _recordAvailabilityLag;
   }
 }
