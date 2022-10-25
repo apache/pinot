@@ -46,13 +46,7 @@ public class IpAddressFunctions {
    * Validates IP prefix prefixStr and returns IPAddress if validated
    */
   private static IPAddress getPrefix(String prefixStr) {
-    IPAddressString prefix = new IPAddressString(prefixStr);
-    IPAddress prefixAddr;
-    try {
-      prefixAddr = prefix.toAddress();
-    } catch (AddressStringException e) {
-      throw new IllegalArgumentException("Invalid IP Address format for " + prefix);
-    }
+    IPAddress prefixAddr = getAddress(prefixStr);
     if (!prefixAddr.isPrefixed()) {
       throw new IllegalArgumentException("IP Address " + prefixStr + " should be prefixed.");
     }
@@ -78,6 +72,9 @@ public class IpAddressFunctions {
   public static boolean isSubnetOf(String ipPrefix, String ipAddress) {
     IPAddress prefix = getPrefix(ipPrefix);
     IPAddress ip = getAddress(ipAddress);
+    if (ip.isPrefixed()) {
+      throw new IllegalArgumentException("IP Address " + ipAddress + " should not be prefixed.");
+    }
     return prefix.contains(ip);
   }
 }

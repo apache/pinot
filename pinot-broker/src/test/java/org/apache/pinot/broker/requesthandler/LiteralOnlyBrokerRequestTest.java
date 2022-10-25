@@ -358,8 +358,54 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertTrue((boolean) rows.get(0)[0]);
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
+    // first argument must be in prefix format
     request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT isSubnetOf('2001:db8:85a3::8a2e:370:7334', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') as"
+            + " booleanCol\"}");
+    requestStats = Tracing.getTracer().createRequestScope();
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    Assert.assertTrue(
+        brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+
+    // first argument must be in prefix format
+    request = JsonUtils.stringToJsonNode(
+        "{\"sql\":\"SELECT isSubnetOf('10.34.0.32', '10.34.0.40') as"
+            + " booleanCol\"}");
+    requestStats = Tracing.getTracer().createRequestScope();
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    Assert.assertTrue(
+        brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+
+    // second argument should not be a prefix
+    request = JsonUtils.stringToJsonNode(
+        "{\"sql\":\"SELECT isSubnetOf('10.3.168.0/22', '10.187.84.128/26') as"
+            + " booleanCol\"}");
+    requestStats = Tracing.getTracer().createRequestScope();
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    Assert.assertTrue(
+        brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+
+    // second argument should not be a prefix
+    request = JsonUtils.stringToJsonNode(
+        "{\"sql\":\"SELECT isSubnetOf('2a04:f547:255:1::/64', '2620:119:50e7:101::/64') as"
+            + " booleanCol\"}");
+    requestStats = Tracing.getTracer().createRequestScope();
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    Assert.assertTrue(
+        brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+
+    // invalid prefix length
+    request = JsonUtils.stringToJsonNode(
+        "{\"sql\":\"SELECT isSubnetOf('2a04:f547:255:1::/129', '2620:119:50e7:101::') as"
+            + " booleanCol\"}");
+    requestStats = Tracing.getTracer().createRequestScope();
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    Assert.assertTrue(
+        brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+
+    // invalid prefix length
+    request = JsonUtils.stringToJsonNode(
+        "{\"sql\":\"SELECT isSubnetOf('10.3.168.0/33', '10.187.84.128') as"
             + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
