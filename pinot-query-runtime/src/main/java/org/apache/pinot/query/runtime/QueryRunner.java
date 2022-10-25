@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime;
 
+import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -51,8 +53,12 @@ import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.utils.ServerRequestUtils;
 import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,9 +118,8 @@ public class QueryRunner {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
       // server executor.
-      List<ServerQueryRequest> serverQueryRequests =
-          ServerRequestUtils.constructServerQueryRequest(distributedStagePlan, requestMetadataMap,
-              _helixPropertyStore);
+      List<ServerQueryRequest> serverQueryRequests = constructServerQueryRequests(distributedStagePlan,
+          requestMetadataMap, _helixPropertyStore);
 
       // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
       List<BaseDataBlock> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
@@ -137,6 +142,41 @@ public class QueryRunner {
     } else {
       _workerExecutor.processQuery(distributedStagePlan, requestMetadataMap, executorService);
     }
+  }
+
+  private static List<ServerQueryRequest> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
+      Map<String, String> requestMetadataMap, ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
+    StageMetadata stageMetadata = distributedStagePlan.getMetadataMap().get(distributedStagePlan.getStageId());
+    Preconditions.checkState(stageMetadata.getScannedTables().size() == 1,
+        "Server request for V2 engine should only have 1 scan table per request.");
+    String rawTableName = stageMetadata.getScannedTables().get(0);
+    Map<String, List<String>> tableToSegmentListMap = stageMetadata.getServerInstanceToSegmentsMap()
+        .get(distributedStagePlan.getServerInstance());
+    List<ServerQueryRequest> requests = new ArrayList<>();
+    for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
+      String tableType = tableEntry.getKey();
+      // ZkHelixPropertyStore extends from ZkCacheBaseDataAccessor so it should not cause too much out-of-the-box
+      // network traffic. but there's chance to improve this:
+      // TODO: use TableDataManager: it is already getting tableConfig and Schema when processing segments.
+      if (TableType.OFFLINE.name().equals(tableType)) {
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
+            TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
+        Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
+            TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
+        requests.add(ServerRequestUtils.build(distributedStagePlan, requestMetadataMap, tableConfig, schema,
+            stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, tableEntry.getValue()));
+      } else if (TableType.REALTIME.name().equals(tableType)) {
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
+            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
+        Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
+            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
+        requests.add(ServerRequestUtils.build(distributedStagePlan, requestMetadataMap, tableConfig, schema,
+            stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, tableEntry.getValue()));
+      } else {
+        throw new IllegalArgumentException("Unsupported table type key: " + tableType);
+      }
+    }
+    return requests;
   }
 
   private BaseDataBlock processServerQuery(ServerQueryRequest serverQueryRequest, ExecutorService executorService) {

@@ -18,47 +18,22 @@
  */
 package org.apache.pinot.query.runtime.utils;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
-import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
-import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.query.parser.CalciteRexExpressionParser;
-import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
-import org.apache.pinot.query.planner.stage.SortNode;
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.ServerRequestPlanVisitor;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.sql.FilterKind;
-import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter;
-import org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter;
-import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
-import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 
 
 /**
@@ -68,75 +43,28 @@ import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
  * conversion step is needed so that the V2 query plan can be converted into a compatible format to run V1 executor.
  */
 public class ServerRequestUtils {
-  private static final int DEFAULT_LEAF_NODE_LIMIT = 10_000_000;
-  private static final List<String> QUERY_REWRITERS_CLASS_NAMES =
-      ImmutableList.of(
-          PredicateComparisonRewriter.class.getName(),
-          NonAggregationGroupByToDistinctQueryRewriter.class.getName()
-      );
-  private static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(
-      QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
-  private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
 
   private ServerRequestUtils() {
     // do not instantiate.
   }
 
-  // TODO: This is a hack, make an actual ServerQueryRequest converter.
-  public static List<ServerQueryRequest> constructServerQueryRequest(DistributedStagePlan distributedStagePlan,
-      Map<String, String> requestMetadataMap, ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
-    StageMetadata stageMetadata = distributedStagePlan.getMetadataMap().get(distributedStagePlan.getStageId());
-    Preconditions.checkState(stageMetadata.getScannedTables().size() == 1,
-        "Server request for V2 engine should only have 1 scan table per request.");
-    String rawTableName = stageMetadata.getScannedTables().get(0);
-    Map<String, List<String>> tableToSegmentListMap = stageMetadata.getServerInstanceToSegmentsMap()
-        .get(distributedStagePlan.getServerInstance());
-    List<ServerQueryRequest> requests = new ArrayList<>();
-    for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
-      String tableType = tableEntry.getKey();
-      // ZkHelixPropertyStore extends from ZkCacheBaseDataAccessor so it should not cause too much out-of-the-box
-      // network traffic. but there's chance to improve this:
-      // TODO: use TableDataManager: it is already getting tableConfig and Schema when processing segments.
-      if (TableType.OFFLINE.name().equals(tableType)) {
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
-            TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
-        Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
-            TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
-        requests.add(constructServerQueryRequest(distributedStagePlan, requestMetadataMap, tableConfig, schema,
-            stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, tableEntry.getValue()));
-      } else if (TableType.REALTIME.name().equals(tableType)) {
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
-            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
-        Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
-            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
-        requests.add(constructServerQueryRequest(distributedStagePlan, requestMetadataMap, tableConfig, schema,
-            stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, tableEntry.getValue()));
-      } else {
-        throw new IllegalArgumentException("Unsupported table type key: " + tableType);
-      }
-    }
-    return requests;
-  }
-
-  public static ServerQueryRequest constructServerQueryRequest(DistributedStagePlan distributedStagePlan,
+  public static ServerQueryRequest build(DistributedStagePlan stagePlan,
       Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema,
       TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList) {
+    PinotQuery pinotQuery = ServerRequestPlanVisitor.build(stagePlan, tableConfig, schema, timeBoundaryInfo, tableType);
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(Long.parseLong(requestMetadataMap.get("REQUEST_ID")));
     instanceRequest.setBrokerId("unknown");
     instanceRequest.setEnableTrace(false);
     instanceRequest.setSearchSegments(segmentList);
-    instanceRequest.setQuery(constructBrokerRequest(distributedStagePlan, tableType, tableConfig, schema,
-        timeBoundaryInfo));
+    instanceRequest.setQuery(toBrokerRequest(pinotQuery));
     return new ServerQueryRequest(instanceRequest, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
         System.currentTimeMillis());
   }
 
   // TODO: this is a hack, create a broker request object should not be needed because we rewrite the entire
   // query into stages already.
-  public static BrokerRequest constructBrokerRequest(DistributedStagePlan distributedStagePlan, TableType tableType,
-      TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo) {
-    PinotQuery pinotQuery = constructPinotQuery(distributedStagePlan, tableType, tableConfig, schema, timeBoundaryInfo);
+  public static BrokerRequest toBrokerRequest(PinotQuery pinotQuery) {
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setPinotQuery(pinotQuery);
     // Set table name in broker request because it is used for access control, query routing etc.
@@ -147,89 +75,5 @@ public class ServerRequestUtils {
       brokerRequest.setQuerySource(querySource);
     }
     return brokerRequest;
-  }
-
-  public static PinotQuery constructPinotQuery(DistributedStagePlan distributedStagePlan, TableType tableType,
-      TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo) {
-    PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
-    pinotQuery.setExplain(false);
-    walkStageTree(distributedStagePlan.getStageRoot(), pinotQuery, tableType);
-    if (timeBoundaryInfo != null) {
-      attachTimeBoundary(pinotQuery, timeBoundaryInfo, tableType == TableType.OFFLINE);
-    }
-    for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
-      pinotQuery = queryRewriter.rewrite(pinotQuery);
-    }
-    QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
-    return pinotQuery;
-  }
-
-  private static void walkStageTree(StageNode node, PinotQuery pinotQuery, TableType tableType) {
-    // this walkStageTree should only be a sequential walk.
-    for (StageNode child : node.getInputs()) {
-      walkStageTree(child, pinotQuery, tableType);
-    }
-    if (node instanceof TableScanNode) {
-      TableScanNode tableScanNode = (TableScanNode) node;
-      DataSource dataSource = new DataSource();
-      String tableNameWithType = TableNameBuilder.forType(tableType)
-          .tableNameWithType(TableNameBuilder.extractRawTableName(tableScanNode.getTableName()));
-      dataSource.setTableName(tableNameWithType);
-      pinotQuery.setDataSource(dataSource);
-      pinotQuery.setSelectList(tableScanNode.getTableScanColumns().stream().map(RequestUtils::getIdentifierExpression)
-          .collect(Collectors.toList()));
-    } else if (node instanceof FilterNode) {
-      pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(
-          ((FilterNode) node).getCondition(), pinotQuery));
-    } else if (node instanceof ProjectNode) {
-      pinotQuery.setSelectList(CalciteRexExpressionParser.overwriteSelectList(
-          ((ProjectNode) node).getProjects(), pinotQuery));
-    } else if (node instanceof AggregateNode) {
-      // set group-by list
-      pinotQuery.setGroupByList(CalciteRexExpressionParser.convertGroupByList(
-          ((AggregateNode) node).getGroupSet(), pinotQuery));
-      // set agg list
-      pinotQuery.setSelectList(CalciteRexExpressionParser.addSelectList(pinotQuery.getGroupByList(),
-          ((AggregateNode) node).getAggCalls(), pinotQuery));
-    } else if (node instanceof SortNode) {
-      if (((SortNode) node).getCollationKeys().size() > 0) {
-        pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(((SortNode) node).getCollationKeys(),
-            ((SortNode) node).getCollationDirections(), pinotQuery));
-      }
-      if (((SortNode) node).getFetch() > 0) {
-        pinotQuery.setLimit(((SortNode) node).getFetch());
-      }
-      if (((SortNode) node).getOffset() > 0) {
-        pinotQuery.setOffset(((SortNode) node).getOffset());
-      }
-    } else if (node instanceof MailboxSendNode) {
-      // TODO: MailboxSendNode should be the root of the leaf stage. but ignore for now since it is handle seperately
-      // in QueryRunner as a single step sender.
-    } else {
-      throw new UnsupportedOperationException("Unsupported logical plan node: " + node);
-    }
-  }
-
-  /**
-   * Helper method to attach the time boundary to the given PinotQuery.
-   */
-  private static void attachTimeBoundary(PinotQuery pinotQuery, TimeBoundaryInfo timeBoundaryInfo,
-      boolean isOfflineRequest) {
-    String timeColumn = timeBoundaryInfo.getTimeColumn();
-    String timeValue = timeBoundaryInfo.getTimeValue();
-    Expression timeFilterExpression = RequestUtils.getFunctionExpression(
-        isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name());
-    timeFilterExpression.getFunctionCall().setOperands(
-        Arrays.asList(RequestUtils.getIdentifierExpression(timeColumn), RequestUtils.getLiteralExpression(timeValue)));
-
-    Expression filterExpression = pinotQuery.getFilterExpression();
-    if (filterExpression != null) {
-      Expression andFilterExpression = RequestUtils.getFunctionExpression(FilterKind.AND.name());
-      andFilterExpression.getFunctionCall().setOperands(Arrays.asList(filterExpression, timeFilterExpression));
-      pinotQuery.setFilterExpression(andFilterExpression);
-    } else {
-      pinotQuery.setFilterExpression(timeFilterExpression);
-    }
   }
 }

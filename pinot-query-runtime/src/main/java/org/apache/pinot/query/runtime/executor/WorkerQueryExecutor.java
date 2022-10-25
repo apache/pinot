@@ -29,6 +29,8 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,8 +73,8 @@ public class WorkerQueryExecutor {
     long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
     StageNode stageRoot = queryRequest.getStageRoot();
 
-    Operator<TransferableBlock> rootOperator = PhysicalPlanVisitor.build(
-        _mailboxService, _hostName, _port, requestId, queryRequest.getMetadataMap(), stageRoot);
+    Operator<TransferableBlock> rootOperator = PhysicalPlanVisitor.build(_mailboxService, stageRoot,
+        new PlanRequestContext(requestId, stageRoot.getStageId(), _hostName, _port, queryRequest.getMetadataMap()));
 
     executorService.submit(new TraceRunnable() {
       @Override
