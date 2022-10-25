@@ -50,12 +50,9 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-dumpStarTree"})
   private boolean _dumpStarTree = false;
 
-  public void doMain(String[] args)
-      throws Exception {
-    CommandLine commandLine = new CommandLine(this);
-    commandLine.parseArgs(args);
-    dump();
-  }
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
+      description = "Print this message.")
+  private boolean _help = false;
 
   private void dump()
       throws Exception {
@@ -149,7 +146,14 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
 
   public static void main(String[] args)
       throws Exception {
-    new SegmentDumpTool().doMain(args);
+    SegmentDumpTool tool = new SegmentDumpTool();
+    CommandLine commandLine = new CommandLine(tool);
+    CommandLine.ParseResult result = commandLine.parseArgs(args);
+    if (commandLine.isUsageHelpRequested() || result.matchedArgs().size() == 0) {
+      commandLine.usage(System.out);
+      return;
+    }
+    tool.execute();
   }
 
   public String getName() {
@@ -170,6 +174,6 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean getHelp() {
-    return false;
+    return _help;
   }
 }

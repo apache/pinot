@@ -43,7 +43,7 @@ public class PinotToolLauncher {
     SUBCOMMAND_MAP.put("SegmentDump", new SegmentDumpTool());
   }
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
       description = "Print this message.")
   boolean _help = false;
 
