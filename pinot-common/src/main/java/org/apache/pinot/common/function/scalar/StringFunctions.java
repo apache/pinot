@@ -488,7 +488,7 @@ public class StringFunctions {
   }
 
   /**
-   * TODO: Revisit if index should be zero-based
+   * TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
    * @param input
    * @param delimiter
    * @param index
