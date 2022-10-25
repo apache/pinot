@@ -280,24 +280,24 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testStringSplitTransformFunction() {
     ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("split(%s, ',')", STRING_ALPHANUM_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("split(%s, 'ab')", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "split");
     String[][] expectedValues = new String[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = StringUtils.split(_stringAlphaNumericSVValues[i], ",");
+      expectedValues[i] = StringUtils.splitByWholeSeparator(_stringAlphaNumericSVValues[i], "ab");
     }
     testTransformFunctionMV(transformFunction, expectedValues);
 
     expression = RequestContextUtils.getExpression(
-        String.format("split(%s, ',', %s)", STRING_ALPHANUM_SV_COLUMN, INT_SV_COLUMN));
+        String.format("split(%s, 'ab', %s)", STRING_ALPHANUM_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "split");
     expectedValues = new String[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = StringUtils.split(_stringAlphaNumericSVValues[i], ",", _intSVValues[i]);
+      expectedValues[i] = StringUtils.splitByWholeSeparator(_stringAlphaNumericSVValues[i], "ab", _intSVValues[i]);
     }
     testTransformFunctionMV(transformFunction, expectedValues);
   }
@@ -306,13 +306,13 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   public void testStringSplitPartTransformFunction() {
     int index = 2;
     ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("split_part(%s, ',', %d)", STRING_ALPHANUM_SV_COLUMN, index));
+        RequestContextUtils.getExpression(String.format("split_part(%s, 'ab', %d)", STRING_ALPHANUM_SV_COLUMN, index));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "splitPart");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      String[] splitString = StringUtils.split(_stringAlphaNumericSVValues[i], ",");
+      String[] splitString = StringUtils.splitByWholeSeparator(_stringAlphaNumericSVValues[i], "ab");
       if (splitString.length > index) {
         expectedValues[i] = splitString[i];
       } else {
@@ -871,8 +871,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   public void testArrayElementAtInt() {
     Random rand = new Random();
     int index = rand.nextInt(MAX_NUM_MULTI_VALUES);
-    ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("array_element_at_int(%s, %d)", INT_MV_COLUMN, index + 1));
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("array_element_at_int(%s, %d)", INT_MV_COLUMN, index + 1));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
@@ -889,8 +889,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   public void testArrayElementAtLong() {
     Random rand = new Random();
     int index = rand.nextInt(MAX_NUM_MULTI_VALUES);
-    ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("array_element_at_long(%s, %d)", LONG_MV_COLUMN, index + 1));
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("array_element_at_long(%s, %d)", LONG_MV_COLUMN, index + 1));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.LONG);
@@ -907,8 +907,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   public void testArrayElementAtFloat() {
     Random rand = new Random();
     int index = rand.nextInt(MAX_NUM_MULTI_VALUES);
-    ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("array_element_at_float(%s, %d)", FLOAT_MV_COLUMN, index + 1));
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("array_element_at_float(%s, %d)", FLOAT_MV_COLUMN, index + 1));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.FLOAT);

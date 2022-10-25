@@ -473,7 +473,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String[] split(String input, String delimiter) {
-    return StringUtils.split(input, delimiter);
+    return StringUtils.splitByWholeSeparator(input, delimiter);
   }
 
   /**
@@ -484,10 +484,11 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String[] split(String input, String delimiter, int limit) {
-    return StringUtils.split(input, delimiter, limit);
+    return StringUtils.splitByWholeSeparator(input, delimiter, limit);
   }
 
   /**
+   * TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
    * @param input
    * @param delimiter
    * @param index
@@ -495,7 +496,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int index) {
-    String[] splitString = StringUtils.split(input, delimiter);
+    String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
     if (index < splitString.length) {
       return splitString[index];
     } else {
