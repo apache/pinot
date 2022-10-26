@@ -437,7 +437,7 @@ public class TablesResource {
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
           String realtimeTableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
-      @ApiParam(value = "Whether to update hdfs url") @QueryParam("updateUrl") boolean updateUrl)
+      @ApiParam(value = "Whether to update hdfs url") @QueryParam("updateUrl") @DefaultValue("false") boolean updateUrl)
       throws Exception {
     LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
         realtimeTableName);
