@@ -19,7 +19,9 @@
 package org.apache.pinot.query.runtime.plan.server;
 
 import java.util.Map;
+import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.spi.config.table.TableType;
@@ -31,13 +33,18 @@ import org.apache.pinot.spi.config.table.TableType;
  */
 public class ServerPlanRequestContext extends PlanRequestContext {
   protected TableType _tableType;
-  protected PinotQuery _pinotQuery;
+  protected TimeBoundaryInfo _timeBoundaryInfo;
 
-  public ServerPlanRequestContext(int requestId, int stageId, String hostName, int port,
-      Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery, TableType tableType) {
+  protected PinotQuery _pinotQuery;
+  protected InstanceRequest _instanceRequest;
+
+  public ServerPlanRequestContext(long requestId, int stageId, String hostName, int port,
+      Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery, TableType tableType,
+      TimeBoundaryInfo timeBoundaryInfo) {
     super(requestId, stageId, hostName, port, metadataMap);
     _pinotQuery = pinotQuery;
     _tableType = tableType;
+    _timeBoundaryInfo = timeBoundaryInfo;
   }
 
   public TableType getTableType() {
@@ -46,5 +53,13 @@ public class ServerPlanRequestContext extends PlanRequestContext {
 
   public PinotQuery getPinotQuery() {
     return _pinotQuery;
+  }
+
+  public void setInstanceRequest(InstanceRequest instanceRequest) {
+    _instanceRequest = instanceRequest;
+  }
+
+  public InstanceRequest getInstanceRequest() {
+    return _instanceRequest;
   }
 }

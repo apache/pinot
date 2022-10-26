@@ -22,10 +22,14 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -83,15 +87,23 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     return _instance;
   }
 
-  public static PinotQuery build(DistributedStagePlan stagePlan, TableConfig tableConfig, Schema schema,
-      TimeBoundaryInfo timeBoundaryInfo, TableType tableType) {
+  public static ServerPlanRequestContext build(DistributedStagePlan stagePlan, Map<String, String> requestMetadataMap,
+      TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo, TableType tableType,
+      List<String> segmentList) {
+    // Before-visit: construct the ServerPlanRequestContext baseline
+    long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
     PinotQuery pinotQuery = new PinotQuery();
     pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
     pinotQuery.setExplain(false);
-    ServerPlanRequestContext context = new ServerPlanRequestContext(-1, stagePlan.getStageId(),
+    ServerPlanRequestContext context = new ServerPlanRequestContext(requestId, stagePlan.getStageId(),
         stagePlan.getServerInstance().getHostname(), stagePlan.getServerInstance().getPort(),
-        stagePlan.getMetadataMap(), pinotQuery, tableType);
+        stagePlan.getMetadataMap(), pinotQuery, tableType, timeBoundaryInfo);
+
+    // visit the plan and create query physical plan.
     ServerRequestPlanVisitor.walkStageNode(stagePlan.getStageRoot(), context);
+
+    // Post-visit: finalize context.
+    // 1. global rewrite/optimize
     if (timeBoundaryInfo != null) {
       attachTimeBoundary(pinotQuery, timeBoundaryInfo, tableType == TableType.OFFLINE);
     }
@@ -99,8 +111,31 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
       pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
     QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
-    return pinotQuery;
+
+    // 2. wrapped around in broker request
+    BrokerRequest brokerRequest = new BrokerRequest();
+    brokerRequest.setPinotQuery(pinotQuery);
+    DataSource dataSource = pinotQuery.getDataSource();
+    if (dataSource != null) {
+      QuerySource querySource = new QuerySource();
+      querySource.setTableName(dataSource.getTableName());
+      brokerRequest.setQuerySource(querySource);
+    }
+
+    // 3. create instance request with segmentList
+    InstanceRequest instanceRequest = new InstanceRequest();
+    instanceRequest.setRequestId(requestId);
+    instanceRequest.setBrokerId("unknown");
+    instanceRequest.setEnableTrace(false);
+    instanceRequest.setSearchSegments(segmentList);
+    instanceRequest.setQuery(brokerRequest);
+
+    context.setInstanceRequest(instanceRequest);
+    return context;
   }
+
+
+
 
   private static void walkStageNode(StageNode node, ServerPlanRequestContext context) {
     node.visit(getInstance(), context);

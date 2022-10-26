@@ -51,12 +51,14 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
-import org.apache.pinot.query.runtime.utils.ServerRequestUtils;
+import org.apache.pinot.query.runtime.plan.ServerRequestPlanVisitor;
+import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -118,12 +120,14 @@ public class QueryRunner {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
       // server executor.
-      List<ServerQueryRequest> serverQueryRequests = constructServerQueryRequests(distributedStagePlan,
+      List<ServerPlanRequestContext> serverQueryRequests = constructServerQueryRequests(distributedStagePlan,
           requestMetadataMap, _helixPropertyStore);
 
       // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
       List<BaseDataBlock> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
-      for (ServerQueryRequest request : serverQueryRequests) {
+      for (ServerPlanRequestContext requestContext : serverQueryRequests) {
+        ServerQueryRequest request = new ServerQueryRequest(requestContext.getInstanceRequest(),
+            new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
         serverQueryResults.add(processServerQuery(request, executorService));
       }
 
@@ -144,7 +148,7 @@ public class QueryRunner {
     }
   }
 
-  private static List<ServerQueryRequest> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
+  private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
       Map<String, String> requestMetadataMap, ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
     StageMetadata stageMetadata = distributedStagePlan.getMetadataMap().get(distributedStagePlan.getStageId());
     Preconditions.checkState(stageMetadata.getScannedTables().size() == 1,
@@ -152,7 +156,7 @@ public class QueryRunner {
     String rawTableName = stageMetadata.getScannedTables().get(0);
     Map<String, List<String>> tableToSegmentListMap = stageMetadata.getServerInstanceToSegmentsMap()
         .get(distributedStagePlan.getServerInstance());
-    List<ServerQueryRequest> requests = new ArrayList<>();
+    List<ServerPlanRequestContext> requests = new ArrayList<>();
     for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
       String tableType = tableEntry.getKey();
       // ZkHelixPropertyStore extends from ZkCacheBaseDataAccessor so it should not cause too much out-of-the-box
@@ -163,14 +167,14 @@ public class QueryRunner {
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
         Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
-        requests.add(ServerRequestUtils.build(distributedStagePlan, requestMetadataMap, tableConfig, schema,
+        requests.add(ServerRequestPlanVisitor.build(distributedStagePlan, requestMetadataMap, tableConfig, schema,
             stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, tableEntry.getValue()));
       } else if (TableType.REALTIME.name().equals(tableType)) {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
         Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
-        requests.add(ServerRequestUtils.build(distributedStagePlan, requestMetadataMap, tableConfig, schema,
+        requests.add(ServerRequestPlanVisitor.build(distributedStagePlan, requestMetadataMap, tableConfig, schema,
             stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, tableEntry.getValue()));
       } else {
         throw new IllegalArgumentException("Unsupported table type key: " + tableType);
