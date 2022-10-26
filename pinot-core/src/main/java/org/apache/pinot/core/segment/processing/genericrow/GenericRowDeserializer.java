@@ -82,6 +82,15 @@ public class GenericRowDeserializer {
             buffer.putValue(fieldName, _dataBuffer.getDouble(offset));
             offset += Double.BYTES;
             break;
+          case BIG_DECIMAL: {
+            int numBytes = _dataBuffer.getInt(offset);
+            offset += Integer.BYTES;
+            byte[] bigDecimalBytes = new byte[numBytes];
+            _dataBuffer.copyTo(offset, bigDecimalBytes);
+            offset += numBytes;
+            buffer.putValue(fieldName, BigDecimalUtils.deserialize(bigDecimalBytes));
+            break;
+          }
           case STRING: {
             int numBytes = _dataBuffer.getInt(offset);
             offset += Integer.BYTES;
@@ -98,15 +107,6 @@ public class GenericRowDeserializer {
             _dataBuffer.copyTo(offset, bytes);
             offset += numBytes;
             buffer.putValue(fieldName, bytes);
-            break;
-          }
-          case BIG_DECIMAL: {
-            int numBytes = _dataBuffer.getInt(offset);
-            offset += Integer.BYTES;
-            byte[] bigDecimalBytes = new byte[numBytes];
-            _dataBuffer.copyTo(offset, bigDecimalBytes);
-            offset += numBytes;
-            buffer.putValue(fieldName, BigDecimalUtils.deserialize(bigDecimalBytes));
             break;
           }
           default:

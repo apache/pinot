@@ -98,6 +98,11 @@ public class GenericRowSerializer {
           case DOUBLE:
             numBytes += Double.BYTES;
             break;
+          case BIG_DECIMAL:
+            byte[] bigDecimalBytes = BigDecimalUtils.serialize((BigDecimal) value);
+            numBytes += Integer.BYTES + bigDecimalBytes.length;
+            _objectBytes[i] = bigDecimalBytes;
+            break;
           case STRING:
             byte[] stringBytes = ((String) value).getBytes(UTF_8);
             numBytes += Integer.BYTES + stringBytes.length;
@@ -105,11 +110,6 @@ public class GenericRowSerializer {
             break;
           case BYTES:
             numBytes += Integer.BYTES + ((byte[]) value).length;
-            break;
-          case BIG_DECIMAL:
-            byte[] bigDecimalBytes = BigDecimalUtils.serialize((BigDecimal) value);
-            numBytes += Integer.BYTES + bigDecimalBytes.length;
-            _objectBytes[i] = bigDecimalBytes;
             break;
           default:
             throw new IllegalStateException("Unsupported SV stored type: " + _storedTypes[i]);
@@ -183,8 +183,8 @@ public class GenericRowSerializer {
           case DOUBLE:
             byteBuffer.putDouble((double) value);
             break;
-          case STRING:
           case BIG_DECIMAL:
+          case STRING:
             byte[] objectBytes = (byte[]) _objectBytes[i];
             byteBuffer.putInt(objectBytes.length);
             byteBuffer.put(objectBytes);
