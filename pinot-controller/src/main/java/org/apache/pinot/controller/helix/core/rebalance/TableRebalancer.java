@@ -37,6 +37,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.AccessOption;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -46,6 +47,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
@@ -383,6 +385,17 @@ public class TableRebalancer {
     }
   }
 
+  public RebalanceResult.Status rebalanceStatus(String tableNameWithType,IdealState idealState,ExternalView externalView){
+
+     if (idealState==null){
+       throw  new IllegalStateException("ideal state is empty");
+     }
+    if (externalView!=null && isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
+        idealState.getRecord().getMapFields(), true)) {
+      return RebalanceResult.Status.DONE;
+    }
+    return  RebalanceResult.Status.IN_PROGRESS;
+  }
   private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap(TableConfig tableConfig,
       boolean reassignInstances, boolean dryRun) {
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
@@ -558,6 +571,7 @@ public class TableRebalancer {
   static boolean isExternalViewConverged(String tableNameWithType,
       Map<String, Map<String, String>> externalViewSegmentStates,
       Map<String, Map<String, String>> idealStateSegmentStates, boolean bestEfforts) {
+
     for (Map.Entry<String, Map<String, String>> entry : idealStateSegmentStates.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> externalViewInstanceStateMap = externalViewSegmentStates.get(segmentName);

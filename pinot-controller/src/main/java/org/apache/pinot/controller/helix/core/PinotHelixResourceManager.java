@@ -3057,6 +3057,21 @@ public class PinotHelixResourceManager {
     return new TableRebalancer(_helixZkManager).rebalance(tableConfig, rebalanceConfig);
   }
 
+  public RebalanceResult.Status rebalanceTableStatus(String tableNameWithType)
+      throws TableNotFoundException {
+
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
+    }
+
+    IdealState idealState =getHelixAdmin().getResourceIdealState(getHelixClusterName(), tableNameWithType);
+    ExternalView externalView=getHelixAdmin().getResourceExternalView(getHelixClusterName(), tableNameWithType);
+
+    return new TableRebalancer(_helixZkManager).rebalanceStatus(tableNameWithType,idealState,externalView);
+
+  }
+
   /**
    * Check if an Instance exists in the Helix cluster.
    *

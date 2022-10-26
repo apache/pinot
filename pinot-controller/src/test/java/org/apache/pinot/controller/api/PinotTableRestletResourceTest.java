@@ -479,12 +479,34 @@ public class PinotTableRestletResourceTest {
     // Create the table
     ControllerTest.sendPostRequest(_createTableUrl, _offlineBuilder.build().toJsonString());
 
+    System.out.print( TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"));
     // Rebalance should return status NO_OP
     RebalanceResult rebalanceResult = JsonUtils.stringToObject(ControllerTest.sendPostRequest(
             TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"),
             null),
         RebalanceResult.class);
     Assert.assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+  }
+
+
+  @Test
+  public void checkRebalanceStatus()
+      throws Exception {
+
+    // Create the table
+    ControllerTest.sendPostRequest(_createTableUrl, _offlineBuilder.build().toJsonString());
+
+    // Rebalance table
+    ControllerTest.sendPostRequest(
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"),
+        null);
+
+    // Check rebalance status
+    String respnose = ControllerTest.sendGetRequest(
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalanceStatus(OFFLINE_TABLE_NAME, "offline"),
+        null);
+
+    Assert.assertEquals(respnose, "{\"status\":\"IN_PROGRESS\"}");
   }
 
   @Test

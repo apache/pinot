@@ -688,6 +688,28 @@ public class PinotTableRestletResource {
   }
 
   @GET
+  @Path("/tables/{tableName}/rebalance/status")
+  @ApiOperation(value = "Table rebalance status",
+      notes = "Provides status after rebalancing table")
+  public String getTableRebalnceStatus(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr
+  ){
+
+    try {
+        String tableNameWithType=constructTableNameWithType(tableName,tableTypeStr);
+        RebalanceResult.Status status= _pinotHelixResourceManager.rebalanceTableStatus(tableNameWithType);
+        ObjectNode data = JsonUtils.newObjectNode();
+      data.put("status", status.toString());
+      return data.toString();
+
+    }catch(TableNotFoundException e){
+
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    }
+  }
+
+  @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/state")
   @ApiOperation(value = "Get current table state", notes = "Get current table state")
@@ -733,6 +755,7 @@ public class PinotTableRestletResource {
     try {
       tableType = TableType.valueOf(tableTypeStr.toUpperCase());
     } catch (Exception e) {
+
       throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
           Response.Status.BAD_REQUEST);
     }

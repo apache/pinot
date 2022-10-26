@@ -218,6 +218,12 @@ public class ControllerRequestURLBuilder {
     return stringBuilder.toString();
   }
 
+  public String forTableRebalanceStatus(String tableName, String tableType) {
+    StringBuilder stringBuilder =
+        new StringBuilder(StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance","status?type=" + tableType));
+    return stringBuilder.toString();
+  }
+
   public String forTableReload(String tableName, TableType tableType, boolean forceDownload) {
     String query = String.format("reload?type=%s&forceDownload=%s", tableType.name(), forceDownload);
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
