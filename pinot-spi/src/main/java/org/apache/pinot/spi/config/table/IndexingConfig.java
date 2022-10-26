@@ -57,11 +57,16 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _nullHandlingEnabled;
 
   /**
-   * If `optimizeDictionaryForMetrics` enabled, dictionary is not created for the high-cardinality
+   * If `optimizeDictionary` enabled, dictionary is not created for the high-cardinality
    * single-valued columns for which rawIndexSize / forwardIndexSize is less than the `noDictionarySizeRatioThreshold`.
    * It also disables dictionary for json and text columns.
    */
   private boolean _optimizeDictionary;
+
+  // Present only for backward compatibility. Please use `optimizeDictionary` for new tables.
+  @Deprecated
+  private boolean _optimizeDictionaryForMetrics;
+
   private double _noDictionarySizeRatioThreshold;
 
   // TODO: Add a new configuration related to the segment generation
@@ -300,6 +305,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setOptimizeDictionary(boolean optimizeDictionary) {
     _optimizeDictionary = optimizeDictionary;
+  }
+
+  public boolean isOptimizeDictionaryForMetrics() {
+    return _optimizeDictionaryForMetrics;
+  }
+
+  public void setOptimizeDictionaryForMetrics(boolean optimizeDictionaryForMetrics) {
+    _optimizeDictionaryForMetrics = optimizeDictionaryForMetrics;
   }
 
   public double getNoDictionarySizeRatioThreshold() {

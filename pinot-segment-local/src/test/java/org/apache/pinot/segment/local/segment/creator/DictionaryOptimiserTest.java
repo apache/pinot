@@ -21,8 +21,11 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
@@ -34,6 +37,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -114,6 +118,11 @@ public class DictionaryOptimiserTest {
         Assert.assertFalse(heapSegment.getForwardIndex(columnName).isDictionaryEncoded(),
             "No Raw index for high cardinality columns");
       }
+
+      if (columnName.contains("key")) {
+        Assert.assertFalse(heapSegment.getSegmentMetadata().getColumnMetadataFor(columnName).hasDictionary(),
+            "Dictionary found for text index column");
+      }
     }
   }
 
@@ -128,10 +137,19 @@ public class DictionaryOptimiserTest {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setRowTimeValueCheck(false);
     ingestionConfig.setSegmentTimeValueCheck(false);
+    Schema schema = extractSchemaFromAvroWithoutTime(inputAvro);
+    List<DimensionFieldSpec> stringColumns =
+        schema.getDimensionFieldSpecs().stream().filter(x -> x.getDataType() == FieldSpec.DataType.STRING).collect(
+        Collectors.toList());
+
+    List<FieldConfig> fieldConfigList = stringColumns.stream()
+        .map(x -> new FieldConfig(x.getName(), FieldConfig.EncodingType.DICTIONARY,
+        Collections.singletonList(FieldConfig.IndexType.TEXT), null, null)).collect(Collectors.toList());
+
     final SegmentGeneratorConfig segmentGenSpec =
         new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
-            .setIngestionConfig(ingestionConfig).build(),
-            extractSchemaFromAvroWithoutTime(inputAvro));
+            .setIngestionConfig(ingestionConfig).setFieldConfigList(fieldConfigList).build(),
+            schema);
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setTimeColumnName(timeColumn);
     segmentGenSpec.setSegmentTimeUnit(timeUnit);

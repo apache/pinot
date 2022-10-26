@@ -242,6 +242,11 @@ public class SegmentGeneratorConfig implements Serializable {
       _fstTypeForFSTIndex = indexingConfig.getFSTIndexType();
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
       _optimizeDictionary = indexingConfig.isOptimizeDictionary();
+
+      // Added for backward compatibility. Only `optimizeDictionary` config should be used in the future.
+      if (indexingConfig.isOptimizeDictionaryForMetrics() && !_optimizeDictionary) {
+        _optimizeDictionary = indexingConfig.isOptimizeDictionaryForMetrics();
+      }
       _noDictionarySizeRatioThreshold = indexingConfig.getNoDictionarySizeRatioThreshold();
     }
 

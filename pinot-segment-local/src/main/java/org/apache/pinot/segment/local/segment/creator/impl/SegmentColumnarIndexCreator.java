@@ -378,7 +378,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (config.isOptimizeDictionary()) {
 
       // Do not create dictionaries for json or text index columns as they are high-cardinality values almost always
-      if (config.getJsonIndexCreationColumns().contains(column)
+      if (config.getJsonIndexConfigs().containsKey(column)
           || config.getTextIndexCreationColumns().contains(column)) {
         return false;
       }
