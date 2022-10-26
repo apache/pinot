@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-public class MinimizeMerger implements PartialUpsertMerger {
+public class MinMerger implements PartialUpsertMerger {
 
-  MinimizeMerger() {
+  MinMerger() {
   }
 
   /**

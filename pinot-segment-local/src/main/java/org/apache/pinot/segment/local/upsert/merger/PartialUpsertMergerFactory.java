@@ -29,8 +29,8 @@ public class PartialUpsertMergerFactory {
   private static final IncrementMerger INCREMENT_MERGER = new IncrementMerger();
   private static final IgnoreMerger IGNORE_MERGER = new IgnoreMerger();
   private static final OverwriteMerger OVERWRITE_MERGER = new OverwriteMerger();
-  private static final MaximizeMerger MAXIMIZE_MERGER = new MaximizeMerger();
-  private static final MinimizeMerger MINIMIZE_MERGER = new MinimizeMerger();
+  private static final MaxMerger MAX_MERGER = new MaxMerger();
+  private static final MinMerger MIN_MERGER = new MinMerger();
   private static final UnionMerger UNION_MERGER = new UnionMerger();
 
   public static PartialUpsertMerger getMerger(UpsertConfig.Strategy strategy) {
@@ -42,9 +42,9 @@ public class PartialUpsertMergerFactory {
       case IGNORE:
         return IGNORE_MERGER;
       case MAX:
-        return MAXIMIZE_MERGER;
+        return MAX_MERGER;
       case MIN:
-        return MINIMIZE_MERGER;
+        return MIN_MERGER;
       case OVERWRITE:
         return OVERWRITE_MERGER;
       case UNION:

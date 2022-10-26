@@ -50,12 +50,12 @@ public class PartialUpsertMergerTest {
 
   @Test
   public void testMaxMinMergers() {
-    MaximizeMerger maximizeMerger = new MaximizeMerger();
-    MinimizeMerger minimizeMerger = new MinimizeMerger();
-    assertEquals(1, maximizeMerger.merge(0, 1));
-    assertEquals(0, minimizeMerger.merge(0, 1));
-    assertEquals(1, maximizeMerger.merge(1, 0));
-    assertEquals(0, minimizeMerger.merge(1, 0));
+    MaxMerger maxMerger = new MaxMerger();
+    MinMerger minMerger = new MinMerger();
+    assertEquals(1, maxMerger.merge(0, 1));
+    assertEquals(0, minMerger.merge(0, 1));
+    assertEquals(1, maxMerger.merge(1, 0));
+    assertEquals(0, minMerger.merge(1, 0));
   }
 
   @Test

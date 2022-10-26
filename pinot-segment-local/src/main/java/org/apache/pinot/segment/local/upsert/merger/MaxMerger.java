@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-public class MaximizeMerger implements PartialUpsertMerger {
+public class MaxMerger implements PartialUpsertMerger {
 
-  MaximizeMerger() {
+  MaxMerger() {
   }
 
   /**
