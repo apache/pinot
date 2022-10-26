@@ -45,6 +45,8 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
 
   public static final SqlFunction COALESCE = new PinotSqlCoalesceFunction();
 
+  // TODO: clean up lazy init by using Suppliers.memorized(this::computeInstance) and make getter wrapped around
+  // supplier instance. this should replace all lazy init static objects in the codebase
   public static synchronized PinotOperatorTable instance() {
     if (_instance == null) {
       // Creates and initializes the standard operator table.
@@ -59,6 +61,9 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
   /**
    * Initialize without duplicate, e.g. when 2 duplicate operator is linked with the same op
    * {@link org.apache.calcite.sql.SqlKind} it causes problem.
+   *
+   * <p>This is a direct copy of the {@link org.apache.calcite.sql.util.ReflectiveSqlOperatorTable} and can be hard to
+   * debug, suggest changing to a non-dynamic registration. Dynamic function support should happen via catalog.
    */
   public final void initNoDuplicate() {
     // Use reflection to register the expressions stored in public fields.

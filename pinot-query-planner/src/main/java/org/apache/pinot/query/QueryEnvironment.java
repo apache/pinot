@@ -93,7 +93,6 @@ public class QueryEnvironment {
     _config = Frameworks.newConfigBuilder().traitDefs()
         .operatorTable(new ChainedSqlOperatorTable(Arrays.asList(
             PinotOperatorTable.instance(),
-//            SqlStdOperatorTable.instance(),
             _catalogReader)))
         .defaultSchema(_rootSchema.plus())
         .sqlToRelConverterConfig(SqlToRelConverter.config()
