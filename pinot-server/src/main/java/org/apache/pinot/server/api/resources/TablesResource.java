@@ -436,7 +436,8 @@ public class TablesResource {
   public String uploadLLCSegment(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
           String realtimeTableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName)
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "Whether to update hdfs url") @QueryParam("updateUrl") boolean updateUrl)
       throws Exception {
     LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
         realtimeTableName);
@@ -484,7 +485,16 @@ public class TablesResource {
             String.format("Failed to upload table %s segment %s to segment store", realtimeTableName, segmentName),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
-      return segmentDownloadUrl.toString();
+      String segmentDownloadUrlStr = segmentDownloadUrl.toString();
+      if (updateUrl) {
+        SegmentZKMetadata zkMetadata =
+            ZKMetadataProvider.getSegmentZKMetadata(_serverInstance.getHelixManager().getHelixPropertyStore(),
+                tableNameWithType, segmentName);
+        zkMetadata.setDownloadUrl(segmentDownloadUrlStr);
+        ZKMetadataProvider.setSegmentZKMetadata(_serverInstance.getHelixManager().getHelixPropertyStore(),
+            tableNameWithType, zkMetadata);
+      }
+      return segmentDownloadUrlStr;
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
