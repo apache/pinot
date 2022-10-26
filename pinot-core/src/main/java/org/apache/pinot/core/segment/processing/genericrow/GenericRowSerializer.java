@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -42,8 +44,8 @@ public class GenericRowSerializer {
   private final String[] _fieldNames;
   private final boolean[] _isSingleValueFields;
   private final DataType[] _storedTypes;
-  // Cache the encoded string bytes
-  private final Object[] _stringBytes;
+  // Cache the encoded objects as bytes
+  private final Object[] _objectBytes;
   // Store index for null fields
   private final Map<String, Integer> _fieldIndexMap;
   private final int[] _nullFieldIndexes;
@@ -53,7 +55,7 @@ public class GenericRowSerializer {
     _fieldNames = new String[_numFields];
     _isSingleValueFields = new boolean[_numFields];
     _storedTypes = new DataType[_numFields];
-    _stringBytes = new Object[_numFields];
+    _objectBytes = new Object[_numFields];
     for (int i = 0; i < _numFields; i++) {
       FieldSpec fieldSpec = fieldSpecs.get(i);
       _fieldNames[i] = fieldSpec.getName();
@@ -99,10 +101,15 @@ public class GenericRowSerializer {
           case STRING:
             byte[] stringBytes = ((String) value).getBytes(UTF_8);
             numBytes += Integer.BYTES + stringBytes.length;
-            _stringBytes[i] = stringBytes;
+            _objectBytes[i] = stringBytes;
             break;
           case BYTES:
             numBytes += Integer.BYTES + ((byte[]) value).length;
+            break;
+          case BIG_DECIMAL:
+            byte[] bigDecimalBytes = BigDecimalUtils.serialize((BigDecimal) value);
+            numBytes += Integer.BYTES + bigDecimalBytes.length;
+            _objectBytes[i] = bigDecimalBytes;
             break;
           default:
             throw new IllegalStateException("Unsupported SV stored type: " + _storedTypes[i]);
@@ -133,7 +140,7 @@ public class GenericRowSerializer {
               numBytes += stringBytes.length;
               stringBytesArray[j] = stringBytes;
             }
-            _stringBytes[i] = stringBytesArray;
+            _objectBytes[i] = stringBytesArray;
             break;
           default:
             throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[i]);
@@ -177,9 +184,10 @@ public class GenericRowSerializer {
             byteBuffer.putDouble((double) value);
             break;
           case STRING:
-            byte[] stringBytes = (byte[]) _stringBytes[i];
-            byteBuffer.putInt(stringBytes.length);
-            byteBuffer.put(stringBytes);
+          case BIG_DECIMAL:
+            byte[] objectBytes = (byte[]) _objectBytes[i];
+            byteBuffer.putInt(objectBytes.length);
+            byteBuffer.put(objectBytes);
             break;
           case BYTES:
             byte[] bytes = (byte[]) value;
@@ -215,7 +223,7 @@ public class GenericRowSerializer {
             }
             break;
           case STRING:
-            byte[][] stringBytesArray = (byte[][]) _stringBytes[i];
+            byte[][] stringBytesArray = (byte[][]) _objectBytes[i];
             for (byte[] stringBytes : stringBytesArray) {
               byteBuffer.putInt(stringBytes.length);
               byteBuffer.put(stringBytes);
