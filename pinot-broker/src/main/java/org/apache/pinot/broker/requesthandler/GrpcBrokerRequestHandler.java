@@ -100,10 +100,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
-      // NOTE: When both OFFLINE and REALTIME request exist, use negative request id for REALTIME to differentiate
-      //       from the OFFLINE one
-      long realtimeRequestId = offlineBrokerRequest == null ? requestId : -requestId;
-      sendRequest(realtimeRequestId, TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap,
+      sendRequest(requestId, TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap,
           requestContext.isSampledRequest());
     }
     return _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs,

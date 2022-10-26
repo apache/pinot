@@ -179,17 +179,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   Set<ServerInstance> getRunningServers(long requestId) {
     Preconditions.checkState(_queriesById != null, "Query cancellation is not enabled on broker");
     QueryServers queryServers = _queriesById.get(requestId);
-    if (queryServers == null) {
-      return Collections.emptySet();
-    }
-    Set<ServerInstance> runningServers = new HashSet<>();
-    if (queryServers._offlineRoutingTable != null) {
-      runningServers.addAll(queryServers._offlineRoutingTable.keySet());
-    }
-    if (queryServers._realtimeRoutingTable != null) {
-      runningServers.addAll(queryServers._realtimeRoutingTable.keySet());
-    }
-    return runningServers;
+    return queryServers != null ? queryServers._servers : Collections.emptySet();
   }
 
   @Override
@@ -201,23 +191,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (queryServers == null) {
       return false;
     }
+    // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils for
+    //       details
+    String globalQueryId = getGlobalQueryId(requestId);
     List<String> serverUrls = new ArrayList<>();
-    if (queryServers._offlineRoutingTable != null) {
-      for (ServerInstance server : queryServers._offlineRoutingTable.keySet()) {
-        serverUrls.add(String.format("%s/query/%s", server.getAdminEndpoint(), getGlobalQueryId(requestId)));
-      }
-    }
-    if (queryServers._realtimeRoutingTable != null) {
-      // NOTE: When the query is sent to both OFFLINE and REALTIME table, the REALTIME one has negative request id to
-      //       differentiate from the OFFLINE one
-      long realtimeRequestId = queryServers._offlineRoutingTable == null ? requestId : -requestId;
-      for (ServerInstance server : queryServers._realtimeRoutingTable.keySet()) {
-        serverUrls.add(String.format("%s/query/%s", server.getAdminEndpoint(), getGlobalQueryId(realtimeRequestId)));
-      }
-    }
-    if (serverUrls.isEmpty()) {
-      LOGGER.debug("No servers running the query: {} right now", queryServers._query);
-      return true;
+    for (ServerInstance serverInstance : queryServers._servers) {
+      serverUrls.add(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId));
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
     CompletionService<DeleteMethod> completionService =
@@ -1676,15 +1655,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Helper class to track the query plaintext and the requested servers.
    */
   private static class QueryServers {
-    private final String _query;
-    private final Map<ServerInstance, List<String>> _offlineRoutingTable;
-    private final Map<ServerInstance, List<String>> _realtimeRoutingTable;
+    final String _query;
+    final Set<ServerInstance> _servers = new HashSet<>();
 
-    public QueryServers(String query, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
+    QueryServers(String query, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
         @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable) {
       _query = query;
-      _offlineRoutingTable = offlineRoutingTable;
-      _realtimeRoutingTable = realtimeRoutingTable;
+      if (offlineRoutingTable != null) {
+        _servers.addAll(offlineRoutingTable.keySet());
+      }
+      if (realtimeRoutingTable != null) {
+        _servers.addAll(realtimeRoutingTable.keySet());
+      }
     }
   }
 }
