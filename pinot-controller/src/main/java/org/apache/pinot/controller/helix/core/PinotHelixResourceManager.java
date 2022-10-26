@@ -3065,11 +3065,10 @@ public class PinotHelixResourceManager {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
 
-    IdealState idealState =getHelixAdmin().getResourceIdealState(getHelixClusterName(), tableNameWithType);
-    ExternalView externalView=getHelixAdmin().getResourceExternalView(getHelixClusterName(), tableNameWithType);
+    IdealState idealState = getHelixAdmin().getResourceIdealState(getHelixClusterName(), tableNameWithType);
+    ExternalView externalView = getHelixAdmin().getResourceExternalView(getHelixClusterName(), tableNameWithType);
 
-    return new TableRebalancer(_helixZkManager).rebalanceStatus(tableNameWithType,idealState,externalView);
-
+    return new TableRebalancer(_helixZkManager).rebalanceStatus(tableNameWithType, idealState, externalView);
   }
 
   /**

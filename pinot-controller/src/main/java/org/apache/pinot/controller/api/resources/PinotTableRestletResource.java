@@ -689,22 +689,17 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("/tables/{tableName}/rebalance/status")
-  @ApiOperation(value = "Table rebalance status",
-      notes = "Provides status after rebalancing table")
-  public String getTableRebalnceStatus(
+  @ApiOperation(value = "Table rebalance status", notes = "Provides status after rebalancing table")
+  public String getTableRebalanceStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr
-  ){
-
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
     try {
-        String tableNameWithType=constructTableNameWithType(tableName,tableTypeStr);
-        RebalanceResult.Status status= _pinotHelixResourceManager.rebalanceTableStatus(tableNameWithType);
+        String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
+        RebalanceResult.Status status = _pinotHelixResourceManager.rebalanceTableStatus(tableNameWithType);
         ObjectNode data = JsonUtils.newObjectNode();
-      data.put("status", status.toString());
+        data.put("status", status.toString());
       return data.toString();
-
-    }catch(TableNotFoundException e){
-
+    } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }
   }
