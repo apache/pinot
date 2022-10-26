@@ -27,13 +27,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.core.query.prefetch.FetchPlanner;
+import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
 import org.apache.pinot.segment.spi.FetchContext;
@@ -43,7 +44,6 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -75,11 +75,13 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
 
   private int _inPredicateThreshold;
+  private FetchPlanner _fetchPlanner;
 
   @Override
   public void init(PinotConfiguration config) {
     _inPredicateThreshold =
         config.getProperty(IN_PREDICATE_THRESHOLD, Server.DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD);
+    _fetchPlanner = FetchPlannerRegistry.getPlanner();
   }
 
   @Override
@@ -108,32 +110,22 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     List<IndexSegment> selectedSegments = new ArrayList<>(numSegments);
 
     if (!eqInColumns.isEmpty() && query.isEnablePrefetch()) {
-      Map[] dataSourceCaches = new Map[numSegments];
       FetchContext[] fetchContexts = new FetchContext[numSegments];
       try {
         // Prefetch bloom filter for columns within the EQ/IN predicate if exists
         for (int i = 0; i < numSegments; i++) {
           IndexSegment segment = segments.get(i);
-          Map<String, DataSource> dataSourceCache = new HashMap<>();
-          Map<String, List<ColumnIndexType>> columnToIndexList = new HashMap<>();
-          for (String column : eqInColumns) {
-            DataSource dataSource = segment.getDataSource(column);
-            dataSourceCache.put(column, dataSource);
-            if (dataSource.getBloomFilter() != null) {
-              columnToIndexList.put(column, Collections.singletonList(ColumnIndexType.BLOOM_FILTER));
-            }
-          }
-          dataSourceCaches[i] = dataSourceCache;
-          if (!columnToIndexList.isEmpty()) {
-            FetchContext fetchContext =
-                new FetchContext(UUID.randomUUID(), segment.getSegmentName(), columnToIndexList);
+          FetchContext fetchContext = _fetchPlanner.planFetchForPruning(segment, query,
+              Collections.singletonMap(Predicate.Type.EQ, eqInColumns));
+          if (fetchContext != null) {
             segment.prefetch(fetchContext);
             fetchContexts[i] = fetchContext;
           }
         }
-
         // Prune segments
+        Map[] dataSourceCaches = new Map[numSegments];
         for (int i = 0; i < numSegments; i++) {
+          dataSourceCaches[i] = new HashMap<>();
           IndexSegment segment = segments.get(i);
           FetchContext fetchContext = fetchContexts[i];
           if (fetchContext != null) {
