@@ -37,8 +37,8 @@ public class ResultsBlockUtilsTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable WHERE foo = 'bar'");
     DataTable dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable(queryContext);
     DataSchema dataSchema = dataTable.getDataSchema();
-    assertEquals(dataSchema.getColumnNames(), new String[]{"*"});
-    assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    assertEquals(dataSchema.getColumnNames(), new String[]{});
+    assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{});
     assertEquals(dataTable.getNumberOfRows(), 0);
 
     // Aggregation

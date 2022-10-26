@@ -2821,4 +2821,26 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rows.size(), 1);
     assertFalse(rows.get(0).get(0).asBoolean());
   }
+
+  /** Test to make sure that query result column types are empty (see pinot github issue #9660) for empty resultset. */
+  @Test
+  public void testEmptyResult()
+      throws Exception {
+    // Run a query that will return empty results
+    String query1 = "SELECT AirlineID, AirTime, Carrier FROM mytable WHERE AirlineID < 0";
+    JsonNode response = postQuery(query1, _brokerBaseApiUrl);
+    int numSegmentsQueried = response.get("numSegmentsQueried").asInt();
+    int numSegmentsPrunedByServer = response.get("numSegmentsPrunedByServer").asInt();
+
+    // Check to make sure that all segments were pruned for this query.
+    assertEquals(numSegmentsQueried, numSegmentsPrunedByServer);
+
+    // Check result column names
+    String columnNames = response.get("resultTable").get("dataSchema").get("columnNames").toPrettyString();
+    assertEquals(columnNames, "[ \"AirlineID\", \"AirTime\", \"Carrier\" ]");
+
+    // make sure column data types are not set
+    String columnDataTypes = response.get("resultTable").get("dataSchema").get("columnDataTypes").toPrettyString();
+    assertEquals(columnDataTypes, "[ null, null, null ]");
+  }
 }

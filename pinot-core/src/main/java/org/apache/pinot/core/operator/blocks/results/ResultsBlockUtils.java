@@ -53,17 +53,8 @@ public class ResultsBlockUtils {
   }
 
   private static SelectionResultsBlock buildEmptySelectionQueryResults(QueryContext queryContext) {
-    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    int numSelectExpressions = selectExpressions.size();
-    String[] columnNames = new String[numSelectExpressions];
-    for (int i = 0; i < numSelectExpressions; i++) {
-      columnNames[i] = selectExpressions.get(i).toString();
-    }
-    ColumnDataType[] columnDataTypes = new ColumnDataType[numSelectExpressions];
-    // NOTE: Use STRING column data type as default for selection query
-    Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    return new SelectionResultsBlock(dataSchema, Collections.emptyList());
+    // return result block with empty DataSchema and empty rows.
+    return new SelectionResultsBlock(new DataSchema(new String[]{}, new ColumnDataType[]{}), Collections.emptyList());
   }
 
   private static AggregationResultsBlock buildEmptyAggregationQueryResults(QueryContext queryContext) {
