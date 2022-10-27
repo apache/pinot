@@ -345,12 +345,24 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
     int numTotalSegments = indexSegments.size();
+    // Keep a handle on the first segment, so that we can add it back to the list of segments to query in case all
+    // the segments get pruned out. We need to query at least one segment so that column types are set properly in the
+    // query results. If for some reason the table doesn't contain any segments (for example when all the segments of
+    // a table were deleted), then we will generate empty result that does not contain column datatypes in result
+    // metadata.
+    IndexSegment firstSegment = numTotalSegments > 0 ? indexSegments.get(0): null;
     SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
     List<IndexSegment> selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext, prunerStats);
     segmentPruneTimer.stopAndRecord();
     int numSelectedSegments = selectedSegments.size();
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
     InstanceResponseBlock instanceResponse;
+    if (selectedSegments.size() == 0 && firstSegment != null) {
+      selectedSegments.add(firstSegment);
+      numSelectedSegments = selectedSegments.size();
+      LOGGER.debug("Adding back one segment to query since all the segments were pruned out.");
+    }
+
     if (numSelectedSegments == 0) {
       if (queryContext.isExplain()) {
         instanceResponse = getExplainResponseForNoMatchingSegment(numTotalSegments, queryContext);

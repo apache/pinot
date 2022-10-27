@@ -2827,20 +2827,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testEmptyResult()
       throws Exception {
     // Run a query that will return empty results
-    String query1 = "SELECT AirlineID, AirTime, Carrier FROM mytable WHERE AirlineID < 0";
+    String query1 = "SELECT AirlineID, AirTime, cast(AirTime as STRING), Carrier FROM mytable WHERE AirlineID < 0";
     JsonNode response = postQuery(query1, _brokerBaseApiUrl);
     int numSegmentsQueried = response.get("numSegmentsQueried").asInt();
     int numSegmentsPrunedByServer = response.get("numSegmentsPrunedByServer").asInt();
 
-    // Check to make sure that all segments were pruned for this query.
-    assertEquals(numSegmentsQueried, numSegmentsPrunedByServer);
+    // Check to make sure that all, but one segments got pruned for this query.
+    assertEquals(numSegmentsQueried - 1, numSegmentsPrunedByServer);
 
     // Check result column names
     String columnNames = response.get("resultTable").get("dataSchema").get("columnNames").toPrettyString();
-    assertEquals(columnNames, "[ \"AirlineID\", \"AirTime\", \"Carrier\" ]");
+    assertEquals(columnNames, "[ \"AirlineID\", \"AirTime\", \"cast(AirTime,'STRING')\", \"Carrier\" ]");
 
     // make sure column data types are not set
     String columnDataTypes = response.get("resultTable").get("dataSchema").get("columnDataTypes").toPrettyString();
-    assertEquals(columnDataTypes, "[ null, null, null ]");
+    assertEquals(columnDataTypes, "[ \"LONG\", \"INT\", \"STRING\", \"STRING\" ]");
   }
 }
