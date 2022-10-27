@@ -389,7 +389,11 @@ public class TableRebalancer {
     if (idealState == null) {
       throw new IllegalStateException("ideal state is empty");
     }
-    if (externalView != null && isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
+    if(externalView==null){
+      return RebalanceResult.Status.NO_OP;
+    }
+
+    if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
         idealState.getRecord().getMapFields(), true)) {
       return RebalanceResult.Status.DONE;
     }

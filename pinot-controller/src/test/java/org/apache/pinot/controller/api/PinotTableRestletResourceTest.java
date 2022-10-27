@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.pinot.controller.api.resources.TableAndSchemaConfig;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -491,21 +492,28 @@ public class PinotTableRestletResourceTest {
   @Test
   public void checkRebalanceStatus()
       throws Exception {
+    String tableName="testTable1";
+    TableConfig testTableConfig = _offlineBuilder.setTableName(tableName).build();
 
     // Create the table
-    ControllerTest.sendPostRequest(_createTableUrl, _offlineBuilder.build().toJsonString());
+    ControllerTest.sendPostRequest(_createTableUrl, testTableConfig.toJsonString());
 
     // Rebalance table
     ControllerTest.sendPostRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"),
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(tableName, "offline"),
         null);
 
     // Check rebalance status
-    String respnose = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalanceStatus(OFFLINE_TABLE_NAME, "offline"),
+    String response = ControllerTest.sendGetRequest(
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalanceStatus(tableName, "offline"),
         null);
 
-    Assert.assertEquals(respnose, "{\"status\":\"IN_PROGRESS\"}");
+    _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).build();
+
+    System.out.print(response);
+    Assert.assertTrue(Objects.equals(response, "{\"status\":\"IN_PROGRESS\"}") || Objects.equals(response,
+        "{\"status\":\"DONE\"}") || Objects.equals(response,
+        "{\"status\":\"NO_OP\"}"));
   }
 
   @Test
