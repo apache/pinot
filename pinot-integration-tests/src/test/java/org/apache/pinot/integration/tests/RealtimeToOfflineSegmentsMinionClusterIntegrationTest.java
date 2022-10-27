@@ -51,7 +51,7 @@ import org.testng.annotations.Test;
  * With every task run, a new segment is created in the offline table for 1 day. Watermark also keeps progressing
  * accordingly.
  */
-public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends RealtimeClusterIntegrationTest {
+public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
 
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotTaskManager _taskManager;
@@ -65,11 +65,6 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   protected TableTaskConfig getTaskConfig() {
     return new TableTaskConfig(
         Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>()));
-  }
-
-  @Override
-  protected boolean useLlc() {
-    return true;
   }
 
   @BeforeClass

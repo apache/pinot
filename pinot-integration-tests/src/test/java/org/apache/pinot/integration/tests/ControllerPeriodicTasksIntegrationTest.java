@@ -80,11 +80,6 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   }
 
   @Override
-  protected boolean useLlc() {
-    return true;
-  }
-
-  @Override
   protected int getNumReplicas() {
     return NUM_REPLICAS;
   }

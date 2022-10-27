@@ -70,7 +70,7 @@ import static org.testng.Assert.assertTrue;
  * (1) All the segments on all servers are in either ONLINE or CONSUMING states
  * (2) For segments failed during deep store upload, the corresponding segment download url string is empty in Zk.
  */
-public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
+public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeerDownloadLLCRealtimeClusterIntegrationTest.class);
 
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
@@ -149,11 +149,6 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
         "org.apache.pinot.integration.tests.PeerDownloadLLCRealtimeClusterIntegrationTest$MockPinotFS");
     startController(controllerConfig);
     enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
-  }
-
-  @Override
-  protected boolean useLlc() {
-    return true;
   }
 
   @Nullable

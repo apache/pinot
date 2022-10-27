@@ -381,7 +381,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
 
     // TODO: Change dedup handling to handle segment replacement
-    if (isDedupEnabled()) {
+    if (isDedupEnabled() && immutableSegment instanceof ImmutableSegmentImpl) {
       buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
     }
     super.addSegment(immutableSegment);
