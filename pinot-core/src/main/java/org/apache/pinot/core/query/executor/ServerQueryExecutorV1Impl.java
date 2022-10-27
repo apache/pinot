@@ -350,7 +350,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     // query results. If for some reason the table doesn't contain any segments (for example when all the segments of
     // a table were deleted), then we will generate empty result that does not contain column datatypes in result
     // metadata.
-    IndexSegment firstSegment = numTotalSegments > 0 ? indexSegments.get(0): null;
+    IndexSegment firstSegment = numTotalSegments > 0 ? indexSegments.get(0) : null;
     SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
     List<IndexSegment> selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext, prunerStats);
     segmentPruneTimer.stopAndRecord();
