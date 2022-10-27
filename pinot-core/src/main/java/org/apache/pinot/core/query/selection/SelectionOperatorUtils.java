@@ -490,7 +490,8 @@ public class SelectionOperatorUtils {
 
     DataSchema resultDataSchema = dataSchema;
     Map<String, Integer> columnNameToIndexMap = null;
-    if (dataSchema.getColumnNames().length != selectionColumns.size()) {
+    String[] dataSchemaColumnNames = dataSchema.getColumnNames();
+    if (dataSchemaColumnNames.length > 0 && dataSchemaColumnNames.length != selectionColumns.size()) {
       // Create updated data schema since one column can be selected multiple times.
       columnNameToIndexMap = new HashMap<>(dataSchema.getColumnNames().length);
       String[] columnNames = dataSchema.getColumnNames();
