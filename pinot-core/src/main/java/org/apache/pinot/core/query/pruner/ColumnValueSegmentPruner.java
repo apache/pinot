@@ -19,9 +19,7 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,29 +93,17 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
       return segments;
     }
     FilterContext filter = Objects.requireNonNull(query.getFilter());
-
-    // Extract EQ/IN/RANGE predicate columns
-    Set<String> eqInColumns = new HashSet<>();
-    Set<String> rangeColumns = new HashSet<>();
     ValueCache cachedValues = new ValueCache();
-    extractPredicateColumns(filter, eqInColumns, rangeColumns, cachedValues);
-
-    if (eqInColumns.isEmpty() && rangeColumns.isEmpty()) {
-      return segments;
-    }
-
     int numSegments = segments.size();
     List<IndexSegment> selectedSegments = new ArrayList<>(numSegments);
-
-    if (!eqInColumns.isEmpty() && query.isEnablePrefetch()) {
+    if (query.isEnablePrefetch()) {
       FetchContext[] fetchContexts = new FetchContext[numSegments];
       try {
         // Prefetch bloom filter for columns within the EQ/IN predicate if exists
         for (int i = 0; i < numSegments; i++) {
           IndexSegment segment = segments.get(i);
-          FetchContext fetchContext = _fetchPlanner.planFetchForPruning(segment, query,
-              Collections.singletonMap(Predicate.Type.EQ, eqInColumns));
-          if (fetchContext != null) {
+          FetchContext fetchContext = _fetchPlanner.planFetchForPruning(segment, query);
+          if (!fetchContext.isEmpty()) {
             segment.prefetch(fetchContext);
             fetchContexts[i] = fetchContext;
           }
@@ -162,60 +148,6 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
       }
     }
     return selectedSegments;
-  }
-
-  /**
-   * Extracts predicate columns from the given filter.
-   */
-  private void extractPredicateColumns(FilterContext filter, Set<String> eqInColumns, Set<String> rangeColumns,
-      ValueCache valueCache) {
-    switch (filter.getType()) {
-      case AND:
-      case OR:
-        for (FilterContext child : filter.getChildren()) {
-          extractPredicateColumns(child, eqInColumns, rangeColumns, valueCache);
-        }
-        break;
-      case NOT:
-        // Do not track the predicates under NOT filter
-        break;
-      case PREDICATE:
-        Predicate predicate = filter.getPredicate();
-
-        // Only prune columns
-        ExpressionContext lhs = predicate.getLhs();
-        if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
-          break;
-        }
-        String column = lhs.getIdentifier();
-
-        Predicate.Type predicateType = predicate.getType();
-        switch (predicateType) {
-          case EQ: {
-            eqInColumns.add(column);
-            valueCache.add((EqPredicate) predicate);
-            break;
-          }
-          case IN: {
-            InPredicate inPredicate = (InPredicate) predicate;
-            if (inPredicate.getValues().size() <= _inPredicateThreshold) {
-              eqInColumns.add(column);
-              valueCache.add(inPredicate);
-            }
-            break;
-          }
-          case RANGE: {
-            rangeColumns.add(column);
-            break;
-          }
-          default: {
-            break;
-          }
-        }
-        break;
-      default:
-        throw new IllegalStateException();
-    }
   }
 
   private boolean pruneSegment(IndexSegment segment, FilterContext filter, Map<String, DataSource> dataSourceCache,
@@ -468,26 +400,35 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     // structure. This is specially useful in the IN expression.
     private final Map<Predicate, Object> _cache = new IdentityHashMap<>();
 
-    public void add(EqPredicate pred) {
-      _cache.put(pred, new CachedValue(pred.getValue()));
+    private CachedValue add(EqPredicate pred) {
+      CachedValue val = new CachedValue(pred.getValue());
+      _cache.put(pred, val);
+      return val;
     }
 
-    public void add(InPredicate pred) {
-      List<CachedValue> list = new ArrayList<>(pred.getValues().size());
+    private List<CachedValue> add(InPredicate pred) {
+      List<CachedValue> vals = new ArrayList<>(pred.getValues().size());
       for (String value : pred.getValues()) {
-        list.add(new CachedValue(value));
+        vals.add(new CachedValue(value));
       }
-      _cache.put(pred, list);
+      _cache.put(pred, vals);
+      return vals;
     }
 
     public CachedValue get(EqPredicate pred, DataType dt) {
       CachedValue cachedValue = (CachedValue) _cache.get(pred);
+      if (cachedValue == null) {
+        cachedValue = add(pred);
+      }
       cachedValue.ensureDataType(dt);
       return cachedValue;
     }
 
     public List<CachedValue> get(InPredicate pred, DataType dt) {
       List<CachedValue> cachedValues = (List<CachedValue>) _cache.get(pred);
+      if (cachedValues == null) {
+        cachedValues = add(pred);
+      }
       for (CachedValue cachedValue : cachedValues) {
         cachedValue.ensureDataType(dt);
       }

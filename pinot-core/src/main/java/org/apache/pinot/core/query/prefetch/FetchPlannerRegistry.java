@@ -33,6 +33,12 @@ public class FetchPlannerRegistry {
         Optional.ofNullable(REGISTRATION.get()).orElseGet(DefaultFetchPlanner::new);
   }
 
+  /**
+   * Provides a custom planner to replace the default one when server starts up.
+   *
+   * @param planner a custom fetch planner overwriting the default one.
+   * @return true, if this is called for the first time.
+   */
   public static boolean registerPlanner(FetchPlanner planner) {
     return REGISTRATION.compareAndSet(null, planner);
   }

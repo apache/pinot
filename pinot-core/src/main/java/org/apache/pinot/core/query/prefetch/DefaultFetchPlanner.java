@@ -23,11 +23,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
@@ -40,36 +40,48 @@ public class DefaultFetchPlanner implements FetchPlanner {
   /**
    * Get BloomFilter for columns present in EQ and IN predicates.
    */
-  @Nullable
   @Override
-  public FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext,
-      @Nullable Map<Predicate.Type, Set<String>> requestedColumns) {
-    if (requestedColumns == null) {
-      return null;
-    }
-    Set<String> columns = new HashSet<>();
-    Set<String> requested = requestedColumns.get(Predicate.Type.EQ);
-    if (CollectionUtils.isNotEmpty(requested)) {
-      columns.addAll(requested);
-    }
-    requested = requestedColumns.get(Predicate.Type.IN);
-    if (CollectionUtils.isNotEmpty(requested)) {
-      columns.addAll(requested);
-    }
-    if (columns.isEmpty()) {
-      return null;
-    }
+  public FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext) {
+    // Extract columns in EQ/IN predicates.
+    Set<String> eqInColumns = new HashSet<>();
+    extractEqInColumns(Objects.requireNonNull(queryContext.getFilter()), eqInColumns);
     Map<String, List<ColumnIndexType>> columnToIndexList = new HashMap<>();
-    for (String column : columns) {
+    for (String column : eqInColumns) {
       DataSource dataSource = indexSegment.getDataSource(column);
       if (dataSource.getBloomFilter() != null) {
         columnToIndexList.put(column, Collections.singletonList(ColumnIndexType.BLOOM_FILTER));
       }
     }
-    if (columnToIndexList.isEmpty()) {
-      return null;
-    }
     return new FetchContext(UUID.randomUUID(), indexSegment.getSegmentName(), columnToIndexList);
+  }
+
+  protected static void extractEqInColumns(FilterContext filter, Set<String> eqInColumns) {
+    switch (filter.getType()) {
+      case AND:
+      case OR:
+        for (FilterContext child : filter.getChildren()) {
+          extractEqInColumns(child, eqInColumns);
+        }
+        break;
+      case NOT:
+        // Do not track the predicates under NOT filter
+        break;
+      case PREDICATE:
+        Predicate predicate = filter.getPredicate();
+        ExpressionContext lhs = predicate.getLhs();
+        if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
+          // Only prune columns
+          break;
+        }
+        String column = lhs.getIdentifier();
+        Predicate.Type predicateType = predicate.getType();
+        if (predicateType == Predicate.Type.EQ || predicateType == Predicate.Type.IN) {
+          eqInColumns.add(column);
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unknown filter type: " + filter.getType());
+    }
   }
 
   /**

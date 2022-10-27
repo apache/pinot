@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.core.query.prefetch;
 
-import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nullable;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -41,12 +37,9 @@ public interface FetchPlanner {
    *
    * @param indexSegment     segment to be pruned.
    * @param queryContext     context extracted from the query.
-   * @param requestedColumns columns requested for pruning, with predicate type they are from.
    * @return context to guide data prefetching.
    */
-  @Nullable
-  FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext,
-      @Nullable Map<Predicate.Type, Set<String>> requestedColumns);
+  FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext);
 
   /**
    * Plan what index data to prefetch to process it. For example, one can fetch all types of index for columns tracked

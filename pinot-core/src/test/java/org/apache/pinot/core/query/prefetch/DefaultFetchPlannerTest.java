@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.core.query.prefetch;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.FetchContext;
@@ -35,8 +33,9 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class DefaultFetchPlannerTest {
@@ -66,27 +65,21 @@ public class DefaultFetchPlannerTest {
     when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("c0", "c1", "c2"));
     String query = "SELECT COUNT(*) FROM testTable WHERE c0 = 0 OR (c1 < 10 AND c2 IN (1, 2))";
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-    // No requested columns in EQ or IN predicate.
-    FetchContext fetchContext = planner.planFetchForPruning(indexSegment, queryContext, null);
-    assertNull(fetchContext);
-
-    // no Bloomfilter for those columns.
+    // No Bloomfilter for those columns.
     DataSource ds0 = mock(DataSource.class);
     when(indexSegment.getDataSource("c0")).thenReturn(ds0);
     when(ds0.getBloomFilter()).thenReturn(null);
     DataSource ds2 = mock(DataSource.class);
     when(indexSegment.getDataSource("c2")).thenReturn(ds2);
     when(ds2.getBloomFilter()).thenReturn(null);
-    fetchContext = planner.planFetchForPruning(indexSegment, queryContext,
-        ImmutableMap.of(Predicate.Type.EQ, ImmutableSet.of("c0"), Predicate.Type.IN, ImmutableSet.of("c2")));
-    assertNull(fetchContext);
+    FetchContext fetchContext = planner.planFetchForPruning(indexSegment, queryContext);
+    assertTrue(fetchContext.isEmpty());
 
     // Add Bloomfilter for column c0.
     BloomFilterReader bfReader = mock(BloomFilterReader.class);
     when(ds0.getBloomFilter()).thenReturn(bfReader);
-    fetchContext = planner.planFetchForPruning(indexSegment, queryContext,
-        ImmutableMap.of(Predicate.Type.EQ, ImmutableSet.of("c0"), Predicate.Type.IN, ImmutableSet.of("c2")));
-    assertNotNull(fetchContext);
+    fetchContext = planner.planFetchForPruning(indexSegment, queryContext);
+    assertFalse(fetchContext.isEmpty());
     assertEquals(fetchContext.getSegmentName(), "s0");
     Map<String, List<ColumnIndexType>> columns = fetchContext.getColumnToIndexList();
     assertEquals(columns.size(), 1);
