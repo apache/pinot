@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
@@ -52,27 +51,21 @@ import org.apache.pinot.query.runtime.operator.TransformOperator;
  * this works only for the intermediate stage nodes, leaf stage nodes are expected to compile into
  * v1 operators at this point in time.
  *
- * <p>This class should be used statically via {@link #build(MailboxService, StageNode, PlanRequestContext)}
+ * <p>This class should be used statically via {@link #build(StageNode, PlanRequestContext)}
  *
  * @see org.apache.pinot.query.runtime.QueryRunner#processQuery(DistributedStagePlan, ExecutorService, Map)
  */
 public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<TransferableBlock>, PlanRequestContext> {
+  private static final PhysicalPlanVisitor INSTANCE = new PhysicalPlanVisitor();
 
-  private final MailboxService<TransferableBlock> _mailboxService;
-
-  public static Operator<TransferableBlock> build(MailboxService<TransferableBlock> mailboxService,
-      StageNode node, PlanRequestContext context) {
-    return node.visit(new PhysicalPlanVisitor(mailboxService), context);
-  }
-
-  private PhysicalPlanVisitor(MailboxService<TransferableBlock> mailboxService) {
-    _mailboxService = mailboxService;
+  public static Operator<TransferableBlock> build(StageNode node, PlanRequestContext context) {
+    return node.visit(INSTANCE, context);
   }
 
   @Override
   public Operator<TransferableBlock> visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
     List<ServerInstance> sendingInstances = context.getMetadataMap().get(node.getSenderStageId()).getServerInstances();
-    return new MailboxReceiveOperator(_mailboxService, node.getDataSchema(), sendingInstances,
+    return new MailboxReceiveOperator(context.getMailboxService(), node.getDataSchema(), sendingInstances,
         node.getExchangeType(), node.getPartitionKeySelector(), context.getHostName(), context.getPort(),
         context.getRequestId(), node.getSenderStageId());
   }
@@ -81,7 +74,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
   public Operator<TransferableBlock> visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
     Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
     StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
-    return new MailboxSendOperator(_mailboxService, node.getDataSchema(), nextOperator,
+    return new MailboxSendOperator(context.getMailboxService(), node.getDataSchema(), nextOperator,
         receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
         context.getHostName(), context.getPort(), context.getRequestId(), node.getStageId());
   }

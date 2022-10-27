@@ -22,7 +22,9 @@ import java.util.Map;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.spi.config.table.TableType;
 
@@ -38,10 +40,10 @@ public class ServerPlanRequestContext extends PlanRequestContext {
   protected PinotQuery _pinotQuery;
   protected InstanceRequest _instanceRequest;
 
-  public ServerPlanRequestContext(long requestId, int stageId, String hostName, int port,
-      Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery, TableType tableType,
+  public ServerPlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
+      String hostName, int port, Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery, TableType tableType,
       TimeBoundaryInfo timeBoundaryInfo) {
-    super(requestId, stageId, hostName, port, metadataMap);
+    super(mailboxService, requestId, stageId, hostName, port, metadataMap);
     _pinotQuery = pinotQuery;
     _tableType = tableType;
     _timeBoundaryInfo = timeBoundaryInfo;
