@@ -89,12 +89,10 @@ public class ControllerTest {
   public static final String DEFAULT_TENANT = "DefaultTenant";
   public static final String LOCAL_HOST = "localhost";
   public static final int DEFAULT_CONTROLLER_PORT = 18998;
-  public static final String DEFAULT_DATA_DIR =
-      new File(FileUtils.getTempDirectoryPath(), "test-controller-data-dir" + System.currentTimeMillis())
-          .getAbsolutePath();
-  public static final String DEFAULT_LOCAL_TEMP_DIR =
-      new File(FileUtils.getTempDirectoryPath(), "test-controller-local-temp-dir" + System.currentTimeMillis())
-          .getAbsolutePath();
+  public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
+      "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
+  public static final String DEFAULT_LOCAL_TEMP_DIR = new File(FileUtils.getTempDirectoryPath(),
+      "test-controller-local-temp-dir" + System.currentTimeMillis()).getAbsolutePath();
   public static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   public static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
@@ -657,7 +655,7 @@ public class ControllerTest {
   }
 
   public List<String> listSegments(String tableName)
-    throws IOException {
+      throws IOException {
     return listSegments(tableName, null, false);
   }
 
@@ -923,21 +921,13 @@ public class ControllerTest {
     return properties;
   }
 
-  public void startSharedTestSetup()
-      throws Exception {
-    startSharedTestSetup(Collections.emptyMap());
-  }
-
   /**
    * Initialize shared state for the TestNG default test group.
    */
-  public void startSharedTestSetup(Map<String, Object> extraProperties)
+  public void startSharedTestSetup()
       throws Exception {
     startZk();
-
-    Map<String, Object> sharedControllerConfiguration = getSharedControllerConfiguration();
-    sharedControllerConfiguration.putAll(extraProperties);
-    startController(sharedControllerConfiguration);
+    startController(getSharedControllerConfiguration());
 
     addMoreFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addMoreFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
@@ -962,16 +952,11 @@ public class ControllerTest {
    */
   public void setupSharedStateAndValidate()
       throws Exception {
-    setupSharedStateAndValidate(Collections.emptyMap());
-  }
-
-  public void setupSharedStateAndValidate(Map<String, Object> extraProperties)
-      throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
       // this is expected to happen only when running a single test case outside of testNG group, i.e when test
       // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
       // group, state will have already been setup by @BeforeGroups method in ControllerTestSetup.
-      startSharedTestSetup(extraProperties);
+      startSharedTestSetup();
     }
 
     // Check number of tenants
