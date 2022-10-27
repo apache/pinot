@@ -102,16 +102,12 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     }
   }
 
-  protected AvroRecordExtractor createAvroRecordExtractor() {
-    return new AvroRecordExtractor();
-  }
-
   @Test
   public void testDataTypeReturnFromAvroRecordExtractor()
       throws IOException {
     String testColumnName = "column1";
     long columnValue = 999999999L;
-    AvroRecordExtractor avroRecordExtractor = createAvroRecordExtractor();
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
     avroRecordExtractor.init(null, new AvroRecordExtractorConfig());
 
     org.apache.pinot.spi.data.Schema pinotSchema =
@@ -163,7 +159,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     timestampMicrosColValue.setNanos(123987000);
     AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
     config.setEnableLogicalTypes(true);
-    AvroRecordExtractor avroRecordExtractor = createAvroRecordExtractor();
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
     avroRecordExtractor.init(null, config);
 
     String schemaString =
@@ -242,7 +238,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     byte[] content = new byte[100];
     ThreadLocalRandom.current().nextBytes(content);
     ByteBuffer byteBuffer = ByteBuffer.wrap(content);
-    AvroRecordExtractor avroRecordExtractor = createAvroRecordExtractor();
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
     for (int i = 0; i < 10; i++) {
       Assert.assertEquals(avroRecordExtractor.convertSingleValue(byteBuffer), content);
     }
@@ -256,9 +252,9 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     GenericRecord genericRecord = new GenericData.Record(avroSchema);
     genericRecord.put("fixed_data", new GenericData.Fixed(fixedSchema, new byte[] {0, 1, 2, 3}));
     GenericRow genericRow = new GenericRow();
-    AvroRecordExtractor avroRecordExtractor = createAvroRecordExtractor();
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
     avroRecordExtractor.init(null, null);
     avroRecordExtractor.extract(genericRecord, genericRow);
-    Assert.assertEquals(genericRow.getValue("fixed_data"), "[0, 1, 2, 3]");
+    Assert.assertEquals(genericRow.getValue("fixed_data"), new byte[] {0, 1, 2, 3});
   }
 }

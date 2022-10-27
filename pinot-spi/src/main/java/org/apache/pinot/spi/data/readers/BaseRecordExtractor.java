@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.avro.generic.GenericData;
 
 
 /**
@@ -185,6 +186,9 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
     }
     if (value instanceof Number || value instanceof byte[]) {
       return value;
+    }
+    if (value instanceof GenericData.Fixed) {
+      return ((GenericData.Fixed) value).bytes();
     }
     return value.toString();
   }
