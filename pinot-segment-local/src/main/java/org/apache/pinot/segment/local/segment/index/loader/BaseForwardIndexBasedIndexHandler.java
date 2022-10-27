@@ -1,0 +1,86 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.segment.index.loader;
+
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+/**
+ * Base class for all of the {@link IndexHandler} classes which need to build their indexes from the forward index.
+ * This class handles temporarily rebuilding the forward index if the forward index does not exist and cleaning up
+ * the forward index once all handlers have completed via overriding the postUpdateIndicesCleanup() method.
+ */
+public abstract class BaseForwardIndexBasedIndexHandler implements IndexHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseForwardIndexBasedIndexHandler.class);
+
+  protected final SegmentMetadata _segmentMetadata;
+  protected final IndexLoadingConfig _indexLoadingConfig;
+  protected final Set<String> _forwardIndexDisabledColumnsToCleanup;
+
+  public BaseForwardIndexBasedIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
+    _segmentMetadata = segmentMetadata;
+    _indexLoadingConfig = indexLoadingConfig;
+    _forwardIndexDisabledColumnsToCleanup = new HashSet<>();
+  }
+
+  @Override
+  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
+      throws Exception {
+    // Delete the forward index for columns which have it disabled. Perform this as a post-processing step after all
+    // IndexHandlers have updated their indexes as some of them need to temporarily create a forward index to
+    // generate other indexes off of.
+    for (String column : _forwardIndexDisabledColumnsToCleanup) {
+      segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
+    }
+  }
+
+  protected void createForwardIndexIfNeeded(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
+      IndexCreatorProvider indexCreatorProvider, boolean isTemporaryForwardIndex)
+      throws IOException {
+    String columnName = columnMetadata.getColumnName();
+    if (segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)) {
+      LOGGER.info("Forward index already exists for column: {}, skip trying to create it", columnName);
+      return;
+    }
+
+    InvertedIndexAndDictionaryBasedForwardIndexCreator invertedIndexAndDictionaryBasedForwardIndexCreator =
+        new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentMetadata, _indexLoadingConfig,
+            segmentWriter, indexCreatorProvider, isTemporaryForwardIndex);
+    invertedIndexAndDictionaryBasedForwardIndexCreator.constructForwardIndexFromInvertedIndexAndDictionary();
+    // If forward index is disabled it means that it has to be dictionary based and the inverted index must exist.
+    // Validate that the forward index is created.
+    if (!segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)) {
+      throw new IOException(String.format("Forward index was not created for column: %s, is temporary: %s", columnName,
+          isTemporaryForwardIndex ? "true" : "false"));
+    }
+
+    if (isTemporaryForwardIndex) {
+      _forwardIndexDisabledColumnsToCleanup.add(columnName);
+    }
+  }
+}

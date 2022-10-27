@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.BaseForwardIndexBasedIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -43,15 +43,14 @@ import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class RangeIndexHandler implements IndexHandler {
+public class RangeIndexHandler extends BaseForwardIndexBasedIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexHandler.class);
 
-  private final SegmentMetadata _segmentMetadata;
   private final Set<String> _columnsToAddIdx;
   private final int _rangeIndexVersion;
 
   public RangeIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    _segmentMetadata = segmentMetadata;
+    super(segmentMetadata, indexLoadingConfig);
     _columnsToAddIdx = indexLoadingConfig.getRangeIndexColumns();
     _rangeIndexVersion = indexLoadingConfig.getRangeIndexVersion();
   }
@@ -96,7 +95,7 @@ public class RangeIndexHandler implements IndexHandler {
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateRangeIndex(columnMetadata)) {
-        createRangeIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+        createRangeIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider, indexCreatorProvider);
       }
     }
   }
@@ -107,7 +106,7 @@ public class RangeIndexHandler implements IndexHandler {
   }
 
   private void createRangeIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      RangeIndexCreatorProvider indexCreatorProvider)
+      RangeIndexCreatorProvider rangeIndexCreatorProvider, IndexCreatorProvider indexCreatorProvider)
       throws IOException {
     File indexDir = _segmentMetadata.getIndexDir();
     String segmentName = _segmentMetadata.getName();
@@ -126,12 +125,15 @@ public class RangeIndexHandler implements IndexHandler {
       FileUtils.deleteQuietly(rangeIndexFile);
     }
 
+    // Create a temporary forward index if it is disabled and does not exist
+    createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+
     // Create new range index for the column.
     LOGGER.info("Creating new range index for segment: {}, column: {}", segmentName, columnName);
     if (columnMetadata.hasDictionary()) {
-      handleDictionaryBasedColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+      handleDictionaryBasedColumn(segmentWriter, columnMetadata, rangeIndexCreatorProvider);
     } else {
-      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata, rangeIndexCreatorProvider);
     }
 
     // For v3, write the generated range index file into the single file and remove it.
