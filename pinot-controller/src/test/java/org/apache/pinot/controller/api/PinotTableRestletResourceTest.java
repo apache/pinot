@@ -510,7 +510,6 @@ public class PinotTableRestletResourceTest {
 
     _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).build();
 
-    System.out.print(response);
     Assert.assertTrue(Objects.equals(response, "{\"status\":\"IN_PROGRESS\"}") || Objects.equals(response,
         "{\"status\":\"DONE\"}") || Objects.equals(response,
         "{\"status\":\"NO_OP\"}"));
