@@ -61,6 +61,7 @@ import static org.mockito.Mockito.when;
 /**
  * Tests the {@link ConsumingSegmentInfoReader}
  */
+@Test(groups = "stateless")
 public class ConsumingSegmentInfoReaderStatelessTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentInfoReaderStatelessTest.class);
 
