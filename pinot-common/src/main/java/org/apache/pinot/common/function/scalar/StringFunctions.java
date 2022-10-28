@@ -728,7 +728,7 @@ public class StringFunctions {
     return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, occurence, "");
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"regexpLike", "regexp_like"})
   public static boolean regexpLike(String inputStr, String regexPatternStr) {
     Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
     return pattern.matcher(inputStr).find();

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
@@ -44,6 +45,16 @@ public class ObjectFunctions {
       return true;
     }
     return !obj1.equals(obj2);
+  }
+
+  @ScalarFunction
+  public static boolean in(Object obj, List<Object> objList) {
+    return objList.contains(obj);
+  }
+
+  @ScalarFunction(names = {"not_in", "notIn"})
+  public static boolean notIn(Object obj, List<Object> objList) {
+    return !in(obj, objList);
   }
 
   @ScalarFunction(nullableParameters = true)

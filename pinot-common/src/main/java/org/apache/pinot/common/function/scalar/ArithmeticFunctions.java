@@ -30,27 +30,27 @@ public class ArithmeticFunctions {
   private ArithmeticFunctions() {
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"add", "plus"})
   public static double plus(double a, double b) {
     return a + b;
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"sub", "minus"})
   public static double minus(double a, double b) {
     return a - b;
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"mult", "times"})
   public static double times(double a, double b) {
     return a * b;
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"div", "divide"})
   public static double divide(double a, double b) {
     return a / b;
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"div", "divide"})
   public static double divide(double a, double b, double defaultValue) {
     return (b == 0) ? defaultValue : a / b;
   }
