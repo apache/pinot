@@ -48,7 +48,6 @@ public class SegmentGenerationAndPushTaskUtils {
       pinotFS.init(fsProps);
       return pinotFS;
     }
-    // Fallback to use the PinotFS created by Minion Server configs
     return null;
   }
 
@@ -66,7 +65,6 @@ public class SegmentGenerationAndPushTaskUtils {
       pinotFS.init(fsProps);
       return pinotFS;
     }
-    // Fallback to use the PinotFS created by Minion Server configs
     return null;
   }
 
