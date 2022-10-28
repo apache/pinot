@@ -1612,9 +1612,13 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"DOC_ID_SET", 6, 5});
     result4.add(new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:noIndexCol1 = '8')",
         7, 6});
-    result4.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
+    result4.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
-    result4.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
+    result4.add(new Object[]{"SELECT(selectList:noIndexCol1, invertedIndexCol3)", 3, 2});
+    result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol3, noIndexCol1)", 4, 3});
+    result4.add(new Object[]{"PROJECT(invertedIndexCol3, noIndexCol1)", 5, 4});
+    result4.add(new Object[]{"DOC_ID_SET", 6, 5});
+    result4.add(new Object[]{"FILTER_EMPTY", 7, 6});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
   }
 
@@ -1773,20 +1777,22 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result1 = new ArrayList<>();
     result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
     result1.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
-    result1.add(new Object[]{
-        "PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
-    });
-    result1.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
-    result1.add(new Object[]{
-        "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
-    });
-    result1.add(new Object[]{
-        "GROUP_BY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1," + "noIndexCol2)), min(noIndexCol3))", 3, 2
-    });
+    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
+            ExplainPlanRows.PLAN_START_IDS});
+    result1.add(new Object[]{"GROUP_BY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1,noIndexCol2)), min"
+            + "(noIndexCol3))", 3, 2});
     result1.add(new Object[]{"TRANSFORM(add(noIndexCol1,noIndexCol2), noIndexCol2, noIndexCol3)", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol1 < '3')", 7, 6});
+    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
+        ExplainPlanRows.PLAN_START_IDS});
+    result1.add(new Object[]{"GROUP_BY(groupKeys:noIndexCol2, aggregations:sum(add(noIndexCol1,noIndexCol2)), min"
+            + "(noIndexCol3))", 3, 2});
+    result1.add(new Object[]{"TRANSFORM(add(noIndexCol1,noIndexCol2), noIndexCol2, noIndexCol3)", 4, 3});
+    result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
+    result1.add(new Object[]{"DOC_ID_SET", 6, 5});
+    result1.add(new Object[]{"FILTER_EMPTY", 7, 6});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
   }
 
@@ -1922,7 +1928,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result8 = new ArrayList<>();
     result8.add(new Object[]{"BROKER_REDUCE(limit:100)", 1, 0});
     result8.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
-    result8.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
+    result8.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result8.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
     result8.add(new Object[]{"FILTER_EMPTY", 4, 3});
@@ -1953,9 +1959,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         + "noIndexCol1 = 100 LIMIT 100";
     List<Object[]> result10 = new ArrayList<>();
     result10.add(new Object[]{"BROKER_REDUCE(limit:100)", 1, 0});
-    result10.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
+    result10.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
+    result10.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
-    result10.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
+    result10.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
+    result10.add(new Object[]{"FILTER_EMPTY", 4, 3});
     check(query10, new ResultTable(DATA_SCHEMA, result10));
   }
 
@@ -2123,13 +2131,10 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result8 = new ArrayList<>();
     result8.add(new Object[]{"BROKER_REDUCE(limit:100)", 1, 0});
     result8.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
-    result8.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
+    result8.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result8.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
     result8.add(new Object[]{"FILTER_EMPTY", 4, 3});
-    result8.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
-        ExplainPlanRows.PLAN_START_IDS});
-    result8.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
     check(query8, new ResultTable(DATA_SCHEMA, result8));
 
     // Segment 1 is pruned because 'minnie' and 'pluto' are outside the range of min-max values of the segment
@@ -2163,9 +2168,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         + "invertedIndexCol3 = 'roadrunner' AND noIndexCol1 = 100 LIMIT 100";
     List<Object[]> result10 = new ArrayList<>();
     result10.add(new Object[]{"BROKER_REDUCE(limit:100)", 1, 0});
-    result10.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
+    result10.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
+    result10.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
-    result10.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
+    result10.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
+    result10.add(new Object[]{"FILTER_EMPTY", 4, 3});
     check(query10, new ResultTable(DATA_SCHEMA, result10));
   }
 
