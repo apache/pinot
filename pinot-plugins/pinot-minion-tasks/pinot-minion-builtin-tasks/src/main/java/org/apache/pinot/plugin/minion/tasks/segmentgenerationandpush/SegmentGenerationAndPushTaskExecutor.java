@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
@@ -177,12 +178,24 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     }
     PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI);
+    boolean closeOutputFSOnExit = true;
+
+    if (outputFileFS == null) {
+      String fileURIScheme = outputSegmentDirURI.getScheme();
+      outputFileFS = PinotFSFactory.create(fileURIScheme);
+      // We shouldn't close FileSystem cached in the factory because it can be re-used
+      closeOutputFSOnExit = false;
+    }
+
     switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
       case TAR:
         try {
           SegmentPushUtils.pushSegments(spec, SegmentGenerationAndPushTaskUtils.getLocalPinotFs(),
               Arrays.asList(outputSegmentTarURI.toString()));
         } catch (RetriableOperationException | AttemptsExceededException e) {
+          if (closeOutputFSOnExit) {
+            outputFileFS.close();
+          }
           throw new RuntimeException(e);
         }
         break;
@@ -195,6 +208,9 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
           segmentUris.add(updatedURI.toString());
           SegmentPushUtils.sendSegmentUris(spec, segmentUris);
         } catch (RetriableOperationException | AttemptsExceededException e) {
+          if (closeOutputFSOnExit) {
+            outputFileFS.close();
+          }
           throw new RuntimeException(e);
         }
         break;
@@ -204,11 +220,21 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
               pushJobSpec, new String[]{outputSegmentTarURI.toString()});
           SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap);
         } catch (RetriableOperationException | AttemptsExceededException e) {
+          if (closeOutputFSOnExit) {
+            outputFileFS.close();
+          }
           throw new RuntimeException(e);
         }
         break;
       default:
+        if (closeOutputFSOnExit) {
+          outputFileFS.close();
+        }
         throw new UnsupportedOperationException("Unrecognized push mode - " + pushMode);
+    }
+
+    if (closeOutputFSOnExit) {
+      outputFileFS.close();
     }
   }
 
@@ -238,6 +264,13 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     }
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI);
+    boolean closeOutputFSOnExit = true;
+    if (outputFileFS == null) {
+      String fileURIScheme = outputSegmentDirURI.getScheme();
+      outputFileFS = PinotFSFactory.create(fileURIScheme);
+      closeOutputFSOnExit = false;
+    }
+
     URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
     if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS
         .exists(outputSegmentDirURI)) {
@@ -245,6 +278,11 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     } else {
       outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
     }
+
+    if (closeOutputFSOnExit) {
+      outputFileFS.close();
+    }
+
     return outputSegmentTarURI;
   }
 
@@ -268,6 +306,13 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     SegmentGenerationTaskSpec taskSpec = new SegmentGenerationTaskSpec();
     URI inputFileURI = URI.create(taskConfigs.get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY));
     PinotFS inputFileFS = SegmentGenerationAndPushTaskUtils.getInputPinotFS(taskConfigs, inputFileURI);
+    boolean closeInputFSOnExit = true;
+
+    if (inputFileFS == null) {
+      String fileURIScheme = inputFileURI.getScheme();
+      inputFileFS = PinotFSFactory.create(fileURIScheme);
+      closeInputFSOnExit = false;
+    }
 
     File localInputTempDir = new File(localTempDir, "input");
     FileUtils.forceMkdir(localInputTempDir);
@@ -321,6 +366,10 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
         BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
     taskSpec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
+
+    if (closeInputFSOnExit) {
+      inputFileFS.close();
+    }
     return taskSpec;
   }
 }

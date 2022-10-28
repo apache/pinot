@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -324,6 +325,14 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
       Set<String> existingSegmentInputFileURIs)
       throws Exception {
     PinotFS inputDirFS = SegmentGenerationAndPushTaskUtils.getInputPinotFS(batchConfigMap, inputDirURI);
+    boolean closeInputFSOnExit = true;
+
+    if (inputDirFS == null) {
+      String fileURIScheme = inputDirURI.getScheme();
+      inputDirFS = PinotFSFactory.create(fileURIScheme);
+      // We shouldn't close FileSystem cached in the factory because it can be re-used
+      closeInputFSOnExit = false;
+    }
 
     String includeFileNamePattern = batchConfigMap.get(BatchConfigProperties.INCLUDE_FILE_NAME_PATTERN);
     String excludeFileNamePattern = batchConfigMap.get(BatchConfigProperties.EXCLUDE_FILE_NAME_PATTERN);
@@ -333,6 +342,9 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     try {
       files = inputDirFS.listFiles(inputDirURI, true);
     } catch (IOException e) {
+      if (closeInputFSOnExit) {
+        inputDirFS.close();
+      }
       LOGGER.error("Unable to list files under URI: " + inputDirURI, e);
       return Collections.emptyList();
     }
@@ -374,6 +386,10 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
         LOGGER.error("Failed to construct inputFileURI for path: {}, parent directory URI: {}", file, inputDirURI, e);
         continue;
       }
+    }
+
+    if (closeInputFSOnExit) {
+      inputDirFS.close();
     }
     return inputFileURIs;
   }

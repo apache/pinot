@@ -23,7 +23,6 @@ import java.util.Map;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -50,7 +49,7 @@ public class SegmentGenerationAndPushTaskUtils {
       return pinotFS;
     }
     // Fallback to use the PinotFS created by Minion Server configs
-    return PinotFSFactory.create(fileURIScheme);
+    return null;
   }
 
   static PinotFS getOutputPinotFS(Map<String, String> taskConfigs, URI fileURI)
@@ -68,7 +67,7 @@ public class SegmentGenerationAndPushTaskUtils {
       return pinotFS;
     }
     // Fallback to use the PinotFS created by Minion Server configs
-    return PinotFSFactory.create(fileURIScheme);
+    return null;
   }
 
   static PinotFS getLocalPinotFs() {
