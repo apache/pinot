@@ -56,27 +56,27 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private final int[] _aggregationFunctionInputRefs;
   private final Object[] _aggregationFunctionLiterals;
   private final DataSchema _resultSchema;
-  private final Map<Integer, Object>[] _groupByResultHolders;
-  private final Map<Integer, Object[]> _groupByKeyHolder;
+  // 1:1 mapping between aggregate result and aggregate function.
+  private final Map<Key, Object>[] _groupByResultHolders;
+  // 1:1 mapping between _groupSet keyHashCode and key values.
+  private final Map<Key, Object[]> _groupByKeyHolder;
 
-  private DataSchema _upstreamDataSchema;
   private TransferableBlock _upstreamErrorBlock;
   private boolean _isCumulativeBlockConstructed;
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
   public AggregateOperator(Operator<TransferableBlock> inputOperator, DataSchema dataSchema,
-      List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema upstreamDataSchema) {
+      List<RexExpression> aggCalls, List<RexExpression> groupSet) {
     _inputOperator = inputOperator;
     _aggCalls = aggCalls;
     _groupSet = groupSet;
-    _upstreamDataSchema = upstreamDataSchema;
     _upstreamErrorBlock = null;
 
     _aggregationFunctions = new AggregationFunction[_aggCalls.size()];
     _aggregationFunctionInputRefs = new int[_aggCalls.size()];
     _aggregationFunctionLiterals = new Object[_aggCalls.size()];
     _groupByResultHolders = new Map[_aggCalls.size()];
-    _groupByKeyHolder = new HashMap<Integer, Object[]>();
+    _groupByKeyHolder = new HashMap<Key, Object[]>();
     for (int i = 0; i < aggCalls.size(); i++) {
       // agg function operand should either be a InputRef or a Literal
       RexExpression rexExpression = toAggregationFunctionOperand(aggCalls.get(i));
@@ -87,7 +87,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         _aggregationFunctionLiterals[i] = ((RexExpression.Literal) rexExpression).getValue();
       }
       _aggregationFunctions[i] = toAggregationFunction(aggCalls.get(i), _aggregationFunctionInputRefs[i]);
-      _groupByResultHolders[i] = new HashMap<Integer, Object>();
+      _groupByResultHolders[i] = new HashMap<Key, Object>();
     }
     _resultSchema = dataSchema;
 
@@ -129,7 +129,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     }
     if (!_isCumulativeBlockConstructed) {
       List<Object[]> rows = new ArrayList<>(_groupByKeyHolder.size());
-      for (Map.Entry<Integer, Object[]> e : _groupByKeyHolder.entrySet()) {
+      for (Map.Entry<Key, Object[]> e : _groupByKeyHolder.entrySet()) {
         Object[] row = new Object[_aggregationFunctions.length + _groupSet.size()];
         Object[] keyElements = e.getValue();
         for (int i = 0; i < keyElements.length; i++) {
@@ -160,15 +160,16 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         for (int rowId = 0; rowId < numRows; rowId++) {
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
           Key key = extraRowKey(row, _groupSet);
-          int keyHashCode = key.hashCode();
-          _groupByKeyHolder.put(keyHashCode, key.getValues());
+          _groupByKeyHolder.put(key, key.getValues());
+          if(_aggregationFunctions.length == 0){
+          }
           for (int i = 0; i < _aggregationFunctions.length; i++) {
-            Object currentRes = _groupByResultHolders[i].get(keyHashCode);
+            Object currentRes = _groupByResultHolders[i].get(key);
             if (currentRes == null) {
-              _groupByResultHolders[i].put(keyHashCode, _aggregationFunctionInputRefs[i] == -1
+              _groupByResultHolders[i].put(key, _aggregationFunctionInputRefs[i] == -1
                   ? _aggregationFunctionLiterals[i] : row[_aggregationFunctionInputRefs[i]]);
             } else {
-              _groupByResultHolders[i].put(keyHashCode,
+              _groupByResultHolders[i].put(key,
                   merge(_aggCalls.get(i), currentRes, _aggregationFunctionInputRefs[i] == -1
                       ? _aggregationFunctionLiterals[i] : row[_aggregationFunctionInputRefs[i]]));
             }
@@ -202,7 +203,6 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       case "MAX":
         return new MaxAggregationFunction(
             ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
-      // COUNT(*) is rewritten to SUM(1)
       case "COUNT":
         return new SumAggregationFunction(ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, 1));
       default:

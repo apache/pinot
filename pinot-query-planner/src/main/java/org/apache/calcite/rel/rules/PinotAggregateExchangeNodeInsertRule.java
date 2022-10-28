@@ -105,12 +105,30 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     // 1. attach leaf agg RelHint to original agg.
     ImmutableList<RelHint> newLeafAggHints =
         new ImmutableList.Builder<RelHint>().addAll(orgHints).add(PinotRelationalHints.AGG_LEAF_STAGE).build();
-    Aggregate newLeafAgg =
-        new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newLeafAggHints, oldAggRel.getInput(),
-            oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
-
+    Aggregate newLeafAgg = null;
+    if (oldAggRel.containsDistinctCall()) {
+      List<AggregateCall> oldAggCalls = oldAggRel.getAggCallList();
+      List<AggregateCall> newAggCalls = new ArrayList<>();
+      ImmutableBitSet newAggRelGroupSet = oldAggRel.getGroupSet();
+      for (AggregateCall aggCall : oldAggCalls) {
+        if (!aggCall.isDistinct()) {
+          newAggCalls.add(aggCall);
+        } else {
+          for(Integer arg: aggCall.getArgList()) {
+            newAggRelGroupSet = newAggRelGroupSet.set(arg);
+          }
+        }
+        newLeafAgg =
+            new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newLeafAggHints, oldAggRel.getInput(),
+                newAggRelGroupSet, ImmutableList.of(newAggRelGroupSet), newAggCalls);
+      }
+    } else {
+      newLeafAgg =
+          new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newLeafAggHints, oldAggRel.getInput(),
+              oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
+    }
     // 2. attach exchange.
-    List<Integer> groupSetIndices = ImmutableIntList.range(0, oldAggRel.getGroupCount());
+    List<Integer> groupSetIndices = ImmutableIntList.range(0, newLeafAgg.getGroupCount());
     LogicalExchange exchange = null;
     if (groupSetIndices.size() == 0) {
       exchange = LogicalExchange.create(newLeafAgg, RelDistributions.hash(Collections.emptyList()));
@@ -119,22 +137,23 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     }
 
     // 3. attach intermediate agg stage.
-    RelNode newAggNode = makeNewIntermediateAgg(call, oldAggRel, exchange);
+    RelNode newAggNode = makeNewIntermediateAgg(call, oldAggRel, newLeafAgg, exchange);
     call.transformTo(newAggNode);
   }
 
-  private RelNode makeNewIntermediateAgg(RelOptRuleCall ruleCall, Aggregate oldAggRel, LogicalExchange exchange) {
+  private RelNode makeNewIntermediateAgg(RelOptRuleCall ruleCall, Aggregate oldAggRel,
+      Aggregate newLeafAgg,
+      LogicalExchange exchange) {
 
     // add the exchange as the input node to the relation builder.
     RelBuilder relBuilder = ruleCall.builder();
     relBuilder.push(exchange);
-    List<RexNode> inputExprs = new ArrayList<>(relBuilder.fields());
 
     // make input ref to the exchange after the leaf aggregate.
     RexBuilder rexBuilder = exchange.getCluster().getRexBuilder();
-    final int nGroups = oldAggRel.getGroupCount();
+    final int nGroups = newLeafAgg.getGroupCount();
     for (int i = 0; i < nGroups; i++) {
-      rexBuilder.makeInputRef(oldAggRel, i);
+      rexBuilder.makeInputRef(newLeafAgg, i);
     }
 
     // create new aggregate function calls from exchange input.
@@ -144,14 +163,14 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     for (int oldCallIndex = 0; oldCallIndex < oldCalls.size(); oldCallIndex++) {
       AggregateCall oldCall = oldCalls.get(oldCallIndex);
-      convertAggCall(rexBuilder, oldAggRel, oldCallIndex, oldCall, newCalls, aggCallMapping, inputExprs);
+      convertAggCall(rexBuilder,newLeafAgg, oldAggRel, oldCallIndex, oldCall, newCalls, aggCallMapping);
     }
 
     // create new aggregate relation.
     ImmutableList<RelHint> orgHints = oldAggRel.getHints();
     ImmutableList<RelHint> newIntermediateAggHints =
         new ImmutableList.Builder<RelHint>().addAll(orgHints).add(PinotRelationalHints.AGG_INTERMEDIATE_STAGE).build();
-    ImmutableBitSet groupSet = ImmutableBitSet.range(nGroups);
+    ImmutableBitSet groupSet = ImmutableBitSet.range(oldAggRel.getGroupCount());
     relBuilder.aggregate(
         relBuilder.groupKey(groupSet, ImmutableList.of(groupSet)),
         newCalls);
@@ -167,22 +186,28 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    *
    * <p>For COUNT operations, the intermediate stage will be converted to SUM.
    */
-  private static void convertAggCall(RexBuilder rexBuilder, Aggregate oldAggRel, int oldCallIndex,
-      AggregateCall oldCall, List<AggregateCall> newCalls, Map<AggregateCall, RexNode> aggCallMapping,
-      List<RexNode> inputExprs) {
-    final int nGroups = oldAggRel.getGroupCount();
+  private static void convertAggCall(RexBuilder rexBuilder,
+      Aggregate newAgg,
+      Aggregate oldAggRel, int oldCallIndex,
+      AggregateCall oldCall, List<AggregateCall> newCalls, Map<AggregateCall, RexNode> aggCallMapping) {
+    final int nGroups = newAgg.getGroupCount();
     final SqlAggFunction oldAggregation = oldCall.getAggregation();
     final SqlKind aggKind = oldAggregation.getKind();
     // Check only the supported AGG functions are provided.
     Preconditions.checkState(SUPPORTED_AGG_KIND.contains(aggKind), "Unsupported SQL aggregation "
         + "kind: {}. Only splittable aggregation functions are supported!", aggKind);
 
-    // Special treatment on COUNT
     AggregateCall newCall;
     if (oldAggregation instanceof SqlCountAggFunction) {
-      newCall = AggregateCall.create(new SqlSumEmptyIsZeroAggFunction(), oldCall.isDistinct(), oldCall.isApproximate(),
-          oldCall.ignoreNulls(), convertArgList(nGroups + oldCallIndex, Collections.singletonList(oldCallIndex)),
-          oldCall.filterArg, oldCall.distinctKeys, oldCall.collation, oldCall.type, oldCall.getName());
+      if(oldCall.isDistinct()){
+        newCall = AggregateCall.create(oldAggregation, oldCall.isDistinct(), oldCall.isApproximate(),
+            oldCall.ignoreNulls(), convertArgList(nGroups + oldCallIndex - 1, Collections.singletonList(oldCallIndex)),
+            oldCall.filterArg, oldCall.distinctKeys, oldCall.collation, oldCall.type, oldCall.getName());;
+      } else {
+        newCall = AggregateCall.create(new SqlSumEmptyIsZeroAggFunction(), oldCall.isDistinct(), oldCall.isApproximate(),
+            oldCall.ignoreNulls(), convertArgList(nGroups + oldCallIndex, Collections.singletonList(oldCallIndex)),
+            oldCall.filterArg, oldCall.distinctKeys, oldCall.collation, oldCall.type, oldCall.getName());
+      }
     } else {
       newCall = AggregateCall.create(
           oldCall.getAggregation(), oldCall.isDistinct(), oldCall.isApproximate(), oldCall.ignoreNulls(),
@@ -190,7 +215,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
           oldCall.collation, oldCall.type, oldCall.getName());
     }
     rexBuilder.addAggCall(newCall,
-        nGroups,
+        oldAggRel.getGroupCount(),
         newCalls,
         aggCallMapping,
         oldAggRel.getInput()::fieldIsNullable);

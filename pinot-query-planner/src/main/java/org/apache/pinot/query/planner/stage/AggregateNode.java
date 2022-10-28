@@ -57,7 +57,20 @@ public class AggregateNode extends AbstractStageNode {
 
   @Override
   public String explain() {
-    return "AGGREGATE";
+    StringBuilder explainBuilder = new StringBuilder();
+    explainBuilder.append("AGGREGATE");
+    explainBuilder.append("aggCalls(");
+    for(RexExpression agg: _aggCalls){
+      explainBuilder.append(agg.getClass());
+      explainBuilder.append(",");
+    }
+    explainBuilder.append(")");
+    explainBuilder.append("groupSet(");
+    for(RexExpression group: _groupSet){
+      explainBuilder.append(group.toString());
+    }
+    explainBuilder.append(")");
+    return explainBuilder.toString();
   }
 
   @Override

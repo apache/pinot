@@ -101,7 +101,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
   public Operator<TransferableBlock> visitAggregate(AggregateNode node, Void context) {
     Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, null);
     return new AggregateOperator(nextOperator, node.getDataSchema(), node.getAggCalls(),
-        node.getGroupSet(), node.getInputs().get(0).getDataSchema());
+        node.getGroupSet());
   }
 
   @Override
@@ -118,8 +118,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
     Operator<TransferableBlock> leftOperator = left.visit(this, null);
     Operator<TransferableBlock> rightOperator = right.visit(this, null);
 
-    return new HashJoinOperator(leftOperator, left.getDataSchema(), rightOperator,
-        right.getDataSchema(), node.getDataSchema(), node.getJoinKeys(),
+    return new HashJoinOperator(leftOperator, rightOperator, node.getDataSchema(), node.getJoinKeys(),
         node.getJoinClauses(), node.getJoinRelType());
   }
 

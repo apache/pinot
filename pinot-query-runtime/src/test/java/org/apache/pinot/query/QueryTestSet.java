@@ -206,7 +206,7 @@ public class QueryTestSet {
 //        new Object[]{"SELECT SUM(CAST(col3 AS INTEGER)) FROM a HAVING MIN(col3) BETWEEN 1 AND 0"},
 //        new Object[]{"SELECT col1, COUNT(col3) FROM a GROUP BY col1 HAVING SUM(col3) > 40 AND SUM(col3) < 30"},
 
-        new Object[]{"SELECT DISTINCT(col1) FROM a"},
+        new Object[]{"SELECT COUNT(DISTINCT(col1)) FROM a"},
     };
   }
 }

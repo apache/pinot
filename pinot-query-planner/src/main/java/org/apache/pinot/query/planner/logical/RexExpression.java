@@ -30,6 +30,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.NlsString;
 import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -98,6 +99,10 @@ public interface RexExpression {
 
   static RexExpression toRexExpression(AggregateCall aggCall) {
     List<RexExpression> operands = aggCall.getArgList().stream().map(InputRef::new).collect(Collectors.toList());
+    if(aggCall.isDistinct() && aggCall.getAggregation().getKind() == SqlKind.COUNT){
+      return new RexExpression.FunctionCall(aggCall.getAggregation().getKind(), toDataType(aggCall.getType()),
+          "DISTINCT_COUNT", operands);
+    }
     return new RexExpression.FunctionCall(aggCall.getAggregation().getKind(), toDataType(aggCall.getType()),
         aggCall.getAggregation().getName(), operands);
   }

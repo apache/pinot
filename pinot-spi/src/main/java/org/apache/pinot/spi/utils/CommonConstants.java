@@ -501,7 +501,7 @@ public class CommonConstants {
         "org.apache.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
         "org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl";
-    public static final long DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS = 15_000L;
+    public static final long DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS = 15_000_000L;
     public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS =
         "org.apache.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";

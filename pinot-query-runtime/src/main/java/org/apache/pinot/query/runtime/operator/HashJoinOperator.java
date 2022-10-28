@@ -53,8 +53,6 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private final Operator<TransferableBlock> _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
-  private final DataSchema _leftTableSchema;
-  private final DataSchema _rightTableSchema;
   private final int _resultRowSize;
   private final List<FilterOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
@@ -62,16 +60,14 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
-  public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, DataSchema leftSchema,
-      Operator<TransferableBlock> rightTableOperator, DataSchema rightSchema, DataSchema outputSchema,
+  public HashJoinOperator(Operator<TransferableBlock> leftTableOperator,
+      Operator<TransferableBlock> rightTableOperator, DataSchema outputSchema,
       JoinNode.JoinKeys joinKeys, List<RexExpression> joinClauses, JoinRelType joinType) {
     _leftKeySelector = joinKeys.getLeftJoinKeySelector();
     _rightKeySelector = joinKeys.getRightJoinKeySelector();
     _leftTableOperator = leftTableOperator;
     _rightTableOperator = rightTableOperator;
     _resultSchema = outputSchema;
-    _leftTableSchema = leftSchema;
-    _rightTableSchema = rightSchema;
     _joinClauseEvaluators = new ArrayList<>(joinClauses.size());
     for (RexExpression joinClause : joinClauses) {
       _joinClauseEvaluators.add(FilterOperand.toFilterOperand(joinClause, _resultSchema));
