@@ -1087,7 +1087,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
         // Total docs should not change during reload
         assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse.get("numSegmentsProcessed").asLong() == 0L;
+        return queryResponse.get("numSegmentsProcessed").asLong() == 1L;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -2474,9 +2474,42 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String query2 = "EXPLAIN PLAN FOR SELECT * FROM mytable WHERE FlightNum < 0";
     String response2 = postQuery(query2, _brokerBaseApiUrl).get("resultTable").toString();
 
+    System.out.println("response: " + response2);
     assertEquals(response2, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
         + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(limit:10)\",1,0],"
-        + "[\"PLAN_START(numSegmentsForThisPlan:12)\",-1,-1],[\"ALL_SEGMENTS_PRUNED_ON_SERVER\",2,1]]}");
+    + "[\"COMBINE_SELECT\",2,1],[\"PLAN_START(numSegmentsForThisPlan:1)\",-1,-1],[\"SELECT"
+    + "(selectList:ActualElapsedTime, AirTime, AirlineID, ArrDel15, ArrDelay, ArrDelayMinutes, ArrTime, ArrTimeBlk, "
+    + "ArrivalDelayGroups, CRSArrTime, CRSDepTime, CRSElapsedTime, CancellationCode, Cancelled, Carrier, "
+    + "CarrierDelay, DayOfWeek, DayofMonth, DaysSinceEpoch, DepDel15, DepDelay, DepDelayMinutes, DepTime, DepTimeBlk,"
+    + " DepartureDelayGroups, Dest, DestAirportID, DestAirportSeqID, DestCityMarketID, DestCityName, DestState, "
+    + "DestStateFips, DestStateName, DestWac, Distance, DistanceGroup, DivActualElapsedTime, DivAirportIDs, "
+    + "DivAirportLandings, DivAirportSeqIDs, DivAirports, DivArrDelay, DivDistance, DivLongestGTimes, DivReachedDest,"
+    + " DivTailNums, DivTotalGTimes, DivWheelsOffs, DivWheelsOns, Diverted, FirstDepTime, FlightDate, FlightNum, "
+    + "Flights, LateAircraftDelay, LongestAddGTime, Month, NASDelay, Origin, OriginAirportID, OriginAirportSeqID, "
+    + "OriginCityMarketID, OriginCityName, OriginState, OriginStateFips, OriginStateName, OriginWac, Quarter, "
+    + "RandomAirports, SecurityDelay, TailNum, TaxiIn, TaxiOut, TotalAddGTime, UniqueCarrier, WeatherDelay, "
+    + "WheelsOff, WheelsOn, Year)\",3,2],[\"TRANSFORM_PASSTHROUGH(ActualElapsedTime, AirTime, AirlineID, ArrDel15, "
+    + "ArrDelay, ArrDelayMinutes, ArrTime, ArrTimeBlk, ArrivalDelayGroups, CRSArrTime, CRSDepTime, CRSElapsedTime, "
+    + "CancellationCode, Cancelled, Carrier, CarrierDelay, DayOfWeek, DayofMonth, DaysSinceEpoch, DepDel15, DepDelay,"
+    + " DepDelayMinutes, DepTime, DepTimeBlk, DepartureDelayGroups, Dest, DestAirportID, DestAirportSeqID, "
+    + "DestCityMarketID, DestCityName, DestState, DestStateFips, DestStateName, DestWac, Distance, DistanceGroup, "
+    + "DivActualElapsedTime, DivAirportIDs, DivAirportLandings, DivAirportSeqIDs, DivAirports, DivArrDelay, "
+    + "DivDistance, DivLongestGTimes, DivReachedDest, DivTailNums, DivTotalGTimes, DivWheelsOffs, DivWheelsOns, "
+    + "Diverted, FirstDepTime, FlightDate, FlightNum, Flights, LateAircraftDelay, LongestAddGTime, Month, NASDelay, "
+    + "Origin, OriginAirportID, OriginAirportSeqID, OriginCityMarketID, OriginCityName, OriginState, OriginStateFips,"
+    + " OriginStateName, OriginWac, Quarter, RandomAirports, SecurityDelay, TailNum, TaxiIn, TaxiOut, TotalAddGTime, "
+    + "UniqueCarrier, WeatherDelay, WheelsOff, WheelsOn, Year)\",4,3],[\"PROJECT(FlightNum, Origin, Quarter, "
+    + "LateAircraftDelay, DivActualElapsedTime, DivWheelsOns, DivWheelsOffs, AirTime, ArrDel15, DivTotalGTimes, "
+    + "DepTimeBlk, DestCityMarketID, DaysSinceEpoch, DivAirportSeqIDs, DepTime, Month, CRSElapsedTime, DestStateName,"
+    + " Carrier, DestAirportID, Distance, ArrTimeBlk, DivArrDelay, SecurityDelay, LongestAddGTime, OriginWac, "
+    + "WheelsOff, DestAirportSeqID, UniqueCarrier, DivReachedDest, Diverted, ActualElapsedTime, AirlineID, "
+    + "OriginStateName, DepartureDelayGroups, DivAirportLandings, FlightDate, OriginCityName, OriginStateFips, "
+    + "OriginState, DistanceGroup, WeatherDelay, DestWac, WheelsOn, OriginAirportID, OriginCityMarketID, NASDelay, "
+    + "ArrTime, DestState, ArrivalDelayGroups, Flights, DayofMonth, RandomAirports, TotalAddGTime, CRSDepTime, "
+    + "DayOfWeek, CancellationCode, Dest, FirstDepTime, DivTailNums, DepDelayMinutes, DepDelay, TaxiIn, "
+    + "OriginAirportSeqID, DestStateFips, ArrDelay, Cancelled, DivAirportIDs, TaxiOut, CarrierDelay, DepDel15, "
+    + "DivLongestGTimes, DivAirports, DivDistance, Year, ArrDelayMinutes, CRSArrTime, TailNum, DestCityName)\",5,4],"
+    + "[\"DOC_ID_SET\",6,5],[\"FILTER_EMPTY\",7,6]]}");
   }
 
   /** Test to make sure we are properly handling string comparisons in predicates. */
