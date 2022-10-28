@@ -389,7 +389,7 @@ public class TableRebalancer {
     if (idealState == null) {
       throw new IllegalStateException("ideal state is empty");
     }
-    if(externalView==null){
+    if (externalView == null) {
       return RebalanceResult.Status.NO_OP;
     }
 

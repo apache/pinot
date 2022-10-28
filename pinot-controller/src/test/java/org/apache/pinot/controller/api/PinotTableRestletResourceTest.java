@@ -492,7 +492,7 @@ public class PinotTableRestletResourceTest {
   @Test
   public void checkRebalanceStatus()
       throws Exception {
-    String tableName="testTable1";
+    String tableName = "testTable1";
     TableConfig testTableConfig = _offlineBuilder.setTableName(tableName).build();
 
     // Create the table
@@ -510,8 +510,9 @@ public class PinotTableRestletResourceTest {
 
     _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).build();
 
-    Assert.assertTrue(Objects.equals(response, "{\"status\":\"IN_PROGRESS\"}") || Objects.equals(response,
-        "{\"status\":\"DONE\"}") || Objects.equals(response,
+    Assert.assertTrue(Objects.equals(response, "{\"status\":\"IN_PROGRESS\"}")
+        || Objects.equals(response, "{\"status\":\"DONE\"}")
+        || Objects.equals(response,
         "{\"status\":\"NO_OP\"}"));
   }
 
