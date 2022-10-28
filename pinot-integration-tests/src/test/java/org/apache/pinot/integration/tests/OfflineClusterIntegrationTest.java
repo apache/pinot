@@ -2477,7 +2477,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     System.out.println("response: " + response2);
     assertEquals(response2, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
         + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(limit:10)\",1,0],"
-    + "[\"COMBINE_SELECT\",2,1],[\"PLAN_START(numSegmentsForThisPlan:1)\",-1,-1],[\"SELECT"
+    + "[\"COMBINE_SELECT\",2,1],[\"PLAN_START(numSegmentsForThisPlan:" + getNumServers() + ")\",-1,-1],[\"SELECT"
     + "(selectList:ActualElapsedTime, AirTime, AirlineID, ArrDel15, ArrDelay, ArrDelayMinutes, ArrTime, ArrTimeBlk, "
     + "ArrivalDelayGroups, CRSArrTime, CRSDepTime, CRSElapsedTime, CancellationCode, Cancelled, Carrier, "
     + "CarrierDelay, DayOfWeek, DayofMonth, DaysSinceEpoch, DepDel15, DepDelay, DepDelayMinutes, DepTime, DepTimeBlk,"
@@ -2862,12 +2862,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Run a query that will return empty results
     String query1 = "SELECT AirlineID, AirTime, cast(AirTime as STRING), Carrier FROM mytable WHERE AirlineID < 0";
     JsonNode response = postQuery(query1, _brokerBaseApiUrl);
+    int numServersQueried = response.get("numServersQueried").asInt();
+    int numServersResponded = response.get("numServersResponded").asInt();
     int numSegmentsQueried = response.get("numSegmentsQueried").asInt();
     int numSegmentsPrunedByServer = response.get("numSegmentsPrunedByServer").asInt();
 
     // Check to make sure that all, but one segments got pruned for this query since we need to query at least one
     // segment to set the result set metadata properly.
-    assertEquals(numSegmentsQueried - 1, numSegmentsPrunedByServer);
+    assertEquals(numServersQueried, numServersResponded);
+
+    // Each server will query one segment, the rest of the segments get pruned away.
+    assertEquals(numSegmentsQueried - numServersResponded, numSegmentsPrunedByServer);
 
     // Check result column names.
     String columnNames = response.get("resultTable").get("dataSchema").get("columnNames").toPrettyString();
