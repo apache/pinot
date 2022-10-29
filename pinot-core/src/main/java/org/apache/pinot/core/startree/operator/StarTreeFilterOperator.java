@@ -21,12 +21,12 @@ package org.apache.pinot.core.startree.operator;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -208,28 +208,22 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     StarTreeNode starTreeRootNode = starTree.getRoot();
 
     // Use BFS to traverse the star tree
-    Queue<StarTreeNode> queue = new LinkedList<>();
+    Queue<StarTreeNode> queue = new ArrayDeque<>();
     queue.add(starTreeRootNode);
-    // Use null to mark the end of the current level
-    queue.add(null);
-    int childDimensionId = 0;
+    int currentDimensionId = -1;
     Set<String> remainingPredicateColumns = new HashSet<>(_predicateEvaluatorsMap.keySet());
     Set<String> remainingGroupByColumns = new HashSet<>(_groupByColumns);
     IntSet matchingDictIds = null;
-    while (!queue.isEmpty()) {
-      StarTreeNode starTreeNode = queue.poll();
-      if (starTreeNode == null) {
+    StarTreeNode starTreeNode;
+    while ((starTreeNode = queue.poll()) != null) {
+      int dimensionId = starTreeNode.getDimensionId();
+      if (dimensionId > currentDimensionId) {
         // Previous level finished
-        if (queue.isEmpty()) {
-          break;
-        } else {
-          String childDimension = dimensionNames.get(childDimensionId++);
-          remainingPredicateColumns.remove(childDimension);
-          remainingGroupByColumns.remove(childDimension);
-          matchingDictIds = null;
-          queue.add(null);
-          continue;
-        }
+        String dimension = dimensionNames.get(dimensionId);
+        remainingPredicateColumns.remove(dimension);
+        remainingGroupByColumns.remove(dimension);
+        matchingDictIds = null;
+        currentDimensionId = dimensionId;
       }
 
       // If all predicate columns and group-by columns are matched, we can use aggregated document
@@ -244,7 +238,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       if (starTreeNode.isLeaf()) {
         matchingDocIds.add((long) starTreeNode.getStartDocId(), starTreeNode.getEndDocId());
         // Only set the global remaining predicate columns once because we traverse the tree with BFS, so the first leaf
-        // node always have all the
+        // node always have all the remaining predicate columns
         if (!globalRemainingPredicateColumnsSet) {
           if (!remainingPredicateColumns.isEmpty()) {
             globalRemainingPredicateColumns = new HashSet<>(remainingPredicateColumns);
@@ -255,7 +249,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       }
 
       // For non-leaf node, proceed to next level
-      String childDimension = dimensionNames.get(childDimensionId);
+      String childDimension = dimensionNames.get(dimensionId + 1);
 
       // Only read star-node when the dimension is not in the global remaining predicate columns or group-by columns
       // because we cannot use star-node in such cases
@@ -271,11 +265,11 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         // Calculate the matching dictionary ids for the child dimension
         if (matchingDictIds == null) {
           matchingDictIds = getMatchingDictIds(_predicateEvaluatorsMap.get(childDimension));
-        }
 
-        // If no matching dictionary id found, directly return null
-        if (matchingDictIds.isEmpty()) {
-          return null;
+          // If no matching dictionary id found, directly return null
+          if (matchingDictIds.isEmpty()) {
+            return null;
+          }
         }
 
         int numMatchingDictIds = matchingDictIds.size();
