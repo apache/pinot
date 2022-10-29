@@ -163,8 +163,8 @@ public class QueryException {
     QUOTA_EXCEEDED_ERROR.setMessage("QuotaExceededError");
   }
 
-  public static ProcessingException getException(ProcessingException processingException, Exception exception) {
-    return getException(processingException, getTruncatedStackTrace(exception));
+  public static ProcessingException getException(ProcessingException processingException, Throwable t) {
+    return getException(processingException, getTruncatedStackTrace(t));
   }
 
   public static ProcessingException getException(ProcessingException processingException, String errorMessage) {
@@ -174,9 +174,9 @@ public class QueryException {
     return copiedProcessingException;
   }
 
-  public static String getTruncatedStackTrace(Throwable exception) {
+  public static String getTruncatedStackTrace(Throwable t) {
     StringWriter stringWriter = new StringWriter();
-    exception.printStackTrace(new PrintWriter(stringWriter));
+    t.printStackTrace(new PrintWriter(stringWriter));
     String fullStackTrace = stringWriter.toString();
     String[] lines = StringUtils.split(fullStackTrace, '\n');
     // exception should at least have one line, no need to check here.
