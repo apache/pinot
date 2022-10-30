@@ -19,14 +19,11 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import javax.annotation.RegEx;
-import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
@@ -37,7 +34,6 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
