@@ -26,6 +26,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -38,6 +42,8 @@ import org.testng.annotations.Test;
 
 
 public class QueryRunnerTest extends QueryRunnerTestBase {
+  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(
+      ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("query_server_enclosure"));
 
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows)
@@ -71,7 +77,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedStagePlan distributedStagePlan =
               QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
+          EXECUTOR_SERVICE.submit(() -> {
+            _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
+          });
         }
       }
     }

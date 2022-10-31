@@ -16,14 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.executor;
+package org.apache.pinot.query.runtime.plan;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
@@ -45,7 +44,6 @@ import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
-import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 
 
 /**
@@ -53,69 +51,54 @@ import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
  * this works only for the intermediate stage nodes, leaf stage nodes are expected to compile into
  * v1 operators at this point in time.
  *
- * <p>This class should be used statically via {@link #build(MailboxService, String, int, long, Map, StageNode)}
+ * <p>This class should be used statically via {@link #build(StageNode, PlanRequestContext)}
  *
  * @see org.apache.pinot.query.runtime.QueryRunner#processQuery(DistributedStagePlan, ExecutorService, Map)
  */
-public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<TransferableBlock>, Void> {
+public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<TransferableBlock>, PlanRequestContext> {
+  private static final PhysicalPlanVisitor INSTANCE = new PhysicalPlanVisitor();
 
-  private final MailboxService<TransferableBlock> _mailboxService;
-  private final String _hostName;
-  private final int _port;
-  private final long _requestId;
-  private final Map<Integer, StageMetadata> _metadataMap;
-
-  public static Operator<TransferableBlock> build(MailboxService<TransferableBlock> mailboxService,
-      String hostName, int port, long requestId, Map<Integer, StageMetadata> metadataMap, StageNode node) {
-    return node.visit(new PhysicalPlanVisitor(mailboxService, hostName, port, requestId, metadataMap), null);
-  }
-
-  private PhysicalPlanVisitor(MailboxService<TransferableBlock> mailboxService, String hostName, int port,
-      long requestId, Map<Integer, StageMetadata> metadataMap) {
-    _mailboxService = mailboxService;
-    _hostName = hostName;
-    _port = port;
-    _requestId = requestId;
-    _metadataMap = metadataMap;
+  public static Operator<TransferableBlock> build(StageNode node, PlanRequestContext context) {
+    return node.visit(INSTANCE, context);
   }
 
   @Override
-  public Operator<TransferableBlock> visitMailboxReceive(MailboxReceiveNode node, Void context) {
-    List<ServerInstance> sendingInstances = _metadataMap.get(node.getSenderStageId()).getServerInstances();
-    return new MailboxReceiveOperator(_mailboxService, node.getDataSchema(), sendingInstances,
-        node.getExchangeType(), node.getPartitionKeySelector(), _hostName, _port, _requestId,
-        node.getSenderStageId());
+  public Operator<TransferableBlock> visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
+    List<ServerInstance> sendingInstances = context.getMetadataMap().get(node.getSenderStageId()).getServerInstances();
+    return new MailboxReceiveOperator(context.getMailboxService(), node.getDataSchema(), sendingInstances,
+        node.getExchangeType(), node.getPartitionKeySelector(), context.getHostName(), context.getPort(),
+        context.getRequestId(), node.getSenderStageId());
   }
 
   @Override
-  public Operator<TransferableBlock> visitMailboxSend(MailboxSendNode node, Void context) {
-    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, null);
-    StageMetadata receivingStageMetadata = _metadataMap.get(node.getReceiverStageId());
-    return new MailboxSendOperator(_mailboxService, node.getDataSchema(), nextOperator,
+  public Operator<TransferableBlock> visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
+    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
+    StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
+    return new MailboxSendOperator(context.getMailboxService(), node.getDataSchema(), nextOperator,
         receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
-        _hostName, _port, _requestId, node.getStageId());
+        context.getHostName(), context.getPort(), context.getRequestId(), node.getStageId());
   }
 
   @Override
-  public Operator<TransferableBlock> visitAggregate(AggregateNode node, Void context) {
-    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, null);
+  public Operator<TransferableBlock> visitAggregate(AggregateNode node, PlanRequestContext context) {
+    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
     return new AggregateOperator(nextOperator, node.getDataSchema(), node.getAggCalls(),
         node.getGroupSet(), node.getInputs().get(0).getDataSchema());
   }
 
   @Override
-  public Operator<TransferableBlock> visitFilter(FilterNode node, Void context) {
-    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, null);
+  public Operator<TransferableBlock> visitFilter(FilterNode node, PlanRequestContext context) {
+    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
     return new FilterOperator(nextOperator, node.getDataSchema(), node.getCondition());
   }
 
   @Override
-  public Operator<TransferableBlock> visitJoin(JoinNode node, Void context) {
+  public Operator<TransferableBlock> visitJoin(JoinNode node, PlanRequestContext context) {
     StageNode left = node.getInputs().get(0);
     StageNode right = node.getInputs().get(1);
 
-    Operator<TransferableBlock> leftOperator = left.visit(this, null);
-    Operator<TransferableBlock> rightOperator = right.visit(this, null);
+    Operator<TransferableBlock> leftOperator = left.visit(this, context);
+    Operator<TransferableBlock> rightOperator = right.visit(this, context);
 
     return new HashJoinOperator(leftOperator, left.getDataSchema(), rightOperator,
         right.getDataSchema(), node.getDataSchema(), node.getJoinKeys(),
@@ -123,26 +106,26 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
   }
 
   @Override
-  public Operator<TransferableBlock> visitProject(ProjectNode node, Void context) {
-    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, null);
+  public Operator<TransferableBlock> visitProject(ProjectNode node, PlanRequestContext context) {
+    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
     return new TransformOperator(nextOperator, node.getDataSchema(), node.getProjects(),
         node.getInputs().get(0).getDataSchema());
   }
 
   @Override
-  public Operator<TransferableBlock> visitSort(SortNode node, Void context) {
-    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, null);
+  public Operator<TransferableBlock> visitSort(SortNode node, PlanRequestContext context) {
+    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
     return new SortOperator(nextOperator, node.getCollationKeys(), node.getCollationDirections(),
         node.getFetch(), node.getOffset(), node.getDataSchema());
   }
 
   @Override
-  public Operator<TransferableBlock> visitTableScan(TableScanNode node, Void context) {
+  public Operator<TransferableBlock> visitTableScan(TableScanNode node, PlanRequestContext context) {
     throw new UnsupportedOperationException("Stage node of type TableScanNode is not supported!");
   }
 
   @Override
-  public Operator<TransferableBlock> visitValue(ValueNode node, Void context) {
+  public Operator<TransferableBlock> visitValue(ValueNode node, PlanRequestContext context) {
     return new LiteralValueOperator(node.getDataSchema(), node.getLiteralRows());
   }
 }
