@@ -108,21 +108,16 @@ public class FunctionRegistry {
 
   private static void registerFunctionInfoMap(String functionName, Method method, boolean nullableParameters) {
     FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
-    // register the function
-    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(functionName, k -> new HashMap<>());
-    FunctionInfo existingFunctionInfo = functionInfoMap.put(method.getParameterCount(), functionInfo);
-    Preconditions.checkState(existingFunctionInfo == null,
-        "Function: %s with %s parameters is already registered", functionName, method.getParameterCount());
-    // register the canonicalized version if not already done so.
     String canonicalName = canonicalize(functionName);
-    functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
-    existingFunctionInfo = functionInfoMap.put(method.getParameterCount(), functionInfo);
+    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
+    FunctionInfo existingFunctionInfo = functionInfoMap.put(method.getParameterCount(), functionInfo);
     Preconditions.checkState(existingFunctionInfo == null
             || existingFunctionInfo.getMethod() == functionInfo.getMethod(),
         "Function: %s with %s parameters is already registered", canonicalName, method.getParameterCount());
   }
 
   private static void registerCalciteFunctionMap(String functionName, Method method) {
+    // Calcite ScalarFunctionImpl doesn't allow customized named functions. TODO: fix me.
     if (method.getAnnotation(Deprecated.class) == null) {
       FUNCTION_MAP.put(functionName, ScalarFunctionImpl.create(method));
     }
