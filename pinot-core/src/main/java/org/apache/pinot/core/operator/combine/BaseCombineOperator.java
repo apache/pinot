@@ -107,6 +107,9 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             // Early-terminated by interruption (canceled by the main thread)
           } catch (Throwable t) {
             // Caught exception/error, skip processing the remaining segments
+            // NOTE: We need to handle Error here, or the execution threads will die without adding the execution
+            //       exception into the query response, and the main thread might wait infinitely (until timeout) or
+            //       throw unexpected exceptions (such as NPE).
             if (t instanceof Exception) {
               LOGGER.error("Caught exception while processing query: " + _queryContext, t);
             } else {
