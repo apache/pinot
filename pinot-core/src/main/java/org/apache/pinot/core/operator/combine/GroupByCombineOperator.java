@@ -216,8 +216,8 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
   }
 
   @Override
-  protected void onException(Exception e) {
-    _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+  protected void onException(Throwable t) {
+    _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, t));
   }
 
   @Override

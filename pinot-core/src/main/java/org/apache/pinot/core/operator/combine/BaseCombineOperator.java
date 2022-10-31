@@ -105,10 +105,17 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             processSegments();
           } catch (EarlyTerminationException e) {
             // Early-terminated by interruption (canceled by the main thread)
-          } catch (Exception e) {
-            // Caught exception, skip processing the remaining segments
-            LOGGER.error("Caught exception while processing query: " + _queryContext, e);
-            onException(e);
+          } catch (Throwable t) {
+            // Caught exception/error, skip processing the remaining segments
+            // NOTE: We need to handle Error here, or the execution threads will die without adding the execution
+            //       exception into the query response, and the main thread might wait infinitely (until timeout) or
+            //       throw unexpected exceptions (such as NPE).
+            if (t instanceof Exception) {
+              LOGGER.error("Caught exception while processing query: " + _queryContext, t);
+            } else {
+              LOGGER.error("Caught serious error while processing query: " + _queryContext, t);
+            }
+            onException(t);
           } finally {
             onFinish();
             phaser.arriveAndDeregister();
@@ -180,10 +187,10 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   }
 
   /**
-   * Invoked when {@link #processSegments()} throws exception.
+   * Invoked when {@link #processSegments()} throws exception/error.
    */
-  protected void onException(Exception e) {
-    _blockingQueue.offer(new ExceptionResultsBlock(e));
+  protected void onException(Throwable t) {
+    _blockingQueue.offer(new ExceptionResultsBlock(t));
   }
 
   /**
