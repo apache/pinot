@@ -543,7 +543,6 @@ public class TablesResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
-    
     return segmentConsumerInfoList;
   }
 
