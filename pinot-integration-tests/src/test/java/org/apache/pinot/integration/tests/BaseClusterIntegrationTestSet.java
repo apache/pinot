@@ -652,11 +652,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode testQueryResponse = postQuery(testQuery);
-        // Should not throw exception during reload
-        assertEquals(testQueryResponse.get("exceptions").size(), 0);
-        // Total docs should not change during reload
-        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult;
+        // Should not throw exception during reload and total docs should not change during reload
+        return testQueryResponse.get("exceptions").size() == 0
+            && testQueryResponse.get("totalDocs").asLong() == numTotalDocs
+            && testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

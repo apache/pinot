@@ -260,19 +260,15 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
 
-    // Select non-existing key with proper filter
+    // Select non-existing key with bad column name in filter
     query = "SELECT jsonExtractScalar(intKeyMapStr, '$.123', 'INT') FROM " + getTableName()
         + " WHERE jsonExtractKey(intKeyMapStr, '$.*') = \"$['123']\"";
     pinotResponse = postQuery(query);
-    assertEquals(pinotResponse.get("exceptions").size(), 0);
-    rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), 0);
+    assertEquals(pinotResponse.get("exceptions").size(), 1);
     query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k3', 'INT') FROM " + getTableName()
         + " WHERE jsonExtractKey(stringKeyMapStr, '$.*') = \"$['k3']\"";
     pinotResponse = postQuery(query);
-    assertEquals(pinotResponse.get("exceptions").size(), 0);
-    rows = pinotResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), 0);
+    assertEquals(pinotResponse.get("exceptions").size(), 1);
   }
 
   @Test
