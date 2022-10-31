@@ -34,15 +34,19 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
  * <p>The main purpose of this Pinot specific SQL operator table is to
  * <ul>
  *   <li>Ensure that any specific SQL validation rules can apply with Pinot override entirely over Calcite's.</li>
- *   <li>Ability to create customer operators that are not function and cannot use
+ *   <li>Ability to create customer operators that are not function and cannot be used.
  *     {@link org.apache.calcite.prepare.Prepare.CatalogReader} to override</li>
  *   <li>Still maintain minimum customization and benefit from Calcite's original operator table setting.</li>
  * </ul>
  */
 public class PinotOperatorTable extends SqlStdOperatorTable {
-
   private static @MonotonicNonNull PinotOperatorTable _instance;
 
+  // SqlFunction/SqlOperator fields will be registered as function or operator.
+  // Note that SqlOperator is subclass of SqlFunction.
+  // Duplicate name (non-case-sensitive) is not allowed.
+
+  // COALESCE is needed now because we don't support CASE WHEN in pinot server.
   public static final SqlFunction COALESCE = new PinotSqlCoalesceFunction();
 
   // TODO: clean up lazy init by using Suppliers.memorized(this::computeInstance) and make getter wrapped around
@@ -50,8 +54,8 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
   public static synchronized PinotOperatorTable instance() {
     if (_instance == null) {
       // Creates and initializes the standard operator table.
-      // Uses two-phase construction, because we can't initialize the
-      // table until the constructor of the sub-class has completed.
+      // Uses two-phase construction, because we can't initialize the table until the constructor of the subclass
+      // has completed.
       _instance = new PinotOperatorTable();
       _instance.initNoDuplicate();
     }
@@ -69,12 +73,7 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
     // Use reflection to register the expressions stored in public fields.
     for (Field field : getClass().getFields()) {
       try {
-        if (SqlFunction.class.isAssignableFrom(field.getType())) {
-          SqlFunction op = (SqlFunction) field.get(this);
-          if (op != null && notRegistered(op)) {
-            register(op);
-          }
-        } else if (
+         if (
             SqlOperator.class.isAssignableFrom(field.getType())) {
           SqlOperator op = (SqlOperator) field.get(this);
           if (op != null && notRegistered(op)) {
@@ -85,13 +84,6 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
         throw Util.throwAsRuntime(Util.causeOrSelf(e));
       }
     }
-  }
-
-  private boolean notRegistered(SqlFunction op) {
-    List<SqlOperator> operatorList = new ArrayList<>();
-    lookupOperatorOverloads(op.getNameAsId(), op.getFunctionType(), op.getSyntax(), operatorList,
-        SqlNameMatchers.withCaseSensitive(false));
-    return operatorList.size() == 0;
   }
 
   private boolean notRegistered(SqlOperator op) {
