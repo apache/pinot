@@ -172,10 +172,10 @@ public class DebugResource {
       Map<String, String> upstreamLatest = partitionStateMap.entrySet().stream().collect(
           Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString()));
       Map<String, String> recordsLagMap = new HashMap<>();
-      Map<String, String> recordsAvailabilityMap = new HashMap<>();
+      Map<String, String> availabilityLagMsMap = new HashMap<>();
       realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
         recordsLagMap.put(k, v.getRecordsLag());
-        recordsAvailabilityMap.put(k, v.getAvailabilityLagMs());
+        availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
       });
 
       segmentConsumerInfo =
@@ -185,7 +185,7 @@ public class DebugResource {
               realtimeSegmentDataManager.getLastConsumedTimestamp(),
               currentOffsets,
               new SegmentConsumerInfo.PartitionOffsetInfo(currentOffsets,
-                  upstreamLatest, recordsLagMap, recordsAvailabilityMap));
+                  upstreamLatest, recordsLagMap, availabilityLagMsMap));
     }
     return segmentConsumerInfo;
   }
