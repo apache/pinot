@@ -63,7 +63,7 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
   }
 
   /**
-   * Initialize without duplicate, e.g. when 2 duplicate operator is linked with the same op
+   * Initialize without duplicate, e.g. when two duplicate operators are linked with the same op
    * {@link org.apache.calcite.sql.SqlKind} it causes problem.
    *
    * <p>This is a direct copy of the {@link org.apache.calcite.sql.util.ReflectiveSqlOperatorTable} and can be hard to
