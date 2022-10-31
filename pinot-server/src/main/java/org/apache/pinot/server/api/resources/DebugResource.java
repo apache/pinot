@@ -175,7 +175,7 @@ public class DebugResource {
       Map<String, String> recordsAvailabilityMap = new HashMap<>();
       realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
         recordsLagMap.put(k, v.getRecordsLag());
-        recordsAvailabilityMap.put(k, v.getRecordAvailabilityLagMs());
+        recordsAvailabilityMap.put(k, v.getAvailabilityLagMs());
       });
 
       segmentConsumerInfo =

@@ -23,11 +23,11 @@ import org.apache.pinot.spi.stream.PartitionLagState;
 
 public class KafkaConsumerPartitionLag extends PartitionLagState {
   private final String _recordsLag;
-  private final String _recordAvailabilityLag;
+  private final String _availabilityLagMs;
 
-  public KafkaConsumerPartitionLag(String recordsLag, String recordAvailabilityLag) {
+  public KafkaConsumerPartitionLag(String recordsLag, String availabilityLagMs) {
     _recordsLag = recordsLag;
-    _recordAvailabilityLag = recordAvailabilityLag;
+    _availabilityLagMs = availabilityLagMs;
   }
 
   public String getRecordsLag() {
@@ -35,7 +35,7 @@ public class KafkaConsumerPartitionLag extends PartitionLagState {
   }
 
   @Override
-  public String getRecordAvailabilityLagMs() {
-    return _recordAvailabilityLag;
+  public String getAvailabilityLagMs() {
+    return _availabilityLagMs;
   }
 }

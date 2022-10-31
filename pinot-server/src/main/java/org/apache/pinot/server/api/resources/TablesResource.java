@@ -517,10 +517,10 @@ public class TablesResource {
           Map<String, ConsumerPartitionState> partitionStateMap =
               realtimeSegmentDataManager.getConsumerPartitionState();
           Map<String, String> recordsLagMap = new HashMap<>();
-          Map<String, String> availabilityLagMap = new HashMap<>();
+          Map<String, String> availabilityLagMsMap = new HashMap<>();
           realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
             recordsLagMap.put(k, v.getRecordsLag());
-            availabilityLagMap.put(k, v.getRecordAvailabilityLagMs());
+            availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
           });
           @Deprecated Map<String, String> partitiionToOffsetMap =
               realtimeSegmentDataManager.getPartitionToCurrentOffset();
@@ -533,7 +533,7 @@ public class TablesResource {
                       partitiionToOffsetMap,
                       partitionStateMap.entrySet().stream().collect(
                           Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
-                      ), recordsLagMap, availabilityLagMap)));
+                      ), recordsLagMap, availabilityLagMsMap)));
         }
       }
     } catch (Exception e) {

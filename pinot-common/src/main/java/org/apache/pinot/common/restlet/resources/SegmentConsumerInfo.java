@@ -77,18 +77,18 @@ public class SegmentConsumerInfo {
     @JsonProperty("latestUpstreamOffsets")
     public Map<String, String> _latestUpstreamOffsets;
 
-    @JsonProperty("recordsAvailabilityLag")
-    public Map<String, String> _availabilityLag;
+    @JsonProperty("availabilityLagMs")
+    public Map<String, String> _availabilityLagMs;
 
     public PartitionOffsetInfo(
         @JsonProperty("currentOffsets") Map<String, String> currentOffsets,
         @JsonProperty("latestUpstreamOffsets") Map<String, String> latestUpstreamOffsets,
         @JsonProperty("recordsLag") Map<String, String> recordsLag,
-        @JsonProperty("recordsAvailabilityLag") Map<String, String> availabilityLag) {
+        @JsonProperty("availabilityLagMs") Map<String, String> availabilityLagMs) {
       _currentOffsets = currentOffsets;
       _latestUpstreamOffsets = latestUpstreamOffsets;
       _recordsLag = recordsLag;
-      _availabilityLag = availabilityLag;
+      _availabilityLagMs = availabilityLagMs;
     }
 
     public Map<String, String> getCurrentOffsets() {
@@ -103,8 +103,8 @@ public class SegmentConsumerInfo {
       return _latestUpstreamOffsets;
     }
 
-    public Map<String, String> getAvailabilityLag() {
-      return _availabilityLag;
+    public Map<String, String> getAvailabilityLagMs() {
+      return _availabilityLagMs;
     }
   }
 }

@@ -126,15 +126,15 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       }
 
       // Compute record-availability
-      String recordAvailabilityLag = "UNKNOWN";
+      String availabilityLagMs = "UNKNOWN";
       RowMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
       if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
         long availabilityLag = partitionState.getLastProcessedTimeMs()
             - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
-        recordAvailabilityLag = String.valueOf(availabilityLag);
+        availabilityLagMs = String.valueOf(availabilityLag);
       }
 
-      perPartitionLag.put(entry.getKey(), new KafkaConsumerPartitionLag(offsetLagString, recordAvailabilityLag));
+      perPartitionLag.put(entry.getKey(), new KafkaConsumerPartitionLag(offsetLagString, availabilityLagMs));
     }
     return perPartitionLag;
   }
