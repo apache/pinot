@@ -20,6 +20,8 @@ package org.apache.pinot.common.function.scalar;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.BooleanUtils;
+
 
 public class ObjectFunctions {
   private ObjectFunctions() {
@@ -92,13 +94,40 @@ public class ObjectFunctions {
     return null;
   }
 
-  @Nullable
-  private static Object coalesce(Object... objects) {
-    for (Object o : objects) {
-      if (o != null) {
-        return o;
+  @ScalarFunction
+  public static Object caseWhen(Object c1, Object o1, Object oe) {
+    return caseWhenVar(c1, o1, oe);
+  }
+
+  @ScalarFunction
+  public static Object caseWhen(Object c1, Object o1, Object c2, Object o2, Object oe) {
+    return caseWhenVar(c1, o1, c2, o2, oe);
+  }
+
+  @ScalarFunction
+  public static Object caseWhen(Object c1, Object o1, Object c2, Object o2, Object c3, Object o3, Object oe) {
+    return caseWhenVar(c1, o1, c2, o2, c3, o3, oe);
+  }
+
+  @ScalarFunction
+  public static Object caseWhen(Object c1, Object o1, Object c2, Object o2, Object c3, Object o3, Object c4, Object o4,
+      Object oe) {
+    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, oe);
+  }
+
+  @ScalarFunction
+  public static Object caseWhen(Object c1, Object o1, Object c2, Object o2, Object c3, Object o3, Object c4, Object o4,
+      Object c5, Object o5, Object oe) {
+    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, oe);
+  }
+
+  private static Object caseWhenVar(Object... objs) {
+    for (int i = 0; i < objs.length - 1; i += 2) {
+      if (BooleanUtils.toBoolean(objs[i])) {
+        return objs[i + 1];
       }
     }
-    return null;
+    // with or without else statement.
+    return objs.length % 2 == 0 ? null : objs[objs.length - 1];
   }
 }

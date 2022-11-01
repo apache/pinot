@@ -84,13 +84,12 @@ public class CaseTransformFunction extends BaseTransformFunction {
     }
     int numWhenStatements = arguments.size() / 2;
     _whenStatements = new ArrayList<>(numWhenStatements);
-    for (int i = 0; i < numWhenStatements; i++) {
-      _whenStatements.add(arguments.get(i));
-    }
     _elseThenStatements = new ArrayList<>(numWhenStatements + 1);
-    for (int i = numWhenStatements; i < numWhenStatements * 2 + 1; i++) {
-      _elseThenStatements.add(arguments.get(i));
+    for (int i = 0; i < numWhenStatements; i++) {
+      _whenStatements.add(arguments.get(i * 2));
+      _elseThenStatements.add(arguments.get(i * 2 + 1));
     }
+    _elseThenStatements.add(arguments.get(arguments.size() - 1));
     _selections = new boolean[_elseThenStatements.size()];
     Collections.reverse(_elseThenStatements);
     Collections.reverse(_whenStatements);
