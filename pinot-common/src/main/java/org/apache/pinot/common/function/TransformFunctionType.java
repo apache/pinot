@@ -25,7 +25,7 @@ import java.util.List;
 
 
 public enum TransformFunctionType {
-  // Aggregation functions for single-valued columns
+  // arithmetic functions for single-valued columns
   ADD("add", "plus"),
   SUB("sub", "minus"),
   MULT("mult", "times"),
@@ -48,6 +48,7 @@ public enum TransformFunctionType {
   LEAST("least"),
   GREATEST("greatest"),
 
+  // predicate functions
   EQUALS("equals"),
   NOT_EQUALS("not_equals"),
   GREATER_THAN("greater_than"),
@@ -68,10 +69,17 @@ public enum TransformFunctionType {
   OR("or"),
   NOT("not"),   // NOT operator doesn't cover the transform for NOT IN and NOT LIKE
 
-  CAST("cast"),
+  // CASE WHEN function parsed as 'CASE_WHEN'
   CASE("case"),
+
+  // date type conversion functions
+  CAST("cast"),
+
+  // string functions
   JSONEXTRACTSCALAR("jsonExtractScalar"),
   JSONEXTRACTKEY("jsonExtractKey"),
+
+  // date time functions
   TIMECONVERT("timeConvert"),
   DATETIMECONVERT("dateTimeConvert"),
   DATETRUNC("dateTrunc"),
@@ -87,6 +95,10 @@ public enum TransformFunctionType {
   MINUTE("minute"),
   SECOND("second"),
   MILLISECOND("millisecond"),
+
+  EXTRACT("extract"),
+
+  // array functions
   // The only column accepted by "cardinality" function is multi-value array, thus putting "cardinality" as alias.
   // TODO: once we support other types of multiset, we should make CARDINALITY its own function
   ARRAYLENGTH("arrayLength", "cardinality"),
@@ -96,11 +108,11 @@ public enum TransformFunctionType {
   ARRAYSUM("arraySum"),
   VALUEIN("valueIn"),
   MAPVALUE("mapValue"),
+
+  // special functions
   INIDSET("inIdSet"),
   LOOKUP("lookUp"),
   GROOVY("groovy"),
-
-  EXTRACT("extract"),
 
   // Regexp functions
   REGEXP_EXTRACT("regexpExtract"),

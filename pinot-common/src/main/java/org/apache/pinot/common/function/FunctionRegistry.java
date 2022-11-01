@@ -96,11 +96,6 @@ public class FunctionRegistry {
    */
   public static void registerFunction(Method method, boolean nullableParameters) {
     registerFunction(method.getName(), method, nullableParameters);
-
-    // Calcite ScalarFunctionImpl doesn't allow customized named functions. TODO: fix me.
-    if (method.getAnnotation(Deprecated.class) == null) {
-      FUNCTION_MAP.put(method.getName(), ScalarFunctionImpl.create(method));
-    }
   }
 
   /**
@@ -110,8 +105,13 @@ public class FunctionRegistry {
     FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
     String canonicalName = canonicalize(functionName);
     Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
-    Preconditions.checkState(functionInfoMap.put(method.getParameterCount(), functionInfo) == null,
+    FunctionInfo existFunctionInfo = functionInfoMap.put(method.getParameterCount(), functionInfo);
+    Preconditions.checkState(existFunctionInfo == null || existFunctionInfo.getMethod() == functionInfo.getMethod(),
         "Function: %s with %s parameters is already registered", functionName, method.getParameterCount());
+
+    if (method.getAnnotation(Deprecated.class) == null) {
+      FUNCTION_MAP.put(functionName, ScalarFunctionImpl.create(method));
+    }
   }
 
   public static Map<String, List<Function>> getRegisteredCalciteFunctionMap() {
@@ -146,5 +146,38 @@ public class FunctionRegistry {
 
   private static String canonicalize(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
+  }
+
+  /**
+   * Placeholders for scalar function, they register and represents the signature for transform and filter predicate
+   * so that v2 engine can understand and plan them correctly.
+   */
+  private static class PlaceholderScalarFunctions {
+
+    @ScalarFunction
+    public static Object jsonExtractScalar(String jsonFieldName, String jsonPath, String resultsType) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction
+    public static Object jsonExtractScalar(String jsonFieldName, String jsonPath, String resultsType,
+        Object defaultValue) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction
+    public static String jsonExtractKey(String jsonFieldName, String jsonPath) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction
+    public static long timeConvert(String timeConvertInput, String fromFormat, String toFormat) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction
+    public static long extract(String extractFormat, long timestamp) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
   }
 }
