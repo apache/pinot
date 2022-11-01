@@ -160,3 +160,8 @@ rules:
   labels:
     table: "$1"
     tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.version.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_version"
+  cache: true
+  labels:
+    version: "$1"
