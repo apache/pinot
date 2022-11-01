@@ -18,12 +18,20 @@
  */
 
 import {
+  Box,
   Chip,
+  CircularProgress,
+  IconButton,
   makeStyles,
   Tooltip,
 } from "@material-ui/core";
-import { DISPLAY_SEGMENT_STATUS } from "Models";
-import React, { useEffect, useState } from "react";
+import { HelpOutlineOutlined } from "@material-ui/icons";
+import { DISPLAY_SEGMENT_STATUS, SegmentDebugDetails } from "Models";
+import React, { useContext, useEffect, useState } from "react";
+import { getSegmentLevelDebugDetails } from "../requests";
+import CustomCodemirror from "./CustomCodemirror";
+import CustomDialog from "./CustomDialog";
+import { NotificationContext } from "./Notification/NotificationContext";
 
 const useStyles = makeStyles((theme) => ({
   error: {
@@ -41,11 +49,17 @@ const useStyles = makeStyles((theme) => ({
   warning: {
     color: theme.palette.warning.main,
     border: `1px solid ${theme.palette.warning.main}`,
-  }
+  },
+  segmentDebugDetails: {
+    "& .CodeMirror": { fontSize: 14, height: "100%" },
+    maxHeight: 500,
+  },
 }));
 
 interface SegmentStatusRendererProps {
   status: DISPLAY_SEGMENT_STATUS;
+  segmentName: string;
+  tableName: string;
 }
 
 export enum StatusVariant {
@@ -57,12 +71,19 @@ export enum StatusVariant {
 
 export const SegmentStatusRenderer = ({
   status,
+  segmentName,
+  tableName,
 }: SegmentStatusRendererProps) => {
   const [statusTooltipTitle, setStatusTooltipTitle] = useState<string>("");
   const [statusVariant, setStatusVariant] = useState<StatusVariant | null>(
     null
   );
   const segmentStatusRendererClasses = useStyles();
+  const [errorDetailsVisible, setErrorDetailsVisible] =
+    useState<boolean>(false);
+  const [segmentDebugDetails, setSegmentDebugDetails] =
+    useState<SegmentDebugDetails | null>(null);
+  const { dispatch: notify } = useContext(NotificationContext);
 
   useEffect(() => {
     initializeValues();
@@ -91,6 +112,33 @@ export const SegmentStatusRenderer = ({
     }
   };
 
+  const fetchSegmentErrorDetails = async () => {
+    setSegmentDebugDetails(null);
+    try {
+      const segmentDebugDetails = await getSegmentLevelDebugDetails(
+        tableName,
+        segmentName
+      );
+      setSegmentDebugDetails(segmentDebugDetails);
+    } catch (error) {
+      notify({
+        type: "error",
+        message: "Error occurred while fetching segment debug details.",
+        show: true,
+      });
+      setSegmentDebugDetails({} as SegmentDebugDetails);
+    }
+  };
+
+  const handleShowErrorDetailsClick = () => {
+    setErrorDetailsVisible(true);
+    fetchSegmentErrorDetails();
+  };
+
+  const handleHideErrorDetails = () => {
+    setErrorDetailsVisible(false);
+  };
+
   return (
     <>
       <Tooltip arrow title={statusTooltipTitle} placement="top">
@@ -102,6 +150,38 @@ export const SegmentStatusRenderer = ({
           variant="outlined"
         />
       </Tooltip>
+
+      {/* Only show when segment status is bad */}
+      {status === DISPLAY_SEGMENT_STATUS.BAD && (
+        <>
+          <Tooltip
+            title="Click to show segment error details"
+            arrow
+            placement="top"
+          >
+            <IconButton onClick={handleShowErrorDetailsClick}>
+              <HelpOutlineOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <CustomDialog
+            title="Segment Debug Details"
+            open={errorDetailsVisible}
+            handleClose={handleHideErrorDetails}
+            showOkBtn={false}
+          >
+            {/* Loading */}
+            {!segmentDebugDetails && (
+              <Box display="flex" justifyContent="center"><CircularProgress /></Box>
+            )}
+            {segmentDebugDetails && (
+              <CustomCodemirror
+                customClass={segmentStatusRendererClasses.segmentDebugDetails}
+                data={segmentDebugDetails}
+              />
+            )}
+          </CustomDialog>
+        </>
+      )}
     </>
   );
 };
