@@ -7,3 +7,8 @@ rules:
   cache: true
   labels:
     id: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.version.(\\w+)\"><>(\\w+)"
+  name: "pinot_minion_version"
+  cache: true
+  labels:
+    version: "$1"

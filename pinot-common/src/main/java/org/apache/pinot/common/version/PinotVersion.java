@@ -45,6 +45,16 @@ public class PinotVersion {
     // private constructor for utility class
   }
 
+  /**
+   * Returns a sanitized version string with all dots replaced with underscores, which is necessary
+   * for Prometheus to be able to properly handle the version.
+   *
+   * @return the version in a way that can be indexed by prometheus
+   */
+  public static String getVersionMetricName() {
+    return VERSION.replace('.', '_').replace('-', '_');
+  }
+
   static {
     String version;
 
