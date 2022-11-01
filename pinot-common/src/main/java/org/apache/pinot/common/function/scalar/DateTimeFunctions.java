@@ -387,7 +387,7 @@ public class DateTimeFunctions {
   /**
    * Returns the month of the year from the given epoch millis in UTC timezone. The value ranges from 1 to 12.
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"month", "month_of_year", "monthOfYear"})
   public static int monthOfYear(long millis) {
     return new DateTime(millis, DateTimeZone.UTC).getMonthOfYear();
   }
