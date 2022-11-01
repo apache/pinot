@@ -66,28 +66,31 @@ public final class TierConfigUtils {
   public static String getDataDirForTier(TableConfig tableConfig, String tierName,
       Map<String, Map<String, String>> instanceTierConfigs) {
     String tableNameWithType = tableConfig.getTableName();
-    List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
-    Preconditions.checkState(CollectionUtils.isNotEmpty(tierCfgs), "No tierConfigs for table: %s", tableNameWithType);
-    TierConfig tierCfg = null;
-    for (TierConfig tc : tierCfgs) {
-      if (tierName.equals(tc.getName())) {
-        tierCfg = tc;
-        break;
-      }
-    }
-    Preconditions.checkNotNull(tierCfg, "No configs for tier: %s on table: %s", tierName, tableNameWithType);
     String dataDir = null;
-    Map<String, String> backendProps = tierCfg.getTierBackendProperties();
-    if (backendProps != null) {
-      dataDir = backendProps.get(CommonConstants.Tier.BACKEND_PROP_DATA_DIR);
-    } else {
-      LOGGER.debug("No backend props for tier: {} in TableConfig of table: {}", tierName, tableNameWithType);
-    }
-    if (StringUtils.isNotEmpty(dataDir)) {
-      LOGGER.debug("Got dataDir: {} for tier: {} in TableConfig of table: {}", dataDir, tierName, tableNameWithType);
-      return dataDir;
-    } else {
-      LOGGER.debug("No dataDir for tier: {} in TableConfig of table: {}", tierName, tableNameWithType);
+    List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
+    if (CollectionUtils.isNotEmpty(tierCfgs)) {
+      TierConfig tierCfg = null;
+      for (TierConfig tc : tierCfgs) {
+        if (tierName.equals(tc.getName())) {
+          tierCfg = tc;
+          break;
+        }
+      }
+      if (tierCfg != null) {
+        Map<String, String> backendProps = tierCfg.getTierBackendProperties();
+        if (backendProps != null) {
+          dataDir = backendProps.get(CommonConstants.Tier.BACKEND_PROP_DATA_DIR);
+        } else {
+          LOGGER.debug("No backend props for tier: {} in TableConfig of table: {}", tierName, tableNameWithType);
+        }
+        if (StringUtils.isNotEmpty(dataDir)) {
+          LOGGER.debug("Got dataDir: {} for tier: {} in TableConfig of table: {}", dataDir, tierName,
+              tableNameWithType);
+          return dataDir;
+        } else {
+          LOGGER.debug("No dataDir for tier: {} in TableConfig of table: {}", tierName, tableNameWithType);
+        }
+      }
     }
     // Check if there is data path defined in instance tier configs.
     Map<String, String> instanceCfgs = instanceTierConfigs.get(tierName);

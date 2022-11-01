@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.data.manager;
 
+import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -50,5 +51,25 @@ public class TableDataManagerConfigTest {
     when(segConfig.getPeerSegmentDownloadScheme()).thenReturn(null);
     finalConfig.overrideConfigs(tableConfig);
     assertNull(finalConfig.getTablePeerDownloadScheme());
+  }
+
+  @Test
+  public void testGetTierConfigMaps() {
+    Configuration defaultConfig = new PropertiesConfiguration();
+    defaultConfig.setProperty("tierConfigs.0.tierName", "tierX");
+    defaultConfig.setProperty("tierConfigs.1.tierName", "tierY");
+    defaultConfig.setProperty("tierConfigs.c.tierName", "tierZ");
+    defaultConfig.setProperty("tierConfigs.0.dataDir", "/foo/bar");
+    defaultConfig.setProperty("tierConfigs.1.dataDir", "/xyz/abc");
+    defaultConfig.setProperty("tierConfigs.c.somepath", "somewhere");
+    Map<String, Map<String, String>> tierCfgs =
+        TableDataManagerConfig.getTierConfigMaps(defaultConfig.subset("tierConfigs"));
+    assertEquals(tierCfgs.size(), 3);
+    assertEquals(tierCfgs.get("tierX").get("tierName"), "tierX");
+    assertEquals(tierCfgs.get("tierX").get("dataDir"), "/foo/bar");
+    assertEquals(tierCfgs.get("tierY").get("tierName"), "tierY");
+    assertEquals(tierCfgs.get("tierY").get("dataDir"), "/xyz/abc");
+    assertEquals(tierCfgs.get("tierZ").get("tierName"), "tierZ");
+    assertEquals(tierCfgs.get("tierZ").get("somepath"), "somewhere");
   }
 }
