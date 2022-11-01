@@ -417,7 +417,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       DataType storedType = fieldSpec.getDataType().getStoredType();
       ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(columnName);
       boolean useVarLengthDictionary =
-          varLengthDictionaryColumns.contains(columnName) || shouldUseVarLengthDictionary(storedType, columnProfile);
+          shouldUseVarLengthDictionary(columnName, varLengthDictionaryColumns, storedType, columnProfile);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
       if (storedType == DataType.BYTES) {
         defaultNullValue = new ByteArray((byte[]) defaultNullValue);
@@ -432,15 +432,21 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   /**
-   * Uses the column properties like storedType and length of elements to determine if varLengthDictionary should be
-   * used.
+   * Uses config and column properties like storedType and length of elements to determine if
+   * varLengthDictionary should be used for a column
    */
-  public static boolean shouldUseVarLengthDictionary(DataType columnStoredType, ColumnStatistics columnProfile) {
+  public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
+      DataType columnStoredType, ColumnStatistics columnProfile) {
+    if (varLengthDictColumns.contains(columnName)) {
+      return true;
+    }
+
     if (columnStoredType == DataType.BYTES || columnStoredType == DataType.BIG_DECIMAL) {
       if (!columnProfile.isFixedLength()) {
         return true;
       }
     }
+
     return false;
   }
 

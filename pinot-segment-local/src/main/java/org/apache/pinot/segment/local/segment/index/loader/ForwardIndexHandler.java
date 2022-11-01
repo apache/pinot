@@ -59,9 +59,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.HAS_DICTIONARY;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
 
 
 /**
@@ -154,9 +152,9 @@ public class ForwardIndexHandler implements IndexHandler {
 
     for (String column : existingAllColumns) {
       if (existingNoDictColumns.contains(column) && !newNoDictColumns.contains(column)) {
-        if (_schema == null) {
+        if (_schema == null || _indexLoadingConfig.getTableConfig() == null) {
           // This can only happen in tests.
-          LOGGER.warn("Cannot enable dictionary for column={} as schema is null.", column);
+          LOGGER.warn("Cannot enable dictionary for column={} as schema or tableConfig is null.", column);
           continue;
         }
         // Existing column is RAW. New column is dictionary enabled.
@@ -435,7 +433,8 @@ public class ForwardIndexHandler implements IndexHandler {
       throws Exception {
     Preconditions.checkState(_segmentMetadata.getVersion() == SegmentVersion.v3);
     ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
-    Preconditions.checkState(!existingColMetadata.hasDictionary(), "Existing column already has dictionary.");
+    Preconditions.checkState(!existingColMetadata.hasDictionary(),
+        "Cannot rewrite dictionary enabled forward index. Dictionary already exists for column:" + column);
     boolean isSingleValue = existingColMetadata.isSingleValue();
 
     File indexDir = _segmentMetadata.getIndexDir();
@@ -444,11 +443,9 @@ public class ForwardIndexHandler implements IndexHandler {
     File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENSION);
     String fwdIndexFileExtension;
     if (isSingleValue) {
-      if (existingColMetadata.isSorted()) {
-        fwdIndexFileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
-      } else {
-        fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
-      }
+      fwdIndexFileExtension =
+          existingColMetadata.isSorted() ? V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION
+              : V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
     } else {
       fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
     }
@@ -482,7 +479,11 @@ public class ForwardIndexHandler implements IndexHandler {
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, ColumnIndexType.FORWARD_INDEX);
 
     LOGGER.info("Created forwardIndex. Updating metadata properties for segment={} and column={}", segmentName, column);
-    updateMetadataProperties(indexDir, column, dictionaryCreator);
+    Map<String, String> metadataProperties = new HashMap<>();
+    metadataProperties.put(Column.getKeyFor(column, Column.HAS_DICTIONARY), String.valueOf(true));
+    metadataProperties.put(Column.getKeyFor(column, Column.DICTIONARY_ELEMENT_SIZE),
+        String.valueOf(dictionaryCreator.getNumBytesPerEntry()));
+    updateMetadataProperties(indexDir, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
     // handler will take care of recreating the index.
@@ -499,7 +500,6 @@ public class ForwardIndexHandler implements IndexHandler {
       throws Exception {
     int numDocs = existingColMetadata.getTotalDocs();
     // SegmentPartitionConfig is not relevant for rewrites.
-    Preconditions.checkState(_indexLoadingConfig.getTableConfig() != null);
     StatsCollectorConfig statsCollectorConfig =
         new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
     AbstractColumnStatisticsCollector statsCollector;
@@ -546,8 +546,8 @@ public class ForwardIndexHandler implements IndexHandler {
       }
       statsCollector.seal();
 
-      boolean useVarLength = _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column)
-          || SegmentIndexCreationDriverImpl.shouldUseVarLengthDictionary(reader.getStoredType(), statsCollector);
+      boolean useVarLength = SegmentIndexCreationDriverImpl.shouldUseVarLengthDictionary(column,
+          _indexLoadingConfig.getVarLengthDictionaryColumns(), reader.getStoredType(), statsCollector);
       SegmentDictionaryCreator dictionaryCreator =
           new SegmentDictionaryCreator(existingColMetadata.getFieldSpec(), _segmentMetadata.getIndexDir(),
               useVarLength);
@@ -583,15 +583,15 @@ public class ForwardIndexHandler implements IndexHandler {
     segmentWriter.removeIndex(column, ColumnIndexType.RANGE_INDEX);
   }
 
-  private void updateMetadataProperties(File indexDir, String column, SegmentDictionaryCreator dictionaryCreator)
+  private void updateMetadataProperties(File indexDir, Map<String, String> metadataProperties)
       throws Exception {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, SegmentVersion.v3);
     File metadataFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
 
-    properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(true));
-    properties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
-        String.valueOf(dictionaryCreator.getNumBytesPerEntry()));
+    for (Map.Entry<String, String> entry : metadataProperties.entrySet()) {
+      properties.setProperty(entry.getKey(), entry.getValue());
+    }
 
     properties.save();
   }

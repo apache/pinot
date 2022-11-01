@@ -386,7 +386,7 @@ public class ForwardIndexHandlerTest {
     // TEST6: Disable dictionary. Should be a No-op.
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
     indexLoadingConfig.getNoDictionaryColumns().add(DIM_DICT_INTEGER);
-    fwdIndexHandler = new ForwardIndexHandler(existingSegmentMetadata, indexLoadingConfig, null);
+    fwdIndexHandler = new ForwardIndexHandler(existingSegmentMetadata, indexLoadingConfig, _schema);
     operationMap = fwdIndexHandler.computeOperation(writer);
     assertEquals(operationMap, Collections.EMPTY_MAP);
 
@@ -394,9 +394,17 @@ public class ForwardIndexHandlerTest {
     indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
     indexLoadingConfig.getTextIndexColumns().add(DIM_DICT_INTEGER);
     indexLoadingConfig.getTextIndexColumns().add(DIM_LZ4_INTEGER);
-    fwdIndexHandler = new ForwardIndexHandler(existingSegmentMetadata, indexLoadingConfig, null);
+    fwdIndexHandler = new ForwardIndexHandler(existingSegmentMetadata, indexLoadingConfig, _schema);
     operationMap = fwdIndexHandler.computeOperation(writer);
     assertEquals(operationMap, Collections.EMPTY_MAP);
+
+    // TEST8: Add text index and disable forward index.
+    indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
+    indexLoadingConfig.getRangeIndexColumns().add(METRIC_LZ4_INTEGER);
+    indexLoadingConfig.getNoDictionaryColumns().remove(METRIC_LZ4_INTEGER);
+    fwdIndexHandler = new ForwardIndexHandler(existingSegmentMetadata, indexLoadingConfig, _schema);
+    operationMap = fwdIndexHandler.computeOperation(writer);
+    assertEquals(operationMap.get(METRIC_LZ4_INTEGER), ForwardIndexHandler.Operation.ENABLE_DICTIONARY);
 
     // TEST8: Change compression
     Random rand = new Random();

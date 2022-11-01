@@ -108,7 +108,8 @@ public class SegmentPreProcessor implements AutoCloseable {
             IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig, _schema);
         handler.updateIndices(segmentWriter, indexCreatorProvider);
         if (type == ColumnIndexType.FORWARD_INDEX) {
-          // ForwardIndexHandler may modify the segment metadata.
+          // ForwardIndexHandler may modify the segment metadata while rewriting forward index to create a dictionary
+          // . This new metadata is needed to construct other indexes like RangeIndex.
           _segmentMetadata = new SegmentMetadataImpl(indexDir);
           _segmentDirectory.reloadMetadata();
         }
