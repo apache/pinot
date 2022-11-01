@@ -19,8 +19,10 @@
 package org.apache.pinot.controller.api;
 
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentCompletionUtilsTest {
@@ -28,13 +30,13 @@ public class SegmentCompletionUtilsTest {
   @Test
   public void testGenerateSegmentFilePrefix() {
     String segmentName = "segment";
-    Assert.assertEquals(SegmentCompletionUtils.getSegmentNamePrefix(segmentName), "segment.tmp.");
+    assertEquals(SegmentCompletionUtils.getSegmentNamePrefix(segmentName), "segment.tmp.");
   }
 
   @Test
   public void testGenerateSegmentLocation() {
     String segmentName = "segment";
     String segmentNamePrefix = SegmentCompletionUtils.getSegmentNamePrefix(segmentName);
-    Assert.assertTrue(SegmentCompletionUtils.generateSegmentFileName(segmentName).startsWith(segmentNamePrefix));
+    assertTrue(SegmentCompletionUtils.generateSegmentFileName(segmentName).startsWith(segmentNamePrefix));
   }
 }
