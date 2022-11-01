@@ -110,6 +110,8 @@ public class ControllerTest {
    */
   private static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
 
+  protected final String _clusterName = getClass().getSimpleName();
+
   protected static HttpClient _httpClient = null;
 
   protected int _controllerPort;
@@ -141,7 +143,7 @@ public class ControllerTest {
   }
 
   public String getHelixClusterName() {
-    return getClass().getSimpleName();
+    return _clusterName;
   }
 
   /**
