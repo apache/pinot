@@ -79,6 +79,9 @@ public class FunctionRegistry {
         }
       }
     }
+    for (Method method : PlaceholderScalarFunctions.class.getMethods()) {
+      FunctionRegistry.registerCalciteNamedFunctionMap(method.getName(), method, false);
+    }
     LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_INFO_MAP.size(),
         FUNCTION_INFO_MAP.keySet(), System.currentTimeMillis() - startTimeMs);
   }
@@ -102,13 +105,20 @@ public class FunctionRegistry {
    * Registers a method with the given function name.
    */
   public static void registerFunction(String functionName, Method method, boolean nullableParameters) {
+    registerFunctionInfoMap(functionName, method, nullableParameters);
+    registerCalciteNamedFunctionMap(functionName, method, nullableParameters);
+  }
+
+  private static void registerFunctionInfoMap(String functionName, Method method, boolean nullableParameters) {
     FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
     String canonicalName = canonicalize(functionName);
     Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
     FunctionInfo existFunctionInfo = functionInfoMap.put(method.getParameterCount(), functionInfo);
     Preconditions.checkState(existFunctionInfo == null || existFunctionInfo.getMethod() == functionInfo.getMethod(),
         "Function: %s with %s parameters is already registered", functionName, method.getParameterCount());
+  }
 
+  private static void registerCalciteNamedFunctionMap(String functionName, Method method, boolean nullableParameters) {
     if (method.getAnnotation(Deprecated.class) == null) {
       FUNCTION_MAP.put(functionName, ScalarFunctionImpl.create(method));
     }
@@ -154,30 +164,41 @@ public class FunctionRegistry {
    */
   private static class PlaceholderScalarFunctions {
 
-    @ScalarFunction
     public static Object jsonExtractScalar(String jsonFieldName, String jsonPath, String resultsType) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
-    @ScalarFunction
     public static Object jsonExtractScalar(String jsonFieldName, String jsonPath, String resultsType,
         Object defaultValue) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
-    @ScalarFunction
     public static String jsonExtractKey(String jsonFieldName, String jsonPath) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
-    @ScalarFunction
     public static long timeConvert(String timeConvertInput, String fromFormat, String toFormat) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
-    @ScalarFunction
     public static long extract(String extractFormat, long timestamp) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
+
+    // CHECKSTYLE:OFF
+    // @formatter:off
+    public static boolean text_contains(String text, String pattern) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    public static boolean text_match(String text, String pattern) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    public static boolean json_match(String text, String pattern) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+    // CHECKSTYLE:ON
+    // @formatter:ON
   }
 }

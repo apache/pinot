@@ -19,10 +19,13 @@
 package org.apache.pinot.common.function;
 
 import com.google.common.collect.ImmutableList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.sql.FilterKind;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -40,8 +43,8 @@ public class FunctionDefinitionRegistryTest {
   private static final List<String> IGNORED_FUNCTION_NAMES = ImmutableList.of(
       // functions we are not supporting post transform anyway
       "valuein", "mapvalue", "inidset", "lookup", "groovy", "scalar", "geotoh3", "case", "not_in",
-      // functions will not occur post transform as function since they are std operator tables
-      "in", "and", "or", "not"
+      // functions not needed for register b/c they are in std sql table or they will not be composed directly.
+      "in", "and", "or", "not", "range"
   );
 
   @Test
@@ -58,19 +61,23 @@ public class FunctionDefinitionRegistryTest {
   }
 
   @Test
-  public void testAllRegistered() {
+  public void testCalciteFunctionMapAllRegistered() {
+    Set<String> registeredCalciteFunctionNameIgnoreCase = new HashSet<>();
+    for (String funcNames : FunctionRegistry.getRegisteredCalciteFunctionNames()) {
+      registeredCalciteFunctionNameIgnoreCase.add(funcNames.toLowerCase());
+    }
     for (TransformFunctionType enumType : TransformFunctionType.values()) {
       if (!isIgnored(enumType.getName().toLowerCase())) {
         for (String funcName : enumType.getAliases()) {
-          boolean foundSignature = false;
-          for (int nArg = 0; nArg < MAX_NARG; nArg++) {
-            if (FunctionRegistry.getFunctionInfo(funcName, nArg) != null) {
-              foundSignature = true;
-              break;
-            }
-          }
-          assertTrue(foundSignature, "Unable to find transform/filter function signature for: " + funcName);
+          assertTrue(registeredCalciteFunctionNameIgnoreCase.contains(funcName.toLowerCase()),
+              "Unable to find transform function signature for: " + funcName);
         }
+      }
+    }
+    for (FilterKind enumType : FilterKind.values()) {
+      if (!isIgnored(enumType.name().toLowerCase())) {
+        assertTrue(registeredCalciteFunctionNameIgnoreCase.contains(enumType.name().toLowerCase()),
+            "Unable to find filter function signature for: " + enumType.name());
       }
     }
   }

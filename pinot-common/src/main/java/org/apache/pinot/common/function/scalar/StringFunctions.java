@@ -211,7 +211,7 @@ public class StringFunctions {
    * @param regexp
    * @return the matched result.
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"regexp_extract", "regexpExtract"})
   public static String regexpExtract(String value, String regexp) {
     return regexpExtract(value, regexp, 0, "");
   }
@@ -223,7 +223,7 @@ public class StringFunctions {
    * @param group
    * @return the matched result.
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"regexp_extract", "regexpExtract"})
   public static String regexpExtract(String value, String regexp, int group) {
     return regexpExtract(value, regexp, group, "");
   }
@@ -236,7 +236,7 @@ public class StringFunctions {
    * @param defaultValue the default value if no match found
    * @return the matched result
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"regexp_extract", "regexpExtract"})
   public static String regexpExtract(String value, String regexp, int group, String defaultValue) {
     Pattern p = Pattern.compile(regexp);
     Matcher matcher = p.matcher(value);
