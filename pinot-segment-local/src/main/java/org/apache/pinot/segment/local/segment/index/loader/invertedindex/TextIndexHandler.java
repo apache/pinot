@@ -143,6 +143,11 @@ public class TextIndexHandler implements IndexHandler {
     }
   }
 
+  @Override
+  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
+      throws Exception {
+  }
+
   private boolean shouldCreateTextIndex(ColumnMetadata columnMetadata) {
     if (columnMetadata != null) {
       // Fail fast upon unsupported operations.
