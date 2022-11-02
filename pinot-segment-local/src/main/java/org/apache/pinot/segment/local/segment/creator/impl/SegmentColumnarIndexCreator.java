@@ -282,7 +282,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           }
         }
         _textIndexCreatorMap.put(columnName,
-            _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(fstType, true)));
+            _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(fstType, true,
+                TextIndexUtils.extractStopWordsInclude(columnName, _columnProperties),
+                TextIndexUtils.extractStopWordsExclude(columnName, _columnProperties))));
       }
 
       if (fstIndexColumns.contains(columnName)) {
