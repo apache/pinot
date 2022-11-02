@@ -107,8 +107,8 @@ public class TextIndexUtils {
         .map(String::trim).collect(Collectors.toList());
   }
 
-  public static StandardAnalyzer getStandardAnalyzerWithCustomizedStopWords(List<String> stopWordsInclude,
-      List<String> stopWordsExclude) {
+  public static StandardAnalyzer getStandardAnalyzerWithCustomizedStopWords(@Nullable List<String> stopWordsInclude,
+     @Nullable List<String> stopWordsExclude) {
     HashSet<String> stopWordSet = LuceneTextIndexCreator.getDefaultEnglishStopWordsSet();
     if (stopWordsInclude != null) {
       stopWordSet.addAll(stopWordsInclude);
