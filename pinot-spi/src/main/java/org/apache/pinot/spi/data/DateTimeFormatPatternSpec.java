@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data;
 
+import java.io.Serializable;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.TimeZone;
@@ -33,7 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class DateTimeFormatPatternSpec {
+public class DateTimeFormatPatternSpec implements Serializable {
   public static final Logger LOGGER = LoggerFactory.getLogger(DateTimeFormatPatternSpec.class);
 
   public static final DateTimeZone DEFAULT_DATE_TIME_ZONE = DateTimeZone.UTC;
