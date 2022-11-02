@@ -19,6 +19,10 @@
 package org.apache.pinot.controller.helix;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.commons.httpclient.SimpleHttpConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -39,14 +44,17 @@ import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.MissingConsumingSegmentFinder;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -75,6 +83,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   private long _lastDisabledTableLogTimestamp = 0;
 
   private TableSizeReader _tableSizeReader;
+  private final ConsumingSegmentInfoReader _consumingSegmentInfoReader;
 
   /**
    * Constructs the segment status checker.
@@ -92,6 +101,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _tableSizeReader =
         new TableSizeReader(executorService, new MultiThreadedHttpConnectionManager(), _controllerMetrics,
             _pinotHelixResourceManager);
+    _consumingSegmentInfoReader = new ConsumingSegmentInfoReader(executorService, new SimpleHttpConnectionManager(),
+        _pinotHelixResourceManager);
   }
 
   @Override
@@ -119,6 +130,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       updateTableConfigMetrics(tableNameWithType, tableConfig);
       updateSegmentMetrics(tableNameWithType, tableConfig, context);
       updateTableSizeMetrics(tableNameWithType);
+      updateTableConsumptionMetrics(tableNameWithType);
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
       // Remove the metric for this table
@@ -131,6 +143,39 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, context._realTimeTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, context._offlineTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTableCount);
+  }
+
+  private void updateTableConsumptionMetrics(String tableNameWithType) {
+    try {
+      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap segmentsInfoMap =
+          _consumingSegmentInfoReader.getConsumingSegmentsInfo(tableNameWithType, 10000);
+      Map<String, List<Long>> partitionToLagSet = new HashMap<>();
+      for (List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> info :
+          segmentsInfoMap._segmentToConsumingInfoMap.values()) {
+        info.forEach(segment -> {
+          segment._partitionOffsetInfo._recordsLagMap.forEach((k, v) -> {
+            if (!PartitionLagState.NOT_CALCULATED.equals(v)) {
+              try {
+                long recordsLag = Long.parseLong(v);
+                partitionToLagSet.computeIfAbsent(k, k1 -> new ArrayList<>());
+                partitionToLagSet.get(k).add(recordsLag);
+              } catch (NumberFormatException nfe) {
+                // skip this as we are unable to parse the lag string
+              }
+            }
+          });
+        });
+      }
+      partitionToLagSet.forEach((partition, lagSet) -> {
+        System.out.println("Info - "
+            + _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.MAX_CONSUMPTION_RECORDS_LAG) + " - "
+            + Arrays.toString(lagSet.toArray()));
+        _controllerMetrics.setValueOfPartitionGauge(tableNameWithType, Integer.parseInt(partition),
+            ControllerGauge.MAX_CONSUMPTION_RECORDS_LAG, Collections.max(lagSet));
+      });
+    } catch (Exception e) {
+      LOGGER.error("Failed to fetch consuming segments info. Unable to update table consumption status metrics");
+    }
   }
 
   /**
