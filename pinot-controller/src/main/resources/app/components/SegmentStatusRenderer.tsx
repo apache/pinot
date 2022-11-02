@@ -90,7 +90,7 @@ export const SegmentStatusRenderer = ({
         break;
       }
       case DISPLAY_SEGMENT_STATUS.MISSING: {
-        setStatusColor(StatusColor.Info);
+        setStatusColor(StatusColor.Error);
         setStatusTooltipTitle("External View is empty (segments not found on servers)");
 
         break;
