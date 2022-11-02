@@ -22,6 +22,7 @@ import {
   makeStyles,
   Tooltip,
 } from "@material-ui/core";
+import clsx from "clsx";
 import { DISPLAY_SEGMENT_STATUS } from "Models";
 import React, { useEffect, useState } from "react";
 
@@ -105,9 +106,7 @@ export const SegmentStatusRenderer = ({
     <>
       <Tooltip arrow title={statusTooltipTitle} placement="top">
         <Chip
-          className={
-            statusVariant ? segmentStatusRendererClasses[statusVariant] : ""
-          }
+          className={clsx([segmentStatusRendererClasses[statusVariant]])}
           label={status}
           variant="outlined"
         />
