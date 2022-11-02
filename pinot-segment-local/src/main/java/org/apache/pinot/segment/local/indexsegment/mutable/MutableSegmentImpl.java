@@ -319,12 +319,16 @@ public class MutableSegmentImpl implements MutableSegment {
 
       // Text index
       MutableTextIndex textIndex;
+      List<String> stopWordsInclude = null;
+      List<String> stopWordsExclude = null;
       if (textIndexColumns.contains(column)) {
         boolean useNativeTextIndex = false;
         if (_fieldConfigList != null) {
           for (FieldConfig fieldConfig : _fieldConfigList) {
             if (fieldConfig.getName().equals(column)) {
               Map<String, String> properties = fieldConfig.getProperties();
+              stopWordsInclude = TextIndexUtils.extractStopWordsInclude(properties);
+              stopWordsExclude = TextIndexUtils.extractStopWordsExclude(properties);
               if (TextIndexUtils.isFstTypeNative(properties)) {
                 useNativeTextIndex = true;
               }
@@ -340,7 +344,8 @@ public class MutableSegmentImpl implements MutableSegment {
           //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
           //  text indexes remain statically defined. Revisit this after this refactoring has been done.
           RealtimeLuceneTextIndex luceneTextIndex =
-              new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
+              new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName,
+                  stopWordsInclude, stopWordsExclude);
           if (_realtimeLuceneReaders == null) {
             _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
           }

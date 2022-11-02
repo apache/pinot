@@ -21,6 +21,9 @@ package org.apache.pinot.segment.local.segment.creator.impl.text;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -33,6 +36,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
@@ -55,10 +59,15 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
 
   private int _nextDocId = 0;
 
-  public static final CharArraySet ENGLISH_STOP_WORDS_SET = new CharArraySet(Arrays
-      .asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no",
-          "not", "of", "on", "or", "such", "that", "the", "their", "then", "than", "there", "these", "they", "this",
-          "to", "was", "will", "with", "those"), true);
+  public static HashSet<String> getDefaultEnglishStopWordsSet() {
+    return new HashSet<>(
+        Arrays.asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it",
+            "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "than", "there", "these", "they",
+            "this", "to", "was", "will", "with", "those"));
+  }
+
+  public static final CharArraySet ENGLISH_STOP_WORDS_SET = new CharArraySet(getDefaultEnglishStopWordsSet(), true);
+
 
   /**
    * Called by {@link SegmentColumnarIndexCreator}
@@ -82,16 +91,20 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
    *               no need to commit the index from the realtime side. So when the realtime segment
    *               is destroyed (which is after the realtime segment has been committed and converted
    *               to offline), we close this lucene index writer to release resources but don't commit.
-   *               This is the reason to have commit flag part of the constructor.
+   * @param stopWordsInclude the words to include in addition to the default stop word list
+   * @param stopWordsExclude the words to exclude from the default stop word list
    */
-  public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit) {
+  public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit,
+      @Nullable List<String> stopWordsInclude, @Nullable List<String> stopWordsExclude) {
     _textColumn = column;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       File indexFile = getV1TextIndexFile(segmentIndexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
-      StandardAnalyzer standardAnalyzer = new StandardAnalyzer(ENGLISH_STOP_WORDS_SET);
+
+      StandardAnalyzer standardAnalyzer =
+          TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(stopWordsInclude, stopWordsExclude);
       IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
       indexWriterConfig.setRAMBufferSizeMB(LUCENE_INDEX_MAX_BUFFER_SIZE_MB);
       indexWriterConfig.setCommitOnClose(commit);
