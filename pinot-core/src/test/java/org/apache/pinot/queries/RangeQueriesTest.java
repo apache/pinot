@@ -223,11 +223,81 @@ public class RangeQueriesTest extends BaseQueriesTest {
     }
   }
 
+  @Test(dataProvider = "selectionTestCases")
+  public void testSelectionOverRangeFilterAfterReload(String query, int min, int max, boolean inclusive)
+      throws Exception {
+    // Enable dictionary on RAW_INT_COL and reload the segment.
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, TABLE_CONFIG);
+    indexLoadingConfig.getNoDictionaryColumns().remove(RAW_INT_COL);
+    File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
+    ImmutableSegment immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+
+    Operator<?> operator = getOperator(query);
+    assertTrue(operator instanceof SelectionOnlyOperator);
+    for (Object[] row : Objects.requireNonNull(((SelectionOnlyOperator) operator).nextBlock().getRows())) {
+      int value = (int) row[0];
+      assertTrue(inclusive ? value >= min : value > min);
+      assertTrue(inclusive ? value <= max : value < max);
+    }
+
+    // Enable dictionary on RAW_DOUBLE_COL and reload the segment.
+    indexLoadingConfig = new IndexLoadingConfig(null, TABLE_CONFIG);
+    indexLoadingConfig.getNoDictionaryColumns().remove(RAW_DOUBLE_COL);
+    indexDir = new File(INDEX_DIR, SEGMENT_NAME);
+    immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+
+    operator = getOperator(query);
+    assertTrue(operator instanceof SelectionOnlyOperator);
+    for (Object[] row : Objects.requireNonNull(((SelectionOnlyOperator) operator).nextBlock().getRows())) {
+      int value = (int) row[0];
+      assertTrue(inclusive ? value >= min : value > min);
+      assertTrue(inclusive ? value <= max : value < max);
+    }
+  }
+
   @Test(dataProvider = "countTestCases")
   public void testCountOverRangeFilter(String query, int expectedCount) {
     Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof FastFilteredCountOperator);
     List<Object> aggregationResult = ((FastFilteredCountOperator) operator).nextBlock().getResults();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertEquals(((Number) aggregationResult.get(0)).intValue(), expectedCount, query);
+  }
+
+  @Test(dataProvider = "countTestCases")
+  public void testCountOverRangeFilterAfterReload(String query, int expectedCount)
+      throws Exception {
+    // Enable dictionary on RAW_LONG_COL and reload the segment.
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, TABLE_CONFIG);
+    indexLoadingConfig.getNoDictionaryColumns().remove(RAW_LONG_COL);
+    File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
+    ImmutableSegment immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+
+
+    Operator<?> operator = getOperator(query);
+    assertTrue(operator instanceof FastFilteredCountOperator);
+    List<Object> aggregationResult = ((FastFilteredCountOperator) operator).nextBlock().getResults();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertEquals(((Number) aggregationResult.get(0)).intValue(), expectedCount, query);
+
+    // Enable dictionary on RAW_FLOAT_COL and reload the segment.
+    indexLoadingConfig = new IndexLoadingConfig(null, TABLE_CONFIG);
+    indexLoadingConfig.getNoDictionaryColumns().remove(RAW_FLOAT_COL);
+    immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+
+    operator = getOperator(query);
+    assertTrue(operator instanceof FastFilteredCountOperator);
+    aggregationResult = ((FastFilteredCountOperator) operator).nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), expectedCount, query);
