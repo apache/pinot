@@ -91,7 +91,7 @@ export const SegmentStatusRenderer = ({
       }
       case DISPLAY_SEGMENT_STATUS.MISSING: {
         setStatusVariant(StatusVariant.Info);
-        setStatusTooltipTitle("External View is empty i.e does not have any servers");
+        setStatusTooltipTitle("External View is empty, i.e., does not have any servers");
 
         break;
       }
