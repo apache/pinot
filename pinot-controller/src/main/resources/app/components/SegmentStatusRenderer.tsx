@@ -49,7 +49,7 @@ interface SegmentStatusRendererProps {
   status: DISPLAY_SEGMENT_STATUS;
 }
 
-export enum StatusVariant {
+export enum StatusColor {
   Error = "error",
   Warning = "warning",
   Info = "info",
@@ -60,7 +60,7 @@ export const SegmentStatusRenderer = ({
   status,
 }: SegmentStatusRendererProps) => {
   const [statusTooltipTitle, setStatusTooltipTitle] = useState<string>("");
-  const [statusVariant, setStatusVariant] = useState<StatusVariant | null>(
+  const [statusColor, setStatusColor] = useState<StatusColor | null>(
     null
   );
   const segmentStatusRendererClasses = useStyles();
@@ -72,31 +72,31 @@ export const SegmentStatusRenderer = ({
   const initializeValues = () => {
     switch (status) {
       case DISPLAY_SEGMENT_STATUS.GOOD: {
-        setStatusVariant(StatusVariant.Success);
+        setStatusColor(StatusColor.Success);
         setStatusTooltipTitle("All the servers are ONLINE/CONSUMING");
 
         break;
       }
       case DISPLAY_SEGMENT_STATUS.BAD: {
-        setStatusVariant(StatusVariant.Error);
+        setStatusColor(StatusColor.Error);
         setStatusTooltipTitle("One or more servers are in ERROR state");
 
         break;
       }
       case DISPLAY_SEGMENT_STATUS.PARTIAL: {
-        setStatusVariant(StatusVariant.Warning);
+        setStatusColor(StatusColor.Warning);
         setStatusTooltipTitle("External View is OFFLINE and does not match Ideal State");
 
         break;
       }
       case DISPLAY_SEGMENT_STATUS.MISSING: {
-        setStatusVariant(StatusVariant.Info);
-        setStatusTooltipTitle("External View is empty, i.e., does not have any servers");
+        setStatusColor(StatusColor.Info);
+        setStatusTooltipTitle("External View is empty (segments not found on servers)");
 
         break;
       }
       default: {
-        setStatusVariant(StatusVariant.Info);
+        setStatusColor(StatusColor.Info);
         setStatusTooltipTitle("Unknown status");
       }
     }
@@ -106,7 +106,7 @@ export const SegmentStatusRenderer = ({
     <>
       <Tooltip arrow title={statusTooltipTitle} placement="top">
         <Chip
-          className={clsx([segmentStatusRendererClasses[statusVariant]])}
+          className={clsx([segmentStatusRendererClasses[statusColor]])}
           label={status}
           variant="outlined"
         />
