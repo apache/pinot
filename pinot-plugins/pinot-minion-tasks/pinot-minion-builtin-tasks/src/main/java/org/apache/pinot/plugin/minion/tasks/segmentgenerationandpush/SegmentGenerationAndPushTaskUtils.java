@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -38,7 +39,7 @@ public class SegmentGenerationAndPushTaskUtils {
       throws Exception {
     String fileURIScheme = fileURI.getScheme();
     if (fileURIScheme == null) {
-      return LOCAL_PINOT_FS;
+      return new LocalPinotFS();
     }
     // Try to create PinotFS using given Input FileSystem config always
     String fsClass = taskConfigs.get(BatchConfigProperties.INPUT_FS_CLASS);
@@ -48,14 +49,14 @@ public class SegmentGenerationAndPushTaskUtils {
       pinotFS.init(fsProps);
       return pinotFS;
     }
-    return null;
+    return PinotFSFactory.createNewInstance(fileURIScheme);
   }
 
   static PinotFS getOutputPinotFS(Map<String, String> taskConfigs, URI fileURI)
       throws Exception {
     String fileURIScheme = (fileURI == null) ? null : fileURI.getScheme();
     if (fileURIScheme == null) {
-      return LOCAL_PINOT_FS;
+      return new LocalPinotFS();
     }
     // Try to create PinotFS using given Input FileSystem config always
     String fsClass = taskConfigs.get(BatchConfigProperties.OUTPUT_FS_CLASS);
@@ -65,7 +66,7 @@ public class SegmentGenerationAndPushTaskUtils {
       pinotFS.init(fsProps);
       return pinotFS;
     }
-    return null;
+    return PinotFSFactory.createNewInstance(fileURIScheme);
   }
 
   static PinotFS getLocalPinotFs() {

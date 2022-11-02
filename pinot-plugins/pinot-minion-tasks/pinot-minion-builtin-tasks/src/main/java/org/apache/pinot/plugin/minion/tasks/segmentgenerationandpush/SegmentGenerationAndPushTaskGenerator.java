@@ -47,7 +47,6 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -324,74 +323,62 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
   private List<URI> getInputFilesFromDirectory(Map<String, String> batchConfigMap, URI inputDirURI,
       Set<String> existingSegmentInputFileURIs)
       throws Exception {
-    PinotFS inputDirFS = SegmentGenerationAndPushTaskUtils.getInputPinotFS(batchConfigMap, inputDirURI);
-    boolean closeInputFSOnExit = true;
+    try (PinotFS inputDirFS = SegmentGenerationAndPushTaskUtils.getInputPinotFS(batchConfigMap, inputDirURI)) {
 
-    if (inputDirFS == null) {
-      String fileURIScheme = inputDirURI.getScheme();
-      inputDirFS = PinotFSFactory.create(fileURIScheme);
-      // We shouldn't close FileSystem cached in the factory because it can be re-used
-      closeInputFSOnExit = false;
-    }
+      String includeFileNamePattern = batchConfigMap.get(BatchConfigProperties.INCLUDE_FILE_NAME_PATTERN);
+      String excludeFileNamePattern = batchConfigMap.get(BatchConfigProperties.EXCLUDE_FILE_NAME_PATTERN);
 
-    String includeFileNamePattern = batchConfigMap.get(BatchConfigProperties.INCLUDE_FILE_NAME_PATTERN);
-    String excludeFileNamePattern = batchConfigMap.get(BatchConfigProperties.EXCLUDE_FILE_NAME_PATTERN);
-
-    //Get list of files to process
-    String[] files;
-    try {
-      files = inputDirFS.listFiles(inputDirURI, true);
-    } catch (IOException e) {
-      if (closeInputFSOnExit) {
-        inputDirFS.close();
-      }
-      LOGGER.error("Unable to list files under URI: " + inputDirURI, e);
-      return Collections.emptyList();
-    }
-    PathMatcher includeFilePathMatcher = null;
-    if (includeFileNamePattern != null) {
-      includeFilePathMatcher = FileSystems.getDefault().getPathMatcher(includeFileNamePattern);
-    }
-    PathMatcher excludeFilePathMatcher = null;
-    if (excludeFileNamePattern != null) {
-      excludeFilePathMatcher = FileSystems.getDefault().getPathMatcher(excludeFileNamePattern);
-    }
-    List<URI> inputFileURIs = new ArrayList<>();
-    for (String file : files) {
-      LOGGER.debug("Processing file: {}", file);
-      if (includeFilePathMatcher != null) {
-        if (!includeFilePathMatcher.matches(Paths.get(file))) {
-          LOGGER.debug("Exclude file {} as it's not matching includeFilePathMatcher: {}", file, includeFileNamePattern);
-          continue;
-        }
-      }
-      if (excludeFilePathMatcher != null) {
-        if (excludeFilePathMatcher.matches(Paths.get(file))) {
-          LOGGER.debug("Exclude file {} as it's matching excludeFilePathMatcher: {}", file, excludeFileNamePattern);
-          continue;
-        }
-      }
+      //Get list of files to process
+      String[] files;
       try {
-        URI inputFileURI = SegmentGenerationUtils.getFileURI(file, inputDirURI);
-        if (existingSegmentInputFileURIs.contains(inputFileURI.toString())) {
-          LOGGER.debug("Skipping already processed inputFileURI: {}", inputFileURI);
-          continue;
-        }
-        if (inputDirFS.isDirectory(inputFileURI)) {
-          LOGGER.debug("Skipping directory: {}", inputFileURI);
-          continue;
-        }
-        inputFileURIs.add(inputFileURI);
-      } catch (Exception e) {
-        LOGGER.error("Failed to construct inputFileURI for path: {}, parent directory URI: {}", file, inputDirURI, e);
-        continue;
+        files = inputDirFS.listFiles(inputDirURI, true);
+      } catch (IOException e) {
+        LOGGER.error("Unable to list files under URI: " + inputDirURI, e);
+        return Collections.emptyList();
       }
-    }
+      PathMatcher includeFilePathMatcher = null;
+      if (includeFileNamePattern != null) {
+        includeFilePathMatcher = FileSystems.getDefault().getPathMatcher(includeFileNamePattern);
+      }
+      PathMatcher excludeFilePathMatcher = null;
+      if (excludeFileNamePattern != null) {
+        excludeFilePathMatcher = FileSystems.getDefault().getPathMatcher(excludeFileNamePattern);
+      }
+      List<URI> inputFileURIs = new ArrayList<>();
+      for (String file : files) {
+        LOGGER.debug("Processing file: {}", file);
+        if (includeFilePathMatcher != null) {
+          if (!includeFilePathMatcher.matches(Paths.get(file))) {
+            LOGGER.debug("Exclude file {} as it's not matching includeFilePathMatcher: {}",
+                file, includeFileNamePattern);
+            continue;
+          }
+        }
+        if (excludeFilePathMatcher != null) {
+          if (excludeFilePathMatcher.matches(Paths.get(file))) {
+            LOGGER.debug("Exclude file {} as it's matching excludeFilePathMatcher: {}", file, excludeFileNamePattern);
+            continue;
+          }
+        }
+        try {
+          URI inputFileURI = SegmentGenerationUtils.getFileURI(file, inputDirURI);
+          if (existingSegmentInputFileURIs.contains(inputFileURI.toString())) {
+            LOGGER.debug("Skipping already processed inputFileURI: {}", inputFileURI);
+            continue;
+          }
+          if (inputDirFS.isDirectory(inputFileURI)) {
+            LOGGER.debug("Skipping directory: {}", inputFileURI);
+            continue;
+          }
+          inputFileURIs.add(inputFileURI);
+        } catch (Exception e) {
+          LOGGER.error("Failed to construct inputFileURI for path: {}, parent directory URI: {}", file, inputDirURI, e);
+          continue;
+        }
+      }
 
-    if (closeInputFSOnExit) {
-      inputDirFS.close();
+      return inputFileURIs;
     }
-    return inputFileURIs;
   }
 
   private Set<String> getExistingSegmentInputFiles(List<SegmentZKMetadata> segmentsZKMetadata) {

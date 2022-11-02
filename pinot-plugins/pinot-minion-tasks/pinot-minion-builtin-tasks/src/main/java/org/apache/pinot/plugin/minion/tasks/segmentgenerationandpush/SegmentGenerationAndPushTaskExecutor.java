@@ -41,7 +41,6 @@ import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
@@ -177,64 +176,40 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     if (taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     }
-    PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI);
-    boolean closeOutputFSOnExit = true;
-
-    if (outputFileFS == null) {
-      String fileURIScheme = outputSegmentDirURI.getScheme();
-      outputFileFS = PinotFSFactory.create(fileURIScheme);
-      // We shouldn't close FileSystem cached in the factory because it can be re-used
-      closeOutputFSOnExit = false;
-    }
-
-    switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
-      case TAR:
-        try {
-          SegmentPushUtils.pushSegments(spec, SegmentGenerationAndPushTaskUtils.getLocalPinotFs(),
-              Arrays.asList(outputSegmentTarURI.toString()));
-        } catch (RetriableOperationException | AttemptsExceededException e) {
-          if (closeOutputFSOnExit) {
-            outputFileFS.close();
+    try (PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
+      switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
+        case TAR:
+          try {
+            SegmentPushUtils.pushSegments(spec,
+                SegmentGenerationAndPushTaskUtils.getLocalPinotFs(), Arrays.asList(outputSegmentTarURI.toString()));
+          } catch (RetriableOperationException | AttemptsExceededException e) {
+            throw new RuntimeException(e);
           }
-          throw new RuntimeException(e);
-        }
-        break;
-      case URI:
-        try {
-          List<String> segmentUris = new ArrayList<>();
-          URI updatedURI = SegmentPushUtils
-              .generateSegmentTarURI(outputSegmentDirURI, outputSegmentTarURI, pushJobSpec.getSegmentUriPrefix(),
-                  pushJobSpec.getSegmentUriSuffix());
-          segmentUris.add(updatedURI.toString());
-          SegmentPushUtils.sendSegmentUris(spec, segmentUris);
-        } catch (RetriableOperationException | AttemptsExceededException e) {
-          if (closeOutputFSOnExit) {
-            outputFileFS.close();
+          break;
+        case URI:
+          try {
+            List<String> segmentUris = new ArrayList<>();
+            URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputSegmentDirURI, outputSegmentTarURI,
+                pushJobSpec.getSegmentUriPrefix(), pushJobSpec.getSegmentUriSuffix());
+            segmentUris.add(updatedURI.toString());
+            SegmentPushUtils.sendSegmentUris(spec, segmentUris);
+          } catch (RetriableOperationException | AttemptsExceededException e) {
+            throw new RuntimeException(e);
           }
-          throw new RuntimeException(e);
-        }
-        break;
-      case METADATA:
-        try {
-          Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
-              pushJobSpec, new String[]{outputSegmentTarURI.toString()});
-          SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap);
-        } catch (RetriableOperationException | AttemptsExceededException e) {
-          if (closeOutputFSOnExit) {
-            outputFileFS.close();
+          break;
+        case METADATA:
+          try {
+            Map<String, String> segmentUriToTarPathMap =
+                SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
+                    new String[]{outputSegmentTarURI.toString()});
+            SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap);
+          } catch (RetriableOperationException | AttemptsExceededException e) {
+            throw new RuntimeException(e);
           }
-          throw new RuntimeException(e);
-        }
-        break;
-      default:
-        if (closeOutputFSOnExit) {
-          outputFileFS.close();
-        }
-        throw new UnsupportedOperationException("Unrecognized push mode - " + pushMode);
-    }
-
-    if (closeOutputFSOnExit) {
-      outputFileFS.close();
+          break;
+        default:
+          throw new UnsupportedOperationException("Unrecognized push mode - " + pushMode);
+      }
     }
   }
 
@@ -263,27 +238,16 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       return localSegmentTarFile.toURI();
     }
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI);
-    boolean closeOutputFSOnExit = true;
-    if (outputFileFS == null) {
-      String fileURIScheme = outputSegmentDirURI.getScheme();
-      outputFileFS = PinotFSFactory.create(fileURIScheme);
-      closeOutputFSOnExit = false;
+    try (PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
+      URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
+      if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
+          outputSegmentDirURI)) {
+        LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentDirURI));
+      } else {
+        outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
+      }
+      return outputSegmentTarURI;
     }
-
-    URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
-    if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS
-        .exists(outputSegmentDirURI)) {
-      LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentDirURI));
-    } else {
-      outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
-    }
-
-    if (closeOutputFSOnExit) {
-      outputFileFS.close();
-    }
-
-    return outputSegmentTarURI;
   }
 
   private File tarSegmentDir(SegmentGenerationTaskSpec taskSpec, String segmentName)
@@ -305,71 +269,62 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       throws Exception {
     SegmentGenerationTaskSpec taskSpec = new SegmentGenerationTaskSpec();
     URI inputFileURI = URI.create(taskConfigs.get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY));
-    PinotFS inputFileFS = SegmentGenerationAndPushTaskUtils.getInputPinotFS(taskConfigs, inputFileURI);
-    boolean closeInputFSOnExit = true;
 
-    if (inputFileFS == null) {
-      String fileURIScheme = inputFileURI.getScheme();
-      inputFileFS = PinotFSFactory.create(fileURIScheme);
-      closeInputFSOnExit = false;
+    try (PinotFS inputFileFS = SegmentGenerationAndPushTaskUtils.getInputPinotFS(taskConfigs, inputFileURI)) {
+      File localInputTempDir = new File(localTempDir, "input");
+      FileUtils.forceMkdir(localInputTempDir);
+      File localOutputTempDir = new File(localTempDir, "output");
+      FileUtils.forceMkdir(localOutputTempDir);
+      taskSpec.setOutputDirectoryPath(localOutputTempDir.getAbsolutePath());
+
+      //copy input path to local
+      _eventObserver.notifyProgress(_pinotTaskConfig, String.format("Copying file: %s to local disk", inputFileURI));
+      File localInputDataFile = new File(localInputTempDir, new File(inputFileURI.getPath()).getName());
+      inputFileFS.copyToLocalFile(inputFileURI, localInputDataFile);
+      taskSpec.setInputFilePath(localInputDataFile.getAbsolutePath());
+
+      RecordReaderSpec recordReaderSpec = new RecordReaderSpec();
+      recordReaderSpec.setDataFormat(taskConfigs.get(BatchConfigProperties.INPUT_FORMAT));
+      recordReaderSpec.setClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CLASS));
+      recordReaderSpec.setConfigClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CONFIG_CLASS));
+      taskSpec.setRecordReaderSpec(recordReaderSpec);
+
+      String authToken = taskConfigs.get(BatchConfigProperties.AUTH_TOKEN);
+
+      String tableNameWithType = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
+      Schema schema;
+      if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA)) {
+        schema = JsonUtils.stringToObject(JsonUtils.objectToString(taskConfigs.get(BatchConfigProperties.SCHEMA)),
+            Schema.class);
+      } else if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA_URI)) {
+        schema = SegmentGenerationUtils.getSchema(taskConfigs.get(BatchConfigProperties.SCHEMA_URI), authToken);
+      } else {
+        schema = getSchema(tableNameWithType);
+      }
+      taskSpec.setSchema(schema);
+      TableConfig tableConfig;
+      if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS)) {
+        tableConfig = JsonUtils.stringToObject(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS), TableConfig.class);
+      } else if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS_URI)) {
+        tableConfig = SegmentGenerationUtils.getTableConfig(
+            taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS_URI), authToken);
+      } else {
+        tableConfig = getTableConfig(tableNameWithType);
+      }
+      taskSpec.setTableConfig(tableConfig);
+      taskSpec.setSequenceId(Integer.parseInt(taskConfigs.get(BatchConfigProperties.SEQUENCE_ID)));
+      if (taskConfigs.containsKey(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT)) {
+        taskSpec.setFailOnEmptySegment(
+            Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT)));
+      }
+      SegmentNameGeneratorSpec segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
+      segmentNameGeneratorSpec.setType(taskConfigs.get(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE));
+      segmentNameGeneratorSpec.setConfigs(IngestionConfigUtils.getConfigMapWithPrefix(taskConfigs,
+          BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
+      taskSpec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
+      taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
+
+      return taskSpec;
     }
-
-    File localInputTempDir = new File(localTempDir, "input");
-    FileUtils.forceMkdir(localInputTempDir);
-    File localOutputTempDir = new File(localTempDir, "output");
-    FileUtils.forceMkdir(localOutputTempDir);
-    taskSpec.setOutputDirectoryPath(localOutputTempDir.getAbsolutePath());
-
-    //copy input path to local
-    _eventObserver.notifyProgress(_pinotTaskConfig, String.format("Copying file: %s to local disk", inputFileURI));
-    File localInputDataFile = new File(localInputTempDir, new File(inputFileURI.getPath()).getName());
-    inputFileFS.copyToLocalFile(inputFileURI, localInputDataFile);
-    taskSpec.setInputFilePath(localInputDataFile.getAbsolutePath());
-
-    RecordReaderSpec recordReaderSpec = new RecordReaderSpec();
-    recordReaderSpec.setDataFormat(taskConfigs.get(BatchConfigProperties.INPUT_FORMAT));
-    recordReaderSpec.setClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CLASS));
-    recordReaderSpec.setConfigClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CONFIG_CLASS));
-    taskSpec.setRecordReaderSpec(recordReaderSpec);
-
-    String authToken = taskConfigs.get(BatchConfigProperties.AUTH_TOKEN);
-
-    String tableNameWithType = taskConfigs.get(BatchConfigProperties.TABLE_NAME);
-    Schema schema;
-    if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA)) {
-      schema = JsonUtils
-          .stringToObject(JsonUtils.objectToString(taskConfigs.get(BatchConfigProperties.SCHEMA)), Schema.class);
-    } else if (taskConfigs.containsKey(BatchConfigProperties.SCHEMA_URI)) {
-      schema = SegmentGenerationUtils.getSchema(taskConfigs.get(BatchConfigProperties.SCHEMA_URI), authToken);
-    } else {
-      schema = getSchema(tableNameWithType);
-    }
-    taskSpec.setSchema(schema);
-    TableConfig tableConfig;
-    if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS)) {
-      tableConfig = JsonUtils.stringToObject(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS), TableConfig.class);
-    } else if (taskConfigs.containsKey(BatchConfigProperties.TABLE_CONFIGS_URI)) {
-      tableConfig =
-          SegmentGenerationUtils.getTableConfig(taskConfigs.get(BatchConfigProperties.TABLE_CONFIGS_URI), authToken);
-    } else {
-      tableConfig = getTableConfig(tableNameWithType);
-    }
-    taskSpec.setTableConfig(tableConfig);
-    taskSpec.setSequenceId(Integer.parseInt(taskConfigs.get(BatchConfigProperties.SEQUENCE_ID)));
-    if (taskConfigs.containsKey(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT)) {
-      taskSpec
-          .setFailOnEmptySegment(Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT)));
-    }
-    SegmentNameGeneratorSpec segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
-    segmentNameGeneratorSpec.setType(taskConfigs.get(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE));
-    segmentNameGeneratorSpec.setConfigs(IngestionConfigUtils.getConfigMapWithPrefix(taskConfigs,
-        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX));
-    taskSpec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
-    taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
-
-    if (closeInputFSOnExit) {
-      inputFileFS.close();
-    }
-    return taskSpec;
   }
 }
