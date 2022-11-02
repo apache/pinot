@@ -94,24 +94,37 @@ public class CaseTransformFunction extends BaseTransformFunction {
 
   private void constructStatementList(List<TransformFunction> arguments) {
     int numWhenStatements = arguments.size() / 2;
-    boolean hasLegacyFormat = false;
+    boolean allBooleanFirstHalf = true;
+    boolean notAllBooleanOddHalf = false;
     for (int i = 0; i < numWhenStatements; i++) {
-      if (arguments.get(i * 2).getResultMetadata().getDataType() != DataType.BOOLEAN) {
-        hasLegacyFormat = true;
-        break;
+      if (arguments.get(i).getResultMetadata().getDataType() != DataType.BOOLEAN) {
+        allBooleanFirstHalf = false;
       }
+      if (arguments.get(i * 2).getResultMetadata().getDataType() != DataType.BOOLEAN) {
+        notAllBooleanOddHalf = true;
+      }
+    }
+    if (allBooleanFirstHalf && notAllBooleanOddHalf) {
+      constructStatementListLegacy(arguments);
+    } else {
+      constructStatementListCalcite(arguments);
+    }
+  }
+
+  private void constructStatementListCalcite(List<TransformFunction> arguments) {
+    int numWhenStatements = arguments.size() / 2;
+    // alternating WHEN and THEN clause, last one ELSE
+    for (int i = 0; i < numWhenStatements; i++) {
       _whenStatements.add(arguments.get(i * 2));
       _elseThenStatements.add(arguments.get(i * 2 + 1));
     }
     _elseThenStatements.add(arguments.get(arguments.size() - 1));
-    if (hasLegacyFormat) {
-      constructStatementListLegacy(arguments);
-    }
   }
 
-  // Legacy format, this is here for backward compatibility support, remove after release 0.12
+  // TODO: Legacy format, this is here for backward compatibility support, remove after release 0.12
   private void constructStatementListLegacy(List<TransformFunction> arguments) {
     int numWhenStatements = arguments.size() / 2;
+    // first half WHEN, second half THEN, last one ELSE
     for (int i = 0; i < numWhenStatements; i++) {
       _whenStatements.add(arguments.get(i));
     }
