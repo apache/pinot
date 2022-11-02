@@ -175,6 +175,7 @@ export const SegmentStatusRenderer = ({
             )}
             {segmentDebugDetails && (
               <CustomCodemirror
+                showLineWrapToggle
                 customClass={segmentStatusRendererClasses.segmentDebugDetails}
                 data={segmentDebugDetails}
               />

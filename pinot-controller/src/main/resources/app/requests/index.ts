@@ -28,7 +28,7 @@ const headers = {
   'Accept': 'text/plain, */*; q=0.01'
 };
 
-import { baseApi, baseApiV1, transformApi } from '../utils/axios-config';
+import { baseApi, baseApiWithErrors, transformApi } from '../utils/axios-config';
 
 export const getTenants = (): Promise<AxiosResponse<Tenants>> =>
   baseApi.get('/tenants');
@@ -238,7 +238,7 @@ export const getSegmentDebugInfo = (tableName: string, tableType: string): Promi
   baseApi.get(`debug/tables/${tableName}?type=${tableType}&verbosity=10`);
 
 export const getSegmentLevelDebugDetails = async (tableName: string, segmentName: string): Promise<SegmentDebugDetails> => {
-  const response = await baseApiV1.get(`debug/segments/${tableName}/${segmentName}`);
+  const response = await baseApiWithErrors.get(`debug/segments/${tableName}/${segmentName}`);
   return response.data;
 }
 
