@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data;
 
 import com.google.common.base.Preconditions;
+import java.io.Serializable;
 import java.sql.Timestamp;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -35,7 +36,7 @@ import org.joda.time.format.ISODateTimeFormat;
 /**
  * Class to represent format from {@link DateTimeFieldSpec}
  */
-public class DateTimeFormatSpec {
+public class DateTimeFormatSpec implements Serializable {
 
   // Colon format: 'size:timeUnit:timeFormat:pattern tz(timeZone)'
   // 'pattern' applies to the 'SIMPLE_DATE_FORMAT' time format

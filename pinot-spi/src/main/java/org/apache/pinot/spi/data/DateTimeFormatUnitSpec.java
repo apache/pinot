@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data;
 
 import com.google.common.base.Preconditions;
+import java.io.Serializable;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.EnumUtils;
@@ -26,7 +27,7 @@ import org.joda.time.DurationFieldType;
 import org.joda.time.chrono.ISOChronology;
 
 
-public class DateTimeFormatUnitSpec {
+public class DateTimeFormatUnitSpec implements Serializable {
 
   /**
    * Time unit enum with range from MILLISECONDS to YEARS
