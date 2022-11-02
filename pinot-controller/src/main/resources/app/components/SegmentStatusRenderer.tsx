@@ -35,8 +35,8 @@ const useStyles = makeStyles((theme) => ({
     border: `1px solid ${theme.palette.success.main}`,
   },
   info: {
-    color: theme.palette.info.main,
-    border: `1px solid ${theme.palette.info.main}`,
+    color: theme.palette.grey[600],
+    border: `1px solid ${theme.palette.grey[600]}`,
   },
   warning: {
     color: theme.palette.warning.main,
@@ -72,7 +72,7 @@ export const SegmentStatusRenderer = ({
     switch (status) {
       case DISPLAY_SEGMENT_STATUS.GOOD: {
         setStatusVariant(StatusVariant.Success);
-        setStatusTooltipTitle("All the servers are ONLINE/CONSUMING.");
+        setStatusTooltipTitle("All the servers are ONLINE/CONSUMING");
 
         break;
       }
@@ -87,6 +87,16 @@ export const SegmentStatusRenderer = ({
         setStatusTooltipTitle("External View is OFFLINE and does not match Ideal State");
 
         break;
+      }
+      case DISPLAY_SEGMENT_STATUS.MISSING: {
+        setStatusVariant(StatusVariant.Info);
+        setStatusTooltipTitle("External View is empty i.e does not have any servers");
+
+        break;
+      }
+      default: {
+        setStatusVariant(StatusVariant.Info);
+        setStatusTooltipTitle("Unknown status");
       }
     }
   };

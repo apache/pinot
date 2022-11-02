@@ -215,6 +215,8 @@ declare module 'Models' {
   export const enum DISPLAY_SEGMENT_STATUS {
     BAD = "BAD",
     GOOD = "GOOD",
-    PARTIAL = "PARTIAL"
+    PARTIAL = "PARTIAL",
+    MISSING = "MISSING",
+    UNKNOWN = "UNKNOWN"
   }
 }
