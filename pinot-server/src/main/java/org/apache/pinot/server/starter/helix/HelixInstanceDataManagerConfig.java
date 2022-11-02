@@ -123,6 +123,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   private static final String DELETED_SEGMENTS_CACHE_SIZE = "table.deleted.segments.cache.size";
   private static final String DELETED_SEGMENTS_CACHE_TTL_MINUTES = "table.deleted.segments.cache.ttl.minutes";
+  private static final String PEER_DOWNLOAD_SCHEME = "peer.download.scheme";
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
@@ -272,6 +273,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public int getDeletedSegmentsCacheTtlMinutes() {
     return _instanceDataManagerConfiguration.getProperty(DELETED_SEGMENTS_CACHE_TTL_MINUTES,
         DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES);
+  }
+
+  @Override
+  public String getPeerDownloadScheme() {
+    return _instanceDataManagerConfiguration.getProperty(PEER_DOWNLOAD_SCHEME);
   }
 
   @Override
