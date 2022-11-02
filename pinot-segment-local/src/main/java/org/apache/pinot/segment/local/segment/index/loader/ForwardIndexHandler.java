@@ -59,9 +59,9 @@ import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
-
-
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.HAS_DICTIONARY;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
 /**
  * Helper class used by {@link SegmentPreProcessor} to make changes to forward index and dictionary configs. Note
  * that this handler only works for segment versions >= 3.0. Support for segment version < 3.0 is not added because
@@ -480,8 +480,8 @@ public class ForwardIndexHandler implements IndexHandler {
 
     LOGGER.info("Created forwardIndex. Updating metadata properties for segment={} and column={}", segmentName, column);
     Map<String, String> metadataProperties = new HashMap<>();
-    metadataProperties.put(Column.getKeyFor(column, Column.HAS_DICTIONARY), String.valueOf(true));
-    metadataProperties.put(Column.getKeyFor(column, Column.DICTIONARY_ELEMENT_SIZE),
+    metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(true));
+    metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
         String.valueOf(dictionaryCreator.getNumBytesPerEntry()));
     updateMetadataProperties(indexDir, metadataProperties);
 
