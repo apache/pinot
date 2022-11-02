@@ -58,7 +58,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
    * @param column column name
    * @param segmentIndexDir realtime segment consumer dir
    * @param segmentName realtime segment name
-   * @param stopWordsInclude stop words to include from default stop words
+   * @param stopWordsInclude the words to include in addition to the default stop word list
    * @param stopWordsExclude stop words to exclude from default stop words
    */
   public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName,
