@@ -91,8 +91,8 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
    *               no need to commit the index from the realtime side. So when the realtime segment
    *               is destroyed (which is after the realtime segment has been committed and converted
    *               to offline), we close this lucene index writer to release resources but don't commit.
-   * @param stopWordsInclude
-   * @param stopWordsExclude
+   * @param stopWordsInclude the words to include in addition to the default stop word list
+   * @param stopWordsExclude the words to exclude from the default stop word list
    */
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit,
       @Nullable List<String> stopWordsInclude, @Nullable List<String> stopWordsExclude) {

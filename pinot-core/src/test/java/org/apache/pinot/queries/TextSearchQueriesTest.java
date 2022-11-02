@@ -1878,11 +1878,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, 'a and or in the are')";
     testInterSegmentAggregationQueryHelper(query, 0);
 
-    // query with excluded stop-words. they should be indexed
+    // query with words excluded from default stop-words. they should be indexed
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"IT support\" or \"IT manager\"')";
     testInterSegmentAggregationQueryHelper(query, 8);
 
-    // query with excluded stop-words. they should be indexed
+    // query with words excluded from default stop-words. they should be indexed
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"IT\"')";
     testInterSegmentAggregationQueryHelper(query, 16);
 
@@ -1897,6 +1897,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // query with included stop-words. they should not be indexed
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'coordinator')";
     testInterSegmentAggregationQueryHelper(query, 0);
+
+    // query with default stop-words. they should not be indexed
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"IT support\" or \"IT manager\"')";
+    testInterSegmentAggregationQueryHelper(query, 12);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"IT\"')";
+    testInterSegmentAggregationQueryHelper(query, 0);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"support\" or \"manager\"')";
+    testInterSegmentAggregationQueryHelper(query, 12);
 
     // analyzer should prune/ignore the stop words from search expression and consider everything else for a match
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"learned a lot\"')";

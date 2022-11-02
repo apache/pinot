@@ -20,10 +20,12 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.CharArraySet;
@@ -72,33 +74,33 @@ public class TextIndexUtils {
     return SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, column) != null ? FSTType.LUCENE : FSTType.NATIVE;
   }
 
-  @Nullable
+  @Nonnull
   public static List<String> extractStopWordsInclude(String colName,
       Map<String, Map<String, String>> columnProperties) {
     return extractStopWordsInclude(columnProperties.getOrDefault(colName, null));
   }
 
-  @Nullable
+  @Nonnull
   public static List<String> extractStopWordsExclude(String colName,
       Map<String, Map<String, String>> columnProperties) {
     return extractStopWordsExclude(columnProperties.getOrDefault(colName, null));
   }
 
-  @Nullable
+  @Nonnull
   public static List<String> extractStopWordsInclude(Map<String, String> columnProperty) {
     return parseEntryAsString(columnProperty, FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY);
   }
 
-  @Nullable
+  @Nonnull
   public static List<String> extractStopWordsExclude(Map<String, String> columnProperty) {
     return parseEntryAsString(columnProperty, FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY);
   }
 
-  @Nullable
-  public static List<String> parseEntryAsString(@Nullable Map<String, String> columnProperties,
+  @Nonnull
+  private static List<String> parseEntryAsString(@Nullable Map<String, String> columnProperties,
       String stopWordKey) {
     if (columnProperties == null) {
-      return null;
+      return Collections.EMPTY_LIST;
     }
     String includeWords = columnProperties.getOrDefault(stopWordKey, "");
     return Arrays.stream(includeWords.split(FieldConfig.TEXT_INDEX_STOP_WORD_SEPERATOR))
@@ -114,7 +116,6 @@ public class TextIndexUtils {
     if (stopWordsExclude != null) {
       stopWordsExclude.forEach(stopWordSet::remove);
     }
-    StandardAnalyzer standardAnalyzer = new StandardAnalyzer(new CharArraySet(stopWordSet, true));
-    return standardAnalyzer;
+    return new StandardAnalyzer(new CharArraySet(stopWordSet, true));
   }
 }
