@@ -72,19 +72,19 @@ export const SegmentStatusRenderer = ({
     switch (status) {
       case DISPLAY_SEGMENT_STATUS.GOOD: {
         setStatusVariant(StatusVariant.Success);
-        setStatusTooltipTitle("Segment is in healthy state");
+        setStatusTooltipTitle("All the servers are ONLINE/CONSUMING.");
 
         break;
       }
       case DISPLAY_SEGMENT_STATUS.BAD: {
         setStatusVariant(StatusVariant.Error);
-        setStatusTooltipTitle("One or more server is in error state");
+        setStatusTooltipTitle("One or more servers are in ERROR state");
 
         break;
       }
       case DISPLAY_SEGMENT_STATUS.PARTIAL: {
         setStatusVariant(StatusVariant.Warning);
-        setStatusTooltipTitle("External view is in offline state");
+        setStatusTooltipTitle("External View is OFFLINE and does not match Ideal State");
 
         break;
       }
