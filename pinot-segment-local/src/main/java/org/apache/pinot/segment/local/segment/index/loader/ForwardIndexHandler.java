@@ -117,7 +117,7 @@ public class ForwardIndexHandler implements IndexHandler {
           break;
         }
         case ENABLE_DICTIONARY: {
-          enableDictionary(column, segmentWriter, indexCreatorProvider);
+          createDictBasedForwardIndex(column, segmentWriter, indexCreatorProvider);
           break;
         }
         default:
@@ -201,7 +201,6 @@ public class ForwardIndexHandler implements IndexHandler {
   private void rewriteRawForwardIndex(String column, SegmentDirectory.Writer segmentWriter,
       IndexCreatorProvider indexCreatorProvider)
       throws Exception {
-    Preconditions.checkState(_segmentMetadata.getVersion() == SegmentVersion.v3);
     ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
     boolean isSingleValue = existingColMetadata.isSingleValue();
 
@@ -423,18 +422,15 @@ public class ForwardIndexHandler implements IndexHandler {
           break;
         }
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException("Unsupported storedType=" + reader.getStoredType() + " for column=" + column);
       }
     }
   }
 
-  private void enableDictionary(String column, SegmentDirectory.Writer segmentWriter,
+  private void createDictBasedForwardIndex(String column, SegmentDirectory.Writer segmentWriter,
       IndexCreatorProvider indexCreatorProvider)
       throws Exception {
-    Preconditions.checkState(_segmentMetadata.getVersion() == SegmentVersion.v3);
     ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
-    Preconditions.checkState(!existingColMetadata.hasDictionary(),
-        "Cannot rewrite dictionary enabled forward index. Dictionary already exists for column:" + column);
     boolean isSingleValue = existingColMetadata.isSingleValue();
 
     File indexDir = _segmentMetadata.getIndexDir();
@@ -531,10 +527,9 @@ public class ForwardIndexHandler implements IndexHandler {
           statsCollector = new BigDecimalColumnPreIndexStatsCollector(column, statsCollectorConfig);
           break;
         default:
-          throw new IllegalStateException();
+          throw new IllegalStateException("Unsupported storedType=" + reader.getStoredType() + " for column=" + column);
       }
 
-      Preconditions.checkState(statsCollector != null);
       // Note: Special Null handling is not necessary here. This is because, the existing default null value in the
       // raw forwardIndex will be retained as such while created the dictionary and dict-based forward index. Also,
       // null value vectors maintain a bitmap of docIds. No handling is necessary there.
