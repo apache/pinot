@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
@@ -32,211 +31,171 @@ import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.util.TestUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.fail;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 /**
  * Tests for the instances Restlet.
  */
-public class PinotInstanceRestletResourceTest {
-  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
-  private static final long GET_CALL_TIMEOUT_MS = 10000;
+public class PinotInstanceRestletResourceTest extends ControllerTest {
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupSharedStateAndValidate();
+    DEFAULT_INSTANCE.setupSharedStateAndValidate();
   }
 
   @Test
   public void testInstanceListingAndCreation()
       throws Exception {
-    // Check that there is only one CONTROLLER instance in the cluster
-    String listInstancesUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forInstanceList();
-
-    // Determine number of instances and controllers. count[0]: number of instances, count[1]: number of controllers;
-    int[] counts = {0, 0};
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String getResponse = ControllerTest.sendGetRequest(listInstancesUrl);
-        JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
-
-        if (jsonNode != null && jsonNode.get("instances") != null && !jsonNode.get("instances").isEmpty()) {
-          JsonNode instances = jsonNode.get("instances");
-          counts[0] = instances.size();
-          for (int i = 0; i < counts[0]; i++) {
-            if (instances.get(i).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE)) {
-              counts[1]++;
-            }
-          }
-        }
-
-        return counts[1] == 1;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, GET_CALL_TIMEOUT_MS, "Expected one controller instance");
+    ControllerRequestURLBuilder requestURLBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
+    String listInstancesUrl = requestURLBuilder.forInstanceList();
+    int expectedNumInstances = 1 + DEFAULT_NUM_BROKER_INSTANCES + DEFAULT_NUM_SERVER_INSTANCES;
+    checkNumInstances(listInstancesUrl, expectedNumInstances);
 
     // Create untagged broker and server instances
-    String createInstanceUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forInstanceCreate();
-    Instance brokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null, 0, 0, 0, 0, false);
-    ControllerTest.sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
-
-    Instance serverInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, null, null, 8090, 8091, 8092, 8093,
-        false);
-    ControllerTest.sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
+    String createInstanceUrl = requestURLBuilder.forInstanceCreate();
+    Instance brokerInstance1 = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null, 0, 0, 0, 0, false);
+    sendPostRequest(createInstanceUrl, brokerInstance1.toJsonString());
+    Instance serverInstance1 =
+        new Instance("1.2.3.4", 2345, InstanceType.SERVER, null, null, 8090, 8091, 8092, 8093, false);
+    sendPostRequest(createInstanceUrl, serverInstance1.toJsonString());
 
     // Check that we have added two more instances
-    checkNumInstances(listInstancesUrl, counts[0] + 2);
+    checkNumInstances(listInstancesUrl, expectedNumInstances + 2);
 
     // Create broker and server instances with tags and pools
-    brokerInstance =
+    Instance brokerInstance2 =
         new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null, 0, 0, 0, 0,
             false);
-    ControllerTest.sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
-
+    sendPostRequest(createInstanceUrl, brokerInstance2.toJsonString());
     Map<String, Integer> serverPools = new TreeMap<>();
     serverPools.put("tag_OFFLINE", 0);
     serverPools.put("tag_REALTIME", 1);
-    serverInstance =
+    Instance serverInstance2 =
         new Instance("2.3.4.5", 2345, InstanceType.SERVER, Arrays.asList("tag_OFFLINE", "tag_REALTIME"), serverPools,
             18090, 18091, 18092, 18093, false);
-    ControllerTest.sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
+    sendPostRequest(createInstanceUrl, serverInstance2.toJsonString());
 
     // Check that we have added four instances so far
-    checkNumInstances(listInstancesUrl, counts[0] + 4);
+    checkNumInstances(listInstancesUrl, expectedNumInstances + 4);
 
     // Create duplicate broker and server instances should fail
-    try {
-      ControllerTest.sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
-      fail("Duplicate broker instance creation did not fail");
-    } catch (IOException e) {
-      // Expected
-    }
-
-    try {
-      ControllerTest.sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
-      fail("Duplicate server instance creation did not fail");
-    } catch (IOException e) {
-      // Expected
-    }
+    assertThrows(IOException.class, () -> sendPostRequest(createInstanceUrl, brokerInstance1.toJsonString()));
+    assertThrows(IOException.class, () -> sendPostRequest(createInstanceUrl, serverInstance1.toJsonString()));
+    assertThrows(IOException.class, () -> sendPostRequest(createInstanceUrl, brokerInstance2.toJsonString()));
+    assertThrows(IOException.class, () -> sendPostRequest(createInstanceUrl, serverInstance2.toJsonString()));
 
     // Check that number of instances did not change.
-    checkNumInstances(listInstancesUrl, counts[0] + 4);
+    checkNumInstances(listInstancesUrl, expectedNumInstances + 4);
 
     // Check that the instances are properly created
-    checkInstanceInfo("Broker_1.2.3.4_1234", "1.2.3.4", 1234, new String[0], null, null, false);
-    checkInstanceInfo("Server_1.2.3.4_2345", "1.2.3.4", 2345, new String[0], null, null, 8090, 8091, false);
-    checkInstanceInfo("Broker_2.3.4.5_1234", "2.3.4.5", 1234, new String[]{"tag_BROKER"}, null, null, false);
-    checkInstanceInfo("Server_2.3.4.5_2345", "2.3.4.5", 2345, new String[]{"tag_OFFLINE", "tag_REALTIME"},
-        new String[]{"tag_OFFLINE", "tag_REALTIME"}, new int[]{0, 1}, 18090, 18091, false);
+    checkInstanceInfo("Broker_1.2.3.4_1234", "1.2.3.4", 1234, new String[0], null, -1, -1, -1, -1, false);
+    checkInstanceInfo("Server_1.2.3.4_2345", "1.2.3.4", 2345, new String[0], null, 8090, 8091, 8092, 8093, false);
+    checkInstanceInfo("Broker_2.3.4.5_1234", "2.3.4.5", 1234, new String[]{"tag_BROKER"}, null, -1, -1, -1, -1, false);
+    checkInstanceInfo("Server_2.3.4.5_2345", "2.3.4.5", 2345, new String[]{"tag_OFFLINE", "tag_REALTIME"}, serverPools,
+        18090, 18091, 18092, 18093, false);
 
-    // Test PUT Instance API
+    // Test PUT instance API
     String newBrokerTag = "new-broker-tag";
     Instance newBrokerInstance =
         new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null, 0, 0, 0, 0,
             false);
     String brokerInstanceId = "Broker_1.2.3.4_1234";
-    String brokerInstanceUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forInstance(brokerInstanceId);
-    ControllerTest.sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
-
+    String brokerInstanceUrl = requestURLBuilder.forInstance(brokerInstanceId);
+    sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
     String newServerTag = "new-server-tag";
     Instance newServerInstance =
         new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null, 28090, 28091,
             28092, 28093, true);
     String serverInstanceId = "Server_1.2.3.4_2345";
-    String serverInstanceUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forInstance(serverInstanceId);
-    ControllerTest.sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
+    String serverInstanceUrl = requestURLBuilder.forInstance(serverInstanceId);
+    sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
 
-    checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{newBrokerTag}, null, null, false);
-    checkInstanceInfo(serverInstanceId, "1.2.3.4", 2345, new String[]{newServerTag}, null, null, 28090, 28091, true);
+    checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{newBrokerTag}, null, -1, -1, -1, -1, false);
+    checkInstanceInfo(serverInstanceId, "1.2.3.4", 2345, new String[]{newServerTag}, null, 28090, 28091, 28092, 28093,
+        true);
 
     // Test Instance updateTags API
-    String brokerInstanceUpdateTagsUrl = TEST_INSTANCE.getControllerRequestURLBuilder()
-        .forInstanceUpdateTags(brokerInstanceId, Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
-    ControllerTest.sendPutRequest(brokerInstanceUpdateTagsUrl);
-    String serverInstanceUpdateTagsUrl = TEST_INSTANCE.getControllerRequestURLBuilder()
-        .forInstanceUpdateTags(serverInstanceId,
-            Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
-    ControllerTest.sendPutRequest(serverInstanceUpdateTagsUrl);
-    checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null, null,
-        false);
+    String brokerInstanceUpdateTagsUrl =
+        requestURLBuilder.forInstanceUpdateTags(brokerInstanceId, Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
+    sendPutRequest(brokerInstanceUpdateTagsUrl);
+    String serverInstanceUpdateTagsUrl = requestURLBuilder.forInstanceUpdateTags(serverInstanceId,
+        Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
+    sendPutRequest(serverInstanceUpdateTagsUrl);
+    checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null, -1, -1, -1,
+        -1, false);
     checkInstanceInfo(serverInstanceId, "1.2.3.4", 2345,
-        new String[]{"tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"}, null, null, 28090, 28091, true);
+        new String[]{"tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"}, null, 28090, 28091, 28092, 28093, true);
+
+    // Test DELETE instance API
+    sendDeleteRequest(requestURLBuilder.forInstance("Broker_1.2.3.4_1234"));
+    sendDeleteRequest(requestURLBuilder.forInstance("Server_1.2.3.4_2345"));
+    sendDeleteRequest(requestURLBuilder.forInstance("Broker_2.3.4.5_1234"));
+    sendDeleteRequest(requestURLBuilder.forInstance("Server_2.3.4.5_2345"));
+    checkNumInstances(listInstancesUrl, expectedNumInstances);
   }
 
-  private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags, String[] pools,
-      int[] poolValues, boolean queriesDisabled) {
-    checkInstanceInfo(instanceName, hostName, port, tags, pools, poolValues, Instance.NOT_SET_GRPC_PORT_VALUE,
-        Instance.NOT_SET_ADMIN_PORT_VALUE, queriesDisabled);
-  }
-
-  private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags, String[] pools,
-      int[] poolValues, int grpcPort, int adminPort, boolean queriesDisabled) {
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          String getResponse = ControllerTest
-              .sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forInstance(instanceName));
-          JsonNode instance = JsonUtils.stringToJsonNode(getResponse);
-          boolean result =
-              (instance.get("instanceName") != null) && (instance.get("instanceName").asText().equals(instanceName))
-                  && (instance.get("hostName") != null) && (instance.get("hostName").asText().equals(hostName)) && (
-                  instance.get("port") != null) && (instance.get("port").asText().equals(String.valueOf(port)))
-                  && (instance.get("enabled").asBoolean()) && (instance.get("tags") != null) && (
-                  instance.get("tags").size() == tags.length) && (
-                  instance.get("grpcPort").asText().equals(String.valueOf(grpcPort)) && (
-                      instance.get("queriesDisabled") == null && !queriesDisabled
-                          || instance.get("queriesDisabled") != null
-                          && instance.get("queriesDisabled").asBoolean() == queriesDisabled));
-
-          for (int i = 0; i < tags.length; i++) {
-            result = result && instance.get("tags").get(i).asText().equals(tags[i]);
-          }
-
-          if (!result) {
-            return false;
-          }
-
-          if (pools != null) {
-            result = result && (instance.get("pools") != null) && (instance.get("pools").size() == pools.length);
-            for (int i = 0; i < pools.length; i++) {
-              result = result && instance.get("pools").get(pools[i]).asText().equals((String.valueOf(poolValues[i])));
-            }
-          } else {
-            result = result && instance.get("pools").isNull();
-          }
-
-          return result;
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
+  private void checkNumInstances(String listInstancesUrl, int expectedNumInstances)
+      throws Exception {
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(listInstancesUrl));
+    JsonNode instances = response.get("instances");
+    assertEquals(instances.size(), expectedNumInstances);
+    int numControllers = 0;
+    for (int i = 0; i < expectedNumInstances; i++) {
+      if (instances.get(i).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE)) {
+        numControllers++;
       }
-    }, GET_CALL_TIMEOUT_MS, "Failed to retrieve correct information for instance: " + instanceName);
+    }
+    assertEquals(numControllers, 1);
   }
 
-  private void checkNumInstances(String listInstancesUrl, int numInstances) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String getResponse = ControllerTest.sendGetRequest(listInstancesUrl);
-        JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
-        return jsonNode != null && jsonNode.get("instances") != null
-            && jsonNode.get("instances").size() == numInstances;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
+  private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags,
+      @Nullable Map<String, Integer> pools, int grpcPort, int adminPort, int queryServicePort, int queryMailboxPort,
+      boolean queriesDisabled)
+      throws Exception {
+    JsonNode response = JsonUtils.stringToJsonNode(
+        ControllerTest.sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forInstance(instanceName)));
+    assertEquals(response.get("instanceName").asText(), instanceName);
+    assertEquals(response.get("hostName").asText(), hostName);
+    assertTrue(response.get("enabled").asBoolean());
+    assertEquals(response.get("port").asInt(), port);
+    JsonNode actualTags = response.get("tags");
+    assertEquals(actualTags.size(), tags.length);
+    for (int i = 0; i < tags.length; i++) {
+      assertEquals(actualTags.get(i).asText(), tags[i]);
+    }
+    JsonNode actualPools = response.get("pools");
+    if (pools != null) {
+      assertEquals(actualPools.size(), pools.size());
+      for (Map.Entry<String, Integer> entry : pools.entrySet()) {
+        assertEquals(actualPools.get(entry.getKey()).asInt(), (int) entry.getValue());
       }
-    }, GET_CALL_TIMEOUT_MS, "Expected " + numInstances + " instances after creation of tagged instances");
+    } else {
+      assertTrue(actualPools.isNull());
+    }
+    assertEquals(response.get("grpcPort").asInt(), grpcPort);
+    assertEquals(response.get("adminPort").asInt(), adminPort);
+    assertEquals(response.get("queryServicePort").asInt(), queryServicePort);
+    assertEquals(response.get("queryMailboxPort").asInt(), queryMailboxPort);
+    if (queriesDisabled) {
+      assertTrue(response.get("queriesDisabled").asBoolean());
+    } else {
+      assertNull(response.get("queriesDisabled"));
+    }
   }
 
   @AfterClass
-  public void tearDown() {
-    TEST_INSTANCE.cleanup();
+  public void tearDown()
+      throws Exception {
+    DEFAULT_INSTANCE.cleanup();
   }
 }
