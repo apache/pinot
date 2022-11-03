@@ -349,12 +349,6 @@ const splitStringByLastUnderscore = (str: string) => {
 export const getDisplaySegmentStatus = (idealState, externalView): DISPLAY_SEGMENT_STATUS => {
   const externalViewStatesArray = Object.values(externalView || {});
 
-  // There is a possibility that the segment is in ideal state but not in external view making external view segment as null.
-  // if EV is empty then segment is missing servers - MISSING state
-  if(externalViewStatesArray.length === 0) {
-    return DISPLAY_SEGMENT_STATUS.MISSING;
-  }
-
   // if EV contains ERROR state then segment is in Bad state
   if(externalViewStatesArray.includes(SEGMENT_STATUS.ERROR)) {
     return DISPLAY_SEGMENT_STATUS.BAD;
@@ -370,13 +364,14 @@ export const getDisplaySegmentStatus = (idealState, externalView): DISPLAY_SEGME
     return DISPLAY_SEGMENT_STATUS.GOOD;
   }
 
-  // If EV state is OFFLINE and EV does not matches IS then segment is in Partial state.
-  if(externalViewStatesArray.includes(SEGMENT_STATUS.OFFLINE) && !isEqual(idealState, externalView)) {
+  // If EV is empty or EV state is OFFLINE and does not matches IS then segment is in Partial state.
+  // PARTIAL state can also be interpreted as we're waiting for segments to converge
+  if(externalViewStatesArray.length === 0 || externalViewStatesArray.includes(SEGMENT_STATUS.OFFLINE) && !isEqual(idealState, externalView)) {
     return DISPLAY_SEGMENT_STATUS.PARTIAL;
   }
 
-  // Unknown status
-  return DISPLAY_SEGMENT_STATUS.UNKNOWN;
+  // does not match any condition -> assume PARTIAL state as we are waiting for segments to converge 
+  return DISPLAY_SEGMENT_STATUS.PARTIAL;
 }
 
 export default {

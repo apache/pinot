@@ -35,10 +35,6 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.success.main,
     border: `1px solid ${theme.palette.success.main}`,
   },
-  info: {
-    color: theme.palette.grey[600],
-    border: `1px solid ${theme.palette.grey[600]}`,
-  },
   warning: {
     color: theme.palette.warning.main,
     border: `1px solid ${theme.palette.warning.main}`,
@@ -52,7 +48,6 @@ interface SegmentStatusRendererProps {
 export enum StatusColor {
   Error = "error",
   Warning = "warning",
-  Info = "info",
   Success = "success",
 }
 
@@ -73,31 +68,21 @@ export const SegmentStatusRenderer = ({
     switch (status) {
       case DISPLAY_SEGMENT_STATUS.GOOD: {
         setStatusColor(StatusColor.Success);
-        setStatusTooltipTitle("All the servers are ONLINE/CONSUMING");
+        setStatusTooltipTitle("All the servers of this segment are ONLINE/CONSUMING");
 
         break;
       }
       case DISPLAY_SEGMENT_STATUS.BAD: {
         setStatusColor(StatusColor.Error);
-        setStatusTooltipTitle("One or more servers are in ERROR state");
+        setStatusTooltipTitle("One or more servers of this segment are in ERROR state");
 
         break;
       }
       case DISPLAY_SEGMENT_STATUS.PARTIAL: {
         setStatusColor(StatusColor.Warning);
-        setStatusTooltipTitle("External View is OFFLINE and does not match Ideal State");
+        setStatusTooltipTitle("External view is OFFLINE or missing for one or more servers of this segment");
 
         break;
-      }
-      case DISPLAY_SEGMENT_STATUS.MISSING: {
-        setStatusColor(StatusColor.Error);
-        setStatusTooltipTitle("External View is empty (segments not found on servers)");
-
-        break;
-      }
-      default: {
-        setStatusColor(StatusColor.Info);
-        setStatusTooltipTitle("Unknown status");
       }
     }
   };

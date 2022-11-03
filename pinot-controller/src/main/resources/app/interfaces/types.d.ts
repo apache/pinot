@@ -216,7 +216,5 @@ declare module 'Models' {
     BAD = "BAD",
     GOOD = "GOOD",
     PARTIAL = "PARTIAL",
-    MISSING = "MISSING",
-    UNKNOWN = "UNKNOWN"
   }
 }
