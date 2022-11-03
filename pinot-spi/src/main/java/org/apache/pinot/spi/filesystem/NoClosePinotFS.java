@@ -29,7 +29,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public class NoClosePinotFS implements PinotFS {
   protected final PinotFS _delegate;
 
-  public NoClosePinotFS(PinotFS delegate) {
+  protected NoClosePinotFS(PinotFS delegate) {
     _delegate = delegate;
   }
 

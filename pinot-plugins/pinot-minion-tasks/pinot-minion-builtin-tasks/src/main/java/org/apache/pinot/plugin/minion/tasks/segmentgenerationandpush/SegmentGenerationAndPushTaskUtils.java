@@ -22,7 +22,6 @@ import java.net.URI;
 import java.util.Map;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
-import org.apache.pinot.spi.filesystem.NoClosePinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
@@ -33,8 +32,6 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 public class SegmentGenerationAndPushTaskUtils {
   private SegmentGenerationAndPushTaskUtils() {
   }
-
-  private static final PinotFS LOCAL_PINOT_FS = new NoClosePinotFS(new LocalPinotFS());
 
   static PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI)
       throws Exception {
@@ -71,6 +68,6 @@ public class SegmentGenerationAndPushTaskUtils {
   }
 
   static PinotFS getLocalPinotFs() {
-    return LOCAL_PINOT_FS;
+    return new LocalPinotFS();
   }
 }

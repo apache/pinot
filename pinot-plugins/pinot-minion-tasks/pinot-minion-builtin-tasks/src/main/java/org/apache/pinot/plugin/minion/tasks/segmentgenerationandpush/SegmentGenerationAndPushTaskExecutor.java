@@ -179,9 +179,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     try (PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
       switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
         case TAR:
-          try {
-            SegmentPushUtils.pushSegments(spec,
-                SegmentGenerationAndPushTaskUtils.getLocalPinotFs(), Arrays.asList(outputSegmentTarURI.toString()));
+          try (PinotFS pinotFS = SegmentGenerationAndPushTaskUtils.getLocalPinotFs()) {
+            SegmentPushUtils.pushSegments(spec, pinotFS, Arrays.asList(outputSegmentTarURI.toString()));
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
           }
