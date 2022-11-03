@@ -468,6 +468,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private void downloadSegmentFromDeepStore(String segmentName, IndexLoadingConfig indexLoadingConfig, String uri) {
     File segmentTarFile = new File(_indexDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    if (segmentTarFile.exists()) {
+      _logger.warn(
+          "Segment tar file: {} already exists (possibly due to server restart/crash resulting in skipped cleanup). "
+              + "Deleting it before fetching again from uri: {}",
+          segmentName, uri);
+      FileUtils.deleteQuietly(segmentTarFile);
+    }
     try {
       SegmentFetcherFactory.fetchSegmentToLocal(uri, segmentTarFile);
       _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, segmentTarFile,
