@@ -19,12 +19,12 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -34,65 +34,59 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
  *
- * This class is not thread safe.
- *
- * AggregateOperator is used to aggregate values over a set of group by keys.
- * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
- * Currently, we only support SUM/COUNT/MIN/MAX aggregation.
- *
- * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
- * In this case, the input can be any type.
- *
- * If the list of aggregation calls is not empty, the input of aggregation has to be a number.
- * Note: This class performs aggregation over the double value of input.
  */
 public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
+
   private Operator<TransferableBlock> _inputOperator;
-  // TODO: Deal with the case where _aggCalls is empty but we have groupSet setup, which means this is a Distinct call.
-  private List<RexExpression.FunctionCall> _aggCalls;
-  private List<RexExpression.InputRef> _groupSet;
+  private List<RexExpression> _aggCalls;
+  private List<RexExpression> _groupSet;
+
+  private final int[] _aggregationFunctionInputRefs;
+  private final Object[] _aggregationFunctionLiterals;
   private final DataSchema _resultSchema;
-
-  // Mapping from group by key to list of aggregation results.
-  private final Map<Key, Object[]> _groupByResultHolders = new HashMap<>();
-  private TransferableBlock _upstreamErrorBlock = null;
-  private boolean _isCumulativeBlockConstructed = false;
-
-  private static Object getAggOperand(@Nullable RexExpression op, Object[] row) {
-    if (op == null) {
-      return 1;
-    }
-    if (op instanceof RexExpression.InputRef) {
-      return row[((RexExpression.InputRef) op).getIndex()];
-    }
-    return ((RexExpression.Literal) op).getValue();
-  }
+  private final Map<Key, Object>[] _groupByResultHolders;
+  private final Map<Key, Object[]> _groupByKeyHolder;
+  private TransferableBlock _upstreamErrorBlock;
+  private boolean _isCumulativeBlockConstructed;
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
-  // aggCalls has to be a list of FunctionCall and cannot be null
-  // groupSet has to be a list of InputRef and cannot be null
   public AggregateOperator(Operator<TransferableBlock> inputOperator, DataSchema dataSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet) {
     _inputOperator = inputOperator;
-    // TODO: double check if this exception is propagated up.
-    // aggCalls and groupSet cannot be both empty.
-    Preconditions.checkState(aggCalls != null && groupSet != null && !(aggCalls.isEmpty() && groupSet.isEmpty()));
-    _aggCalls = new ArrayList<>(aggCalls.size());
-    for (RexExpression exp : aggCalls) {
-      Preconditions.checkState(exp instanceof RexExpression.FunctionCall);
-      _aggCalls.add((RexExpression.FunctionCall) exp);
-    }
-    _groupSet = new ArrayList<>(groupSet.size());
-    for (RexExpression exp : groupSet) {
-      Preconditions.checkState(exp instanceof RexExpression.InputRef);
-      _groupSet.add((RexExpression.InputRef) exp);
+    _aggCalls = aggCalls;
+    _groupSet = groupSet;
+    _upstreamErrorBlock = null;
+
+    _aggregationFunctionInputRefs = new int[_aggCalls.size()];
+    _aggregationFunctionLiterals = new Object[_aggCalls.size()];
+    _groupByResultHolders = new Map[_aggCalls.size()];
+    _groupByKeyHolder = new HashMap<Key, Object[]>();
+    for (int i = 0; i < aggCalls.size(); i++) {
+      // agg function operand should either be a InputRef or a Literal
+      RexExpression rexExpression = toAggregationFunctionOperand(aggCalls.get(i));
+      if (rexExpression instanceof RexExpression.InputRef) {
+        _aggregationFunctionInputRefs[i] = ((RexExpression.InputRef) rexExpression).getIndex();
+      } else {
+        _aggregationFunctionInputRefs[i] = -1;
+        _aggregationFunctionLiterals[i] = ((RexExpression.Literal) rexExpression).getValue();
+      }
+      _groupByResultHolders[i] = new HashMap<Key, Object>();
     }
     _resultSchema = dataSchema;
+
+    _isCumulativeBlockConstructed = false;
+  }
+
+  private RexExpression toAggregationFunctionOperand(RexExpression rexExpression) {
+    List<RexExpression> functionOperands = ((RexExpression.FunctionCall) rexExpression).getFunctionOperands();
+    Preconditions.checkState(functionOperands.size() < 2);
+    return functionOperands.size() > 0 ? functionOperands.get(0) : new RexExpression.Literal(FieldSpec.DataType.INT, 1);
   }
 
   @Override
@@ -108,96 +102,103 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   }
 
   @Override
-  protected TransferableBlock getNextBlock()
-      throws IllegalStateException {
-    if (_isCumulativeBlockConstructed) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
-    }
+  protected TransferableBlock getNextBlock() {
     try {
       consumeInputBlocks();
+      return produceAggregatedBlock();
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
+  }
+
+  private TransferableBlock produceAggregatedBlock()
+      throws IOException {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
     }
-    return produceAggregatedBlock();
-  }
-
-  private TransferableBlock produceAggregatedBlock() {
-    _isCumulativeBlockConstructed = true;
-    List<Object[]> rows = new ArrayList<>(_groupByResultHolders.size());
-    // Each row is written in the format of [group by keys, aggregate result1, ...aggregate resultN]
-    for (Map.Entry<Key, Object[]> e : _groupByResultHolders.entrySet()) {
-      Object[] keyElements = e.getKey().getValues();
-      Object[] groupByResult = e.getValue();
-      Object[] row = ArrayUtils.addAll(keyElements, groupByResult);
-      rows.add(row);
-    }
-    if (rows.isEmpty()) {
+    if (!_isCumulativeBlockConstructed) {
+      List<Object[]> rows = new ArrayList<>(_groupByKeyHolder.size());
+      for (Map.Entry<Key, Object[]> e : _groupByKeyHolder.entrySet()) {
+        Object[] row = new Object[_aggCalls.size() + _groupSet.size()];
+        Object[] keyElements = e.getValue();
+        for (int i = 0; i < keyElements.length; i++) {
+          row[i] = keyElements[i];
+        }
+        for (int i = 0; i < _groupByResultHolders.length; i++) {
+          row[i + _groupSet.size()] = _groupByResultHolders[i].get(e.getKey());
+        }
+        rows.add(row);
+      }
+      _isCumulativeBlockConstructed = true;
+      if (rows.size() == 0) {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
+      } else {
+        return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
+      }
+    } else {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
     }
-    return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
   }
 
-  private void consumeInputBlocks()
-      throws IllegalStateException {
-    TransferableBlock block = _inputOperator.nextBlock();
-    while (!TransferableBlockUtils.isEndOfStream(block)) {
-      BaseDataBlock dataBlock = block.getDataBlock();
-      int numRows = dataBlock.getNumberOfRows();
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
-        Key key = extraRowKey(row, _groupSet);
-        Object[] aggResults = _groupByResultHolders.computeIfAbsent(key, k -> new Object[_aggCalls.size()]);
-        for (int i = 0; i < _aggCalls.size(); i++) {
-          List<RexExpression> functionOperands = _aggCalls.get(i).getFunctionOperands();
-          Preconditions.checkState(functionOperands.size() < 2);
-          RexExpression op = functionOperands.isEmpty() ? null : functionOperands.get(0);
-          Object input = getAggOperand(op, row);
-          // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
-          if (aggResults[i] == null) {
-            aggResults[i] = input;
-          } else {
-            Preconditions.checkState(aggResults[i] instanceof Number && input instanceof Number);
-            aggResults[i] = merge(_aggCalls.get(i).getFunctionName(), (Number) aggResults[i], (Number) input);
+  private void consumeInputBlocks() {
+    if (!_isCumulativeBlockConstructed) {
+      TransferableBlock block = _inputOperator.nextBlock();
+      while (!TransferableBlockUtils.isEndOfStream(block)) {
+        BaseDataBlock dataBlock = block.getDataBlock();
+        int numRows = dataBlock.getNumberOfRows();
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
+          Key key = extraRowKey(row, _groupSet);
+          _groupByKeyHolder.put(key, key.getValues());
+          for (int i = 0; i < _aggCalls.size(); i++) {
+            Object currentRes = _groupByResultHolders[i].get(key);
+            if (currentRes == null) {
+              _groupByResultHolders[i].put(key, _aggregationFunctionInputRefs[i] == -1
+                  ? _aggregationFunctionLiterals[i] : row[_aggregationFunctionInputRefs[i]]);
+            } else {
+              _groupByResultHolders[i].put(key,
+                  merge(_aggCalls.get(i), currentRes, _aggregationFunctionInputRefs[i] == -1
+                      ? _aggregationFunctionLiterals[i] : row[_aggregationFunctionInputRefs[i]]));
+            }
           }
         }
+        block = _inputOperator.nextBlock();
       }
-      block = _inputOperator.nextBlock();
-    }
-    // setting upstream error block
-    if (block.isErrorBlock()) {
-      _upstreamErrorBlock = block;
+      // setting upstream error block
+      if (block.isErrorBlock()) {
+        _upstreamErrorBlock = block;
+      }
     }
   }
 
-  private Object merge(String functionName, Number left, Number right) {
-    switch (functionName) {
+  private Object merge(RexExpression aggCall, Object left, Object right) {
+    Preconditions.checkState(aggCall instanceof RexExpression.FunctionCall);
+    switch (((RexExpression.FunctionCall) aggCall).getFunctionName()) {
       case "SUM":
       case "$SUM":
       case "$SUM0":
-        return left.doubleValue() + right.doubleValue();
+        return ((Number) left).doubleValue() + ((Number) right).doubleValue();
       case "MIN":
       case "$MIN":
       case "$MIN0":
-        return Math.min(left.doubleValue(), right.doubleValue());
+        return Math.min(((Number) left).doubleValue(), ((Number) right).doubleValue());
       case "MAX":
       case "$MAX":
       case "$MAX0":
-        return Math.max(left.doubleValue(), right.doubleValue());
+        return Math.max(((Number) left).doubleValue(), ((Number) right).doubleValue());
       // COUNT(*) doesn't need to parse right object.
       case "COUNT":
-        return left.doubleValue() + 1;
+        return ((Number) left).doubleValue() + 1;
       default:
-        throw new IllegalStateException("Unexpected functionName in aggregateOperator: " + functionName);
+        throw new IllegalStateException(
+            "Unexpected value: " + ((RexExpression.FunctionCall) aggCall).getFunctionName());
     }
   }
 
-  private static Key extraRowKey(Object[] row, List<RexExpression.InputRef> groupSet) {
+  private static Key extraRowKey(Object[] row, List<RexExpression> groupSet) {
     Object[] keyElements = new Object[groupSet.size()];
     for (int i = 0; i < groupSet.size(); i++) {
-      keyElements[i] = row[groupSet.get(i).getIndex()];
+      keyElements[i] = row[((RexExpression.InputRef) groupSet.get(i)).getIndex()];
     }
     return new Key(keyElements);
   }
