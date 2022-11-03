@@ -32,7 +32,6 @@ import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexCo
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -44,12 +43,11 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 
 /**
@@ -93,19 +91,39 @@ public class IndexLoadingConfig {
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
   private TableConfig _tableConfig;
+  private Schema _schema;
+
   private String _tableDataDir;
   private String _segmentDirectoryLoader;
   private String _segmentTier;
 
   private String _instanceId;
 
-  public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
+  /**
+   * NOTE: This step might modify the passed in table config and schema.
+   */
+  public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig,
+      @Nullable Schema schema) {
     extractFromInstanceConfig(instanceDataManagerConfig);
-    extractFromTableConfig(tableConfig);
-    _tableConfig = tableConfig;
+    extractFromTableConfigAndSchema(tableConfig, schema);
   }
 
-  private void extractFromTableConfig(TableConfig tableConfig) {
+  @VisibleForTesting
+  public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
+    this(instanceDataManagerConfig, tableConfig, null);
+  }
+
+  @VisibleForTesting
+  public IndexLoadingConfig() {
+  }
+
+  private void extractFromTableConfigAndSchema(TableConfig tableConfig, @Nullable Schema schema) {
+    if (schema != null) {
+      TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
+    }
+    _tableConfig = tableConfig;
+    _schema = schema;
+
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     String tableReadMode = indexingConfig.getLoadMode();
     if (tableReadMode != null) {
@@ -173,33 +191,6 @@ public class IndexLoadingConfig {
     extractFSTIndexColumnsFromTableConfig(tableConfig);
     extractH3IndexConfigsFromTableConfig(tableConfig);
     extractForwardIndexDisabledColumnsFromTableConfig(tableConfig);
-
-    Map<String, List<TimestampIndexGranularity>> timestampIndexConfigs =
-        SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig);
-    if (!timestampIndexConfigs.isEmpty()) {
-      // Apply transform function and range index to the timestamp with granularity columns
-      IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-      if (ingestionConfig == null) {
-        ingestionConfig = new IngestionConfig();
-        tableConfig.setIngestionConfig(ingestionConfig);
-      }
-      List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
-      if (transformConfigs == null) {
-        transformConfigs = new ArrayList<>();
-        ingestionConfig.setTransformConfigs(transformConfigs);
-      }
-      for (Map.Entry<String, List<TimestampIndexGranularity>> entry : timestampIndexConfigs.entrySet()) {
-        String column = entry.getKey();
-        for (TimestampIndexGranularity granularity : entry.getValue()) {
-          String columnNameWithGranularity =
-              TimestampIndexGranularity.getColumnNameWithGranularity(column, granularity);
-          TransformConfig transformConfig = new TransformConfig(columnNameWithGranularity,
-              TimestampIndexGranularity.getTransformExpression(column, granularity));
-          transformConfigs.add(transformConfig);
-          _rangeIndexColumns.add(columnNameWithGranularity);
-        }
-      }
-    }
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
     if (noDictionaryConfig != null) {
@@ -347,20 +338,15 @@ public class IndexLoadingConfig {
       for (FieldConfig fieldConfig : fieldConfigList) {
         Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
         if (fieldConfigProperties != null) {
-          boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties
-              .getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
+          boolean forwardIndexDisabled = Boolean.parseBoolean(
+              fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
+                  FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
           if (forwardIndexDisabled) {
             _forwardIndexDisabledColumns.add(fieldConfig.getName());
           }
         }
       }
     }
-  }
-
-  /**
-   * For tests only.
-   */
-  public IndexLoadingConfig() {
   }
 
   public ReadMode getReadMode() {
@@ -627,6 +613,11 @@ public class IndexLoadingConfig {
 
   public TableConfig getTableConfig() {
     return _tableConfig;
+  }
+
+  @Nullable
+  public Schema getSchema() {
+    return _schema;
   }
 
   @VisibleForTesting
