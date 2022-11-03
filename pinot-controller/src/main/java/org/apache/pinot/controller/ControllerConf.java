@@ -217,6 +217,14 @@ public class ControllerConf extends PinotConfiguration {
     private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
     private static final int DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
     private static final int DEFAULT_SEGMENT_TIER_ASSIGNER_FREQUENCY_IN_SECONDS = -1; // Disabled
+
+    // Realtime Consumer Monitor
+    private static final String RT_CONSUMER_MONITOR_FREQUENCY_PERIOD =
+        "controller.realtimeConsumerMonitor.frequencyPeriod";
+    private static final String RT_CONSUMER_MONITOR_INITIAL_DELAY_IN_SECONDS =
+        "controller.realtimeConsumerMonitor.initialDelayInSeconds";
+
+    private static final int DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS = 60;
   }
 
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
@@ -586,6 +594,17 @@ public class ControllerConf extends PinotConfiguration {
   public void setStatusCheckerFrequencyInSeconds(int statusCheckerFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.DEPRECATED_STATUS_CHECKER_FREQUENCY_IN_SECONDS,
         Integer.toString(statusCheckerFrequencyInSeconds));
+  }
+
+  public int getRealtimeConsumerMonitorRunFrequency() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.RT_CONSUMER_MONITOR_FREQUENCY_PERIOD))
+        .map(period -> (int) convertPeriodToSeconds(period)).orElse(
+            ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS);
+  }
+
+  public long getRealtimeConsumerMonitorInitialDelayInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.RT_CONSUMER_MONITOR_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
   public int getTaskMetricsEmitterFrequencyInSeconds() {
