@@ -79,8 +79,9 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   public AggregateOperator(Operator<TransferableBlock> inputOperator, DataSchema dataSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet) {
     _inputOperator = inputOperator;
-    Preconditions.checkState(_aggCalls != null
-        && _aggCalls.isEmpty() && _groupSet !=null &&_groupSet.isEmpty());
+    // TODO: double check if this exception is propagated up.
+    // aggCalls and groupSet cannot be both empty.
+    Preconditions.checkState(aggCalls != null && groupSet != null && !(aggCalls.isEmpty() && groupSet.isEmpty()));
     _aggCalls = new ArrayList<>(aggCalls.size());
     for(RexExpression exp: aggCalls){
       Preconditions.checkState(exp instanceof RexExpression.FunctionCall);
@@ -132,7 +133,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       Object[] row = ArrayUtils.addAll(keyElements, groupByResult);
       rows.add(row);
     }
-    if (rows.size() == 0) {
+    if (rows.isEmpty()) {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
     }
     return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
@@ -152,6 +153,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
             Preconditions.checkState(functionOperands.size() < 2);
             RexExpression op = functionOperands.isEmpty()? null: functionOperands.get(0);
             Object input = getAggOperand(op, row);
+            // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
             if (aggResults[i] == null) {
               aggResults[i] = input;
             } else {

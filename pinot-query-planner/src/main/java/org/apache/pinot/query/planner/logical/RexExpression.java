@@ -150,9 +150,6 @@ public interface RexExpression {
     @ProtoProperties
     private int _index;
 
-    public InputRef() {
-    }
-
     public InputRef(int index) {
       _sqlKind = SqlKind.INPUT_REF;
       _index = index;
