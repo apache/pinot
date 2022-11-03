@@ -44,7 +44,7 @@ public class GroovyTemplateUtils {
     Map<String, Object> contextMap = getDefaultContextMap();
     contextMap.putAll(newContext);
     String templateRendered = GROOVY_TEMPLATE_ENGINE.createTemplate(template).make(contextMap).toString();
-    GROOVY_SHELL.getClassLoader().clearCache();
+    GROOVY_SHELL.resetLoadedClasses();
     return templateRendered;
   }
 
