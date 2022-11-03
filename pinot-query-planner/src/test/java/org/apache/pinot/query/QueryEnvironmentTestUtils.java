@@ -37,6 +37,7 @@ import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.testutils.MockRoutingManagerFactory;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -62,9 +63,6 @@ public class QueryEnvironmentTestUtils {
       ImmutableMap.of("a", Lists.newArrayList("a3"), "c", Lists.newArrayList("c2", "c3"),
           "d_R", Lists.newArrayList("d2"), "d_O", Lists.newArrayList("d3"));
 
-  public static final Map<String, String> TABLE_NAME_MAP;
-  public static final Map<String, Schema> SCHEMA_NAME_MAP;
-
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder()
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -72,83 +70,31 @@ public class QueryEnvironmentTestUtils {
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
         .addMetric("col3", FieldSpec.DataType.INT, 0)
         .setSchemaName("defaultSchemaName");
-    SCHEMA_NAME_MAP = ImmutableMap.of(
-        "a", SCHEMA_BUILDER.setSchemaName("a").build(),
-        "b", SCHEMA_BUILDER.setSchemaName("b").build(),
-        "c", SCHEMA_BUILDER.setSchemaName("c").build(),
-        "d", SCHEMA_BUILDER.setSchemaName("d").build());
-    TABLE_NAME_MAP = ImmutableMap.of("a_REALTIME", "a", "b_REALTIME", "b", "c_OFFLINE", "c",
-        "d_OFFLINE", "d", "d_REALTIME", "d");
   }
 
   private QueryEnvironmentTestUtils() {
     // do not instantiate.
   }
 
-  public static TableCache mockTableCache() {
-    TableCache mock = mock(TableCache.class);
-    when(mock.getTableNameMap()).thenReturn(TABLE_NAME_MAP);
-    when(mock.getSchema(anyString())).thenAnswer(invocationOnMock -> {
-      String schemaName = invocationOnMock.getArgument(0);
-      return SCHEMA_NAME_MAP.get(schemaName);
-    });
-    return mock;
-  }
-
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2) {
-    RoutingManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(port1, port2);
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2)
+        .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
+        .registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
+        .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
+        .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
+        .registerFakeSegments(port1, "a_REALTIME", 2)
+        .registerFakeSegments(port1, "b_REALTIME", 1)
+        .registerFakeSegments(port1, "c_OFFLINE", 1)
+        .registerFakeSegments(port1, "d_OFFLINE", 1)
+        .registerFakeSegments(port2, "a_REALTIME", 1)
+        .registerFakeSegments(port2, "c_OFFLINE", 2)
+        .registerFakeSegments(port2, "d_OFFLINE", 1)
+        .registerFakeSegments(port2, "d_REALTIME", 1);
+    RoutingManager routingManager = factory.buildRoutingManager();
+    TableCache tableCache = factory.buildTableCache();
     return new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(QueryEnvironmentTestUtils.mockTableCache())),
+        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager("localhost", reducerPort, routingManager));
-  }
-
-  public static RoutingManager getMockRoutingManager(int port1, int port2) {
-    String server1 = String.format("localhost_%d", port1);
-    String server2 = String.format("localhost_%d", port2);
-    // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
-    // this is only use for test identifier purpose.
-    ServerInstance host1 = new WorkerInstance("localhost", port1, port1, port1, port1);
-    ServerInstance host2 = new WorkerInstance("localhost", port2, port2, port2, port2);
-
-    RoutingTable rtA = mock(RoutingTable.class);
-    when(rtA.getServerInstanceToSegmentsMap()).thenReturn(
-        ImmutableMap.of(host1, SERVER1_SEGMENTS.get("a"), host2, SERVER2_SEGMENTS.get("a")));
-    RoutingTable rtB = mock(RoutingTable.class);
-    when(rtB.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("b")));
-    RoutingTable rtC = mock(RoutingTable.class);
-    when(rtC.getServerInstanceToSegmentsMap()).thenReturn(
-        ImmutableMap.of(host1, SERVER1_SEGMENTS.get("c"), host2, SERVER2_SEGMENTS.get("c")));
-
-    // hybrid table
-    RoutingTable rtDOffline = mock(RoutingTable.class);
-    RoutingTable rtDRealtime = mock(RoutingTable.class);
-    when(rtDOffline.getServerInstanceToSegmentsMap()).thenReturn(
-        ImmutableMap.of(host1, SERVER1_SEGMENTS.get("d_O"), host2, SERVER2_SEGMENTS.get("d_O")));
-    when(rtDRealtime.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host2, SERVER2_SEGMENTS.get("d_R")));
-    Map<String, RoutingTable> mockRoutingTableMap = ImmutableMap.of("a", rtA, "b", rtB, "c", rtC,
-        "d_OFFLINE", rtDOffline, "d_REALTIME", rtDRealtime);
-
-    RoutingManager mock = mock(RoutingManager.class);
-    when(mock.getRoutingTable(any())).thenAnswer(invocation -> {
-      BrokerRequest brokerRequest = invocation.getArgument(0);
-      String tableName = brokerRequest.getPinotQuery().getDataSource().getTableName();
-      return mockRoutingTableMap.getOrDefault(tableName,
-          mockRoutingTableMap.get(TableNameBuilder.extractRawTableName(tableName)));
-    });
-    when(mock.getEnabledServerInstanceMap()).thenReturn(ImmutableMap.of(server1, host1, server2, host2));
-    when(mock.getTimeBoundaryInfo(anyString())).thenAnswer(invocation -> {
-      String offlineTableName = invocation.getArgument(0);
-      return "d_OFFLINE".equals(offlineTableName) ? new TimeBoundaryInfo("ts",
-          String.valueOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))) : null;
-    });
-    return mock;
-  }
-
-  public static int getTestStageByServerCount(QueryPlan queryPlan, int serverCount) {
-    List<Integer> stageIds = queryPlan.getStageMetadataMap().entrySet().stream()
-        .filter(e -> !e.getKey().equals(0) && e.getValue().getServerInstances().size() == serverCount)
-        .map(Map.Entry::getKey).collect(Collectors.toList());
-    return stageIds.size() > 0 ? stageIds.get(0) : -1;
   }
 
   public static int getAvailablePort() {

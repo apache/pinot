@@ -1,0 +1,154 @@
+package org.apache.pinot.query.testutils;
+
+import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.routing.WorkerInstance;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+
+/**
+ * This is a builder pattern for generating a Mock Routing Manager.
+ */
+public class MockRoutingManagerFactory {
+  private static final String TIME_BOUNDARY_COLUMN = "ts";
+  private static final String HOST_NAME = "localhost";
+
+  private final HashMap<String, String> _tableNameMap;
+  private final Map<String, Schema> _schemaMap;
+
+  private final Map<String, ServerInstance> _serverInstances;
+  private final Map<String, RoutingTable> _mockRoutingTableMap;
+  private final List<String> _hybridTables;
+
+  private final Map<String, Map<ServerInstance, List<String>>> _tableServerSegmentMap;
+
+  public MockRoutingManagerFactory(int numServers) {
+    this(IntStream.range(0, numServers).toArray());
+  }
+
+  public MockRoutingManagerFactory(int... ports) {
+    _hybridTables = new ArrayList<>();
+    _serverInstances = new HashMap<>();
+    _schemaMap = new HashMap<>();
+    _tableNameMap = new HashMap<>();
+    _mockRoutingTableMap = new HashMap<>();
+
+    _tableServerSegmentMap = new HashMap<>();
+    for (int port : ports) {
+      _serverInstances.put(toHostname(port), new WorkerInstance(HOST_NAME, port, port, port, port));
+    }
+  }
+
+  public MockRoutingManagerFactory registerTable(Schema schema, String tableName) {
+    // register table cache mapping for REALTIME/OFFLINE suffix
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    if (rawTableName.equals(tableName)) {
+      // register table;
+      _tableNameMap.put(TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName), rawTableName);
+      _tableNameMap.put(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName), rawTableName);
+      // register schema map
+      _schemaMap.put(rawTableName, schema);
+      _schemaMap.put(TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName), schema);
+      _schemaMap.put(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName), schema);
+      // register hybrid table signature.
+      _hybridTables.add(rawTableName);
+    } else {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+      _tableNameMap.put(TableNameBuilder.forType(tableType).tableNameWithType(rawTableName), rawTableName);
+      // register schema map
+      _schemaMap.put(rawTableName, schema);
+      _schemaMap.put(TableNameBuilder.forType(tableType).tableNameWithType(rawTableName), schema);
+    }
+    return this;
+  }
+
+  public MockRoutingManagerFactory registerFakeSegments(int insertToServerPort, String tableNameWithType,
+      int numOfFakeSegments) {
+    Map<ServerInstance, List<String>> serverSegmentMap =
+        _tableServerSegmentMap.getOrDefault(tableNameWithType, new HashMap<>());
+    ServerInstance serverInstance = _serverInstances.get(toHostname(insertToServerPort));
+
+    List<String> sSegments = serverSegmentMap.getOrDefault(serverInstance, new ArrayList<>());
+    for (int i = 0; i < numOfFakeSegments; i++) {
+      String segment = String.format("%s_%d_%d", tableNameWithType, i, System.currentTimeMillis());
+      sSegments.add(segment);
+    }
+    serverSegmentMap.put(serverInstance, sSegments);
+    _tableServerSegmentMap.put(tableNameWithType, serverSegmentMap);
+    return this;
+  }
+
+  public MockRoutingManagerFactory registerRealSegments(int insertToServerPort, String tableNameWithType,
+      String segmentName) {
+    Map<ServerInstance, List<String>> serverSegmentMap =
+        _tableServerSegmentMap.getOrDefault(tableNameWithType, new HashMap<>());
+    ServerInstance serverInstance = _serverInstances.get(toHostname(insertToServerPort));
+
+    List<String> sSegments = serverSegmentMap.getOrDefault(serverInstance, new ArrayList<>());
+    sSegments.add(segmentName);
+    serverSegmentMap.put(serverInstance, sSegments);
+    _tableServerSegmentMap.put(tableNameWithType, serverSegmentMap);
+    return this;
+  }
+
+  public RoutingManager buildRoutingManager() {
+    // create all the mock routing tables
+    _mockRoutingTableMap.clear();
+    for (Map.Entry<String, Map<ServerInstance, List<String>>> tableEntry : _tableServerSegmentMap.entrySet()) {
+      String tableNameWithType = tableEntry.getKey();
+      RoutingTable mockRoutingTable = mock(RoutingTable.class);
+      when(mockRoutingTable.getServerInstanceToSegmentsMap()).thenReturn(tableEntry.getValue());
+      _mockRoutingTableMap.put(tableNameWithType, mockRoutingTable);
+    }
+
+    // create the routing manager and the table cache
+    RoutingManager mock = mock(RoutingManager.class);
+    when(mock.getRoutingTable(any())).thenAnswer(invocation -> {
+      BrokerRequest brokerRequest = invocation.getArgument(0);
+      String tableName = brokerRequest.getPinotQuery().getDataSource().getTableName();
+      return _mockRoutingTableMap.getOrDefault(tableName,
+          _mockRoutingTableMap.get(TableNameBuilder.extractRawTableName(tableName)));
+    });
+    when(mock.getEnabledServerInstanceMap()).thenReturn(_serverInstances);
+    // TODO: make time boundary column also configurable, for now we can assume TS column always exist.
+    when(mock.getTimeBoundaryInfo(anyString())).thenAnswer(invocation -> {
+      String tableName = TableNameBuilder.extractRawTableName(invocation.getArgument(0));
+      return _hybridTables.contains(tableName) ? new TimeBoundaryInfo(TIME_BOUNDARY_COLUMN,
+          String.valueOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))) : null;
+    });
+    return mock;
+  }
+
+  public TableCache buildTableCache() {
+    TableCache mock = mock(TableCache.class);
+    when(mock.getTableNameMap()).thenReturn(_tableNameMap);
+    when(mock.getSchema(anyString())).thenAnswer(invocationOnMock -> {
+      String schemaName = invocationOnMock.getArgument(0);
+      return _schemaMap.get(schemaName);
+    });
+    return mock;
+  }
+
+  private static String toHostname(int port) {
+    return String.format("%s_%d", HOST_NAME, port);
+  }
+}

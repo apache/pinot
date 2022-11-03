@@ -19,6 +19,7 @@
 package org.apache.pinot.query;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -127,13 +128,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            ImmutableList.of("Server_localhost_1", "Server_localhost_2"));
+            e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toSet()),
+            ImmutableSet.of("Server_localhost_1", "Server_localhost_2"));
       } else {
         // reduce stage should have the reducer instance.
         Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            ImmutableList.of("Server_localhost_3"));
+            e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toSet()),
+            ImmutableSet.of("Server_localhost_3"));
       }
     }
   }

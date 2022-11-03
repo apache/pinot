@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.query;
 
-import org.apache.calcite.jdbc.CalciteSchemaBuilder;
-import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.query.catalog.PinotCatalog;
-import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.type.TypeFactory;
-import org.apache.pinot.query.type.TypeSystem;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
@@ -34,10 +28,7 @@ public class QueryEnvironmentTestBase {
   @BeforeClass
   public void setUp() {
     // the port doesn't matter as we are not actually making a server call.
-    RoutingManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(1, 2);
-    _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(QueryEnvironmentTestUtils.mockTableCache())),
-        new WorkerManager("localhost", 3, routingManager));
+    _queryEnvironment = QueryEnvironmentTestUtils.getQueryEnvironment(3, 1, 2);
   }
 
   @DataProvider(name = "testQueryDataProvider")
