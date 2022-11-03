@@ -39,11 +39,23 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 /**
  *
+ * This class is not thread safe.
+ *
+ * AggregateOperator is used to aggregate values over a set of group by keys.
+ * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
+ * Currently, we only support SUM/COUNT/MIN/MAX aggregation.
+ *
+ * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
+ * In this case, the input can be any type.
+ *
+ * If the list of aggregation calls is not empty, the input of aggregation has to be a number.
+ * Note: This class performs aggregation over the double value of input.
  */
 public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
 
   private Operator<TransferableBlock> _inputOperator;
+  // TODO: Deal with the case where _aggCalls is empty but we have groupSet setup, which means this is a Distinct call.
   private List<RexExpression> _aggCalls;
   private List<RexExpression> _groupSet;
 
@@ -56,6 +68,9 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private boolean _isCumulativeBlockConstructed;
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
+  // aggCalls has to be a list of FunctionCall and cannot be null
+  // groupSet has to be a list of InputRef and cannot be null
+  // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
   public AggregateOperator(Operator<TransferableBlock> inputOperator, DataSchema dataSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet) {
     _inputOperator = inputOperator;
@@ -152,6 +167,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
           _groupByKeyHolder.put(key, key.getValues());
           for (int i = 0; i < _aggCalls.size(); i++) {
             Object currentRes = _groupByResultHolders[i].get(key);
+            // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
             if (currentRes == null) {
               _groupByResultHolders[i].put(key, _aggregationFunctionInputRefs[i] == -1
                   ? _aggregationFunctionLiterals[i] : row[_aggregationFunctionInputRefs[i]]);
