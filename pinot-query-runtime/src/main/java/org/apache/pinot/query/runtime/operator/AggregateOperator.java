@@ -49,7 +49,9 @@ import org.apache.pinot.spi.data.FieldSpec;
  * In this case, the input can be any type.
  *
  * If the list of aggregation calls is not empty, the input of aggregation has to be a number.
+ *
  * Note: This class performs aggregation over the double value of input.
+ * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  */
 public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
