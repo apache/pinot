@@ -63,11 +63,11 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private TransferableBlock _upstreamErrorBlock = null;
   private boolean _isCumulativeBlockConstructed = false;
 
-  private static Object getAggOperand(@Nullable RexExpression op, Object[] row){
-    if(op == null){
+  private static Object getAggOperand(@Nullable RexExpression op, Object[] row) {
+    if (op == null) {
       return 1;
     }
-    if(op instanceof RexExpression.InputRef) {
+    if (op instanceof RexExpression.InputRef) {
       return row[((RexExpression.InputRef) op).getIndex()];
     }
     return ((RexExpression.Literal) op).getValue();
@@ -83,12 +83,12 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     // aggCalls and groupSet cannot be both empty.
     Preconditions.checkState(aggCalls != null && groupSet != null && !(aggCalls.isEmpty() && groupSet.isEmpty()));
     _aggCalls = new ArrayList<>(aggCalls.size());
-    for(RexExpression exp: aggCalls){
+    for (RexExpression exp : aggCalls) {
       Preconditions.checkState(exp instanceof RexExpression.FunctionCall);
       _aggCalls.add((RexExpression.FunctionCall) exp);
     }
     _groupSet = new ArrayList<>(groupSet.size());
-    for(RexExpression exp: groupSet){
+    for (RexExpression exp : groupSet) {
       Preconditions.checkState(exp instanceof RexExpression.InputRef);
       _groupSet.add((RexExpression.InputRef) exp);
     }
@@ -108,13 +108,14 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() throws IllegalStateException {
-    if(_isCumulativeBlockConstructed){
+  protected TransferableBlock getNextBlock()
+      throws IllegalStateException {
+    if (_isCumulativeBlockConstructed) {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
     }
     try {
       consumeInputBlocks();
-    } catch (Exception e){
+    } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
     if (_upstreamErrorBlock != null) {
@@ -139,35 +140,36 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
   }
 
-  private void consumeInputBlocks() throws IllegalStateException {
+  private void consumeInputBlocks()
+      throws IllegalStateException {
     TransferableBlock block = _inputOperator.nextBlock();
     while (!TransferableBlockUtils.isEndOfStream(block)) {
       BaseDataBlock dataBlock = block.getDataBlock();
       int numRows = dataBlock.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
-          Key key = extraRowKey(row, _groupSet);
-          Object[] aggResults = _groupByResultHolders.computeIfAbsent(key, k-> new Object[_aggCalls.size()]);
-          for (int i = 0; i < _aggCalls.size(); i++) {
-            List<RexExpression> functionOperands = _aggCalls.get(i).getFunctionOperands();
-            Preconditions.checkState(functionOperands.size() < 2);
-            RexExpression op = functionOperands.isEmpty()? null: functionOperands.get(0);
-            Object input = getAggOperand(op, row);
-            // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
-            if (aggResults[i] == null) {
-              aggResults[i] = input;
-            } else {
-              Preconditions.checkState(aggResults[i] instanceof Number && input instanceof Number);
-              aggResults[i] = merge(_aggCalls.get(i).getFunctionName(), (Number) aggResults[i], (Number) input);
-            }
+        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
+        Key key = extraRowKey(row, _groupSet);
+        Object[] aggResults = _groupByResultHolders.computeIfAbsent(key, k -> new Object[_aggCalls.size()]);
+        for (int i = 0; i < _aggCalls.size(); i++) {
+          List<RexExpression> functionOperands = _aggCalls.get(i).getFunctionOperands();
+          Preconditions.checkState(functionOperands.size() < 2);
+          RexExpression op = functionOperands.isEmpty() ? null : functionOperands.get(0);
+          Object input = getAggOperand(op, row);
+          // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
+          if (aggResults[i] == null) {
+            aggResults[i] = input;
+          } else {
+            Preconditions.checkState(aggResults[i] instanceof Number && input instanceof Number);
+            aggResults[i] = merge(_aggCalls.get(i).getFunctionName(), (Number) aggResults[i], (Number) input);
           }
         }
-        block = _inputOperator.nextBlock();
       }
-      // setting upstream error block
-      if (block.isErrorBlock()) {
-        _upstreamErrorBlock = block;
-      }
+      block = _inputOperator.nextBlock();
+    }
+    // setting upstream error block
+    if (block.isErrorBlock()) {
+      _upstreamErrorBlock = block;
+    }
   }
 
   private Object merge(String functionName, Number left, Number right) {
