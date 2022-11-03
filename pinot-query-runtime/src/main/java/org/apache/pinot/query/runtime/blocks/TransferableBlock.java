@@ -161,14 +161,6 @@ public class TransferableBlock implements Block {
     return _isErrorBlock;
   }
 
-  boolean isContainerBlock() {
-    return _container != null;
-  }
-
-  boolean isDataBlock() {
-    return _dataBlock != null;
-  }
-
   @Override
   public BlockValSet getBlockValueSet() {
     throw new UnsupportedOperationException();
