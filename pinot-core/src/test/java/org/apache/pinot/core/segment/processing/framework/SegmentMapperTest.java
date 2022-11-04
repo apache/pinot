@@ -39,9 +39,12 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.config.table.TimestampConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -63,13 +66,16 @@ public class SegmentMapperTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentMapperTest");
 
   private final TableConfig _tableConfig =
-      new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("timeValue")
-          .setNullHandlingEnabled(true).build();
-  private final Schema _schema = new Schema.SchemaBuilder().setSchemaName("myTable")
-      .addSingleValueDimension("campaign", FieldSpec.DataType.STRING, "xyz").addMetric("clicks", FieldSpec.DataType.INT)
-      .addDateTime("timeValue", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
-  private final List<Object[]> _rawData = Arrays
-      .asList(new Object[]{"abc", 1000, 1597719600000L}, new Object[]{"pqr", 2000, 1597773600000L},
+      new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("ts")
+          .setNullHandlingEnabled(true).setFieldConfigList(Collections.singletonList(
+              new FieldConfig("ts", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TIMESTAMP, null, null,
+                  new TimestampConfig(Collections.singletonList(TimestampIndexGranularity.DAY)), null))).build();
+  private final Schema _schema =
+      new Schema.SchemaBuilder().setSchemaName("myTable").addSingleValueDimension("campaign", DataType.STRING, "xyz")
+          .addMetric("clicks", DataType.INT).addDateTime("ts", DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS")
+          .build();
+  private final List<Object[]> _rawData =
+      Arrays.asList(new Object[]{"abc", 1000, 1597719600000L}, new Object[]{"pqr", 2000, 1597773600000L},
           new Object[]{"abc", 1000, 1597777200000L}, new Object[]{"abc", 4000, 1597795200000L},
           new Object[]{"abc", 3000, 1597802400000L}, new Object[]{"pqr", 1000, 1597838400000L},
           new Object[]{null, 4000, 1597856400000L}, new Object[]{"pqr", 1000, 1597878000000L},
@@ -97,7 +103,7 @@ public class SegmentMapperTest {
         row.putDefaultNullValue("campaign", "xyz");
       }
       row.putValue("clicks", rawRow[1]);
-      row.putValue("timeValue", rawRow[2]);
+      row.putValue("ts", rawRow[2]);
       inputRows.add(row);
     }
 
@@ -154,7 +160,9 @@ public class SegmentMapperTest {
         Object[] expectedValues = expectedRecords.get(i);
         assertEquals(buffer.getValue("campaign"), expectedValues[0]);
         assertEquals(buffer.getValue("clicks"), expectedValues[1]);
-        assertEquals(buffer.getValue("timeValue"), expectedValues[2]);
+        assertEquals(buffer.getValue("ts"), expectedValues[2]);
+        // TIMESTAMP index
+        assertEquals(buffer.getValue("$ts$DAY"), (long) expectedValues[2] / 86400000 * 86400000);
         // Default null value
         if (expectedValues[0].equals("xyz")) {
           assertEquals(buffer.getNullValueFields(), Collections.singleton("campaign"));
@@ -214,7 +222,7 @@ public class SegmentMapperTest {
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setPartitionerConfigs(
             Collections.singletonList(new PartitionerConfig.Builder()
                 .setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
-                .setTransformFunction("toEpochDays(timeValue)").build())).build();
+                .setTransformFunction("toEpochDays(ts)").build())).build();
     Map<String, List<Object[]>> expectedRecords3 =
         outputData.stream().collect(Collectors.groupingBy(r -> "0_" + ((long) r[2] / 86400000), Collectors.toList()));
     inputs.add(new Object[]{config3, expectedRecords3});
