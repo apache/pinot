@@ -25,13 +25,12 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.hamcrest.Matchers;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.Mockito.when;
 
 
@@ -58,7 +57,9 @@ public class AggregateOperatorTest {
             Arrays.asList(new RexExpression.InputRef(1)));
     TransferableBlock result = sum0GroupBy1.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{"BB", 5.0}, new Object[]{"Aa", 1});
-    assertThat(expectedRows, Matchers.containsInAnyOrder(resultRows.toArray()));
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{"Aa", 1}, new Object[]{"BB", 5.0});
+    Assert.assertTrue(resultRows.size() == expectedRows.size());
+    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
+    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
   }
 }
