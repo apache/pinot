@@ -46,6 +46,7 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
  *
  * <p>For each of the data block received from the left table, it will generate a joint data block.
  *
+ * We currently support left join, inner join and semi join.
  * The output is in the format of [left_row, right_row]
  */
 public class HashJoinOperator extends BaseOperator<TransferableBlock> {
