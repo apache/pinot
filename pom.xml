@@ -185,7 +185,7 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+        <argLine>-Xms4g -Xmx4g -XX:ActiveProcessorCount=2 -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
     <!-- jfim: this profile is overridden in pinot-integration-tests -->
