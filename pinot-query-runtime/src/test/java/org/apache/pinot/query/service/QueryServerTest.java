@@ -32,7 +32,6 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
-import org.apache.pinot.query.QueryEnvironmentTestUtils;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -40,6 +39,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -64,7 +64,7 @@ public class QueryServerTest extends QueryTestSet {
       throws Exception {
 
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
-      int availablePort = QueryEnvironmentTestUtils.getAvailablePort();
+      int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
       QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer.start();
@@ -79,7 +79,7 @@ public class QueryServerTest extends QueryTestSet {
     List<Integer> portList = Lists.newArrayList(_queryServerMap.keySet());
 
     // reducer port doesn't matter, we are testing the worker instance not GRPC.
-    _queryEnvironment = QueryEnvironmentTestUtils.getQueryEnvironment(1, portList.get(0), portList.get(1),
+    _queryEnvironment = QueryTestUtils.getQueryEnvironment(1, portList.get(0), portList.get(1),
         QueryEnvironmentTestBase.SERVER1_SEGMENTS, QueryEnvironmentTestBase.SERVER2_SEGMENTS);
   }
 
