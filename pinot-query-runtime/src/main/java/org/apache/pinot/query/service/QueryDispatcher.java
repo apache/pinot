@@ -27,13 +27,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -71,7 +71,7 @@ public class QueryDispatcher {
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
         requestId, reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
         mailboxService.getMailboxPort());
-    List<DataTable> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutNano);
+    List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutNano);
     return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
         queryPlan.getQueryStageMap().get(0).getDataSchema());
   }
@@ -119,12 +119,12 @@ public class QueryDispatcher {
         queryPlan.getStageMetadataMap());
   }
 
-  public static List<DataTable> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator) {
+  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator) {
     return reduceMailboxReceive(mailboxReceiveOperator, QueryConfig.DEFAULT_TIMEOUT_NANO);
   }
 
-  public static List<DataTable> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutNano) {
-    List<DataTable> resultDataBlocks = new ArrayList<>();
+  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutNano) {
+    List<DataBlock> resultDataBlocks = new ArrayList<>();
     TransferableBlock transferableBlock;
     long timeoutWatermark = System.nanoTime() + timeoutNano;
     while (System.nanoTime() < timeoutWatermark) {
@@ -147,23 +147,24 @@ public class QueryDispatcher {
     throw new RuntimeException("Timed out while receiving from mailbox: " + QueryException.EXECUTION_TIMEOUT_ERROR);
   }
 
-  public static ResultTable toResultTable(List<DataTable> queryResult, List<Pair<Integer, String>> fields,
+  public static ResultTable toResultTable(List<DataBlock> queryResult, List<Pair<Integer, String>> fields,
       DataSchema sourceSchema) {
     List<Object[]> resultRows = new ArrayList<>();
     DataSchema resultSchema = toResultSchema(sourceSchema, fields);
-    for (DataTable dataTable : queryResult) {
+    for (DataBlock dataBlock : queryResult) {
       int numColumns = resultSchema.getColumnNames().length;
-      int numRows = dataTable.getNumberOfRows();
+      int numRows = dataBlock.getNumberOfRows();
       DataSchema.ColumnDataType[] resultColumnDataTypes = resultSchema.getColumnDataTypes();
-      List<Object[]> rows = new ArrayList<>(dataTable.getNumberOfRows());
+      List<Object[]> rows = new ArrayList<>(dataBlock.getNumberOfRows());
       if (numRows > 0) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
         for (int colId = 0; colId < numColumns; colId++) {
-          nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+          nullBitmaps[colId] = dataBlock.getNullRowIds(colId);
         }
-        for (int rowId = 0; rowId < numRows; rowId++) {
+        List<Object[]> rawRows = DataBlockUtils.extractRows(dataBlock);
+        int rowId = 0;
+        for (Object[] rawRow : rawRows) {
           Object[] row = new Object[numColumns];
-          Object[] rawRow = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
           // Only the masked fields should be selected out.
           int colId = 0;
           for (Pair<Integer, String> field : fields) {
@@ -171,10 +172,11 @@ public class QueryDispatcher {
               row[colId++] = null;
             } else {
               int colRef = field.left;
-              row[colId++] = resultColumnDataTypes[colRef].convertAndFormat(rawRow[colRef]);
+              row[colId++] = rawRow[colRef];
             }
           }
           rows.add(row);
+          rowId++;
         }
       }
       resultRows.addAll(rows);

@@ -21,7 +21,6 @@ package org.apache.pinot.common.datablock;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import org.apache.pinot.common.datatable.DataTable;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -116,12 +115,12 @@ public class MetadataBlockTest {
     }
 
     @Override
-    public DataTable toMetadataOnlyDataTable() {
+    public DataBlock toMetadataOnlyDataTable() {
       return null;
     }
 
     @Override
-    public DataTable toDataOnlyDataTable() {
+    public DataBlock toDataOnlyDataTable() {
       return null;
     }
   }

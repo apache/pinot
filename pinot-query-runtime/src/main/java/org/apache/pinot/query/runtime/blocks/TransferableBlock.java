@@ -19,8 +19,8 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import java.util.List;
-import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
@@ -34,30 +34,30 @@ import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 
 
 /**
- * A {@code TransferableBlock} is a wrapper around {@link BaseDataBlock} for transferring data using
+ * A {@code TransferableBlock} is a wrapper around {@link DataBlock} for transferring data using
  * {@link org.apache.pinot.common.proto.Mailbox}.
  */
 public class TransferableBlock implements Block {
 
-  private final BaseDataBlock.Type _type;
+  private final DataBlock.Type _type;
   private final DataSchema _dataSchema;
   private final int _numRows;
 
-  private BaseDataBlock _dataBlock;
+  private DataBlock _dataBlock;
   private List<Object[]> _container;
 
-  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, BaseDataBlock.Type containerType) {
+  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType) {
     _container = container;
     _dataSchema = dataSchema;
     _type = containerType;
     _numRows = _container.size();
   }
 
-  public TransferableBlock(BaseDataBlock dataBlock) {
+  public TransferableBlock(DataBlock dataBlock) {
     _dataBlock = dataBlock;
     _dataSchema = dataBlock.getDataSchema();
-    _type = dataBlock instanceof ColumnarDataBlock ? BaseDataBlock.Type.COLUMNAR
-        : dataBlock instanceof RowDataBlock ? BaseDataBlock.Type.ROW : BaseDataBlock.Type.METADATA;
+    _type = dataBlock instanceof ColumnarDataBlock ? DataBlock.Type.COLUMNAR
+        : dataBlock instanceof RowDataBlock ? DataBlock.Type.ROW : DataBlock.Type.METADATA;
     _numRows = _dataBlock.getNumberOfRows();
   }
 
@@ -98,7 +98,7 @@ public class TransferableBlock implements Block {
    *
    * @return data block.
    */
-  public BaseDataBlock getDataBlock() {
+  public DataBlock getDataBlock() {
     if (_dataBlock == null) {
       try {
         switch (_type) {
@@ -125,7 +125,7 @@ public class TransferableBlock implements Block {
    *
    * @return return type of block
    */
-  public BaseDataBlock.Type getType() {
+  public DataBlock.Type getType() {
     return _type;
   }
 
@@ -160,7 +160,7 @@ public class TransferableBlock implements Block {
   }
 
   private boolean isType(MetadataBlock.MetadataBlockType type) {
-    if (_type != BaseDataBlock.Type.METADATA) {
+    if (_type != DataBlock.Type.METADATA) {
       return false;
     }
 
