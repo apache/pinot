@@ -79,7 +79,7 @@ public class QueryServerTest extends QueryTestSet {
     List<Integer> portList = Lists.newArrayList(_queryServerMap.keySet());
 
     // reducer port doesn't matter, we are testing the worker instance not GRPC.
-    _queryEnvironment = QueryTestUtils.getQueryEnvironment(1, portList.get(0), portList.get(1),
+    _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(1, portList.get(0), portList.get(1),
         QueryEnvironmentTestBase.SERVER1_SEGMENTS, QueryEnvironmentTestBase.SERVER2_SEGMENTS);
   }
 
