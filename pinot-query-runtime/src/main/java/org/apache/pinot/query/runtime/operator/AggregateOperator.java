@@ -39,8 +39,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 /**
  *
- * This class is not thread safe.
- *
  * AggregateOperator is used to aggregate values over a set of group by keys.
  * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
  * Currently, we only support SUM/COUNT/MIN/MAX aggregation.
