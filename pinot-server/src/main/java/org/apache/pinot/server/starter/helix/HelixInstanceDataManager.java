@@ -367,8 +367,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       return;
     }
 
-    File indexDir = segmentMetadata.getIndexDir();
-    if (indexDir == null) {
+    if (segmentMetadata.isMutableSegment()) {
       // Use force commit to reload consuming segment
       SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
       if (segmentDataManager == null) {

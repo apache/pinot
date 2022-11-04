@@ -200,6 +200,11 @@ public class MutableSegmentImpl implements MutableSegment {
       public long getLatestIngestionTimestamp() {
         return _latestIngestionTimeMs;
       }
+
+      @Override
+      public boolean isMutableSegment() {
+        return true;
+      }
     };
 
     _offHeap = config.isOffHeap();
