@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -42,6 +43,7 @@ import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -56,13 +58,9 @@ import static org.mockito.Mockito.when;
  */
 public class QueryEnvironmentTestUtils {
   public static final Schema.SchemaBuilder SCHEMA_BUILDER;
-  public static final Map<String, List<String>> SERVER1_SEGMENTS =
-      ImmutableMap.of("a", Lists.newArrayList("a1", "a2"), "b", Lists.newArrayList("b1"), "c",
-          Lists.newArrayList("c1"), "d_O", Lists.newArrayList("d1"));
-  public static final Map<String, List<String>> SERVER2_SEGMENTS =
-      ImmutableMap.of("a", Lists.newArrayList("a3"), "c", Lists.newArrayList("c2", "c3"),
-          "d_R", Lists.newArrayList("d2"), "d_O", Lists.newArrayList("d3"));
-
+  private static final int NUM_ROWS = 5;
+  private static final String[] STRING_FIELD_LIST = new String[]{"foo", "bar", "alice", "bob", "charlie"};
+  private static final int[] INT_FIELD_LIST = new int[]{1, 42};
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder()
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -76,20 +74,37 @@ public class QueryEnvironmentTestUtils {
     // do not instantiate.
   }
 
-  public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2) {
+  public static List<GenericRow> buildRows(String tableName) {
+    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue("col1", STRING_FIELD_LIST[i % STRING_FIELD_LIST.length]);
+      row.putValue("col2", STRING_FIELD_LIST[i % (STRING_FIELD_LIST.length - 2)]);
+      row.putValue("col3", INT_FIELD_LIST[i % INT_FIELD_LIST.length]);
+      row.putValue("ts", tableName.endsWith("_O")
+          ? System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2) : System.currentTimeMillis());
+      rows.add(row);
+    }
+    return rows;
+  }
+
+  public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
+      Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2)
         .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
         .registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
         .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
-        .registerFakeSegments(port1, "a_REALTIME", 2)
-        .registerFakeSegments(port1, "b_REALTIME", 1)
-        .registerFakeSegments(port1, "c_OFFLINE", 1)
-        .registerFakeSegments(port1, "d_OFFLINE", 1)
-        .registerFakeSegments(port2, "a_REALTIME", 1)
-        .registerFakeSegments(port2, "c_OFFLINE", 2)
-        .registerFakeSegments(port2, "d_OFFLINE", 1)
-        .registerFakeSegments(port2, "d_REALTIME", 1);
+        .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
+    for (Map.Entry<String, List<String>> entry : segmentMap1.entrySet()) {
+      for (String segment : entry.getValue()) {
+        factory.registerSegment(port1, entry.getKey(), segment);
+      }
+    }
+    for (Map.Entry<String, List<String>> entry : segmentMap2.entrySet()) {
+      for (String segment : entry.getValue()) {
+        factory.registerSegment(port2, entry.getKey(), segment);
+      }
+    }
     RoutingManager routingManager = factory.buildRoutingManager();
     TableCache tableCache = factory.buildTableCache();
     return new QueryEnvironment(new TypeFactory(new TypeSystem()),

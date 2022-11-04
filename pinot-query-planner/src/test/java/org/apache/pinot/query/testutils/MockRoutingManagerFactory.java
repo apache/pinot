@@ -41,10 +41,6 @@ public class MockRoutingManagerFactory {
 
   private final Map<String, Map<ServerInstance, List<String>>> _tableServerSegmentMap;
 
-  public MockRoutingManagerFactory(int numServers) {
-    this(IntStream.range(0, numServers).toArray());
-  }
-
   public MockRoutingManagerFactory(int... ports) {
     _hybridTables = new ArrayList<>();
     _serverInstances = new HashMap<>();
@@ -59,45 +55,18 @@ public class MockRoutingManagerFactory {
   }
 
   public MockRoutingManagerFactory registerTable(Schema schema, String tableName) {
-    // register table cache mapping for REALTIME/OFFLINE suffix
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    if (rawTableName.equals(tableName)) {
-      // register table;
-      _tableNameMap.put(TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName), rawTableName);
-      _tableNameMap.put(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName), rawTableName);
-      // register schema map
-      _schemaMap.put(rawTableName, schema);
-      _schemaMap.put(TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName), schema);
-      _schemaMap.put(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName), schema);
-      // register hybrid table signature.
-      _hybridTables.add(rawTableName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == null) {
+      registerTableNameWithType(schema, TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName));
+      registerTableNameWithType(schema, TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName));
+      _hybridTables.add(tableName);
     } else {
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-      _tableNameMap.put(TableNameBuilder.forType(tableType).tableNameWithType(rawTableName), rawTableName);
-      // register schema map
-      _schemaMap.put(rawTableName, schema);
-      _schemaMap.put(TableNameBuilder.forType(tableType).tableNameWithType(rawTableName), schema);
+      registerTableNameWithType(schema, TableNameBuilder.forType(tableType).tableNameWithType(tableName));
     }
     return this;
   }
 
-  public MockRoutingManagerFactory registerFakeSegments(int insertToServerPort, String tableNameWithType,
-      int numOfFakeSegments) {
-    Map<ServerInstance, List<String>> serverSegmentMap =
-        _tableServerSegmentMap.getOrDefault(tableNameWithType, new HashMap<>());
-    ServerInstance serverInstance = _serverInstances.get(toHostname(insertToServerPort));
-
-    List<String> sSegments = serverSegmentMap.getOrDefault(serverInstance, new ArrayList<>());
-    for (int i = 0; i < numOfFakeSegments; i++) {
-      String segment = String.format("%s_%d_%d", tableNameWithType, i, System.currentTimeMillis());
-      sSegments.add(segment);
-    }
-    serverSegmentMap.put(serverInstance, sSegments);
-    _tableServerSegmentMap.put(tableNameWithType, serverSegmentMap);
-    return this;
-  }
-
-  public MockRoutingManagerFactory registerRealSegments(int insertToServerPort, String tableNameWithType,
+  public MockRoutingManagerFactory registerSegment(int insertToServerPort, String tableNameWithType,
       String segmentName) {
     Map<ServerInstance, List<String>> serverSegmentMap =
         _tableServerSegmentMap.getOrDefault(tableNameWithType, new HashMap<>());
@@ -150,5 +119,12 @@ public class MockRoutingManagerFactory {
 
   private static String toHostname(int port) {
     return String.format("%s_%d", HOST_NAME, port);
+  }
+
+  private void registerTableNameWithType(Schema schema, String tableNameWithType) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    _tableNameMap.put(tableNameWithType, rawTableName);
+    _schemaMap.put(rawTableName, schema);
+    _schemaMap.put(tableNameWithType, schema);
   }
 }

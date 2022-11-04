@@ -18,17 +18,27 @@
  */
 package org.apache.pinot.query;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import java.util.List;
+import java.util.Map;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
 
 public class QueryEnvironmentTestBase {
+  public static final Map<String, List<String>> SERVER1_SEGMENTS =
+      ImmutableMap.of("a_REALTIME", ImmutableList.of("a1", "a2"), "b_REALTIME", ImmutableList.of("b1"), "c_OFFLINE",
+          ImmutableList.of("c1"), "d_OFFLINE", ImmutableList.of("d1"));
+  public static final Map<String, List<String>> SERVER2_SEGMENTS =
+      ImmutableMap.of("a_REALTIME", ImmutableList.of("a3"), "c_OFFLINE", ImmutableList.of("c2", "c3"),
+          "d_REALTIME", ImmutableList.of("d2"), "d_OFFLINE", ImmutableList.of("d3"));
   protected QueryEnvironment _queryEnvironment;
 
   @BeforeClass
   public void setUp() {
     // the port doesn't matter as we are not actually making a server call.
-    _queryEnvironment = QueryEnvironmentTestUtils.getQueryEnvironment(3, 1, 2);
+    _queryEnvironment = QueryEnvironmentTestUtils.getQueryEnvironment(3, 1, 2, SERVER1_SEGMENTS, SERVER2_SEGMENTS);
   }
 
   @DataProvider(name = "testQueryDataProvider")
