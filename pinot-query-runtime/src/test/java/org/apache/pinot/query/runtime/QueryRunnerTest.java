@@ -157,9 +157,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
   private Object[][] provideTestSqlAndRowCount() {
     return new Object[][] {
-        // Hybrid table - hybrid table has a 1-day cut-off from current, so it will always use REALTIME only
-        new Object[]{"SELECT * FROM d", 5},
-
         // using join clause
         new Object[]{"SELECT * FROM a JOIN b USING (col1)", 15},
 
