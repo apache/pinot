@@ -171,12 +171,12 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
             Object currentRes = _groupByResultHolders[i].get(key);
             // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
             if (currentRes == null) {
-              _groupByResultHolders[i].put(key, _aggregationFunctionInputRefs[i] == -1
-                  ? _aggregationFunctionLiterals[i] : row[_aggregationFunctionInputRefs[i]]);
+              _groupByResultHolders[i].put(key, _aggregationFunctionInputRefs[i] == -1 ? _aggregationFunctionLiterals[i]
+                  : row[_aggregationFunctionInputRefs[i]]);
             } else {
-              _groupByResultHolders[i].put(key,
-                  merge(_aggCalls.get(i), currentRes, _aggregationFunctionInputRefs[i] == -1
-                      ? _aggregationFunctionLiterals[i] : row[_aggregationFunctionInputRefs[i]]));
+              _groupByResultHolders[i].put(key, merge(_aggCalls.get(i), currentRes,
+                  _aggregationFunctionInputRefs[i] == -1 ? _aggregationFunctionLiterals[i]
+                      : row[_aggregationFunctionInputRefs[i]]));
             }
           }
         }
