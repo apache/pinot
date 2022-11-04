@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.BlockType;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -150,7 +150,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
           }
         }
       }
-      return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
+      return new TransferableBlock(rows, _resultSchema, BlockType.ROW);
     } else if (leftBlock.isErrorBlock()) {
       _upstreamErrorBlock = leftBlock;
       return _upstreamErrorBlock;

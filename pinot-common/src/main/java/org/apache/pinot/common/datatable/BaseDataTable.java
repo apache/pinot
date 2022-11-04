@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datablock.BlockType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -265,6 +266,11 @@ public abstract class BaseDataTable implements DataTable {
     int offset = rowId * _rowSizeInBytes + _columnOffsets[colId];
     _variableSizeData.position(_fixedSizeData.getInt(offset));
     return _fixedSizeData.getInt(offset + 4);
+  }
+
+  @Override
+  public BlockType getBlockType() {
+    return BlockType.ROW;
   }
 
   @Override

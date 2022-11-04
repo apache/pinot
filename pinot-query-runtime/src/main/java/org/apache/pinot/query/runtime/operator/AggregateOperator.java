@@ -25,7 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.BlockType;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -144,7 +145,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       if (rows.size() == 0) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
       } else {
-        return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
+        return new TransferableBlock(rows, _resultSchema, BlockType.ROW);
       }
     } else {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
@@ -155,7 +156,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     if (!_isCumulativeBlockConstructed) {
       TransferableBlock block = _inputOperator.nextBlock();
       while (!TransferableBlockUtils.isEndOfStream(block)) {
-        BaseDataBlock dataBlock = block.getDataBlock();
+        DataTable dataBlock = block.getDataBlock();
         int numRows = dataBlock.getNumberOfRows();
         for (int rowId = 0; rowId < numRows; rowId++) {
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);

@@ -44,7 +44,7 @@ public class MetadataBlock extends BaseDataBlock {
 
   @Override
   public int getDataBlockVersionType() {
-    return VERSION + (Type.METADATA.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
+    return VERSION + (BlockType.METADATA.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
   }
 
   @Override
@@ -65,5 +65,10 @@ public class MetadataBlock extends BaseDataBlock {
   @Override
   public MetadataBlock toDataOnlyDataTable() {
     return new MetadataBlock(_dataSchema);
+  }
+
+  @Override
+  public BlockType getBlockType() {
+    return BlockType.METADATA;
   }
 }

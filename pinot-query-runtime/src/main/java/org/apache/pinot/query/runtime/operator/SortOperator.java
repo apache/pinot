@@ -25,7 +25,8 @@ import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.BlockType;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -98,7 +99,7 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
       if (rows.size() == 0) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
       } else {
-        return new TransferableBlock(rows, _dataSchema, BaseDataBlock.Type.ROW);
+        return new TransferableBlock(rows, _dataSchema, BlockType.ROW);
       }
     } else {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
@@ -109,7 +110,7 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
     if (!_isSortedBlockConstructed) {
       TransferableBlock block = _upstreamOperator.nextBlock();
       while (!TransferableBlockUtils.isEndOfStream(block)) {
-        BaseDataBlock dataBlock = block.getDataBlock();
+        DataTable dataBlock = block.getDataBlock();
         int numRows = dataBlock.getNumberOfRows();
         for (int rowId = 0; rowId < numRows; rowId++) {
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);

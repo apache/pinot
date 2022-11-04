@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -59,11 +60,11 @@ public final class DataBlockUtils {
     return new MetadataBlock(dataSchema);
   }
 
-  public static BaseDataBlock getDataBlock(ByteBuffer byteBuffer)
+  public static DataTable getDataBlock(ByteBuffer byteBuffer)
       throws IOException {
     int versionType = byteBuffer.getInt();
     int version = versionType & ((1 << VERSION_TYPE_SHIFT) - 1);
-    BaseDataBlock.Type type = BaseDataBlock.Type.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
+    BlockType type = BlockType.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
     switch (type) {
       case COLUMNAR:
         return new ColumnarDataBlock(byteBuffer);

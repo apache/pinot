@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.BlockType;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
@@ -58,9 +58,9 @@ public final class TransferableBlockUtils {
    *
    *  When row size is greater than maxBlockSize, we pack each row as a separate block.
    */
-  public static List<TransferableBlock> splitBlock(TransferableBlock block, BaseDataBlock.Type type, int maxBlockSize) {
+  public static List<TransferableBlock> splitBlock(TransferableBlock block, BlockType type, int maxBlockSize) {
     List<TransferableBlock> blockChunks = new ArrayList<>();
-    if (type != BaseDataBlock.Type.ROW) {
+    if (type != BlockType.ROW) {
       return Collections.singletonList(block);
     } else {
       int rowSizeInBytes = ((RowDataBlock) block.getDataBlock()).getRowSizeInBytes();
@@ -80,7 +80,7 @@ public final class TransferableBlockUtils {
   }
 
   public static Object[] getRow(TransferableBlock transferableBlock, int rowId) {
-    Preconditions.checkState(transferableBlock.getType() == BaseDataBlock.Type.ROW,
+    Preconditions.checkState(transferableBlock.getType() == BlockType.ROW,
         "TransferableBlockUtils doesn't support get row from non-ROW-based data block type yet!");
     return transferableBlock.getContainer().get(rowId);
   }

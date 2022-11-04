@@ -680,29 +680,4 @@ public abstract class BaseDataBlock implements DataTable {
     }
     return stringBuilder.toString();
   }
-
-  public enum Type {
-    ROW(0),
-    COLUMNAR(1),
-    METADATA(2);
-
-    private final int _ordinal;
-
-    Type(int ordinal) {
-      _ordinal = ordinal;
-    }
-
-    public static Type fromOrdinal(int ordinal) {
-      switch (ordinal) {
-        case 0:
-          return ROW;
-        case 1:
-          return COLUMNAR;
-        case 2:
-          return METADATA;
-        default:
-          throw new IllegalArgumentException("Invalid ordinal: " + ordinal);
-      }
-    }
-  }
 }

@@ -28,7 +28,6 @@ import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
@@ -124,7 +123,7 @@ public class QueryRunner {
           requestMetadataMap, _helixPropertyStore, _mailboxService);
 
       // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
-      List<BaseDataBlock> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
+      List<DataTable> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
       for (ServerPlanRequestContext requestContext : serverQueryRequests) {
         ServerQueryRequest request = new ServerQueryRequest(requestContext.getInstanceRequest(),
             new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
@@ -184,8 +183,8 @@ public class QueryRunner {
     return requests;
   }
 
-  private BaseDataBlock processServerQuery(ServerQueryRequest serverQueryRequest, ExecutorService executorService) {
-    BaseDataBlock dataBlock;
+  private DataTable processServerQuery(ServerQueryRequest serverQueryRequest, ExecutorService executorService) {
+    DataTable dataBlock;
     try {
       InstanceResponseBlock instanceResponse = _serverExecutor.execute(serverQueryRequest, executorService);
       if (!instanceResponse.getExceptions().isEmpty()) {
@@ -216,13 +215,13 @@ public class QueryRunner {
   private static class LeafStageTransferableBlockOperator extends BaseOperator<TransferableBlock> {
     private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
 
-    private final BaseDataBlock _errorBlock;
-    private final List<BaseDataBlock> _baseDataBlocks;
+    private final DataTable _errorBlock;
+    private final List<DataTable> _baseDataBlocks;
     private final DataSchema _dataSchema;
     private boolean _hasTransferred;
     private int _currentIndex;
 
-    private LeafStageTransferableBlockOperator(List<BaseDataBlock> baseDataBlocks, DataSchema dataSchema) {
+    private LeafStageTransferableBlockOperator(List<DataTable> baseDataBlocks, DataSchema dataSchema) {
       _baseDataBlocks = baseDataBlocks;
       _dataSchema = dataSchema;
       _errorBlock = baseDataBlocks.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);

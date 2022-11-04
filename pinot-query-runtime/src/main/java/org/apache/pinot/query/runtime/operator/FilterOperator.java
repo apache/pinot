@@ -21,7 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.BlockType;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -80,7 +80,7 @@ public class FilterOperator extends BaseOperator<TransferableBlock> {
           resultRows.add(row);
         }
       }
-      return new TransferableBlock(resultRows, _dataSchema, BaseDataBlock.Type.ROW);
+      return new TransferableBlock(resultRows, _dataSchema, BlockType.ROW);
     } else if (block.isErrorBlock()) {
       _upstreamErrorBlock = block;
       return _upstreamErrorBlock;

@@ -24,9 +24,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.query.mailbox.channel.MailboxContentStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -115,7 +115,7 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
       throws IOException {
     ByteBuffer byteBuffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
     if (byteBuffer.hasRemaining()) {
-      BaseDataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
+      DataTable dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
       if (dataBlock instanceof MetadataBlock && !dataBlock.getExceptions().isEmpty()) {
         return TransferableBlockUtils.getErrorTransferableBlock(dataBlock.getExceptions());
       }

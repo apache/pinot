@@ -64,7 +64,7 @@ public class ColumnarDataBlock extends BaseDataBlock {
 
   @Override
   protected int getDataBlockVersionType() {
-    return VERSION + (Type.COLUMNAR.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
+    return VERSION + (BlockType.COLUMNAR.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
   }
 
   @Override
@@ -90,6 +90,11 @@ public class ColumnarDataBlock extends BaseDataBlock {
   @Override
   public ColumnarDataBlock toDataOnlyDataTable() {
     return new ColumnarDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
+  }
+
+  @Override
+  public BlockType getBlockType() {
+    return BlockType.COLUMNAR;
   }
 
   // TODO: add whole-column access methods.

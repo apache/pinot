@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
-import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
@@ -138,7 +137,7 @@ public class QueryDispatcher {
               + transferableBlock.getDataBlock().getExceptions());
       }
       if (transferableBlock.getDataBlock() != null) {
-        BaseDataBlock dataTable = transferableBlock.getDataBlock();
+        DataTable dataTable = transferableBlock.getDataBlock();
         resultDataBlocks.add(dataTable);
       }
       if (transferableBlock.isEndOfStreamBlock()) {

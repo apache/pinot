@@ -57,7 +57,7 @@ public class RowDataBlock extends BaseDataBlock {
 
   @Override
   protected int getDataBlockVersionType() {
-    return VERSION + (Type.ROW.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
+    return VERSION + (BlockType.ROW.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
   }
 
   @Override
@@ -83,6 +83,11 @@ public class RowDataBlock extends BaseDataBlock {
   @Override
   public RowDataBlock toDataOnlyDataTable() {
     return new RowDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
+  }
+
+  @Override
+  public BlockType getBlockType() {
+    return BlockType.ROW;
   }
 
   public int getRowSizeInBytes() {

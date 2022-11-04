@@ -94,7 +94,8 @@ public class DataBlockTest {
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     convertToDataTableCompatibleRows(rows, dataSchema);
     DataTable dataTableImpl = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, true);
-    BaseDataBlock dataBlockFromDataTable = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTableImpl.toBytes()));
+    BaseDataBlock dataBlockFromDataTable =
+        (BaseDataBlock) DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTableImpl.toBytes()));
 
     RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
     for (int coldId = 0; coldId < numColumns; coldId++) {

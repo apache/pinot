@@ -22,8 +22,9 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.BlockType;
 import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.util.TestUtils;
@@ -92,7 +93,7 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
 
     TransferableBlock receivedContent = receivingMailbox.receive();
     Assert.assertNotNull(receivedContent);
-    BaseDataBlock receivedDataBlock = receivedContent.getDataBlock();
+    DataTable receivedDataBlock = receivedContent.getDataBlock();
     Assert.assertTrue(receivedDataBlock instanceof MetadataBlock);
     Assert.assertFalse(receivedDataBlock.getExceptions().isEmpty());
   }
@@ -100,7 +101,7 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
   private TransferableBlock getTestTransferableBlock() {
     List<Object[]> rows = new ArrayList<>();
     rows.add(createRow(0, "test_string"));
-    return new TransferableBlock(rows, TEST_DATA_SCHEMA, BaseDataBlock.Type.ROW);
+    return new TransferableBlock(rows, TEST_DATA_SCHEMA, BlockType.ROW);
   }
 
   private TransferableBlock getTooLargeTransferableBlock() {
@@ -109,7 +110,7 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
     for (int i = 0; i < size; i++) {
       rows.add(createRow(0, "test_string"));
     }
-    return new TransferableBlock(rows, TEST_DATA_SCHEMA, BaseDataBlock.Type.ROW);
+    return new TransferableBlock(rows, TEST_DATA_SCHEMA, BlockType.ROW);
   }
 
   private Object[] createRow(int intValue, String stringValue) {

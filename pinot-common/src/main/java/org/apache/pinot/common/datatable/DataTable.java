@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datablock.BlockType;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -88,6 +89,8 @@ public interface DataTable {
   DataTable toMetadataOnlyDataTable();
 
   DataTable toDataOnlyDataTable();
+
+  BlockType getBlockType();
 
   class CustomObject {
     public static final int NULL_TYPE_VALUE = 100;
