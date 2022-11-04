@@ -57,7 +57,7 @@ public class AggregateOperatorTest {
             Arrays.asList(new RexExpression.InputRef(1)));
     TransferableBlock result = sum0GroupBy1.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList( new Object[]{"Aa", 1}, new Object[]{"BB", 5.0});
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{"Aa", 1}, new Object[]{"BB", 5.0});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
