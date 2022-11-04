@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
-import java.util.List;
+import com.google.common.annotations.VisibleForTesting;
+import java.util.Collection;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -44,9 +45,15 @@ public class TransferableBlock implements Block {
   private final int _numRows;
 
   private DataBlock _dataBlock;
-  private List<Object[]> _container;
+  private Collection<Object[]> _container;
 
-  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType) {
+  public TransferableBlock(Collection<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType) {
+    this(container, dataSchema, containerType, false);
+  }
+
+  @VisibleForTesting
+  TransferableBlock(Collection<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType,
+      boolean isErrorBlock) {
     _container = container;
     _dataSchema = dataSchema;
     _type = containerType;
@@ -76,7 +83,7 @@ public class TransferableBlock implements Block {
    *
    * @return data container.
    */
-  public List<Object[]> getContainer() {
+  public Collection<Object[]> getContainer() {
     if (_container == null) {
       switch (_type) {
         case ROW:

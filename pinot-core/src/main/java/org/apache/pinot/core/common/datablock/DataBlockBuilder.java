@@ -26,9 +26,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.util.List;
+import java.util.Collection;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -45,7 +44,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 public class DataBlockBuilder {
   private final DataSchema _dataSchema;
-  private final BaseDataBlock.Type _blockType;
+  private final DataBlock.Type _blockType;
   private final DataSchema.ColumnDataType[] _columnDataTypes;
 
   private int[] _columnOffsets;
@@ -63,7 +62,7 @@ public class DataBlockBuilder {
   private final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);
 
-  private DataBlockBuilder(DataSchema dataSchema, BaseDataBlock.Type blockType) {
+  private DataBlockBuilder(DataSchema dataSchema, DataBlock.Type blockType) {
     _dataSchema = dataSchema;
     _columnDataTypes = dataSchema.getColumnDataTypes();
     _blockType = blockType;
@@ -95,7 +94,7 @@ public class DataBlockBuilder {
     }
   }
 
-  public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema)
+  public static RowDataBlock buildFromRows(Collection<Object[]> rows, DataSchema dataSchema)
       throws IOException {
     DataBlockBuilder rowBuilder = new DataBlockBuilder(dataSchema, DataBlock.Type.ROW);
     // TODO: consolidate these null utils into data table utils.
@@ -110,8 +109,8 @@ public class DataBlockBuilder {
       nullPlaceholders[colId] = columnDataTypes[colId].convert(storedColumnDataTypes[colId].getNullPlaceholder());
     }
     rowBuilder._numRows = rows.size();
-    for (int rowId = 0; rowId < rows.size(); rowId++) {
-      Object[] row = rows.get(rowId);
+    int rowId = 0;
+    for (Object[] row : rows) {
       ByteBuffer byteBuffer = ByteBuffer.allocate(rowBuilder._rowSizeInBytes);
       for (int colId = 0; colId < rowBuilder._numColumns; colId++) {
         Object value = row[colId];
@@ -221,6 +220,7 @@ public class DataBlockBuilder {
         }
       }
       rowBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
+      rowId++;
     }
     // Write null bitmaps after writing data.
     for (RoaringBitmap nullBitmap : nullBitmaps) {
@@ -229,7 +229,7 @@ public class DataBlockBuilder {
     return buildRowBlock(rowBuilder);
   }
 
-  public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema)
+  public static ColumnarDataBlock buildFromColumns(Collection<Object[]> columns, DataSchema dataSchema)
       throws IOException {
     DataBlockBuilder columnarBuilder = new DataBlockBuilder(dataSchema, DataBlock.Type.COLUMNAR);
 
@@ -244,8 +244,8 @@ public class DataBlockBuilder {
       nullBitmaps[colId] = new RoaringBitmap();
       nullPlaceholders[colId] = columnDataTypes[colId].convert(storedColumnDataTypes[colId].getNullPlaceholder());
     }
-    for (int colId = 0; colId < columns.size(); colId++) {
-      Object[] column = columns.get(colId);
+    int colId = 0;
+    for (Object[] column : columns) {
       columnarBuilder._numRows = column.length;
       ByteBuffer byteBuffer = ByteBuffer.allocate(columnarBuilder._numRows * columnarBuilder._columnSizeInBytes[colId]);
       Object value;
@@ -465,6 +465,7 @@ public class DataBlockBuilder {
                   columnarBuilder._dataSchema.getColumnName(colId)));
       }
       columnarBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
+      colId++;
     }
     // Write null bitmaps after writing data.
     for (RoaringBitmap nullBitmap : nullBitmaps) {

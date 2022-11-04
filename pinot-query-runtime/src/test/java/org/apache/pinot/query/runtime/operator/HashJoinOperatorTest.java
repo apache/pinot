@@ -20,6 +20,8 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
@@ -56,16 +58,17 @@ public class HashJoinOperatorTest {
     while (result.isNoOpBlock()) {
       result = join.nextBlock();
     }
-    List<Object[]> resultRows = result.getContainer();
+    Collection<Object[]> resultRows = result.getContainer();
+    Iterator<Object[]> resultIt = resultRows.iterator();
     List<Object[]> expectedRows =
         Arrays.asList(new Object[]{1, "Aa", 1, "Aa"}, new Object[]{2, "BB", 2, "BB"}, new Object[]{2, "BB", 3, "BB"},
             new Object[]{3, "BB", 2, "BB"}, new Object[]{3, "BB", 3, "BB"});
     Assert.assertEquals(expectedRows.size(), resultRows.size());
-    Assert.assertEquals(expectedRows.get(0), resultRows.get(0));
-    Assert.assertEquals(expectedRows.get(1), resultRows.get(1));
-    Assert.assertEquals(expectedRows.get(2), resultRows.get(2));
-    Assert.assertEquals(expectedRows.get(3), resultRows.get(3));
-    Assert.assertEquals(expectedRows.get(4), resultRows.get(4));
+    Assert.assertEquals(expectedRows.get(0), resultIt.next());
+    Assert.assertEquals(expectedRows.get(1), resultIt.next());
+    Assert.assertEquals(expectedRows.get(2), resultIt.next());
+    Assert.assertEquals(expectedRows.get(3), resultIt.next());
+    Assert.assertEquals(expectedRows.get(4), resultIt.next());
   }
 
   @Test
@@ -85,12 +88,13 @@ public class HashJoinOperatorTest {
     while (result.isNoOpBlock()) {
       result = join.nextBlock();
     }
-    List<Object[]> resultRows = result.getContainer();
+    Collection<Object[]> resultRows = result.getContainer();
+    Iterator<Object[]> resultIt = resultRows.iterator();
     Object[] expRow = new Object[]{1, "Aa", 2, "Aa"};
     List<Object[]> expectedRows = new ArrayList<>();
     expectedRows.add(expRow);
     Assert.assertEquals(expectedRows.size(), resultRows.size());
-    Assert.assertEquals(expectedRows.get(0), resultRows.get(0));
+    Assert.assertEquals(expectedRows.get(0), resultIt.next());
   }
 
   @Test
@@ -110,12 +114,13 @@ public class HashJoinOperatorTest {
     while (result.isNoOpBlock()) {
       result = join.nextBlock();
     }
-    List<Object[]> resultRows = result.getContainer();
+    Collection<Object[]> resultRows = result.getContainer();
+    Iterator<Object[]> resultIt = resultRows.iterator();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "BB", null, null},
         new Object[]{3, "BB", null, null});
     Assert.assertEquals(expectedRows.size(), resultRows.size());
-    Assert.assertEquals(expectedRows.get(0), resultRows.get(0));
-    Assert.assertEquals(expectedRows.get(1), resultRows.get(1));
-    Assert.assertEquals(expectedRows.get(2), resultRows.get(2));
+    Assert.assertEquals(expectedRows.get(0), resultIt.next());
+    Assert.assertEquals(expectedRows.get(1), resultIt.next());
+    Assert.assertEquals(expectedRows.get(2), resultIt.next());
   }
 }

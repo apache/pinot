@@ -21,6 +21,8 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -227,11 +229,12 @@ public class AggregateOperatorTest {
     while (result.isNoOpBlock()) {
       result = sum0GroupBy1.getNextBlock();
     }
-    List<Object[]> resultRows = result.getContainer();
+    Collection<Object[]> resultRows = result.getContainer();
+    Iterator<Object[]> resultIt = resultRows.iterator();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{"Aa", 1}, new Object[]{"BB", 5.0});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    Assert.assertEquals(resultIt.next(), expectedRows.get(0));
+    Assert.assertEquals(resultIt.next(), expectedRows.get(1));
   }
 
   @Test(

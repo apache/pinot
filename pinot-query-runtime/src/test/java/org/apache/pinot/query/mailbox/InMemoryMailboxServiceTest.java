@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -52,9 +53,9 @@ public class InMemoryMailboxServiceTest {
     // Iterate 1 less time than the loop above
     for (int i = 0; i + 1 < InMemoryMailboxService.DEFAULT_CHANNEL_CAPACITY; i++) {
       TransferableBlock receivedBlock = receivingMailbox.receive();
-      List<Object[]> receivedContainer = receivedBlock.getContainer();
+      Collection<Object[]> receivedContainer = receivedBlock.getContainer();
       Assert.assertEquals(receivedContainer.size(), 1);
-      Object[] row = receivedContainer.get(0);
+      Object[] row = receivedContainer.iterator().next();
       Assert.assertEquals(row.length, 2);
       Assert.assertEquals((int) row[0], i);
 

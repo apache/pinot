@@ -20,13 +20,14 @@ package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.datablock.RowDataBlock;
+import org.apache.pinot.common.utils.DataSchema;
 
 
 public final class TransferableBlockUtils {
@@ -59,37 +60,67 @@ public final class TransferableBlockUtils {
   }
 
   /**
-   *  Split a block into multiple block so that each block size is within maxBlockSize.
-   *  Currently, we only support split for row type dataBlock.
-   *  For columnar data block, we return the original data block.
-   *  Metadata data block split is not supported.
+   * Split block into multiple blocks. Default without any clean up.
    *
-   *  When row size is greater than maxBlockSize, we pack each row as a separate block.
+   * @see TransferableBlockUtils#splitBlock(TransferableBlock, BaseDataBlock.Type, int, boolean)
    */
   public static List<TransferableBlock> splitBlock(TransferableBlock block, BaseDataBlock.Type type, int maxBlockSize) {
+    return splitBlock(block, type, maxBlockSize, false);
+  }
+
+  /**
+   *
+   *  Split a block into multiple block so that each block size is within maxBlockSize. Currently,
+   *  <ul>
+   *    <li>For row data block, we split for row type dataBlock.</li>
+   *    <li>For columnar data block, we return the original data block.</li>
+   *    <li>For metadata block, split is not supported.</li>
+   *  </ul>
+   *
+   * @param block the data block
+   * @param type type of block
+   * @param maxBlockSize Each chunk of data is less than maxBlockSize
+   * @param isCleanupRequired whether clean up is required, set to true if the block is constructed from leaf stage.
+   * @return a list of data block chunks
+   */
+  public static List<TransferableBlock> splitBlock(TransferableBlock block, BaseDataBlock.Type type, int maxBlockSize,
+      boolean isCleanupRequired) {
     List<TransferableBlock> blockChunks = new ArrayList<>();
     if (type != DataBlock.Type.ROW) {
       return Collections.singletonList(block);
     } else {
-      int rowSizeInBytes = ((RowDataBlock) block.getDataBlock()).getRowSizeInBytes();
-      int numRowsPerChunk = maxBlockSize / rowSizeInBytes;
+      int estimatedRowSizeInBytes = block.getDataSchema().getColumnNames().length * 8;
+      int numRowsPerChunk = maxBlockSize / estimatedRowSizeInBytes;
       Preconditions.checkState(numRowsPerChunk > 0, "row size too large for query engine to handle, abort!");
 
-      int totalNumRows = block.getNumRows();
-      List<Object[]> allRows = block.getContainer();
-      int currentRow = 0;
-      while (currentRow < totalNumRows) {
-        List<Object[]> chunk = allRows.subList(currentRow, Math.min(currentRow + numRowsPerChunk, allRows.size()));
-        currentRow += numRowsPerChunk;
-        blockChunks.add(new TransferableBlock(chunk, block.getDataSchema(), block.getType()));
+      Collection<Object[]> allRows = block.getContainer();
+      DataSchema dataSchema = block.getDataSchema();
+      int rowId = 0;
+      List<Object[]> chunk = new ArrayList<>(numRowsPerChunk);
+      for (Object[] row : allRows) {
+        if (isCleanupRequired) {
+          chunk.add(cleanupRow(row, dataSchema));
+        } else {
+          chunk.add(row);
+        }
+        rowId++;
+        if (rowId % numRowsPerChunk == 0) {
+          blockChunks.add(new TransferableBlock(List.copyOf(chunk), block.getDataSchema(), block.getType()));
+          chunk.clear();
+        }
+      }
+      if (chunk.size() > 0) {
+        blockChunks.add(new TransferableBlock(List.copyOf(chunk), block.getDataSchema(), block.getType()));
       }
     }
     return blockChunks;
   }
 
-  public static Object[] getRow(TransferableBlock transferableBlock, int rowId) {
-    Preconditions.checkState(transferableBlock.getType() == DataBlock.Type.ROW,
-        "TransferableBlockUtils doesn't support get row from non-ROW-based data block type yet!");
-    return transferableBlock.getContainer().get(rowId);
+  private static Object[] cleanupRow(Object[] row, DataSchema dataSchema) {
+    Object[] resultRow = new Object[row.length];
+    for (int colId = 0; colId < row.length; colId++) {
+      resultRow[colId] = dataSchema.getColumnDataType(colId).convert(row[colId]);
+    }
+    return resultRow;
   }
 }
