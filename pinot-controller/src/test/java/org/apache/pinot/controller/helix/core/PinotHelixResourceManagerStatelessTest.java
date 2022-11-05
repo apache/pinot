@@ -39,6 +39,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
@@ -143,24 +144,57 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   }
 
   @Test
-  public void testGetInstanceEndpoints()
+  public void testGetDataInstanceAdminEndpoints()
       throws Exception {
     Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
-    BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(servers);
 
-    // Check that we have endpoints for all instances.
-    assertEquals(endpoints.size(), NUM_SERVER_INSTANCES);
-
-    // Check actual endpoint names
-    for (Map.Entry<String, String> entry : endpoints.entrySet()) {
+    BiMap<String, String> adminEndpoints = _helixResourceManager.getDataInstanceAdminEndpoints(servers);
+    assertEquals(adminEndpoints.size(), NUM_SERVER_INSTANCES);
+    for (Map.Entry<String, String> entry : adminEndpoints.entrySet()) {
       String key = entry.getKey();
       int port = Server.DEFAULT_ADMIN_API_PORT + Integer.parseInt(key.substring("Server_localhost_".length()));
       assertEquals(entry.getValue(), "http://localhost:" + port);
     }
+
+    // Add a new server
+    String serverName = "Server_localhost_" + NUM_SERVER_INSTANCES;
+    Instance instance = new Instance("localhost", NUM_SERVER_INSTANCES, InstanceType.SERVER,
+        Collections.singletonList(Helix.UNTAGGED_SERVER_INSTANCE), null, 0, 12345, 0, 0, false);
+    _helixResourceManager.addInstance(instance, false);
+    adminEndpoints = _helixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(serverName));
+    assertEquals(adminEndpoints.size(), 1);
+    assertEquals(adminEndpoints.get(serverName), "http://localhost:12345");
+
+    // Modify the admin port for the new added server
+    instance = new Instance("localhost", NUM_SERVER_INSTANCES, InstanceType.SERVER,
+        Collections.singletonList(Helix.UNTAGGED_SERVER_INSTANCE), null, 0, 23456, 0, 0, false);
+    _helixResourceManager.updateInstance(serverName, instance, false);
+    // Admin endpoint is updated through the instance config change callback, which happens asynchronously
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        BiMap<String, String> endpoints =
+            _helixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(serverName));
+        assertEquals(endpoints.size(), 1);
+        return endpoints.get(serverName).equals("http://localhost:23456");
+      } catch (InvalidConfigException e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to update the admin port");
+
+    // Remove the new added server
+    _helixResourceManager.dropInstance(serverName);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        _helixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(serverName));
+        return false;
+      } catch (InvalidConfigException e) {
+        return true;
+      }
+    }, 60_000L, "Failed to remove the admin endpoint");
   }
 
   @Test
-  public void testGetInstanceConfigs() {
+  public void testAddRemoveInstance() {
     Set<String> serverInstances = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
     for (String instanceName : serverInstances) {
       InstanceConfig instanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
