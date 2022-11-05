@@ -114,6 +114,18 @@ public class MockInstanceDataManagerFactory {
     return instanceDataManager;
   }
 
+  public Map<String, Schema> buildSchemaMap() {
+    return _schemaMap;
+  }
+
+  public Map<String, List<GenericRow>> buildTableRowsMap() {
+    return _tableRowsMap;
+  }
+
+  public Map<String, List<String>> buildTableSegmentNameMap() {
+    return _tableSegmentNameMap;
+  }
+
   private TableDataManager mockTableDataManager(List<ImmutableSegment> segmentList) {
     List<SegmentDataManager> tableSegmentDataManagers =
         segmentList.stream().map(ImmutableSegmentDataManager::new).collect(Collectors.toList());
@@ -143,18 +155,6 @@ public class MockInstanceDataManagerFactory {
     } catch (Exception e) {
       throw new RuntimeException("Unable to construct immutable segment from records", e);
     }
-  }
-
-  public Map<String, Schema> buildSchemaMap() {
-    return _schemaMap;
-  }
-
-  public Map<String, List<GenericRow>> buildTableRowsMap() {
-    return _tableRowsMap;
-  }
-
-  public Map<String, List<String>> buildTableSegmentNameMap() {
-    return _tableSegmentNameMap;
   }
 
   private void registerTableNameWithType(Schema schema, String tableNameWithType) {
