@@ -26,7 +26,6 @@ import java.util.Map;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.RowDataBlock;
-import org.apache.pinot.common.utils.DataSchema;
 
 
 public final class TransferableBlockUtils {
@@ -34,8 +33,12 @@ public final class TransferableBlockUtils {
     // do not instantiate.
   }
 
-  public static TransferableBlock getEndOfStreamTransferableBlock(DataSchema dataSchema) {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(dataSchema));
+  public static TransferableBlock getEndOfStreamTransferableBlock() {
+    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+  }
+
+  public static TransferableBlock getNoOpTransferableBlock() {
+    return new TransferableBlock(DataBlockUtils.getNoOpBlock());
   }
 
   public static TransferableBlock getErrorTransferableBlock(Exception e) {
@@ -48,6 +51,10 @@ public final class TransferableBlockUtils {
 
   public static boolean isEndOfStream(TransferableBlock transferableBlock) {
     return transferableBlock.isEndOfStreamBlock();
+  }
+
+  public static boolean isNoOpBlock(TransferableBlock transferableBlock) {
+    return transferableBlock.isNoOpBlock();
   }
 
   /**

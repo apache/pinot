@@ -79,11 +79,15 @@ public class WorkerQueryExecutor {
     executorService.submit(new TraceRunnable() {
       @Override
       public void runJob() {
-        ThreadTimer executionThreadTimer = new ThreadTimer();
-        while (!TransferableBlockUtils.isEndOfStream(rootOperator.nextBlock())) {
-          LOGGER.debug("Result Block acquired");
+        try {
+          ThreadTimer executionThreadTimer = new ThreadTimer();
+          while (!TransferableBlockUtils.isEndOfStream(rootOperator.nextBlock())) {
+            LOGGER.debug("Result Block acquired");
+          }
+          LOGGER.info("Execution time:" + executionThreadTimer.getThreadTimeNs());
+        } catch (Exception e) {
+          LOGGER.error("Failed to execute query!", e);
         }
-        LOGGER.info("Execution time:" + executionThreadTimer.getThreadTimeNs());
       }
     });
   }

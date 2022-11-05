@@ -61,7 +61,7 @@ public class LiteralValueOperator extends BaseOperator<TransferableBlock> {
       _isLiteralBlockReturned = true;
       return _rexLiteralBlock;
     } else {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
   }
 

@@ -65,7 +65,9 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private final Map<Key, Object>[] _groupByResultHolders;
   private final Map<Key, Object[]> _groupByKeyHolder;
   private TransferableBlock _upstreamErrorBlock;
-  private boolean _isCumulativeBlockConstructed;
+
+  private boolean _readyToConstruct;
+  private boolean _hasReturnedAggregateBlock;
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
   // aggCalls has to be a list of FunctionCall and cannot be null
@@ -95,7 +97,8 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     }
     _resultSchema = dataSchema;
 
-    _isCumulativeBlockConstructed = false;
+    _readyToConstruct = false;
+    _hasReturnedAggregateBlock = false;
   }
 
   private RexExpression toAggregationFunctionOperand(RexExpression rexExpression) {
@@ -119,8 +122,16 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      consumeInputBlocks();
-      return produceAggregatedBlock();
+      if (!_readyToConstruct) {
+        consumeInputBlocks();
+        return TransferableBlockUtils.getNoOpTransferableBlock();
+      }
+
+      if (!_hasReturnedAggregateBlock) {
+        return produceAggregatedBlock();
+      } else {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      }
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
@@ -131,58 +142,52 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
     }
-    if (!_isCumulativeBlockConstructed) {
-      List<Object[]> rows = new ArrayList<>(_groupByKeyHolder.size());
-      for (Map.Entry<Key, Object[]> e : _groupByKeyHolder.entrySet()) {
-        Object[] row = new Object[_aggCalls.size() + _groupSet.size()];
-        Object[] keyElements = e.getValue();
-        for (int i = 0; i < keyElements.length; i++) {
-          row[i] = keyElements[i];
-        }
-        for (int i = 0; i < _groupByResultHolders.length; i++) {
-          row[i + _groupSet.size()] = _groupByResultHolders[i].get(e.getKey());
-        }
-        rows.add(row);
+
+    List<Object[]> rows = new ArrayList<>(_groupByKeyHolder.size());
+    for (Map.Entry<Key, Object[]> e : _groupByKeyHolder.entrySet()) {
+      Object[] row = new Object[_aggCalls.size() + _groupSet.size()];
+      Object[] keyElements = e.getValue();
+      System.arraycopy(keyElements, 0, row, 0, keyElements.length);
+      for (int i = 0; i < _groupByResultHolders.length; i++) {
+        row[i + _groupSet.size()] = _groupByResultHolders[i].get(e.getKey());
       }
-      _isCumulativeBlockConstructed = true;
-      if (rows.size() == 0) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
-      } else {
-        return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
-      }
+      rows.add(row);
+    }
+    _hasReturnedAggregateBlock = true;
+    if (rows.size() == 0) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } else {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
+      return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
     }
   }
 
   private void consumeInputBlocks() {
-    if (!_isCumulativeBlockConstructed) {
-      TransferableBlock block = _inputOperator.nextBlock();
-      while (!TransferableBlockUtils.isEndOfStream(block)) {
-        BaseDataBlock dataBlock = block.getDataBlock();
-        int numRows = dataBlock.getNumberOfRows();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
-          Key key = extraRowKey(row, _groupSet);
-          _groupByKeyHolder.put(key, key.getValues());
-          for (int i = 0; i < _aggCalls.size(); i++) {
-            Object currentRes = _groupByResultHolders[i].get(key);
-            // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
-            if (currentRes == null) {
-              _groupByResultHolders[i].put(key, _aggregationFunctionInputRefs[i] == -1 ? _aggregationFunctionLiterals[i]
-                  : row[_aggregationFunctionInputRefs[i]]);
-            } else {
-              _groupByResultHolders[i].put(key, merge(_aggCalls.get(i), currentRes,
-                  _aggregationFunctionInputRefs[i] == -1 ? _aggregationFunctionLiterals[i]
-                      : row[_aggregationFunctionInputRefs[i]]));
-            }
-          }
+    TransferableBlock block = _inputOperator.nextBlock();
+    // setting upstream error block
+    if (block.isErrorBlock()) {
+      _upstreamErrorBlock = block;
+    } else if (block.isEndOfStreamBlock()) {
+      _readyToConstruct = true;
+      return;
+    }
+
+    BaseDataBlock dataBlock = block.getDataBlock();
+    int numRows = dataBlock.getNumberOfRows();
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
+      Key key = extraRowKey(row, _groupSet);
+      _groupByKeyHolder.put(key, key.getValues());
+      for (int i = 0; i < _aggCalls.size(); i++) {
+        Object currentRes = _groupByResultHolders[i].get(key);
+        // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
+        if (currentRes == null) {
+          _groupByResultHolders[i].put(key, _aggregationFunctionInputRefs[i] == -1 ? _aggregationFunctionLiterals[i]
+              : row[_aggregationFunctionInputRefs[i]]);
+        } else {
+          _groupByResultHolders[i].put(key, merge(_aggCalls.get(i), currentRes,
+              _aggregationFunctionInputRefs[i] == -1 ? _aggregationFunctionLiterals[i]
+                  : row[_aggregationFunctionInputRefs[i]]));
         }
-        block = _inputOperator.nextBlock();
-      }
-      // setting upstream error block
-      if (block.isErrorBlock()) {
-        _upstreamErrorBlock = block;
       }
     }
   }

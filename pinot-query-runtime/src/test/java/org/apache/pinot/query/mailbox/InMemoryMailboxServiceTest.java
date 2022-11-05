@@ -95,7 +95,7 @@ public class InMemoryMailboxServiceTest {
 
   private TransferableBlock getTestTransferableBlock(int index, boolean isEndOfStream) {
     if (isEndOfStream) {
-      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(TEST_DATA_SCHEMA));
+      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
     }
     List<Object[]> rows = new ArrayList<>(index);
     rows.add(new Object[]{index, "test_data"});

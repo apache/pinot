@@ -253,7 +253,7 @@ public class QueryRunner {
           return new TransferableBlock(_baseDataBlocks.get(_currentIndex++));
         } else {
           _currentIndex = -1;
-          return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(_dataSchema));
+          return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
         }
       }
     }

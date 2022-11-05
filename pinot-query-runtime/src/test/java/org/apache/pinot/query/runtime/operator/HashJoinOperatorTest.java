@@ -71,7 +71,10 @@ public class HashJoinOperatorTest {
     HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.INNER);
 
-    TransferableBlock result = join.getNextBlock();
+    TransferableBlock result = join.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = join.nextBlock();
+    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows =
         Arrays.asList(new Object[]{1, "Aa", 1, "Aa"}, new Object[]{2, "BB", 2, "BB"}, new Object[]{2, "BB", 3, "BB"},
@@ -101,7 +104,10 @@ public class HashJoinOperatorTest {
     HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.INNER);
 
-    TransferableBlock result = join.getNextBlock();
+    TransferableBlock result = join.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = join.nextBlock();
+    }
     List<Object[]> resultRows = result.getContainer();
     Object[] expRow = new Object[]{1, "Aa", 2, "Aa"};
     List<Object[]> expectedRows = new ArrayList<>();
@@ -127,7 +133,10 @@ public class HashJoinOperatorTest {
     HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.LEFT);
 
-    TransferableBlock result = join.getNextBlock();
+    TransferableBlock result = join.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = join.nextBlock();
+    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "BB", null, null},
         new Object[]{3, "BB", null, null});
