@@ -207,7 +207,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
       // Cluster.
       // Configs existence is already verified.
       _zkAddress = conf.getZkStr();
-      _clusterName = properties.get(ControllerConf.HELIX_CLUSTER_NAME).toString();
+      _clusterName = conf.getHelixClusterName();
     } else {
       if (_controllerHost == null) {
         _controllerHost = NetUtils.getHostAddress();
