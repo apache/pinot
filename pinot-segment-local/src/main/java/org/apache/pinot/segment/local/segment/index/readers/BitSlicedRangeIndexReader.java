@@ -160,14 +160,7 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
     RangeBitmap rangeBitmap = mapRangeBitmap();
     if (Long.compareUnsigned(max, columnMax) < 0) {
       if (Long.compareUnsigned(min, 0) > 0) {
-        // TODO: RangeBitmap has a bug in version 0.9.28 which gives wrong result computing between for 2 numbers with
-        //       different sign. The bug is tracked here: https://github.com/RoaringBitmap/RoaringBitmap/issues/586.
-        //       This is a work-around for the bug.
-        if (columnMax > 0) {
-          return rangeBitmap.between(min, max).toMutableRoaringBitmap();
-        } else {
-          return rangeBitmap.gte(min, rangeBitmap.lte(max)).toMutableRoaringBitmap();
-        }
+        return rangeBitmap.between(min, max).toMutableRoaringBitmap();
       }
       return rangeBitmap.lte(max).toMutableRoaringBitmap();
     } else {
@@ -175,7 +168,7 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
         return rangeBitmap.gte(min).toMutableRoaringBitmap();
       }
       MutableRoaringBitmap all = new MutableRoaringBitmap();
-      all.add(0, _numDocs);
+      all.add(0L, _numDocs);
       return all;
     }
   }
@@ -184,14 +177,7 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
     RangeBitmap rangeBitmap = mapRangeBitmap();
     if (Long.compareUnsigned(max, columnMax) < 0) {
       if (Long.compareUnsigned(min, 0) > 0) {
-        // TODO: RangeBitmap has a bug in version 0.9.28 which gives wrong result computing between for 2 numbers with
-        //       different sign. The bug is tracked here: https://github.com/RoaringBitmap/RoaringBitmap/issues/586.
-        //       This is a work-around for the bug.
-        if (columnMax > 0) {
-          return (int) rangeBitmap.betweenCardinality(min, max);
-        } else {
-          return (int) rangeBitmap.gteCardinality(min, rangeBitmap.lte(max));
-        }
+        return (int) rangeBitmap.betweenCardinality(min, max);
       }
       return (int) rangeBitmap.lteCardinality(max);
     } else {
