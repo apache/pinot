@@ -19,6 +19,7 @@
 package org.apache.pinot.sql.parsers;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -717,15 +718,16 @@ public class CalciteSqlParser {
         SqlNodeList thenOperands = caseSqlNode.getThenOperands();
         SqlNode elseOperand = caseSqlNode.getElseOperand();
         Expression caseFuncExpr = RequestUtils.getFunctionExpression("case");
-        for (SqlNode whenSqlNode : whenOperands.getList()) {
+        Preconditions.checkState(whenOperands.size() == thenOperands.size());
+        for (int i = 0; i < whenOperands.size(); i++) {
+          SqlNode whenSqlNode = whenOperands.get(i);
           Expression whenExpression = toExpression(whenSqlNode);
           if (isAggregateExpression(whenExpression)) {
             throw new SqlCompilationException(
                 "Aggregation functions inside WHEN Clause is not supported - " + whenSqlNode);
           }
           caseFuncExpr.getFunctionCall().addToOperands(whenExpression);
-        }
-        for (SqlNode thenSqlNode : thenOperands.getList()) {
+          SqlNode thenSqlNode = thenOperands.get(i);
           Expression thenExpression = toExpression(thenSqlNode);
           if (isAggregateExpression(thenExpression)) {
             throw new SqlCompilationException(
