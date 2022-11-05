@@ -25,7 +25,6 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.datablock.BaseDataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Key;
@@ -99,11 +98,17 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    // Build JOIN hash table
-    buildBroadcastHashTable();
+    if (!_isHashTableBuilt) {
+      // Build JOIN hash table
+      buildBroadcastHashTable();
+    }
+
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
+    } else if (!_isHashTableBuilt) {
+      return TransferableBlockUtils.getNoOpTransferableBlock();
     }
+
     // JOIN each left block with the right block.
     try {
       return buildJoinedDataBlock(_leftTableOperator.nextBlock());
@@ -113,54 +118,58 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   }
 
   private void buildBroadcastHashTable() {
-    if (!_isHashTableBuilt) {
-      TransferableBlock rightBlock = _rightTableOperator.nextBlock();
-      while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
-        List<Object[]> container = rightBlock.getContainer();
-        // put all the rows into corresponding hash collections keyed by the key selector function.
-        for (Object[] row : container) {
-          List<Object[]> hashCollection =
-              _broadcastHashTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>());
-          hashCollection.add(row);
-        }
-        rightBlock = _rightTableOperator.nextBlock();
-      }
-      if (rightBlock.isErrorBlock()) {
-        _upstreamErrorBlock = rightBlock;
-      }
+    TransferableBlock rightBlock = _rightTableOperator.nextBlock();
+    if (rightBlock.isErrorBlock()) {
+      _upstreamErrorBlock = rightBlock;
+      return;
+    }
+
+    if (TransferableBlockUtils.isEndOfStream(rightBlock)) {
       _isHashTableBuilt = true;
+      return;
+    } else if (TransferableBlockUtils.isNoOpBlock(rightBlock)) {
+      return;
+    }
+
+    List<Object[]> container = rightBlock.getContainer();
+    // put all the rows into corresponding hash collections keyed by the key selector function.
+    for (Object[] row : container) {
+      List<Object[]> hashCollection =
+          _broadcastHashTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>());
+      hashCollection.add(row);
     }
   }
 
   private TransferableBlock buildJoinedDataBlock(TransferableBlock leftBlock)
       throws Exception {
-    if (!TransferableBlockUtils.isEndOfStream(leftBlock)) {
-      List<Object[]> rows = new ArrayList<>();
-      List<Object[]> container = leftBlock.getContainer();
-      for (Object[] leftRow : container) {
-        List<Object[]> hashCollection = _broadcastHashTable.getOrDefault(
-            new Key(_leftKeySelector.getKey(leftRow)), Collections.emptyList());
-        // If it is a left join and right table is empty, we return left rows.
-        if (hashCollection.isEmpty() && _joinType == JoinRelType.LEFT) {
-          rows.add(joinRow(leftRow, null));
-        } else {
-          // If it is other type of join.
-          for (Object[] rightRow : hashCollection) {
-            Object[] resultRow = joinRow(leftRow, rightRow);
-            if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
-              evaluator -> evaluator.apply(resultRow))) {
-              rows.add(resultRow);
-            }
+    if (leftBlock.isErrorBlock()) {
+      _upstreamErrorBlock = leftBlock;
+      return _upstreamErrorBlock;
+    } else if (TransferableBlockUtils.isEndOfStream(leftBlock) || TransferableBlockUtils.isNoOpBlock(leftBlock)) {
+      return leftBlock;
+    }
+
+    List<Object[]> rows = new ArrayList<>();
+    List<Object[]> container = leftBlock.getContainer();
+    for (Object[] leftRow : container) {
+      List<Object[]> hashCollection = _broadcastHashTable.getOrDefault(
+          new Key(_leftKeySelector.getKey(leftRow)), Collections.emptyList());
+      // If it is a left join and right table is empty, we return left rows.
+      if (hashCollection.isEmpty() && _joinType == JoinRelType.LEFT) {
+        rows.add(joinRow(leftRow, null));
+      } else {
+        // If it is other type of join.
+        for (Object[] rightRow : hashCollection) {
+          Object[] resultRow = joinRow(leftRow, rightRow);
+          if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
+            evaluator -> evaluator.apply(resultRow))) {
+            rows.add(resultRow);
           }
         }
       }
-      return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
-    } else if (leftBlock.isErrorBlock()) {
-      _upstreamErrorBlock = leftBlock;
-      return _upstreamErrorBlock;
-    } else {
-      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(_resultSchema));
     }
+
+    return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
   }
 
   private Object[] joinRow(Object[] leftRow, @Nullable Object[] rightRow) {

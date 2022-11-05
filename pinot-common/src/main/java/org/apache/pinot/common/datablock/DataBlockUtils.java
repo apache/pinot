@@ -47,16 +47,20 @@ public final class DataBlockUtils {
   }
 
   public static MetadataBlock getErrorDataBlock(Map<Integer, String> exceptions) {
-    MetadataBlock errorBlock = new MetadataBlock();
+    MetadataBlock errorBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.ERROR);
     for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
       errorBlock.addException(exception.getKey(), exception.getValue());
     }
     return errorBlock;
   }
 
-  public static MetadataBlock getEndOfStreamDataBlock(DataSchema dataSchema) {
+  public static MetadataBlock getEndOfStreamDataBlock() {
     // TODO: add query statistics metadata for the block.
-    return new MetadataBlock(dataSchema);
+    return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
+  }
+
+  public static MetadataBlock getNoOpBlock() {
+    return new MetadataBlock(MetadataBlock.MetadataBlockType.NOOP);
   }
 
   public static BaseDataBlock getDataBlock(ByteBuffer byteBuffer)

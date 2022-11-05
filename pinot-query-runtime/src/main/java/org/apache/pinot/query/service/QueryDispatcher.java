@@ -22,14 +22,11 @@ import com.google.common.annotations.VisibleForTesting;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
-import org.apache.pinot.common.datablock.BaseDataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
@@ -75,7 +72,8 @@ public class QueryDispatcher {
         requestId, reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
         mailboxService.getMailboxPort());
     List<DataTable> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutNano);
-    return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields());
+    return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
+        queryPlan.getQueryStageMap().get(0).getDataSchema());
   }
 
   public int submit(long requestId, QueryPlan queryPlan)
@@ -137,26 +135,23 @@ public class QueryDispatcher {
           throw new RuntimeException("Received error query execution result block: "
               + transferableBlock.getDataBlock().getExceptions());
       }
-      if (transferableBlock.getDataBlock() != null) {
-        BaseDataBlock dataTable = transferableBlock.getDataBlock();
-        resultDataBlocks.add(dataTable);
+      if (transferableBlock.isNoOpBlock()) {
+        continue;
+      } else if (transferableBlock.isEndOfStreamBlock()) {
+        return resultDataBlocks;
       }
-      if (transferableBlock.isEndOfStreamBlock()) {
-        break;
-      }
+
+      resultDataBlocks.add(transferableBlock.getDataBlock());
     }
-    if (System.nanoTime() >= timeoutWatermark) {
-      resultDataBlocks = Collections.singletonList(
-          DataBlockUtils.getErrorDataBlock(QueryException.EXECUTION_TIMEOUT_ERROR));
-    }
-    return resultDataBlocks;
+
+    throw new RuntimeException("Timed out while receiving from mailbox: " + QueryException.EXECUTION_TIMEOUT_ERROR);
   }
 
-  public static ResultTable toResultTable(List<DataTable> queryResult, List<Pair<Integer, String>> fields) {
-    DataSchema resultSchema = null;
+  public static ResultTable toResultTable(List<DataTable> queryResult, List<Pair<Integer, String>> fields,
+      DataSchema sourceSchema) {
     List<Object[]> resultRows = new ArrayList<>();
+    DataSchema resultSchema = toResultSchema(sourceSchema, fields);
     for (DataTable dataTable : queryResult) {
-      resultSchema = resultSchema == null ? toResultSchema(dataTable.getDataSchema(), fields) : resultSchema;
       int numColumns = resultSchema.getColumnNames().length;
       int numRows = dataTable.getNumberOfRows();
       DataSchema.ColumnDataType[] resultColumnDataTypes = resultSchema.getColumnDataTypes();

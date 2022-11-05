@@ -33,11 +33,11 @@ public class OperatorTestUtil {
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
 
   public static TransferableBlock getEndOfStreamRowBlock() {
-    return getEndOfStreamRowBlockWithSchema(TEST_DATA_SCHEMA);
+    return getEndOfStreamRowBlockWithSchema();
   }
 
-  public static TransferableBlock getEndOfStreamRowBlockWithSchema(DataSchema schema) {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(schema));
+  public static TransferableBlock getEndOfStreamRowBlockWithSchema() {
+    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
   }
 
   public static TransferableBlock getRowDataBlock(List<Object[]> rows) {

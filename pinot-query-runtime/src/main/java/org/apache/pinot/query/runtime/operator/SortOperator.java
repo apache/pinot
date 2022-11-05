@@ -44,6 +44,7 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
   private final PriorityQueue<Object[]> _rows;
   private final int _numRowsToKeep;
 
+  private boolean _readyToConstruct;
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
 
@@ -87,7 +88,10 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
       throws IOException {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
+    } else if (!_readyToConstruct) {
+      return TransferableBlockUtils.getNoOpTransferableBlock();
     }
+
     if (!_isSortedBlockConstructed) {
       LinkedList<Object[]> rows = new LinkedList<>();
       while (_rows.size() > _offset) {
@@ -96,30 +100,34 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
       }
       _isSortedBlockConstructed = true;
       if (rows.size() == 0) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       } else {
         return new TransferableBlock(rows, _dataSchema, BaseDataBlock.Type.ROW);
       }
     } else {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
   }
 
   private void consumeInputBlocks() {
     if (!_isSortedBlockConstructed) {
       TransferableBlock block = _upstreamOperator.nextBlock();
-      while (!TransferableBlockUtils.isEndOfStream(block)) {
-        BaseDataBlock dataBlock = block.getDataBlock();
-        int numRows = dataBlock.getNumberOfRows();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
-          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
-        }
-        block = _upstreamOperator.nextBlock();
-      }
       // setting upstream error block
       if (block.isErrorBlock()) {
         _upstreamErrorBlock = block;
+        return;
+      } else if (TransferableBlockUtils.isEndOfStream(block)) {
+        _readyToConstruct = true;
+        return;
+      } else if (TransferableBlockUtils.isNoOpBlock(block)) {
+        return;
+      }
+
+      BaseDataBlock dataBlock = block.getDataBlock();
+      int numRows = dataBlock.getNumberOfRows();
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
+        SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
       }
     }
   }

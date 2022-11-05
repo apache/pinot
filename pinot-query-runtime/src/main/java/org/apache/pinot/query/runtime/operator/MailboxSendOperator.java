@@ -114,7 +114,20 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    TransferableBlock transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+    TransferableBlock transferableBlock;
+    try {
+      transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+    } catch (final Exception e) {
+      // ideally, MailboxSendOperator doesn't ever throw an exception because
+      // it will just get swallowed, in this scenario at least we can forward
+      // any upstream exceptions as an error  block
+      transferableBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+    }
+
+    if (TransferableBlockUtils.isNoOpBlock(transferableBlock)) {
+      return transferableBlock;
+    }
+
     boolean isEndOfStream = TransferableBlockUtils.isEndOfStream(transferableBlock);
     BaseDataBlock.Type type = transferableBlock.getType();
     try {
