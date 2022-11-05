@@ -64,7 +64,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
-  // TODO: Fix inequi join bug.
+  // TODO: Fix inequi join bug. (https://github.com/apache/pinot/issues/9728)
   // TODO: Double check semi join logic.
   public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
       DataSchema outputSchema, JoinNode.JoinKeys joinKeys, List<RexExpression> joinClauses, JoinRelType joinType) {
