@@ -730,22 +730,29 @@ public class PinotHelixResourceManager {
    */
 
   /**
-   * Returns the segments for the given table.
+   * Returns the segments for the given table from the ideal state.
    *
    * @param tableNameWithType Table name with type suffix
    * @param shouldExcludeReplacedSegments whether to return the list of segments that doesn't contain replaced segments.
    * @return List of segment names
    */
   public List<String> getSegmentsFor(String tableNameWithType, boolean shouldExcludeReplacedSegments) {
-    List<String> segmentsFromPropertiesStore = ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
-    if (shouldExcludeReplacedSegments) {
-      return excludeReplacedSegments(tableNameWithType, segmentsFromPropertiesStore);
-    }
-    return segmentsFromPropertiesStore;
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+    List<String> segments = new ArrayList<>(idealState.getPartitionSet());
+    return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, segments) : segments;
   }
 
   /**
-   * Returns the segments for the given table based on the start and end timestamp.
+   * Returns the segments for the given table from the property store. This API is useful to track the orphan segments
+   * that are removed from the ideal state but not the property store.
+   */
+  public List<String> getSegmentsFromPropertyStore(String tableNameWithType) {
+    return ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
+  }
+
+  /**
+   * Returns the segments for the given table based on the start and end timestamp from the ideal state.
    *
    * @param tableNameWithType  Table name with type suffix
    * @param startTimestamp  start timestamp in milliseconds (inclusive)
@@ -754,21 +761,24 @@ public class PinotHelixResourceManager {
    */
   public List<String> getSegmentsForTableWithTimestamps(String tableNameWithType, long startTimestamp,
       long endTimestamp, boolean excludeOverlapping) {
-    List<String> selectedSegments;
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+    Set<String> segments = idealState.getPartitionSet();
     // If no start and end timestamp specified, just select all the segments.
     if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
-      selectedSegments = getSegmentsFor(tableNameWithType, false);
+      return excludeReplacedSegments(tableNameWithType, new ArrayList<>(segments));
     } else {
-      selectedSegments = new ArrayList<>();
+      List<String> selectedSegments = new ArrayList<>();
       List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
       for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
         String segmentName = segmentZKMetadata.getSegmentName();
-        if (isSegmentWithinTimeStamps(segmentZKMetadata, startTimestamp, endTimestamp, excludeOverlapping)) {
+        if (segments.contains(segmentName) && isSegmentWithinTimeStamps(segmentZKMetadata, startTimestamp, endTimestamp,
+            excludeOverlapping)) {
           selectedSegments.add(segmentName);
         }
       }
+      return excludeReplacedSegments(tableNameWithType, selectedSegments);
     }
-    return excludeReplacedSegments(tableNameWithType, selectedSegments);
   }
 
   /**
@@ -1890,7 +1900,7 @@ public class PinotHelixResourceManager {
 
     // Remove all stored segments for the table
     Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
-    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName, false),
+    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFromPropertyStore(offlineTableName),
         retentionPeriodMs);
     LOGGER.info("Deleting table {}: Removed stored segments", offlineTableName);
 
@@ -1947,7 +1957,7 @@ public class PinotHelixResourceManager {
 
     // Remove all stored segments for the table
     Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
-    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName, false),
+    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFromPropertyStore(realtimeTableName),
         retentionPeriodMs);
     LOGGER.info("Deleting table {}: Removed stored segments", realtimeTableName);
 
@@ -3334,7 +3344,6 @@ public class PinotHelixResourceManager {
           if (!segmentsToCleanUp.isEmpty()) {
             LOGGER.info("Cleaning up the segments while startReplaceSegments: {}", segmentsToCleanUp);
             deleteSegments(tableNameWithType, segmentsToCleanUp);
-            waitForSegmentsToDelete(tableNameWithType, segmentsToCleanUp, SEGMENT_CLEANUP_TIMEOUT_MS);
           }
           return true;
         } else {
@@ -3353,23 +3362,6 @@ public class PinotHelixResourceManager {
             + "segmentsTo = {}, segmentLineageEntryId = {})", tableNameWithType, segmentsFrom, segmentsTo,
         segmentLineageEntryId);
     return segmentLineageEntryId;
-  }
-
-  private void waitForSegmentsToDelete(String tableNameWithType, List<String> segments, long timeOutInMillis)
-      throws InterruptedException {
-    LOGGER.info("Waiting for {} segments to delete for table: {}. timeout = {}ms, segments = {}", segments.size(),
-        tableNameWithType, timeOutInMillis, segments);
-    long endTimeMs = System.currentTimeMillis() + timeOutInMillis;
-    do {
-      if (Collections.disjoint(getSegmentsFor(tableNameWithType, false), segments)) {
-        return;
-      } else {
-        Thread.sleep(SEGMENT_CLEANUP_CHECK_INTERVAL_MS);
-      }
-    } while (System.currentTimeMillis() < endTimeMs);
-    throw new RuntimeException(
-        "Timeout while waiting for segments to be deleted for table: " + tableNameWithType + ", timeout: "
-            + timeOutInMillis + "ms");
   }
 
   /**
