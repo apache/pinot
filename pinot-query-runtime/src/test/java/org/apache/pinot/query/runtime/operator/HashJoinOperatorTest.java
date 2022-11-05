@@ -28,13 +28,12 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.hamcrest.Matchers;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.Mockito.when;
 
 
@@ -77,7 +76,12 @@ public class HashJoinOperatorTest {
     List<Object[]> expectedRows =
         Arrays.asList(new Object[]{1, "Aa", 1, "Aa"}, new Object[]{2, "BB", 2, "BB"}, new Object[]{2, "BB", 3, "BB"},
             new Object[]{3, "BB", 2, "BB"}, new Object[]{3, "BB", 3, "BB"});
-    assertThat(expectedRows, Matchers.containsInAnyOrder(resultRows.toArray()));
+    Assert.assertEquals(expectedRows.size(), resultRows.size());
+    Assert.assertEquals(expectedRows.get(0), resultRows.get(0));
+    Assert.assertEquals(expectedRows.get(1), resultRows.get(1));
+    Assert.assertEquals(expectedRows.get(2), resultRows.get(2));
+    Assert.assertEquals(expectedRows.get(3), resultRows.get(3));
+    Assert.assertEquals(expectedRows.get(4), resultRows.get(4));
   }
 
   @Test
@@ -102,7 +106,8 @@ public class HashJoinOperatorTest {
     Object[] expRow = new Object[]{1, "Aa", 2, "Aa"};
     List<Object[]> expectedRows = new ArrayList<>();
     expectedRows.add(expRow);
-    assertThat(expectedRows, Matchers.containsInAnyOrder(resultRows.toArray()));
+    Assert.assertEquals(expectedRows.size(), resultRows.size());
+    Assert.assertEquals(expectedRows.get(0), resultRows.get(0));
   }
 
   @Test
@@ -126,6 +131,9 @@ public class HashJoinOperatorTest {
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "BB", null, null},
         new Object[]{3, "BB", null, null});
-    assertThat(expectedRows, Matchers.containsInAnyOrder(resultRows.toArray()));
+    Assert.assertEquals(expectedRows.size(), resultRows.size());
+    Assert.assertEquals(expectedRows.get(0), resultRows.get(0));
+    Assert.assertEquals(expectedRows.get(1), resultRows.get(1));
+    Assert.assertEquals(expectedRows.get(2), resultRows.get(2));
   }
 }
