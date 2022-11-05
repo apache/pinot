@@ -1053,8 +1053,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Call revert segment replacements (s3, s4, s5) <- (s9, s10, s11) to check if the revertReplaceSegments correctly
     // deleted (s9, s10, s11).
     _helixResourceManager.revertReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId3, false);
-    TestUtils.waitForCondition(aVoid -> _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).size() == 3,
-        60_000L, "Failed to delete the segments");
+    assertEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).size(), 3);
     assertSetEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true), "s3", "s4", "s5");
 
     // Re-upload (s9, s10, s11) to test the segment clean up from startReplaceSegments
