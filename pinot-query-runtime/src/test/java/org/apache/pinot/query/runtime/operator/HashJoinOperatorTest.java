@@ -22,12 +22,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -135,5 +138,33 @@ public class HashJoinOperatorTest {
     Assert.assertEquals(expectedRows.get(0), resultRows.get(0));
     Assert.assertEquals(expectedRows.get(1), resultRows.get(1));
     Assert.assertEquals(expectedRows.get(2), resultRows.get(2));
+  }
+
+  @Test
+  public void testInequiJoin() {
+    List<Object[]> leftRows = Arrays.asList(new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"});
+    when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(leftRows))
+        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
+    List<Object[]> rightRows = Arrays.asList(new Object[]{1, "AA"}, new Object[]{2, "Aa"});
+    when(_rightOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(rightRows))
+        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
+
+    List<RexExpression> joinClauses = new ArrayList<>();
+    List<RexExpression> functionOperands = new ArrayList<>();
+    functionOperands.add(new RexExpression.InputRef(0));
+    functionOperands.add(new RexExpression.InputRef(2));
+    joinClauses.add(
+        new RexExpression.FunctionCall(SqlKind.NOT_EQUALS, FieldSpec.DataType.INT, "NOT_EQUALS", functionOperands));
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+        DataSchema.ColumnDataType.STRING
+    });
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, JoinRelType.INNER);
+
+    TransferableBlock result = join.getNextBlock();
+    List<Object[]> resultRows = result.getContainer();
+    Assert.assertTrue(resultRows.size() != 0);
+
   }
 }

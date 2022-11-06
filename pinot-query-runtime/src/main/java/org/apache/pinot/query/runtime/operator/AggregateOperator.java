@@ -50,6 +50,8 @@ import org.apache.pinot.spi.data.FieldSpec;
  *
  * Note: This class performs aggregation over the double value of input.
  * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
+ *
+ * For inequi join, the join key has to be numeric.
  */
 public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
