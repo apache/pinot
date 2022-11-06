@@ -43,14 +43,11 @@ import org.slf4j.LoggerFactory;
  */
 public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
-  private StreamMessageDecoder _messageDecoder;
-  private Logger _instanceLogger;
+  private final StreamMessageDecoder _messageDecoder;
+  private final Logger _instanceLogger;
 
-  private String _clientId;
-  private String _tableAndStreamName;
-
-  private StreamConfig _streamConfig;
-  private KafkaStreamLevelStreamConfig _kafkaStreamLevelStreamConfig;
+  private final StreamConfig _streamConfig;
+  private final KafkaStreamLevelStreamConfig _kafkaStreamLevelStreamConfig;
 
   private KafkaConsumer<Bytes, Bytes> _consumer;
   private ConsumerRecords<Bytes, Bytes> _consumerRecords;
@@ -63,13 +60,10 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
   public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig,
       Set<String> sourceFields, String groupId) {
-    _clientId = clientId;
     _streamConfig = streamConfig;
     _kafkaStreamLevelStreamConfig = new KafkaStreamLevelStreamConfig(streamConfig, tableName, groupId);
 
     _messageDecoder = StreamDecoderProvider.create(streamConfig, sourceFields);
-
-    _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
     _instanceLogger = LoggerFactory
         .getLogger(KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamConfig.getTopicName());
     _instanceLogger.info("KafkaStreamLevelConsumer: streamConfig : {}", _streamConfig);

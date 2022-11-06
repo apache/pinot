@@ -129,7 +129,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
     try {
       IngestionJobLauncher.runIngestionJob(spec);
     } catch (Exception e) {
-      LOGGER.error("Got exception to kick off standalone data ingestion job - ", e);
+      LOGGER.error("Got exception to kick off {} data ingestion job - ", spec.getExecutionFrameworkSpec().getName(), e);
       throw e;
     }
     return true;
@@ -159,6 +159,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
 
   public static void main(String[] args) {
     PluginManager.get().init();
-    new CommandLine(new LaunchDataIngestionJobCommand()).execute(args);
+    int exitCode = new CommandLine(new LaunchDataIngestionJobCommand()).execute(args);
+    System.exit(exitCode);
   }
 }

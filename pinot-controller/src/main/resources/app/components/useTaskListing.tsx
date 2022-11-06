@@ -47,7 +47,6 @@ export default function useTaskListing(props) {
         data={tasks}
         showSearchBox={true}
         inAccordionFormat={true}
-        isPagination={false}
         addLinks
         baseURL={`/task-queue/${taskType}/tables/${tableName}/task/`}
       />

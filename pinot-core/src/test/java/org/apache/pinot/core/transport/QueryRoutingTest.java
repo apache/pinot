@@ -22,14 +22,17 @@ import com.google.common.util.concurrent.Futures;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -60,12 +63,13 @@ public class QueryRoutingTest {
 
   @BeforeClass
   public void setUp() {
-    _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class));
+    _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class), mock(ServerRoutingStatsManager.class));
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes) {
-    return new QueryServer(TEST_PORT, mockQueryScheduler(responseDelayMs, responseBytes), mock(ServerMetrics.class),
-        null);
+    InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(),
+        mockQueryScheduler(responseDelayMs, responseBytes), mock(ServerMetrics.class), mock(AccessControl.class));
+    return new QueryServer(TEST_PORT, null, handler);
   }
 
   private QueryScheduler mockQueryScheduler(int responseDelayMs, byte[] responseBytes) {
@@ -81,7 +85,7 @@ public class QueryRoutingTest {
   public void testValidResponse()
       throws Exception {
     long requestId = 123;
-    DataTable dataTable = DataTableFactory.getEmptyDataTable();
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 
@@ -159,7 +163,7 @@ public class QueryRoutingTest {
   public void testNonMatchingRequestId()
       throws Exception {
     long requestId = 123;
-    DataTable dataTable = DataTableFactory.getEmptyDataTable();
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 
@@ -192,7 +196,7 @@ public class QueryRoutingTest {
     // To avoid flakyness, set timeoutMs to 2000 msec. For some test runs, it can take up to
     // 1400 msec to mark request as failed.
     long timeoutMs = 2000L;
-    DataTable dataTable = DataTableFactory.getEmptyDataTable();
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
 

@@ -44,9 +44,15 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_NO_RAW_DATA = "noRawDataForTextIndex";
   public static final String TEXT_INDEX_RAW_VALUE = "rawValueForTextIndex";
   public static final String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
+  public static final String TEXT_INDEX_STOP_WORD_INCLUDE_KEY = "stopWordInclude";
+  public static final String TEXT_INDEX_STOP_WORD_EXCLUDE_KEY = "stopWordExclude";
+  public static final String TEXT_INDEX_STOP_WORD_SEPERATOR = ",";
   // "native" for native, default is Lucene
   public static final String TEXT_FST_TYPE = "fstType";
   public static final String TEXT_NATIVE_FST_LITERAL = "native";
+  // Config to disable forward index
+  public static final String FORWARD_INDEX_DISABLED = "forwardIndexDisabled";
+  public static final String DEFAULT_FORWARD_INDEX_DISABLED = Boolean.FALSE.toString();
 
   private final String _name;
   private final EncodingType _encodingType;

@@ -44,6 +44,7 @@ import {
   getMinionMeta,
   getTasks,
   getTaskDebug,
+  getTaskGeneratorDebug,
   updateInstanceTags,
   getClusterConfig,
   getQueryTables,
@@ -56,6 +57,7 @@ import {
   getTenantTableDetails,
   getSegmentMetadata,
   reloadSegment,
+  getTableJobs,
   getClusterInfo,
   zookeeperGetList,
   zookeeperGetData,
@@ -88,7 +90,10 @@ import {
   requestUserList,
   requestAddUser,
   requestDeleteUser,
-  requestUpdateUser
+  requestUpdateUser,
+  getTaskProgress,
+  getSegmentReloadStatus,
+  getTaskRuntimeConfig
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -797,7 +802,7 @@ const getElapsedTime = (startTime) => {
 
 const getTasksList = async (tableName, taskType) => {
   const finalResponse = {
-    columns: ['Task ID', 'Status', 'Start Time', 'Elapsed Time', 'Finish Time', 'Num of Sub Tasks'],
+    columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Num of Sub Tasks'],
     records: []
   }
   await new Promise((resolve, reject) => {
@@ -805,13 +810,11 @@ const getTasksList = async (tableName, taskType) => {
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
         const debugData = await getTaskDebugData(taskID);
-        const startTime = moment(get(debugData, 'data.subtaskInfos.0.startTime'), 'YYYY-MM-DD hh:mm:ss');
         finalResponse.records.push([
           taskID,
           status,
-          get(debugData, 'data.subtaskInfos.0.startTime'),
-          startTime ? getElapsedTime(startTime) : '',
-          get(debugData, 'data.subtaskInfos.0.finishTime', ''),
+          get(debugData, 'data.startTime', ''),
+          get(debugData, 'data.finishTime', ''),
           get(debugData, 'data.subtaskCount.total', 0)
         ]);
       };
@@ -825,8 +828,25 @@ const getTasksList = async (tableName, taskType) => {
   return finalResponse;
 };
 
+const getTaskRuntimeConfigData = async (taskName: string) => {
+  const response = await getTaskRuntimeConfig(taskName);
+  
+  return response.data;
+}
+
 const getTaskDebugData = async (taskName) => {
   const debugRes = await getTaskDebug(taskName);
+  return debugRes;
+};
+
+const getTaskProgressData = async (taskName, subTaskName) => {
+  const progressData = await getTaskProgress(taskName, subTaskName);
+
+  return progressData.data;
+}
+
+const getTaskGeneratorDebugData = async (taskName, taskType) => {
+  const debugRes = await getTaskGeneratorDebug(taskName, taskType);
   return debugRes;
 };
 
@@ -853,6 +873,18 @@ const deleteSegmentOp = (tableName, segmentName) => {
     return response.data;
   });
 };
+
+const fetchTableJobs = async (tableName: string) => {
+  const response = await getTableJobs(tableName);
+  
+  return response.data;
+}
+
+const fetchSegmentReloadStatus = async (jobId: string) => {
+  const response = await getSegmentReloadStatus(jobId);
+  
+  return response.data;
+}
 
 const updateTable = (tableName: string, table: string) => {
   return putTable(tableName, table).then((res)=>{
@@ -1088,8 +1120,11 @@ export default {
   deleteInstance,
   getAllPeriodicTaskNames,
   getAllTaskTypes,
+  fetchTableJobs,
+  fetchSegmentReloadStatus,
   getTaskTypeDebugData,
   getTableData,
+  getTaskRuntimeConfigData,
   getTaskInfo,
   stopAllTasks,
   resumeAllTasks,
@@ -1102,6 +1137,8 @@ export default {
   getElapsedTime,
   getTasksList,
   getTaskDebugData,
+  getTaskProgressData,
+  getTaskGeneratorDebugData,
   deleteSegmentOp,
   reloadSegmentOp,
   reloadStatusOp,

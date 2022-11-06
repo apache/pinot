@@ -27,6 +27,7 @@ import java.util.Base64;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -385,6 +386,36 @@ public class StringFunctions {
   }
 
   /**
+   * @param bytes
+   * @param charsetName encoding
+   * @return bytearray to string
+   * returns null on exception
+   */
+  @ScalarFunction
+  public static String fromBytes(byte[] bytes, String charsetName) {
+    try {
+      return new String(bytes, charsetName);
+    } catch (UnsupportedEncodingException e) {
+      return null;
+    }
+  }
+
+  /**
+   * @param input
+   * @param charsetName encoding
+   * @return bytearray to string
+   * returns null on exception
+   */
+  @ScalarFunction
+  public static byte[] toBytes(String input, String charsetName) {
+    try {
+      return input.getBytes(charsetName);
+    } catch (UnsupportedEncodingException e) {
+      return null;
+    }
+  }
+
+  /**
    * @see StandardCharsets#UTF_8#encode(String)
    * @param input
    * @return bytes
@@ -443,7 +474,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String[] split(String input, String delimiter) {
-    return StringUtils.split(input, delimiter);
+    return StringUtils.splitByWholeSeparator(input, delimiter);
   }
 
   /**
@@ -454,10 +485,11 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String[] split(String input, String delimiter, int limit) {
-    return StringUtils.split(input, delimiter, limit);
+    return StringUtils.splitByWholeSeparator(input, delimiter, limit);
   }
 
   /**
+   * TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
    * @param input
    * @param delimiter
    * @param index
@@ -465,7 +497,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int index) {
-    String[] splitString = StringUtils.split(input, delimiter);
+    String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
     if (index < splitString.length) {
       return splitString[index];
     } else {
@@ -556,7 +588,7 @@ public class StringFunctions {
   @ScalarFunction
   public static String encodeUrl(String input)
       throws UnsupportedEncodingException {
-      return URLEncoder.encode(input, StandardCharsets.UTF_8.toString());
+    return URLEncoder.encode(input, StandardCharsets.UTF_8.toString());
   }
 
   /**
@@ -694,5 +726,17 @@ public class StringFunctions {
   public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
       int occurence) {
     return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, occurence, "");
+  }
+
+  @ScalarFunction
+  public static boolean regexpLike(String inputStr, String regexPatternStr) {
+    Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
+    return pattern.matcher(inputStr).find();
+  }
+
+  @ScalarFunction
+  public static boolean like(String inputStr, String likePatternStr) {
+    String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
+    return regexpLike(inputStr, regexPatternStr);
   }
 }

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
@@ -43,10 +44,12 @@ public class SegmentProcessorConfig {
   private final MergeType _mergeType;
   private final Map<String, AggregationFunctionType> _aggregationTypes;
   private final SegmentConfig _segmentConfig;
+  private final Consumer<Object> _progressObserver;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema, TimeHandlerConfig timeHandlerConfig,
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
-      Map<String, AggregationFunctionType> aggregationTypes, SegmentConfig segmentConfig) {
+      Map<String, AggregationFunctionType> aggregationTypes, SegmentConfig segmentConfig,
+      Consumer<Object> progressObserver) {
     _tableConfig = tableConfig;
     _schema = schema;
     _timeHandlerConfig = timeHandlerConfig;
@@ -54,6 +57,9 @@ public class SegmentProcessorConfig {
     _mergeType = mergeType;
     _aggregationTypes = aggregationTypes;
     _segmentConfig = segmentConfig;
+    _progressObserver = (progressObserver != null) ? progressObserver : p -> {
+      // Do nothing.
+    };
   }
 
   /**
@@ -105,6 +111,10 @@ public class SegmentProcessorConfig {
     return _segmentConfig;
   }
 
+  public Consumer<Object> getProgressObserver() {
+    return _progressObserver;
+  }
+
   @Override
   public String toString() {
     return "SegmentProcessorConfig{" + "_tableConfig=" + _tableConfig + ", _schema=" + _schema + ", _timeHandlerConfig="
@@ -123,6 +133,7 @@ public class SegmentProcessorConfig {
     private MergeType _mergeType;
     private Map<String, AggregationFunctionType> _aggregationTypes;
     private SegmentConfig _segmentConfig;
+    private Consumer<Object> _progressObserver;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -159,6 +170,11 @@ public class SegmentProcessorConfig {
       return this;
     }
 
+    public Builder setProgressObserver(Consumer<Object> progressObserver) {
+      _progressObserver = progressObserver;
+      return this;
+    }
+
     public SegmentProcessorConfig build() {
       Preconditions.checkState(_tableConfig != null, "Must provide table config in SegmentProcessorConfig");
       Preconditions.checkState(_schema != null, "Must provide schema in SegmentProcessorConfig");
@@ -179,7 +195,7 @@ public class SegmentProcessorConfig {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
       return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
-          _aggregationTypes, _segmentConfig);
+          _aggregationTypes, _segmentConfig, _progressObserver);
     }
   }
 }

@@ -23,6 +23,7 @@ class app_state {
   authWorkflow: AuthWorkflow;
   authToken: string | null;
   columnNameSeparator: string = '#$%';
+  hideQueryConsoleTab: boolean;
   username: string;
   role: string;
 }

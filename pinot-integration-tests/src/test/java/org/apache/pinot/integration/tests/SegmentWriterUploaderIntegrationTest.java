@@ -155,7 +155,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   private int getNumSegments()
       throws IOException {
     String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-        forSegmentListAPIWithTableType(_tableNameWithType, TableType.OFFLINE.toString()));
+        forSegmentListAPI(_tableNameWithType, TableType.OFFLINE.toString()));
     JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
     return array.get(0).get("OFFLINE").size();
   }
@@ -169,7 +169,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   private int getNumDocsInLatestSegment()
       throws IOException {
     String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-        forSegmentListAPIWithTableType(_tableNameWithType, TableType.OFFLINE.toString()));
+        forSegmentListAPI(_tableNameWithType, TableType.OFFLINE.toString()));
     JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
     JsonNode segments = array.get(0).get("OFFLINE");
     String segmentName = segments.get(segments.size() - 1).asText();

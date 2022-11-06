@@ -99,8 +99,8 @@ public class ImmutableSegmentLoader {
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
       boolean needPreprocess)
       throws Exception {
-    Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory",
-        indexDir);
+    Preconditions
+        .checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory", indexDir);
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentMetadata.getTotalDocs() == 0) {
@@ -117,8 +117,9 @@ public class ImmutableSegmentLoader {
     String segmentName = segmentMetadata.getName();
     SegmentDirectoryLoaderContext segmentLoaderContext =
         new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
-            .setSchema(schema).setInstanceId(indexLoadingConfig.getInstanceId()).setSegmentName(segmentName)
-            .setSegmentCrc(segmentMetadata.getCrc())
+            .setSchema(schema).setInstanceId(indexLoadingConfig.getInstanceId())
+            .setTableDataDir(indexLoadingConfig.getTableDataDir()).setSegmentName(segmentName)
+            .setSegmentCrc(segmentMetadata.getCrc()).setSegmentTier(indexLoadingConfig.getSegmentTier())
             .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs()).build();
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());

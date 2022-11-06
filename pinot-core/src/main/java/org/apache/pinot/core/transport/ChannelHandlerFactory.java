@@ -28,6 +28,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -82,8 +83,8 @@ public class ChannelHandlerFactory {
    * The {@code getInstanceRequestHandler} return a {@code InstanceRequestHandler} Netty inbound handler on Pinot
    * Server side to handle the serialized instance requests sent from Pinot Broker.
    */
-  public static ChannelHandler getInstanceRequestHandler(QueryScheduler queryScheduler, ServerMetrics serverMetrics,
-      AccessControl accessControl) {
-    return new InstanceRequestHandler(queryScheduler, serverMetrics, accessControl);
+  public static ChannelHandler getInstanceRequestHandler(String instanceName, PinotConfiguration config,
+      QueryScheduler queryScheduler, ServerMetrics serverMetrics, AccessControl accessControl) {
+    return new InstanceRequestHandler(instanceName, config, queryScheduler, serverMetrics, accessControl);
   }
 }

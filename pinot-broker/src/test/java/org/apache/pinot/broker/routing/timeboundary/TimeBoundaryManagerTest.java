@@ -32,12 +32,15 @@ import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.mockito.Mockito;
@@ -47,7 +50,6 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
-import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -111,10 +113,11 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     Map<String, String> offlineInstanceStateMap = Collections.singletonMap("server", OFFLINE);
     Set<String> onlineSegments = new HashSet<>();
     // NOTE: Ideal state is not used in the current implementation.
-    IdealState idealState = mock(IdealState.class);
+    IdealState idealState = new IdealState("");
 
     // Start with no segment
-    TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore);
+    TimeBoundaryManager timeBoundaryManager =
+        new TimeBoundaryManager(tableConfig, _propertyStore, Mockito.mock(BrokerMetrics.class));
     timeBoundaryManager.init(idealState, externalView, onlineSegments);
     assertNull(timeBoundaryManager.getTimeBoundaryInfo());
 
@@ -169,14 +172,34 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     // Refresh the changed segment should update the time boundary
     timeBoundaryManager.refreshSegment(segment2);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(4, TimeUnit.DAYS));
+
+    // Setting the enforced time boundary in ideal state should update the time boundary
+    idealState.getRecord().setSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY,
+        Long.toString(TimeUnit.MILLISECONDS.convert(50, TimeUnit.DAYS)));
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(50, TimeUnit.DAYS));
+
+    // Refresh with more recent segment should not update the enforced time boundary
+    String segment3 = "segment3";
+    setSegmentZKMetadata(rawTableName, segment3, 100, timeUnit);
+    onlineSegments.add(segment3);
+    segmentAssignment.put(segment3, onlineInstanceStateMap);
+    timeBoundaryManager.refreshSegment(segment3);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(50, TimeUnit.DAYS));
+
+    // Unsetting the enforced time boundary should change it to most recent time boundary
+    idealState.getRecord().getSimpleFields().remove(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(99, TimeUnit.DAYS));
   }
 
   private void testHourlyPushTable(String rawTableName, TableConfig tableConfig, TimeUnit timeUnit) {
     // NOTE: External view and ideal state are not used in the current implementation.
     ExternalView externalView = Mockito.mock(ExternalView.class);
-    IdealState idealState = Mockito.mock(IdealState.class);
+    IdealState idealState = new IdealState("");
 
-    TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore);
+    TimeBoundaryManager timeBoundaryManager =
+        new TimeBoundaryManager(tableConfig, _propertyStore, Mockito.mock(BrokerMetrics.class));
     Set<String> onlineSegments = new HashSet<>();
     String segment0 = "segment0";
     onlineSegments.add(segment0);
@@ -190,6 +213,17 @@ public class TimeBoundaryManagerTest extends ControllerTest {
       // Time boundary should be endTime - 1 HOUR when time unit is other than DAYS
       expectedTimeValue = timeUnit.convert(47, TimeUnit.HOURS);
     }
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), expectedTimeValue);
+
+    // Setting the enforced time boundary in ideal state should update the time boundary
+    idealState.getRecord().setSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY,
+        Long.toString(TimeUnit.MILLISECONDS.convert(50, TimeUnit.HOURS)));
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
+    verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), timeUnit.convert(50, TimeUnit.HOURS));
+
+    // Unsetting the enforced time boundary should change it back to original time boundary
+    idealState.getRecord().getSimpleFields().remove(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
+    timeBoundaryManager.onAssignmentChange(idealState, externalView, onlineSegments);
     verifyTimeBoundaryInfo(timeBoundaryManager.getTimeBoundaryInfo(), expectedTimeValue);
   }
 

@@ -19,13 +19,17 @@
 package org.apache.pinot.core.operator.docidsets;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.SortedRangeIntersection;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -51,9 +55,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public final class AndDocIdSet implements FilterBlockDocIdSet {
   private final List<FilterBlockDocIdSet> _docIdSets;
+  private final boolean _cardinalityBasedRankingForScan;
 
-  public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets) {
+  public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets, Map<String, String> queryOptions) {
     _docIdSets = docIdSets;
+    _cardinalityBasedRankingForScan =
+        !MapUtils.isEmpty(queryOptions) && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
   }
 
   @Override
@@ -79,6 +86,21 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
         remainingDocIdIterators.add(docIdIterator);
       }
     }
+
+    // evaluate the bitmaps in the order of the lowest matching num docIds comes first, so that we minimize the number
+    // of containers (range) for comparison from the beginning, as will minimize the effort of bitmap AND application
+    bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
+
+    // Evaluate the scan based operator with the highest cardinality coming first, this potentially reduce the range of
+    // scanning from the beginning. Automatically place N/A cardinality column (negative infinity) to the back as we
+    // want to evaluate these unestimated predicates in the end.
+    // TODO: 1. remainingDocIdIterators currently doesn't report cardinality; therefore, it cannot be
+    //          prioritized even if it provides high effective cardinality, one way to do this is to let AND/OR
+    //          DocIdIterators bubble up cardinality for the sort to happen recursively for nested AND-OR predicates
+    if (_cardinalityBasedRankingForScan) {
+      scanBasedDocIdIterators.sort(Comparator.comparing(x -> (-x.getEstimatedCardinality(true))));
+    }
+
     int numSortedDocIdIterators = sortedDocIdIterators.size();
     int numBitmapBasedDocIdIterators = bitmapBasedDocIdIterators.size();
     int numScanBasedDocIdIterators = scanBasedDocIdIterators.size();

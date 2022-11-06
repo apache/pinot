@@ -18,16 +18,22 @@
  */
 package org.apache.pinot.core.query.request;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.utils.QueryIdUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.protocol.TCompactProtocol;
@@ -47,6 +53,10 @@ public class ServerQueryRequest {
   private final List<String> _segmentsToQuery;
   private final QueryContext _queryContext;
 
+  // Request id might not be unique across brokers or for request hitting a hybrid table. To solve that we may construct
+  // a unique query id from broker id, request id and table type.
+  private final String _queryId;
+
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
 
@@ -56,7 +66,9 @@ public class ServerQueryRequest {
     _enableTrace = instanceRequest.isEnableTrace();
     _enableStreaming = false;
     _segmentsToQuery = instanceRequest.getSearchSegments();
-    _queryContext = QueryContextConverterUtils.getQueryContext(instanceRequest.getQuery().getPinotQuery());
+    _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
+    _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
+        TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
@@ -83,8 +95,19 @@ public class ServerQueryRequest {
     } else {
       throw new UnsupportedOperationException("Unsupported payloadType: " + payloadType);
     }
-    _queryContext = QueryContextConverterUtils.getQueryContext(brokerRequest.getPinotQuery());
+    _queryContext = getQueryContext(brokerRequest.getPinotQuery());
+    _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
+        TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+  }
+
+  private static QueryContext getQueryContext(PinotQuery pinotQuery) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    if (queryContext.isNullHandlingEnabled()) {
+      Preconditions.checkState(DataTableBuilderFactory.getDataTableVersion() >= DataTableFactory.VERSION_4,
+          "Null handling cannot be enabled for data table version smaller than 4");
+    }
+    return queryContext;
   }
 
   public long getRequestId() {
@@ -113,6 +136,10 @@ public class ServerQueryRequest {
 
   public QueryContext getQueryContext() {
     return _queryContext;
+  }
+
+  public String getQueryId() {
+    return _queryId;
   }
 
   public TimerContext getTimerContext() {

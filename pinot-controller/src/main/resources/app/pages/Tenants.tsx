@@ -108,7 +108,6 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
         title={tenantName}
         data={tableData}
         tooltipData={TableTooltipData}
-        isPagination
         addLinks
         baseURL={`/tenants/${tenantName}/table/`}
         showSearchBox={true}
@@ -122,7 +121,6 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
               columns: ['Instance Name'],
               records: brokerData.length > 0 ? brokerData : []
             }}
-            isPagination
             addLinks
             baseURL="/instance/"
             showSearchBox={true}
@@ -136,7 +134,6 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
               columns: ['Instance Name'],
               records: serverData.length > 0 ? serverData : []
             }}
-            isPagination
             addLinks
             baseURL="/instance/"
             showSearchBox={true}

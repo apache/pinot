@@ -160,6 +160,13 @@ public interface BlockValSet {
   String[][] getStringValuesMV();
 
   /**
+   * Returns the byte[] values for a multi-valued column.
+   *
+   * @return Array of byte[] values
+   */
+  byte[][][] getBytesValuesMV();
+
+  /**
    * Returns the number of MV entries for a multi-valued column.
    *
    * @return Array of number of MV entries

@@ -18,10 +18,17 @@
  */
 package org.apache.pinot.plugin.stream.kafka20.server;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,6 +73,38 @@ public class KafkaDataProducer implements StreamDataProducer {
   public void produce(String topic, byte[] key, byte[] payload) {
     _producer.send(new ProducerRecord<>(topic, key, payload));
     _producer.flush();
+  }
+
+  @Override
+  public void produce(String topic, byte[] key, byte[] payload, GenericRow headers) {
+    List<Header> headerList = new ArrayList<>();
+    long nowMs = System.currentTimeMillis();
+    headerList.add(new RecordHeader("producerTimestamp", String.valueOf(nowMs).getBytes(
+        StandardCharsets.UTF_8)));
+    if (headers != null) {
+      headers.getFieldToValueMap().forEach((k, v) -> {
+        Header header = convertToKafkaHeader(k, v);
+        if (header != null) {
+          headerList.add(header);
+        }
+      });
+    }
+    _producer.send(new ProducerRecord<>(topic, null, nowMs, key, payload, headerList));
+    _producer.flush();
+  }
+
+  public Header convertToKafkaHeader(String key, Object value) {
+    if (value != null) {
+      if (value instanceof String) {
+        return new RecordHeader(key, ((String) value).getBytes(StandardCharsets.UTF_8));
+      }
+      if (value instanceof Long) {
+        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+        buffer.putLong(((Long) value));
+        return new RecordHeader(key, buffer.array());
+      }
+    }
+    return null;
   }
 
   @Override

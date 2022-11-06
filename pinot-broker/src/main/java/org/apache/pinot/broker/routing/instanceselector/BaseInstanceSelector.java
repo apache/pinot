@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -54,6 +55,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   private final AtomicLong _requestId = new AtomicLong();
   private final String _tableNameWithType;
   private final BrokerMetrics _brokerMetrics;
+  protected final AdaptiveServerSelector _adaptiveServerSelector;
 
   // These 4 variables are the cached states to help accelerate the change processing
   private Set<String> _enabledInstances;
@@ -65,9 +67,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   private volatile Map<String, List<String>> _segmentToEnabledInstancesMap;
   private volatile Set<String> _unavailableSegments;
 
-  BaseInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics) {
+  BaseInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector) {
     _tableNameWithType = tableNameWithType;
     _brokerMetrics = brokerMetrics;
+    _adaptiveServerSelector = adaptiveServerSelector;
   }
 
   @Override
@@ -269,7 +273,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         && brokerRequest.getPinotQuery().getQueryOptions() != null)
         ? brokerRequest.getPinotQuery().getQueryOptions()
         : Collections.emptyMap();
-    Map<String, String> segmentToInstanceMap = select(segments, requestId, _segmentToEnabledInstancesMap, queryOptions);
+    Map<String, String> segmentToInstanceMap = select(segments, requestId, _segmentToEnabledInstancesMap,
+        queryOptions);
     Set<String> unavailableSegments = _unavailableSegments;
     if (unavailableSegments.isEmpty()) {
       return new SelectionResult(segmentToInstanceMap, Collections.emptyList());

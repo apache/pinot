@@ -96,6 +96,11 @@ public class ArithmeticFunctionsTest {
     inputs.add(new Object[]{"sign(a)", Lists.newArrayList("a"), row6, 1.0});
     inputs.add(new Object[]{"sign(a)", Lists.newArrayList("a"), row7, -1.0});
 
+    GenericRow row8 = new GenericRow();
+    row8.putValue("a", 9.5);
+    row8.putValue("b", 0);
+    inputs.add(new Object[]{"divide(a, b, 0)", Lists.newArrayList("a", "b"), row8, 0.0});
+
     return inputs.toArray(new Object[0][]);
   }
 }

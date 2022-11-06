@@ -144,8 +144,7 @@ public class SegmentConversionUtils {
           fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authProvider);
       String responseString = response.getResponse();
       LOGGER.info(
-          "Got response {}: {} while sending start replace segment reBaseSingleSegmentConversionExecutorquest for "
-              + "table: {}, uploadURL: {}, request: {}",
+          "Got response {}: {} while sending start replace segment request for table: {}, uploadURL: {}, request: {}",
           response.getStatusCode(), responseString, tableNameWithType, uploadURL, startReplaceSegmentsRequest);
       return JsonUtils.stringToJsonNode(responseString).get("segmentLineageEntryId").asText();
     }

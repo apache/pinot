@@ -18,7 +18,12 @@
  */
 package org.apache.calcite.jdbc;
 
+import java.util.List;
+import java.util.Map;
+import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.Schema;
+import org.apache.calcite.schema.SchemaPlus;
+import org.apache.pinot.common.function.FunctionRegistry;
 
 
 /**
@@ -47,6 +52,13 @@ public class CalciteSchemaBuilder {
    * @return calcite schema with given schema as the root
    */
   public static CalciteSchema asRootSchema(Schema root) {
-    return new SimpleCalciteSchema(null, root, "");
+    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, "", root);
+    SchemaPlus schemaPlus = rootSchema.plus();
+    for (Map.Entry<String, List<Function>> e : FunctionRegistry.getRegisteredCalciteFunctionMap().entrySet()) {
+      for (Function f : e.getValue()) {
+        schemaPlus.add(e.getKey(), f);
+      }
+    }
+    return rootSchema;
   }
 }

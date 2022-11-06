@@ -36,6 +36,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.realtime.converter.ColumnIndicesForRealtimeTable;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
@@ -50,6 +51,8 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -93,8 +96,6 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private final String _sortedColumn;
   private final List<String> _invertedIndexColumns;
-  private final List<String> _noDictionaryColumns;
-  private final List<String> _varLengthDictionaryColumns;
   private final Logger _segmentLogger;
   private final SegmentVersion _segmentVersion;
 
@@ -150,18 +151,12 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       invertedIndexColumns.add(_sortedColumn);
     }
     _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
-
-    // No DictionaryColumns
-    _noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
-
-    _varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
-
     _streamConfig = new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(tableConfig));
 
     _segmentLogger = LoggerFactory.getLogger(
         HLRealtimeSegmentDataManager.class.getName() + "_" + _segmentName + "_" + _streamConfig.getTopicName());
     _segmentLogger.info("Created segment data manager with Sorted column:{}, invertedIndexColumns:{}", _sortedColumn,
-        _invertedIndexColumns);
+        invertedIndexColumns);
 
     _segmentEndTimeThreshold = _start + _streamConfig.getFlushThresholdTimeMillis();
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
@@ -283,12 +278,15 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           updateCurrentDocumentCountMetrics();
           _segmentLogger.info("Indexed {} raw events", _realtimeSegment.getNumDocsIndexed());
           File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + System.currentTimeMillis());
+          ColumnIndicesForRealtimeTable columnIndicesForRealtimeTable =
+              new ColumnIndicesForRealtimeTable(_sortedColumn, _invertedIndexColumns, Collections.emptyList(),
+                  Collections.emptyList(), new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns()),
+                  new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns()));
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(_realtimeSegment, null, tempSegmentFolder.getAbsolutePath(),
-                  schema, _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(), _sortedColumn,
-                  _invertedIndexColumns, Collections.emptyList(), Collections.emptyList(), _noDictionaryColumns,
-                  _varLengthDictionaryColumns, indexingConfig.isNullHandlingEnabled());
+                  schema, _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(),
+                  columnIndicesForRealtimeTable, indexingConfig.isNullHandlingEnabled());
 
           _segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();
@@ -425,6 +423,17 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   @Override
   public long getLastConsumedTimestamp() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Map<String, ConsumerPartitionState> getConsumerPartitionState() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Map<String, PartitionLagState> getPartitionToLagState(
+      Map<String, ConsumerPartitionState> consumerPartitionStateMap) {
     throw new UnsupportedOperationException();
   }
 

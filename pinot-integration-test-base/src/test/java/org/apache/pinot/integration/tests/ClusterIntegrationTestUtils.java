@@ -69,6 +69,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -175,7 +176,7 @@ public class ClusterIntegrationTestUtils {
                 if (i < array.size()) {
                   value = array.get(i);
                   if (value instanceof Utf8) {
-                    value = value.toString();
+                    value = StringUtil.sanitizeStringValue(value.toString(), FieldSpec.DEFAULT_MAX_LENGTH);
                   }
                 } else {
                   value = null;
@@ -184,7 +185,7 @@ public class ClusterIntegrationTestUtils {
               }
             } else {
               if (value instanceof Utf8) {
-                value = value.toString();
+                value = StringUtil.sanitizeStringValue(value.toString(), FieldSpec.DEFAULT_MAX_LENGTH);
               }
               h2Statement.setObject(h2Index++, value);
             }
@@ -555,8 +556,25 @@ public class ClusterIntegrationTestUtils {
   static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
+    testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, null);
+  }
+
+  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+      String h2Query, Connection h2Connection, @Nullable Map<String, String> headers,
+      @Nullable Map<String, String> extraJsonProperties) {
+    try {
+      testQueryInternal(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, extraJsonProperties);
+    } catch (Exception e) {
+      failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
+    }
+  }
+
+  private static void testQueryInternal(String pinotQuery, String brokerUrl,
+      org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
+      throws Exception {
     // broker response
-    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers);
+    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers, extraJsonProperties);
     if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
     }
@@ -594,7 +612,7 @@ public class ClusterIntegrationTestUtils {
       comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet, orderByColumns,
           pinotQuery, h2Query, h2NumRows, pinotNumRecordsSelected);
     } else {
-      if (queryContext.getGroupByExpressions() == null) {
+      if (queryContext.getGroupByExpressions() == null && !QueryContextUtils.isDistinctQuery(queryContext)) {
         // aggregation only
 
         // compare the single row
@@ -606,12 +624,17 @@ public class ClusterIntegrationTestUtils {
           // If H2 value is null, it means no record selected in H2
           if (h2Value == null) {
             if (pinotNumRecordsSelected != 0) {
-              String failureMessage =
-                  "No record selected in H2 but " + pinotNumRecordsSelected + " records selected in Pinot";
-              failure(pinotQuery, h2Query, failureMessage);
+              throw new RuntimeException("No record selected in H2 but " + pinotNumRecordsSelected
+                  + " records selected in Pinot");
             }
 
             // Skip further comparison
+            return;
+          }
+
+          if (brokerResponseRows.size() == 0 || resultTableResultSet.getRowCount() == 0) {
+            // Skip comparison if agg results returns 0 row, this is difference in treating
+            // always-false literal predicate.
             return;
           }
 
@@ -621,10 +644,8 @@ public class ClusterIntegrationTestUtils {
           // Fuzzy compare expected value and actual value
           boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
           if (error) {
-            String failureMessage =
-                "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
-                    + ", got client value:" + connectionValue;
-            failure(pinotQuery, h2Query, failureMessage);
+            throw new RuntimeException("Value: " + c + " does not match, expected: " + h2Value
+                + ", got broker value: " + brokerValue + ", got client value:" + connectionValue);
           }
         }
       } else {
@@ -638,17 +659,15 @@ public class ClusterIntegrationTestUtils {
             return;
           }
           if (h2ResultSet.first()) {
-            for (int i = 0; i < brokerResponseRows.size(); i++) {
+            for (int i = 0; i < numRows; i++) {
               for (int c = 0; c < numColumns; c++) {
                 String h2Value = h2ResultSet.getString(c + 1);
                 String brokerValue = brokerResponseRows.get(i).get(c).asText();
                 String connectionValue = resultTableResultSet.getString(i, c);
                 boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
                 if (error) {
-                  String failureMessage =
-                      "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
-                          + ", got client value:" + connectionValue;
-                  failure(pinotQuery, h2Query, failureMessage);
+                  throw new RuntimeException("Value: " + c + " does not match, expected: " + h2Value
+                      + ", got broker value: " + brokerValue + ", got client value:" + connectionValue);
                 }
               }
               if (!h2ResultSet.next()) {
@@ -741,16 +760,13 @@ public class ClusterIntegrationTestUtils {
     // No record selected in H2
     if (h2NumRows == 0) {
       if (pinotNumRows != 0) {
-        String failureMessage = "No record selected in H2 but number of records selected in Pinot: " + pinotNumRows;
-        failure(pinotQuery, h2Query, failureMessage);
-        return;
+        throw new RuntimeException(
+            "No record selected in H2 but number of records selected in Pinot: " + pinotNumRows);
       }
 
       if (pinotNumRecordsSelected != 0) {
-        String failureMessage =
-            "No selection result returned in Pinot but number of records selected: " + pinotNumRecordsSelected;
-        failure(pinotQuery, h2Query, failureMessage);
-        return;
+        throw new RuntimeException(
+            "No selection result returned in Pinot but number of records selected: " + pinotNumRecordsSelected);
       }
 
       // Skip further comparison
@@ -810,19 +826,15 @@ public class ClusterIntegrationTestUtils {
         String actualOrderByValue = actualOrderByValueBuilder.toString();
         // Check actual value in expected values set, skip comparison if query response is truncated by limit
         if ((!isLimitSet || limit > h2NumRows) && !expectedValues.contains(actualValue)) {
-          String failureMessage =
-              "Selection result returned in Pinot but not in H2: " + actualValue + ", " + expectedValues;
-          failure(pinotQuery, h2Query, failureMessage);
-          return;
+          throw new RuntimeException("Selection result returned in Pinot but not in H2: " + actualValue
+              + ", " + expectedValues);
         }
         if (!orderByColumns.isEmpty()) {
           // Check actual group value is the same as expected group value in the same order.
           if (!expectedOrderByValues.get(rowIndex).equals(actualOrderByValue)) {
-            String failureMessage = String.format(
+            throw new RuntimeException(String.format(
                 "Selection Order by result at row index: %d in Pinot: [ %s ] is different than result in H2: [ %s ].",
-                rowIndex, actualOrderByValue, expectedOrderByValues.get(rowIndex));
-            failure(pinotQuery, h2Query, failureMessage);
-            return;
+                rowIndex, actualOrderByValue, expectedOrderByValues.get(rowIndex)));
           }
         }
       }
@@ -841,15 +853,16 @@ public class ClusterIntegrationTestUtils {
     return value;
   }
 
-  private static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
+  public static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
     // Fuzzy compare expected value and actual value
     boolean error = false;
     if (NumberUtils.isParsable(h2Value)) {
       double expectedValue = Double.parseDouble(h2Value);
       double actualValueBroker = Double.parseDouble(brokerValue);
       double actualValueConnection = Double.parseDouble(connectionValue);
-      if (!DoubleMath.fuzzyEquals(actualValueBroker, expectedValue, 1.0) || !DoubleMath.fuzzyEquals(
-          actualValueConnection, expectedValue, 1.0)) {
+      double tolerance = Math.max(1.0, Math.abs(expectedValue * 1e-5));
+      if (!DoubleMath.fuzzyEquals(actualValueBroker, expectedValue, tolerance) || !DoubleMath.fuzzyEquals(
+          actualValueConnection, expectedValue, tolerance)) {
         error = true;
       }
     } else {
@@ -875,17 +888,6 @@ public class ClusterIntegrationTestUtils {
     } else {
       Assert.fail(failureMessage, e);
     }
-  }
-
-  /**
-   * Helper method to report failures.
-   *
-   * @param pinotQuery Pinot query
-   * @param h2Query H2 query
-   * @param failureMessage Failure message
-   */
-  private static void failure(String pinotQuery, String h2Query, String failureMessage) {
-    failure(pinotQuery, h2Query, failureMessage, null);
   }
 
   /**

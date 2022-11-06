@@ -39,11 +39,13 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -87,26 +89,29 @@ public class TextIndexHandler implements IndexHandler {
   private final SegmentMetadata _segmentMetadata;
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
+  private final Map<String, Map<String, String>> _columnProperties;
 
   public TextIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
     _fstType = indexLoadingConfig.getFSTIndexType();
-    _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getTextIndexColumns());
+    _columnsToAddIdx = indexLoadingConfig.getTextIndexColumns();
+    _columnProperties = indexLoadingConfig.getColumnProperties();
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentMetadata.getName();
+    Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
-      if (!_columnsToAddIdx.remove(column)) {
+      if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing text index from segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
     // Check if any new index need to be added.
-    for (String column : _columnsToAddIdx) {
+    for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateTextIndex(columnMetadata)) {
         LOGGER.info("Need to create new text index for segment: {}, column: {}", segmentName, column);
@@ -121,15 +126,16 @@ public class TextIndexHandler implements IndexHandler {
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
+    Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
     for (String column : existingColumns) {
-      if (!_columnsToAddIdx.remove(column)) {
+      if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing text index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, ColumnIndexType.TEXT_INDEX);
         LOGGER.info("Removed existing text index from segment: {}, column: {}", segmentName, column);
       }
     }
-    for (String column : _columnsToAddIdx) {
+    for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateTextIndex(columnMetadata)) {
         createTextIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
@@ -177,7 +183,9 @@ public class TextIndexHandler implements IndexHandler {
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         TextIndexCreator textIndexCreator = indexCreatorProvider.newTextIndexCreator(IndexCreationContext.builder()
-            .withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build().forTextIndex(_fstType, true))) {
+            .withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build().forTextIndex(_fstType, true,
+                TextIndexUtils.extractStopWordsInclude(columnName, _columnProperties),
+                TextIndexUtils.extractStopWordsExclude(columnName, _columnProperties)))) {
       if (columnMetadata.isSingleValue()) {
         processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
             columnMetadata);

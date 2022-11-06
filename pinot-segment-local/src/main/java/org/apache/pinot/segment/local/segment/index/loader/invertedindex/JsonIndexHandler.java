@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
@@ -40,6 +41,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,26 +52,27 @@ public class JsonIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonIndexHandler.class);
 
   private final SegmentMetadata _segmentMetadata;
-  private final HashSet<String> _columnsToAddIdx;
+  private final Map<String, JsonIndexConfig> _jsonIndexConfigs;
 
   public JsonIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
-    _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getJsonIndexColumns());
+    _jsonIndexConfigs = indexLoadingConfig.getJsonIndexConfigs();
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentMetadata.getName();
+    Set<String> columnsToAddIdx = new HashSet<>(_jsonIndexConfigs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.JSON_INDEX);
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
-      if (!_columnsToAddIdx.remove(column)) {
+      if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing json index from segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
     // Check if any new index need to be added.
-    for (String column : _columnsToAddIdx) {
+    for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateJsonIndex(columnMetadata)) {
         LOGGER.info("Need to create new json index for segment: {}, column: {}", segmentName, column);
@@ -84,15 +87,16 @@ public class JsonIndexHandler implements IndexHandler {
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
+    Set<String> columnsToAddIdx = new HashSet<>(_jsonIndexConfigs.keySet());
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.JSON_INDEX);
     for (String column : existingColumns) {
-      if (!_columnsToAddIdx.remove(column)) {
+      if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing json index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, ColumnIndexType.JSON_INDEX);
         LOGGER.info("Removed existing json index from segment: {}, column: {}", segmentName, column);
       }
     }
-    for (String column : _columnsToAddIdx) {
+    for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateJsonIndex(columnMetadata)) {
         createJsonIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
@@ -150,11 +154,13 @@ public class JsonIndexHandler implements IndexHandler {
       JsonIndexCreatorProvider indexCreatorProvider)
       throws IOException {
     File indexDir = _segmentMetadata.getIndexDir();
+    String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata);
-        JsonIndexCreator jsonIndexCreator = indexCreatorProvider.newJsonIndexCreator(IndexCreationContext.builder()
-            .withIndexDir(indexDir).withColumnMetadata(columnMetadata).build().forJsonIndex())) {
+        JsonIndexCreator jsonIndexCreator = indexCreatorProvider.newJsonIndexCreator(
+            IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
+                .forJsonIndex(_jsonIndexConfigs.get(columnName)))) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         int dictId = forwardIndexReader.getDictId(i, readerContext);
@@ -168,10 +174,12 @@ public class JsonIndexHandler implements IndexHandler {
       JsonIndexCreatorProvider indexCreatorProvider)
       throws IOException {
     File indexDir = _segmentMetadata.getIndexDir();
+    String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        JsonIndexCreator jsonIndexCreator = indexCreatorProvider.newJsonIndexCreator(IndexCreationContext.builder()
-            .withIndexDir(indexDir).withColumnMetadata(columnMetadata).build().forJsonIndex())) {
+        JsonIndexCreator jsonIndexCreator = indexCreatorProvider.newJsonIndexCreator(
+            IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
+                .forJsonIndex(_jsonIndexConfigs.get(columnName)))) {
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         jsonIndexCreator.add(forwardIndexReader.getString(i, readerContext));

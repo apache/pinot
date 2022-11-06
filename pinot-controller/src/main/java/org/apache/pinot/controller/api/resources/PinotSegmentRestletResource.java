@@ -59,6 +59,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -76,10 +77,12 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -462,9 +465,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
       @DefaultValue("false") boolean forceDownload) {
     segmentName = URIUtils.decode(segmentName);
-    TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    String tableNameWithType = getExistingTable(tableName, segmentName);
     Pair<Integer, String> msgInfo =
         _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload);
     boolean zkJobMetaWriteSuccess = false;
@@ -491,6 +492,19 @@ public class PinotSegmentRestletResource {
   }
 
   /**
+   * Helper method to find the existing table based on the given table name (with or without type suffix) and segment
+   * name.
+   */
+  private String getExistingTable(String tableName, String segmentName) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == null) {
+      // Derive table type from segment name if the given table name doesn't have type suffix
+      tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
+    }
+    return ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+  }
+
+  /**
    * Resets the segment of the table, by disabling and then enabling it.
    * This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to
    * ONLINE/CONSUMING state,
@@ -507,14 +521,13 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses "
-          + "serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
+      @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
+          String targetInstance) {
     segmentName = URIUtils.decode(segmentName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
-      _pinotHelixResourceManager.resetSegment(tableNameWithType, segmentName,
-          maxWaitTimeMs > 0 ? maxWaitTimeMs : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      _pinotHelixResourceManager.resetSegment(tableNameWithType, segmentName, targetInstance);
       return new SuccessResponse(
           String.format("Successfully reset segment: %s of table: %s", segmentName, tableNameWithType));
     } catch (IllegalStateException e) {
@@ -543,14 +556,13 @@ public class PinotSegmentRestletResource {
           + " finally enabling the segments", notes = "Resets a segment by disabling and then enabling a segment")
   public SuccessResponse resetAllSegments(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType, @ApiParam(
-      value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses "
-          + "serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
+          String tableNameWithType,
+      @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
+          String targetInstance) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
-      _pinotHelixResourceManager.resetAllSegments(tableNameWithType,
-          maxWaitTimeMs > 0 ? maxWaitTimeMs : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      _pinotHelixResourceManager.resetAllSegments(tableNameWithType, targetInstance);
       return new SuccessResponse(String.format("Successfully reset all segments of table: %s", tableNameWithType));
     } catch (IllegalStateException e) {
       throw new ControllerApplicationException(LOGGER,
@@ -794,9 +806,7 @@ public class PinotSegmentRestletResource {
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod) {
     segmentName = URIUtils.decode(segmentName);
-    TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    String tableNameWithType = getExistingTable(tableName, segmentName);
     deleteSegmentsInternal(tableNameWithType, Collections.singletonList(segmentName), retentionPeriod);
     return new SuccessResponse("Segment deleted");
   }
@@ -819,8 +829,8 @@ public class PinotSegmentRestletResource {
     }
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    deleteSegmentsInternal(tableNameWithType, _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false),
-        retentionPeriod);
+    deleteSegmentsInternal(tableNameWithType,
+        _pinotHelixResourceManager.getSegmentsFromPropertyStore(tableNameWithType), retentionPeriod);
     return new SuccessResponse("All segments of table " + tableNameWithType + " deleted");
   }
 
@@ -841,16 +851,7 @@ public class PinotSegmentRestletResource {
     if (numSegments == 0) {
       throw new ControllerApplicationException(LOGGER, "Segments must be provided", Status.BAD_REQUEST);
     }
-    boolean isRealtimeSegment = SegmentName.isRealtimeSegmentName(segments.get(0));
-    for (int i = 1; i < numSegments; i++) {
-      if (SegmentName.isRealtimeSegmentName(segments.get(i)) != isRealtimeSegment) {
-        throw new ControllerApplicationException(LOGGER, "All segments must be of the same type (OFFLINE|REALTIME)",
-            Status.BAD_REQUEST);
-      }
-    }
-    TableType tableType = isRealtimeSegment ? TableType.REALTIME : TableType.OFFLINE;
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    String tableNameWithType = getExistingTable(tableName, segments.get(0));
     deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod);
     if (numSegments <= 5) {
       return new SuccessResponse("Deleted segments: " + segments + " from table: " + tableNameWithType);
@@ -1008,33 +1009,67 @@ public class PinotSegmentRestletResource {
         .getSegmentsMetadata(tableNameWithType, columns, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
-  // TODO: Move this API into PinotTableRestletResource
-  @GET
-  @Path("/tables/{realtimeTableName}/consumingSegmentsInfo")
+  @POST
+  @Path("/segments/{tableNameWithType}/updateZKTimeInterval")
+  @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Returns state of consuming segments", notes = "Gets the status of consumers from all servers")
+  @ApiOperation(value = "Update the start and end time of the segments based on latest schema",
+      notes = "Update the start and end time of the segments based on latest schema")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap getConsumingSegmentsInfo(
-      @ApiParam(value = "Realtime table name with or without type", required = true,
-          example = "myTable | myTable_REALTIME") @PathParam("realtimeTableName") String realtimeTableName) {
-    try {
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
-      if (TableType.OFFLINE == tableType) {
-        throw new IllegalStateException("Cannot get consuming segments info for OFFLINE table: " + realtimeTableName);
+  public SuccessResponse updateTimeIntervalZK(
+      @ApiParam(value = "Table name with type", required = true,
+          example = "myTable_REALTIME") @PathParam("tableNameWithType") String tableNameWithType) {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      if (tableType == null) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Table type not provided with table name %s", tableNameWithType),
+            Status.BAD_REQUEST);
       }
-      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
-      ConsumingSegmentInfoReader consumingSegmentInfoReader =
-          new ConsumingSegmentInfoReader(_executor, _connectionManager, _pinotHelixResourceManager);
-      return consumingSegmentInfoReader
-          .getConsumingSegmentsInfo(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to get consuming segments info for table %s. %s", realtimeTableName, e.getMessage()),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
+      return updateZKTimeIntervalInternal(tableNameWithType);
+  }
+
+  /**
+   * Internal method to update schema
+   * @param tableNameWithType  name of the table
+   * @return
+   */
+  private SuccessResponse updateZKTimeIntervalInternal(String tableNameWithType) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find table config for table: " + tableNameWithType, Status.NOT_FOUND);
+      }
+
+      Schema tableSchema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+      if (tableSchema == null) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find schema for table: " + tableNameWithType, Status.NOT_FOUND);
+      }
+
+      String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      if (StringUtils.isEmpty(timeColumn)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to find time column for table : " + tableNameWithType, Status.NOT_FOUND);
+      }
+
+      DateTimeFieldSpec timeColumnFieldSpec = tableSchema.getSpecForTimeColumn(timeColumn);
+      if (timeColumnFieldSpec == null) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Failed to find field spec for column: %s and table: %s", timeColumn, tableNameWithType),
+            Status.NOT_FOUND);
+      }
+
+      try {
+        _pinotHelixResourceManager.updateSegmentsZKTimeInterval(tableNameWithType, timeColumnFieldSpec);
+      } catch (Exception e) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Failed to update time interval zk metadata for table %s", tableNameWithType),
+            Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
+      return new SuccessResponse("Successfully updated time interval zk metadata for table: " + tableNameWithType);
   }
 }

@@ -21,7 +21,7 @@ package org.apache.pinot.core.plan;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
@@ -49,7 +49,7 @@ public class DistinctPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator<IntermediateResultsBlock> run() {
+  public Operator<DistinctResultsBlock> run() {
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     assert aggregationFunctions != null && aggregationFunctions.length == 1
         && aggregationFunctions[0] instanceof DistinctAggregationFunction;

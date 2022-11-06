@@ -25,7 +25,9 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
@@ -57,6 +59,31 @@ public class InstanceUtils {
         throw new IllegalStateException();
     }
     return prefix + instance.getHost() + "_" + instance.getPort();
+  }
+
+  public static String getServerAdminEndpoint(InstanceConfig instanceConfig) {
+    // Backward-compatible with legacy hostname of format 'Server_<hostname>'
+    String hostname = instanceConfig.getHostName();
+    if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    }
+    return getServerAdminEndpoint(instanceConfig, hostname, CommonConstants.HTTP_PROTOCOL);
+  }
+
+  public static String getServerAdminEndpoint(InstanceConfig instanceConfig, String hostname, String defaultProtocol) {
+    String protocol = defaultProtocol;
+    int port = CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
+    int adminPort = instanceConfig.getRecord().getIntField(Helix.Instance.ADMIN_PORT_KEY, -1);
+    int adminHttpsPort = instanceConfig.getRecord().getIntField(Helix.Instance.ADMIN_HTTPS_PORT_KEY, -1);
+    // NOTE: preference for insecure is sub-optimal, but required for incremental upgrade scenarios
+    if (adminPort > 0) {
+      protocol = CommonConstants.HTTP_PROTOCOL;
+      port = adminPort;
+    } else if (adminHttpsPort > 0) {
+      protocol = CommonConstants.HTTPS_PROTOCOL;
+      port = adminHttpsPort;
+    }
+    return String.format("%s://%s:%d", protocol, hostname, port);
   }
 
   /**
@@ -130,5 +157,25 @@ public class InstanceUtils {
     } else {
       mapFields.remove(POOL_KEY);
     }
+  }
+
+  public static String getInstanceBaseUri(InstanceConfig instanceConfig) {
+    Map<String, String> fieldMap = instanceConfig.getRecord().getSimpleFields();
+    String hostName = instanceConfig.getHostName();
+    String adminPort;
+    String scheme;
+    if (fieldMap.containsKey(CommonConstants.Helix.Instance.ADMIN_HTTPS_PORT_KEY)) {
+      // For Pinot Server admin https port
+      adminPort = fieldMap.get(CommonConstants.Helix.Instance.ADMIN_HTTPS_PORT_KEY);
+      scheme = "https";
+    } else if (fieldMap.containsKey(ExtraInstanceConfig.PinotInstanceConfigProperty.PINOT_TLS_PORT.toString())) {
+      // For Pinot Controller/Broker TLS port
+      adminPort = fieldMap.get(ExtraInstanceConfig.PinotInstanceConfigProperty.PINOT_TLS_PORT.toString());
+      scheme = "https";
+    } else {
+      adminPort = fieldMap.getOrDefault(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, instanceConfig.getPort());
+      scheme = "http";
+    }
+    return String.format("%s://%s:%s", scheme, hostName, adminPort);
   }
 }

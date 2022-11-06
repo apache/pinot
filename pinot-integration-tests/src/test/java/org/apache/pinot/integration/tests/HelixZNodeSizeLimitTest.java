@@ -36,6 +36,7 @@ import org.testng.annotations.Test;
  * large IdealStates
  */
 public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -45,6 +46,7 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
     // src/main/java/org/apache/helix/zookeeper/zkclient/ZkClient.java#L105
     // The below line gets executed before ZkClient.WRITE_SIZE_LIMIT is created
     System.setProperty(ZkSystemPropertyKeys.JUTE_MAXBUFFER, "4000000");
+
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start Zookeeper

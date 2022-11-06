@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.11.0-SNAPSHOT</version>
+    <version>0.12.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-tools</artifactId>
@@ -34,6 +34,8 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <aws.version>2.14.28</aws.version>
+    <scala.version>2.12</scala.version>
+    <spark.version>3.2.1</spark.version>
   </properties>
   <dependencies>
     <dependency>
@@ -267,6 +269,24 @@
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
+    </dependency>
+
+    <!--
+      This dependency is needed for LaunchSparkDataIngestionJobCommand.
+      The dependency only contains a few classes and scala library which has been excluded.
+      Hence, it will not interfere with spark-core classes present in runtime env
+      and will use the env spark version to actually execute the spark job
+    -->
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-launcher_${scala.version}</artifactId>
+      <version>${spark.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-library</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
   <build>

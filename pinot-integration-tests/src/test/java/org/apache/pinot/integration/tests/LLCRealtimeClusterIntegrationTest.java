@@ -55,10 +55,10 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
+ * Integration test for low-level Kafka consumer.
  * TODO: Add separate module-level tests and remove the randomness of this test
  */
-public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
+public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
   private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
@@ -74,11 +74,6 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   @Override
   protected boolean injectTombstones() {
-    return true;
-  }
-
-  @Override
-  protected boolean useLlc() {
     return true;
   }
 
@@ -155,17 +150,17 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
         if (changeCrc) {
           changeCrcInSegmentZKMetadata(tableName, segmentTarFile.toString());
         }
-        assertEquals(fileUploadDownloadClient
-            .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName,
-                TableType.REALTIME).getStatusCode(), HttpStatus.SC_OK);
+        assertEquals(
+            fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
+                tableName, TableType.REALTIME).getStatusCode(), HttpStatus.SC_OK);
       } else {
         // Upload segments in parallel
         ExecutorService executorService = Executors.newFixedThreadPool(numSegments);
         List<Future<Integer>> futures = new ArrayList<>(numSegments);
         for (File segmentTarFile : segmentTarFiles) {
-          futures.add(executorService.submit(() -> fileUploadDownloadClient
-              .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName,
-                  TableType.REALTIME).getStatusCode()));
+          futures.add(executorService.submit(
+              () -> fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
+                  segmentTarFile, tableName, TableType.REALTIME).getStatusCode()));
         }
         executorService.shutdown();
         for (Future<Integer> future : futures) {
@@ -253,10 +248,12 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
         JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         // Total docs should not change during reload
         assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
-        assertEquals(queryResponse1.get("numConsumingSegmentsQueried").asLong(), 2);
-        assertTrue(queryResponse1.get("minConsumingFreshnessTimeMs").asLong() > _startTime);
-        assertTrue(queryResponse1.get("minConsumingFreshnessTimeMs").asLong() < System.currentTimeMillis());
-        return queryResponse1.get("numEntriesScannedInFilter").asLong() == 0;
+
+        long numConsumingSegmentsQueried = queryResponse1.get("numConsumingSegmentsQueried").asLong();
+        long minConsumingFreshnessTimeMs = queryResponse1.get("minConsumingFreshnessTimeMs").asLong();
+        long numEntriesScannedInFilter = queryResponse1.get("numEntriesScannedInFilter").asLong();
+        return numConsumingSegmentsQueried == 2 && minConsumingFreshnessTimeMs > _startTime
+            && minConsumingFreshnessTimeMs < System.currentTimeMillis() && numEntriesScannedInFilter == 0;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -275,6 +272,12 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   public void testReload()
       throws Exception {
     testReload(false);
+  }
+
+  @Test
+  public void testReset()
+      throws Exception {
+    super.testReset(TableType.REALTIME);
   }
 
   @Test

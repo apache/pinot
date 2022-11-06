@@ -34,8 +34,8 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -191,9 +191,9 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
 
   private void testInnerSegmentSelectionQuery(String query, int expectedResultSize,
       @Nullable List<Object[]> expectedResults) {
-    Operator<IntermediateResultsBlock> operator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = operator.nextBlock();
-    List<Object[]> results = (List<Object[]>) resultsBlock.getSelectionResult();
+    Operator<SelectionResultsBlock> operator = getOperator(query);
+    SelectionResultsBlock resultsBlock = operator.nextBlock();
+    List<Object[]> results = (List<Object[]>) resultsBlock.getRows();
     assertNotNull(results);
     assertEquals(results.size(), expectedResultSize);
     if (expectedResults != null) {
@@ -218,7 +218,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   }
 
   private AggregationGroupByResult getGroupByResults(String query) {
-    AggregationGroupByOrderByOperator groupByOrderByOperator = getOperator(query);
+    GroupByOperator groupByOrderByOperator = getOperator(query);
     return groupByOrderByOperator.nextBlock().getAggregationGroupByResult();
   }
 

@@ -22,15 +22,22 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
+import org.apache.helix.HelixManager;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.Pairs;
 
@@ -74,10 +81,10 @@ public class SegmentAssignmentUtils {
    */
   public static List<String> getInstancesForNonReplicaGroupBasedAssignment(InstancePartitions instancePartitions,
       int replication) {
-    Preconditions.checkState(
-        instancePartitions.getNumReplicaGroups() == 1 && instancePartitions.getNumPartitions() == 1,
-        "Instance partitions: %s should contain 1 replica and 1 partition for non-replica-group based assignment",
-        instancePartitions.getInstancePartitionsName());
+    Preconditions
+        .checkState(instancePartitions.getNumReplicaGroups() == 1 && instancePartitions.getNumPartitions() == 1,
+            "Instance partitions: %s should contain 1 replica and 1 partition for non-replica-group based assignment",
+            instancePartitions.getInstancePartitionsName());
     List<String> instances = instancePartitions.getInstances(0, 0);
     int numInstances = instances.size();
     Preconditions.checkState(numInstances >= replication,
@@ -91,8 +98,7 @@ public class SegmentAssignmentUtils {
    */
   public static List<String> assignSegmentWithoutReplicaGroup(Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions, int replication) {
-    List<String> instances =
-        SegmentAssignmentUtils.getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, replication);
+    List<String> instances = getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, replication);
     int[] numSegmentsAssignedPerInstance = getNumSegmentsAssignedPerInstance(currentAssignment, instances);
     int numInstances = numSegmentsAssignedPerInstance.length;
     PriorityQueue<Pairs.IntPair> heap = new PriorityQueue<>(numInstances, Pairs.intPairComparator());
@@ -113,8 +119,7 @@ public class SegmentAssignmentUtils {
       InstancePartitions instancePartitions, int partitionId) {
     // First assign the segment to replica-group 0
     List<String> instances = instancePartitions.getInstances(partitionId, 0);
-    int[] numSegmentsAssignedPerInstance =
-        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, instances);
+    int[] numSegmentsAssignedPerInstance = getNumSegmentsAssignedPerInstance(currentAssignment, instances);
     int minNumSegmentsAssigned = numSegmentsAssignedPerInstance[0];
     int instanceIdWithLeastSegmentsAssigned = 0;
     int numInstances = numSegmentsAssignedPerInstance.length;
@@ -129,8 +134,8 @@ public class SegmentAssignmentUtils {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
     for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-      instancesAssigned.add(
-          instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
+      instancesAssigned
+          .add(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
     }
     return instancesAssigned;
   }
@@ -168,8 +173,8 @@ public class SegmentAssignmentUtils {
       // Uniformly spray the segment partitions over the instance partitions
       int instancePartitionId = entry.getKey();
       List<String> segments = entry.getValue();
-      SegmentAssignmentUtils.rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions,
-          instancePartitionId, segments, newAssignment);
+      rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions, instancePartitionId, segments,
+          newAssignment);
     }
     return newAssignment;
   }
@@ -198,7 +203,7 @@ public class SegmentAssignmentUtils {
       Map<String, Map<String, String>> newAssignment) {
     // Fetch instances in replica-group 0
     List<String> instances = instancePartitions.getInstances(partitionId, 0);
-    Map<String, Integer> instanceNameToIdMap = SegmentAssignmentUtils.getInstanceNameToIdMap(instances);
+    Map<String, Integer> instanceNameToIdMap = getInstanceNameToIdMap(instances);
 
     // Calculate target number of segments per instance
     // NOTE: in order to minimize the segment movements, use the ceiling of the quotient
@@ -214,8 +219,8 @@ public class SegmentAssignmentUtils {
       for (String instanceName : currentAssignment.get(segmentName).keySet()) {
         Integer instanceId = instanceNameToIdMap.get(instanceName);
         if (instanceId != null && numSegmentsAssignedPerInstance[instanceId] < targetNumSegmentsPerInstance) {
-          newAssignment.put(segmentName,
-              getReplicaGroupBasedInstanceStateMap(instancePartitions, partitionId, instanceId));
+          newAssignment
+              .put(segmentName, getReplicaGroupBasedInstanceStateMap(instancePartitions, partitionId, instanceId));
           numSegmentsAssignedPerInstance[instanceId]++;
           segmentAssigned = true;
           break;
@@ -250,8 +255,8 @@ public class SegmentAssignmentUtils {
     Map<String, String> instanceStateMap = new TreeMap<>();
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-      instanceStateMap.put(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceId),
-          SegmentStateModel.ONLINE);
+      instanceStateMap
+          .put(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceId), SegmentStateModel.ONLINE);
     }
     return instanceStateMap;
   }
@@ -389,5 +394,91 @@ public class SegmentAssignmentUtils {
     public Map<String, Map<String, String>> getNonTierSegmentAssignment() {
       return _nonTierSegmentAssignment;
     }
+  }
+
+  /**
+   * Returns a partition id for offline table
+   */
+  public static int getOfflineSegmentPartitionId(String segmentName, String offlineTableName, HelixManager helixManager,
+      @Nullable String partitionColumn) {
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(helixManager.getHelixPropertyStore(), offlineTableName, segmentName);
+    Preconditions
+        .checkState(segmentZKMetadata != null, "Failed to find segment ZK metadata for segment: %s of table: %s",
+            segmentName, offlineTableName);
+    return getPartitionId(segmentZKMetadata, offlineTableName, partitionColumn);
+  }
+
+  private static int getPartitionId(SegmentZKMetadata segmentZKMetadata, String offlineTableName,
+      @Nullable String partitionColumn) {
+    String segmentName = segmentZKMetadata.getSegmentName();
+    ColumnPartitionMetadata partitionMetadata =
+        segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().get(partitionColumn);
+    Preconditions.checkState(partitionMetadata != null,
+        "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata for column: %s",
+        segmentName, offlineTableName, partitionColumn);
+    Set<Integer> partitions = partitionMetadata.getPartitions();
+    Preconditions.checkState(partitions.size() == 1,
+        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s", segmentName,
+        offlineTableName, partitionColumn);
+    return partitions.iterator().next();
+  }
+
+  /**
+   * Returns map of instance partition id to segments for offline tables
+   */
+  public static Map<Integer, List<String>> getOfflineInstancePartitionIdToSegmentsMap(Set<String> segments,
+      int numInstancePartitions, String offlineTableName, HelixManager helixManager, @Nullable String partitionColumn) {
+    // Fetch partition id from segment ZK metadata
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        ZKMetadataProvider.getSegmentsZKMetadata(helixManager.getHelixPropertyStore(), offlineTableName);
+
+    Map<Integer, List<String>> instancePartitionIdToSegmentsMap = new HashMap<>();
+    Set<String> segmentsWithoutZKMetadata = new HashSet<>(segments);
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      String segmentName = segmentZKMetadata.getSegmentName();
+      if (segmentsWithoutZKMetadata.remove(segmentName)) {
+        int partitionId = getPartitionId(segmentZKMetadata, offlineTableName, partitionColumn);
+        int instancePartitionId = partitionId % numInstancePartitions;
+        instancePartitionIdToSegmentsMap.computeIfAbsent(instancePartitionId, k -> new ArrayList<>()).add(segmentName);
+      }
+    }
+    Preconditions.checkState(segmentsWithoutZKMetadata.isEmpty(), "Failed to find ZK metadata for segments: %s",
+        segmentsWithoutZKMetadata);
+
+    return instancePartitionIdToSegmentsMap;
+  }
+
+  /**
+   * Returns a partition id for realtime table
+   */
+  public static int getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName,
+      HelixManager helixManager, @Nullable String partitionColumn) {
+    Integer segmentPartitionId =
+        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, realtimeTableName, helixManager, partitionColumn);
+    if (segmentPartitionId == null) {
+      // This case is for the uploaded segments for which there's no partition information.
+      // A random, but consistent, partition id is calculated based on the hash code of the segment name.
+      // Note that '% 10K' is used to prevent having partition ids with large value which will be problematic later in
+      // instance assignment formula.
+      segmentPartitionId = Math.abs(segmentName.hashCode() % 10_000);
+    }
+    return segmentPartitionId;
+  }
+
+  /**
+   * Returns map of instance partition id to segments for realtime tables
+   */
+  public static Map<Integer, List<String>> getRealtimeInstancePartitionIdToSegmentsMap(Set<String> segments,
+      int numInstancePartitions, String realtimeTableName, HelixManager helixManager,
+      @Nullable String partitionColumn) {
+    Map<Integer, List<String>> instancePartitionIdToSegmentsMap = new HashMap<>();
+    for (String segmentName : segments) {
+      int instancePartitionId =
+          getRealtimeSegmentPartitionId(segmentName, realtimeTableName, helixManager, partitionColumn)
+              % numInstancePartitions;
+      instancePartitionIdToSegmentsMap.computeIfAbsent(instancePartitionId, k -> new ArrayList<>()).add(segmentName);
+    }
+    return instancePartitionIdToSegmentsMap;
   }
 }

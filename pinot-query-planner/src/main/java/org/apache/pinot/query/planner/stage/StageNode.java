@@ -19,9 +19,7 @@
 package org.apache.pinot.query.planner.stage;
 
 import java.io.Serializable;
-import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -45,7 +43,7 @@ public interface StageNode extends Serializable {
 
   void setDataSchema(DataSchema dataSchema);
 
-  Set<Integer> getPartitionKeys();
+  String explain();
 
-  void setPartitionKeys(Collection<Integer> partitionKeys);
+  <T, C> T visit(StageNodeVisitor<T, C> visitor, C context);
 }

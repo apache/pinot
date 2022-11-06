@@ -1,0 +1,18 @@
+{
+  "tableName": "billing",
+  "segmentsConfig" : {
+    "replication" : "1",
+    "schemaName" : "billing"
+  },
+  "tableIndexConfig" : {
+    "invertedIndexColumns" : [],
+    "loadMode"  : "MMAP"
+  },
+  "tenants" : {
+    "broker":"DefaultTenant",
+    "server":"DefaultTenant"
+  },
+  "tableType":"OFFLINE",
+  "metadata": {}
+}
+

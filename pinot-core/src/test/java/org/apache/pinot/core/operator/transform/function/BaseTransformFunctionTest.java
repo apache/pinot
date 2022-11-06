@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.io.File;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
@@ -51,12 +52,14 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+
+import static org.testng.Assert.assertEquals;
 
 
 public abstract class BaseTransformFunctionTest {
@@ -81,9 +84,11 @@ public abstract class BaseTransformFunctionTest {
   protected static final String DOUBLE_MV_COLUMN = "doubleMV";
   protected static final String STRING_MV_COLUMN = "stringMV";
   protected static final String STRING_ALPHANUM_MV_COLUMN = "stringAlphaNumMV";
+  protected static final String STRING_LONG_MV_COLUMN = "stringLongMV";
   protected static final String TIME_COLUMN = "timeColumn";
   protected static final String TIMESTAMP_COLUMN = "timestampColumn";
   protected static final String JSON_COLUMN = "json";
+  protected static final String DEFAULT_JSON_COLUMN = "defaultJson";
   protected final int[] _intSVValues = new int[NUM_ROWS];
   protected final long[] _longSVValues = new long[NUM_ROWS];
   protected final float[] _floatSVValues = new float[NUM_ROWS];
@@ -98,6 +103,7 @@ public abstract class BaseTransformFunctionTest {
   protected final double[][] _doubleMVValues = new double[NUM_ROWS][];
   protected final String[][] _stringMVValues = new String[NUM_ROWS][];
   protected final String[][] _stringAlphaNumericMVValues = new String[NUM_ROWS][];
+  protected final String[][] _stringLongFormatMVValues = new String[NUM_ROWS][];
   protected final long[] _timeValues = new long[NUM_ROWS];
   protected final String[] _jsonValues = new String[NUM_ROWS];
 
@@ -128,6 +134,7 @@ public abstract class BaseTransformFunctionTest {
       _doubleMVValues[i] = new double[numValues];
       _stringMVValues[i] = new String[numValues];
       _stringAlphaNumericMVValues[i] = new String[numValues];
+      _stringLongFormatMVValues[i] = new String[numValues];
 
       for (int j = 0; j < numValues; j++) {
         _intMVValues[i][j] = 1 + RANDOM.nextInt(MAX_MULTI_VALUE);
@@ -136,6 +143,7 @@ public abstract class BaseTransformFunctionTest {
         _doubleMVValues[i][j] = 1 + RANDOM.nextDouble();
         _stringMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextDouble());
         _stringAlphaNumericMVValues[i][j] = RandomStringUtils.randomAlphanumeric(26);
+        _stringLongFormatMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextLong());
       }
 
       // Time in the past year
@@ -159,6 +167,7 @@ public abstract class BaseTransformFunctionTest {
       map.put(DOUBLE_MV_COLUMN, ArrayUtils.toObject(_doubleMVValues[i]));
       map.put(STRING_MV_COLUMN, _stringMVValues[i]);
       map.put(STRING_ALPHANUM_MV_COLUMN, _stringAlphaNumericMVValues[i]);
+      map.put(STRING_LONG_MV_COLUMN, _stringLongFormatMVValues[i]);
       map.put(TIMESTAMP_COLUMN, _timeValues[i]);
       map.put(TIME_COLUMN, _timeValues[i]);
       _jsonValues[i] = JsonUtils.objectToJsonNode(map).toString();
@@ -176,13 +185,15 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
-        .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.STRING, Integer.MAX_VALUE, null)
+        .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
+        .addSingleValueDimension(DEFAULT_JSON_COLUMN, FieldSpec.DataType.JSON)
         .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
         .addMultiValueDimension(LONG_MV_COLUMN, FieldSpec.DataType.LONG)
         .addMultiValueDimension(FLOAT_MV_COLUMN, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(DOUBLE_MV_COLUMN, FieldSpec.DataType.DOUBLE)
         .addMultiValueDimension(STRING_MV_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(STRING_ALPHANUM_MV_COLUMN, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(STRING_LONG_MV_COLUMN, FieldSpec.DataType.STRING)
         .addDateTime(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
@@ -214,12 +225,12 @@ public abstract class BaseTransformFunctionTest {
     BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(intValues[i], expectedValues[i]);
-      Assert.assertEquals(longValues[i], expectedValues[i]);
-      Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
-      Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
-      Assert.assertEquals(bigDecimalValues[i].intValue(), expectedValues[i]);
-      Assert.assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
+      assertEquals(intValues[i], expectedValues[i]);
+      assertEquals(longValues[i], expectedValues[i]);
+      assertEquals(floatValues[i], (float) expectedValues[i]);
+      assertEquals(doubleValues[i], (double) expectedValues[i]);
+      assertEquals(bigDecimalValues[i].intValue(), expectedValues[i]);
+      assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
     }
   }
 
@@ -231,12 +242,12 @@ public abstract class BaseTransformFunctionTest {
     BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(intValues[i], (int) expectedValues[i]);
-      Assert.assertEquals(longValues[i], expectedValues[i]);
-      Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
-      Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
-      Assert.assertEquals(bigDecimalValues[i].longValue(), expectedValues[i]);
-      Assert.assertEquals(stringValues[i], Long.toString(expectedValues[i]));
+      assertEquals(intValues[i], (int) expectedValues[i]);
+      assertEquals(longValues[i], expectedValues[i]);
+      assertEquals(floatValues[i], (float) expectedValues[i]);
+      assertEquals(doubleValues[i], (double) expectedValues[i]);
+      assertEquals(bigDecimalValues[i].longValue(), expectedValues[i]);
+      assertEquals(stringValues[i], Long.toString(expectedValues[i]));
     }
   }
 
@@ -248,12 +259,12 @@ public abstract class BaseTransformFunctionTest {
     BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(intValues[i], (int) expectedValues[i]);
-      Assert.assertEquals(longValues[i], (long) expectedValues[i]);
-      Assert.assertEquals(floatValues[i], expectedValues[i]);
-      Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
-      Assert.assertEquals(bigDecimalValues[i].floatValue(), expectedValues[i]);
-      Assert.assertEquals(stringValues[i], Float.toString(expectedValues[i]));
+      assertEquals(intValues[i], (int) expectedValues[i]);
+      assertEquals(longValues[i], (long) expectedValues[i]);
+      assertEquals(floatValues[i], expectedValues[i]);
+      assertEquals(doubleValues[i], (double) expectedValues[i]);
+      assertEquals(bigDecimalValues[i].floatValue(), expectedValues[i]);
+      assertEquals(stringValues[i], Float.toString(expectedValues[i]));
     }
   }
 
@@ -272,14 +283,14 @@ public abstract class BaseTransformFunctionTest {
     }
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(intValues[i], (int) expectedValues[i]);
-      Assert.assertEquals(longValues[i], (long) expectedValues[i]);
-      Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
-      Assert.assertEquals(doubleValues[i], expectedValues[i]);
+      assertEquals(intValues[i], (int) expectedValues[i]);
+      assertEquals(longValues[i], (long) expectedValues[i]);
+      assertEquals(floatValues[i], (float) expectedValues[i]);
+      assertEquals(doubleValues[i], expectedValues[i]);
       if (bigDecimalValues != null) {
-        Assert.assertEquals(bigDecimalValues[i].doubleValue(), expectedValues[i]);
+        assertEquals(bigDecimalValues[i].doubleValue(), expectedValues[i]);
       }
-      Assert.assertEquals(stringValues[i], Double.toString(expectedValues[i]));
+      assertEquals(stringValues[i], Double.toString(expectedValues[i]));
     }
   }
 
@@ -289,65 +300,171 @@ public abstract class BaseTransformFunctionTest {
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
-    byte[][] bytesValues = transformFunction.transformToBytesValuesSV(_projectionBlock);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    byte[][] bytesValues = transformFunction.transformToBytesValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(intValues[i], expectedValues[i].intValue());
-      Assert.assertEquals(longValues[i], expectedValues[i].longValue());
-      Assert.assertEquals(floatValues[i], expectedValues[i].floatValue());
-      Assert.assertEquals(doubleValues[i], expectedValues[i].doubleValue());
-      Assert.assertEquals(bigDecimalValues[i].compareTo(expectedValues[i]), 0);
-      Assert.assertEquals(BigDecimalUtils.deserialize(bytesValues[i]).compareTo(expectedValues[i]), 0);
-      Assert.assertEquals((new BigDecimal(stringValues[i])).compareTo(expectedValues[i]), 0);
+      assertEquals(intValues[i], expectedValues[i].intValue());
+      assertEquals(longValues[i], expectedValues[i].longValue());
+      assertEquals(floatValues[i], expectedValues[i].floatValue());
+      assertEquals(doubleValues[i], expectedValues[i].doubleValue());
+      assertEquals(bigDecimalValues[i].compareTo(expectedValues[i]), 0);
+      assertEquals((new BigDecimal(stringValues[i])).compareTo(expectedValues[i]), 0);
+      assertEquals(BigDecimalUtils.deserialize(bytesValues[i]).compareTo(expectedValues[i]), 0);
+    }
+  }
+
+  protected void testTransformFunction(TransformFunction transformFunction, boolean[] expectedValues) {
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    // TODO: Support implicit cast from BOOLEAN to STRING
+//    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(intValues[i] == 1, expectedValues[i]);
+      assertEquals(longValues[i] == 1, expectedValues[i]);
+      assertEquals(floatValues[i] == 1, expectedValues[i]);
+      assertEquals(doubleValues[i] == 1, expectedValues[i]);
+      assertEquals(bigDecimalValues[i].intValue() == 1, expectedValues[i]);
+//      assertEquals(stringValues[i], Boolean.toString(expectedValues[i]));
+    }
+  }
+
+  protected void testTransformFunction(TransformFunction transformFunction, Timestamp[] expectedValues) {
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    // TODO: Support implicit cast from TIMESTAMP to STRING
+//    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(intValues[i], (int) expectedValues[i].getTime());
+      assertEquals(longValues[i], expectedValues[i].getTime());
+      assertEquals(floatValues[i], (float) expectedValues[i].getTime());
+      assertEquals(doubleValues[i], (double) expectedValues[i].getTime());
+      assertEquals(bigDecimalValues[i], BigDecimal.valueOf(expectedValues[i].getTime()));
+//      assertEquals(stringValues[i], expectedValues[i].toString());
     }
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, String[] expectedValues) {
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(stringValues[i], expectedValues[i]);
+      assertEquals(stringValues[i], expectedValues[i]);
     }
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, byte[][] expectedValues) {
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     byte[][] bytesValues = transformFunction.transformToBytesValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(bytesValues[i], expectedValues[i]);
+      assertEquals(bytesValues[i], BytesUtils.toBytes(stringValues[i]));
+      assertEquals(bytesValues[i], expectedValues[i]);
     }
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, int[][] expectedValues) {
-    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    int[][] intValuesMV = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longValuesMV = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatValuesMV = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleValuesMV = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringValuesMV = transformFunction.transformToStringValuesMV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(intMVValues[i], expectedValues[i]);
+      int[] expectedValueMV = expectedValues[i];
+      int numValues = expectedValueMV.length;
+      assertEquals(intValuesMV[i].length, numValues);
+      assertEquals(longValuesMV[i].length, numValues);
+      assertEquals(floatValuesMV[i].length, numValues);
+      assertEquals(doubleValuesMV[i].length, numValues);
+      assertEquals(stringValuesMV[i].length, numValues);
+      for (int j = 0; j < numValues; j++) {
+        assertEquals(intValuesMV[i][j], expectedValues[i][j]);
+        assertEquals(longValuesMV[i][j], expectedValues[i][j]);
+        assertEquals(floatValuesMV[i][j], (float) expectedValues[i][j]);
+        assertEquals(doubleValuesMV[i][j], (double) expectedValues[i][j]);
+        assertEquals(stringValuesMV[i][j], Integer.toString(expectedValues[i][j]));
+      }
     }
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, long[][] expectedValues) {
-    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    int[][] intValuesMV = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longValuesMV = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatValuesMV = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleValuesMV = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringValuesMV = transformFunction.transformToStringValuesMV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(longMVValues[i], expectedValues[i]);
+      long[] expectedValueMV = expectedValues[i];
+      int numValues = expectedValueMV.length;
+      assertEquals(intValuesMV[i].length, numValues);
+      assertEquals(longValuesMV[i].length, numValues);
+      assertEquals(floatValuesMV[i].length, numValues);
+      assertEquals(doubleValuesMV[i].length, numValues);
+      assertEquals(stringValuesMV[i].length, numValues);
+      for (int j = 0; j < numValues; j++) {
+        assertEquals(intValuesMV[i][j], (int) expectedValues[i][j]);
+        assertEquals(longValuesMV[i][j], expectedValues[i][j]);
+        assertEquals(floatValuesMV[i][j], (float) expectedValues[i][j]);
+        assertEquals(doubleValuesMV[i][j], (double) expectedValues[i][j]);
+        assertEquals(stringValuesMV[i][j], Long.toString(expectedValues[i][j]));
+      }
     }
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, float[][] expectedValues) {
-    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    int[][] intValuesMV = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longValuesMV = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatValuesMV = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleValuesMV = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringValuesMV = transformFunction.transformToStringValuesMV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(floatMVValues[i], expectedValues[i]);
+      float[] expectedValueMV = expectedValues[i];
+      int numValues = expectedValueMV.length;
+      assertEquals(intValuesMV[i].length, numValues);
+      assertEquals(longValuesMV[i].length, numValues);
+      assertEquals(floatValuesMV[i].length, numValues);
+      assertEquals(doubleValuesMV[i].length, numValues);
+      assertEquals(stringValuesMV[i].length, numValues);
+      for (int j = 0; j < numValues; j++) {
+        assertEquals(intValuesMV[i][j], (int) expectedValues[i][j]);
+        assertEquals(longValuesMV[i][j], (long) expectedValues[i][j]);
+        assertEquals(floatValuesMV[i][j], expectedValues[i][j]);
+        assertEquals(doubleValuesMV[i][j], (double) expectedValues[i][j]);
+        assertEquals(stringValuesMV[i][j], Float.toString(expectedValues[i][j]));
+      }
     }
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, double[][] expectedValues) {
-    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    int[][] intValuesMV = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longValuesMV = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatValuesMV = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleValuesMV = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringValuesMV = transformFunction.transformToStringValuesMV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(doubleMVValues[i], expectedValues[i]);
+      double[] expectedValueMV = expectedValues[i];
+      int numValues = expectedValueMV.length;
+      assertEquals(intValuesMV[i].length, numValues);
+      assertEquals(longValuesMV[i].length, numValues);
+      assertEquals(floatValuesMV[i].length, numValues);
+      assertEquals(doubleValuesMV[i].length, numValues);
+      assertEquals(stringValuesMV[i].length, numValues);
+      for (int j = 0; j < numValues; j++) {
+        assertEquals(intValuesMV[i][j], (int) expectedValues[i][j]);
+        assertEquals(longValuesMV[i][j], (long) expectedValues[i][j]);
+        assertEquals(floatValuesMV[i][j], (float) expectedValues[i][j]);
+        assertEquals(doubleValuesMV[i][j], expectedValues[i][j]);
+        assertEquals(stringValuesMV[i][j], Double.toString(expectedValues[i][j]));
+      }
     }
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, String[][] expectedValues) {
-    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    String[][] stringValuesMV = transformFunction.transformToStringValuesMV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(stringMVValues[i], expectedValues[i]);
+      assertEquals(stringValuesMV[i], expectedValues[i]);
     }
   }
 

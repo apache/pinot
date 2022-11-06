@@ -36,6 +36,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETE_TABLE_FAILURES("tables", false),
   REALTIME_ROWS_CONSUMED("rows", true),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
+  INCOMPLETE_REALTIME_ROWS_CONSUMED("rows", false),
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
@@ -73,7 +74,6 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_RESIZES("numResizes", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
-  QUERY_HAS_MV_SELECTION_ORDER_BY("queryHasMVSelectionOrderBy", false),
 
   READINESS_CHECK_OK_CALLS("readinessCheck", true),
   READINESS_CHECK_BAD_CALLS("readinessCheck", true),

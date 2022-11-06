@@ -123,6 +123,9 @@ public class ControllerConf extends PinotConfiguration {
     @Deprecated
     public static final String DEPRECATED_TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
     public static final String TASK_MANAGER_FREQUENCY_PERIOD = "controller.task.frequencyPeriod";
+    public static final String TASK_MANAGER_SKIP_LATE_CRON_SCHEDULE = "controller.task.skipLateCronSchedule";
+    public static final String TASK_MANAGER_MAX_CRON_SCHEDULE_DELAY_IN_SECONDS =
+        "controller.task.maxCronScheduleDelayInSeconds";
     // Deprecated as of 0.8.0
     @Deprecated
     public static final String DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS =
@@ -145,6 +148,10 @@ public class ControllerConf extends PinotConfiguration {
         "controller.minion.task.metrics.emitter.frequencyPeriod";
 
     public static final String PINOT_TASK_MANAGER_SCHEDULER_ENABLED = "controller.task.scheduler.enabled";
+    // This is the expiry for the ended tasks. Helix cleans up the task info from ZK after the expiry time from the
+    // end of the task.
+    public static final String PINOT_TASK_EXPIRE_TIME_MS = "controller.task.expire.time.ms";
+
     @Deprecated
     // RealtimeSegmentRelocator has been rebranded as SegmentRelocator
     public static final String DEPRECATED_REALTIME_SEGMENT_RELOCATOR_FREQUENCY =
@@ -177,6 +184,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtimeSegmentRelocation.initialDelayInSeconds";
     public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
         "controller.segmentRelocator.initialDelayInSeconds";
+    public static final String SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION =
+        "controller.segmentRelocator.enableLocalTierMigration";
 
     // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
     // Default value is false.
@@ -207,9 +216,11 @@ public class ControllerConf extends PinotConfiguration {
 
     private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
     private static final int DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
+    private static final int DEFAULT_SEGMENT_TIER_ASSIGNER_FREQUENCY_IN_SECONDS = -1; // Disabled
   }
 
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
+  private static final String MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = "minion.request.timeoutSeconds";
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
   private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
@@ -237,6 +248,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
 
   private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
+  private static final int DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   private static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   private static final boolean DEFAULT_ENABLE_SPLIT_COMMIT = true;
@@ -601,11 +613,9 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /**
-   * RealtimeSegmentRelocator has been rebranded to SegmentRelocator. Returns
-   * <code>controller.segment.relocator.frequencyInSeconds</code> or <code>controller.segment.relocator
-   * .frequencyInSeconds</code>
-   * or REALTIME_SEGMENT_RELOCATOR_FREQUENCY, in the order of decreasing perference (left ->
-   * right).
+   * RealtimeSegmentRelocator has been rebranded to SegmentRelocator. Returns <code>controller.segment.relocator
+   * .frequencyPeriod</code> or <code>controller.segment.relocator .frequencyInSeconds</code> or
+   * REALTIME_SEGMENT_RELOCATOR_FREQUENCY, in the order of decreasing perference (left -> right).
    */
   public int getSegmentRelocatorFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD))
@@ -646,12 +656,28 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS);
   }
 
+  public void setMinionAdminRequestTimeoutSeconds(int timeoutSeconds) {
+    setProperty(MINION_ADMIN_REQUEST_TIMEOUT_SECONDS, timeoutSeconds);
+  }
+
+  public int getMinionAdminRequestTimeoutSeconds() {
+    return getProperty(MINION_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS);
+  }
+
   public int getDeletedSegmentsRetentionInDays() {
     return getProperty(DELETED_SEGMENTS_RETENTION_IN_DAYS, DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS);
   }
 
   public void setDeletedSegmentsRetentionInDays(int retentionInDays) {
     setProperty(DELETED_SEGMENTS_RETENTION_IN_DAYS, retentionInDays);
+  }
+
+  public boolean isSkipLateCronSchedule() {
+    return getProperty(ControllerPeriodicTasksConf.TASK_MANAGER_SKIP_LATE_CRON_SCHEDULE, false);
+  }
+
+  public int getMaxCronScheduleDelayInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.TASK_MANAGER_MAX_CRON_SCHEDULE_DELAY_IN_SECONDS, 600);
   }
 
   public int getTaskManagerFrequencyInSeconds() {
@@ -804,6 +830,10 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
   }
 
+  public long getPinotTaskExpireTimeInMs() {
+    return getProperty(ControllerPeriodicTasksConf.PINOT_TASK_EXPIRE_TIME_MS, TimeUnit.HOURS.toMillis(24));
+  }
+
   /**
    * RealtimeSegmentRelocator has been rebranded to SegmentRelocator.
    * Check for SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS property, if not found, return
@@ -818,6 +848,10 @@ public class ControllerConf extends PinotConfiguration {
               ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
     }
     return segmentRelocatorInitialDelaySeconds;
+  }
+
+  public boolean enableSegmentRelocatorLocalTierMigration() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION, false);
   }
 
   public long getPeriodicTaskInitialDelayInSeconds() {

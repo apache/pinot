@@ -43,13 +43,13 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private static final int LESS_THAN_OR_EQUAL = 4;
   private static final int NOT_EQUAL = 5;
 
-  private final int _op;
-  private final TransformFunctionType _transformFunctionType;
-  private TransformFunction _leftTransformFunction;
-  private TransformFunction _rightTransformFunction;
-  private DataType _leftStoredType;
-  private DataType _rightStoredType;
-  private int[] _results;
+  protected final int _op;
+  protected final TransformFunctionType _transformFunctionType;
+  protected TransformFunction _leftTransformFunction;
+  protected TransformFunction _rightTransformFunction;
+  protected DataType _leftStoredType;
+  protected DataType _rightStoredType;
+  protected int[] _results;
 
   protected BinaryOperatorTransformFunction(TransformFunctionType transformFunctionType) {
     // translate to integer in [0, 5] for guaranteed tableswitch
@@ -400,7 +400,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillLongResultArray(ProjectionBlock projectionBlock, float[] leftValues, int length) {
     long[] rightValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _results[i] = compare(leftValues[i], rightValues[i]);
+      _results[i] = getIntResult(compare(leftValues[i], rightValues[i]));
     }
   }
 
@@ -446,7 +446,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillLongResultArray(ProjectionBlock projectionBlock, double[] leftValues, int length) {
     long[] rightValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _results[i] = compare(leftValues[i], rightValues[i]);
+      _results[i] = getIntResult(compare(leftValues[i], rightValues[i]));
     }
   }
 
@@ -526,17 +526,17 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private int compare(long left, double right) {
     if (Math.abs(left) <= 1L << 53) {
-      return getIntResult(Double.compare(left, right));
+      return Double.compare(left, right);
     } else {
-      return getIntResult(BigDecimal.valueOf(left).compareTo(BigDecimal.valueOf(right)));
+      return BigDecimal.valueOf(left).compareTo(BigDecimal.valueOf(right));
     }
   }
 
   private int compare(double left, long right) {
     if (Math.abs(right) <= 1L << 53) {
-      return getIntResult(Double.compare(left, right));
+      return Double.compare(left, right);
     } else {
-      return getIntResult(BigDecimal.valueOf(left).compareTo(BigDecimal.valueOf(right)));
+      return BigDecimal.valueOf(left).compareTo(BigDecimal.valueOf(right));
     }
   }
 

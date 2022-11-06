@@ -105,6 +105,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return -1;
+    }
+
+    @Override
     public boolean applySV(int dictId) {
       return _nonMatchingDictId != dictId;
     }
@@ -159,6 +164,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return -1;
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.INT;
     }
@@ -188,6 +198,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     LongRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, long nonMatchingValue) {
       super(notEqPredicate);
       _nonMatchingValue = nonMatchingValue;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return -1;
     }
 
     @Override
@@ -223,6 +238,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return -1;
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.FLOAT;
     }
@@ -252,6 +272,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     DoubleRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, double nonMatchingValue) {
       super(notEqPredicate);
       _nonMatchingValue = nonMatchingValue;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return -1;
     }
 
     @Override
@@ -287,6 +312,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return -1;
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.BIG_DECIMAL;
     }
@@ -306,6 +336,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return -1;
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.STRING;
     }
@@ -322,6 +357,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     BytesRawValueBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, byte[] nonMatchingValue) {
       super(notEqPredicate);
       _nonMatchingValue = nonMatchingValue;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return -1;
     }
 
     @Override

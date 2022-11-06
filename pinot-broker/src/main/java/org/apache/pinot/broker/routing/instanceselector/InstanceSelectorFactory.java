@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import javax.annotation.Nullable;
+import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -35,7 +37,8 @@ public class InstanceSelectorFactory {
   public static final String LEGACY_REPLICA_GROUP_OFFLINE_ROUTING = "PartitionAwareOffline";
   public static final String LEGACY_REPLICA_GROUP_REALTIME_ROUTING = "PartitionAwareRealtime";
 
-  public static InstanceSelector getInstanceSelector(TableConfig tableConfig, BrokerMetrics brokerMetrics) {
+  public static InstanceSelector getInstanceSelector(TableConfig tableConfig, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector) {
     String tableNameWithType = tableConfig.getTableName();
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null) {
@@ -45,14 +48,14 @@ public class InstanceSelectorFactory {
           tableConfig.getTableType() == TableType.REALTIME && LEGACY_REPLICA_GROUP_REALTIME_ROUTING
               .equalsIgnoreCase(routingConfig.getRoutingTableBuilderName()))) {
         LOGGER.info("Using ReplicaGroupInstanceSelector for table: {}", tableNameWithType);
-        return new ReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics);
+        return new ReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector);
       }
       if (RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE
           .equalsIgnoreCase(routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using StrictReplicaGroupInstanceSelector for table: {}", tableNameWithType);
-        return new StrictReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics);
+        return new StrictReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector);
       }
     }
-    return new BalancedInstanceSelector(tableNameWithType, brokerMetrics);
+    return new BalancedInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector);
   }
 }

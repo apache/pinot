@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.spi.data.readers;
 
-import org.apache.commons.lang3.SerializationUtils;
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.Test;
 
@@ -43,9 +46,47 @@ public class PrimaryKeyTest {
   @Test
   public void testSerialization() {
     byte[] rawbytes = {0xa, 0x2, (byte) 0xff};
-    PrimaryKey pk = new PrimaryKey(new Object[]{"111", 2, new ByteArray(rawbytes)});
+    Object[] values = new Object[]{
+        "foo_bar", 2, 2.0d, 3.14f, System.currentTimeMillis(), new ByteArray(rawbytes), new BigDecimal(100)
+    };
+    PrimaryKey pk = new PrimaryKey(values);
     byte[] bytes = pk.asBytes();
-    PrimaryKey deserialized = new PrimaryKey((Object[]) SerializationUtils.deserialize(bytes));
-    assertEquals(deserialized, pk);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+
+    int length = byteBuffer.getInt();
+    assertEquals(length, ((String) values[0]).length());
+    byte[] arr = new byte[length];
+    byteBuffer.get(arr);
+    String out = new String(arr, StandardCharsets.UTF_8);
+    assertEquals(out, values[0]);
+
+    assertEquals(byteBuffer.getInt(), values[1]);
+    assertEquals(byteBuffer.getDouble(), values[2]);
+    assertEquals(byteBuffer.getFloat(), values[3]);
+    assertEquals(byteBuffer.getLong(), values[4]);
+
+    assertEquals(byteBuffer.getInt(), rawbytes.length);
+    arr = new byte[rawbytes.length];
+    byteBuffer.get(arr);
+    assertEquals(arr, rawbytes);
+
+    length = byteBuffer.getInt();
+    arr = new byte[length];
+    byteBuffer.get(arr);
+    assertEquals(BigDecimalUtils.deserialize(arr), values[6]);
+  }
+
+  @Test
+  public void testSerializationSingleVal() {
+    Object[] values = new Object[]{
+        "foo_bar"
+    };
+    PrimaryKey pk = new PrimaryKey(values);
+    byte[] bytes = pk.asBytes();
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    byte[] arr = new byte[7];
+    byteBuffer.get(arr);
+    String out = new String(arr, StandardCharsets.UTF_8);
+    assertEquals(out, values[0]);
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.tools;
 
 import java.io.File;
+import java.util.Objects;
 import org.apache.pinot.spi.config.table.TableType;
 
 
@@ -102,5 +103,25 @@ public class QuickstartTableRequest {
     return "{ tableName = " + _tableName + ", tableType = " + _tableType + ", schemaFile = " + _schemaFile
         + ", tableRequestFile = " + _tableRequestFile + ", ingestionJobFile = " + _ingestionJobFile
         + ", bootstrapTableDir = " + _bootstrapTableDir + " }";
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    QuickstartTableRequest that = (QuickstartTableRequest) o;
+    return Objects.equals(_tableName, that._tableName) && _tableType == that._tableType
+        && Objects.equals(_schemaFile, that._schemaFile) && Objects.equals(_tableRequestFile,
+        that._tableRequestFile) && Objects.equals(_ingestionJobFile, that._ingestionJobFile)
+        && Objects.equals(_bootstrapTableDir, that._bootstrapTableDir);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_tableName, _tableType, _schemaFile, _tableRequestFile, _ingestionJobFile, _bootstrapTableDir);
   }
 }

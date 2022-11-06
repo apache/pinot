@@ -37,6 +37,8 @@ public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_NAME = "name";
   private static final String TABLE_IS_DIMENSION = "isDimTable";
   private static final String TABLE_DATA_MANAGER_AUTH = "auth";
+  private static final String TABLE_DELETED_SEGMENTS_CACHE_SIZE = "deletedSegmentsCacheSize";
+  private static final String TABLE_DELETED_SEGMENTS_CACHE_TTL_MINUTES = "deletedSegmentsCacheTTL";
 
   private final Configuration _tableDataManagerConfig;
 
@@ -72,6 +74,14 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.subset(TABLE_DATA_MANAGER_AUTH);
   }
 
+  public int getTableDeletedSegmentsCacheSize() {
+    return _tableDataManagerConfig.getInt(TABLE_DELETED_SEGMENTS_CACHE_SIZE);
+  }
+
+  public int getTableDeletedSegmentsCacheTtlMinutes() {
+    return _tableDataManagerConfig.getInt(TABLE_DELETED_SEGMENTS_CACHE_TTL_MINUTES);
+  }
+
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
       InstanceDataManagerConfig instanceDataManagerConfig, String tableNameWithType) {
     Configuration defaultConfig = new PropertiesConfiguration();
@@ -82,6 +92,10 @@ public class TableDataManagerConfig {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     Preconditions.checkNotNull(tableType);
     defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, tableType.name());
+    defaultConfig.addProperty(TABLE_DELETED_SEGMENTS_CACHE_SIZE,
+        instanceDataManagerConfig.getDeletedSegmentsCacheSize());
+    defaultConfig.addProperty(TABLE_DELETED_SEGMENTS_CACHE_TTL_MINUTES,
+        instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes());
 
     // copy auth-related configs
     instanceDataManagerConfig.getConfig().subset(TABLE_DATA_MANAGER_AUTH).toMap()

@@ -24,6 +24,7 @@ import java.net.URI;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -67,10 +68,20 @@ public class ZKOperator {
       long segmentSizeInBytes, boolean enableParallelPushProtection, boolean allowRefresh, HttpHeaders headers)
       throws Exception {
     String segmentName = segmentMetadata.getName();
-    ZNRecord existingSegmentMetadataZNRecord =
-        _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
     boolean refreshOnly =
         Boolean.parseBoolean(headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY));
+
+    ZNRecord existingSegmentMetadataZNRecord =
+        _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
+    if (existingSegmentMetadataZNRecord != null && shouldProcessAsNewSegment(tableNameWithType, segmentName,
+        existingSegmentMetadataZNRecord, enableParallelPushProtection)) {
+      LOGGER.warn("Removing segment ZK metadata (recovering from previous upload failure) for table: {}, segment: {}",
+          tableNameWithType, segmentName);
+      Preconditions.checkState(_pinotHelixResourceManager.removeSegmentZKMetadata(tableNameWithType, segmentName),
+          "Failed to remove segment ZK metadata for table: %s, segment: %s", tableNameWithType, segmentName);
+      existingSegmentMetadataZNRecord = null;
+    }
+
     if (existingSegmentMetadataZNRecord == null) {
       // Add a new segment
       if (refreshOnly) {
@@ -99,6 +110,44 @@ public class ZKOperator {
     }
   }
 
+  /**
+   * Returns {@code true} when the segment should be processed as new segment.
+   * <p>When segment ZK metadata exists, check if segment exists in the ideal state. If the previous upload failed after
+   * segment ZK metadata is created but before assigning the segment to the ideal state, we want to remove the existing
+   * segment ZK metadata and treat it as a new segment.
+   */
+  private boolean shouldProcessAsNewSegment(String tableNameWithType, String segmentName,
+      ZNRecord existingSegmentMetadataZNRecord, boolean enableParallelPushProtection) {
+    IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+    if (idealState.getInstanceStateMap(segmentName) != null) {
+      return false;
+    }
+    // Segment does not exist in the ideal state
+    if (enableParallelPushProtection) {
+      // Check segment upload start time when parallel push protection is enabled in case the segment is being uploaded
+      long segmentUploadStartTime = new SegmentZKMetadata(existingSegmentMetadataZNRecord).getSegmentUploadStartTime();
+      if (segmentUploadStartTime > 0) {
+        handleParallelPush(tableNameWithType, segmentName, segmentUploadStartTime);
+      }
+    }
+    return true;
+  }
+
+  private void handleParallelPush(String tableNameWithType, String segmentName, long segmentUploadStartTime) {
+    assert segmentUploadStartTime > 0;
+    if (System.currentTimeMillis() - segmentUploadStartTime > _controllerConf.getSegmentUploadTimeoutInMillis()) {
+      // Last segment upload does not finish properly, replace the segment
+      LOGGER.error("Segment: {} of table: {} was not properly uploaded, replacing it", segmentName, tableNameWithType);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED, 1L);
+    } else {
+      // Another segment upload is in progress
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Another segment upload is in progress for segment: %s of table: %s, retry later", segmentName,
+              tableNameWithType), Response.Status.CONFLICT);
+    }
+  }
+
   private void processExistingSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
       FileUploadType uploadType, ZNRecord existingSegmentMetadataZNRecord, @Nullable URI finalSegmentLocationURI,
       File segmentFile, @Nullable String sourceDownloadURIStr, String segmentDownloadURIStr,
@@ -117,17 +166,7 @@ public class ZKOperator {
       // When segment upload start time is larger than 0, that means another upload is in progress
       long segmentUploadStartTime = segmentZKMetadata.getSegmentUploadStartTime();
       if (segmentUploadStartTime > 0) {
-        if (System.currentTimeMillis() - segmentUploadStartTime > _controllerConf.getSegmentUploadTimeoutInMillis()) {
-          // Last segment upload does not finish properly, replace the segment
-          LOGGER.error("Segment: {} of table: {} was not properly uploaded, replacing it", segmentName,
-              tableNameWithType);
-          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED, 1L);
-        } else {
-          // Another segment upload is in progress
-          throw new ControllerApplicationException(LOGGER,
-              String.format("Another segment upload is in progress for segment: %s of table: %s, retry later",
-                  segmentName, tableNameWithType), Response.Status.CONFLICT);
-        }
+        handleParallelPush(tableNameWithType, segmentName, segmentUploadStartTime);
       }
 
       // Lock the segment by setting the upload start time in ZK

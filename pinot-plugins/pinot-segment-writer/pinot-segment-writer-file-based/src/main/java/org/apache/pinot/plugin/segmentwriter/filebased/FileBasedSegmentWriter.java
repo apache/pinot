@@ -184,7 +184,8 @@ public class FileBasedSegmentWriter implements SegmentWriter {
       batchConfigMapOverride.put(BatchConfigProperties.OUTPUT_DIR_URI, segmentDir.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_FORMAT, BUFFER_FILE_FORMAT.toString());
       BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
-          _batchIngestionConfig.getSegmentIngestionType(), _batchIngestionConfig.getSegmentIngestionFrequency());
+          _batchIngestionConfig.getSegmentIngestionType(), _batchIngestionConfig.getSegmentIngestionFrequency(),
+          _batchIngestionConfig.getConsistentDataPush());
 
       // Build segment
       SegmentGeneratorConfig segmentGeneratorConfig =

@@ -31,10 +31,13 @@ import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.Schema.SchemaBuilder;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
@@ -103,6 +106,35 @@ public class SegmentGenerationJobRunnerTest {
     // FUTURE - validate contents of file?
   }
 
+  /**
+   * Enabling consistent data push should generate segment names with timestamps in order to differentiate between
+   * the non-unique raw segment names.
+   */
+  @Test
+  public void testSegmentGenerationWithConsistentPush()
+      throws Exception {
+    File testDir = makeTestDir();
+    File inputDir = new File(testDir, "input");
+    inputDir.mkdirs();
+    File inputFile = new File(inputDir, "input.csv");
+    FileUtils.writeLines(inputFile, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+
+    // Create an output directory
+    File outputDir = new File(testDir, "output");
+
+    final String schemaName = "mySchema";
+    File schemaFile = makeSchemaFile(testDir, schemaName);
+    File tableConfigFile = makeTableConfigFileWithConsistentPush(testDir, schemaName);
+    SegmentGenerationJobSpec jobSpec = makeJobSpec(inputDir, outputDir, schemaFile, tableConfigFile);
+    jobSpec.setOverwriteOutput(false);
+    SegmentGenerationJobRunner jobRunner = new SegmentGenerationJobRunner(jobSpec);
+    jobRunner.run();
+
+    // There should be a tar file generated with timestamp (13 digits)
+    String[] list = outputDir.list((dir, name) -> name.matches("myTable_OFFLINE_\\d{13}_0.tar.gz"));
+    assertEquals(list.length, 1);
+  }
+
   @Test
   public void testInputFilesWithSameNameInDifferentDirectories()
       throws Exception {
@@ -125,6 +157,7 @@ public class SegmentGenerationJobRunnerTest {
     File schemaFile = makeSchemaFile(testDir, schemaName);
     File tableConfigFile = makeTableConfigFile(testDir, schemaName);
     SegmentGenerationJobSpec jobSpec = makeJobSpec(inputDir, outputDir, schemaFile, tableConfigFile);
+    jobSpec.setSearchRecursively(true);
     SegmentGenerationJobRunner jobRunner = new SegmentGenerationJobRunner(jobSpec);
     jobRunner.run();
 
@@ -167,7 +200,7 @@ public class SegmentGenerationJobRunnerTest {
     // Set up for a segment name that matches our input filename, so we can validate
     // that only the first input file gets processed.
     SegmentNameGeneratorSpec nameSpec = new SegmentNameGeneratorSpec();
-    nameSpec.setType(SegmentGenerationTaskRunner.INPUT_FILE_SEGMENT_NAME_GENERATOR);
+    nameSpec.setType(BatchConfigProperties.SegmentNameGeneratorType.INPUT_FILE);
     nameSpec.getConfigs().put(SegmentGenerationTaskRunner.FILE_PATH_PATTERN, ".+/(.+)\\.csv");
     nameSpec.getConfigs().put(SegmentGenerationTaskRunner.SEGMENT_NAME_TEMPLATE, "${filePathPattern:\\1}");
     jobSpec.setSegmentNameGeneratorSpec(nameSpec);
@@ -217,10 +250,23 @@ public class SegmentGenerationJobRunnerTest {
   private File makeTableConfigFile(File testDir, String schemaName) throws IOException {
     File tableConfigFile = new File(testDir, "tableConfig");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-      .setTableName("myTable")
-      .setSchemaName(schemaName)
-      .setNumReplicas(1)
-      .build();
+        .setTableName("myTable")
+        .setSchemaName(schemaName)
+        .setNumReplicas(1)
+        .build();
+    FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
+    return tableConfigFile;
+  }
+
+  private File makeTableConfigFileWithConsistentPush(File testDir, String schemaName) throws IOException {
+    File tableConfigFile = new File(testDir, "tableConfig");
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY", true));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("myTable").setSchemaName(schemaName)
+        .setNumReplicas(1)
+        .setIngestionConfig(ingestionConfig)
+        .build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
     return tableConfigFile;
   }

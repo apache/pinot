@@ -27,6 +27,7 @@ import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
@@ -90,7 +91,7 @@ public class ZKOperatorTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN)
             .setStreamConfigs(getStreamConfigs()).setLLC(true).setNumReplicas(1).build();
 
-    _resourceManager.addSchema(schema, false);
+    _resourceManager.addSchema(schema, false, false);
     _resourceManager.addTable(offlineTableConfig);
     _resourceManager.addTable(realtimeTableConfig);
   }
@@ -220,12 +221,35 @@ public class ZKOperatorTest {
 
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, FileUploadType.SEGMENT, null, null,
         "downloadUrl", "downloadUrl", "crypter", 10, true, true, httpHeaders);
-
     SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertNotNull(segmentZKMetadata);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     assertEquals(segmentZKMetadata.getCreationTime(), 123L);
     long pushTime = segmentZKMetadata.getPushTime();
+    assertTrue(pushTime > 0);
+    assertEquals(segmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
+    assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");
+    assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
+    assertEquals(segmentZKMetadata.getSegmentUploadStartTime(), -1);
+    assertEquals(segmentZKMetadata.getSizeInBytes(), 10);
+
+    // Test if the same segment can be uploaded when the previous upload failed after segment ZK metadata is created but
+    // before segment is assigned to the ideal state
+    // Manually remove the segment from the ideal state
+    IdealState idealState = _resourceManager.getTableIdealState(OFFLINE_TABLE_NAME);
+    assertNotNull(idealState);
+    idealState.getRecord().getMapFields().remove(SEGMENT_NAME);
+    _resourceManager.getHelixAdmin()
+        .setResourceIdealState(_resourceManager.getHelixClusterName(), OFFLINE_TABLE_NAME, idealState);
+    // The segment should be uploaded as a new segment (push time should change, and refresh time shouldn't be set)
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, FileUploadType.SEGMENT, null, null,
+        "downloadUrl", "downloadUrl", "crypter", 10, true, true, httpHeaders);
+    segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getCrc(), 12345L);
+    assertEquals(segmentZKMetadata.getCreationTime(), 123L);
+    assertTrue(segmentZKMetadata.getPushTime() > pushTime);
+    pushTime = segmentZKMetadata.getPushTime();
     assertTrue(pushTime > 0);
     assertEquals(segmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
     assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");

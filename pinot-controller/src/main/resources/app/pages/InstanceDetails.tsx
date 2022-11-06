@@ -382,7 +382,6 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
         <CustomizedTables
           title="Tables"
           data={tableData}
-          isPagination
           addLinks
           baseURL={`/instance/${instanceName}/table/`}
           showSearchBox={true}

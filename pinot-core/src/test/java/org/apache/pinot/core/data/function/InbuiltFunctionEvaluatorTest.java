@@ -23,6 +23,8 @@ import java.util.Collections;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -53,6 +55,21 @@ public class InbuiltFunctionEvaluatorTest {
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
       assertEquals(evaluator.evaluate(row), "testValue");
+    }
+  }
+
+  @Test
+  public void testScalarWrapperWithReservedKeywordExpression() {
+    String expression = "dateTrunc('MONTH', \"date\")";
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    assertEquals(evaluator.getArguments(), Collections.singletonList("date"));
+    GenericRow row = new GenericRow();
+    for (int i = 1; i < 9; i++) {
+      DateTime dt = new DateTime(String.format("2020-0%d-15T12:00:00", i));
+      long millis = dt.getMillis();
+      DateTime truncDt = dt.withZone(DateTimeZone.UTC).withDayOfMonth(1).withHourOfDay(0).withMillisOfDay(0);
+      row.putValue("date", millis);
+      assertEquals(evaluator.evaluate(row), truncDt.getMillis());
     }
   }
 

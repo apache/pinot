@@ -103,7 +103,7 @@ public class MutableSegmentImplRawMVTest {
         .createMutableSegmentImpl(_schema, noDictionaryColumns, Collections.emptySet(), Collections.emptySet(),
             false);
     _lastIngestionTimeMs = System.currentTimeMillis();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs);
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs, new GenericRow());
     _startTimeMs = System.currentTimeMillis();
 
     try (RecordReader recordReader = RecordReaderFactory

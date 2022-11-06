@@ -66,6 +66,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
@@ -139,6 +140,9 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableName}/{segmentName}")
   @ApiOperation(value = "Download a segment", notes = "Download a segment")
+  @TrackInflightRequestMetrics
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_DOWNLOADS_IN_PROGRESS)
+  @Authenticate(AccessType.READ)
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
@@ -157,7 +161,6 @@ public class PinotSegmentUploadDownloadRestletResource {
       throw new ControllerApplicationException(LOGGER, "No data access to table: " + tableName,
           Response.Status.FORBIDDEN);
     }
-
     segmentName = URIUtils.decode(segmentName);
     URI dataDirURI = ControllerFilePathProvider.getInstance().getDataDirURI();
     Response.ResponseBuilder builder = Response.ok();
@@ -323,7 +326,9 @@ public class PinotSegmentUploadDownloadRestletResource {
         throw new ControllerApplicationException(LOGGER, "Failed to find table: " + tableNameWithType,
             Response.Status.BAD_REQUEST);
       }
-      SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
+      if (tableConfig.getIngestionConfig() == null || tableConfig.getIngestionConfig().isSegmentTimeValueCheck()) {
+        SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
+      }
       if (uploadType != FileUploadDownloadClient.FileUploadType.METADATA) {
         SegmentValidationUtils.checkStorageQuota(tempSegmentDir, segmentMetadata, tableConfig,
             _pinotHelixResourceManager, _controllerConf, _controllerMetrics, _connectionManager, _executor,
@@ -463,6 +468,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 412, message = "CRC check fails"),
       @ApiResponse(code = 500, message = "Internal error")
   })
+  @TrackInflightRequestMetrics
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
   // request if a multipart object is not sent. This endpoint does not move the segment to its final location;
   // it keeps it at the downloadURI header that is set. We will not support this endpoint going forward.
@@ -501,6 +508,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 412, message = "CRC check fails"),
       @ApiResponse(code = 500, message = "Internal error")
   })
+  @TrackInflightRequestMetrics
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // For the multipart endpoint, we will always move segment to final location regardless of the segment endpoint.
   public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
       @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
@@ -537,6 +546,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 412, message = "CRC check fails"),
       @ApiResponse(code = 500, message = "Internal error")
   })
+  @TrackInflightRequestMetrics
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
   // request if a multipart object is not sent. This endpoint is recommended for use. It differs from the first
   // endpoint in how it moves the segment to a Pinot-determined final directory.
@@ -576,6 +587,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 412, message = "CRC check fails"),
       @ApiResponse(code = 500, message = "Internal error")
   })
+  @TrackInflightRequestMetrics
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // This behavior does not differ from v1 of the same endpoint.
   public void uploadSegmentAsMultiPartV2(FormDataMultiPart multiPart,
       @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)

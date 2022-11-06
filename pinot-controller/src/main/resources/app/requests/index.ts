@@ -20,7 +20,7 @@
 import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
   IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
-  BrokerList, ServerList, UserList, TableList, UserObject
+  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig
 } from 'Models';
 
 const headers = {
@@ -126,8 +126,17 @@ export const getMinionMeta = (tableName: string, taskType: string): Promise<Axio
 export const getTasks = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/${tableName}/state`, { headers: { ...headers, Accept: 'application/json' } });
 
+export const getTaskRuntimeConfig = (taskName: string): Promise<AxiosResponse<TaskRuntimeConfig>> =>
+  baseApi.get(`/tasks/task/${taskName}/runtime/config`, { headers: { ...headers, Accept: 'application/json' }});
+
 export const getTaskDebug = (taskName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/task/${taskName}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskProgress = (taskName: string, subTaskName: string): Promise<AxiosResponse<TaskProgressResponse>> =>
+  baseApi.get(`/tasks/subtask/${taskName}/progress`, { headers: { ...headers, Accept: 'application/json' }, params: {subtaskNames: subTaskName} });
+
+export const getTaskGeneratorDebug = (taskName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/generator/${taskName}/${taskType}/debug`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getTaskTypeDebug = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
@@ -185,6 +194,12 @@ export const reloadStatus = (tableName: string, tableType: string): Promise<Axio
 
 export const deleteSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/segments/${tableName}/${instanceName}`, {headers});
+
+export const getTableJobs = (tableName: string): Promise<AxiosResponse<TableSegmentJobs>> => 
+  baseApi.get(`/table/${tableName}/jobs`);
+
+export const getSegmentReloadStatus = (jobId: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/segments/segmentReloadStatus/${jobId}`, {headers});
 
 export const deleteTable = (tableName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/tables/${tableName}`, {headers});

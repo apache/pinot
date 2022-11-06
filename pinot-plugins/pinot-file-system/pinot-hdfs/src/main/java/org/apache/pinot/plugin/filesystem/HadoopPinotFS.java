@@ -20,13 +20,14 @@
 package org.apache.pinot.plugin.filesystem;
 
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -36,6 +37,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,34 +142,47 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public String[] listFiles(URI fileUri, boolean recursive)
       throws IOException {
-    ArrayList<String> filePathStrings = new ArrayList<>();
-    Path path = new Path(fileUri);
-    if (_hadoopFS.exists(path)) {
-      // _hadoopFS.listFiles(path, false) will not return directories as files, thus use listStatus(path) here.
-      List<FileStatus> files = listStatus(path, recursive);
-      for (FileStatus file : files) {
-        filePathStrings.add(file.getPath().toString());
-      }
-    } else {
-      throw new IllegalArgumentException("fileUri does not exist: " + fileUri);
-    }
-    String[] retArray = new String[filePathStrings.size()];
-    filePathStrings.toArray(retArray);
-    return retArray;
+    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    visitFiles(fileUri, recursive, f -> builder.add(f.getPath().toString()));
+    String[] listedFiles = builder.build().toArray(new String[0]);
+    LOGGER.debug("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
+    return listedFiles;
   }
 
-  private List<FileStatus> listStatus(Path path, boolean recursive)
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
-    List<FileStatus> fileStatuses = new ArrayList<>();
+    ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
+    visitFiles(fileUri, recursive, f -> {
+      FileMetadata.Builder fileBuilder =
+          new FileMetadata.Builder().setFilePath(f.getPath().toString()).setLastModifiedTime(f.getModificationTime())
+              .setLength(f.getLen()).setIsDirectory(f.isDirectory());
+      listBuilder.add(fileBuilder.build());
+    });
+    ImmutableList<FileMetadata> listedFiles = listBuilder.build();
+    LOGGER.debug("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), fileUri, recursive);
+    return listedFiles;
+  }
+
+  private void visitFiles(URI fileUri, boolean recursive, Consumer<FileStatus> visitor)
+      throws IOException {
+    Path path = new Path(fileUri);
+    if (!_hadoopFS.exists(path)) {
+      throw new IllegalArgumentException("fileUri does not exist: " + fileUri);
+    }
+    visitFileStatus(path, recursive, visitor);
+  }
+
+  private void visitFileStatus(Path path, boolean recursive, Consumer<FileStatus> visitor)
+      throws IOException {
+    // _hadoopFS.listFiles(path, false) will not return directories as files, thus use listStatus(path) here.
     FileStatus[] files = _hadoopFS.listStatus(path);
     for (FileStatus file : files) {
-      fileStatuses.add(file);
+      visitor.accept(file);
       if (file.isDirectory() && recursive) {
-        List<FileStatus> subFiles = listStatus(file.getPath(), true);
-        fileStatuses.addAll(subFiles);
+        visitFileStatus(file.getPath(), true, visitor);
       }
     }
-    return fileStatuses;
   }
 
   @Override

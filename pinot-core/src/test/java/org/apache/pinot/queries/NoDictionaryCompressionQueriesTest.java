@@ -30,7 +30,7 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -387,8 +387,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
    */
   private void testSelectQueryHelper(String query, int expectedResultSize, List<Serializable[]> expectedResults) {
     SelectionOnlyOperator operator = getOperator(query);
-    IntermediateResultsBlock operatorResult = operator.nextBlock();
-    List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
+    SelectionResultsBlock operatorResult = operator.nextBlock();
+    List<Object[]> resultset = (List<Object[]>) operatorResult.getRows();
     Assert.assertNotNull(resultset);
     Assert.assertEquals(resultset.size(), expectedResultSize);
     if (expectedResults != null) {

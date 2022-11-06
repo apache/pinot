@@ -48,6 +48,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.realtime.converter.ColumnIndicesForRealtimeTable;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -70,16 +71,21 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamDataDecoder;
+import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
+import org.apache.pinot.spi.stream.StreamDataDecoderResult;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
@@ -210,7 +216,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final SegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
-  private final StreamMessageDecoder _messageDecoder;
+  private final StreamDataDecoder _streamDataDecoder;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
@@ -260,15 +266,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final LLCSegmentName _llcSegmentName;
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
-  private StreamMetadataProvider _streamMetadataProvider = null;
+  private StreamMetadataProvider _partitionMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
-  private final List<String> _invertedIndexColumns;
-  private final List<String> _textIndexColumns;
-  private final List<String> _fstIndexColumns;
-  private final List<String> _noDictionaryColumns;
-  private final List<String> _varLengthDictionaryColumns;
-  private final String _sortedColumn;
+  private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
   private final Logger _segmentLogger;
   private final String _tableStreamName;
   private final PinotDataBufferMemoryManager _memoryManager;
@@ -279,6 +280,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final StreamPartitionMsgOffset _startOffset;
   private final PartitionLevelStreamConfig _partitionLevelStreamConfig;
 
+  private RowMetadata _lastRowMetadata;
+  private long _lastConsumedTimestampMs = -1;
+
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
   private String _stopReason = null;
@@ -288,7 +292,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _rateLimiter;
 
-  private volatile StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime = null;
+  private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -498,18 +502,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * otherwise
    */
   private boolean processStreamEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
-
     int messageCount = messagesAndOffsets.getMessageCount();
     _rateLimiter.throttle(messageCount);
 
     PinotMeter realtimeRowsConsumedMeter = null;
     PinotMeter realtimeRowsDroppedMeter = null;
+    PinotMeter realtimeIncompleteRowsConsumedMeter = null;
 
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
     boolean canTakeMore = true;
 
-    GenericRow reuse = new GenericRow();
     TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     boolean prematureExit = false;
     for (int index = 0; index < messageCount; index++) {
@@ -542,18 +545,18 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         throw new RuntimeException("Realtime segment full");
       }
 
-      // Index each message
-      reuse.clear();
-      // retrieve metadata from the message batch if available
-      // this can be overridden by the decoder if there is a better indicator in the message payload
-      RowMetadata msgMetadata = messagesAndOffsets.getMetadataAtIndex(index);
-
-      GenericRow decodedRow = _messageDecoder
-          .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
-              messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
-      if (decodedRow != null) {
+      // Decode message
+      StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(messagesAndOffsets.getStreamMessage(index));
+      RowMetadata msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
+      if (decodedRow.getException() != null) {
+        // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
+        // decode error
+        realtimeRowsDroppedMeter =
+            _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                realtimeRowsDroppedMeter);
+      } else {
         try {
-          _transformPipeline.processRow(decodedRow, reusedResult);
+          _transformPipeline.processRow(decodedRow.getResult(), reusedResult);
         } catch (Exception e) {
           _numRowsErrored++;
           // when exception happens we prefer abandoning the whole batch and not partially indexing some rows
@@ -568,10 +571,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED,
                   reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
         }
+        if (reusedResult.getIncompleteRowCount() > 0) {
+          realtimeIncompleteRowsConsumedMeter =
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
+                  reusedResult.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
+        }
         for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
           try {
             canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             indexedMessageCount++;
+            _lastRowMetadata = msgMetadata;
+            _lastConsumedTimestampMs = System.currentTimeMillis();
             realtimeRowsConsumedMeter =
                 _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
                     realtimeRowsConsumedMeter);
@@ -583,10 +593,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 new SegmentErrorInfo(now(), errorMessage, e));
           }
         }
-      } else {
-        realtimeRowsDroppedMeter =
-            _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
-                realtimeRowsDroppedMeter);
       }
 
       _currentOffset = messagesAndOffsets.getNextStreamPartitionMsgOffsetAtIndex(index);
@@ -817,7 +823,24 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   @Override
   public long getLastConsumedTimestamp() {
-    return _lastLogTime;
+    return _lastConsumedTimestampMs;
+  }
+
+  @Override
+  public Map<String, ConsumerPartitionState> getConsumerPartitionState() {
+    String partitionGroupId = String.valueOf(_partitionGroupId);
+    return Collections.singletonMap(partitionGroupId, new ConsumerPartitionState(partitionGroupId, getCurrentOffset(),
+        getLastConsumedTimestamp(), fetchLatestStreamOffset(5_000), _lastRowMetadata));
+  }
+
+  @Override
+  public Map<String, PartitionLagState> getPartitionToLagState(
+      Map<String, ConsumerPartitionState> consumerPartitionStateMap) {
+    if (_partitionMetadataProvider == null) {
+      createPartitionMetadataProvider("Get Partition Lag State");
+    }
+    ;
+    return _partitionMetadataProvider.getCurrentPartitionLagState(consumerPartitionStateMap);
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {
@@ -865,9 +888,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // lets convert the segment now
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
-              _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(), _sortedColumn,
-              _invertedIndexColumns, _textIndexColumns, _fstIndexColumns, _noDictionaryColumns,
-              _varLengthDictionaryColumns, _nullHandlingEnabled);
+              _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
+              _columnIndicesForRealtimeTable, _nullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1014,7 +1036,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private void closeStreamConsumers() {
     closePartitionGroupConsumer();
-    closeStreamMetadataProvider();
+    closePartitionMetadataProvider();
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
       _partitionGroupConsumerSemaphore.release();
     }
@@ -1028,11 +1050,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private void closeStreamMetadataProvider() {
-    try {
-      _streamMetadataProvider.close();
-    } catch (Exception e) {
-      _segmentLogger.warn("Could not close stream metadata provider", e);
+  private void closePartitionMetadataProvider() {
+    if (_partitionMetadataProvider != null) {
+      try {
+        _partitionMetadataProvider.close();
+      } catch (Exception e) {
+        _segmentLogger.warn("Could not close stream metadata provider", e);
+      }
     }
   }
 
@@ -1266,8 +1290,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _partitionLevelStreamConfig =
         new PartitionLevelStreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig));
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig);
-    _streamPartitionMsgOffsetFactory =
-        StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig).createStreamMsgOffsetFactory();
+    _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
     String streamTopic = _partitionLevelStreamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
@@ -1288,41 +1311,35 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         serverMetrics);
 
     _rateLimiter = RealtimeConsumptionRateManager.getInstance()
-        .createRateLimiter(_partitionLevelStreamConfig, _tableNameWithType);
+        .createRateLimiter(_partitionLevelStreamConfig, _tableNameWithType, _serverMetrics, _metricKeyName);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
+    String sortedColumn;
     if (sortedColumns.isEmpty()) {
       _segmentLogger.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
           _llcSegmentName);
-      _sortedColumn = null;
+      sortedColumn = null;
     } else {
       String firstSortedColumn = sortedColumns.get(0);
       if (_schema.hasColumn(firstSortedColumn)) {
         _segmentLogger.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata for segment {}",
             firstSortedColumn, _llcSegmentName);
-        _sortedColumn = firstSortedColumn;
+        sortedColumn = firstSortedColumn;
       } else {
         _segmentLogger
             .warn("Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema for segment {}.",
                 firstSortedColumn, _llcSegmentName);
-        _sortedColumn = null;
+        sortedColumn = null;
       }
     }
-
     // Inverted index columns
     Set<String> invertedIndexColumns = indexLoadingConfig.getInvertedIndexColumns();
     // We need to add sorted column into inverted index columns because when we convert realtime in memory segment into
     // offline segment, we use sorted column's inverted index to maintain the order of the records so that the records
     // are sorted on the sorted column.
-    if (_sortedColumn != null) {
-      invertedIndexColumns.add(_sortedColumn);
+    if (sortedColumn != null) {
+      invertedIndexColumns.add(sortedColumn);
     }
-    _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
-
-    // No dictionary Columns
-    _noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
-
-    _varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
 
     // Read the max number of rows
     int segmentMaxRowCount = _partitionLevelStreamConfig.getFlushThresholdRows();
@@ -1336,11 +1353,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
-    Set<String> textIndexColumns = indexLoadingConfig.getTextIndexColumns();
-    _textIndexColumns = new ArrayList<>(textIndexColumns);
-
-    Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
-    _fstIndexColumns = new ArrayList<>(fstIndexColumns);
+    _columnIndicesForRealtimeTable = new ColumnIndicesForRealtimeTable(sortedColumn,
+        new ArrayList<>(invertedIndexColumns),
+        new ArrayList<>(indexLoadingConfig.getTextIndexColumns()),
+        new ArrayList<>(indexLoadingConfig.getFSTIndexColumns()),
+        new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns()),
+        new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns()));
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
@@ -1350,8 +1368,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setCapacity(_segmentMaxRowCount).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
-            .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(textIndexColumns)
-            .setFSTIndexColumns(fstIndexColumns).setJsonIndexColumns(indexLoadingConfig.getJsonIndexColumns())
+            .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(indexLoadingConfig.getTextIndexColumns())
+            .setFSTIndexColumns(indexLoadingConfig.getFSTIndexColumns())
+            .setJsonIndexConfigs(indexLoadingConfig.getJsonIndexConfigs())
             .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
@@ -1366,7 +1385,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
-    _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
+    StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
+    _streamDataDecoder = new StreamDataDecoderImpl(streamMessageDecoder);
     _clientId = streamTopic + "-" + _partitionGroupId;
 
     _transformPipeline = new TransformPipeline(tableConfig, schema);
@@ -1384,7 +1404,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _startOffset = _partitionGroupConsumptionStatus.getStartOffset();
       _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
       makeStreamConsumer("Starting");
-      makeStreamMetadataProvider("Starting");
+      createPartitionMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
       _resourceTmpDir = new File(resourceDataDir, "_tmp");
@@ -1392,7 +1412,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _resourceTmpDir.mkdirs();
       }
       _state = State.INITIAL_CONSUMING;
-      fetchLatestStreamOffset();
+      _latestStreamOffsetAtStartupTime = fetchLatestStreamOffset(5000);
       _consumeStartTime = now();
       setConsumeEndTime(segmentZKMetadata, _consumeStartTime);
       _segmentCommitterFactory =
@@ -1429,15 +1449,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private void fetchLatestStreamOffset() {
-    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
-        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
-      _latestStreamOffsetAtStartupTime =
-          metadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, /*maxWaitTimeMs*/5000);
-    } catch (Exception e) {
-      _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
-          _partitionGroupId);
+  public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
+    if (_partitionMetadataProvider == null) {
+      createPartitionMetadataProvider("Fetch latest stream offset");
     }
+    try {
+      return _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA,
+          maxWaitTimeMs);
+    } catch (Exception e) {
+      _segmentLogger.warn(
+          "Cannot fetch latest stream offset for clientId {} and partitionGroupId {} with maxWaitTime {}", _clientId,
+          _partitionGroupId, maxWaitTimeMs);
+    }
+    return null;
   }
 
   /*
@@ -1468,7 +1492,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
           //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
-          int numPartitionGroups = _streamMetadataProvider
+          int numPartitionGroups = _partitionMetadataProvider
               .computePartitionGroupMetadata(_clientId, _partitionLevelStreamConfig,
                   Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
 
@@ -1482,7 +1506,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         } catch (Exception e) {
           _segmentLogger.warn("Failed to get number of stream partitions in 5s, "
               + "using number of partitions in the partition config: {}", numPartitions, e);
-          makeStreamMetadataProvider("Timeout getting number of stream partitions");
+          createPartitionMetadataProvider("Timeout getting number of stream partitions");
         }
 
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
@@ -1524,12 +1548,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   /**
    * Creates a new stream metadata provider
    */
-  private void makeStreamMetadataProvider(String reason) {
-    if (_streamMetadataProvider != null) {
-      closeStreamMetadataProvider();
-    }
-    _segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
-    _streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(_clientId);
+  private void createPartitionMetadataProvider(String reason) {
+    closePartitionMetadataProvider();
+    _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
+    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

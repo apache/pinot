@@ -26,13 +26,19 @@
   <parent>
     <artifactId>v0_deprecated</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.11.0-SNAPSHOT</version>
+    <version>0.12.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
   <artifactId>pinot-ingestion-common</artifactId>
   <name>Pinot Ingestion Common</name>
   <url>https://pinot.apache.org/</url>
+  <repositories>
+    <repository>
+      <id>confluent</id>
+      <url>https://packages.confluent.io/maven/</url>
+    </repository>
+  </repositories>
   <properties>
     <pinot.root>${basedir}/../../../..</pinot.root>
     <phase.prop>package</phase.prop>

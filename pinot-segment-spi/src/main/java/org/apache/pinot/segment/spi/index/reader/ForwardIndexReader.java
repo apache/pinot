@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.index.reader;
 import java.io.Closeable;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
@@ -48,6 +49,24 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * forward index.
    */
   DataType getStoredType();
+
+  /**
+   * Returns the compression type (if valid). Only valid for RAW forward index columns implemented in
+   * BaseChunkForwardIndexReader.
+   * @return
+   */
+  default ChunkCompressionType getCompressionType() {
+    return null;
+  }
+
+  /**
+   * Returns the length of the longest entry. Only valid for RAW forward index columns implemented in
+   * BaseChunkForwardIndexReader. Returns -1 otherwise.
+   * @return
+   */
+  default int getLengthOfLongestEntry() {
+    return -1;
+  }
 
   /**
    * Creates a new {@link ForwardIndexReaderContext} of the reader which can be used to accelerate the reads.
@@ -322,14 +341,14 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
           values[i] = BigDecimal.valueOf(getDouble(docIds[i], context));
         }
         break;
-      case STRING:
-        for (int i = 0; i < length; i++) {
-          values[i] = new BigDecimal(getString(docIds[i], context));
-        }
-        break;
       case BIG_DECIMAL:
         for (int i = 0; i < length; i++) {
           values[i] = getBigDecimal(docIds[i], context);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = new BigDecimal(getString(docIds[i], context));
         }
         break;
       case BYTES:
@@ -720,6 +739,20 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         break;
       default:
         throw new IllegalArgumentException("readValuesMV not supported for type " + getStoredType());
+    }
+  }
+
+  /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param maxNumValuesPerMVEntry Maximum number of values per MV entry
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesMV(int[] docIds, int length, int maxNumValuesPerMVEntry, byte[][][] values, T context) {
+    for (int i = 0; i < length; i++) {
+      values[i] = getBytesMV(docIds[i], context);
     }
   }
 

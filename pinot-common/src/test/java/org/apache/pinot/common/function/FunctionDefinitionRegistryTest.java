@@ -43,22 +43,6 @@ public class FunctionDefinitionRegistryTest {
     assertFalse(AggregationFunctionType.isAggregationFunction("toEpochSeconds"));
   }
 
-  @Test
-  public void testIsTransformFunc() {
-    assertTrue(TransformFunctionType.isTransformFunction("toEpochSeconds"));
-    assertTrue(TransformFunctionType.isTransformFunction("json_extract_scalar"));
-    assertTrue(TransformFunctionType.isTransformFunction("jsonextractscalar"));
-    assertTrue(TransformFunctionType.isTransformFunction("JSON_EXTRACT_SCALAR"));
-    assertTrue(TransformFunctionType.isTransformFunction("JSONEXTRACTSCALAR"));
-    assertTrue(TransformFunctionType.isTransformFunction("jsonExtractScalar"));
-    assertTrue(TransformFunctionType.isTransformFunction("ST_AsText"));
-    assertTrue(TransformFunctionType.isTransformFunction("STAsText"));
-    assertTrue(TransformFunctionType.isTransformFunction("stastext"));
-    assertTrue(TransformFunctionType.isTransformFunction("ST_ASTEXT"));
-    assertTrue(TransformFunctionType.isTransformFunction("STASTEXT"));
-    assertFalse(TransformFunctionType.isTransformFunction("foo_bar"));
-  }
-
   @ScalarFunction(names = {"testFunc1", "testFunc2"})
   public static String testScalarFunction(long randomArg1, String randomArg2) {
     return null;

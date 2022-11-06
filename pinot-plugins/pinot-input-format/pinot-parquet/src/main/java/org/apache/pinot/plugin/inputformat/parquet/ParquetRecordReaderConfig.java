@@ -27,7 +27,10 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
  */
 public class ParquetRecordReaderConfig implements RecordReaderConfig {
   private static final String USE_PARQUET_AVRO_RECORDER_READER = "useParquetAvroRecordReader";
-  private boolean _useParquetAvroRecordReader = true;
+  private static final String USE_PARQUET_NATIVE_RECORDER_READER = "useParquetNativeRecordReader";
+
+  private boolean _useParquetAvroRecordReader;
+  private boolean _useParquetNativeRecordReader;
   private Configuration _conf;
 
   public ParquetRecordReaderConfig() {
@@ -35,11 +38,20 @@ public class ParquetRecordReaderConfig implements RecordReaderConfig {
 
   public ParquetRecordReaderConfig(Configuration conf) {
     _conf = conf;
-    _useParquetAvroRecordReader = conf.getBoolean(USE_PARQUET_AVRO_RECORDER_READER, true);
+    _useParquetAvroRecordReader = conf.getBoolean(USE_PARQUET_AVRO_RECORDER_READER, false);
+    _useParquetNativeRecordReader = conf.getBoolean(USE_PARQUET_NATIVE_RECORDER_READER, false);
   }
 
   public boolean useParquetAvroRecordReader() {
     return _useParquetAvroRecordReader;
+  }
+
+  public boolean useParquetNativeRecordReader() {
+    return _useParquetNativeRecordReader;
+  }
+
+  public void setUseParquetNativeRecordReader(boolean useParquetNativeRecordReader) {
+    _useParquetNativeRecordReader = useParquetNativeRecordReader;
   }
 
   public void setUseParquetAvroRecordReader(boolean useParquetAvroRecordReader) {

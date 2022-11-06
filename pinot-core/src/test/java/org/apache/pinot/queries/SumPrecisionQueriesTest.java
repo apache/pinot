@@ -157,7 +157,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     // Inner segment
     Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
-    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 6);
     assertEquals(aggregationResult.get(0), _intSum);
@@ -196,7 +196,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     // Inner segment
     Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
-    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 6);
     assertEquals(aggregationResult.get(0), _intSum);
@@ -236,7 +236,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     // Inner segment
     Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
-    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 6);
     assertEquals(aggregationResult.get(0), _intSum);
@@ -274,7 +274,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
     // Inner segment
     Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
-    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertEquals(aggregationResult.get(0), _intSum);

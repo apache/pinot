@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import com.google.common.base.Preconditions;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,6 +30,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -39,14 +42,15 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
-import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
+import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -60,6 +64,7 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByDataTableReducer implements DataTableReducer {
   private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
+  private static final int MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK = 10_000;
 
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
@@ -84,19 +89,35 @@ public class GroupByDataTableReducer implements DataTableReducer {
    */
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
+      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponse,
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     assert dataSchema != null;
-    try {
-      reduceToResultTable(brokerResponseNative, dataSchema, dataTableMap.values(), reducerContext, tableName,
-          brokerMetrics);
-      if (brokerMetrics != null) {
-        brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.GROUP_BY_SIZE,
-            brokerResponseNative.getResultTable().getRows().size());
+
+    if (dataTableMap.isEmpty()) {
+      PostAggregationHandler postAggregationHandler =
+          new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema));
+      DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
+      brokerResponse.setResultTable(new ResultTable(resultDataSchema, Collections.emptyList()));
+      return;
+    }
+
+    if (!_queryContext.isServerReturnFinalResult()) {
+      try {
+        reduceWithIntermediateResult(brokerResponse, dataSchema, dataTableMap.values(), reducerContext, tableName,
+            brokerMetrics);
+      } catch (TimeoutException e) {
+        brokerResponse.getProcessingExceptions()
+            .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
       }
-    } catch (TimeoutException e) {
-      brokerResponseNative.getProcessingExceptions()
-          .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
+    } else {
+      // TODO: Support merging results from multiple servers when the data is partitioned on the group-by column
+      Preconditions.checkState(dataTableMap.size() == 1, "Cannot merge final results from multiple servers");
+      reduceWithFinalResult(dataSchema, dataTableMap.values().iterator().next(), brokerResponse);
+    }
+
+    if (brokerMetrics != null && brokerResponse.getResultTable() != null) {
+      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.GROUP_BY_SIZE,
+          brokerResponse.getResultTable().getRows().size());
     }
   }
 
@@ -110,24 +131,17 @@ public class GroupByDataTableReducer implements DataTableReducer {
    * @param brokerMetrics broker metrics (meters)
    * @throws TimeoutException If unable complete within timeout.
    */
-  private void reduceToResultTable(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
+  private void reduceWithIntermediateResult(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       Collection<DataTable> dataTables, DataTableReducerContext reducerContext, String rawTableName,
       BrokerMetrics brokerMetrics)
       throws TimeoutException {
-    int numRecords;
-    Iterator<Record> sortedIterator;
-    if (!dataTables.isEmpty()) {
-      IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
-      if (brokerMetrics != null) {
-        brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NUM_RESIZES, indexedTable.getNumResizes());
-        brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.RESIZE_TIME_MS, indexedTable.getResizeTimeMs());
-      }
-      numRecords = indexedTable.size();
-      sortedIterator = indexedTable.iterator();
-    } else {
-      numRecords = 0;
-      sortedIterator = Collections.emptyIterator();
+    IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
+    if (brokerMetrics != null) {
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NUM_RESIZES, indexedTable.getNumResizes());
+      brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.RESIZE_TIME_MS, indexedTable.getResizeTimeMs());
     }
+    int numRecords = indexedTable.size();
+    Iterator<Record> sortedIterator = indexedTable.iterator();
 
     DataSchema prePostAggregationDataSchema = getPrePostAggregationDataSchema(dataSchema);
     PostAggregationHandler postAggregationHandler =
@@ -148,8 +162,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
     FilterContext havingFilter = _queryContext.getHavingFilter();
     if (havingFilter != null) {
       rows = new ArrayList<>();
-      HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler,
-          _queryContext.isNullHandlingEnabled());
+      HavingFilterHandler havingFilterHandler =
+          new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.isNullHandlingEnabled());
       while (rows.size() < limit && sortedIterator.hasNext()) {
         Object[] row = sortedIterator.next().getValues();
         extractFinalAggregationResults(row);
@@ -180,19 +194,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
 
     // Calculate final result rows after post aggregation
-    List<Object[]> resultRows = new ArrayList<>(rows.size());
-    ColumnDataType[] resultColumnDataTypes = resultDataSchema.getColumnDataTypes();
-    int numResultColumns = resultColumnDataTypes.length;
-    for (Object[] row : rows) {
-      Object[] resultRow = postAggregationHandler.getResult(row);
-      for (int i = 0; i < numResultColumns; i++) {
-        Object value = resultRow[i];
-        if (value != null) {
-          resultRow[i] = resultColumnDataTypes[i].format(value);
-        }
-      }
-      resultRows.add(resultRow);
-    }
+    List<Object[]> resultRows = calculateFinalResultRows(postAggregationHandler, rows);
 
     brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
   }
@@ -240,7 +242,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     if (numReduceThreadsToUse == 1) {
       indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, resultSize, trimSize, trimThreshold);
     } else {
-      if (trimThreshold >= GroupByOrderByCombineOperator.MAX_TRIM_THRESHOLD) {
+      if (trimThreshold >= GroupByCombineOperator.MAX_TRIM_THRESHOLD) {
         // special case of trim threshold where it is set to max value.
         // there won't be any trimming during upsert in this case.
         // thus we can avoid the overhead of read-lock and write-lock
@@ -287,47 +289,57 @@ public class GroupByDataTableReducer implements DataTableReducer {
               }
 
               int numRows = dataTable.getNumberOfRows();
-              for (int rowId = 0; rowId < numRows; rowId++) {
-                Object[] values = new Object[_numColumns];
-                for (int colId = 0; colId < _numColumns; colId++) {
-                  switch (storedColumnDataTypes[colId]) {
-                    case INT:
-                      values[colId] = dataTable.getInt(rowId, colId);
-                      break;
-                    case LONG:
-                      values[colId] = dataTable.getLong(rowId, colId);
-                      break;
-                    case FLOAT:
-                      values[colId] = dataTable.getFloat(rowId, colId);
-                      break;
-                    case DOUBLE:
-                      values[colId] = dataTable.getDouble(rowId, colId);
-                      break;
-                    case BIG_DECIMAL:
-                      values[colId] = dataTable.getBigDecimal(rowId, colId);
-                      break;
-                    case STRING:
-                      values[colId] = dataTable.getString(rowId, colId);
-                      break;
-                    case BYTES:
-                      values[colId] = dataTable.getBytes(rowId, colId);
-                      break;
-                    case OBJECT:
-                      values[colId] = dataTable.getObject(rowId, colId);
-                      break;
-                    // Add other aggregation intermediate result / group-by column type supports here
-                    default:
-                      throw new IllegalStateException();
-                  }
+              for (int rowIdBatch = 0; rowIdBatch < numRows; rowIdBatch += MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK) {
+                if (Thread.interrupted()) {
+                  return;
                 }
-                if (nullHandlingEnabled) {
+                int upper = Math.min(rowIdBatch + MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK, numRows);
+                for (int rowId = rowIdBatch; rowId < upper; rowId++) {
+                  Object[] values = new Object[_numColumns];
                   for (int colId = 0; colId < _numColumns; colId++) {
-                    if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-                      values[colId] = null;
+                    switch (storedColumnDataTypes[colId]) {
+                      case INT:
+                        values[colId] = dataTable.getInt(rowId, colId);
+                        break;
+                      case LONG:
+                        values[colId] = dataTable.getLong(rowId, colId);
+                        break;
+                      case FLOAT:
+                        values[colId] = dataTable.getFloat(rowId, colId);
+                        break;
+                      case DOUBLE:
+                        values[colId] = dataTable.getDouble(rowId, colId);
+                        break;
+                      case BIG_DECIMAL:
+                        values[colId] = dataTable.getBigDecimal(rowId, colId);
+                        break;
+                      case STRING:
+                        values[colId] = dataTable.getString(rowId, colId);
+                        break;
+                      case BYTES:
+                        values[colId] = dataTable.getBytes(rowId, colId);
+                        break;
+                      case OBJECT:
+                        // TODO: Move ser/de into AggregationFunction interface
+                        DataTable.CustomObject customObject = dataTable.getCustomObject(rowId, colId);
+                        if (customObject != null) {
+                          values[colId] = ObjectSerDeUtils.deserialize(customObject);
+                        }
+                        break;
+                      // Add other aggregation intermediate result / group-by column type supports here
+                      default:
+                        throw new IllegalStateException();
                     }
                   }
+                  if (nullHandlingEnabled) {
+                    for (int colId = 0; colId < _numColumns; colId++) {
+                      if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+                        values[colId] = null;
+                      }
+                    }
+                  }
+                  indexedTable.upsert(new Record(values));
                 }
-                indexedTable.upsert(new Record(values));
               }
             } finally {
               countDownLatch.countDown();
@@ -374,6 +386,105 @@ public class GroupByDataTableReducer implements DataTableReducer {
       return 1;
     } else {
       return Math.min(numDataTables, maxReduceThreadsPerQuery);
+    }
+  }
+
+  private void reduceWithFinalResult(DataSchema dataSchema, DataTable dataTable,
+      BrokerResponseNative brokerResponseNative) {
+    PostAggregationHandler postAggregationHandler = new PostAggregationHandler(_queryContext, dataSchema);
+    DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
+
+    // Directly return when there is no record returned, or limit is 0
+    int numRows = dataTable.getNumberOfRows();
+    int limit = _queryContext.getLimit();
+    if (numRows == 0 || limit == 0) {
+      brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, Collections.emptyList()));
+      return;
+    }
+
+    // Calculate rows before post-aggregation
+    List<Object[]> rows;
+    FilterContext havingFilter = _queryContext.getHavingFilter();
+    if (havingFilter != null) {
+      rows = new ArrayList<>();
+      HavingFilterHandler havingFilterHandler =
+          new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.isNullHandlingEnabled());
+      for (int i = 0; i < numRows; i++) {
+        Object[] row = getConvertedRowWithFinalResult(dataTable, i);
+        if (havingFilterHandler.isMatch(row)) {
+          rows.add(row);
+          if (rows.size() == limit) {
+            break;
+          }
+        }
+      }
+    } else {
+      numRows = Math.min(numRows, limit);
+      rows = new ArrayList<>(numRows);
+      for (int i = 0; i < numRows; i++) {
+        rows.add(getConvertedRowWithFinalResult(dataTable, i));
+      }
+    }
+
+    // Calculate final result rows after post aggregation
+    List<Object[]> resultRows = calculateFinalResultRows(postAggregationHandler, rows);
+
+    brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
+  }
+
+  private List<Object[]> calculateFinalResultRows(PostAggregationHandler postAggregationHandler, List<Object[]> rows) {
+    List<Object[]> resultRows = new ArrayList<>(rows.size());
+    ColumnDataType[] resultColumnDataTypes = postAggregationHandler.getResultDataSchema().getColumnDataTypes();
+    int numResultColumns = resultColumnDataTypes.length;
+    for (Object[] row : rows) {
+      Object[] resultRow = postAggregationHandler.getResult(row);
+      for (int i = 0; i < numResultColumns; i++) {
+        Object value = resultRow[i];
+        if (value != null) {
+          resultRow[i] = resultColumnDataTypes[i].format(value);
+        }
+      }
+      resultRows.add(resultRow);
+    }
+    return resultRows;
+  }
+
+  private Object[] getConvertedRowWithFinalResult(DataTable dataTable, int rowId) {
+    Object[] row = new Object[_numColumns];
+    ColumnDataType[] columnDataTypes = dataTable.getDataSchema().getColumnDataTypes();
+    for (int i = 0; i < _numColumns; i++) {
+      if (i < _numGroupByExpressions) {
+        row[i] = getConvertedKey(dataTable, columnDataTypes[i], rowId, i);
+      } else {
+        row[i] = AggregationFunctionUtils.getConvertedFinalResult(dataTable, columnDataTypes[i], rowId, i);
+      }
+    }
+    return row;
+  }
+
+  private Object getConvertedKey(DataTable dataTable, ColumnDataType columnDataType, int rowId, int colId) {
+    switch (columnDataType) {
+      case INT:
+        return dataTable.getInt(rowId, colId);
+      case LONG:
+        return dataTable.getLong(rowId, colId);
+      case FLOAT:
+        return dataTable.getFloat(rowId, colId);
+      case DOUBLE:
+        return dataTable.getDouble(rowId, colId);
+      case BIG_DECIMAL:
+        return dataTable.getBigDecimal(rowId, colId);
+      case BOOLEAN:
+        return dataTable.getInt(rowId, colId) == 1;
+      case TIMESTAMP:
+        return new Timestamp(dataTable.getLong(rowId, colId));
+      case STRING:
+      case JSON:
+        return dataTable.getString(rowId, colId);
+      case BYTES:
+        return dataTable.getBytes(rowId, colId).getBytes();
+      default:
+        throw new IllegalStateException("Illegal column data type in group key: " + columnDataType);
     }
   }
 }

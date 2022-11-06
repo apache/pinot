@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.joda.time.DateTime;
@@ -168,6 +169,27 @@ public class TimeUtils {
   }
 
   /**
+   * Converts a string representing the timestamp to corresponding milliseconds.
+   *
+   * @param timeStr string representing the timestamp in ISO 8601 format
+   * @return the corresponding time converted to milliseconds
+   * @throws IllegalArgumentException if the string does not conform to the expected format
+   */
+  public static Long convertTimestampToMillis(String timeStr) {
+    long millis = 0L;
+    if (timeStr != null) {
+      try {
+        millis = Instant.parse(timeStr).toEpochMilli();
+      } catch (Exception e) {
+        // rethrowing with more contextual information
+        throw new IllegalArgumentException("Invalid time spec '" + timeStr + "' (Valid example: "
+            + "'2022-08-09T12:31:38.222Z')", e);
+      }
+    }
+    return millis;
+  }
+
+  /**
    * Converts milliseconds into human readable duration string. For ex, input of 86400000L would
    * return "1d".
    *
@@ -189,6 +211,18 @@ public class TimeUtils {
   public static boolean isPeriodValid(String timeStr) {
     try {
       PERIOD_FORMATTER.parsePeriod(timeStr);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  /**
+   * Checks if the given timestamp string is valid
+   */
+  public static boolean isTimestampValid(String timeStr) {
+    try {
+      Instant.parse(timeStr);
       return true;
     } catch (Exception e) {
       return false;

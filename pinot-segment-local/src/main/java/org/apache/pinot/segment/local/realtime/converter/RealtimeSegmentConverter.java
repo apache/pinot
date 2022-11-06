@@ -19,8 +19,6 @@
 package org.apache.pinot.segment.local.realtime.converter;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -40,43 +38,31 @@ import org.apache.pinot.spi.data.Schema;
 
 
 public class RealtimeSegmentConverter {
-  private MutableSegmentImpl _realtimeSegmentImpl;
+  private final MutableSegmentImpl _realtimeSegmentImpl;
   private final SegmentZKPropsConfig _segmentZKPropsConfig;
   private final String _outputPath;
   private final Schema _dataSchema;
   private final String _tableName;
   private final TableConfig _tableConfig;
   private final String _segmentName;
-  private final String _sortedColumn;
-  private final List<String> _invertedIndexColumns;
-  private final List<String> _textIndexColumns;
-  private final List<String> _fstIndexColumns;
-  private final List<String> _noDictionaryColumns;
-  private final List<String> _varLengthDictionaryColumns;
+  private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
   private final boolean _nullHandlingEnabled;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
-      String sortedColumn, List<String> invertedIndexColumns, List<String> textIndexColumns,
-      List<String> fstIndexColumns, List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns,
-      boolean nullHandlingEnabled) {
+      ColumnIndicesForRealtimeTable cdc, boolean nullHandlingEnabled) {
     _realtimeSegmentImpl = realtimeSegment;
     _segmentZKPropsConfig = segmentZKPropsConfig;
     _outputPath = outputPath;
-    _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
-    if (sortedColumn != null) {
-      _invertedIndexColumns.remove(sortedColumn);
+    _columnIndicesForRealtimeTable = cdc;
+    if (cdc.getSortedColumn() != null) {
+      _columnIndicesForRealtimeTable.getInvertedIndexColumns().remove(cdc.getSortedColumn());
     }
     _dataSchema = getUpdatedSchema(schema);
-    _sortedColumn = sortedColumn;
     _tableName = tableName;
     _tableConfig = tableConfig;
     _segmentName = segmentName;
-    _noDictionaryColumns = noDictionaryColumns;
-    _varLengthDictionaryColumns = varLengthDictionaryColumns;
     _nullHandlingEnabled = nullHandlingEnabled;
-    _textIndexColumns = textIndexColumns;
-    _fstIndexColumns = fstIndexColumns;
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
@@ -87,15 +73,15 @@ public class RealtimeSegmentConverter {
     // range. We don't want the realtime consumption to stop (if an exception
     // is thrown) and thus the time validity check is explicitly disabled for
     // realtime segment generation
-    genConfig.setSkipTimeValueCheck(true);
-    if (_invertedIndexColumns != null && !_invertedIndexColumns.isEmpty()) {
-      for (String column : _invertedIndexColumns) {
+    genConfig.setSegmentTimeValueCheck(false);
+    if (_columnIndicesForRealtimeTable.getInvertedIndexColumns() != null) {
+      for (String column : _columnIndicesForRealtimeTable.getInvertedIndexColumns()) {
         genConfig.createInvertedIndexForColumn(column);
       }
     }
 
-    if (_varLengthDictionaryColumns != null) {
-      genConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
+    if (_columnIndicesForRealtimeTable.getVarLengthDictionaryColumns() != null) {
+      genConfig.setVarLengthDictionaryColumns(_columnIndicesForRealtimeTable.getVarLengthDictionaryColumns());
     }
 
     if (segmentVersion != null) {
@@ -104,8 +90,8 @@ public class RealtimeSegmentConverter {
     genConfig.setTableName(_tableName);
     genConfig.setOutDir(_outputPath);
     genConfig.setSegmentName(_segmentName);
-    genConfig.setTextIndexCreationColumns(_textIndexColumns);
-    genConfig.setFSTIndexCreationColumns(_fstIndexColumns);
+    genConfig.setTextIndexCreationColumns(_columnIndicesForRealtimeTable.getTextIndexColumns());
+    genConfig.setFSTIndexCreationColumns(_columnIndicesForRealtimeTable.getFstIndexColumns());
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
@@ -114,8 +100,9 @@ public class RealtimeSegmentConverter {
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
       int[] sortedDocIds =
-          _sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(_sortedColumn)
-              : null;
+          _columnIndicesForRealtimeTable.getSortedColumn() != null
+              ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(
+                  _columnIndicesForRealtimeTable.getSortedColumn()) : null;
       recordReader.init(_realtimeSegmentImpl, sortedDocIds);
       RealtimeSegmentSegmentCreationDataSource dataSource =
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);

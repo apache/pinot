@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
@@ -103,8 +104,13 @@ public class SegmentProcessorFramework {
 
     // Reduce phase
     LOGGER.info("Beginning reduce phase on partitions: {}", partitionToFileManagerMap.keySet());
+    Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
+    int totalCount = partitionToFileManagerMap.keySet().size();
+    int count = 1;
     for (Map.Entry<String, GenericRowFileManager> entry : partitionToFileManagerMap.entrySet()) {
       String partitionId = entry.getKey();
+      observer.accept(String
+          .format("Doing reduce phase on data from partition: %s (%d out of %d)", partitionId, count++, totalCount));
       GenericRowFileManager fileManager = entry.getValue();
       Reducer reducer = ReducerFactory.getReducer(partitionId, fileManager, _segmentProcessorConfig, _reducerOutputDir);
       entry.setValue(reducer.reduce());
@@ -126,7 +132,7 @@ public class SegmentProcessorFramework {
           .createSegmentNameGenerator(tableConfig, schema, segmentNamePrefix, segmentNamePostfix, fixedSegmentName,
               false));
     } else {
-      // SimpleSegmentNameGenerator is used by default.
+      // SegmentNameGenerator will be inferred by the SegmentGeneratorConfig.
       generatorConfig.setSegmentNamePrefix(segmentNamePrefix);
       generatorConfig.setSegmentNamePostfix(segmentNamePostfix);
     }
@@ -146,6 +152,9 @@ public class SegmentProcessorFramework {
         int endRowId = Math.min(startRowId + maxNumRecordsPerSegment, numRows);
         LOGGER.info("Start creating segment of sequenceId: {} with row range: {} to {}", sequenceId, startRowId,
             endRowId);
+        observer.accept(String.format(
+            "Creating segment of sequentId: %d with data from partition: %s and row range: [%d, %d) out of [0, %d)",
+            sequenceId, partitionId, startRowId, endRowId, numRows));
         generatorConfig.setSequenceId(sequenceId);
         GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
         SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

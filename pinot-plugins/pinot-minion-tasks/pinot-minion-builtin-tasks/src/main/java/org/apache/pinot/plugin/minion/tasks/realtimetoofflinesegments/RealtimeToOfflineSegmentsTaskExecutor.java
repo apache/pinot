@@ -90,7 +90,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
 
     ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
-        _minionTaskZkMetadataManager.getRealtimeToOfflineSegmentsTaskZNRecord(realtimeTableName);
+        _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName,
+            RealtimeToOfflineSegmentsTask.TASK_TYPE);
     Preconditions.checkState(realtimeToOfflineSegmentsTaskZNRecord != null,
         "RealtimeToOfflineSegmentsTaskMetadata ZNRecord for table: %s should not be null. Exiting task.",
         realtimeTableName);
@@ -110,6 +111,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   protected List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> segmentDirs,
       File workingDir)
       throws Exception {
+    int numInputSegments = segmentDirs.size();
+    _eventObserver.notifyProgress(pinotTaskConfig, "Converting segments: " + numInputSegments);
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
@@ -149,10 +152,16 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     // Segment config
     segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));
 
+    // Progress observer
+    segmentProcessorConfigBuilder.setProgressObserver(p -> _eventObserver.notifyProgress(_pinotTaskConfig, p));
+
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
 
-    List<RecordReader> recordReaders = new ArrayList<>(segmentDirs.size());
+    List<RecordReader> recordReaders = new ArrayList<>(numInputSegments);
+    int count = 1;
     for (File segmentDir : segmentDirs) {
+      _eventObserver.notifyProgress(_pinotTaskConfig,
+          String.format("Creating RecordReader for: %s (%d out of %d)", segmentDir, count++, numInputSegments));
       PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
       // NOTE: Do not fill null field with default value to be consistent with other record readers
       recordReader.init(segmentDir, null, null, true);
@@ -160,6 +169,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     }
     List<File> outputSegmentDirs;
     try {
+      _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
       outputSegmentDirs = new SegmentProcessorFramework(recordReaders, segmentProcessorConfig, workingDir).process();
     } finally {
       for (RecordReader recordReader : recordReaders) {
@@ -191,7 +201,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     long waterMarkMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
     RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata =
         new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, waterMarkMs);
-    _minionTaskZkMetadataManager.setRealtimeToOfflineSegmentsTaskMetadata(newMinionMetadata, _expectedVersion);
+    _minionTaskZkMetadataManager.setTaskMetadataZNRecord(newMinionMetadata, RealtimeToOfflineSegmentsTask.TASK_TYPE,
+        _expectedVersion);
   }
 
   @Override

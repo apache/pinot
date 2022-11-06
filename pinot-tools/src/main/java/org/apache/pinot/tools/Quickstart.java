@@ -18,30 +18,26 @@
  */
 package org.apache.pinot.tools;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.File;
-import java.io.IOException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
+/**
+ * The basic Batch/Offline Quickstart.
+ */
 public class Quickstart extends QuickStartBase {
   @Override
   public List<String> types() {
     return Arrays.asList("OFFLINE", "BATCH");
   }
-
-  private static final String TAB = "\t\t";
-  private static final String NEW_LINE = "\n";
-  private static final String DEFAULT_BOOTSTRAP_DIRECTORY = "examples/minions/batch/baseballStats";
 
   public enum Color {
     RESET("\u001B[0m"), GREEN("\u001B[32m"), YELLOW("\u001B[33m"), CYAN("\u001B[36m");
@@ -61,49 +57,18 @@ public class Quickstart extends QuickStartBase {
     return null;
   }
 
-  public static String prettyPrintResponse(JsonNode response) {
-    StringBuilder responseBuilder = new StringBuilder();
-
-    // Sql Results
-    if (response.has("resultTable")) {
-      JsonNode columns = response.get("resultTable").get("dataSchema").get("columnNames");
-      int numColumns = columns.size();
-      for (int i = 0; i < numColumns; i++) {
-        responseBuilder.append(columns.get(i).asText()).append(TAB);
-      }
-      responseBuilder.append(NEW_LINE);
-      JsonNode rows = response.get("resultTable").get("rows");
-      for (int i = 0; i < rows.size(); i++) {
-        JsonNode row = rows.get(i);
-        for (int j = 0; j < numColumns; j++) {
-          responseBuilder.append(row.get(j).asText()).append(TAB);
-        }
-        responseBuilder.append(NEW_LINE);
-      }
-    }
-    return responseBuilder.toString();
-  }
-
   public void execute()
       throws Exception {
-    String tableName = getTableName(DEFAULT_BOOTSTRAP_DIRECTORY);
     File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
-    File baseDir = new File(quickstartTmpDir, tableName);
-    File dataDir = new File(baseDir, "rawdata");
-    Preconditions.checkState(dataDir.mkdirs());
+    File quickstartRunnerDir = new File(quickstartTmpDir, "quickstart");
+    Preconditions.checkState(quickstartRunnerDir.mkdirs());
+    List<QuickstartTableRequest> quickstartTableRequests = bootstrapOfflineTableDirectories(quickstartTmpDir);
 
-    if (useDefaultBootstrapTableDir()) {
-      copyResourceTableToTmpDirectory(getBootstrapDataDir(DEFAULT_BOOTSTRAP_DIRECTORY), tableName, baseDir, dataDir);
-    } else {
-      copyFilesystemTableToTmpDirectory(getBootstrapDataDir(DEFAULT_BOOTSTRAP_DIRECTORY), tableName, baseDir);
-    }
-
-    QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, true, getAuthProvider(),
-            getConfigOverrides(), null, true);
+        new QuickstartRunner(quickstartTableRequests, 1, 1, getNumQuickstartRunnerServers(), 1, quickstartRunnerDir,
+            true, getAuthProvider(), getConfigOverrides(), null, true);
 
-    printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
+    printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker, server and minion *****");
     runner.startAll();
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
@@ -114,14 +79,16 @@ public class Quickstart extends QuickStartBase {
         e.printStackTrace();
       }
     }));
-    printStatus(Color.CYAN, "***** Bootstrap " + tableName + " table *****");
-    runner.bootstrapTable();
 
-    waitForBootstrapToComplete(runner);
+    if (!CollectionUtils.isEmpty(quickstartTableRequests)) {
+      printStatus(Color.CYAN, "***** Bootstrap tables *****");
+      runner.bootstrapTable();
+      waitForBootstrapToComplete(runner);
+    }
 
     printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
 
-    if (useDefaultBootstrapTableDir()) {
+    if (useDefaultBootstrapTableDir() && !CollectionUtils.isEmpty(quickstartTableRequests)) {
       // Quickstart is using the default baseballStats sample table, so run sample queries.
       runSampleQueries(runner);
     }
@@ -129,58 +96,12 @@ public class Quickstart extends QuickStartBase {
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 
-  private static void copyResourceTableToTmpDirectory(String sourcePath, String tableName, File baseDir, File dataDir)
-      throws IOException {
-
-    File schemaFile = new File(baseDir, tableName + "_schema.json");
-    File tableConfigFile = new File(baseDir, tableName + "_offline_table_config.json");
-    File ingestionJobSpecFile = new File(baseDir, "ingestionJobSpec.yaml");
-    File dataFile = new File(dataDir, tableName + "_data.csv");
-
-    ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource(sourcePath + File.separator + tableName + "_schema.json");
-    com.google.common.base.Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, schemaFile);
-    resource =
-        classLoader.getResource(sourcePath + File.separator + "rawdata" + File.separator + tableName + "_data.csv");
-    com.google.common.base.Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, dataFile);
-    resource = classLoader.getResource(sourcePath + File.separator + "ingestionJobSpec.yaml");
-    if (resource != null) {
-      FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
-    }
-    resource = classLoader.getResource(sourcePath + File.separator + tableName + "_offline_table_config.json");
-    com.google.common.base.Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, tableConfigFile);
+  protected int getNumQuickstartRunnerServers() {
+    return 1;
   }
 
-  private static void copyFilesystemTableToTmpDirectory(String sourcePath, String tableName, File baseDir)
-      throws IOException {
-    File fileDb = new File(sourcePath);
-
-    if (!fileDb.exists() || !fileDb.isDirectory()) {
-      throw new RuntimeException("Directory " + fileDb.getAbsolutePath() + " not found.");
-    }
-
-    File schemaFile = new File(fileDb, tableName + "_schema.json");
-    if (!schemaFile.exists()) {
-      throw new RuntimeException("Schema file " + schemaFile.getAbsolutePath() + " not found.");
-    }
-
-    File tableFile = new File(fileDb, tableName + "_offline_table_config.json");
-    if (!tableFile.exists()) {
-      throw new RuntimeException("Table table " + tableFile.getAbsolutePath() + " not found.");
-    }
-
-    File data = new File(fileDb, "rawdata" + File.separator + tableName + "_data.csv");
-    if (!data.exists()) {
-      throw new RuntimeException(("Data file " + data.getAbsolutePath() + " not found. "));
-    }
-
-    FileUtils.copyDirectory(fileDb, baseDir);
-  }
-
-  private static void runSampleQueries(QuickstartRunner runner)
+  @Override
+  public void runSampleQueries(QuickstartRunner runner)
       throws Exception {
     String q1 = "select count(*) from baseballStats limit 1";
     printStatus(Color.YELLOW, "Total number of documents in the table");

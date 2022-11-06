@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -38,16 +37,15 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -69,7 +67,7 @@ import org.roaringbitmap.RoaringBitmap;
  *   </li>
  * </ul>
  */
-public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
+public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
 
   private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
@@ -82,20 +80,16 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private final TransformResultMetadata[] _orderByExpressionMetadata;
   private final int _numRowsToKeep;
   private final PriorityQueue<Object[]> _rows;
-  private final boolean _allOrderByColsPreSorted;
 
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
 
-  private boolean _queryHasMVSelectionOrderBy = false;
-
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator, boolean allOrderByColsPreSorted) {
+      List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _expressions = expressions;
     _transformOperator = transformOperator;
-    _allOrderByColsPreSorted = allOrderByColsPreSorted;
 
     _orderByExpressions = queryContext.getOrderByExpressions();
     assert _orderByExpressions != null;
@@ -107,8 +101,11 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
 
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
+    Comparator<Object[]> comparator =
+        OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByExpressionMetadata, true,
+            _nullHandlingEnabled);
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        getComparator());
+        comparator);
   }
 
   @Override
@@ -123,190 +120,19 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     return stringBuilder.append(')').toString();
   }
 
-  private Comparator<Object[]> getComparator() {
-    // Compare all single-value columns
-    int numOrderByExpressions = _orderByExpressions.size();
-    List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
-    for (int i = 0; i < numOrderByExpressions; i++) {
-      if (_orderByExpressionMetadata[i].isSingleValue()) {
-        valueIndexList.add(i);
-      } else {
-        _queryHasMVSelectionOrderBy = true;
-      }
-    }
-
-    int numValuesToCompare = valueIndexList.size();
-    int[] valueIndices = new int[numValuesToCompare];
-    DataType[] storedTypes = new DataType[numValuesToCompare];
-    // Use multiplier -1 or 1 to control ascending/descending order
-    int[] multipliers = new int[numValuesToCompare];
-    for (int i = 0; i < numValuesToCompare; i++) {
-      int valueIndex = valueIndexList.get(i);
-      valueIndices[i] = valueIndex;
-      storedTypes[i] = _orderByExpressionMetadata[valueIndex].getDataType().getStoredType();
-      multipliers[i] = _orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
-    }
-
-    if (_nullHandlingEnabled) {
-      return (Object[] o1, Object[] o2) -> {
-        for (int i = 0; i < numValuesToCompare; i++) {
-          int index = valueIndices[i];
-
-          // TODO: Evaluate the performance of casting to Comparable and avoid the switch
-          Object v1 = o1[index];
-          Object v2 = o2[index];
-          if (v1 == null) {
-            // The default null ordering is: 'NULLS LAST', regardless of the ordering direction.
-            return v2 == null ? 0 : -multipliers[i];
-          } else if (v2 == null) {
-            return multipliers[i];
-          }
-          int result;
-          switch (storedTypes[i]) {
-            case INT:
-              result = ((Integer) v1).compareTo((Integer) v2);
-              break;
-            case LONG:
-              result = ((Long) v1).compareTo((Long) v2);
-              break;
-            case FLOAT:
-              result = ((Float) v1).compareTo((Float) v2);
-              break;
-            case DOUBLE:
-              result = ((Double) v1).compareTo((Double) v2);
-              break;
-            case BIG_DECIMAL:
-              result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
-              break;
-            case STRING:
-              result = ((String) v1).compareTo((String) v2);
-              break;
-            case BYTES:
-              result = ((ByteArray) v1).compareTo((ByteArray) v2);
-              break;
-            // NOTE: Multi-value columns are not comparable, so we should not reach here
-            default:
-              throw new IllegalStateException();
-          }
-          if (result != 0) {
-            return result * multipliers[i];
-          }
-        }
-        return 0;
-      };
-    } else {
-      return (Object[] o1, Object[] o2) -> {
-        for (int i = 0; i < numValuesToCompare; i++) {
-          int index = valueIndices[i];
-
-          // TODO: Evaluate the performance of casting to Comparable and avoid the switch
-          Object v1 = o1[index];
-          Object v2 = o2[index];
-          int result;
-          switch (storedTypes[i]) {
-            case INT:
-              result = ((Integer) v1).compareTo((Integer) v2);
-              break;
-            case LONG:
-              result = ((Long) v1).compareTo((Long) v2);
-              break;
-            case FLOAT:
-              result = ((Float) v1).compareTo((Float) v2);
-              break;
-            case DOUBLE:
-              result = ((Double) v1).compareTo((Double) v2);
-              break;
-            case BIG_DECIMAL:
-              result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
-              break;
-            case STRING:
-              result = ((String) v1).compareTo((String) v2);
-              break;
-            case BYTES:
-              result = ((ByteArray) v1).compareTo((ByteArray) v2);
-              break;
-            // NOTE: Multi-value columns are not comparable, so we should not reach here
-            default:
-              throw new IllegalStateException();
-          }
-          if (result != 0) {
-            return result * multipliers[i];
-          }
-        }
-        return 0;
-      };
-    }
-  }
-
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
-    IntermediateResultsBlock resultsBlock;
-    if (_allOrderByColsPreSorted) {
-      resultsBlock = computeAllPreSorted();
-    } else if (_expressions.size() == _orderByExpressions.size()) {
-      resultsBlock = computeAllOrdered();
+  protected SelectionResultsBlock getNextBlock() {
+    if (_expressions.size() == _orderByExpressions.size()) {
+      return computeAllOrdered();
     } else {
-      resultsBlock = computePartiallyOrdered();
+      return computePartiallyOrdered();
     }
-    resultsBlock.setQueryHasMVSelectionOrderBy(_queryHasMVSelectionOrderBy);
-    return resultsBlock;
-  }
-
-  private IntermediateResultsBlock computeAllPreSorted() {
-    int numExpressions = _expressions.size();
-
-    // Fetch all the expressions and insert them into the priority queue
-    BlockValSet[] blockValSets = new BlockValSet[numExpressions];
-    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
-    TransformBlock transformBlock;
-    while (_numDocsScanned < _numRowsToKeep && (transformBlock = _transformOperator.nextBlock()) != null) {
-      for (int i = 0; i < numExpressions; i++) {
-        ExpressionContext expression = _expressions.get(i);
-        blockValSets[i] = transformBlock.getBlockValueSet(expression);
-      }
-      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
-      int numDocsFetched = transformBlock.getNumDocs();
-      if (_nullHandlingEnabled) {
-        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
-        for (int i = 0; i < numExpressions; i++) {
-          nullBitmaps[i] = blockValSets[i].getNullBitmap();
-        }
-        for (int rowId = 0; rowId < numDocsFetched && (_numDocsScanned < _numRowsToKeep); rowId++) {
-          Object[] row = blockValueFetcher.getRow(rowId);
-          for (int colId = 0; colId < numExpressions; colId++) {
-            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-              row[colId] = null;
-            }
-          }
-        }
-      }
-      for (int i = 0; i < numDocsFetched && (_numDocsScanned < _numRowsToKeep); i++) {
-        SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
-        _numDocsScanned++;
-      }
-    }
-    _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
-
-    // Create the data schema
-    String[] columnNames = new String[numExpressions];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
-    for (int i = 0; i < numExpressions; i++) {
-      ExpressionContext expression = _expressions.get(i);
-      columnNames[i] = expression.toString();
-      TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
-      columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
-    }
-
-    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-
-    return new IntermediateResultsBlock(dataSchema, _rows, _nullHandlingEnabled);
   }
 
   /**
    * Helper method to compute the result when all the output expressions are ordered.
    */
-  private IntermediateResultsBlock computeAllOrdered() {
+  private SelectionResultsBlock computeAllOrdered() {
     int numExpressions = _expressions.size();
 
     // Fetch all the expressions and insert them into the priority queue
@@ -355,13 +181,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows, _nullHandlingEnabled);
+    return new SelectionResultsBlock(dataSchema, _rows);
   }
 
   /**
    * Helper method to compute the result when not all the output expressions are ordered.
    */
-  private IntermediateResultsBlock computePartiallyOrdered() {
+  private SelectionResultsBlock computePartiallyOrdered() {
     int numExpressions = _expressions.size();
     int numOrderByExpressions = _orderByExpressions.size();
 
@@ -474,15 +300,15 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows, _nullHandlingEnabled);
+    return new SelectionResultsBlock(dataSchema, _rows);
   }
-
 
   @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_transformOperator);
   }
 
+  @Override
   public IndexSegment getIndexSegment() {
     return _indexSegment;
   }

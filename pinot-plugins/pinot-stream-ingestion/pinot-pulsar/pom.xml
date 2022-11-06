@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.11.0-SNAPSHOT</version>
+    <version>0.12.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
@@ -52,7 +52,6 @@
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
     <commons-collections.version>4.1</commons-collections.version>
     <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
-    <swagger-annotations.version>1.5.21</swagger-annotations.version>
     <okio.version>1.6.0</okio.version>
   </properties>
 
@@ -187,11 +186,6 @@
       <groupId>io.prometheus</groupId>
       <artifactId>simpleclient_hotspot</artifactId>
       <version>${simpleclient_common.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.swagger</groupId>
-      <artifactId>swagger-annotations</artifactId>
-      <version>${swagger-annotations.version}</version>
     </dependency>
     <dependency>
       <groupId>io.grpc</groupId>

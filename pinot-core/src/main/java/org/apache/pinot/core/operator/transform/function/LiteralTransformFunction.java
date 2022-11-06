@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
@@ -26,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -41,6 +43,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
  * TODO: Preserve the type of the literal instead of inferring the type from the string
  */
 public class LiteralTransformFunction implements TransformFunction {
+  // TODO: Deprecate the string representation of literal.
   private final String _literal;
   private final DataType _dataType;
   private final int _intLiteral;
@@ -58,27 +61,31 @@ public class LiteralTransformFunction implements TransformFunction {
   private String[] _stringResult;
   private byte[][] _bytesResult;
 
-  public LiteralTransformFunction(String literal) {
-    _literal = literal;
-    _dataType = inferLiteralDataType(literal);
-    if (_dataType.isNumeric()) {
-      _bigDecimalLiteral = new BigDecimal(_literal);
-    } else if (_dataType == DataType.BOOLEAN) {
-      _bigDecimalLiteral = PinotDataType.BOOLEAN.toBigDecimal(Boolean.valueOf(literal));
-    } else if (_dataType == DataType.TIMESTAMP) {
-      // inferLiteralDataType successfully interpreted the literal as TIMESTAMP. _bigDecimalLiteral is populated and
-      // assigned to _longLiteral.
-      _bigDecimalLiteral = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(literal));
+  public LiteralTransformFunction(LiteralContext literalContext) {
+    Preconditions.checkNotNull(literalContext);
+    _literal = literalContext.getValue() == null ? "" : literalContext.getValue().toString();
+    if (literalContext.getType() == DataType.BOOLEAN) {
+      _bigDecimalLiteral = PinotDataType.BOOLEAN.toBigDecimal(literalContext.getValue());
+      _dataType = DataType.BOOLEAN;
     } else {
-      _bigDecimalLiteral = BigDecimal.ZERO;
+      _dataType = inferLiteralDataType(_literal);
+      if (_dataType.isNumeric()) {
+        _bigDecimalLiteral = new BigDecimal(_literal);
+      } else if (_dataType == DataType.TIMESTAMP) {
+        // inferLiteralDataType successfully interpreted the literal as TIMESTAMP. _bigDecimalLiteral is populated and
+        // assigned to _longLiteral.
+        _bigDecimalLiteral = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(_literal));
+      } else {
+        _bigDecimalLiteral = BigDecimal.ZERO;
+      }
     }
-
     _intLiteral = _bigDecimalLiteral.intValue();
     _longLiteral = _bigDecimalLiteral.longValue();
     _floatLiteral = _bigDecimalLiteral.floatValue();
     _doubleLiteral = _bigDecimalLiteral.doubleValue();
   }
 
+  // TODO: Deprecate the usage case for this function.
   @VisibleForTesting
   static DataType inferLiteralDataType(String literal) {
     // Try to interpret the literal as number
@@ -99,13 +106,6 @@ public class LiteralTransformFunction implements TransformFunction {
       }
     } catch (Exception e) {
       // Ignored
-    }
-
-    // Try to interpret the literal as BOOLEAN
-    // NOTE: Intentionally use equals() instead of equalsIgnoreCase() here because boolean literal will always be parsed
-    //       into lowercase string. We don't want to parse string "TRUE" as boolean.
-    if (literal.equals("true") || literal.equals("false")) {
-      return DataType.BOOLEAN;
     }
 
     // Try to interpret the literal as TIMESTAMP
@@ -163,7 +163,7 @@ public class LiteralTransformFunction implements TransformFunction {
           Arrays.fill(intResult, _intLiteral);
         }
       } else {
-        Arrays.fill(intResult, _literal.equals("true") ? 1 : 0);
+        Arrays.fill(intResult, _intLiteral);
       }
       _intResult = intResult;
     }
@@ -274,6 +274,11 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
     throw new UnsupportedOperationException();
   }
 }

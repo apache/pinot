@@ -22,12 +22,14 @@ import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import javax.annotation.Nullable;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -37,18 +39,23 @@ public class PinotSegmentColumnReader implements Closeable {
   private final Dictionary _dictionary;
   private final NullValueVectorReader _nullValueVectorReader;
   private final int[] _dictIdBuffer;
+  private final int _maxNumValuesPerMVEntry;
 
   public PinotSegmentColumnReader(IndexSegment indexSegment, String column) {
     DataSource dataSource = indexSegment.getDataSource(column);
     Preconditions.checkArgument(dataSource != null, "Failed to find data source for column: %s", column);
     _forwardIndexReader = dataSource.getForwardIndex();
+    Preconditions.checkArgument(_forwardIndexReader != null, "Forward index disabled for column: %s", column);
     _forwardIndexReaderContext = _forwardIndexReader.createContext();
     _dictionary = dataSource.getDictionary();
     _nullValueVectorReader = dataSource.getNullValueVector();
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
+      _maxNumValuesPerMVEntry = -1;
     } else {
-      _dictIdBuffer = new int[dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry()];
+      _maxNumValuesPerMVEntry = dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
+      Preconditions.checkState(_maxNumValuesPerMVEntry >= 0, "maxNumValuesPerMVEntry is negative for an MV column.");
+      _dictIdBuffer = new int[_maxNumValuesPerMVEntry];
     }
   }
 
@@ -58,6 +65,7 @@ public class PinotSegmentColumnReader implements Closeable {
     _forwardIndexReaderContext = _forwardIndexReader.createContext();
     _dictionary = dictionary;
     _nullValueVectorReader = nullValueVectorReader;
+    _maxNumValuesPerMVEntry = maxNumValuesPerMVEntry;
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
@@ -83,6 +91,7 @@ public class PinotSegmentColumnReader implements Closeable {
 
   public Object getValue(int docId) {
     if (_dictionary != null) {
+      // Dictionary based
       if (_forwardIndexReader.isSingleValue()) {
         return _dictionary.get(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
       } else {
@@ -94,26 +103,44 @@ public class PinotSegmentColumnReader implements Closeable {
         return values;
       }
     } else {
-      // NOTE: Only support single-value raw index
-      assert _forwardIndexReader.isSingleValue();
-
-      switch (_forwardIndexReader.getStoredType()) {
-        case INT:
-          return _forwardIndexReader.getInt(docId, _forwardIndexReaderContext);
-        case LONG:
-          return _forwardIndexReader.getLong(docId, _forwardIndexReaderContext);
-        case FLOAT:
-          return _forwardIndexReader.getFloat(docId, _forwardIndexReaderContext);
-        case DOUBLE:
-          return _forwardIndexReader.getDouble(docId, _forwardIndexReaderContext);
-        case BIG_DECIMAL:
-          return _forwardIndexReader.getBigDecimal(docId, _forwardIndexReaderContext);
-        case STRING:
-          return _forwardIndexReader.getString(docId, _forwardIndexReaderContext);
-        case BYTES:
-          return _forwardIndexReader.getBytes(docId, _forwardIndexReaderContext);
-        default:
-          throw new IllegalStateException();
+      // Raw index based
+      DataType storedType = _forwardIndexReader.getStoredType();
+      if (_forwardIndexReader.isSingleValue()) {
+        switch (storedType) {
+          case INT:
+            return _forwardIndexReader.getInt(docId, _forwardIndexReaderContext);
+          case LONG:
+            return _forwardIndexReader.getLong(docId, _forwardIndexReaderContext);
+          case FLOAT:
+            return _forwardIndexReader.getFloat(docId, _forwardIndexReaderContext);
+          case DOUBLE:
+            return _forwardIndexReader.getDouble(docId, _forwardIndexReaderContext);
+          case BIG_DECIMAL:
+            return _forwardIndexReader.getBigDecimal(docId, _forwardIndexReaderContext);
+          case STRING:
+            return _forwardIndexReader.getString(docId, _forwardIndexReaderContext);
+          case BYTES:
+            return _forwardIndexReader.getBytes(docId, _forwardIndexReaderContext);
+          default:
+            throw new IllegalStateException("Unsupported SV type: " + storedType);
+        }
+      } else {
+        switch (storedType) {
+          case INT:
+            return ArrayUtils.toObject(_forwardIndexReader.getIntMV(docId, _forwardIndexReaderContext));
+          case LONG:
+            return ArrayUtils.toObject(_forwardIndexReader.getLongMV(docId, _forwardIndexReaderContext));
+          case FLOAT:
+            return ArrayUtils.toObject(_forwardIndexReader.getFloatMV(docId, _forwardIndexReaderContext));
+          case DOUBLE:
+            return ArrayUtils.toObject(_forwardIndexReader.getDoubleMV(docId, _forwardIndexReaderContext));
+          case STRING:
+            return _forwardIndexReader.getStringMV(docId, _forwardIndexReaderContext);
+          case BYTES:
+            return _forwardIndexReader.getBytesMV(docId, _forwardIndexReaderContext);
+          default:
+            throw new IllegalStateException("Unsupported MV type: " + storedType);
+        }
       }
     }
   }

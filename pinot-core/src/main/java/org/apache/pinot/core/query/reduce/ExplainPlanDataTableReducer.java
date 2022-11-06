@@ -25,11 +25,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ExplainPlanRowData;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
@@ -74,7 +74,7 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
     boolean explainPlanVerbose = queryOptions != null && QueryOptionsUtils.isExplainPlanVerbose(queryOptions);
 
     // Add the rest of the rows for each unique Explain plan received from the servers
-    List<ExplainPlanRows> explainPlanRowsList = extractUniqueExplainPlansAcrossServers(dataTableMap);
+    List<ExplainPlanRows> explainPlanRowsList = extractUniqueExplainPlansAcrossServers(dataTableMap, combinedRow);
     if (!explainPlanVerbose && (explainPlanRowsList.size() > 1)) {
       // Pick the most appropriate plan if verbose option is disabled
       explainPlanRowsList = chooseBestExplainPlanToUse(explainPlanRowsList);
@@ -129,7 +129,7 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
    * Extract a list of all the unique explain plans across all servers
    */
   private List<ExplainPlanRows> extractUniqueExplainPlansAcrossServers(
-      Map<ServerRoutingInstance, DataTable> dataTableMap) {
+      Map<ServerRoutingInstance, DataTable> dataTableMap, Object[] combinedRow) {
     List<ExplainPlanRows> explainPlanRowsList = new ArrayList<>();
     HashSet<Integer> explainPlanHashCodeSet = new HashSet<>();
 
@@ -167,7 +167,13 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
         } else if (rowName.contains(ExplainPlanRows.ALL_SEGMENTS_PRUNED_ON_SERVER)) {
           explainPlanRows.setHasNoMatchingSegment(true);
         }
-        explainPlanRows.getExplainPlanRowData().add(new ExplainPlanRowData(rowName, (int) row[1], (int) row[2]));
+        if (combinedRow == null && rowName.contains(ExplainPlanRows.ALL_SEGMENTS_PRUNED_ON_SERVER)) {
+          // If there is no COMBINE node it means all segments got pruned across all servers. Fix up the operator ID
+          // and parent ID to reflect the correct values without COMBINE
+          explainPlanRows.getExplainPlanRowData().add(new ExplainPlanRowData(rowName, 2, 1));
+        } else {
+          explainPlanRows.getExplainPlanRowData().add(new ExplainPlanRowData(rowName, (int) row[1], (int) row[2]));
+        }
       }
       // The last plan needs to be completed so that it isn't lost. There is no end delimiter, just use end of rows
       // as the end delimiter

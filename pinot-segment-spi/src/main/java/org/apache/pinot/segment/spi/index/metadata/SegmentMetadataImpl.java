@@ -45,10 +45,13 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.Schema;
@@ -243,6 +246,26 @@ public class SegmentMetadataImpl implements SegmentMetadata {
           ColumnMetadataImpl.fromPropertiesConfiguration(column, segmentMetadataPropertiesConfiguration);
       _columnMetadataMap.put(column, columnMetadata);
       _schema.addField(columnMetadata.getFieldSpec());
+    }
+
+    // Load index metadata
+    // Support V3 (e.g. SingleFileIndexDirectory only)
+    if (_segmentVersion == SegmentVersion.v3) {
+      File indexMapFile = new File(_indexDir, "v3" + File.separator + V1Constants.INDEX_MAP_FILE_NAME);
+      if (indexMapFile.exists()) {
+        PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(indexMapFile);
+        for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
+          try {
+            String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _indexDir.getPath());
+            if (parsedKeys[2].equals(ColumnIndexUtils.MAP_KEY_NAME_SIZE)) {
+              ColumnIndexType columnIndexType = ColumnIndexType.getValue(parsedKeys[1]);
+              _columnMetadataMap.get(parsedKeys[0]).getIndexSizeMap().put(columnIndexType, mapConfig.getLong(key));
+            }
+          } catch (Exception e) {
+            LOGGER.debug("Unable to load index metadata in {} for {}!", indexMapFile, key, e);
+          }
+        }
+      }
     }
 
     // Build star-tree v2 metadata

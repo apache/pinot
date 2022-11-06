@@ -25,9 +25,9 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -208,7 +208,7 @@ public class SelectionOperatorServiceTest {
     rows.add(_compatibleRow1);
     DataSchema dataSchema = _dataSchema.clone();
     assertTrue(dataSchema.isTypeCompatibleWith(_compatibleDataSchema));
-    dataSchema.upgradeToCover(_compatibleDataSchema);
+    dataSchema = DataSchema.upgradeToCover(dataSchema, _compatibleDataSchema);
     assertEquals(dataSchema, _upgradedDataSchema);
     DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, false);
     Object[] expectedRow1 = {

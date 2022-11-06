@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.readers;
 import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class StringDictionary extends BaseImmutableDictionary {
@@ -77,7 +76,7 @@ public class StringDictionary extends BaseImmutableDictionary {
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return BytesUtils.toBytes(getUnpaddedString(dictId, getBuffer()));
+    return getUnpaddedBytes(dictId, getBuffer());
   }
 
   @Override
@@ -124,7 +123,7 @@ public class StringDictionary extends BaseImmutableDictionary {
   public void readBytesValues(int[] dictIds, int length, byte[][] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = BytesUtils.toBytes(getUnpaddedString(dictIds[i], buffer));
+      outValues[i] = getUnpaddedBytes(dictIds[i], buffer);
     }
   }
 }

@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.task.JobContext;
 import org.apache.helix.task.Task;
@@ -40,6 +41,7 @@ import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
+import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.FatalException;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
@@ -47,6 +49,7 @@ import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 
 /**
@@ -85,23 +88,28 @@ public class TaskFactoryRegistry {
                   .addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTimeMs - jobInQueueTimeMs,
                       TimeUnit.MILLISECONDS);
               try {
+                // Set taskId in MDC so that one may config logger to route task logs to separate file.
+                MDC.put("taskId", _taskConfig.getId());
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
+                MinionEventObservers.getInstance().addMinionEventObserver(_taskConfig.getId(), _eventObserver);
                 return runInternal();
               } finally {
+                MinionEventObservers.getInstance().removeMinionEventObserver(_taskConfig.getId());
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
                 long executionTimeMs = System.currentTimeMillis() - jobDequeueTimeMs;
                 _minionMetrics
                     .addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, executionTimeMs, TimeUnit.MILLISECONDS);
                 LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), executionTimeMs);
+                // Clear taskId from MDC to reset it.
+                MDC.remove("taskId");
               }
             }
 
             private TaskResult runInternal() {
               PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(_taskConfig);
               if (StringUtils.isBlank(pinotTaskConfig.getConfigs().get(MinionConstants.AUTH_TOKEN))) {
-                pinotTaskConfig.getConfigs()
-                    .put(MinionConstants.AUTH_TOKEN,
-                        AuthProviderUtils.toStaticToken(MinionContext.getInstance().getTaskAuthProvider()));
+                pinotTaskConfig.getConfigs().put(MinionConstants.AUTH_TOKEN,
+                    AuthProviderUtils.toStaticToken(MinionContext.getInstance().getTaskAuthProvider()));
               }
 
               _eventObserver.notifyTaskStart(pinotTaskConfig);
@@ -119,17 +127,17 @@ public class TaskFactoryRegistry {
                 _eventObserver.notifyTaskCancelled(pinotTaskConfig);
                 _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_CANCELLED, 1L);
                 LOGGER.info("Task: {} got cancelled", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.CANCELED, e.toString());
+                return new TaskResult(TaskResult.Status.CANCELED, ExceptionUtils.getStackTrace(e));
               } catch (FatalException e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
                 _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
                 LOGGER.error("Caught fatal exception while executing task: {}", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.FATAL_FAILED, e.toString());
+                return new TaskResult(TaskResult.Status.FATAL_FAILED, ExceptionUtils.getStackTrace(e));
               } catch (Exception e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
                 _minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FAILED, 1L);
                 LOGGER.error("Caught exception while executing task: {}", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.FAILED, e.toString());
+                return new TaskResult(TaskResult.Status.FAILED, ExceptionUtils.getStackTrace(e));
               }
             }
 

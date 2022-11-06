@@ -33,20 +33,30 @@ public class MailboxReceiveNode extends AbstractStageNode {
   @ProtoProperties
   private KeySelector<Object[], Object[]> _partitionKeySelector;
 
+  // this is only available during planning and should not be relied
+  // on in any post-serialization code
+  private transient StageNode _sender;
+
   public MailboxReceiveNode(int stageId) {
     super(stageId);
   }
 
   public MailboxReceiveNode(int stageId, DataSchema dataSchema, int senderStageId,
-      RelDistribution.Type exchangeType, @Nullable KeySelector<Object[], Object[]> partitionKeySelector) {
+      RelDistribution.Type exchangeType, @Nullable KeySelector<Object[], Object[]> partitionKeySelector,
+      StageNode sender) {
     super(stageId, dataSchema);
     _senderStageId = senderStageId;
     _exchangeType = exchangeType;
     _partitionKeySelector = partitionKeySelector;
+    _sender = sender;
   }
 
   public int getSenderStageId() {
     return _senderStageId;
+  }
+
+  public void setExchangeType(RelDistribution.Type exchangeType) {
+    _exchangeType = exchangeType;
   }
 
   public RelDistribution.Type getExchangeType() {
@@ -55,5 +65,19 @@ public class MailboxReceiveNode extends AbstractStageNode {
 
   public KeySelector<Object[], Object[]> getPartitionKeySelector() {
     return _partitionKeySelector;
+  }
+
+  public StageNode getSender() {
+    return _sender;
+  }
+
+  @Override
+  public String explain() {
+    return "MAIL_RECEIVE(" + _exchangeType + ")";
+  }
+
+  @Override
+  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitMailboxReceive(this, context);
   }
 }

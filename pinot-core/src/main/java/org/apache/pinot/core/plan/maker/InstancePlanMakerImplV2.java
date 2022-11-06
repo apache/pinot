@@ -25,8 +25,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
@@ -37,11 +35,11 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.plan.AcquireReleaseColumnsSegmentPlanNode;
-import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.DistinctPlanNode;
 import org.apache.pinot.core.plan.GlobalPlanImplV0;
+import org.apache.pinot.core.plan.GroupByPlanNode;
 import org.apache.pinot.core.plan.InstanceResponsePlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
@@ -49,6 +47,8 @@ import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.StreamingInstanceResponsePlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
+import org.apache.pinot.core.query.prefetch.FetchPlanner;
+import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -98,6 +98,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private final int _minSegmentGroupTrimSize;
   private final int _minServerGroupTrimSize;
   private final int _groupByTrimThreshold;
+  private final FetchPlanner _fetchPlanner = FetchPlannerRegistry.getPlanner();
 
   @VisibleForTesting
   public InstancePlanMakerImplV2() {
@@ -160,15 +161,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
     if (queryContext.isEnablePrefetch()) {
       fetchContexts = new ArrayList<>(numSegments);
-      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
       for (IndexSegment indexSegment : indexSegments) {
-        Set<String> columns;
-        if (selectExpressions.size() == 1 && "*".equals(selectExpressions.get(0).getIdentifier())) {
-          columns = indexSegment.getPhysicalColumnNames();
-        } else {
-          columns = queryContext.getColumns();
-        }
-        FetchContext fetchContext = new FetchContext(UUID.randomUUID(), indexSegment.getSegmentName(), columns);
+        FetchContext fetchContext = _fetchPlanner.planFetchForProcessing(indexSegment, queryContext);
         fetchContexts.add(fetchContext);
         planNodes.add(
             new AcquireReleaseColumnsSegmentPlanNode(makeSegmentPlanNode(indexSegment, queryContext), indexSegment,
@@ -182,8 +176,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
 
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, null);
-    return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode, indexSegments, fetchContexts,
-        queryContext, serverMetrics));
+    return new GlobalPlanImplV0(
+        new InstanceResponsePlanNode(combinePlanNode, indexSegments, fetchContexts, queryContext));
   }
 
   private void applyQueryOptions(QueryContext queryContext) {
@@ -245,10 +239,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
-        // Aggregation group-by query
-        return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext);
+        // Group-by query
+        return new GroupByPlanNode(indexSegment, queryContext);
       } else {
-        // Aggregation only query
+        // Aggregation query
         return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
@@ -273,14 +267,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (QueryContextUtils.isSelectionOnlyQuery(queryContext)) {
       // selection-only is streamed in StreamingSelectionPlanNode --> here only metadata block is returned.
       return new GlobalPlanImplV0(
-          new InstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList(), queryContext,
-              serverMetrics));
+          new InstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList(), queryContext));
     } else {
       // non-selection-only requires a StreamingInstanceResponsePlanNode to stream data block back and metadata block
       // as final return.
       return new GlobalPlanImplV0(
-          new StreamingInstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList(),
-              streamObserver, queryContext, serverMetrics));
+          new StreamingInstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList(), queryContext,
+              streamObserver));
     }
   }
 

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.AbstractStageNode;
@@ -80,12 +81,25 @@ public class QueryPlanSerDeUtils {
 
   private static StageMetadata fromWorkerStageMetadata(Worker.StageMetadata workerStageMetadata) {
     StageMetadata stageMetadata = new StageMetadata();
+    // scanned table
     stageMetadata.getScannedTables().addAll(workerStageMetadata.getDataSourcesList());
+    // server instance to table-segments mapping
     for (String serverInstanceString : workerStageMetadata.getInstancesList()) {
       stageMetadata.getServerInstances().add(stringToInstance(serverInstanceString));
     }
-    for (Map.Entry<String, Worker.SegmentList> e : workerStageMetadata.getInstanceToSegmentListMap().entrySet()) {
-      stageMetadata.getServerInstanceToSegmentsMap().put(stringToInstance(e.getKey()), e.getValue().getSegmentsList());
+    for (Map.Entry<String, Worker.SegmentMap> instanceEntry
+        : workerStageMetadata.getInstanceToSegmentMapMap().entrySet()) {
+      Map<String, List<String>> tableToSegmentMap = new HashMap<>();
+      for (Map.Entry<String, Worker.SegmentList> tableEntry
+          : instanceEntry.getValue().getTableTypeToSegmentListMap().entrySet()) {
+        tableToSegmentMap.put(tableEntry.getKey(), tableEntry.getValue().getSegmentsList());
+      }
+      stageMetadata.getServerInstanceToSegmentsMap().put(stringToInstance(instanceEntry.getKey()), tableToSegmentMap);
+    }
+    // time boundary info
+    if (!workerStageMetadata.getTimeColumn().isEmpty()) {
+      stageMetadata.setTimeBoundaryInfo(new TimeBoundaryInfo(workerStageMetadata.getTimeColumn(),
+          workerStageMetadata.getTimeValue()));
     }
     return stageMetadata;
   }
@@ -100,13 +114,26 @@ public class QueryPlanSerDeUtils {
 
   private static Worker.StageMetadata toWorkerStageMetadata(StageMetadata stageMetadata) {
     Worker.StageMetadata.Builder builder = Worker.StageMetadata.newBuilder();
+    // scanned table
     builder.addAllDataSources(stageMetadata.getScannedTables());
+    // server instance to table-segments mapping
     for (ServerInstance serverInstance : stageMetadata.getServerInstances()) {
       builder.addInstances(instanceToString(serverInstance));
     }
-    for (Map.Entry<ServerInstance, List<String>> e : stageMetadata.getServerInstanceToSegmentsMap().entrySet()) {
-      builder.putInstanceToSegmentList(instanceToString(e.getKey()),
-          Worker.SegmentList.newBuilder().addAllSegments(e.getValue()).build());
+    for (Map.Entry<ServerInstance, Map<String, List<String>>> instanceEntry
+        : stageMetadata.getServerInstanceToSegmentsMap().entrySet()) {
+      Map<String, Worker.SegmentList> tableToSegmentMap = new HashMap<>();
+      for (Map.Entry<String, List<String>> tableEntry : instanceEntry.getValue().entrySet()) {
+        tableToSegmentMap.put(tableEntry.getKey(),
+            Worker.SegmentList.newBuilder().addAllSegments(tableEntry.getValue()).build());
+      }
+      builder.putInstanceToSegmentMap(instanceToString(instanceEntry.getKey()),
+          Worker.SegmentMap.newBuilder().putAllTableTypeToSegmentList(tableToSegmentMap).build());
+    }
+    // time boundary info
+    if (stageMetadata.getTimeBoundaryInfo() != null) {
+      builder.setTimeColumn(stageMetadata.getTimeBoundaryInfo().getTimeColumn());
+      builder.setTimeValue(stageMetadata.getTimeBoundaryInfo().getTimeValue());
     }
     return builder.build();
   }

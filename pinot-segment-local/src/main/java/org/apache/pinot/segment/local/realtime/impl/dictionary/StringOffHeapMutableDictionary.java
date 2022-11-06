@@ -28,7 +28,6 @@ import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.segment.local.io.writer.impl.MutableOffHeapByteArrayStore;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -175,7 +174,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return BytesUtils.toBytes(getStringValue(dictId));
+    return _byteStore.get(dictId);
   }
 
   @Override

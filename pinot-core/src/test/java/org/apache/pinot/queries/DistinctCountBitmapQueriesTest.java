@@ -30,10 +30,11 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -134,7 +135,7 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
       // Store serialized bitmaps in the BYTES column
       RoaringBitmap bitmap = new RoaringBitmap();
       bitmap.add(value);
-      byte[] bytesValue = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.serialize(bitmap);
+      byte[] bytesValue = RoaringBitmapUtils.serialize(bitmap);
       record.putValue(BYTES_COLUMN, bytesValue);
       records.add(record);
     }
@@ -166,10 +167,10 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
 
     // Inner segment
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         6 * NUM_RECORDS, NUM_RECORDS);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     for (int i = 0; i < 6; i++) {
       assertEquals(((RoaringBitmap) aggregationResult.get(i)).getCardinality(), _expectedResults[i]);
@@ -188,8 +189,8 @@ public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
         + "FROM testTable GROUP BY intColumn";
 
     // Inner segment
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    GroupByOperator groupByOperator = getOperator(query);
+    GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         6 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();

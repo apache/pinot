@@ -28,12 +28,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.asynchttpclient.AsyncHttpClient;
@@ -51,25 +52,30 @@ import org.slf4j.LoggerFactory;
 public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);
   private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;
+  private static final String DEFAULT_EXTRA_QUERY_OPTION_STRING = "groupByMode=sql;responseFormat=sql";
 
   private final Map<String, String> _headers;
   private final String _scheme;
 
   private final int _brokerReadTimeout;
   private final AsyncHttpClient _httpClient;
+  private final String _extraOptionStr;
 
   public JsonAsyncHttpPinotClientTransport() {
     _brokerReadTimeout = 60000;
     _headers = new HashMap<>();
     _scheme = CommonConstants.HTTP_PROTOCOL;
+    _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;
     _httpClient = Dsl.asyncHttpClient();
   }
 
-  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
-    @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols) {
+  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
+      @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols,
+      @Nullable String appId) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
+    _extraOptionStr = StringUtils.isEmpty(extraOptionString) ? DEFAULT_EXTRA_QUERY_OPTION_STRING : extraOptionString;
 
     Builder builder = Dsl.config();
     if (sslContext != null) {
@@ -77,18 +83,20 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     }
 
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
-            .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
-            .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-            .setUserAgent(getUserAgentVersionFromClassPath())
-            .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
+        .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
+        .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
+        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId))
+        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
-  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
-    @Nullable SslContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols) {
+  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionStr,
+      @Nullable SslContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols,
+      @Nullable String appId) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
+    _extraOptionStr = StringUtils.isEmpty(extraOptionStr) ? DEFAULT_EXTRA_QUERY_OPTION_STRING : extraOptionStr;
 
     Builder builder = Dsl.config();
     if (sslContext != null) {
@@ -96,29 +104,16 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     }
 
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
-            .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
-            .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-            .setUserAgent(getUserAgentVersionFromClassPath())
-            .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
+        .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
+        .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
+        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId))
+        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
-  private String getUserAgentVersionFromClassPath() {
-    Properties userAgentProperties = new Properties();
-    try {
-      userAgentProperties.load(JsonAsyncHttpPinotClientTransport.class.getClassLoader()
-              .getResourceAsStream("version.properties"));
-    } catch (IOException e) {
-      LOGGER.warn("Unable to set user agent version");
-    }
-    return userAgentProperties.getProperty("ua", "pinot-java");
-  }
-
-
-
   @Override
   public BrokerResponse executeQuery(String brokerAddress, String query)
-    throws PinotClientException {
+      throws PinotClientException {
     try {
       return executeQueryAsync(brokerAddress, query).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
@@ -131,7 +126,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     try {
       ObjectNode json = JsonNodeFactory.instance.objectNode();
       json.put("sql", query);
-      json.put("queryOptions", "groupByMode=sql;responseFormat=sql");
+      json.put("queryOptions", _extraOptionStr);
 
       String url = _scheme + "://" + brokerAddress + "/query/sql";
       BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
@@ -42,6 +43,8 @@ import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionConf;
+import org.apache.pinot.minion.event.MinionEventObserver;
+import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -64,6 +67,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   private static final String CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID = "lineageEntryId";
 
   protected MinionConf _minionConf;
+
+  // Tracking finer grained progress status.
+  protected PinotTaskConfig _pinotTaskConfig;
+  protected MinionEventObserver _eventObserver;
 
   public BaseMultipleSegmentsConversionExecutor(MinionConf minionConf) {
     _minionConf = minionConf;
@@ -97,6 +104,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   protected void preUploadSegments(SegmentUploadContext context)
       throws Exception {
     // Update the segment lineage to indicate that the segment replacement is in progress.
+    _eventObserver.notifyProgress(_pinotTaskConfig,
+        "Prepare to upload segments: " + context.getSegmentConversionResults().size());
     if (context.isReplaceSegmentsEnabled()) {
       List<String> segmentsFrom =
           Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))
@@ -114,6 +123,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   protected void postUploadSegments(SegmentUploadContext context)
       throws Exception {
     // Update the segment lineage to indicate that the segment replacement is done.
+    _eventObserver.notifyProgress(_pinotTaskConfig,
+        "Finishing uploading segments: " + context.getSegmentConversionResults().size());
     if (context.isReplaceSegmentsEnabled()) {
       String lineageEntryId = (String) context.getCustomContext(CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID);
       SegmentConversionUtils.endSegmentReplace(context.getTableNameWithType(), context.getUploadURL(), lineageEntryId,
@@ -121,11 +132,18 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     }
   }
 
+  // For tests only.
+  @VisibleForTesting
+  public void setMinionEventObserver(MinionEventObserver observer) {
+    _eventObserver = observer;
+  }
+
   @Override
   public List<SegmentConversionResult> executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
     preProcess(pinotTaskConfig);
-
+    _pinotTaskConfig = pinotTaskConfig;
+    _eventObserver = MinionEventObservers.getInstance().getMinionEventObserver(pinotTaskConfig.getTaskId());
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
@@ -146,11 +164,15 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       List<File> inputSegmentDirs = new ArrayList<>();
       for (int i = 0; i < downloadURLs.length; i++) {
         // Download the segment file
+        _eventObserver.notifyProgress(_pinotTaskConfig, String
+            .format("Downloading segment from: %s (%d out of %d)", downloadURLs[i], (i + 1), downloadURLs.length));
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
         LOGGER.info("Downloading segment from {} to {}", downloadURLs[i], tarredSegmentFile.getAbsolutePath());
         SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadURLs[i], tarredSegmentFile, crypterName);
 
         // Un-tar the segment file
+        _eventObserver.notifyProgress(_pinotTaskConfig, String
+            .format("Decompressing segment from: %s (%d out of %d)", downloadURLs[i], (i + 1), downloadURLs.length));
         File segmentDir = new File(tempDataDir, "segmentDir_" + i);
         File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
         inputSegmentDirs.add(indexDir);
@@ -170,8 +192,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       int numOutputSegments = segmentConversionResults.size();
       List<File> tarredSegmentFiles = new ArrayList<>(numOutputSegments);
+      int count = 1;
       for (SegmentConversionResult segmentConversionResult : segmentConversionResults) {
         // Tar the converted segment
+        _eventObserver.notifyProgress(_pinotTaskConfig, String
+            .format("Compressing segment: %s (%d out of %d)", segmentConversionResult.getSegmentName(), count++,
+                numOutputSegments));
         File convertedSegmentDir = segmentConversionResult.getFile();
         File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
             segmentConversionResult.getSegmentName() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
@@ -206,6 +232,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         File convertedTarredSegmentFile = tarredSegmentFiles.get(i);
         SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
         String resultSegmentName = segmentConversionResult.getSegmentName();
+        _eventObserver.notifyProgress(_pinotTaskConfig,
+            String.format("Uploading segment: %s (%d out of %d)", resultSegmentName, (i + 1), numOutputSegments));
 
         // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
         SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =

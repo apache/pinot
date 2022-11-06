@@ -172,7 +172,8 @@ public class GapfillUtils {
         "The second argument of Gapfill should be TimeFormatter.");
     Preconditions.checkArgument(args.get(2).getLiteral() != null,
         "The third argument of Gapfill should be start time.");
-    Preconditions.checkArgument(args.get(3).getLiteral() != null, "The fourth argument of Gapfill should be end time.");
+    Preconditions.checkArgument(args.get(3).getLiteral() != null,
+        "The fourth argument of Gapfill should be end time.");
     Preconditions.checkArgument(args.get(4).getLiteral() != null,
         "The fifth argument of Gapfill should be time bucket size.");
 
@@ -304,15 +305,18 @@ public class GapfillUtils {
       }
     }
 
-    for (Expression orderBy : strippedPinotQuery.getOrderByList()) {
-      if (orderBy.getType() != ExpressionType.FUNCTION) {
-        continue;
-      }
-      if (orderBy.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION && GAP_FILL.equals(
-          orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
-        orderBy.getFunctionCall().getOperands()
-            .set(0, orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
-        break;
+    List<Expression> orderByList = strippedPinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression orderBy : orderByList) {
+        if (orderBy.getType() != ExpressionType.FUNCTION) {
+          continue;
+        }
+        if (orderBy.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION && GAP_FILL.equals(
+            orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
+          orderBy.getFunctionCall().getOperands()
+              .set(0, orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
+          break;
+        }
       }
     }
 

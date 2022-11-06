@@ -40,4 +40,14 @@ public class FilterNode extends AbstractStageNode {
   public RexExpression getCondition() {
     return _condition;
   }
+
+  @Override
+  public String explain() {
+    return "FILTER";
+  }
+
+  @Override
+  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitFilter(this, context);
+  }
 }

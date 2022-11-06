@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -36,6 +37,8 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics {
   public MutableNoDictionaryColStatistics(DataSource dataSource) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
     _forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
+    Preconditions.checkState(_forwardIndex != null,
+        String.format("Forward index should not be null for column: %s", _dataSourceMetadata.getFieldSpec().getName()));
   }
 
   @Override

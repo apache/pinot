@@ -20,7 +20,6 @@
 package org.apache.pinot.controller.api.access;
 
 import java.lang.reflect.Method;
-import java.util.Optional;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -30,6 +29,7 @@ import javax.ws.rs.core.MultivaluedMap;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class AuthenticationFilterTest {
@@ -45,8 +45,7 @@ public class AuthenticationFilterTest {
     queryParams.putSingle("tableName", "D");
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
-    Optional<String> actual = _authFilter.extractTableName(pathParams, queryParams);
-    assertEquals(actual, Optional.of("A"));
+    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "A");
   }
 
   @Test
@@ -58,8 +57,7 @@ public class AuthenticationFilterTest {
     queryParams.putSingle("tableName", "D");
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
-    Optional<String> actual = _authFilter.extractTableName(pathParams, queryParams);
-    assertEquals(actual, Optional.of("B"));
+    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "B");
   }
 
   @Test
@@ -70,8 +68,7 @@ public class AuthenticationFilterTest {
     queryParams.putSingle("tableName", "D");
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
-    Optional<String> actual = _authFilter.extractTableName(pathParams, queryParams);
-    assertEquals(actual, Optional.of("C"));
+    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "C");
   }
 
   @Test
@@ -81,8 +78,7 @@ public class AuthenticationFilterTest {
     queryParams.putSingle("tableName", "D");
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
-    Optional<String> actual = _authFilter.extractTableName(pathParams, queryParams);
-    assertEquals(actual, Optional.of("D"));
+    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "D");
   }
 
   @Test
@@ -91,8 +87,7 @@ public class AuthenticationFilterTest {
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("tableNameWithType", "E");
     queryParams.putSingle("schemaName", "F");
-    Optional<String> actual = _authFilter.extractTableName(pathParams, queryParams);
-    assertEquals(actual, Optional.of("E"));
+    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "E");
   }
 
   @Test
@@ -100,16 +95,14 @@ public class AuthenticationFilterTest {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.putSingle("schemaName", "F");
-    Optional<String> actual = _authFilter.extractTableName(pathParams, queryParams);
-    assertEquals(actual, Optional.of("F"));
+    assertEquals(AuthenticationFilter.extractTableName(pathParams, queryParams), "F");
   }
 
   @Test
   public void testExtractTableNameWithEmptyParams() {
     MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
-    Optional<String> actual = _authFilter.extractTableName(pathParams, queryParams);
-    assertEquals(actual, Optional.empty());
+    assertNull(AuthenticationFilter.extractTableName(pathParams, queryParams));
   }
 
   @Test

@@ -33,9 +33,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -158,10 +159,10 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
     // Inner segment
     for (Object operator : Arrays.asList(getOperator(query), getOperatorWithFilter(query))) {
       assertTrue(operator instanceof NonScanBasedAggregationOperator);
-      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
+      AggregationResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
           0, 0, NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 6);
       for (int i = 0; i < 6; i++) {
@@ -191,7 +192,7 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
     }
     Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
-    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 6);
     for (int i = 0; i < 6; i++) {
@@ -211,8 +212,8 @@ public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest 
         + "testTable GROUP BY intColumn";
 
     // Inner segment
-    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    GroupByOperator groupByOperator = getOperator(query);
+    GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         6 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();

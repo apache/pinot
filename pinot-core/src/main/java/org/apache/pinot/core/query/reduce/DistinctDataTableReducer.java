@@ -24,17 +24,20 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -64,11 +67,43 @@ public class DistinctDataTableReducer implements DataTableReducer {
     // inside a DataTable
 
     // Gather all non-empty DistinctTables
+    // TODO: until we upgrade to newer version of pinot, we have to keep both code path. remove after 0.12.0 release.
+    // This is to work with server rolling upgrade when partially returned as DistinctTable Obj and partially regular
+    // DataTable; if all returns are DataTable we can directly merge with priority queue (with dedup).
     List<DistinctTable> nonEmptyDistinctTables = new ArrayList<>(dataTableMap.size());
     for (DataTable dataTable : dataTableMap.values()) {
-      DistinctTable distinctTable = dataTable.getObject(0, 0);
-      if (!distinctTable.isEmpty()) {
-        nonEmptyDistinctTables.add(distinctTable);
+      // Do not use the cached data schema because it might be either single object (legacy) or normal data table
+      dataSchema = dataTable.getDataSchema();
+      int numColumns = dataSchema.size();
+      if (numColumns == 1 && dataSchema.getColumnDataType(0) == ColumnDataType.OBJECT) {
+        // DistinctTable is still being returned as a single object
+        DataTable.CustomObject customObject = dataTable.getCustomObject(0, 0);
+        assert customObject != null;
+        DistinctTable distinctTable = ObjectSerDeUtils.deserialize(customObject);
+        if (!distinctTable.isEmpty()) {
+          nonEmptyDistinctTables.add(distinctTable);
+        }
+      } else {
+        // DistinctTable is being returned as normal data table
+        int numRows = dataTable.getNumberOfRows();
+        if (numRows > 0) {
+          List<Record> records = new ArrayList<>(numRows);
+          if (_queryContext.isNullHandlingEnabled()) {
+            RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+            for (int coldId = 0; coldId < numColumns; coldId++) {
+              nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
+            }
+            for (int rowId = 0; rowId < numRows; rowId++) {
+              records.add(new Record(
+                  SelectionOperatorUtils.extractRowFromDataTableWithNullHandling(dataTable, rowId, nullBitmaps)));
+            }
+          } else {
+            for (int rowId = 0; rowId < numRows; rowId++) {
+              records.add(new Record(SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId)));
+            }
+          }
+          nonEmptyDistinctTables.add(new DistinctTable(dataSchema, records));
+        }
       }
     }
 

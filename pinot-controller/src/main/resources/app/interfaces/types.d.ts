@@ -178,4 +178,30 @@ declare module 'Models' {
   export type UserList = {
     users: UserObject
   }
+
+  export interface TaskProgressResponse {
+    [key: string]: TaskProgressStatus[] | string;
+  }
+
+  export interface TaskProgressStatus {
+    ts: number,
+    status: string
+  }
+
+  export type TableSegmentJobs = {
+    [key: string]: {
+      jobId: string,
+      messageCount: number,
+      submissionTimeMs: number,
+      jobType: string,
+      tableName: string
+    }
+  }
+  
+  export interface TaskRuntimeConfig {
+    ConcurrentTasksPerWorker: string,
+    TaskTimeoutMs: string,
+    TaskExpireTimeMs: string,
+    MinionWorkerGroupTag: string
+  }
 }

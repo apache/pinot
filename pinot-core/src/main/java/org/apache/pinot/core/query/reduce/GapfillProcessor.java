@@ -305,10 +305,10 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     if (expressionContext != null && expressionContext.getFunction() != null && GapfillUtils
         .isFill(expressionContext)) {
       List<ExpressionContext> args = expressionContext.getFunction().getArguments();
-      if (args.get(1).getLiteral() == null) {
+      if (args.get(1).getLiteralString() == null) {
         throw new UnsupportedOperationException("Wrong Sql.");
       }
-      GapfillUtils.FillType fillType = GapfillUtils.FillType.valueOf(args.get(1).getLiteral());
+      GapfillUtils.FillType fillType = GapfillUtils.FillType.valueOf(args.get(1).getLiteralString());
       if (fillType == GapfillUtils.FillType.FILL_DEFAULT_VALUE) {
         // TODO: may fill the default value from sql in the future.
         return GapfillUtils.getDefaultValue(dataType);

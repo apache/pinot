@@ -35,6 +35,20 @@ public interface MinionEventObserver {
   void notifyTaskStart(PinotTaskConfig pinotTaskConfig);
 
   /**
+   * Invoked to update a minion task progress status.
+   *
+   * @param pinotTaskConfig Pinot task config
+   * @param progress progress status
+   */
+  default void notifyProgress(PinotTaskConfig pinotTaskConfig, @Nullable Object progress) {
+  }
+
+  @Nullable
+  default Object getProgress() {
+    return null;
+  }
+
+  /**
    * Invoked when a minion task succeeds.
    *
    * @param pinotTaskConfig Pinot task config

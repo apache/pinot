@@ -134,8 +134,16 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENT_LINEAGE, tableNameWithType);
   }
 
+  public static String getPropertyStorePathForMinionTaskMetadataPrefix() {
+    return PROPERTYSTORE_MINION_TASK_METADATA_PREFIX;
+  }
+
   public static String constructPropertyStorePathForMinionTaskMetadata(String tableNameWithType, String taskType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType, taskType);
+  }
+
+  public static String constructPropertyStorePathForMinionTaskMetadata(String tableNameWithType) {
+    return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType);
   }
 
   @Deprecated
@@ -211,6 +219,12 @@ public class ZKMetadataProvider {
     return setSegmentZKMetadata(propertyStore, tableNameWithType, segmentZKMetadata, -1);
   }
 
+  public static boolean removeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
+      String segmentName) {
+    return propertyStore.remove(constructPropertyStorePathForSegment(tableNameWithType, segmentName),
+        AccessOption.PERSISTENT);
+  }
+
   @Nullable
   public static ZNRecord getZnRecord(ZkHelixPropertyStore<ZNRecord> propertyStore, String path) {
     Stat stat = new Stat();
@@ -230,7 +244,6 @@ public class ZKMetadataProvider {
         AccessOption.PERSISTENT);
     return znRecord != null ? new SegmentZKMetadata(znRecord) : null;
   }
-
   @Nullable
   public static UserConfig getUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username) {
     ZNRecord znRecord =

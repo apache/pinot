@@ -170,6 +170,11 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return -_numNonMatchingDictIds;
+    }
+
+    @Override
     public boolean applySV(int dictId) {
       return !_nonMatchingDictIdSet.contains(dictId);
     }
@@ -225,6 +230,11 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return -_nonMatchingValues.size();
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.INT;
     }
@@ -254,6 +264,11 @@ public class NotInPredicateEvaluatorFactory {
     LongRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, LongSet nonMatchingValues) {
       super(notInPredicate);
       _nonMatchingValues = nonMatchingValues;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return -_nonMatchingValues.size();
     }
 
     @Override
@@ -289,6 +304,11 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return -_nonMatchingValues.size();
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.FLOAT;
     }
@@ -318,6 +338,11 @@ public class NotInPredicateEvaluatorFactory {
     DoubleRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, DoubleSet nonMatchingValues) {
       super(notInPredicate);
       _nonMatchingValues = nonMatchingValues;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return -_nonMatchingValues.size();
     }
 
     @Override
@@ -356,6 +381,11 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return -_nonMatchingValues.size();
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.BIG_DECIMAL;
     }
@@ -375,6 +405,11 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return -_nonMatchingValues.size();
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.STRING;
     }
@@ -391,6 +426,11 @@ public class NotInPredicateEvaluatorFactory {
     BytesRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Set<ByteArray> nonMatchingValues) {
       super(notInPredicate);
       _nonMatchingValues = nonMatchingValues;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return -_nonMatchingValues.size();
     }
 
     @Override

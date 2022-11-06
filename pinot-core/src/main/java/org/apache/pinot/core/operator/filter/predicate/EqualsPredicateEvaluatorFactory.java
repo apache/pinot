@@ -102,6 +102,11 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return 1;
+    }
+
+    @Override
     public boolean applySV(int dictId) {
       return _matchingDictId == dictId;
     }
@@ -131,6 +136,11 @@ public class EqualsPredicateEvaluatorFactory {
     IntRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, int matchingValue) {
       super(eqPredicate);
       _matchingValue = matchingValue;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return 1;
     }
 
     @Override
@@ -166,6 +176,11 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return 1;
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.LONG;
     }
@@ -195,6 +210,11 @@ public class EqualsPredicateEvaluatorFactory {
     FloatRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, float matchingValue) {
       super(eqPredicate);
       _matchingValue = matchingValue;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return 1;
     }
 
     @Override
@@ -230,6 +250,11 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return 1;
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.DOUBLE;
     }
@@ -262,6 +287,11 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return 1;
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.BIG_DECIMAL;
     }
@@ -281,6 +311,11 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingItems() {
+      return 1;
+    }
+
+    @Override
     public DataType getDataType() {
       return DataType.STRING;
     }
@@ -297,6 +332,11 @@ public class EqualsPredicateEvaluatorFactory {
     BytesRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate, byte[] matchingValue) {
       super(eqPredicate);
       _matchingValue = matchingValue;
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return 1;
     }
 
     @Override

@@ -84,12 +84,6 @@ public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrati
   }
 
   @Override
-  protected boolean useLlc() {
-    // NOTE: Aggregate metrics is only available with LLC.
-    return true;
-  }
-
-  @Override
   protected void waitForAllDocsLoaded(long timeoutMs) {
     // NOTE: For aggregate metrics, we need to test the aggregation result instead of the document count because
     //       documents can be merged during ingestion.

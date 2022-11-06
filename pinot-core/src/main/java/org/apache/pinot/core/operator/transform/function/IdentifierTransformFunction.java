@@ -142,6 +142,11 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
+    return projectionBlock.getBlockValueSet(_columnName).getBytesValuesMV();
+  }
+
+  @Override
   public void transformToIntValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator, int[] buffer) {
     projectionBlock.fillValues(_columnName, evaluator, buffer);
   }

@@ -47,7 +47,6 @@ const ClusterConfig = () => {
       data={tableData}
       showSearchBox={true}
       inAccordionFormat={true}
-      isPagination={false}
     />
   );
 };

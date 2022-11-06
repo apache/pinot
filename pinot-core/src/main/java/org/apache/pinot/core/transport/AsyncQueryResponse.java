@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.datatable.DataTable;
 
 
 /**
@@ -42,6 +42,7 @@ public class AsyncQueryResponse implements QueryResponse {
   private final ConcurrentHashMap<ServerRoutingInstance, ServerResponse> _responseMap;
   private final CountDownLatch _countDownLatch;
   private final long _maxEndTimeMs;
+  private final long _timeoutMs;
 
   private volatile ServerRoutingInstance _failedServer;
   private volatile Exception _exception;
@@ -56,6 +57,7 @@ public class AsyncQueryResponse implements QueryResponse {
       _responseMap.put(serverRoutingInstance, new ServerResponse(startTimeMs));
     }
     _countDownLatch = new CountDownLatch(numServersQueried);
+    _timeoutMs = timeoutMs;
     _maxEndTimeMs = startTimeMs + timeoutMs;
   }
 
@@ -96,6 +98,11 @@ public class AsyncQueryResponse implements QueryResponse {
     return stringBuilder.toString();
   }
 
+  @Override
+  public long getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance) {
+    return _responseMap.get(serverRoutingInstance).getResponseDelayMs();
+  }
+
   @Nullable
   @Override
   public ServerRoutingInstance getFailedServer() {
@@ -107,11 +114,21 @@ public class AsyncQueryResponse implements QueryResponse {
     return _exception;
   }
 
+  @Override
+  public long getRequestId() {
+    return _requestId;
+  }
+
+  @Override
+  public long getTimeoutMs() {
+    return _timeoutMs;
+  }
+
   void markRequestSubmitted(ServerRoutingInstance serverRoutingInstance) {
     _responseMap.get(serverRoutingInstance).markRequestSubmitted();
   }
 
-  void markRequestSent(ServerRoutingInstance serverRoutingInstance, long requestSentLatencyMs) {
+  void markRequestSent(ServerRoutingInstance serverRoutingInstance, int requestSentLatencyMs) {
     _responseMap.get(serverRoutingInstance).markRequestSent(requestSentLatencyMs);
   }
 

@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -36,11 +37,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.util.OsCheck;
-import org.apache.pinot.server.access.AccessControl;
-import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,45 +49,35 @@ import org.slf4j.LoggerFactory;
 public class QueryServer {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
   private final int _port;
-  private final QueryScheduler _queryScheduler;
-  private final ServerMetrics _serverMetrics;
   private final TlsConfig _tlsConfig;
-  private final AccessControl _accessControl;
 
   private final EventLoopGroup _bossGroup;
   private final EventLoopGroup _workerGroup;
   private final Class<? extends ServerSocketChannel> _channelClass;
+  private final ChannelHandler _instanceRequestHandler;
   private Channel _channel;
 
   /**
    * Create an unsecured server instance
    *
    * @param port bind port
-   * @param queryScheduler query scheduler
-   * @param serverMetrics server metrics
    * @param nettyConfig configurations for netty library
    */
-  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, NettyConfig nettyConfig) {
-    this(port, queryScheduler, serverMetrics, nettyConfig, null, new AllowAllAccessFactory().create());
+  public QueryServer(int port, NettyConfig nettyConfig, ChannelHandler instanceRequestHandler) {
+    this(port, nettyConfig, null, instanceRequestHandler);
   }
 
   /**
    * Create a server instance with TLS config
    *
    * @param port bind port
-   * @param queryScheduler query scheduler
-   * @param serverMetrics server metrics
    * @param nettyConfig configurations for netty library
    * @param tlsConfig TLS/SSL config
-   * @param accessControl access control for netty channel
    */
-  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics, NettyConfig nettyConfig,
-      TlsConfig tlsConfig, AccessControl accessControl) {
+  public QueryServer(int port, NettyConfig nettyConfig, TlsConfig tlsConfig, ChannelHandler instanceRequestHandler) {
     _port = port;
-    _queryScheduler = queryScheduler;
-    _serverMetrics = serverMetrics;
     _tlsConfig = tlsConfig;
-    _accessControl = accessControl;
+    _instanceRequestHandler = instanceRequestHandler;
 
     boolean enableNativeTransports = nettyConfig != null && nettyConfig.isNativeTransportsEnabled();
     OsCheck.OSType operatingSystemType = OsCheck.getOperatingSystemType();
@@ -140,8 +127,7 @@ public class QueryServer {
 
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldBasedFrameDecoder());
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldPrepender());
-              ch.pipeline().addLast(
-                  ChannelHandlerFactory.getInstanceRequestHandler(_queryScheduler, _serverMetrics, _accessControl));
+              ch.pipeline().addLast(_instanceRequestHandler);
             }
           }).bind(_port).sync().channel();
     } catch (Exception e) {

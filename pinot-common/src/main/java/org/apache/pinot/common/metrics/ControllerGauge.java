@@ -25,6 +25,7 @@ import org.apache.pinot.common.Utils;
  * Controller gauges.
  */
 public enum ControllerGauge implements AbstractMetrics.Gauge {
+  VERSION("version", true),
 
   REPLICATION_FROM_CONFIG("replicas", false),
   // Number of complete replicas of table in external view containing all segments online in ideal state
@@ -110,7 +111,14 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   MISSING_CONSUMING_SEGMENT_NEW_PARTITION_COUNT("missingConsumingSegmentNewPartitionCount", false),
 
   // Maximum duration of a missing consuming segment in ideal state (in minutes)
-  MISSING_CONSUMING_SEGMENT_MAX_DURATION_MINUTES("missingSegmentsMaxDurationInMinutes", false);
+  MISSING_CONSUMING_SEGMENT_MAX_DURATION_MINUTES("missingSegmentsMaxDurationInMinutes", false),
+
+  // Number of in progress segment downloads
+  SEGMENT_DOWNLOADS_IN_PROGRESS("segmentDownloadsInProgress", true),
+
+  // Number of in progress segment uploads
+  SEGMENT_UPLOADS_IN_PROGRESS("segmentUploadsInProgress", true);
+
 
   private final String _gaugeName;
   private final String _unit;

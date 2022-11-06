@@ -24,7 +24,8 @@ import java.util.Arrays;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BytesUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
@@ -39,6 +40,8 @@ import org.apache.pinot.spi.utils.BytesUtils;
 public class OnHeapStringDictionary extends BaseImmutableDictionary {
   private final byte _paddingByte;
   private final String[] _unpaddedStrings;
+  private final byte[][] _unpaddedBytes;
+
   private final Object2IntOpenHashMap<String> _unPaddedStringToIdMap;
   private final String[] _paddedStrings;
 
@@ -47,14 +50,16 @@ public class OnHeapStringDictionary extends BaseImmutableDictionary {
 
     _paddingByte = paddingByte;
     byte[] buffer = new byte[numBytesPerValue];
+
+    _unpaddedBytes = new byte[length][];
     _unpaddedStrings = new String[length];
     _unPaddedStringToIdMap = new Object2IntOpenHashMap<>(length);
     _unPaddedStringToIdMap.defaultReturnValue(Dictionary.NULL_VALUE_INDEX);
 
     for (int i = 0; i < length; i++) {
-      String unpaddedString = getUnpaddedString(i, buffer);
-      _unpaddedStrings[i] = unpaddedString;
-      _unPaddedStringToIdMap.put(unpaddedString, i);
+      _unpaddedBytes[i] = getUnpaddedBytes(i, buffer);
+      _unpaddedStrings[i] = new String(_unpaddedBytes[i], UTF_8);
+      _unPaddedStringToIdMap.put(_unpaddedStrings[i], i);
     }
 
     if (paddingByte == 0) {
@@ -132,6 +137,6 @@ public class OnHeapStringDictionary extends BaseImmutableDictionary {
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return BytesUtils.toBytes(_unpaddedStrings[dictId]);
+    return _unpaddedBytes[dictId];
   }
 }

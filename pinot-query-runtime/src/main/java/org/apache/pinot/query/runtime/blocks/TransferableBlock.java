@@ -18,20 +18,19 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
 import java.util.List;
+import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.ColumnarDataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.datablock.BaseDataBlock;
-import org.apache.pinot.core.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-import org.apache.pinot.core.common.datablock.DataBlockUtils;
-import org.apache.pinot.core.common.datablock.RowDataBlock;
 
 
 /**
@@ -42,22 +41,16 @@ public class TransferableBlock implements Block {
 
   private final BaseDataBlock.Type _type;
   private final DataSchema _dataSchema;
-  private final boolean _isErrorBlock;
+  private final int _numRows;
 
   private BaseDataBlock _dataBlock;
   private List<Object[]> _container;
 
   public TransferableBlock(List<Object[]> container, DataSchema dataSchema, BaseDataBlock.Type containerType) {
-    this(container, dataSchema, containerType, false);
-  }
-
-  @VisibleForTesting
-  TransferableBlock(List<Object[]> container, DataSchema dataSchema, BaseDataBlock.Type containerType,
-      boolean isErrorBlock) {
     _container = container;
     _dataSchema = dataSchema;
     _type = containerType;
-    _isErrorBlock = isErrorBlock;
+    _numRows = _container.size();
   }
 
   public TransferableBlock(BaseDataBlock dataBlock) {
@@ -65,7 +58,11 @@ public class TransferableBlock implements Block {
     _dataSchema = dataBlock.getDataSchema();
     _type = dataBlock instanceof ColumnarDataBlock ? BaseDataBlock.Type.COLUMNAR
         : dataBlock instanceof RowDataBlock ? BaseDataBlock.Type.ROW : BaseDataBlock.Type.METADATA;
-    _isErrorBlock = !_dataBlock.getExceptions().isEmpty();
+    _numRows = _dataBlock.getNumberOfRows();
+  }
+
+  public int getNumRows() {
+    return _numRows;
   }
 
   public DataSchema getDataSchema() {
@@ -83,9 +80,10 @@ public class TransferableBlock implements Block {
     if (_container == null) {
       switch (_type) {
         case ROW:
-          _container = DataBlockUtils.extraRows(_dataBlock);
+          _container = DataBlockUtils.extractRows(_dataBlock);
           break;
         case COLUMNAR:
+        case METADATA:
         default:
           throw new UnsupportedOperationException("Unable to extract from container with type: " + _type);
       }
@@ -105,10 +103,10 @@ public class TransferableBlock implements Block {
       try {
         switch (_type) {
           case ROW:
-            _dataBlock = DataBlockBuilder.buildFromRows(_container, null, _dataSchema);
+            _dataBlock = DataBlockBuilder.buildFromRows(_container, _dataSchema);
             break;
           case COLUMNAR:
-            _dataBlock = DataBlockBuilder.buildFromColumns(_container, null, _dataSchema);
+            _dataBlock = DataBlockBuilder.buildFromColumns(_container, _dataSchema);
             break;
           case METADATA:
             throw new UnsupportedOperationException("Metadata block cannot be constructed from container");
@@ -116,7 +114,7 @@ public class TransferableBlock implements Block {
             throw new UnsupportedOperationException("Unable to build from container with type: " + _type);
         }
       } catch (Exception e) {
-        throw new RuntimeException("Unable to create DataBlock");
+        throw new RuntimeException("Unable to create DataBlock", e);
       }
     }
     return _dataBlock;
@@ -142,7 +140,14 @@ public class TransferableBlock implements Block {
    * @return whether this block is the end of stream.
    */
   public boolean isEndOfStreamBlock() {
-    return _type == BaseDataBlock.Type.METADATA;
+    return isType(MetadataBlock.MetadataBlockType.ERROR) || isType(MetadataBlock.MetadataBlockType.EOS);
+  }
+
+  /**
+   * @return whether this block represents a NOOP block
+   */
+  public boolean isNoOpBlock() {
+    return isType(MetadataBlock.MetadataBlockType.NOOP);
   }
 
   /**
@@ -151,12 +156,16 @@ public class TransferableBlock implements Block {
    * @return true if contains exception.
    */
   public boolean isErrorBlock() {
-    return _isErrorBlock;
+    return isType(MetadataBlock.MetadataBlockType.ERROR);
   }
 
-  public byte[] toBytes()
-      throws IOException {
-    return _dataBlock.toBytes();
+  private boolean isType(MetadataBlock.MetadataBlockType type) {
+    if (_type != BaseDataBlock.Type.METADATA) {
+      return false;
+    }
+
+    MetadataBlock metadata = (MetadataBlock) _dataBlock;
+    return metadata.getType() == type;
   }
 
   @Override

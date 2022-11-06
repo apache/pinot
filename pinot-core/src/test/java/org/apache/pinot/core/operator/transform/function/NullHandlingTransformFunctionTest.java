@@ -19,10 +19,10 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -39,6 +39,7 @@ import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -48,15 +49,18 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class NullHandlingTransformFunctionTest {
@@ -82,10 +86,10 @@ public class NullHandlingTransformFunctionTest {
   protected final double[] _doubleSVValues = new double[NUM_ROWS];
   protected final String[] _stringSVValues = new String[NUM_ROWS];
   protected final byte[][] _bytesSVValues = new byte[NUM_ROWS][];
+  protected final boolean[] _nullValues = new boolean[NUM_ROWS];
 
   protected Map<String, DataSource> _dataSourceMap;
   protected ProjectionBlock _projectionBlock;
-  protected static final int NULL_VALUE_MOD = 10;
 
   @BeforeClass
   public void setup()
@@ -93,6 +97,7 @@ public class NullHandlingTransformFunctionTest {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
     DecimalFormat df = new DecimalFormat("0", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
     df.setMaximumFractionDigits(340); // 340 = DecimalFormat.DOUBLE_FRACTION_DIGITS
+    Random nullValueRandom = new Random(42);
     long currentTimeMs = System.currentTimeMillis();
     for (int i = 0; i < NUM_ROWS; i++) {
       _intSVValues[i] = RANDOM.nextInt();
@@ -103,12 +108,13 @@ public class NullHandlingTransformFunctionTest {
       _bytesSVValues[i] = RandomStringUtils.randomAlphanumeric(26).getBytes();
 
       _timeValues[i] = currentTimeMs - RANDOM.nextInt(365 * 24 * 3600) * 1000L;
+      _nullValues[i] = nullValueRandom.nextInt(2) > 0;
     }
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       Map<String, Object> map = new HashMap<>();
-      if (i % NULL_VALUE_MOD != 0) {
+      if (!_nullValues[i]) {
         map.put(INT_SV_COLUMN, _intSVValues[i]);
         map.put(LONG_SV_COLUMN, _longSVValues[i]);
         map.put(FLOAT_SV_COLUMN, _floatSVValues[i]);
@@ -130,14 +136,13 @@ public class NullHandlingTransformFunctionTest {
       rows.add(row);
     }
 
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_SV_COLUMN, FieldSpec.DataType.INT)
-        .addSingleValueDimension(LONG_SV_COLUMN, FieldSpec.DataType.LONG)
-        .addSingleValueDimension(FLOAT_SV_COLUMN, FieldSpec.DataType.FLOAT)
-        .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
-        .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
-        .addDateTime(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_SV_COLUMN, DataType.INT)
+        .addSingleValueDimension(LONG_SV_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_SV_COLUMN, DataType.FLOAT)
+        .addSingleValueDimension(DOUBLE_SV_COLUMN, DataType.DOUBLE)
+        .addSingleValueDimension(STRING_SV_COLUMN, DataType.STRING)
+        .addSingleValueDimension(BYTES_SV_COLUMN, DataType.BYTES)
+        .addDateTime(TIMESTAMP_COLUMN, DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testWithNulls").setNullHandlingEnabled(true)
             .setTimeColumnName(TIME_COLUMN).build();
@@ -175,13 +180,15 @@ public class NullHandlingTransformFunctionTest {
       throws Exception {
     ExpressionContext expression = RequestContextUtils.getExpression(String.format("%s IS NULL", columnName));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof IsNullTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.IS_NULL.getName());
-    int[] expectedValues = new int[NUM_ROWS];
+    assertTrue(transformFunction instanceof IsNullTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.IS_NULL.getName());
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
+    boolean[] expectedValues = new boolean[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % NULL_VALUE_MOD == 0) {
-        expectedValues[i] = 1;
-      }
+      expectedValues[i] = _nullValues[i];
     }
     testTransformFunction(expression, expectedValues);
   }
@@ -199,33 +206,38 @@ public class NullHandlingTransformFunctionTest {
 
   public void testIsNotNullTransformFunction(String columnName)
       throws Exception {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("%s IS NOT NULL", columnName));
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("%s IS NOT NULL", columnName));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof IsNotNullTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.IS_NOT_NULL.getName());
-    int[] expectedValues = new int[NUM_ROWS];
-    Arrays.fill(expectedValues, 1);
+    assertTrue(transformFunction instanceof IsNotNullTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.IS_NOT_NULL.getName());
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
+    boolean[] expectedValues = new boolean[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % NULL_VALUE_MOD == 0) {
-        expectedValues[i] = 0;
-      }
+      expectedValues[i] = !_nullValues[i];
     }
     testTransformFunction(expression, expectedValues);
   }
 
-  protected void testTransformFunction(ExpressionContext expression, int[] expectedValues) throws Exception {
+  protected void testTransformFunction(ExpressionContext expression, boolean[] expectedValues)
+      throws Exception {
     int[] intValues = getTransformFunctionInstance(expression).transformToIntValuesSV(_projectionBlock);
     long[] longValues = getTransformFunctionInstance(expression).transformToLongValuesSV(_projectionBlock);
     float[] floatValues = getTransformFunctionInstance(expression).transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = getTransformFunctionInstance(expression).transformToDoubleValuesSV(_projectionBlock);
-    String[] stringValues = getTransformFunctionInstance(expression).transformToStringValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues =
+        getTransformFunctionInstance(expression).transformToBigDecimalValuesSV(_projectionBlock);
+    // TODO: Support implicit cast from BOOLEAN to STRING
+//    String[] stringValues = getTransformFunctionInstance(expression).transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(intValues[i], expectedValues[i]);
-      Assert.assertEquals(longValues[i], expectedValues[i]);
-      Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
-      Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
-      Assert.assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
+      assertEquals(intValues[i] == 1, expectedValues[i]);
+      assertEquals(longValues[i] == 1, expectedValues[i]);
+      assertEquals(floatValues[i] == 1, expectedValues[i]);
+      assertEquals(doubleValues[i] == 1, expectedValues[i]);
+      assertEquals(bigDecimalValues[i].intValue() == 1, expectedValues[i]);
+//      assertEquals(stringValues[i], Boolean.toString(expectedValues[i]));
     }
   }
 

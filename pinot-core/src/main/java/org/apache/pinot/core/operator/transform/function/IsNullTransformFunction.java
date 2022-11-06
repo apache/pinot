@@ -76,12 +76,14 @@ public class IsNullTransformFunction extends BaseTransformFunction {
       int currentDocIdIndex = 0;
       while (_nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {
         _nullValueVectorIterator.advanceIfNeeded(docIds[currentDocIdIndex]);
-        currentDocIdIndex = Arrays.binarySearch(docIds, currentDocIdIndex, length, _nullValueVectorIterator.next());
-        if (currentDocIdIndex >= 0) {
-          _results[currentDocIdIndex] = 1;
-          currentDocIdIndex++;
-        } else {
-          currentDocIdIndex = -currentDocIdIndex - 1;
+        if (_nullValueVectorIterator.hasNext()) {
+          currentDocIdIndex = Arrays.binarySearch(docIds, currentDocIdIndex, length, _nullValueVectorIterator.next());
+          if (currentDocIdIndex >= 0) {
+            _results[currentDocIdIndex] = 1;
+            currentDocIdIndex++;
+          } else {
+            currentDocIdIndex = -currentDocIdIndex - 1;
+          }
         }
       }
     }

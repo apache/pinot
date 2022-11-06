@@ -332,6 +332,33 @@ public class SchemaUtilsTest {
         "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
             + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\","
             + "\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT\",\"granularity\":\"1:DAYS\"}]}");
+    SchemaUtils.validate(schema);
+
+    schema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\","
+            + "\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\","
+            + " \"sampleValue\" : \"19700101\"}]}");
+    checkValidationFails(schema);
+
+    schema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\","
+            + "\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\","
+            + " \"sampleValue\" : \"19720101\"}]}");
+    SchemaUtils.validate(schema);
+
+    schema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"LONG\","
+            + "\"format\":\"1:SECONDS:EPOCH\",\"granularity\":\"1:SECONDS\", \"sampleValue\" : 1663170923}]}");
+    SchemaUtils.validate(schema);
+
+    schema = Schema.fromString(
+        "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
+            + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"LONG\","
+            + "\"format\":\"1:MILLISECONDS:EPOCH\",\"granularity\":\"1:MILLISECONDS\","
+            + " \"sampleValue\" : 1663170923}]}");
     checkValidationFails(schema);
 
     schema = Schema.fromString(

@@ -124,6 +124,11 @@ public interface TableDataManager {
   void removeSegment(String segmentName);
 
   /**
+   * Returns true if the segment was deleted in the last few minutes.
+   */
+  boolean isSegmentDeletedRecently(String segmentName);
+
+  /**
    * Acquires all segments of the table.
    * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
    *
@@ -134,6 +139,8 @@ public interface TableDataManager {
   /**
    * Acquires the segments with the given segment names.
    * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
+   * This method may return some recently deleted segments in missingSegments. The caller can identify those segments
+   * by using {@link #isSegmentDeletedRecently(String)}.
    *
    * @param segmentNames List of names of the segment to acquire
    * @param missingSegments Holder for segments unable to be acquired

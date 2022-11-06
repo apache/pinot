@@ -35,6 +35,8 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,12 +45,15 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * regular column for other record transformers.
  */
 public class ExpressionTransformer implements RecordTransformer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ExpressionTransformer.class);
 
   @VisibleForTesting
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
+  private final boolean _continueOnError;
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
+    _continueOnError = tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().isContinueOnError();
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
       for (TransformConfig transformConfig : tableConfig.getIngestionConfig().getTransformConfigs()) {
         FunctionEvaluator previous = expressionEvaluators.put(transformConfig.getColumnName(),
@@ -118,6 +123,11 @@ public class ExpressionTransformer implements RecordTransformer {
   }
 
   @Override
+  public boolean isNoOp() {
+    return _expressionEvaluators.isEmpty();
+  }
+
+  @Override
   public GenericRow transform(GenericRow record) {
     for (Map.Entry<String, FunctionEvaluator> entry : _expressionEvaluators.entrySet()) {
       String column = entry.getKey();
@@ -125,8 +135,16 @@ public class ExpressionTransformer implements RecordTransformer {
       // Skip transformation if column value already exist.
       // NOTE: column value might already exist for OFFLINE data
       if (record.getValue(column) == null) {
-        Object result = transformFunctionEvaluator.evaluate(record);
-        record.putValue(column, result);
+        try {
+          record.putValue(column, transformFunctionEvaluator.evaluate(record));
+        } catch (Exception e) {
+          if (!_continueOnError) {
+            throw new RuntimeException("Caught exception while evaluation transform function for column: " + column, e);
+          } else {
+            LOGGER.debug("Caught exception while evaluation transform function for column: {}", column, e);
+            record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+          }
+        }
       }
     }
     return record;

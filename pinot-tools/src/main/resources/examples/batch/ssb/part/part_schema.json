@@ -1,0 +1,45 @@
+{
+  "schemaName": "part",
+  "metricFieldSpecs": [
+
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "P_PARTKEY"
+    },
+    {
+      "dataType": "STRING",
+      "name": "P_NAME"
+    },
+    {
+      "dataType": "STRING",
+      "name": "P_MFGR"
+    },
+    {
+      "dataType": "STRING",
+      "name": "P_CATEGORY"
+    },
+    {
+      "dataType": "STRING",
+      "name": "P_BRAND1"
+    },
+    {
+      "dataType": "STRING",
+      "name": "P_COLOR"
+    },
+    {
+      "dataType": "STRING",
+      "name": "P_TYPE"
+    },
+    {
+      "dataType": "INT",
+      "name": "P_SIZE"
+    },
+    {
+      "dataType": "STRING",
+      "name": "P_CONTAINER"
+    }
+  ],
+  "primaryKeyColumns": ["P_PARTKEY"]
+}

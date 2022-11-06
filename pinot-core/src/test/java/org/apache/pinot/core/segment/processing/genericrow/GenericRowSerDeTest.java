@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -27,6 +28,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -45,7 +47,8 @@ public class GenericRowSerDeTest {
         new DimensionFieldSpec("longSV", DataType.LONG, true), new DimensionFieldSpec("floatSV", DataType.FLOAT, true),
         new DimensionFieldSpec("doubleSV", DataType.DOUBLE, true),
         new DimensionFieldSpec("stringSV", DataType.STRING, true),
-        new DimensionFieldSpec("bytesSV", DataType.BYTES, true), new DimensionFieldSpec("nullSV", DataType.INT, true),
+        new DimensionFieldSpec("bytesSV", DataType.BYTES, true),
+        new MetricFieldSpec("bigDecimalSV", DataType.BIG_DECIMAL), new DimensionFieldSpec("nullSV", DataType.INT, true),
         new DimensionFieldSpec("intMV", DataType.INT, false), new DimensionFieldSpec("longMV", DataType.LONG, false),
         new DimensionFieldSpec("floatMV", DataType.FLOAT, false),
         new DimensionFieldSpec("doubleMV", DataType.DOUBLE, false),
@@ -59,6 +62,7 @@ public class GenericRowSerDeTest {
     _row.putValue("doubleSV", 123.0);
     _row.putValue("stringSV", "123");
     _row.putValue("bytesSV", new byte[]{1, 2, 3});
+    _row.putValue("bigDecimalSV", new BigDecimal("122333"));
     _row.putDefaultNullValue("nullSV", Integer.MAX_VALUE);
     _row.putValue("intMV", new Object[]{123, 456});
     _row.putValue("longMV", new Object[]{123L, 456L});

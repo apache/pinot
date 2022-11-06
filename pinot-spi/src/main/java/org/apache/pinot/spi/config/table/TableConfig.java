@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -48,6 +49,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String QUERY_CONFIG_KEY = "query";
   public static final String INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY = "instanceAssignmentConfigMap";
   public static final String INSTANCE_PARTITIONS_MAP_CONFIG_KEY = "instancePartitionsMap";
+  public static final String SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY = "segmentAssignmentConfigMap";
   public static final String FIELD_CONFIG_LIST_KEY = "fieldConfigList";
   public static final String UPSERT_CONFIG_KEY = "upsertConfig";
   public static final String DEDUP_CONFIG_KEY = "dedupConfig";
@@ -89,6 +91,7 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "Point to an existing instance partitions")
   private Map<InstancePartitionsType, String> _instancePartitionsMap;
 
+  private Map<String, SegmentAssignmentConfig> _segmentAssignmentConfigMap;
   private List<FieldConfig> _fieldConfigList;
 
   @JsonPropertyDescription(value = "upsert related config")
@@ -128,7 +131,9 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable,
       @JsonProperty(TUNER_CONFIG_LIST_KEY) @Nullable List<TunerConfig> tunerConfigList,
       @JsonProperty(INSTANCE_PARTITIONS_MAP_CONFIG_KEY) @Nullable
-          Map<InstancePartitionsType, String> instancePartitionsMap) {
+          Map<InstancePartitionsType, String> instancePartitionsMap,
+      @JsonProperty(SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable
+          Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -158,6 +163,7 @@ public class TableConfig extends BaseJsonConfig {
     _dimTable = dimTable;
     _tunerConfigList = tunerConfigList;
     _instancePartitionsMap = instancePartitionsMap;
+    _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -337,5 +343,15 @@ public class TableConfig extends BaseJsonConfig {
 
   public void setTunerConfigsList(List<TunerConfig> tunerConfigList) {
     _tunerConfigList = tunerConfigList;
+  }
+
+  @JsonProperty(SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY)
+  @Nullable
+  public Map<String, SegmentAssignmentConfig> getSegmentAssignmentConfigMap() {
+    return _segmentAssignmentConfigMap;
+  }
+
+  public void setSegmentAssignmentConfigMap(Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap) {
+    _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
   }
 }

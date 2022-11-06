@@ -54,4 +54,14 @@ public class AggregateNode extends AbstractStageNode {
   public List<RexExpression> getGroupSet() {
     return _groupSet;
   }
+
+  @Override
+  public String explain() {
+    return "AGGREGATE";
+  }
+
+  @Override
+  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitAggregate(this, context);
+  }
 }

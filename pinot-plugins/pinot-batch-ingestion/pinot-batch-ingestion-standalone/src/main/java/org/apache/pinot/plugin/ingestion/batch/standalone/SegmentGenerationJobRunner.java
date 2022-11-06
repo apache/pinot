@@ -23,8 +23,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
-import java.nio.file.FileSystems;
-import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +39,7 @@ import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
+import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -72,6 +71,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   private Schema _schema;
   private TableConfig _tableConfig;
   private AtomicReference<Exception> _failure;
+  private boolean _consistentPushEnabled;
 
   public SegmentGenerationJobRunner() {
   }
@@ -157,6 +157,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     }
     _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
 
+    _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_tableConfig);
+
     final int jobParallelism = _spec.getSegmentCreationJobParallelism();
     int numThreads = JobUtils.getNumThreads(jobParallelism);
     LOGGER.info("Creating an executor service with {} threads(Job parallelism: {}, available cores: {}.)", numThreads,
@@ -172,36 +174,11 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   public void run()
       throws Exception {
     // Get list of files to process.
-    String[] files = _inputDirFS.listFiles(_inputDirURI, true);
+    List<String> filteredFiles = SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(_inputDirFS, _inputDirURI,
+        _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern(), _spec.isSearchRecursively());
 
-    // TODO - sort input files by modification timestamp. Though this is problematic because:
-    // a. It can put more load on the external filesystem (e.g. S3), and
-    // b. The call to Collections.sort(siblingFiles) below will reorder files by name.
-
-    List<String> filteredFiles = new ArrayList<>();
-    PathMatcher includeFilePathMatcher = null;
-    if (_spec.getIncludeFileNamePattern() != null) {
-      includeFilePathMatcher = FileSystems.getDefault().getPathMatcher(_spec.getIncludeFileNamePattern());
-    }
-    PathMatcher excludeFilePathMatcher = null;
-    if (_spec.getExcludeFileNamePattern() != null) {
-      excludeFilePathMatcher = FileSystems.getDefault().getPathMatcher(_spec.getExcludeFileNamePattern());
-    }
-
-    for (String file : files) {
-      if (includeFilePathMatcher != null) {
-        if (!includeFilePathMatcher.matches(Paths.get(file))) {
-          continue;
-        }
-      }
-      if (excludeFilePathMatcher != null) {
-        if (excludeFilePathMatcher.matches(Paths.get(file))) {
-          continue;
-        }
-      }
-      if (!_inputDirFS.isDirectory(new URI(file))) {
-        filteredFiles.add(file);
-      }
+    if (_consistentPushEnabled) {
+      ConsistentDataPushUtils.configureSegmentPostfix(_spec);
     }
 
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());

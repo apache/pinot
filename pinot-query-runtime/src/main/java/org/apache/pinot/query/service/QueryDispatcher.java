@@ -18,22 +18,22 @@
  */
 package org.apache.pinot.query.service;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.util.Pair;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datablock.BaseDataBlock;
-import org.apache.pinot.core.common.datablock.DataBlockUtils;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -44,6 +44,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,8 +60,8 @@ public class QueryDispatcher {
   public QueryDispatcher() {
   }
 
-  public List<DataTable> submitAndReduce(long requestId, QueryPlan queryPlan,
-      MailboxService<Mailbox.MailboxContent> mailboxService, long timeoutNano)
+  public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
+      MailboxService<TransferableBlock> mailboxService, long timeoutNano)
       throws Exception {
     // submit all the distributed stages.
     int reduceStageId = submit(requestId, queryPlan);
@@ -70,7 +71,9 @@ public class QueryDispatcher {
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
         requestId, reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
         mailboxService.getMailboxPort());
-    return reduceMailboxReceive(mailboxReceiveOperator, timeoutNano);
+    List<DataTable> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutNano);
+    return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
+        queryPlan.getQueryStageMap().get(0).getDataSchema());
   }
 
   public int submit(long requestId, QueryPlan queryPlan)
@@ -126,28 +129,71 @@ public class QueryDispatcher {
     long timeoutWatermark = System.nanoTime() + timeoutNano;
     while (System.nanoTime() < timeoutWatermark) {
       transferableBlock = mailboxReceiveOperator.nextBlock();
-      if (TransferableBlockUtils.isEndOfStream(transferableBlock)) {
+      if (TransferableBlockUtils.isEndOfStream(transferableBlock) && transferableBlock.isErrorBlock()) {
         // TODO: we only received bubble up error from the execution stage tree.
         // TODO: query dispatch should also send cancel signal to the rest of the execution stage tree.
-        if (transferableBlock.isErrorBlock()) {
           throw new RuntimeException("Received error query execution result block: "
               + transferableBlock.getDataBlock().getExceptions());
-        }
-        break;
       }
-      if (transferableBlock.getDataBlock() != null) {
-        BaseDataBlock dataTable = transferableBlock.getDataBlock();
-        resultDataBlocks.add(dataTable);
+      if (transferableBlock.isNoOpBlock()) {
+        continue;
+      } else if (transferableBlock.isEndOfStreamBlock()) {
+        return resultDataBlocks;
       }
+
+      resultDataBlocks.add(transferableBlock.getDataBlock());
     }
-    if (System.nanoTime() >= timeoutWatermark) {
-      resultDataBlocks = Collections.singletonList(
-          DataBlockUtils.getErrorDataBlock(QueryException.EXECUTION_TIMEOUT_ERROR));
-    }
-    return resultDataBlocks;
+
+    throw new RuntimeException("Timed out while receiving from mailbox: " + QueryException.EXECUTION_TIMEOUT_ERROR);
   }
 
-  public static MailboxReceiveOperator createReduceStageOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
+  public static ResultTable toResultTable(List<DataTable> queryResult, List<Pair<Integer, String>> fields,
+      DataSchema sourceSchema) {
+    List<Object[]> resultRows = new ArrayList<>();
+    DataSchema resultSchema = toResultSchema(sourceSchema, fields);
+    for (DataTable dataTable : queryResult) {
+      int numColumns = resultSchema.getColumnNames().length;
+      int numRows = dataTable.getNumberOfRows();
+      DataSchema.ColumnDataType[] resultColumnDataTypes = resultSchema.getColumnDataTypes();
+      List<Object[]> rows = new ArrayList<>(dataTable.getNumberOfRows());
+      if (numRows > 0) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+        for (int colId = 0; colId < numColumns; colId++) {
+          nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+        }
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = new Object[numColumns];
+          Object[] rawRow = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          // Only the masked fields should be selected out.
+          int colId = 0;
+          for (Pair<Integer, String> field : fields) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId++] = null;
+            } else {
+              int colRef = field.left;
+              row[colId++] = resultColumnDataTypes[colRef].convertAndFormat(rawRow[colRef]);
+            }
+          }
+          rows.add(row);
+        }
+      }
+      resultRows.addAll(rows);
+    }
+    return new ResultTable(resultSchema, resultRows);
+  }
+
+  private static DataSchema toResultSchema(DataSchema inputSchema, List<Pair<Integer, String>> fields) {
+    String[] colNames = new String[fields.size()];
+    DataSchema.ColumnDataType[] colTypes = new DataSchema.ColumnDataType[fields.size()];
+    for (int i = 0; i < fields.size(); i++) {
+      colNames[i] = fields.get(i).right;
+      colTypes[i] = inputSchema.getColumnDataType(fields.get(i).left);
+    }
+    return new DataSchema(colNames, colTypes);
+  }
+
+  @VisibleForTesting
+  public static MailboxReceiveOperator createReduceStageOperator(MailboxService<TransferableBlock> mailboxService,
       List<ServerInstance> sendingInstances, long jobId, int stageId, DataSchema dataSchema, String hostname,
       int port) {
     MailboxReceiveOperator mailboxReceiveOperator =

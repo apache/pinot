@@ -23,6 +23,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -94,15 +97,15 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   }
 
   @Override
-  public void setColumn(int colId, Object value)
+  public void setColumn(int colId, @Nullable Object value)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
-    int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
-    if (objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue()) {
+    if (value == null) {
       _currentRowDataByteBuffer.putInt(0);
-      _variableSizeDataOutputStream.writeInt(objectTypeValue);
+      _variableSizeDataOutputStream.writeInt(DataTable.CustomObject.NULL_TYPE_VALUE);
     } else {
+      int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
       byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
       _currentRowDataByteBuffer.putInt(bytes.length);
       _variableSizeDataOutputStream.writeInt(objectTypeValue);

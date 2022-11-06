@@ -26,6 +26,7 @@ import org.apache.pinot.common.Utils;
  *
  */
 public enum ServerGauge implements AbstractMetrics.Gauge {
+  VERSION("version", true),
   DOCUMENT_COUNT("documents", false),
   SEGMENT_COUNT("segments", false),
   LLC_PARTITION_CONSUMING("state", false),
@@ -42,7 +43,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   // Upsert metrics
   UPSERT_PRIMARY_KEYS_COUNT("upsertPrimaryKeysCount", false),
   // Dedup metrics
-  DEDUP_PRIMARY_KEYS_COUNT("dedupPrimaryKeysCount", false);
+  DEDUP_PRIMARY_KEYS_COUNT("dedupPrimaryKeysCount", false),
+  CONSUMPTION_QUOTA_UTILIZATION("ratio", false);
 
   private final String _gaugeName;
   private final String _unit;

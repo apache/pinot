@@ -29,6 +29,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongConsumer;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
@@ -36,8 +38,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
@@ -161,7 +161,7 @@ public abstract class BaseReduceService {
       Map<String, String> metadata = dataTable.getMetadata();
       // Reduce on trace info.
       if (_enableTrace) {
-        _traceInfo.put(routingInstance.getHostname(), metadata.get(MetadataKey.TRACE_INFO.getName()));
+        _traceInfo.put(routingInstance.getShortName(), metadata.get(MetadataKey.TRACE_INFO.getName()));
       }
 
       // Reduce on exceptions.
@@ -310,6 +310,8 @@ public abstract class BaseReduceService {
       brokerResponseNative.setExplainPlanNumMatchAllFilterSegments(_explainPlanNumMatchAllFilterSegments);
       if (_numConsumingSegmentsQueried > 0) {
         brokerResponseNative.setNumConsumingSegmentsQueried(_numConsumingSegmentsQueried);
+      }
+      if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
         brokerResponseNative.setMinConsumingFreshnessTimeMs(_minConsumingFreshnessTimeMs);
       }
       brokerResponseNative.setNumConsumingSegmentsProcessed(_numConsumingSegmentsProcessed);
@@ -340,7 +342,7 @@ public abstract class BaseReduceService {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_TOTAL_CPU_TIME_NS, _realtimeTotalCpuTimeNs,
             TimeUnit.NANOSECONDS);
 
-        if (_numConsumingSegmentsQueried > 0 && _minConsumingFreshnessTimeMs > 0) {
+        if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
           brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
               System.currentTimeMillis() - _minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
         }

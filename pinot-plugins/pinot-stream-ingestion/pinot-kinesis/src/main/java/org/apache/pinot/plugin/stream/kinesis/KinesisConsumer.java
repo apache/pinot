@@ -175,7 +175,9 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       debugOrLogWarning("Encountered unknown unrecoverable AWS exception", e);
       throw new RuntimeException(e);
     } catch (AbortedException e) {
-      debugOrLogWarning("Task aborted due to exception", e);
+      if (!(e.getCause() instanceof InterruptedException)) {
+        debugOrLogWarning("Task aborted due to exception", e);
+      }
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (Throwable e) {
       // non transient errors

@@ -250,6 +250,9 @@ public class FilterPlanNode implements PlanNode {
               return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
               textIndexReader = dataSource.getTextIndex();
+              Preconditions
+                  .checkState(textIndexReader != null, "Cannot apply TEXT_MATCH on column: %s without text index",
+                      column);
               // We could check for real time and segment Lucene reader, but easier to check the other way round
               if (textIndexReader instanceof NativeTextIndexReader
                   || textIndexReader instanceof NativeMutableTextIndex) {

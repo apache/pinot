@@ -528,6 +528,11 @@ data: {
       "SqlInsertFromFile()"
     ]
 
+    # List of custom function syntax to add
+    extraBinaryExpressions: [
+      "SqlAtTimeZone"
+    ]
+
     # List of files in @includes directory that have parser method
     implementationFiles: [
       "parserImpls.ftl"

@@ -38,6 +38,8 @@ import org.apache.parquet.schema.MessageType;
 
 public class ParquetUtils {
   private static final String DEFAULT_FS = "file:///";
+  private static final String AVRO_SCHEMA_METADATA_KEY = "parquet.avro.schema";
+  private static final String OLD_AVRO_SCHEMA_METADATA_KEY = "avro.schema";
 
   private ParquetUtils() {
   }
@@ -69,17 +71,26 @@ public class ParquetUtils {
     ParquetMetadata footer =
         ParquetFileReader.readFooter(getParquetHadoopConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
     Map<String, String> metaData = footer.getFileMetaData().getKeyValueMetaData();
-    String schemaString = metaData.get("parquet.avro.schema");
-    if (schemaString == null) {
-      // Try the older property
-      schemaString = metaData.get("avro.schema");
-    }
-    if (schemaString != null) {
+
+    if (hasAvroSchemaInFileMetadata(path)) {
+      String schemaString = metaData.get(AVRO_SCHEMA_METADATA_KEY);
+      if (schemaString == null) {
+        // Try the older property
+        schemaString = metaData.get(OLD_AVRO_SCHEMA_METADATA_KEY);
+      }
       return new Schema.Parser().parse(schemaString);
     } else {
       MessageType parquetSchema = footer.getFileMetaData().getSchema();
       return new AvroSchemaConverter().convert(parquetSchema);
     }
+  }
+
+  public static boolean hasAvroSchemaInFileMetadata(Path path) throws IOException {
+    ParquetMetadata footer =
+        ParquetFileReader.readFooter(getParquetHadoopConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
+    Map<String, String> metaData = footer.getFileMetaData().getKeyValueMetaData();
+
+    return metaData.containsKey(AVRO_SCHEMA_METADATA_KEY) || metaData.containsKey(OLD_AVRO_SCHEMA_METADATA_KEY);
   }
 
   public static Configuration getParquetHadoopConfiguration() {

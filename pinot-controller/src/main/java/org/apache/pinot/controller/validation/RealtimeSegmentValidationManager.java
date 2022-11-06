@@ -34,6 +34,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -55,6 +56,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
 
   public static final String RECREATE_DELETED_CONSUMING_SEGMENT_KEY = "recreateDeletedConsumingSegment";
+  public static final String OFFSET_CRITERIA = "offsetCriteria";
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
@@ -82,7 +84,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
     context._recreateDeletedConsumingSegment =
         Boolean.parseBoolean(periodicTaskProperties.getProperty(RECREATE_DELETED_CONSUMING_SEGMENT_KEY));
-
+    String offsetCriteriaStr = periodicTaskProperties.getProperty(OFFSET_CRITERIA);
+    if (offsetCriteriaStr != null) {
+      context._offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetString(offsetCriteriaStr);
+    }
     return context;
   }
 
@@ -106,7 +111,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     if (streamConfig.hasLowLevelConsumerType()) {
       _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
-          context._recreateDeletedConsumingSegment);
+          context._recreateDeletedConsumingSegment, context._offsetCriteria);
     }
   }
 
@@ -178,6 +183,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   public static final class Context {
     private boolean _runSegmentLevelValidation;
     private boolean _recreateDeletedConsumingSegment;
+    private OffsetCriteria _offsetCriteria;
   }
 
   @VisibleForTesting

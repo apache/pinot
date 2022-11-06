@@ -18,24 +18,13 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.standalone;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.List;
 import java.util.Map;
+import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
-import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 
 
-public class SegmentMetadataPushJobRunner implements IngestionJobRunner {
-
-  private SegmentGenerationJobSpec _spec;
+public class SegmentMetadataPushJobRunner extends BaseSegmentPushJobRunner {
 
   public SegmentMetadataPushJobRunner() {
   }
@@ -44,47 +33,8 @@ public class SegmentMetadataPushJobRunner implements IngestionJobRunner {
     init(spec);
   }
 
-  @Override
-  public void init(SegmentGenerationJobSpec spec) {
-    _spec = spec;
-    if (_spec.getPushJobSpec() == null) {
-      throw new RuntimeException("Missing PushJobSpec");
-    }
-  }
-
-  @Override
-  public void run() {
-    //init all file systems
-    List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
-    for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
-    }
-
-    //Get outputFS for list of available Pinot segments
-    URI outputDirURI;
-    try {
-      outputDirURI = new URI(_spec.getOutputDirURI());
-      if (outputDirURI.getScheme() == null) {
-        outputDirURI = new File(_spec.getOutputDirURI()).toURI();
-      }
-    } catch (URISyntaxException e) {
-      throw new RuntimeException("outputDirURI is not valid - '" + _spec.getOutputDirURI() + "'");
-    }
-    PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
-
-    //Get list of files to process
-    String[] files;
-    try {
-      files = outputDirFS.listFiles(outputDirURI, true);
-    } catch (IOException e) {
-      throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
-    }
-    Map<String, String> segmentUriToTarPathMap =
-        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), files);
-    try {
-      SegmentPushUtils.sendSegmentUriAndMetadata(_spec, outputDirFS, segmentUriToTarPathMap);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  public void uploadSegments(Map<String, String> segmentsUriToTarPathMap)
+      throws Exception {
+    SegmentPushUtils.sendSegmentUriAndMetadata(_spec, _outputDirFS, segmentsUriToTarPathMap);
   }
 }

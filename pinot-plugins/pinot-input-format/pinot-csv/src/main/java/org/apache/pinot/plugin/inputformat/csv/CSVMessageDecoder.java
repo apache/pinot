@@ -31,6 +31,7 @@ import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.csv.QuoteMode;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
@@ -48,6 +49,13 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final String CONFIG_COMMENT_MARKER = "commentMarker";
   private static final String CONFIG_CSV_ESCAPE_CHARACTER = "escapeCharacter";
   private static final String CONFIG_CSV_MULTI_VALUE_DELIMITER = "multiValueDelimiter";
+  public static final String NULL_STRING_VALUE = "nullStringValue";
+  public static final String SKIP_HEADER = "skipHeader";
+  public static final String IGNORE_EMPTY_LINES = "ignoreEmptyLines";
+  public static final String IGNORE_SURROUNDING_SPACES = "ignoreSurroundingSpaces";
+  public static final String QUOTE_CHARACTER = "quoteCharacter";
+  public static final String QUOTE_MODE = "quoteMode";
+  public static final String RECORD_SEPARATOR = "recordSeparator";
 
   private CSVFormat _format;
   private CSVRecordExtractor _recordExtractor;
@@ -109,6 +117,41 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
     String escapeChar = props.get(CONFIG_CSV_ESCAPE_CHARACTER);
     if (escapeChar != null) {
       format = format.withEscape(props.get(CONFIG_CSV_ESCAPE_CHARACTER).charAt(0));
+    }
+
+    String nullString = props.get(NULL_STRING_VALUE);
+    if (nullString != null) {
+      format = format.withNullString(nullString);
+    }
+
+    String skipHeader = props.get(SKIP_HEADER);
+    if (skipHeader != null) {
+      format = format.withSkipHeaderRecord(Boolean.parseBoolean(skipHeader));
+    }
+
+    String ignoreEmptyLines = props.get(IGNORE_EMPTY_LINES);
+    if (ignoreEmptyLines != null) {
+      format = format.withIgnoreEmptyLines(Boolean.parseBoolean(ignoreEmptyLines));
+    }
+
+    String ignoreSurroundingSpaces = props.get(IGNORE_SURROUNDING_SPACES);
+    if (ignoreSurroundingSpaces != null) {
+      format = format.withIgnoreSurroundingSpaces(Boolean.parseBoolean(ignoreSurroundingSpaces));
+    }
+
+    String quoteCharacter = props.get(QUOTE_CHARACTER);
+    if (quoteCharacter != null) {
+      format = format.withQuote(quoteCharacter.charAt(0));
+    }
+
+    String quoteMode = props.get(QUOTE_MODE);
+    if (quoteMode != null) {
+      format = format.withQuoteMode(QuoteMode.valueOf(quoteMode));
+    }
+
+    String recordSeparator = props.get(RECORD_SEPARATOR);
+    if (recordSeparator != null) {
+      format = format.withRecordSeparator(recordSeparator);
     }
 
     _format = format;

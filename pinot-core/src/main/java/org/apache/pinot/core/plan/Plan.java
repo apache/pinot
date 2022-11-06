@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.core.plan;
 
-import org.apache.pinot.common.utils.DataTable;
+import java.util.concurrent.TimeoutException;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 
 
@@ -32,5 +33,6 @@ public interface Plan {
   PlanNode getPlanNode();
 
   /** Execute the query plan and get the instance response. */
-  DataTable execute();
+  InstanceResponseBlock execute()
+      throws TimeoutException;
 }

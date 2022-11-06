@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.query.planner.logical;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
@@ -32,14 +29,9 @@ import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
 import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 
 
@@ -51,9 +43,6 @@ import org.apache.pinot.query.routing.WorkerManager;
 public class StagePlanner {
   private final PlannerContext _plannerContext;
   private final WorkerManager _workerManager;
-
-  private Map<Integer, StageNode> _queryStageMap;
-  private Map<Integer, StageMetadata> _stageMetadataMap;
   private int _stageIdCounter;
 
   public StagePlanner(PlannerContext plannerContext, WorkerManager workerManager) {
@@ -67,177 +56,70 @@ public class StagePlanner {
    * @param relRoot relational plan root.
    * @return dispatchable plan.
    */
-  public QueryPlan makePlan(RelNode relRoot) {
-    // clear the state
-    _queryStageMap = new HashMap<>();
-    _stageMetadataMap = new HashMap<>();
+  public QueryPlan makePlan(RelRoot relRoot) {
+    RelNode relRootNode = relRoot.rel;
     // Stage ID starts with 1, 0 will be reserved for ROOT stage.
     _stageIdCounter = 1;
 
     // walk the plan and create stages.
-    StageNode globalStageRoot = walkRelPlan(relRoot, getNewStageId());
+    StageNode globalStageRoot = walkRelPlan(relRootNode, getNewStageId());
+    ShuffleRewriteVisitor.optimizeShuffles(globalStageRoot);
 
     // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
     // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
+    StageNode globalSenderNode = new MailboxSendNode(globalStageRoot.getStageId(), globalStageRoot.getDataSchema(),
+        0, RelDistribution.Type.RANDOM_DISTRIBUTED, null);
+    globalSenderNode.addInput(globalStageRoot);
+
     StageNode globalReceiverNode =
         new MailboxReceiveNode(0, globalStageRoot.getDataSchema(), globalStageRoot.getStageId(),
-            RelDistribution.Type.RANDOM_DISTRIBUTED, null);
-    StageNode globalSenderNode = new MailboxSendNode(globalStageRoot.getStageId(), globalStageRoot.getDataSchema(),
-        globalReceiverNode.getStageId(), RelDistribution.Type.RANDOM_DISTRIBUTED, null);
-    globalSenderNode.addInput(globalStageRoot);
-    _queryStageMap.put(globalSenderNode.getStageId(), globalSenderNode);
-    StageMetadata stageMetadata = _stageMetadataMap.get(globalSenderNode.getStageId());
-    stageMetadata.attach(globalSenderNode);
+            RelDistribution.Type.RANDOM_DISTRIBUTED, null, globalSenderNode);
 
-    _queryStageMap.put(globalReceiverNode.getStageId(), globalReceiverNode);
-    StageMetadata globalReceivingStageMetadata = new StageMetadata();
-    globalReceivingStageMetadata.attach(globalReceiverNode);
-    _stageMetadataMap.put(globalReceiverNode.getStageId(), globalReceivingStageMetadata);
+    QueryPlan queryPlan = StageMetadataVisitor.attachMetadata(relRoot.fields, globalReceiverNode);
 
     // assign workers to each stage.
-    for (Map.Entry<Integer, StageMetadata> e : _stageMetadataMap.entrySet()) {
+    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
       _workerManager.assignWorkerToStage(e.getKey(), e.getValue());
     }
 
-    return new QueryPlan(_queryStageMap, _stageMetadataMap);
+    return queryPlan;
   }
 
   // non-threadsafe
   // TODO: add dataSchema (extracted from RelNode schema) to the StageNode.
   private StageNode walkRelPlan(RelNode node, int currentStageId) {
     if (isExchangeNode(node)) {
-      // 1. exchangeNode always have only one input, get its input converted as a new stage root.
       StageNode nextStageRoot = walkRelPlan(node.getInput(0), getNewStageId());
       RelDistribution distribution = ((LogicalExchange) node).getDistribution();
-      List<Integer> distributionKeys = distribution.getKeys();
-      RelDistribution.Type exchangeType = distribution.getType();
-
-      // 2. make an exchange sender and receiver node pair
-      // only HASH_DISTRIBUTED requires a partition key selector; so all other types (SINGLETON and BROADCAST)
-      // of exchange will not carry a partition key selector.
-      KeySelector<Object[], Object[]> keySelector = exchangeType == RelDistribution.Type.HASH_DISTRIBUTED
-          ? new FieldSelectionKeySelector(distributionKeys) : null;
-
-      StageNode mailboxReceiver;
-      StageNode mailboxSender;
-      if (canSkipShuffle(nextStageRoot, keySelector)) {
-        // Use SINGLETON exchange type indicates a LOCAL-to-LOCAL data transfer between execution threads.
-        // TODO: actually implement the SINGLETON exchange without going through the over-the-wire GRPC mailbox
-        // sender and receiver.
-        mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getDataSchema(),
-            nextStageRoot.getStageId(), RelDistribution.Type.SINGLETON, keySelector);
-        mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), nextStageRoot.getDataSchema(),
-            mailboxReceiver.getStageId(), RelDistribution.Type.SINGLETON, keySelector);
-      } else {
-        mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getDataSchema(),
-            nextStageRoot.getStageId(), exchangeType, keySelector);
-        mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), nextStageRoot.getDataSchema(),
-            mailboxReceiver.getStageId(), exchangeType, keySelector);
-      }
-      mailboxSender.addInput(nextStageRoot);
-
-      // 3. put the sender side as a completed stage.
-      _queryStageMap.put(mailboxSender.getStageId(), mailboxSender);
-
-      // 4. update stage metadata.
-      updateStageMetadata(mailboxSender.getStageId(), mailboxSender, _stageMetadataMap);
-      updateStageMetadata(mailboxReceiver.getStageId(), mailboxReceiver, _stageMetadataMap);
-
-      // 5. return the receiver, this is considered as a "virtual table scan" node for its parent.
-      return mailboxReceiver;
+      return createSendReceivePair(nextStageRoot, distribution, currentStageId);
     } else {
       StageNode stageNode = RelToStageConverter.toStageNode(node, currentStageId);
       List<RelNode> inputs = node.getInputs();
       for (RelNode input : inputs) {
         stageNode.addInput(walkRelPlan(input, currentStageId));
       }
-      updateStageMetadata(currentStageId, stageNode, _stageMetadataMap);
       return stageNode;
     }
   }
 
-  private boolean canSkipShuffle(StageNode stageNode, KeySelector<Object[], Object[]> keySelector) {
-    Set<Integer> originSet = stageNode.getPartitionKeys();
-    if (!originSet.isEmpty() && keySelector != null) {
-      Set<Integer> targetSet = new HashSet<>(((FieldSelectionKeySelector) keySelector).getColumnIndices());
-      return targetSet.containsAll(originSet);
-    }
-    return false;
-  }
 
-  private static void updateStageMetadata(int stageId, StageNode node, Map<Integer, StageMetadata> stageMetadataMap) {
-    updatePartitionKeys(node);
-    StageMetadata stageMetadata = stageMetadataMap.computeIfAbsent(stageId, (id) -> new StageMetadata());
-    stageMetadata.attach(node);
-  }
+  private StageNode createSendReceivePair(StageNode nextStageRoot, RelDistribution distribution, int currentStageId) {
+    List<Integer> distributionKeys = distribution.getKeys();
+    RelDistribution.Type exchangeType = distribution.getType();
 
-  private static void updatePartitionKeys(StageNode node) {
-    if (node instanceof ProjectNode) {
-      // any input reference directly carry over should still be a partition key.
-      Set<Integer> previousPartitionKeys = node.getInputs().get(0).getPartitionKeys();
-      Set<Integer> newPartitionKeys = new HashSet<>();
-      ProjectNode projectNode = (ProjectNode) node;
-      for (int i = 0; i < projectNode.getProjects().size(); i++) {
-        RexExpression rexExpression = projectNode.getProjects().get(i);
-        if (rexExpression instanceof RexExpression.InputRef
-            && previousPartitionKeys.contains(((RexExpression.InputRef) rexExpression).getIndex())) {
-          newPartitionKeys.add(i);
-        }
-      }
-      projectNode.setPartitionKeys(newPartitionKeys);
-    } else if (node instanceof FilterNode) {
-      // filter node doesn't change partition keys.
-      node.setPartitionKeys(node.getInputs().get(0).getPartitionKeys());
-    } else if (node instanceof AggregateNode) {
-      // any input reference directly carry over in group set of aggregation should still be a partition key.
-      Set<Integer> previousPartitionKeys = node.getInputs().get(0).getPartitionKeys();
-      Set<Integer> newPartitionKeys = new HashSet<>();
-      AggregateNode aggregateNode = (AggregateNode) node;
-      for (int i = 0; i < aggregateNode.getGroupSet().size(); i++) {
-        RexExpression rexExpression = aggregateNode.getGroupSet().get(i);
-        if (rexExpression instanceof RexExpression.InputRef
-            && previousPartitionKeys.contains(((RexExpression.InputRef) rexExpression).getIndex())) {
-          newPartitionKeys.add(i);
-        }
-      }
-      aggregateNode.setPartitionKeys(newPartitionKeys);
-    } else if (node instanceof JoinNode) {
-      int leftDataSchemaSize = node.getInputs().get(0).getDataSchema().size();
-      Set<Integer> leftPartitionKeys = node.getInputs().get(0).getPartitionKeys();
-      Set<Integer> rightPartitionKeys = node.getInputs().get(1).getPartitionKeys();
-      // TODO: currently JOIN criteria guarantee to only have one FieldSelectionKeySelector. Support more.
-      FieldSelectionKeySelector leftJoinKeySelector =
-          (FieldSelectionKeySelector) ((JoinNode) node).getCriteria().get(0).getLeftJoinKeySelector();
-      FieldSelectionKeySelector rightJoinKeySelector =
-          (FieldSelectionKeySelector) ((JoinNode) node).getCriteria().get(0).getRightJoinKeySelector();
-      Set<Integer> newPartitionKeys = new HashSet<>();
-      for (int i = 0; i < leftJoinKeySelector.getColumnIndices().size(); i++) {
-        int leftIndex = leftJoinKeySelector.getColumnIndices().get(i);
-        int rightIndex = rightJoinKeySelector.getColumnIndices().get(i);
-        if (leftPartitionKeys.contains(leftIndex)) {
-          newPartitionKeys.add(i);
-        }
-        if (rightPartitionKeys.contains(rightIndex)) {
-          newPartitionKeys.add(leftDataSchemaSize + i);
-        }
-      }
-      node.setPartitionKeys(newPartitionKeys);
-    } else if (node instanceof TableScanNode) {
-      // TODO: add table partition in table config as partition keys. we dont have that information yet.
-    } else if (node instanceof MailboxReceiveNode) {
-      // hash distribution key is partition key.
-      FieldSelectionKeySelector keySelector = (FieldSelectionKeySelector)
-          ((MailboxReceiveNode) node).getPartitionKeySelector();
-      if (keySelector != null) {
-        node.setPartitionKeys(new HashSet<>(keySelector.getColumnIndices()));
-      }
-    } else if (node instanceof MailboxSendNode) {
-      FieldSelectionKeySelector keySelector = (FieldSelectionKeySelector)
-          ((MailboxSendNode) node).getPartitionKeySelector();
-      if (keySelector != null) {
-        node.setPartitionKeys(new HashSet<>(keySelector.getColumnIndices()));
-      }
-    }
+    // make an exchange sender and receiver node pair
+    // only HASH_DISTRIBUTED requires a partition key selector; so all other types (SINGLETON and BROADCAST)
+    // of exchange will not carry a partition key selector.
+    KeySelector<Object[], Object[]> keySelector = exchangeType == RelDistribution.Type.HASH_DISTRIBUTED
+        ? new FieldSelectionKeySelector(distributionKeys) : null;
+
+    StageNode mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), nextStageRoot.getDataSchema(),
+        currentStageId, exchangeType, keySelector);
+    StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getDataSchema(),
+        nextStageRoot.getStageId(), exchangeType, keySelector, mailboxSender);
+    mailboxSender.addInput(nextStageRoot);
+
+    return mailboxReceiver;
   }
 
   private boolean isExchangeNode(RelNode node) {

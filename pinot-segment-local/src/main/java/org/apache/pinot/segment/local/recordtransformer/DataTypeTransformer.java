@@ -28,9 +28,12 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -40,13 +43,21 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 @SuppressWarnings("rawtypes")
 public class DataTypeTransformer implements RecordTransformer {
-  private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataTypeTransformer.class);
 
-  public DataTypeTransformer(Schema schema) {
+  private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
+  private final boolean _continueOnError;
+
+  public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         _dataTypes.put(fieldSpec.getName(), PinotDataType.getPinotDataTypeForIngestion(fieldSpec));
       }
+    }
+    if (tableConfig.getIngestionConfig() != null) {
+      _continueOnError = tableConfig.getIngestionConfig().isContinueOnError();
+    } else {
+      _continueOnError = false;
     }
   }
 
@@ -59,6 +70,7 @@ public class DataTypeTransformer implements RecordTransformer {
         if (value == null) {
           continue;
         }
+
         PinotDataType dest = entry.getValue();
         if (dest != PinotDataType.JSON) {
           value = standardize(column, value, dest.isSingleValue());
@@ -95,7 +107,13 @@ public class DataTypeTransformer implements RecordTransformer {
 
         record.putValue(column, value);
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
+        if (!_continueOnError) {
+          throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
+        } else {
+          LOGGER.debug("Caught exception while transforming data type for column: {}", column, e);
+          record.putValue(column, null);
+          record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+        }
       }
     }
     return record;
@@ -145,8 +163,8 @@ public class DataTypeTransformer implements RecordTransformer {
         return standardizedValues.get(0);
       }
       if (isSingleValue) {
-        throw new IllegalArgumentException("Cannot read single-value from Object[]: " + Arrays.toString(values)
-            + " for column: " + column);
+        throw new IllegalArgumentException(
+            "Cannot read single-value from Object[]: " + Arrays.toString(values) + " for column: " + column);
       }
       return standardizedValues.toArray();
     }
@@ -175,8 +193,8 @@ public class DataTypeTransformer implements RecordTransformer {
     if (numStandardizedValues == 1) {
       return standardizedValues.get(0);
     }
-    Preconditions
-        .checkState(!isSingleValue, "Cannot read single-value from Collection: %s for column: %s", collection, column);
+    Preconditions.checkState(!isSingleValue, "Cannot read single-value from Collection: %s for column: %s", collection,
+        column);
     return standardizedValues.toArray();
   }
 }

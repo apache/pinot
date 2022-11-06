@@ -20,6 +20,7 @@ package org.apache.pinot.common.function.scalar;
 
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
+
 public class ComparisonFunctions {
 
   private static final double DOUBLE_COMPARISON_TOLERANCE = 1e-7d;

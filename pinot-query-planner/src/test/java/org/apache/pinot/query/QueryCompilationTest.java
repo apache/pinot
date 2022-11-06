@@ -19,13 +19,15 @@
 package org.apache.pinot.query;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -43,13 +45,15 @@ import org.testng.annotations.Test;
 
 public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
-  @Test(dataProvider = "testQueryParserDataProvider")
-  public void testQueryParser(String query, String digest)
+  @Test(dataProvider = "testQueryPlanDataProvider")
+  public void testQueryPlanExplain(String query, String digest)
       throws Exception {
-    PlannerContext plannerContext = new PlannerContext();
-    SqlNode sqlNode = _queryEnvironment.parse(query, plannerContext);
-    _queryEnvironment.validate(sqlNode);
-    Assert.assertEquals(sqlNode.toString(), digest);
+    try {
+      String explainedPlan = _queryEnvironment.explainQuery(query);
+      Assert.assertEquals(explainedPlan, digest);
+    } catch (RuntimeException e) {
+      Assert.fail("failed to explain query: " + query, e);
+    }
   }
 
   @Test(dataProvider = "testQueryDataProvider")
@@ -118,7 +122,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            tables.get(0).equals("a") ? ImmutableList.of("Server_localhost_1", "Server_localhost_2")
+            tables.get(0).equals("a") ? ImmutableList.of("Server_localhost_2", "Server_localhost_1")
                 : ImmutableList.of("Server_localhost_1"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
@@ -137,7 +141,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   @Test
   public void testQueryProjectFilterPushDownForJoin() {
     String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-        + "WHERE a.col3 >= 0 AND a.col2 IN  ('a', 'b') AND b.col3 < 0";
+        + "WHERE a.col3 >= 0 AND a.col2 IN ('b') AND b.col3 < 0";
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
     List<StageNode> intermediateStageRoots =
         queryPlan.getStageMetadataMap().entrySet().stream().filter(e -> e.getValue().getScannedTables().size() == 0)
@@ -145,6 +149,81 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     // Assert that no project of filter node for any intermediate stage because all should've been pushed down.
     for (StageNode roots : intermediateStageRoots) {
       assertNodeTypeNotIn(roots, ImmutableList.of(ProjectNode.class, FilterNode.class));
+    }
+  }
+
+  @Test
+  public void testQueryRoutingManagerCompilation() {
+    String query = "SELECT * FROM d_OFFLINE";
+    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+    List<StageMetadata> tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+    Assert.assertEquals(tableScanMetadataList.size(), 1);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 2);
+
+    query = "SELECT * FROM d_REALTIME";
+    queryPlan = _queryEnvironment.planQuery(query);
+    tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+    Assert.assertEquals(tableScanMetadataList.size(), 1);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_2");
+
+    query = "SELECT * FROM d";
+    queryPlan = _queryEnvironment.planQuery(query);
+    tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+    Assert.assertEquals(tableScanMetadataList.size(), 1);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 2);
+  }
+
+  // Test that plan query can be run as multi-thread.
+  @Test
+  public void testPlanQueryMultiThread()
+      throws Exception {
+    Map<String, ArrayList<QueryPlan>> queryPlans = new HashMap<>();
+    Lock lock = new ReentrantLock();
+    Runnable joinQuery = () -> {
+      String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2";
+      QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+      lock.lock();
+      if (!queryPlans.containsKey(queryPlan)) {
+        queryPlans.put(query, new ArrayList<>());
+      }
+      queryPlans.get(query).add(queryPlan);
+      lock.unlock();
+    };
+    Runnable selectQuery = () -> {
+      String query = "SELECT * FROM a";
+      QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+      lock.lock();
+      if (!queryPlans.containsKey(queryPlan)) {
+        queryPlans.put(query, new ArrayList<>());
+      }
+      queryPlans.get(query).add(queryPlan);
+      lock.unlock();
+    };
+    ArrayList<Thread> threads = new ArrayList<>();
+    final int numThreads = 10;
+    for (int i = 0; i < numThreads; i++) {
+      Thread thread = null;
+      if (i % 2 == 0) {
+        thread = new Thread(joinQuery);
+      } else {
+        thread = new Thread(selectQuery);
+      }
+      threads.add(thread);
+    }
+    for (Thread t : threads) {
+      t.start();
+    }
+    for (Thread t : threads) {
+      t.join();
+    }
+    for (ArrayList<QueryPlan> plans : queryPlans.values()) {
+      for (QueryPlan plan : plans) {
+        Assert.assertTrue(plan.equals(plans.get(0)));
+      }
     }
   }
 
@@ -169,14 +248,6 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return false;
   }
 
-  @DataProvider(name = "testQueryParserDataProvider")
-  private Object[][] provideQueriesAndDigest() {
-    return new Object[][] {
-        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
-            "SELECT *\n" + "FROM `a`\n" + "INNER JOIN `b` ON `a`.`col1` = `b`.`col2`\n" + "WHERE `a`.`col3` >= 0"},
-    };
-  }
-
   @DataProvider(name = "testQueryExceptionDataProvider")
   private Object[][] provideQueriesWithException() {
     return new Object[][] {
@@ -184,6 +255,36 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3", "Table 'b' not found"},
         // non-agg column not being grouped
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a", "'a.col1' is not being grouped"},
+        // empty IN clause fails compilation
+        new Object[]{"SELECT a.col1 FROM a WHERE a.col1 IN ()", "Encountered \"\" at line"},
+        // AT TIME ZONE should fail
+        new Object[]{"SELECT a.col1 AT TIME ZONE 'PST' FROM a", "No match found for function signature AT_TIME_ZONE"},
+        // CASE WHEN with non-consolidated result type at compile time.
+        new Object[]{"SELECT SUM(CASE WHEN col3 > 10 THEN 1 WHEN col3 > 20 THEN 2 WHEN col3 > 30 THEN 3 "
+            + "WHEN col3 > 40 THEN 4 WHEN col3 > 50 THEN '5' ELSE 0 END) FROM a", "while converting CASE WHEN"},
+    };
+  }
+
+  @DataProvider(name = "testQueryPlanDataProvider")
+  private Object[][] provideQueriesWithExplainedPlan() {
+    return new Object[][] {
+        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a", "{\n"
+            + "  \"rels\": [\n" + "    {\n" + "      \"id\": \"0\",\n" + "      \"relOp\": \"LogicalTableScan\",\n"
+            + "      \"table\": [\n" + "        \"a\"\n" + "      ],\n" + "      \"inputs\": []\n" + "    },\n"
+            + "    {\n" + "      \"id\": \"1\",\n" + "      \"relOp\": \"LogicalProject\",\n" + "      \"fields\": [\n"
+            + "        \"col1\",\n" + "        \"col3\"\n" + "      ],\n" + "      \"exprs\": [\n" + "        {\n"
+            + "          \"input\": 2,\n" + "          \"name\": \"$2\"\n" + "        },\n" + "        {\n"
+            + "          \"input\": 1,\n" + "          \"name\": \"$1\"\n" + "        }\n" + "      ]\n" + "    }\n"
+            + "  ]\n" + "}"},
+        new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
+            "Execution Plan\n" + "digraph {\n" + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
+                + "\"LogicalAggregate\\n\" -> \"LogicalExchange\\n\" [label=\"0\"]\n"
+                + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n" + "}\n"},
+        new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1", "Execution Plan\n"
+            + "LogicalProject(col1=[$0], col3=[$1])\n" + "  LogicalJoin(condition=[=($0, $2)], joinType=[inner])\n"
+            + "    LogicalExchange(distribution=[hash[0]])\n" + "      LogicalProject(col1=[$2])\n"
+            + "        LogicalTableScan(table=[[a]])\n" + "    LogicalExchange(distribution=[hash[1]])\n"
+            + "      LogicalProject(col3=[$1], col1=[$2])\n" + "        LogicalTableScan(table=[[b]])\n"},
     };
   }
 }

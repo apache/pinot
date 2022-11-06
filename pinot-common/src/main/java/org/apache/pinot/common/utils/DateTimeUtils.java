@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.utils;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.TimeZone;
 
@@ -29,11 +29,8 @@ public class DateTimeUtils {
   }
 
   private static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss z";
-  private static final SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat(DATE_FORMAT, Locale.getDefault());
-
-  static {
-    SIMPLE_DATE_FORMAT.setTimeZone(TimeZone.getDefault());
-  }
+  private static final DateTimeFormatter SIMPLE_DATE_FORMAT =
+      DateTimeFormatter.ofPattern(DATE_FORMAT, Locale.getDefault()).withZone(TimeZone.getDefault().toZoneId());
 
   /**
    * Utility function to convert epoch in millis to SDF of form "yyyy-MM-dd HH:mm:ss z".
@@ -42,6 +39,6 @@ public class DateTimeUtils {
    * @return SDF equivalent
    */
   public static String epochToDefaultDateFormat(long millisSinceEpoch) {
-    return SIMPLE_DATE_FORMAT.format(new Date(millisSinceEpoch));
+    return SIMPLE_DATE_FORMAT.format(Instant.ofEpochMilli(millisSinceEpoch));
   }
 }

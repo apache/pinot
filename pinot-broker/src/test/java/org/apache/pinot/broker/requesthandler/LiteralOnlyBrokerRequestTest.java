@@ -26,9 +26,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -38,6 +39,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
 
 
 public class LiteralOnlyBrokerRequestTest {
@@ -162,14 +165,15 @@ public class LiteralOnlyBrokerRequestTest {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
             new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
-            null, null);
+            null, null, mock(ServerRoutingStatsManager.class));
+
     long randNum = RANDOM.nextLong();
     byte[] randBytes = new byte[12];
     RANDOM.nextBytes(randBytes);
     String ranStr = BytesUtils.toHexString(randBytes);
     JsonNode request = JsonUtils.stringToJsonNode(String.format("{\"sql\":\"SELECT %d, '%s'\"}", randNum, ranStr));
     RequestContext requestStats = Tracing.getTracer().createRequestScope();
-    BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    BrokerResponse brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), String.format("%d", randNum));
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
         DataSchema.ColumnDataType.LONG);
@@ -189,12 +193,12 @@ public class LiteralOnlyBrokerRequestTest {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
             new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
-            null, null);
+            null, null, mock(ServerRoutingStatsManager.class));
     long currentTsMin = System.currentTimeMillis();
     JsonNode request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT now() as currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");
     RequestContext requestStats = Tracing.getTracer().createRequestScope();
-    BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    BrokerResponse brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     long currentTsMax = System.currentTimeMillis();
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "currentTs");
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
@@ -329,12 +333,12 @@ public class LiteralOnlyBrokerRequestTest {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, ACCESS_CONTROL_FACTORY, null, null,
             new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
-            null, null);
+            null, null, mock(ServerRoutingStatsManager.class));
 
     // Test 1: select constant
     JsonNode request = JsonUtils.stringToJsonNode("{\"sql\":\"EXPLAIN PLAN FOR SELECT 1.5, 'test'\"}");
     RequestContext requestStats = Tracing.getTracer().createRequestScope();
-    BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    BrokerResponse brokerResponse = requestHandler.handleRequest(request, null, requestStats);
 
     checkExplainResultSchema(brokerResponse.getResultTable().getDataSchema(),
         new String[]{"Operator", "Operator_Id", "Parent_Id"},

@@ -80,7 +80,9 @@ jobs:
         with:
           java-version: 11
       # Step that does that actual cache save and restore
-      - uses: actions/cache@v1
+      - uses: actions/cache@v3
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -101,8 +103,12 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
         run: .github/workflows/scripts/.pinot_test.sh
       - name: Upload coverage to Codecov
-        run: |
-          bash <(curl -s https://codecov.io/bash) -cF unittests${{ matrix.testset }}
+        uses: codecov/codecov-action@v3
+        with:
+          flags: unittests${{ matrix.testset }}
+          name: codecov-unit-tests
+          fail_ci_if_error: false
+          verbose: true
 
   integration-test:
     if: github.repository == 'apache/pinot'
@@ -118,7 +124,9 @@ jobs:
         with:
           java-version: 11
       # Step that does that actual cache save and restore
-      - uses: actions/cache@v1
+      - uses: actions/cache@v3
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -139,8 +147,12 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
         run: .github/workflows/scripts/.pinot_test.sh
       - name: Upload coverage to Codecov
-        run: |
-          bash <(curl -s https://codecov.io/bash) -cF integration${{ matrix.testset }}
+        uses: codecov/codecov-action@v3
+        with:
+          flags: integration${{ matrix.testset }}
+          name: codecov-integration-tests
+          fail_ci_if_error: false
+          verbose: true
 
   compatibility-verifier:
     if: github.repository == 'apache/pinot'
@@ -157,7 +169,9 @@ jobs:
         with:
           java-version: 1.8
       # Step that does that actual cache save and restore
-      - uses: actions/cache@v1
+      - uses: actions/cache@v3
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -195,7 +209,9 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
       # Step that does that actual cache save and restore
-      - uses: actions/cache@v1
+      - uses: actions/cache@v3
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}

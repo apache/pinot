@@ -97,6 +97,9 @@ public class TableNameBuilder {
    * @return Table name without type suffix
    */
   public static String extractRawTableName(String tableName) {
+    if (tableName == null) {
+      return null;
+    }
     if (OFFLINE.tableHasTypeSuffix(tableName)) {
       return tableName.substring(0, tableName.length() - OFFLINE._typeSuffix.length());
     }

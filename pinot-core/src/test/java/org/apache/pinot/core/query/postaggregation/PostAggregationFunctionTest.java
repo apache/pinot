@@ -25,6 +25,9 @@ import org.locationtech.jts.geom.Coordinate;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.AssertJUnit.assertNull;
 
 
 public class PostAggregationFunctionTest {
@@ -63,5 +66,40 @@ public class PostAggregationFunctionTest {
     function = new PostAggregationFunction("cast", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
     assertEquals(function.getResultType(), ColumnDataType.OBJECT);
     assertEquals(function.invoke(new Object[]{1, "LONG"}), 1L);
+
+    // NOT
+    function = new PostAggregationFunction("not", new ColumnDataType[]{ColumnDataType.BOOLEAN});
+    assertEquals(function.getResultType(), ColumnDataType.BOOLEAN);
+    assertFalse((Boolean) function.invoke(new Object[]{true}));
+    assertTrue((Boolean) function.invoke(new Object[]{false}));
+
+    // isDistinctFrom
+    function = new PostAggregationFunction("isDistinctFrom",
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
+    assertEquals(function.getResultType(), ColumnDataType.BOOLEAN);
+    assertFalse((Boolean) function.invoke(new Object[]{null, null}));
+    assertFalse((Boolean) function.invoke(new Object[]{"a", "a"}));
+    assertTrue((Boolean) function.invoke(new Object[]{null, "a"}));
+    assertTrue((Boolean) function.invoke(new Object[]{"a", null}));
+    assertTrue((Boolean) function.invoke(new Object[]{"a", "b"}));
+
+    // isNotDistinctFrom
+    function = new PostAggregationFunction("isNotDistinctFrom",
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
+    assertEquals(function.getResultType(), ColumnDataType.BOOLEAN);
+    assertTrue((Boolean) function.invoke(new Object[]{null, null}));
+    assertTrue((Boolean) function.invoke(new Object[]{"a", "a"}));
+    assertFalse((Boolean) function.invoke(new Object[]{null, "a"}));
+    assertFalse((Boolean) function.invoke(new Object[]{"a", null}));
+    assertFalse((Boolean) function.invoke(new Object[]{"a", "b"}));
+
+    // Coalesce
+    function = new PostAggregationFunction("coalesce", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING,
+    ColumnDataType.BOOLEAN});
+    assertEquals(function.getResultType(), ColumnDataType.OBJECT);
+    assertNull(function.invoke(new Object[]{null, null, null}));
+    assertEquals(function.invoke(new Object[]{null, "1", null}), "1");
+    assertEquals(function.invoke(new Object[]{1, "2", false}), 1);
+    assertEquals(function.invoke(new Object[]{null, null, true}), true);
   }
 }

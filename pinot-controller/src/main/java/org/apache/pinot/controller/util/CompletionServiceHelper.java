@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.pinot.common.http.MultiGetRequest;
+import org.apache.pinot.common.http.MultiHttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +79,7 @@ public class CompletionServiceHelper {
 
     // TODO: use some service other than completion service so that we know which server encounters the error
     CompletionService<GetMethod> completionService =
-        new MultiGetRequest(_executor, _httpConnectionManager).execute(serverURLs, requestHeaders, timeoutMs);
+        new MultiHttpRequest(_executor, _httpConnectionManager).execute(serverURLs, requestHeaders, timeoutMs);
     for (int i = 0; i < serverURLs.size(); i++) {
       GetMethod getMethod = null;
       try {

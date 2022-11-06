@@ -29,6 +29,13 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public interface RecordTransformer extends Serializable {
 
   /**
+   * Returns {@code true} if the transformer is no-op (can be skipped), {@code false} otherwise.
+   */
+  default boolean isNoOp() {
+    return false;
+  }
+
+  /**
    * Transforms a record based on some custom rules.
    *
    * @param record Record to transform

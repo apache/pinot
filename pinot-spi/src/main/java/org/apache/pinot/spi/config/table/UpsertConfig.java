@@ -54,6 +54,15 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Column for upsert comparison, default to time column")
   private String _comparisonColumn;
 
+  @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
+  private boolean _enableSnapshot;
+
+  @JsonPropertyDescription("Custom class for upsert metadata manager")
+  private String _metadataManagerClass;
+
+  @JsonPropertyDescription("Custom configs for upsert metadata manager")
+  private Map<String, String> _metadataManagerConfigs;
+
   @Deprecated
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
       @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
@@ -105,6 +114,20 @@ public class UpsertConfig extends BaseJsonConfig {
     return _comparisonColumn;
   }
 
+  public boolean isEnableSnapshot() {
+    return _enableSnapshot;
+  }
+
+  @Nullable
+  public String getMetadataManagerClass() {
+    return _metadataManagerClass;
+  }
+
+  @Nullable
+  public Map<String, String> getMetadataManagerConfigs() {
+    return _metadataManagerConfigs;
+  }
+
   public void setHashFunction(HashFunction hashFunction) {
     _hashFunction = hashFunction;
   }
@@ -135,5 +158,17 @@ public class UpsertConfig extends BaseJsonConfig {
    */
   public void setComparisonColumn(String comparisonColumn) {
     _comparisonColumn = comparisonColumn;
+  }
+
+  public void setEnableSnapshot(boolean enableSnapshot) {
+    _enableSnapshot = enableSnapshot;
+  }
+
+  public void setMetadataManagerClass(String metadataManagerClass) {
+    _metadataManagerClass = metadataManagerClass;
+  }
+
+  public void setMetadataManagerConfigs(Map<String, String> metadataManagerConfigs) {
+    _metadataManagerConfigs = metadataManagerConfigs;
   }
 }

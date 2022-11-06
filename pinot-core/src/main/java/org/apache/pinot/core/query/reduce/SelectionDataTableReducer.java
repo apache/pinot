@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -30,7 +31,6 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -118,7 +118,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
         droppedServers.add(entry.getKey());
         iterator.remove();
       } else {
-        dataSchema.upgradeToCover(dataSchemaToCompare);
+        dataSchema = DataSchema.upgradeToCover(dataSchema, dataSchemaToCompare);
       }
     }
     return droppedServers;

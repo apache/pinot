@@ -21,7 +21,7 @@ package org.apache.pinot.core.common.datatable;
 import java.io.IOException;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -62,7 +62,8 @@ public interface DataTableBuilder {
   void setColumn(int colId, ByteArray value)
       throws IOException;
 
-  void setColumn(int colId, Object value)
+  // TODO: Move ser/de into AggregationFunction interface
+  void setColumn(int colId, @Nullable Object value)
       throws IOException;
 
   void setColumn(int colId, int[] values)

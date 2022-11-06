@@ -99,7 +99,7 @@ public class MutableSegmentImplAggregateMetricsTest {
 
     Map<String, Long> expectedValues = new HashMap<>();
     Map<String, Float> expectedValuesFloat = new HashMap<>();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
     for (int i = 0; i < NUM_ROWS; i++) {
       int hoursSinceEpoch = random.nextInt(10);
       int daysSinceEpoch = random.nextInt(5);

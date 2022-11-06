@@ -33,7 +33,7 @@ import org.apache.thrift.protocol.TCompactProtocol;
 
 
 public class GrpcRequestBuilder {
-  private int _requestId;
+  private long _requestId;
   private String _brokerId = "unknown";
   private boolean _enableTrace;
   private boolean _enableStreaming;
@@ -42,7 +42,7 @@ public class GrpcRequestBuilder {
   private BrokerRequest _brokerRequest;
   private List<String> _segments;
 
-  public GrpcRequestBuilder setRequestId(int requestId) {
+  public GrpcRequestBuilder setRequestId(long requestId) {
     _requestId = requestId;
     return this;
   }
@@ -84,7 +84,7 @@ public class GrpcRequestBuilder {
         "Query and segmentsToQuery must be set");
 
     Map<String, String> metadata = new HashMap<>();
-    metadata.put(Request.MetadataKeys.REQUEST_ID, Integer.toString(_requestId));
+    metadata.put(Request.MetadataKeys.REQUEST_ID, Long.toString(_requestId));
     metadata.put(Request.MetadataKeys.BROKER_ID, _brokerId);
     metadata.put(Request.MetadataKeys.ENABLE_TRACE, Boolean.toString(_enableTrace));
     metadata.put(Request.MetadataKeys.ENABLE_STREAMING, Boolean.toString(_enableStreaming));

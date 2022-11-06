@@ -49,11 +49,25 @@ public class MailboxSendNode extends AbstractStageNode {
     return _receiverStageId;
   }
 
+  public void setExchangeType(RelDistribution.Type exchangeType) {
+    _exchangeType = exchangeType;
+  }
+
   public RelDistribution.Type getExchangeType() {
     return _exchangeType;
   }
 
   public KeySelector<Object[], Object[]> getPartitionKeySelector() {
     return _partitionKeySelector;
+  }
+
+  @Override
+  public String explain() {
+    return "MAIL_SEND(" + _exchangeType + ")";
+  }
+
+  @Override
+  public <T, C> T visit(StageNodeVisitor<T, C> visitor, C context) {
+    return visitor.visitMailboxSend(this, context);
   }
 }

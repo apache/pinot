@@ -63,7 +63,7 @@ Pinot was originally built at LinkedIn to power rich interactive real-time analy
 
 * **Stream and batch ingest**: near real time ingestion from streams and batch ingestion from Hadoop.
 
-* **Query with SQL:** SQL-like language that supports selection, aggregation, filtering, group by, order by, distinct queries on data.
+* **Query:** SQL based query execution engine.
 
 * **Upsert during real-time ingestion**: update the data at-scale with consistency
 

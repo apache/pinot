@@ -19,12 +19,15 @@
 package org.apache.pinot.core.common.datablock;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class DataBlockTestUtils {
@@ -35,12 +38,12 @@ public class DataBlockTestUtils {
     // do not instantiate.
   }
 
-  public static Object[] getRandomRow(DataSchema dataSchema) {
+  public static Object[] getRandomRow(DataSchema dataSchema, int nullPercentile) {
     final int numColumns = dataSchema.getColumnNames().length;
     DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     Object[] row = new Object[numColumns];
     for (int colId = 0; colId < numColumns; colId++) {
-      switch (columnDataTypes[colId].getStoredType()) {
+      switch (columnDataTypes[colId]) {
         case INT:
           row[colId] = RANDOM.nextInt();
           break;
@@ -56,6 +59,12 @@ public class DataBlockTestUtils {
         case BIG_DECIMAL:
           row[colId] = BigDecimal.valueOf(RANDOM.nextDouble());
           break;
+        case BOOLEAN:
+          row[colId] = RANDOM.nextInt(2) % 2 == 1;
+          break;
+        case TIMESTAMP:
+          row[colId] = new Timestamp(RANDOM.nextLong());
+          break;
         case STRING:
           row[colId] = RandomStringUtils.random(RANDOM.nextInt(20));
           break;
@@ -66,7 +75,6 @@ public class DataBlockTestUtils {
         case OBJECT:
           row[colId] = RANDOM.nextDouble();
           break;
-        case BOOLEAN_ARRAY:
         case INT_ARRAY:
           int length = RANDOM.nextInt(ARRAY_SIZE);
           int[] intArray = new int[length];
@@ -75,7 +83,6 @@ public class DataBlockTestUtils {
           }
           row[colId] = intArray;
           break;
-        case TIMESTAMP_ARRAY:
         case LONG_ARRAY:
           length = RANDOM.nextInt(ARRAY_SIZE);
           long[] longArray = new long[length];
@@ -100,7 +107,6 @@ public class DataBlockTestUtils {
           }
           row[colId] = doubleArray;
           break;
-        case BYTES_ARRAY:
         case STRING_ARRAY:
           length = RANDOM.nextInt(ARRAY_SIZE);
           String[] stringArray = new String[length];
@@ -109,8 +115,28 @@ public class DataBlockTestUtils {
           }
           row[colId] = stringArray;
           break;
+        case BOOLEAN_ARRAY:
+          length = RANDOM.nextInt(ARRAY_SIZE);
+          boolean[] booleanArray = new boolean[length];
+          for (int i = 0; i < length; i++) {
+            booleanArray[i] = RANDOM.nextInt(2) % 2 == 1;
+          }
+          row[colId] = booleanArray;
+          break;
+        case TIMESTAMP_ARRAY:
+          length = RANDOM.nextInt(ARRAY_SIZE);
+          Timestamp[] timestampArray = new Timestamp[length];
+          for (int i = 0; i < length; i++) {
+            timestampArray[i] = new Timestamp(RANDOM.nextLong());
+          }
+          row[colId] = timestampArray;
+          break;
         default:
           throw new UnsupportedOperationException("Can't fill random data for column type: " + columnDataTypes[colId]);
+      }
+      // randomly set some entry to null
+      if (columnDataTypes[colId].getStoredType() != DataSchema.ColumnDataType.OBJECT) {
+        row[colId] = randomlySettingNull(nullPercentile) ? null : row[colId];
       }
     }
     return row;
@@ -118,6 +144,12 @@ public class DataBlockTestUtils {
 
   public static Object getElement(BaseDataBlock dataBlock, int rowId, int colId,
       DataSchema.ColumnDataType columnDataType) {
+    RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
+    if (nullBitmap != null) {
+      if (nullBitmap.contains(rowId)) {
+        return null;
+      }
+    }
     switch (columnDataType.getStoredType()) {
       case INT:
         return dataBlock.getInt(rowId, colId);
@@ -134,7 +166,7 @@ public class DataBlockTestUtils {
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
       case OBJECT:
-        return dataBlock.getObject(rowId, colId);
+        return dataBlock.getCustomObject(rowId, colId);
       case BOOLEAN_ARRAY:
       case INT_ARRAY:
         return dataBlock.getIntArray(rowId, colId);
@@ -145,7 +177,6 @@ public class DataBlockTestUtils {
         return dataBlock.getFloatArray(rowId, colId);
       case DOUBLE_ARRAY:
         return dataBlock.getDoubleArray(rowId, colId);
-      case BYTES_ARRAY:
       case STRING_ARRAY:
         return dataBlock.getStringArray(rowId, colId);
       default:
@@ -153,17 +184,12 @@ public class DataBlockTestUtils {
     }
   }
 
-  public static List<Object[]> getRandomRows(DataSchema dataSchema, int numRows) {
+  public static List<Object[]> getRandomRows(DataSchema dataSchema, int numRows, int nullPercentile) {
     List<Object[]> rows = new ArrayList<>(numRows);
     for (int i = 0; i < numRows; i++) {
-      rows.add(getRandomRow(dataSchema));
+      rows.add(getRandomRow(dataSchema, nullPercentile));
     }
     return rows;
-  }
-
-  public static List<Object[]> getRandomColumnar(DataSchema dataSchema, int numRows) {
-    List<Object[]> rows = getRandomRows(dataSchema, numRows);
-    return convertColumnar(dataSchema, rows);
   }
 
   public static List<Object[]> convertColumnar(DataSchema dataSchema, List<Object[]> rows) {
@@ -177,5 +203,9 @@ public class DataBlockTestUtils {
       }
     }
     return columnars;
+  }
+
+  public static boolean randomlySettingNull(int percentile) {
+    return RANDOM.nextInt(100) >= (100 - percentile);
   }
 }

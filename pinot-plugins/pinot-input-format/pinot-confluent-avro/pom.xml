@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.11.0-SNAPSHOT</version>
+    <version>0.12.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
@@ -35,7 +35,6 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <kafka.lib.version>2.8.1</kafka.lib.version>
-    <confluent.version>5.3.1</confluent.version>
     <phase.prop>package</phase.prop>
   </properties>
   <repositories>

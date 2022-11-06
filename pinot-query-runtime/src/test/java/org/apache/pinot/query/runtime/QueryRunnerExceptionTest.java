@@ -35,7 +35,7 @@ import org.testng.annotations.Test;
 public class QueryRunnerExceptionTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
-  public void testSqlWithFinalRowCountChecker(String sql, String exeptionMsg) {
+  public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
@@ -61,17 +61,21 @@ public class QueryRunnerExceptionTest extends QueryRunnerTestBase {
       QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
-      Assert.assertTrue(rte.getMessage().contains(exeptionMsg));
+      Assert.assertTrue(rte.getMessage().contains(exceptionMsg));
     }
   }
 
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
     return new Object[][] {
-        // default planner will auto-cast string column to numeric on JOIN condition, so exception is:
-        // "error while invoking cast function", because the cast cannot be done.
-        new Object[]{"SELECT a.col2 - b.col3 FROM a JOIN b ON a.col1 = b.col1", "transform function: cast"},
+        // Function with incorrect argument signature should throw runtime exception
+        new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
+            "ArithmeticFunctions.least(double,double) with arguments"},
+        // Function that tries to cast String to Number should throw runtime exception
         new Object[]{"SELECT a.col2, b.col1 FROM a JOIN b ON a.col1 = b.col3", "transform function: cast"},
+        // standard SqlOpTable function that runs out of signature list in actual impl throws not found exception
+        new Object[]{"SELECT CASE WHEN col3 > 10 THEN 1 WHEN col3 > 20 THEN 2 WHEN col3 > 30 THEN 3 "
+            + "WHEN col3 > 40 THEN 4 WHEN col3 > 50 THEN 5 WHEN col3 > 60 THEN '6' ELSE 0 END FROM a", "caseWhen"},
     };
   }
 }

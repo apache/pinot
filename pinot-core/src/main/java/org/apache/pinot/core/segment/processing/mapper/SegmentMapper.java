@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -38,6 +39,7 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -60,6 +62,7 @@ public class SegmentMapper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMapper.class);
 
   private final List<RecordReader> _recordReaders;
+  private final SegmentProcessorConfig _processorConfig;
   private final File _mapperOutputDir;
 
   private final List<FieldSpec> _fieldSpecs;
@@ -75,12 +78,14 @@ public class SegmentMapper {
 
   public SegmentMapper(List<RecordReader> recordReaders, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
     _recordReaders = recordReaders;
+    _processorConfig = processorConfig;
     _mapperOutputDir = mapperOutputDir;
 
     TableConfig tableConfig = processorConfig.getTableConfig();
-    Schema schema = processorConfig.getSchema();
-    Pair<List<FieldSpec>, Integer> pair = SegmentProcessorUtils
-        .getFieldSpecs(schema, processorConfig.getMergeType(), tableConfig.getIndexingConfig().getSortedColumn());
+    Schema schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(processorConfig.getSchema(),
+        SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig));
+    Pair<List<FieldSpec>, Integer> pair = SegmentProcessorUtils.getFieldSpecs(schema, processorConfig.getMergeType(),
+        tableConfig.getIndexingConfig().getSortedColumn());
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();
     _includeNullFields = tableConfig.getIndexingConfig().isNullHandlingEnabled();
@@ -105,8 +110,12 @@ public class SegmentMapper {
    */
   public Map<String, GenericRowFileManager> map()
       throws Exception {
+    Consumer<Object> observer = _processorConfig.getProgressObserver();
+    int totalCount = _recordReaders.size();
+    int count = 1;
     GenericRow reuse = new GenericRow();
     for (RecordReader recordReader : _recordReaders) {
+      observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count++, totalCount));
       while (recordReader.hasNext()) {
         reuse = recordReader.next(reuse);
 

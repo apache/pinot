@@ -618,7 +618,6 @@ const QueryPage = () => {
                             <CustomizedTables
                               title="Query Result"
                               data={resultData}
-                              isPagination
                               isSticky={true}
                               showSearchBox={true}
                               inAccordionFormat={true}

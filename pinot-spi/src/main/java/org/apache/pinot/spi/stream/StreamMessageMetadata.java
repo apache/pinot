@@ -18,26 +18,51 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.Collections;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.GenericRow;
+
+
 /**
  * A class that provides metadata associated with the message of a stream, for e.g.,
- * ingestion-timestamp of the message.
+ * timestamp derived from the incoming record (not the ingestion time).
  */
 public class StreamMessageMetadata implements RowMetadata {
+  private final long _recordIngestionTimeMs;
+  private final GenericRow _headers;
+  private final Map<String, String> _metadata;
 
-  private final long _ingestionTimeMs;
+  public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers) {
+    this(recordIngestionTimeMs, headers, Collections.emptyMap());
+  }
 
   /**
    * Construct the stream based message/row message metadata
    *
-   * @param ingestionTimeMs  the time that the message was ingested by the stream provider
+   * @param recordIngestionTimeMs  the time that the message was ingested by the stream provider
    *                         use Long.MIN_VALUE if not applicable
+   * @param metadata
    */
-  public StreamMessageMetadata(long ingestionTimeMs) {
-    _ingestionTimeMs = ingestionTimeMs;
+  public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
+      Map<String, String> metadata) {
+    _recordIngestionTimeMs = recordIngestionTimeMs;
+    _headers = headers;
+    _metadata = metadata;
   }
 
   @Override
-  public long getIngestionTimeMs() {
-    return _ingestionTimeMs;
+  public long getRecordIngestionTimeMs() {
+    return _recordIngestionTimeMs;
+  }
+
+  @Override
+  public GenericRow getHeaders() {
+    return _headers;
+  }
+
+  @Override
+  public Map<String, String> getRecordMetadata() {
+    return _metadata;
   }
 }

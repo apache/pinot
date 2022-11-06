@@ -18,25 +18,25 @@
  */
 package org.apache.pinot.tools;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import java.io.File;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
-import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 
-
-public class MultistageEngineQuickStart extends QuickStartBase {
+public class MultistageEngineQuickStart extends Quickstart {
+  private static final String[] MULTI_STAGE_TABLE_DIRECTORIES = new String[]{
+      "examples/batch/ssb/customer",
+      "examples/batch/ssb/dates",
+      "examples/batch/ssb/lineorder",
+      "examples/batch/ssb/part",
+      "examples/batch/ssb/supplier",
+  };
 
   @Override
   public List<String> types() {
@@ -44,59 +44,12 @@ public class MultistageEngineQuickStart extends QuickStartBase {
   }
 
   @Override
-  public Map<String, Object> getConfigOverrides() {
-    Map<String, Object> overrides = new HashMap<>(super.getConfigOverrides());
-    overrides.put("pinot.multistage.engine.enabled", "true");
-    overrides.put("pinot.server.instance.currentDataTableVersion", 4);
-    return overrides;
-  }
-
-  public void execute()
+  public void runSampleQueries(QuickstartRunner runner)
       throws Exception {
-    File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
-
-    // Baseball stat table
-    File baseBallStatsBaseDir = new File(quickstartTmpDir, "baseballStats");
-    File schemaFile = new File(baseBallStatsBaseDir, "baseballStats_schema.json");
-    File tableConfigFile = new File(baseBallStatsBaseDir, "baseballStats_offline_table_config.json");
-    File ingestionJobSpecFile = new File(baseBallStatsBaseDir, "ingestionJobSpec.yaml");
-    ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource("examples/batch/baseballStats/baseballStats_schema.json");
-    Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, schemaFile);
-    resource = classLoader.getResource("examples/batch/baseballStats/baseballStats_offline_table_config.json");
-    Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, tableConfigFile);
-    resource = classLoader.getResource("examples/batch/baseballStats/ingestionJobSpec.yaml");
-    Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
-    QuickstartTableRequest request = new QuickstartTableRequest(baseBallStatsBaseDir.getAbsolutePath());
-
-    File tempDir = new File(quickstartTmpDir, "tmp");
-    FileUtils.forceMkdir(tempDir);
-    QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, tempDir, getConfigOverrides());
-
-    printStatus(Quickstart.Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
-    runner.startAll();
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-      try {
-        printStatus(Quickstart.Color.GREEN, "***** Shutting down offline quick start *****");
-        runner.stop();
-        FileUtils.deleteDirectory(quickstartTmpDir);
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
-    }));
-    printStatus(Quickstart.Color.CYAN, "***** Bootstrap baseballStats table *****");
-    runner.bootstrapTable();
-
-    waitForBootstrapToComplete(null);
-
-    Map<String, String> queryOptions = Collections.singletonMap("queryOptions",
-        CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
 
     printStatus(Quickstart.Color.YELLOW, "***** Multi-stage engine quickstart setup complete *****");
+    Map<String, String> queryOptions = Collections.singletonMap("queryOptions",
+        CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
     String q1 = "SELECT count(*) FROM baseballStats_OFFLINE";
     printStatus(Quickstart.Color.YELLOW, "Total number of documents in the table");
     printStatus(Quickstart.Color.CYAN, "Query : " + q1);
@@ -112,11 +65,33 @@ public class MultistageEngineQuickStart extends QuickStartBase {
     printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q2, queryOptions)));
     printStatus(Quickstart.Color.GREEN, "***************************************************");
 
+    String q3 = "SELECT a.playerName, a.teamID, b.teamName \n"
+        + "FROM baseballStats_OFFLINE AS a\n"
+        + "JOIN dimBaseballTeams_OFFLINE AS b\n"
+        + "ON a.teamID = b.teamID";
+    printStatus(Quickstart.Color.YELLOW, "Baseball Stats with joined team names");
+    printStatus(Quickstart.Color.CYAN, "Query : " + q3);
+    printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q3, queryOptions)));
+    printStatus(Quickstart.Color.GREEN, "***************************************************");
+
     printStatus(Quickstart.Color.GREEN, "***************************************************");
     printStatus(Quickstart.Color.YELLOW, "Example query run completed.");
     printStatus(Quickstart.Color.GREEN, "***************************************************");
-    printStatus(Quickstart.Color.GREEN,
-        "You can always go to http://localhost:9000 to play around in the query console");
+  }
+
+  @Override
+  public String[] getDefaultBatchTableDirectories() {
+    List<String> tableDirs = new ArrayList<>(Arrays.asList(MULTI_STAGE_TABLE_DIRECTORIES));
+    tableDirs.addAll(Arrays.asList(DEFAULT_OFFLINE_TABLE_DIRECTORIES));
+    return tableDirs.toArray(new String[]{});
+  }
+
+  @Override
+  public Map<String, Object> getConfigOverrides() {
+    Map<String, Object> overrides = new HashMap<>(super.getConfigOverrides());
+    overrides.put("pinot.multistage.engine.enabled", "true");
+    overrides.put("pinot.server.instance.currentDataTableVersion", 4);
+    return overrides;
   }
 
   public static void main(String[] args)

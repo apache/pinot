@@ -27,9 +27,9 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -108,11 +108,6 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   @Override
   protected long getCountStarResult() {
     return _countStarResult;
-  }
-
-  @Override
-  protected boolean useLlc() {
-    return true;
   }
 
   @Nullable

@@ -65,6 +65,7 @@ import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.events.SchemaEventType;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -96,7 +97,6 @@ public class PinotSchemaRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
-  AccessControlUtils _accessControlUtils = new AccessControlUtils();
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -210,18 +210,23 @@ public class PinotSchemaRestletResource {
       @ApiResponse(code = 400, message = "Missing or invalid request body"),
       @ApiResponse(code = 500, message = "Internal error")
   })
+  @ManualAuthorization // performed after parsing schema
   public ConfigSuccessResponse addSchema(
       @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true")
-      @QueryParam("override") boolean override, FormDataMultiPart multiPart, @Context HttpHeaders httpHeaders,
+      @QueryParam("override") boolean override,
+      @ApiParam(value = "Whether to force overriding the schema if the schema exists") @DefaultValue("false")
+      @QueryParam("force") boolean force,
+      FormDataMultiPart multiPart,
+      @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
     String endpointUrl = request.getRequestURL().toString();
     validateSchemaName(schema.getSchemaName());
-    _accessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
+    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    SuccessResponse successResponse = addSchema(schema, override);
+    SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
 
@@ -236,9 +241,14 @@ public class PinotSchemaRestletResource {
       @ApiResponse(code = 400, message = "Missing or invalid request body"),
       @ApiResponse(code = 500, message = "Internal error")
   })
+  @ManualAuthorization // performed after parsing schema
   public ConfigSuccessResponse addSchema(
       @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true")
-      @QueryParam("override") boolean override, String schemaJsonString, @Context HttpHeaders httpHeaders,
+      @QueryParam("override") boolean override,
+      @ApiParam(value = "Whether to force overriding the schema if the schema exists") @DefaultValue("false")
+      @QueryParam("force") boolean force,
+      String schemaJsonString,
+      @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProperties = null;
     try {
@@ -251,9 +261,9 @@ public class PinotSchemaRestletResource {
     Schema schema = schemaAndUnrecognizedProperties.getLeft();
     String endpointUrl = request.getRequestURL().toString();
     validateSchemaName(schema.getSchemaName());
-    _accessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
+    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    SuccessResponse successResponse = addSchema(schema, override);
+    SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProperties.getRight());
   }
 
@@ -267,11 +277,16 @@ public class PinotSchemaRestletResource {
       @ApiResponse(code = 400, message = "Missing or invalid request body"),
       @ApiResponse(code = 500, message = "Internal error")
   })
-  public String validateSchema(FormDataMultiPart multiPart) {
+  @ManualAuthorization // performed after parsing schema
+  public String validateSchema(FormDataMultiPart multiPart, @Context HttpHeaders httpHeaders,
+      @Context Request request) {
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
+    String endpointUrl = request.getRequestURL().toString();
     validateSchemaInternal(schema);
+    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
+        _accessControlFactory.create());
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -292,7 +307,8 @@ public class PinotSchemaRestletResource {
       @ApiResponse(code = 400, message = "Missing or invalid request body"),
       @ApiResponse(code = 500, message = "Internal error")
   })
-  public String validateSchema(String schemaJsonString) {
+  @ManualAuthorization // performed after parsing schema
+  public String validateSchema(String schemaJsonString, @Context HttpHeaders httpHeaders, @Context Request request) {
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps = null;
     try {
       schemaAndUnrecognizedProps = JsonUtils.stringToObjectAndUnrecognizedProperties(schemaJsonString, Schema.class);
@@ -301,7 +317,10 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     Schema schema = schemaAndUnrecognizedProps.getLeft();
+    String endpointUrl = request.getRequestURL().toString();
     validateSchemaInternal(schema);
+    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
+        _accessControlFactory.create());
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -333,13 +352,14 @@ public class PinotSchemaRestletResource {
    * Internal method to add schema
    * @param schema  schema
    * @param override  set to true to override the existing schema with the same name
+   * @param force set to true to skip all rules and force to override the existing schema with the same name
    */
-  private SuccessResponse addSchema(Schema schema, boolean override) {
+  private SuccessResponse addSchema(Schema schema, boolean override, boolean force) {
     String schemaName = schema.getSchemaName();
     validateSchemaInternal(schema);
 
     try {
-      _pinotHelixResourceManager.addSchema(schema, override);
+      _pinotHelixResourceManager.addSchema(schema, override, force);
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for adding new schema {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.CREATE);

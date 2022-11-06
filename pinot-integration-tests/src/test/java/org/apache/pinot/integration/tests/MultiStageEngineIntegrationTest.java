@@ -18,28 +18,27 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
+import java.util.Properties;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.client.Connection;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest {
+public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
 
@@ -82,7 +81,32 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
     waitForAllDocsLoaded(600_000L);
 
     // Setting data table version to 4
-    DataTableFactory.setDataTableVersion(4);
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+  }
+
+  @Test
+  @Override
+  public void testHardcodedQueriesMultiStage()
+      throws Exception {
+    super.testHardcodedQueriesMultiStage();
+  }
+
+  @Test
+  @Override
+  public void testGeneratedQueries()
+      throws Exception {
+    // test multistage engine, currently we don't support MV columns.
+    super.testGeneratedQueries(false, true);
+  }
+
+  @Override
+  protected Connection getPinotConnection() {
+    Properties properties = new Properties();
+    properties.put("queryOptions", "useMultistageEngine=true");
+    if (_pinotConnection == null) {
+      _pinotConnection = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName());
+    }
+    return _pinotConnection;
   }
 
   @Override
@@ -98,38 +122,16 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
     serverConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, 8422);
   }
 
-  @Test(dataProvider = "multiStageQueryEngineSqlTestSet")
-  public void testMultiStageQuery(String sql, int expectedNumOfRows, int expectedNumOfColumns)
-      throws IOException {
-    JsonNode multiStageResponse = JsonUtils.stringToJsonNode(
-        sendPostRequest(_brokerBaseApiUrl + "/query/sql",
-            "{\"queryOptions\":\"useMultistageEngine=true\", \"sql\":\"" + sql + "\"}"));
-    Assert.assertTrue(multiStageResponse.has("resultTable"));
-    ArrayNode jsonNode = (ArrayNode) multiStageResponse.get("resultTable").get("rows");
-    // TODO: assert actual result data payload.
-    Assert.assertEquals(jsonNode.size(), expectedNumOfRows);
-    Assert.assertEquals(jsonNode.get(0).size(), expectedNumOfColumns);
+  @Override
+  protected void testQuery(String pinotQuery, String h2Query)
+      throws Exception {
+    ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
+        getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
   }
-
-  @DataProvider
-  public Object[][] multiStageQueryEngineSqlTestSet() {
-    return new Object[][] {
-        new Object[]{"SELECT COUNT(*) FROM mytable_OFFLINE WHERE Carrier='AA'", 1, 1},
-        new Object[]{"SELECT * FROM mytable_OFFLINE WHERE ArrDelay>1000", 2, 73},
-        new Object[]{"SELECT CarrierDelay, ArrDelay FROM mytable_OFFLINE"
-            + " WHERE CarrierDelay=15 AND ArrDelay>20", 172, 2},
-        new Object[]{"SELECT * FROM mytable_OFFLINE AS a JOIN mytable_OFFLINE AS b ON a.Origin = b.Origin "
-            + " WHERE a.Carrier='AA' AND a.ArrDelay>1000 AND b.ArrDelay>1000", 2, 146}
-    };
-  }
-
 
   @AfterClass
   public void tearDown()
       throws Exception {
-    // Setting data table version to 4
-    DataTableFactory.setDataTableVersion(3);
-
     dropOfflineTable(DEFAULT_TABLE_NAME);
 
     stopServer();

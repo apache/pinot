@@ -20,7 +20,7 @@ package org.apache.pinot.core.transport;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.datatable.DataTable;
 
 
 /**
@@ -30,7 +30,7 @@ import org.apache.pinot.common.utils.DataTable;
 public class ServerResponse {
   private final long _startTimeMs;
   private volatile long _submitRequestTimeMs;
-  private volatile long _requestSentLatencyMs;
+  private volatile int _requestSentLatencyMs = -1;
   private volatile long _receiveDataTableTimeMs;
   private volatile DataTable _dataTable;
   private volatile int _responseSize;
@@ -54,11 +54,7 @@ public class ServerResponse {
   }
 
   public int getRequestSentDelayMs() {
-    if (_requestSentLatencyMs != 0) {
-      return (int) _requestSentLatencyMs;
-    } else {
-      return -1;
-    }
+    return _requestSentLatencyMs;
   }
 
   public int getResponseDelayMs() {
@@ -93,7 +89,7 @@ public class ServerResponse {
     _submitRequestTimeMs = System.currentTimeMillis();
   }
 
-  void markRequestSent(long requestSentLatencyMs) {
+  void markRequestSent(int requestSentLatencyMs) {
     _requestSentLatencyMs = requestSentLatencyMs;
   }
 
