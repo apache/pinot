@@ -26,6 +26,7 @@ import {
   makeStyles,
   useTheme,
 } from '@material-ui/core/styles';
+import ComponentLoader from './ComponentLoader';
 import Dialog from '@material-ui/core/Dialog';
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
@@ -279,6 +280,13 @@ export default function CustomizedTables({
   React.useEffect( () => {
     setInitialData(data);
   }, [data]);
+  // We do not use data.isLoading directly in the renderer because there's a gap between data
+  // changing and finalData being set. Without this, there's a flicker where we go from
+  // loading -> no records found -> not loading + data.
+  const [isLoading, setIsLoading] = React.useState(false);
+  React.useEffect( () => {
+    setIsLoading(data.isLoading || false);
+  }, [finalData]);
 
   const [order, setOrder] = React.useState(false);
   const [columnClicked, setColumnClicked] = React.useState('');
@@ -450,7 +458,7 @@ export default function CustomizedTables({
           <Table className={classes.table} size="small" stickyHeader={isSticky}>
             <TableHead>
               <TableRow>
-                {data.columns.map((column, index) => (
+                {data.columns && data.columns.map((column, index) => (
                   <StyledTableCell
                     className={classes.head}
                     key={index}
@@ -494,7 +502,8 @@ export default function CustomizedTables({
               </TableRow>
             </TableHead>
             <TableBody className={classes.body}>
-              {finalData.length === 0 ? (
+              {isLoading ? <ComponentLoader /> : (
+                finalData.length === 0 ? (
                 <TableRow>
                   <StyledTableCell
                     className={classes.nodata}
@@ -531,7 +540,7 @@ export default function CustomizedTables({
                       })}
                     </StyledTableRow>
                   ))
-              )}
+              ))}
             </TableBody>
           </Table>
         </TableContainer>

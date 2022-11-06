@@ -22,6 +22,7 @@ declare module 'Models' {
     records: Array<Array<string | number | boolean>>;
     columns: Array<string>;
     error?: string;
+    isLoading? : boolean
   };
 
   type SchemaDetails = {
