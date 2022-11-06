@@ -54,8 +54,6 @@ const TableTooltipData = [
 const TablesListingPage = () => {
   const classes = useStyles();
 
-  // const [fetchingTableData, setFetchingTableData] = useState(true);
-  // const [fetchingSchemaData, setFetchingSchemaData] = useState(true);
   const [schemaDetails, setSchemaDetails] = useState<TableData>({
     columns: PinotMethodUtils.allSchemaDetailsColumnHeader,
     records: [],

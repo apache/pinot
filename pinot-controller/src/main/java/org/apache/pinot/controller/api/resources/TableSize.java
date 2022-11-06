@@ -98,7 +98,6 @@ public class TableSize {
     if (tableSizeDetails == null) {
       throw new ControllerApplicationException(LOGGER, "Table " + tableName + " not found", Response.Status.NOT_FOUND);
     }
-
     return tableSizeDetails;
   }
 }

@@ -338,10 +338,6 @@ export default function CustomizedTables({
     };
   }, [search, timeoutId, filterSearchResults]);
 
-  // React.useCallback(()=>{
-    // setFinalData(Utils.tableFormat(data));
-  // }, [data]);
-
   const styleCell = (str: string) => {
     if (str === 'Good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
       return (
