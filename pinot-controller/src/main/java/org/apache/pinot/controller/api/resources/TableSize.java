@@ -99,11 +99,6 @@ public class TableSize {
       throw new ControllerApplicationException(LOGGER, "Table " + tableName + " not found", Response.Status.NOT_FOUND);
     }
 
-    try {
-      Thread.sleep(5000);
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
     return tableSizeDetails;
   }
 }
