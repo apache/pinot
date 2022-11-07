@@ -80,6 +80,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.HttpRequesterIdentity;
@@ -210,6 +211,7 @@ public class TablesResource {
     Map<String, Double> columnLengthMap = new HashMap<>();
     Map<String, Double> columnCardinalityMap = new HashMap<>();
     Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
+    Map<String, Map<String, Double>> columnIndexSizesMap = new HashMap<>();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
@@ -256,6 +258,13 @@ public class TablesResource {
               int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
+            for (Map.Entry<ColumnIndexType, Long> entry : columnMetadata.getIndexSizeMap().entrySet()) {
+              Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
+              Double indexSize = columnIndexSizes.getOrDefault(entry.getKey().getIndexName(), 0d);
+              indexSize += entry.getValue();
+              columnIndexSizes.put(entry.getKey().getIndexName(), indexSize);
+              columnIndexSizesMap.put(column, columnIndexSizes);
+            }
           }
         }
       }
@@ -270,7 +279,7 @@ public class TablesResource {
 
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
-            totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap);
+            totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
