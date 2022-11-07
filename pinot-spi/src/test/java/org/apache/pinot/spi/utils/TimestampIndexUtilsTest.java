@@ -64,11 +64,12 @@ public class TimestampIndexUtilsTest {
             new FieldConfig("ts1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TIMESTAMP, null, null,
                 new TimestampConfig(Arrays.asList(TimestampIndexGranularity.SECOND, TimestampIndexGranularity.MINUTE,
                     TimestampIndexGranularity.HOUR)), null),
-            new FieldConfig("ts2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TIMESTAMP, null, null,
+            new FieldConfig("ts2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TIMESTAMP, null, null,
                 new TimestampConfig(Arrays.asList(TimestampIndexGranularity.HOUR, TimestampIndexGranularity.DAY,
                     TimestampIndexGranularity.WEEK)), null),
-            new FieldConfig("ts3", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TIMESTAMP, null, null,
-                new TimestampConfig(Arrays.asList(TimestampIndexGranularity.WEEK, TimestampIndexGranularity.MONTH,
+            new FieldConfig("ts3", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TIMESTAMP, null,
+                FieldConfig.CompressionCodec.PASS_THROUGH, new TimestampConfig(
+                Arrays.asList(TimestampIndexGranularity.WEEK, TimestampIndexGranularity.MONTH,
                     TimestampIndexGranularity.YEAR)), null))).build();
     Set<String> columnsWithGranularity = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
     assertEquals(columnsWithGranularity, new HashSet<>(
@@ -83,7 +84,7 @@ public class TimestampIndexUtilsTest {
             new FieldConfig("ts1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TIMESTAMP, null, null,
                 new TimestampConfig(Arrays.asList(TimestampIndexGranularity.SECOND, TimestampIndexGranularity.MINUTE,
                     TimestampIndexGranularity.HOUR)), null),
-            new FieldConfig("ts2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TIMESTAMP, null, null,
+            new FieldConfig("ts2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TIMESTAMP, null, null,
                 new TimestampConfig(Arrays.asList(TimestampIndexGranularity.DAY, TimestampIndexGranularity.WEEK,
                     TimestampIndexGranularity.MONTH)), null))).build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
