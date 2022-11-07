@@ -21,7 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -96,6 +96,6 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
       }
       resultRows.add(resultRow);
     }
-    return new TransferableBlock(resultRows, _resultSchema, BaseDataBlock.Type.ROW);
+    return new TransferableBlock(resultRows, _resultSchema, DataBlock.Type.ROW);
   }
 }

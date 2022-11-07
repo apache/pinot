@@ -25,7 +25,8 @@ import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -33,6 +34,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class SortOperator extends BaseOperator<TransferableBlock> {
@@ -102,7 +104,7 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
       if (rows.size() == 0) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       } else {
-        return new TransferableBlock(rows, _dataSchema, BaseDataBlock.Type.ROW);
+        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }
     } else {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
@@ -123,11 +125,15 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
         return;
       }
 
-      BaseDataBlock dataBlock = block.getDataBlock();
+      DataBlock dataBlock = block.getDataBlock();
       int numRows = dataBlock.getNumberOfRows();
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
-        SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+      if (numRows > 0) {
+        RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
+              dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
       }
     }
   }

@@ -23,7 +23,7 @@ import io.grpc.ManagedChannel;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
@@ -86,7 +86,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
     return _mailboxId;
   }
 
-  private MailboxContent toMailboxContent(BaseDataBlock dataBlock) {
+  private MailboxContent toMailboxContent(DataBlock dataBlock) {
     try {
       Mailbox.MailboxContent.Builder builder = Mailbox.MailboxContent.newBuilder().setMailboxId(_mailboxId)
           .setPayload(ByteString.copyFrom(dataBlock.toBytes()));

@@ -25,16 +25,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -157,7 +158,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     if (rows.size() == 0) {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } else {
-      return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
+      return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
     }
   }
 
@@ -171,22 +172,26 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       return;
     }
 
-    BaseDataBlock dataBlock = block.getDataBlock();
+    DataBlock dataBlock = block.getDataBlock();
     int numRows = dataBlock.getNumberOfRows();
-    for (int rowId = 0; rowId < numRows; rowId++) {
-      Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
-      Key key = extraRowKey(row, _groupSet);
-      _groupByKeyHolder.put(key, key.getValues());
-      for (int i = 0; i < _aggCalls.size(); i++) {
-        Object currentRes = _groupByResultHolders[i].get(key);
-        // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
-        if (currentRes == null) {
-          _groupByResultHolders[i].put(key, _aggregationFunctionInputRefs[i] == -1 ? _aggregationFunctionLiterals[i]
-              : row[_aggregationFunctionInputRefs[i]]);
-        } else {
-          _groupByResultHolders[i].put(key, merge(_aggCalls.get(i), currentRes,
-              _aggregationFunctionInputRefs[i] == -1 ? _aggregationFunctionLiterals[i]
-                  : row[_aggregationFunctionInputRefs[i]]));
+    if (numRows > 0) {
+      RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
+            dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
+        Key key = extraRowKey(row, _groupSet);
+        _groupByKeyHolder.put(key, key.getValues());
+        for (int i = 0; i < _aggCalls.size(); i++) {
+          Object currentRes = _groupByResultHolders[i].get(key);
+          // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
+          if (currentRes == null) {
+            _groupByResultHolders[i].put(key, _aggregationFunctionInputRefs[i] == -1 ? _aggregationFunctionLiterals[i]
+                : row[_aggregationFunctionInputRefs[i]]);
+          } else {
+            _groupByResultHolders[i].put(key, merge(_aggCalls.get(i), currentRes,
+                _aggregationFunctionInputRefs[i] == -1 ? _aggregationFunctionLiterals[i]
+                    : row[_aggregationFunctionInputRefs[i]]));
+          }
         }
       }
     }
