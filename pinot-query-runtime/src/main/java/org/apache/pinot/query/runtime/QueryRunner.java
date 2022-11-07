@@ -52,6 +52,7 @@ import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -118,7 +119,7 @@ public class QueryRunner {
     _mailboxService.shutdown();
   }
 
-  public void processQuery(DistributedStagePlan distributedStagePlan, ExecutorService executorService,
+  public void processQuery(DistributedStagePlan distributedStagePlan, OpChainSchedulerService scheduler,
       Map<String, String> requestMetadataMap) {
     if (isLeafStage(distributedStagePlan)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
@@ -132,7 +133,7 @@ public class QueryRunner {
       for (ServerPlanRequestContext requestContext : serverQueryRequests) {
         ServerQueryRequest request = new ServerQueryRequest(requestContext.getInstanceRequest(),
             new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
-        serverQueryResults.add(processServerQuery(request, executorService));
+        serverQueryResults.add(processServerQuery(request, scheduler.getWorkerPool()));
       }
 
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
@@ -148,7 +149,7 @@ public class QueryRunner {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
     } else {
-      _workerExecutor.processQuery(distributedStagePlan, requestMetadataMap, executorService);
+      _workerExecutor.processQuery(distributedStagePlan, requestMetadataMap, scheduler);
     }
   }
 

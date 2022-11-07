@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -38,6 +37,7 @@ import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.util.TestUtils;
@@ -119,7 +119,7 @@ public class QueryServerTest extends QueryTestSet {
               StageNode stageNode = queryPlan.getQueryStageMap().get(stageId);
               return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot())
                   && isMetadataMapsEqual(stageMetadata, distributedStagePlan.getMetadataMap().get(stageId));
-            }), any(ExecutorService.class), Mockito.argThat(requestMetadataMap ->
+            }), any(OpChainSchedulerService.class), Mockito.argThat(requestMetadataMap ->
                 requestIdStr.equals(requestMetadataMap.get("REQUEST_ID"))));
             return true;
           } catch (Throwable t) {

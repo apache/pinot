@@ -19,15 +19,11 @@
 package org.apache.pinot.query.runtime.executor;
 
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.request.context.ThreadTimer;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
 import org.apache.pinot.query.runtime.plan.PlanRequestContext;
@@ -69,26 +65,12 @@ public class WorkerQueryExecutor {
   }
 
   public void processQuery(DistributedStagePlan queryRequest, Map<String, String> requestMetadataMap,
-      ExecutorService executorService) {
+      OpChainSchedulerService scheduler) {
     long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
     StageNode stageRoot = queryRequest.getStageRoot();
 
-    Operator<TransferableBlock> rootOperator = PhysicalPlanVisitor.build(stageRoot, new PlanRequestContext(
+    OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot, new PlanRequestContext(
         _mailboxService, requestId, stageRoot.getStageId(), _hostName, _port, queryRequest.getMetadataMap()));
-
-    executorService.submit(new TraceRunnable() {
-      @Override
-      public void runJob() {
-        try {
-          ThreadTimer executionThreadTimer = new ThreadTimer();
-          while (!TransferableBlockUtils.isEndOfStream(rootOperator.nextBlock())) {
-            LOGGER.debug("Result Block acquired");
-          }
-          LOGGER.info("Execution time:" + executionThreadTimer.getThreadTimeNs());
-        } catch (Exception e) {
-          LOGGER.error("Failed to execute query!", e);
-        }
-      }
-    });
+    scheduler.register(rootOperator);
   }
 }
