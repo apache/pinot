@@ -122,8 +122,10 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(metadataInfo.getColumnLengthMap().size(), 2);
     Assert.assertEquals(metadataInfo.getColumnCardinalityMap().size(), 2);
     Assert.assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 2);
-    Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().containsKey(ColumnIndexType.DICTIONARY.getIndexName()));
-    Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().containsKey(ColumnIndexType.FORWARD_INDEX.getIndexName()));
+    Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().get("column1")
+        .containsKey(ColumnIndexType.DICTIONARY.getIndexName()));
+    Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().get("column2")
+        .containsKey(ColumnIndexType.FORWARD_INDEX.getIndexName()));
 
     // No such table
     Response response = _webTarget.path("/tables/noSuchTable/metadata").request().get(Response.class);
