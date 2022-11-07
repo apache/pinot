@@ -122,11 +122,6 @@ public class FSTIndexHandler implements IndexHandler {
     }
   }
 
-  @Override
-  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
-      throws Exception {
-  }
-
   private boolean shouldCreateFSTIndex(ColumnMetadata columnMetadata) {
     if (columnMetadata != null) {
       // Fail fast upon unsupported operations.

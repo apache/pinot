@@ -70,12 +70,13 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKe
  * majority of the usecases are in versions >= 3.0 and this avoids adding tech debt. The currently supported
  * operations are:
  * 1. Change compression on raw SV and MV columns.
- * 2. Disable forward index on a column where it is enabled
+ * 2. Enabling dictionary on a raw column.
+ * 3. Disable forward index on a column where it is enabled.
  *
  *  TODO: Add support for the following:
  *  1. Disable dictionary
  *  2. Segment versions < V3
- *  3. Support enabling forward index on a forward index disabled column
+ *  3. Enable forward index on a forward index disabled column
  */
 public class ForwardIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(ForwardIndexHandler.class);
@@ -86,11 +87,12 @@ public class ForwardIndexHandler implements IndexHandler {
   private final Set<String> _forwardIndexDisabledColumnsToCleanup;
 
   protected enum Operation {
-    // TODO: Add other operations like DISABLE_DICTIONARY, ADD_FORWARD_INDEX, ADD_RAW_FORWARD_INDEX
-    CHANGE_RAW_INDEX_COMPRESSION_TYPE,
+    // TODO: Add other operations like DISABLE_DICTIONARY, ADD_FORWARD_INDEX_FOR_DICT_COLUMN,
+    //       ADD_FORWARD_INDEX_FOR_RAW_COLUMN
+    DISABLE_FORWARD_INDEX_FOR_DICT_COLUMN,
+    DISABLE_FORWARD_INDEX_FOR_RAW_COLUMN,
     ENABLE_DICTIONARY,
-    DELETE_FORWARD_INDEX,
-    CREATE_TEMP_DICTIONARY_BASED_FORWARD_INDEX_FROM_EXISTING_RAW_FORWARD_INDEX,
+    CHANGE_RAW_INDEX_COMPRESSION_TYPE,
   }
 
   public ForwardIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig, Schema schema) {
@@ -120,22 +122,14 @@ public class ForwardIndexHandler implements IndexHandler {
       Operation operation = entry.getValue();
 
       switch (operation) {
-        case CHANGE_RAW_INDEX_COMPRESSION_TYPE: {
-          rewriteRawForwardIndex(column, segmentWriter, indexCreatorProvider);
-          break;
-        }
-        case ENABLE_DICTIONARY: {
-          createDictBasedForwardIndex(column, segmentWriter, indexCreatorProvider);
-          break;
-        }
-        case DELETE_FORWARD_INDEX: {
+        case DISABLE_FORWARD_INDEX_FOR_DICT_COLUMN: {
           // Deletion of the forward index will be handled outside the index handler to ensure that other index
           // handlers that need the forward index to construct their own indexes will have it available.
           // The existing forward index must be in dictionary format for this to be a no-op.
           _forwardIndexDisabledColumnsToCleanup.add(column);
           break;
         }
-        case CREATE_TEMP_DICTIONARY_BASED_FORWARD_INDEX_FROM_EXISTING_RAW_FORWARD_INDEX: {
+        case DISABLE_FORWARD_INDEX_FOR_RAW_COLUMN: {
           // The forward index has been disabled for a column which has a noDictionary based forward index. A dictionary
           // and inverted index need to be created before we can delete the forward index. We create a dictionary here,
           // but let the InvertedIndexHandler handle the creation of the inverted index. We create a temporary
@@ -145,6 +139,14 @@ public class ForwardIndexHandler implements IndexHandler {
           Preconditions.checkState(segmentWriter.hasIndexFor(column, ColumnIndexType.FORWARD_INDEX),
               String.format("Temporary forward index was not created for column: %s", column));
           _forwardIndexDisabledColumnsToCleanup.add(column);
+          break;
+        }
+        case ENABLE_DICTIONARY: {
+          createDictBasedForwardIndex(column, segmentWriter, indexCreatorProvider);
+          break;
+        }
+        case CHANGE_RAW_INDEX_COMPRESSION_TYPE: {
+          rewriteRawForwardIndex(column, segmentWriter, indexCreatorProvider);
           break;
         }
         default:
@@ -160,12 +162,7 @@ public class ForwardIndexHandler implements IndexHandler {
     // IndexHandlers have updated their indexes as some of them need to temporarily create a forward index to
     // generate other indexes off of.
     for (String column : _forwardIndexDisabledColumnsToCleanup) {
-      if ((_indexLoadingConfig.getForwardIndexDisabledColumns() != null
-          && _indexLoadingConfig.getForwardIndexDisabledColumns().contains(column))
-          && (_segmentMetadata.getColumnMetadataFor(column) != null
-          && !_segmentMetadata.getColumnMetadataFor(column).isSorted())) {
-        segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
-      }
+      segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
     }
   }
 
@@ -205,25 +202,28 @@ public class ForwardIndexHandler implements IndexHandler {
     Set<String> newForwardIndexDisabledColumns = _indexLoadingConfig.getForwardIndexDisabledColumns();
 
     for (String column : existingAllColumns) {
-      if (existingForwardIndexColumns.contains(column) && newForwardIndexDisabledColumns != null
-          && newForwardIndexDisabledColumns.contains(column)) {
+      if (existingForwardIndexColumns.contains(column) && newForwardIndexDisabledColumns.contains(column)) {
+        ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+        if (columnMetadata != null && columnMetadata.isSorted()) {
+          // Check if the column is sorted. If sorted, disabling forward index should be a no-op. Do not return an
+          // operation for this column related to disabling forward index.
+          LOGGER.warn("Trying to disable the forward index for a sorted column {}, ignoring", column);
+          continue;
+        }
+
         // Existing column has a forward index. New column config disables the forward index
-        Preconditions.checkState(!newNoDictColumns.contains(column),
-            String.format("Must enable dictionary for disabling the forward index on column: %s", column));
-        Preconditions.checkState(_indexLoadingConfig.getInvertedIndexColumns().contains(column),
-            String.format("Must enable inverted index for disabling the forward index on column: %s", column));
         if (existingDictColumns.contains(column)) {
-          columnOperationMap.put(column, Operation.DELETE_FORWARD_INDEX);
+          columnOperationMap.put(column, Operation.DISABLE_FORWARD_INDEX_FOR_DICT_COLUMN);
         } else {
           columnOperationMap.put(column,
-              Operation.CREATE_TEMP_DICTIONARY_BASED_FORWARD_INDEX_FROM_EXISTING_RAW_FORWARD_INDEX);
+              Operation.DISABLE_FORWARD_INDEX_FOR_RAW_COLUMN);
         }
-      } else if (existingForwardIndexDisabledColumns.contains(column) && newForwardIndexDisabledColumns != null
+      } else if (existingForwardIndexDisabledColumns.contains(column)
           && !newForwardIndexDisabledColumns.contains(column)) {
         // TODO: Add support: existing column has its forward index disabled. New column config enables the forward
         //       index
         LOGGER.warn("Enabling forward index on a forward index disabled column {} is not yet supported", column);
-      } else if (existingForwardIndexDisabledColumns.contains(column) && newForwardIndexDisabledColumns != null
+      } else if (existingForwardIndexDisabledColumns.contains(column)
           && newForwardIndexDisabledColumns.contains(column)) {
         // Forward index is disabled for the existing column and should remain disabled based on the latest config
         Preconditions.checkState(existingDictColumns.contains(column) && !newNoDictColumns.contains(column),

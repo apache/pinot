@@ -104,11 +104,6 @@ public class JsonIndexHandler implements IndexHandler {
     }
   }
 
-  @Override
-  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
-      throws Exception {
-  }
-
   private boolean shouldCreateJsonIndex(ColumnMetadata columnMetadata) {
     return columnMetadata != null;
   }

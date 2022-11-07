@@ -111,11 +111,6 @@ public class BloomFilterHandler implements IndexHandler {
     }
   }
 
-  @Override
-  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
-      throws Exception {
-  }
-
   private boolean shouldCreateBloomFilter(ColumnMetadata columnMetadata) {
     return columnMetadata != null;
   }

@@ -101,11 +101,6 @@ public class RangeIndexHandler implements IndexHandler {
     }
   }
 
-  @Override
-  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
-      throws Exception {
-  }
-
   private boolean shouldCreateRangeIndex(ColumnMetadata columnMetadata) {
     // Only create range index on unsorted columns
     return columnMetadata != null && !columnMetadata.isSorted();

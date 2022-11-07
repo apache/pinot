@@ -101,11 +101,6 @@ public class InvertedIndexHandler implements IndexHandler {
     }
   }
 
-  @Override
-  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
-      throws Exception {
-  }
-
   private boolean shouldCreateInvertedIndex(ColumnMetadata columnMetadata) {
     // Only create inverted index on dictionary-encoded unsorted columns.
     return columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary();

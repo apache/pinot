@@ -45,10 +45,6 @@ public class IndexHandlerFactory {
     public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
       return false;
     }
-
-    @Override
-    public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter) {
-    }
   };
 
   public static IndexHandler getIndexHandler(ColumnIndexType type, SegmentMetadataImpl segmentMetadata,

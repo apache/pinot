@@ -105,11 +105,6 @@ public class H3IndexHandler implements IndexHandler {
     }
   }
 
-  @Override
-  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
-      throws Exception {
-  }
-
   private boolean shouldCreateH3Index(ColumnMetadata columnMetadata) {
     return columnMetadata != null;
   }

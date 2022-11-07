@@ -44,6 +44,7 @@ public interface IndexHandler {
    * Performs any cleanup actions required after the indexes have been updated.
    * Should be called only after all IndexHandlers have run.
    */
-  void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
-    throws Exception;
+  default void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
+    throws Exception {
+  }
 }
