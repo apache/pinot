@@ -369,8 +369,7 @@ public class LiteralOnlyBrokerRequestTest {
 
     // first argument must be in prefix format
     request = JsonUtils.stringToJsonNode(
-        "{\"sql\":\"SELECT isSubnetOf('10.34.0.32', '10.34.0.40') as"
-            + " booleanCol\"}");
+        "{\"sql\":\"SELECT isSubnetOf('105.25.245.115', '105.25.245.115') as" + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     Assert.assertTrue(
@@ -378,8 +377,7 @@ public class LiteralOnlyBrokerRequestTest {
 
     // second argument should not be a prefix
     request = JsonUtils.stringToJsonNode(
-        "{\"sql\":\"SELECT isSubnetOf('10.3.168.0/22', '10.187.84.128/26') as"
-            + " booleanCol\"}");
+        "{\"sql\":\"SELECT isSubnetOf('10.3.168.0/22', '3.175.47.239/26') as" + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     Assert.assertTrue(
@@ -387,7 +385,8 @@ public class LiteralOnlyBrokerRequestTest {
 
     // second argument should not be a prefix
     request = JsonUtils.stringToJsonNode(
-        "{\"sql\":\"SELECT isSubnetOf('2a04:f547:255:1::/64', '2620:119:50e7:101::/64') as"
+        "{\"sql\":\"SELECT isSubnetOf('5f3f:bfdb:1bbe:a824:6bf9:0fbb:d358:1889/64', "
+            + "'4275:386f:b2b5:0664:04aa:d7bd:0589:6909/64') as"
             + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
@@ -396,7 +395,7 @@ public class LiteralOnlyBrokerRequestTest {
 
     // invalid prefix length
     request = JsonUtils.stringToJsonNode(
-        "{\"sql\":\"SELECT isSubnetOf('2a04:f547:255:1::/129', '2620:119:50e7:101::') as"
+        "{\"sql\":\"SELECT isSubnetOf('2001:4801:7825:103:be76:4eff::/129', '2001:4801:7825:103:be76:4eff::') as"
             + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
@@ -405,8 +404,7 @@ public class LiteralOnlyBrokerRequestTest {
 
     // invalid prefix length
     request = JsonUtils.stringToJsonNode(
-        "{\"sql\":\"SELECT isSubnetOf('10.3.168.0/33', '10.187.84.128') as"
-            + " booleanCol\"}");
+        "{\"sql\":\"SELECT isSubnetOf('170.189.0.175/33', '170.189.0.175') as" + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     Assert.assertTrue(

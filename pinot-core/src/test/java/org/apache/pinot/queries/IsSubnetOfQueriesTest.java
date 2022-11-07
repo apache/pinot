@@ -93,19 +93,27 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
     List<GenericRow> records = new ArrayList<>();
 
     // add IPv4 test cases
-    addIPv4Row(records, "10.34.0.32/27", "10.34.0.40", true);
-    addIPv4Row(records, "10.32.229.160/28", "10.32.229.166", true);
-    addIPv4Row(records, "10.154.116.0/26", "10.154.116.21", true);
-    addIPv4Row(records, "144.2.15.0/26", "144.2.15.28", true);
-    addIPv4Row(records, "10.252.186.64/26", "10.252.186.79", true);
-    addIPv4Row(records, "10.187.84.128/26", "10.187.84.178", true);
+    addIPv4Row(records, "105.25.245.115/27", "105.25.245.98", true);
+    addIPv4Row(records, "122.152.0.204/28", "122.152.0.198", true);
+    addIPv4Row(records, "130.191.23.32/26", "130.191.23.33", true);
+    addIPv4Row(records, "122.152.15.0/26", "122.152.15.28", true);
+    addIPv4Row(records, "96.141.228.254/26", "96.141.228.254", true);
+    addIPv4Row(records, "3.175.47.128/26", "3.175.47.178", true);
+
+    addIPv4Row(records, "105.25.245.115/27", "105.25.245.0", false);
+    addIPv4Row(records, "122.152.0.204/28", "122.152.0.254", false);
+    addIPv4Row(records, "130.191.23.32/26", "130.192.23.33", false);
+    addIPv4Row(records, "122.152.15.0/26", "122.152.0.63", false);
+    addIPv4Row(records, "96.141.228.254/26", "96.141.227.254", false);
+    addIPv4Row(records, "3.175.47.128/26", "3.175.48.178", false);
+
     addIPv4Row(records, "10.3.168.0/22", "1.2.3.1", false);
     addIPv4Row(records, "1.2.3.128/26", "1.2.5.1", false);
     addIPv4Row(records, "1.2.3.128/26", "1.1.3.1", false);
 
     // add IPv6 test cases
-    addIPv6Row(records, "2a04:f547:255:1::/64", "2a04:f547:255:1::2050", true);
-    addIPv6Row(records, "2620:119:50e7:101::/64", "2620:119:50e7:101::9002:e15", true);
+    addIPv6Row(records, "2001:4800:7825:103::/64", "2001:4800:7825:103::2050", true);
+    addIPv6Row(records, "2001:4801:7825:103:be76:4efe::/96", "2001:4801:7825:103:be76:4efe::e15", true);
     addIPv6Row(records, "2001:db8:85a3::8a2e:370:7334/62", "2001:0db8:85a3:0003:ffff:ffff:ffff:ffff", true);
     addIPv6Row(records, "7890:db8:113::8a2e:370:7334/127", "7890:db8:113::8a2e:370:7336", false);
     addIPv6Row(records, "64:ff9b::17/64", "64:ffff::17", false);
