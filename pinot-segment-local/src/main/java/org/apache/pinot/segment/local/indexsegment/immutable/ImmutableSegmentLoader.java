@@ -37,7 +37,6 @@ import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
@@ -55,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+// TODO: Clean up this class to use the schema from the IndexLoadingConfig
 public class ImmutableSegmentLoader {
   private ImmutableSegmentLoader() {
   }
@@ -99,18 +99,13 @@ public class ImmutableSegmentLoader {
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
       boolean needPreprocess)
       throws Exception {
-    Preconditions
-        .checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory", indexDir);
+    Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory",
+        indexDir);
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentMetadata.getTotalDocs() == 0) {
       return new EmptyIndexSegment(segmentMetadata);
     }
-    if (schema != null) {
-      schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema,
-          SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(indexLoadingConfig.getTableConfig()));
-    }
-
     if (needPreprocess) {
       preprocess(indexDir, indexLoadingConfig, schema);
     }
@@ -162,8 +157,6 @@ public class ImmutableSegmentLoader {
     // Remove columns not in schema from the metadata
     Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
     if (schema != null) {
-      schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema,
-          SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(indexLoadingConfig.getTableConfig()));
       Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
       columnsInMetadata.removeIf(schema::hasColumn);
       if (!columnsInMetadata.isEmpty()) {

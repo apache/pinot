@@ -80,7 +80,6 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -88,6 +87,7 @@ import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -528,8 +528,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Send empty response since we don't need to evaluate either offline or realtime request.
       BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
       // Extract source info from incoming request
-      _queryLogger.log(new QueryLogger.QueryLogParams(
-          requestId, query, requestContext, tableName, 0, new ServerStats(),
+      _queryLogger.log(new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, 0, new ServerStats(),
           brokerResponse, System.nanoTime(), requesterIdentity));
       return brokerResponse;
     }
@@ -670,9 +669,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         LOGGER.debug("Remove track of running query: {}", requestId);
       }
     } else {
-      brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-          offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-          requestContext);
+      brokerResponse =
+          processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest, offlineRoutingTable,
+              realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
     }
 
     brokerResponse.setExceptions(exceptions);
@@ -696,9 +695,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Extract source info from incoming request
     _queryLogger.log(
-        new QueryLogger.QueryLogParams(
-            requestId, query, requestContext, tableName, numUnavailableSegments, serverStats, brokerResponse,
-            totalTimeMs, requesterIdentity));
+        new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, numUnavailableSegments, serverStats,
+            brokerResponse, totalTimeMs, requesterIdentity));
     return brokerResponse;
   }
 
@@ -739,12 +737,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         String granularString = function.getOperands().get(0).getLiteral().getStringValue().toUpperCase();
         Expression timeExpression = function.getOperands().get(1);
         if (((function.getOperandsSize() == 2) || (function.getOperandsSize() == 3 && "MILLISECONDS".equalsIgnoreCase(
-            function.getOperands().get(2).getLiteral().getStringValue())))
-            && TimestampIndexGranularity.isValidTimeGranularity(granularString)
-            && timeExpression.getIdentifier() != null) {
+            function.getOperands().get(2).getLiteral().getStringValue()))) && TimestampIndexUtils.isValidGranularity(
+            granularString) && timeExpression.getIdentifier() != null) {
           String timeColumn = timeExpression.getIdentifier().getName();
-          String timeColumnWithGranularity = TimestampIndexGranularity.getColumnNameWithGranularity(timeColumn,
-              TimestampIndexGranularity.valueOf(granularString));
+          String timeColumnWithGranularity = TimestampIndexUtils.getColumnWithGranularity(timeColumn, granularString);
           if (timestampIndexColumns.contains(timeColumnWithGranularity)) {
             pinotQuery.putToExpressionOverrideHints(expression,
                 RequestUtils.getIdentifierExpression(timeColumnWithGranularity));

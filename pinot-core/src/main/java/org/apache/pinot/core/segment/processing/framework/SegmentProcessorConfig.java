@@ -29,6 +29,7 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 
 /**
@@ -50,6 +51,7 @@ public class SegmentProcessorConfig {
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
       Map<String, AggregationFunctionType> aggregationTypes, SegmentConfig segmentConfig,
       Consumer<Object> progressObserver) {
+    TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableConfig = tableConfig;
     _schema = schema;
     _timeHandlerConfig = timeHandlerConfig;
