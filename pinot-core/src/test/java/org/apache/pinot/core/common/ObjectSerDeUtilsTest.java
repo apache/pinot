@@ -223,7 +223,10 @@ public class ObjectSerDeUtilsTest {
     // but instead it will only find 1078.
     byte[] bytes = (new HyperLogLog(12)).getBytes();
     byte[] trimmed = Arrays.copyOfRange(bytes, 0, bytes.length - 1024);
-    Assert.assertThrows(RuntimeException.class, () -> ObjectSerDeUtils.deserialize(trimmed, ObjectSerDeUtils.ObjectType.HyperLogLog));
+    Assert.assertThrows(RuntimeException.class, () -> ObjectSerDeUtils.deserialize(
+            trimmed,
+            ObjectSerDeUtils.ObjectType.HyperLogLog
+    ));
   }
 
   @Test
