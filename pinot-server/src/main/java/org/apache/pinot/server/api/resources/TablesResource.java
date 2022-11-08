@@ -259,10 +259,10 @@ public class TablesResource {
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
             for (Map.Entry<ColumnIndexType, Long> entry : columnMetadata.getIndexSizeMap().entrySet()) {
+              String indexName = entry.getKey().getIndexName();
               Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
-              Double indexSize = columnIndexSizes.getOrDefault(entry.getKey().getIndexName(), 0d);
-              indexSize += entry.getValue();
-              columnIndexSizes.put(entry.getKey().getIndexName(), indexSize);
+              Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + entry.getValue();
+              columnIndexSizes.put(indexName, indexSize);
               columnIndexSizesMap.put(column, columnIndexSizes);
             }
           }
