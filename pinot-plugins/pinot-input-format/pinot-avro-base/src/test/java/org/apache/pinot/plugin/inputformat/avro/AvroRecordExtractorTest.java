@@ -275,22 +275,25 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
   /**
    * SpecificRecord created for testing Fixed data type
    */
-  static class EventRecord extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
+  static class EventRecord extends org.apache.avro.specific.SpecificRecordBase
+      implements org.apache.avro.specific.SpecificRecord {
     private static final long serialVersionUID = 5451592186784305712L;
-    public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse(
-        "{\"type\":\"record\",\"name\":\"EventRecord\",\"fields\":[{\"name\":\"fixedData\",\"type\":{\"type\":\"fixed\",\"name\":\"FixedSchema\",\"doc\":\"\",\"size\":4}}]}");
+    public static final org.apache.avro.Schema SCHEMA = new org.apache.avro.Schema.Parser().parse(
+        "{\"type\":\"record\",\"name\":\"EventRecord\",\"fields\":[{"
+            + "\"name\":\"fixedData\",\"type\":{\"type\":\"fixed\",\"name\":\"FixedSchema\",\"doc\":\"\",\"size\":4}}"
+            + "]}");
 
     public static org.apache.avro.Schema getClassSchema() {
-      return SCHEMA$;
+      return SCHEMA;
     }
 
-    private static SpecificData MODEL$ = new SpecificData();
+    private static final SpecificData MODEL = new SpecificData();
 
     private static final BinaryMessageEncoder<EventRecord> ENCODER =
-        new BinaryMessageEncoder<EventRecord>(MODEL$, SCHEMA$);
+        new BinaryMessageEncoder<EventRecord>(MODEL, SCHEMA);
 
     private static final BinaryMessageDecoder<EventRecord> DECODER =
-        new BinaryMessageDecoder<EventRecord>(MODEL$, SCHEMA$);
+        new BinaryMessageDecoder<EventRecord>(MODEL, SCHEMA);
 
     public static BinaryMessageEncoder<EventRecord> getEncoder() {
       return ENCODER;
@@ -301,7 +304,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     }
 
     public static BinaryMessageDecoder<EventRecord> createDecoder(SchemaStore resolver) {
-      return new BinaryMessageDecoder<EventRecord>(MODEL$, SCHEMA$, resolver);
+      return new BinaryMessageDecoder<EventRecord>(MODEL, SCHEMA, resolver);
     }
 
     public java.nio.ByteBuffer toByteBuffer()
@@ -314,28 +317,28 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
       return DECODER.decode(b);
     }
 
-    private FixedSchema fixedData;
+    private FixedSchema _fixedData;
 
     public EventRecord() {
     }
 
     public EventRecord(FixedSchema fixedData) {
-      this.fixedData = fixedData;
+      _fixedData = fixedData;
     }
 
     public org.apache.avro.specific.SpecificData getSpecificData() {
-      return MODEL$;
+      return MODEL;
     }
 
     public org.apache.avro.Schema getSchema() {
-      return SCHEMA$;
+      return SCHEMA;
     }
 
     // Used by DatumWriter.  Applications should not call.
-    public java.lang.Object get(int field$) {
-      switch (field$) {
+    public java.lang.Object get(int field) {
+      switch (field) {
         case 0:
-          return fixedData;
+          return _fixedData;
         default:
           throw new org.apache.avro.AvroRuntimeException("Bad index");
       }
@@ -343,10 +346,10 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
 
     // Used by DatumReader.  Applications should not call.
     @SuppressWarnings(value = "unchecked")
-    public void put(int field$, java.lang.Object value$) {
-      switch (field$) {
+    public void put(int field, java.lang.Object value) {
+      switch (field) {
         case 0:
-          fixedData = (FixedSchema) value$;
+          _fixedData = (FixedSchema) value;
           break;
         default:
           throw new org.apache.avro.AvroRuntimeException("Bad index");
@@ -354,31 +357,31 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     }
 
     public FixedSchema getFixedData() {
-      return fixedData;
+      return _fixedData;
     }
 
     public void setFixedData(FixedSchema value) {
-      this.fixedData = value;
+      _fixedData = value;
     }
 
     @SuppressWarnings("unchecked")
-    private static final org.apache.avro.io.DatumWriter<EventRecord> WRITER$ =
-        (org.apache.avro.io.DatumWriter<EventRecord>) MODEL$.createDatumWriter(SCHEMA$);
+    private static final org.apache.avro.io.DatumWriter<EventRecord> WRITER =
+        (org.apache.avro.io.DatumWriter<EventRecord>) MODEL.createDatumWriter(SCHEMA);
 
     @Override
     public void writeExternal(java.io.ObjectOutput out)
         throws java.io.IOException {
-      WRITER$.write(this, SpecificData.getEncoder(out));
+      WRITER.write(this, SpecificData.getEncoder(out));
     }
 
     @SuppressWarnings("unchecked")
-    private static final org.apache.avro.io.DatumReader<EventRecord> READER$ =
-        (org.apache.avro.io.DatumReader<EventRecord>) MODEL$.createDatumReader(SCHEMA$);
+    private static final org.apache.avro.io.DatumReader<EventRecord> READER =
+        (org.apache.avro.io.DatumReader<EventRecord>) MODEL.createDatumReader(SCHEMA);
 
     @Override
     public void readExternal(java.io.ObjectInput in)
         throws java.io.IOException {
-      READER$.read(this, SpecificData.getDecoder(in));
+      READER.read(this, SpecificData.getDecoder(in));
     }
 
     @Override
@@ -389,7 +392,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     @Override
     public void customEncode(org.apache.avro.io.Encoder out)
         throws java.io.IOException {
-      out.writeFixed(this.fixedData.bytes(), 0, 4);
+      out.writeFixed(_fixedData.bytes(), 0, 4);
     }
 
     @Override
@@ -397,18 +400,18 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
         throws java.io.IOException {
       org.apache.avro.Schema.Field[] fieldOrder = in.readFieldOrderIfDiff();
       if (fieldOrder == null) {
-        if (this.fixedData == null) {
-          this.fixedData = new FixedSchema();
+        if (_fixedData == null) {
+          _fixedData = new FixedSchema();
         }
-        in.readFixed(this.fixedData.bytes(), 0, 4);
+        in.readFixed(_fixedData.bytes(), 0, 4);
       } else {
         for (int i = 0; i < 1; i++) {
           switch (fieldOrder[i].pos()) {
             case 0:
-              if (this.fixedData == null) {
-                this.fixedData = new FixedSchema();
+              if (_fixedData == null) {
+                _fixedData = new FixedSchema();
               }
-              in.readFixed(this.fixedData.bytes(), 0, 4);
+              in.readFixed(_fixedData.bytes(), 0, 4);
               break;
 
             default:
@@ -424,15 +427,15 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
    */
   static class FixedSchema extends org.apache.avro.specific.SpecificFixed {
     private static final long serialVersionUID = -1121289150751596161L;
-    public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse(
+    public static final org.apache.avro.Schema SCHEMA = new org.apache.avro.Schema.Parser().parse(
         "{\"type\":\"fixed\",\"name\":\"FixedSchema\",\"doc\":\"\",\"size\":4}");
 
     public static org.apache.avro.Schema getClassSchema() {
-      return SCHEMA$;
+      return SCHEMA;
     }
 
     public org.apache.avro.Schema getSchema() {
-      return SCHEMA$;
+      return SCHEMA;
     }
 
     /** Creates a new FixedSchema */
@@ -448,22 +451,22 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
       super(bytes);
     }
 
-    private static final org.apache.avro.io.DatumWriter<FixedSchema> WRITER$ =
-        new org.apache.avro.specific.SpecificDatumWriter<FixedSchema>(SCHEMA$);
+    private static final org.apache.avro.io.DatumWriter<FixedSchema> WRITER =
+        new org.apache.avro.specific.SpecificDatumWriter<FixedSchema>(SCHEMA);
 
     @Override
     public void writeExternal(java.io.ObjectOutput out)
         throws java.io.IOException {
-      WRITER$.write(this, org.apache.avro.specific.SpecificData.getEncoder(out));
+      WRITER.write(this, org.apache.avro.specific.SpecificData.getEncoder(out));
     }
 
-    private static final org.apache.avro.io.DatumReader<FixedSchema> READER$ =
-        new org.apache.avro.specific.SpecificDatumReader<FixedSchema>(SCHEMA$);
+    private static final org.apache.avro.io.DatumReader<FixedSchema> READER =
+        new org.apache.avro.specific.SpecificDatumReader<FixedSchema>(SCHEMA);
 
     @Override
     public void readExternal(java.io.ObjectInput in)
         throws java.io.IOException {
-      READER$.read(this, org.apache.avro.specific.SpecificData.getDecoder(in));
+      READER.read(this, org.apache.avro.specific.SpecificData.getDecoder(in));
     }
   }
 }
