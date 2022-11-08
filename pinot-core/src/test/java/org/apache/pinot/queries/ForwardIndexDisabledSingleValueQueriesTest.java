@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -48,8 +49,8 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -64,18 +65,19 @@ import static org.testng.Assert.assertTrue;
  * <p>There are totally 18 columns, 30000 records inside the original Avro file where 11 columns are selected to build
  * the index segment. Selected columns information are as following:
  * <ul>
- *   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, FwdIndexDisabled: S1, S2, HasRangeIndex
- *   <li>column1, METRIC, INT, 6582, F, F, F, F, F</li>
- *   <li>column3, METRIC, INT, 21910, F, F, F, F, F</li>
- *   <li>column5, DIMENSION, STRING, 1, T, F, F, F, F</li>
- *   <li>column6, DIMENSION, INT, 608, F, T, T, T, T</li>
- *   <li>column7, DIMENSION, INT, 146, F, T, T, F, F</li>
- *   <li>column9, DIMENSION, INT, 1737, F, F, F, F, F</li>
- *   <li>column11, DIMENSION, STRING, 5, F, T, F, F, F</li>
- *   <li>column12, DIMENSION, STRING, 5, F, F, F, F, F</li>
- *   <li>column17, METRIC, INT, 24, F, T, F, F, F</li>
- *   <li>column18, METRIC, INT, 1440, F, T, F, F, F</li>
- *   <li>daysSinceEpoch, TIME, INT, 2, T, F, F, F, F</li>
+ *   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, FwdIndexDisabled: S1, S2, HasRangeIndex,
+ *   HasDictionary
+ *   <li>column1, METRIC, INT, 6582, F, F, F, F, F, T</li>
+ *   <li>column3, METRIC, INT, 21910, F, F, F, F, F, T</li>
+ *   <li>column5, DIMENSION, STRING, 1, T, F, F, F, F, T</li>
+ *   <li>column6, DIMENSION, INT, 608, F, T, T, T, T, T</li>
+ *   <li>column7, DIMENSION, INT, 146, F, T, T, F, F, T</li>
+ *   <li>column9, DIMENSION, INT, 1737, F, F, F, F, F, F</li>
+ *   <li>column11, DIMENSION, STRING, 5, F, T, F, F, F, T</li>
+ *   <li>column12, DIMENSION, STRING, 5, F, F, F, F, F, T</li>
+ *   <li>column17, METRIC, INT, 24, F, T, F, F, F, T, T</li>
+ *   <li>column18, METRIC, INT, 1440, F, T, F, F, F, T</li>
+ *   <li>daysSinceEpoch, TIME, INT, 2, T, F, F, F, F, T</li>
  * </ul>
  */
 public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest {
@@ -94,6 +96,18 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       + " AND (column6 < 500000000 OR column11 NOT IN ('t', 'P'))"
       + " AND daysSinceEpoch = 126164076";
 
+  // Build the segment schema.
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName("testTable")
+      .addMetric("column1", FieldSpec.DataType.INT)
+      .addMetric("column3", FieldSpec.DataType.INT).addSingleValueDimension("column5", FieldSpec.DataType.STRING)
+      .addSingleValueDimension("column6", FieldSpec.DataType.INT)
+      .addSingleValueDimension("column7", FieldSpec.DataType.INT)
+      .addSingleValueDimension("column9", FieldSpec.DataType.INT)
+      .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
+      .addSingleValueDimension("column12", FieldSpec.DataType.STRING).addMetric("column17", FieldSpec.DataType.INT)
+      .addMetric("column18", FieldSpec.DataType.INT)
+      .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
+
   private IndexSegment _indexSegment;
   // Contains 2 index segments, one with 2 columns with forward index disabled, and the other with just 1.
   private List<IndexSegment> _indexSegments;
@@ -101,8 +115,9 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
   private TableConfig _tableConfig;
   private List<String> _invertedIndexColumns;
   private List<String> _forwardIndexDisabledColumns;
+  private List<String> _noDictionaryColumns;
 
-  @BeforeClass
+  @BeforeMethod
   public void buildAndLoadSegment()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
@@ -112,19 +127,8 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     assertNotNull(resource);
     String filePath = resource.getFile();
 
-    // Build the segment schema.
-    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addMetric("column1", FieldSpec.DataType.INT)
-        .addMetric("column3", FieldSpec.DataType.INT).addSingleValueDimension("column5", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("column6", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column7", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column9", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("column12", FieldSpec.DataType.STRING).addMetric("column17", FieldSpec.DataType.INT)
-        .addMetric("column18", FieldSpec.DataType.INT)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
-
-    createSegment(filePath, SEGMENT_NAME_1, schema);
-    createSegment(filePath, SEGMENT_NAME_2, schema);
+    createSegment(filePath, SEGMENT_NAME_1);
+    createSegment(filePath, SEGMENT_NAME_2);
 
     ImmutableSegment immutableSegment1 = loadSegmentWithMetadataChecks(SEGMENT_NAME_1);
     ImmutableSegment immutableSegment2 = loadSegmentWithMetadataChecks(SEGMENT_NAME_2);
@@ -133,9 +137,10 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2);
   }
 
-  private void createSegment(String filePath, String segmentName, Schema schema)
+  private void createSegment(String filePath, String segmentName)
       throws Exception {
     // Create field configs for the no forward index columns
+    _noDictionaryColumns = Arrays.asList("column9");
     List<FieldConfig> fieldConfigList = new ArrayList<>();
     fieldConfigList.add(new FieldConfig("column6", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(), null,
         Collections.singletonMap(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString())));
@@ -146,11 +151,12 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       // Build table config based on segment 1 as it contains both columns under no forward index
       _tableConfig =
           new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch")
-              .setFieldConfigList(fieldConfigList).setRangeIndexColumns(Arrays.asList("column6")).build();
+              .setFieldConfigList(fieldConfigList).setRangeIndexColumns(Arrays.asList("column6"))
+              .setNoDictionaryColumns(_noDictionaryColumns).build();
     }
 
     // Create the segment generator config.
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, SCHEMA);
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
@@ -163,6 +169,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     segmentGeneratorConfig.setSkipTimeValueCheck(true);
     _invertedIndexColumns = Arrays.asList("column6", "column7", "column11", "column17", "column18");
     segmentGeneratorConfig.setInvertedIndexCreationColumns(_invertedIndexColumns);
+    segmentGeneratorConfig.setRawIndexCreationColumns(_noDictionaryColumns);
 
     _forwardIndexDisabledColumns = new ArrayList<>(Arrays.asList("column6", "column7"));
     segmentGeneratorConfig.setForwardIndexDisabledColumns(_forwardIndexDisabledColumns);
@@ -181,6 +188,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(_invertedIndexColumns));
     indexLoadingConfig.setForwardIndexDisabledColumns(new HashSet<>(_forwardIndexDisabledColumns));
     indexLoadingConfig.setRangeIndexColumns(new HashSet<>(Arrays.asList("column6")));
+    indexLoadingConfig.setNoDictionaryColumns(new HashSet<>(_noDictionaryColumns));
     indexLoadingConfig.setReadMode(ReadMode.heap);
 
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName),
@@ -200,7 +208,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     return immutableSegment;
   }
 
-  @AfterClass
+  @AfterMethod
   public void deleteAndDestroySegment() {
     FileUtils.deleteQuietly(INDEX_DIR);
     _indexSegments.forEach((IndexSegment::destroy));
@@ -621,8 +629,11 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
           DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT
       }));
       List<Object[]> resultRows = resultTable.getRows();
+      int previousColumn1 = Integer.MIN_VALUE;
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 3);
+        assertTrue(previousColumn1 <= (int) resultRow[0]);
+        previousColumn1 = (int) resultRow[0];
       }
     }
     {
@@ -701,6 +712,142 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
   }
 
   @Test
+  public void testSelectQueriesWithReload()
+      throws Exception {
+    // Selection query with '<' filter on a forwardIndexDisabled column with range index available
+    // This is just a sanity check to ensure the query works when forward index is enabled
+    String query = "SELECT column1, column5, column9, column11 FROM testTable WHERE column6 < 2147458029 AND "
+        + "column6 > 1699000 ORDER BY column1";
+    BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 119_980L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 120_100L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    DataSchema dataSchema = new DataSchema(new String[]{"column1", "column5", "column9", "column11"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+    assertEquals(resultTable.getDataSchema(), dataSchema);
+    List<Object[]> resultRows = resultTable.getRows();
+    int previousColumn1 = Integer.MIN_VALUE;
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 4);
+      assertEquals((String) resultRow[1], "gFuH");
+      assertTrue((Integer) resultRow[0] >= previousColumn1);
+      previousColumn1 = (Integer) resultRow[0];
+    }
+    Object[] firstRow = resultRows.get(0);
+    // Column 11
+    assertEquals((String) firstRow[3], "o");
+
+    // Disable forward index for some columns
+    disableForwardIndexForSomeColumns();
+
+    // Run the same query and validate that an exception is thrown since both column9 and column11 are on the SELECT
+    // list
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() != null
+        && brokerResponseNative.getProcessingExceptions().size() > 0);
+
+    // Select query with a filter on a column9 (which will use the range index). This should work
+    query = "SELECT column1, column5 from testTable WHERE column9 > 11270 ORDER BY column1";
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 119_996L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 120_036L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column5"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+        }));
+    resultRows = resultTable.getRows();
+    previousColumn1 = Integer.MIN_VALUE;
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 2);
+      assertTrue(previousColumn1 <= (int) resultRow[0]);
+      previousColumn1 = (int) resultRow[0];
+    }
+
+    // Select query with a filter on a column11. This should work
+    query = "SELECT column1, column5 from testTable WHERE column11 IN('o', 'P') ORDER BY column1";
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 99336L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 99376L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column5"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+        }));
+    resultRows = resultTable.getRows();
+    previousColumn1 = Integer.MIN_VALUE;
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 2);
+      assertTrue(previousColumn1 <= (int) resultRow[0]);
+      previousColumn1 = (int) resultRow[0];
+    }
+
+    // Transform function on a filter clause for a forwardIndexDisabled column9 in transform should fail. This used to
+    // work before in the `testSelectQueries` test.
+    query = "SELECT column1, column5 from testTable WHERE CONCAT(column5, ADD(column9, column1), '-') = "
+        + "'gFuH-2.96708164E8' ORDER BY column1";
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() != null
+        && brokerResponseNative.getProcessingExceptions().size() > 0);
+
+    // Transform function on a filter clause for a non-forwardIndexDisabled transform should not fail
+    query = "SELECT column1, column5 from testTable WHERE CONCAT(column5, ADD(column1, column1), '-') = "
+        + "'gFuH-481056.0' ORDER BY column1";
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 28L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 56L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 120000L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column5"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+        }));
+    resultRows = resultTable.getRows();
+    assertEquals(resultRows.size(), 10);
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 2);
+      assertEquals(resultRow[0], 240528);
+      assertEquals(resultRow[1], "gFuH");
+    }
+  }
+
+  @Test
   public void testSelectWithDistinctQueries() {
     {
       // Select a mix of forwardIndexDisabled and non-forwardIndexDisabled columns with distinct
@@ -740,6 +887,49 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
         assertTrue((Integer) resultRow[0] >= previousColumn1);
         previousColumn1 = (Integer) resultRow[0];
       }
+    }
+  }
+
+  @Test
+  public void testSelectWithDistinctQueriesWithReload()
+      throws Exception {
+    // Select non-forwardIndexDisabled columns with distinct
+    // This is just a sanity check to ensure the query works when forward index is enabled
+    String query = "SELECT DISTINCT column1, column5, column9 FROM testTable ORDER BY column1 LIMIT 10";
+    BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 120_000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 360_000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column5", "column9"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
+            DataSchema.ColumnDataType.INT}));
+    List<Object[]> resultRows = resultTable.getRows();
+    int previousColumn1 = Integer.MIN_VALUE;
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 3);
+      assertEquals(resultRow[1], "gFuH");
+      assertTrue((Integer) resultRow[0] >= previousColumn1);
+      previousColumn1 = (Integer) resultRow[0];
+    }
+
+    // Disable forward index for some columns
+    disableForwardIndexForSomeColumns();
+
+    // Run the same query and validate that an exception is thrown since column9 has forward index disabled
+    try {
+      getBrokerResponse(query);
+      Assert.fail("Query should fail for running distinct on a column with forward index disabled after reload");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Forward index disabled for column: column9, cannot create DataFetcher!");
     }
   }
 
@@ -787,6 +977,34 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       assertNotNull(brokerResponseNative.getProcessingExceptions());
       assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
       assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column5"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING}));
+      List<Object[]> resultRows = resultTable.getRows();
+      int previousVal = -1;
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 2);
+        assertEquals(resultRow[1], "gFuH");
+        assertTrue((int) resultRow[0] > previousVal);
+        previousVal = (int) resultRow[0];
+      }
+    }
+    {
+      // Select non-forwardIndexDisabled columns with group by order by
+      String query = "SELECT column9, column5 FROM testTable GROUP BY column9, column5 ORDER BY column9, column5 "
+          + " LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+      assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 120000L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 240000L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column9", "column5"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING}));
       List<Object[]> resultRows = resultTable.getRows();
       int previousVal = -1;
@@ -870,6 +1088,81 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
         assertEquals(resultRow.length, 1);
         assertTrue(resultRow[0].toString().endsWith("-gFuH"));
       }
+    }
+  }
+
+  @Test
+  public void testSelectWithGroupByOrderByQueriesWithReload()
+      throws Exception {
+    // Select non-forwardIndexDisabled columns using nested transform with group by order by
+    // This is just a sanity check to ensure the query works when forward index is enabled
+    String query = "SELECT CONCAT(ADD(column1, column9), column5, '-') FROM testTable GROUP BY "
+        + "CONCAT(ADD(column1, column9), column5, '-') ORDER BY CONCAT(ADD(column1, column9), column5, '-') LIMIT 10";
+    BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 120000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 360000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"concat(add(column1,column9),column5,'-')"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
+    List<Object[]> resultRows = resultTable.getRows();
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 1);
+      assertTrue(resultRow[0].toString().endsWith("-gFuH"));
+    }
+
+    // Disable forward index for some columns
+    disableForwardIndexForSomeColumns();
+
+    // Run the same query and validate that an exception is thrown since both column9 and column11 are on the SELECT
+    // list
+    try {
+      getBrokerResponse(query);
+      Assert.fail("Query should fail for this query on a column with forward index disabled after reload");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Forward index disabled for column: column9, cannot create DataFetcher!");
+    }
+
+    // Try a similar query without the forward index disabled columns
+    query = "SELECT CONCAT(ADD(column1, column1), column5, '-') FROM testTable GROUP BY "
+        + "CONCAT(ADD(column1, column1), column5, '-') ORDER BY CONCAT(ADD(column1, column1), column5, '-') LIMIT 10";
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 120000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 240000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"concat(add(column1,column1),column5,'-')"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
+    resultRows = resultTable.getRows();
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 1);
+      assertTrue(resultRow[0].toString().endsWith("-gFuH"));
+    }
+
+    // Try a simpler select with group by and order by including forward index disabled column
+    query = "SELECT column9, column5 FROM testTable GROUP BY column9, column5 ORDER BY column9, column5 "
+        + " LIMIT 10";
+    try {
+      getBrokerResponse(query);
+      Assert.fail("Query should fail for this query on a column with forward index disabled after reload");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Forward index disabled for column: column9, cannot create DataFetcher!");
     }
   }
 
@@ -1161,6 +1454,95 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
   }
 
   @Test
+  public void testSelectWithAggregationQueriesWithReload()
+      throws Exception {
+    // Transform inside aggregation not involving any forwardIndexDisabled column with group by order by
+    // This is just a sanity check to ensure the query works when forward index is enabled
+    String query = "SELECT column1, MAX(ADD(column1, column9)) from testTable GROUP BY column1 ORDER BY column1 "
+        + "DESC LIMIT 10";
+    BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 120_000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 240000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "max(add(column1,column9))"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE}));
+    List<Object[]> resultRows = resultTable.getRows();
+    int previousVal = Integer.MAX_VALUE;
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 2);
+      assertTrue((int) resultRow[0] <= previousVal);
+      previousVal = (int) resultRow[0];
+    }
+
+    // Disable forward index for some columns
+    disableForwardIndexForSomeColumns();
+
+    // Run the same query and validate that an exception is thrown since column9 has forward index disabled
+    try {
+      getBrokerResponse(query);
+      Assert.fail("Query should fail for this query on a column with forward index disabled after reload");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Forward index disabled for column: column9, cannot create DataFetcher!");
+    }
+
+    query = "SELECT max(column9), min(column9) from testTable";
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 120000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 0L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"max(column9)", "min(column9)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE}));
+    resultRows = resultTable.getRows();
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 2);
+      assertEquals(resultRow[0], 2.147450879E9);
+      assertEquals(resultRow[1], 11270.0);
+    }
+
+    // Allowed aggregation functions on non-forwardIndexDisabled columns with a filter on a forwardIndexDisabled
+    // column
+    query = "SELECT max(column1) from testTable WHERE column9 > 50000";
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 119996L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 119996L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"max(column1)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE}));
+    resultRows = resultTable.getRows();
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 1);
+      assertEquals(resultRow[0], 2.146952047E9);
+    }
+  }
+
+  @Test
   public void testSelectWithAggregationGroupByHaving() {
     {
       // forwardIndexDisabled column used in HAVING clause
@@ -1213,5 +1595,87 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
         previousVal = (double) resultRow[0];
       }
     }
+  }
+
+  @Test
+  public void testSelectWithAggregationGroupByHavingWithReload()
+      throws Exception {
+    // forwardIndexDisabled column not used in HAVING clause or aggregation select
+    // This is just a sanity check to ensure the query works when forward index is enabled
+    String query = "SELECT min(column9), column1 from testTable GROUP BY column1, column9 HAVING min(column9) "
+        + "> 11270 ORDER BY column9 DESC LIMIT 10";
+    BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 120_000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 240000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"min(column9)", "column1"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.INT}));
+    List<Object[]> resultRows = resultTable.getRows();
+    double previousVal = Double.MAX_VALUE;
+    for (Object[] resultRow : resultRows) {
+      assertEquals(resultRow.length, 2);
+      assertTrue((double) resultRow[0] <= previousVal);
+      previousVal = (double) resultRow[0];
+    }
+
+    // Disable forward index for some columns
+    disableForwardIndexForSomeColumns();
+
+    // Run the same query and validate that an exception is thrown since column9 has forward index disabled
+    try {
+      getBrokerResponse(query);
+      Assert.fail("Query should fail for this query on a column with forward index disabled after reload");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Forward index disabled for column: column9, cannot create DataFetcher!");
+    }
+  }
+
+  private void disableForwardIndexForSomeColumns()
+      throws Exception {
+    // Now disable forward index for column9 and column11 in the index loading config, while enabling inverted index
+    // and range index for column9. column11 already has inverted index enabled.
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    indexLoadingConfig.setTableConfig(_tableConfig);
+    Set<String> invertedIndexEnabledColumns = new HashSet<>(_invertedIndexColumns);
+    invertedIndexEnabledColumns.add("column9");
+    indexLoadingConfig.setInvertedIndexColumns(invertedIndexEnabledColumns);
+    Set<String> forwardIndexDisabledColumns = new HashSet<>(_forwardIndexDisabledColumns);
+    forwardIndexDisabledColumns.add("column9");
+    forwardIndexDisabledColumns.add("column11");
+    indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
+    indexLoadingConfig.setRangeIndexColumns(new HashSet<>(Arrays.asList("column6", "column9")));
+    indexLoadingConfig.getNoDictionaryColumns().remove("column9");
+    indexLoadingConfig.setReadMode(ReadMode.heap);
+
+    // Reload the segments to pick up the new configs
+    File indexDir = new File(INDEX_DIR, SEGMENT_NAME_1);
+    ImmutableSegment immutableSegment1 = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
+    indexDir = new File(INDEX_DIR, SEGMENT_NAME_2);
+    ImmutableSegment immutableSegment2 = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
+    _indexSegment = immutableSegment1;
+    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2);
+
+    assertNull(immutableSegment1.getForwardIndex("column9"));
+    assertNull(immutableSegment1.getForwardIndex("column11"));
+    assertNotNull(immutableSegment1.getInvertedIndex("column9"));
+    assertNotNull(immutableSegment1.getInvertedIndex("column11"));
+    assertNotNull(immutableSegment1.getDictionary("column9"));
+    assertNotNull(immutableSegment1.getDictionary("column11"));
+
+    assertNull(immutableSegment2.getForwardIndex("column9"));
+    assertNull(immutableSegment2.getForwardIndex("column11"));
+    assertNotNull(immutableSegment2.getInvertedIndex("column9"));
+    assertNotNull(immutableSegment2.getInvertedIndex("column11"));
+    assertNotNull(immutableSegment2.getDictionary("column9"));
+    assertNotNull(immutableSegment2.getDictionary("column11"));
   }
 }
