@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
@@ -71,10 +72,10 @@ public class TransferableBlockUtilsTest {
     RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
     int rowSizeInBytes = rowBlock.getRowSizeInBytes();
     validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rowBlock),
-        BaseDataBlock.Type.ROW, rowSizeInBytes * splitRowCount + 1), rows, dataSchema);
+        DataBlock.Type.ROW, rowSizeInBytes * splitRowCount + 1), rows, dataSchema);
     // compare non-serialized split
-    validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rows, dataSchema, BaseDataBlock.Type.ROW),
-        BaseDataBlock.Type.ROW, rowSizeInBytes * splitRowCount + 1), rows, dataSchema);
+    validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rows, dataSchema, DataBlock.Type.ROW),
+        DataBlock.Type.ROW, rowSizeInBytes * splitRowCount + 1), rows, dataSchema);
   }
 
   @Test
@@ -88,14 +89,14 @@ public class TransferableBlockUtilsTest {
     validateNonSplittableBlock(columnarBlock);
 
     // METADATA
-    MetadataBlock metadataBlock = new MetadataBlock();
+    MetadataBlock metadataBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
     validateNonSplittableBlock(metadataBlock);
   }
 
   private void validateNonSplittableBlock(BaseDataBlock nonSplittableBlock)
       throws Exception {
     List<TransferableBlock> transferableBlocks =
-        TransferableBlockUtils.splitBlock(new TransferableBlock(nonSplittableBlock), BaseDataBlock.Type.METADATA,
+        TransferableBlockUtils.splitBlock(new TransferableBlock(nonSplittableBlock), DataBlock.Type.METADATA,
             4 * 1024 * 1024);
     Assert.assertEquals(transferableBlocks.size(), 1);
     Assert.assertEquals(transferableBlocks.get(0).getDataBlock(), nonSplittableBlock);

@@ -24,8 +24,8 @@ import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.datatable.DataTable;
@@ -56,9 +56,8 @@ public class DataBlockTest {
         QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, originalException);
     String expected = processingException.getMessage();
 
-    BaseDataBlock dataBlock = DataBlockUtils.getErrorDataBlock(originalException);
+    DataBlock dataBlock = DataBlockUtils.getErrorDataBlock(originalException);
     dataBlock.addException(processingException);
-    Assert.assertNull(dataBlock.getDataSchema());
     Assert.assertEquals(dataBlock.getNumberOfRows(), 0);
 
     // Assert processing exception and original exception both matches.
@@ -94,7 +93,7 @@ public class DataBlockTest {
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     convertToDataTableCompatibleRows(rows, dataSchema);
     DataTable dataTableImpl = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, true);
-    BaseDataBlock dataBlockFromDataTable = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTableImpl.toBytes()));
+    DataBlock dataBlockFromDataTable = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTableImpl.toBytes()));
 
     RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
     for (int coldId = 0; coldId < numColumns; coldId++) {

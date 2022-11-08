@@ -24,9 +24,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.RowDataBlock;
-import org.apache.pinot.common.utils.DataSchema;
 
 
 public final class TransferableBlockUtils {
@@ -34,8 +34,12 @@ public final class TransferableBlockUtils {
     // do not instantiate.
   }
 
-  public static TransferableBlock getEndOfStreamTransferableBlock(DataSchema dataSchema) {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(dataSchema));
+  public static TransferableBlock getEndOfStreamTransferableBlock() {
+    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+  }
+
+  public static TransferableBlock getNoOpTransferableBlock() {
+    return new TransferableBlock(DataBlockUtils.getNoOpBlock());
   }
 
   public static TransferableBlock getErrorTransferableBlock(Exception e) {
@@ -50,6 +54,10 @@ public final class TransferableBlockUtils {
     return transferableBlock.isEndOfStreamBlock();
   }
 
+  public static boolean isNoOpBlock(TransferableBlock transferableBlock) {
+    return transferableBlock.isNoOpBlock();
+  }
+
   /**
    *  Split a block into multiple block so that each block size is within maxBlockSize.
    *  Currently, we only support split for row type dataBlock.
@@ -60,7 +68,7 @@ public final class TransferableBlockUtils {
    */
   public static List<TransferableBlock> splitBlock(TransferableBlock block, BaseDataBlock.Type type, int maxBlockSize) {
     List<TransferableBlock> blockChunks = new ArrayList<>();
-    if (type != BaseDataBlock.Type.ROW) {
+    if (type != DataBlock.Type.ROW) {
       return Collections.singletonList(block);
     } else {
       int rowSizeInBytes = ((RowDataBlock) block.getDataBlock()).getRowSizeInBytes();
@@ -80,7 +88,7 @@ public final class TransferableBlockUtils {
   }
 
   public static Object[] getRow(TransferableBlock transferableBlock, int rowId) {
-    Preconditions.checkState(transferableBlock.getType() == BaseDataBlock.Type.ROW,
+    Preconditions.checkState(transferableBlock.getType() == DataBlock.Type.ROW,
         "TransferableBlockUtils doesn't support get row from non-ROW-based data block type yet!");
     return transferableBlock.getContainer().get(rowId);
   }

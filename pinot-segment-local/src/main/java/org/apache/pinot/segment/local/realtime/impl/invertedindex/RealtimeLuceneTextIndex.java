@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
+import java.util.List;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
@@ -57,8 +58,11 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
    * @param column column name
    * @param segmentIndexDir realtime segment consumer dir
    * @param segmentName realtime segment name
+   * @param stopWordsInclude the words to include in addition to the default stop word list
+   * @param stopWordsExclude stop words to exclude from default stop words
    */
-  public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName) {
+  public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName,
+      List<String> stopWordsInclude, List<String> stopWordsExclude) {
     _column = column;
     _segmentName = segmentName;
     try {
@@ -72,7 +76,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       // for realtime
       _indexCreator =
           new LuceneTextIndexCreator(column, new File(segmentIndexDir.getAbsolutePath() + "/" + segmentName),
-              false /* commitOnClose */);
+              false /* commitOnClose */, stopWordsInclude, stopWordsExclude);
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
     } catch (Exception e) {

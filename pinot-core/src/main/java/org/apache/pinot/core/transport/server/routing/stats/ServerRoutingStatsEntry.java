@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.transport.server.routing.stats;
 
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.common.utils.ExponentialMovingAverage;
 
@@ -42,14 +43,17 @@ public class ServerRoutingStatsEntry {
   private final int _hybridScoreExponent;
 
   public ServerRoutingStatsEntry(String serverInstanceId, double alphaEMA, long autoDecayWindowMsEMA,
-      long warmupDurationMsEMA, double avgInitializationValEMA, int scoreExponent) {
+      long warmupDurationMsEMA, double avgInitializationValEMA, int scoreExponent,
+      ScheduledExecutorService periodicTaskExecutor) {
     _serverInstanceId = serverInstanceId;
     _serverLock = new ReentrantReadWriteLock();
 
     _inFlighRequestsEMA =
-        new ExponentialMovingAverage(alphaEMA, autoDecayWindowMsEMA, warmupDurationMsEMA, avgInitializationValEMA);
+        new ExponentialMovingAverage(alphaEMA, autoDecayWindowMsEMA, warmupDurationMsEMA, avgInitializationValEMA,
+            periodicTaskExecutor);
     _latencyMsEMA =
-        new ExponentialMovingAverage(alphaEMA, autoDecayWindowMsEMA, warmupDurationMsEMA, avgInitializationValEMA);
+        new ExponentialMovingAverage(alphaEMA, autoDecayWindowMsEMA, warmupDurationMsEMA, avgInitializationValEMA,
+            periodicTaskExecutor);
 
     _hybridScoreExponent = scoreExponent;
   }

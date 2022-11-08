@@ -352,8 +352,9 @@ const getSchemaObject = async (schemaName) =>{
       return schemaObj;
   }
 
+const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Total Columns"];
+
 const getAllSchemaDetails = async () => {
-  const columnHeaders = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Total Columns"]
   let schemaDetails:Array<any> = [];
   let promiseArr = [];
   const {data} = await getSchemaList()
@@ -371,19 +372,20 @@ const getAllSchemaDetails = async () => {
     return schemaObj;
   })
   return {
-    columns: columnHeaders,
+    columns: allSchemaDetailsColumnHeader,
     records: schemaDetails
   };
 }
 
+const allTableDetailsColumnHeader = [
+  'Table Name',
+  'Reported Size',
+  'Estimated Size',
+  'Number of Segments',
+  'Status',
+];
+
 const getAllTableDetails = (tablesList) => {
-  const columnHeaders = [
-    'Table Name',
-    'Reported Size',
-    'Estimated Size',
-    'Number of Segments',
-    'Status',
-  ];
   if (tablesList.length) {
     const promiseArr = [];
     tablesList.map((name) => {
@@ -433,13 +435,13 @@ const getAllTableDetails = (tablesList) => {
         }
       });
       return {
-        columns: columnHeaders,
+        columns: allTableDetailsColumnHeader,
         records: finalRecordsArr,
       };
     });
   }
   return {
-    columns: columnHeaders,
+    columns: allTableDetailsColumnHeader,
     records: []
   };
 };
@@ -1096,6 +1098,7 @@ export default {
   getTableSchemaData,
   getQueryResults,
   getTenantTableData,
+  allTableDetailsColumnHeader,
   getAllTableDetails,
   getTableSummaryData,
   getSegmentList,
@@ -1154,6 +1157,7 @@ export default {
   saveSchemaAction,
   saveTableAction,
   getSchemaData,
+  allSchemaDetailsColumnHeader,
   getAllSchemaDetails,
   getTableState,
   getAuthInfo,

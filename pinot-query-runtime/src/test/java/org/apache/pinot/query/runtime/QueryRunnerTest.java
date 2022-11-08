@@ -85,7 +85,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
     return QueryDispatcher.toResultTable(QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator),
-        queryPlan.getQueryResultFields()).getRows();
+        queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
   }
 
   private List<Object[]> queryH2(String sql)

@@ -31,6 +31,7 @@ import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -113,14 +114,27 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       Map<String, ConsumerPartitionState> currentPartitionStateMap) {
     Map<String, PartitionLagState> perPartitionLag = new HashMap<>();
     for (Map.Entry<String, ConsumerPartitionState> entry: currentPartitionStateMap.entrySet()) {
-      StreamPartitionMsgOffset currentOffset = entry.getValue().getCurrentOffset();
-      StreamPartitionMsgOffset upstreamLatest = entry.getValue().getUpstreamLatestOffset();
+      ConsumerPartitionState partitionState = entry.getValue();
+      // Compute records-lag
+      StreamPartitionMsgOffset currentOffset = partitionState.getCurrentOffset();
+      StreamPartitionMsgOffset upstreamLatest = partitionState.getUpstreamLatestOffset();
+      String offsetLagString = "UNKNOWN";
+
       if (currentOffset instanceof LongMsgOffset && upstreamLatest instanceof LongMsgOffset) {
         long offsetLag = ((LongMsgOffset) upstreamLatest).getOffset() - ((LongMsgOffset) currentOffset).getOffset();
-        perPartitionLag.put(entry.getKey(), new KafkaConsumerPartitionLag(String.valueOf(offsetLag)));
-      } else {
-        perPartitionLag.put(entry.getKey(), new KafkaConsumerPartitionLag("UNKNOWN"));
+        offsetLagString = String.valueOf(offsetLag);
       }
+
+      // Compute record-availability
+      String availabilityLagMs = "UNKNOWN";
+      RowMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
+      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
+        long availabilityLag = partitionState.getLastProcessedTimeMs()
+            - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
+        availabilityLagMs = String.valueOf(availabilityLag);
+      }
+
+      perPartitionLag.put(entry.getKey(), new KafkaConsumerPartitionLag(offsetLagString, availabilityLagMs));
     }
     return perPartitionLag;
   }

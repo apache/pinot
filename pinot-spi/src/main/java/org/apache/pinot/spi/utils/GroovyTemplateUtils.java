@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils;
 
+import groovy.lang.GroovyShell;
 import groovy.text.SimpleTemplateEngine;
 import java.io.IOException;
 import java.time.Instant;
@@ -33,7 +34,8 @@ public class GroovyTemplateUtils {
   private GroovyTemplateUtils() {
   }
 
-  private static final SimpleTemplateEngine GROOVY_TEMPLATE_ENGINE = new SimpleTemplateEngine();
+  private static final GroovyShell GROOVY_SHELL = new GroovyShell();
+  private static final SimpleTemplateEngine GROOVY_TEMPLATE_ENGINE = new SimpleTemplateEngine(GROOVY_SHELL);
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
 
@@ -41,7 +43,9 @@ public class GroovyTemplateUtils {
       throws IOException, ClassNotFoundException {
     Map<String, Object> contextMap = getDefaultContextMap();
     contextMap.putAll(newContext);
-    return GROOVY_TEMPLATE_ENGINE.createTemplate(template).make(contextMap).toString();
+    String templateRendered = GROOVY_TEMPLATE_ENGINE.createTemplate(template).make(contextMap).toString();
+    GROOVY_SHELL.resetLoadedClasses();
+    return templateRendered;
   }
 
   /**

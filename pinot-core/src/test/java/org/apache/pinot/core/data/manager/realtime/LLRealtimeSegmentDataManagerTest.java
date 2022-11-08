@@ -1084,6 +1084,11 @@ public class LLRealtimeSegmentDataManagerTest {
       _postConsumeStoppedCalled = true;
     }
 
+    // TODO: Some of the tests rely on specific number of calls to the `now()` method in the SegmentDataManager.
+    // This is not a good coding practice and makes the code very fragile. This needs to be fixed.
+    // Invoking now() in any part of LLRealtimeSegmentDataManager code will break the following tests:
+    // 1. LLRealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReached
+    // 2. LLRealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndTimeThresholdIsReached
     @Override
     protected long now() {
       // now() is called in the constructor before _timeSupplier is set

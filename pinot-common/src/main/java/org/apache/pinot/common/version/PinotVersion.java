@@ -41,6 +41,12 @@ public class PinotVersion {
    */
   public static final String VERSION;
 
+  /**
+   * A sanitized version string with all dots replaced with underscores, which is necessary
+   * for Prometheus to be able to properly handle the version.
+   */
+  public static final String VERSION_METRIC_NAME;
+
   private PinotVersion() {
     // private constructor for utility class
   }
@@ -66,5 +72,7 @@ public class PinotVersion {
     } else {
       VERSION = version;
     }
+
+    VERSION_METRIC_NAME = VERSION.replace('.', '_').replace('-', '_');
   }
 }

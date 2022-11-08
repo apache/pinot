@@ -34,7 +34,8 @@ public class PinotFSFactoryTest {
   @Test
   public void testDefaultPinotFSFactory() {
     PinotFSFactory.init(new PinotConfiguration());
-    Assert.assertTrue(PinotFSFactory.create("file") instanceof LocalPinotFS);
+    NoClosePinotFS pinotFS = (NoClosePinotFS) PinotFSFactory.create("file");
+    Assert.assertTrue(pinotFS._delegate instanceof LocalPinotFS);
   }
 
   @Test
@@ -48,14 +49,15 @@ public class PinotFSFactoryTest {
     properties.put("test.region", "us-east");
     PinotFSFactory.init(new PinotConfiguration(properties));
 
-    PinotFS testPinotFS = PinotFSFactory.create("test");
-    Assert.assertTrue(testPinotFS instanceof TestPinotFS);
-    Assert.assertEquals(((TestPinotFS) testPinotFS).getInitCalled(), 1);
-    Assert.assertEquals(((TestPinotFS) testPinotFS).getConfiguration().getProperty("accessKey"), "v1");
-    Assert.assertEquals(((TestPinotFS) testPinotFS).getConfiguration().getProperty("secretKey"), "V2");
-    Assert.assertEquals(((TestPinotFS) testPinotFS).getConfiguration().getProperty("region"), "us-east");
+    NoClosePinotFS testPinotFS = (NoClosePinotFS) PinotFSFactory.create("test");
+    Assert.assertTrue(testPinotFS._delegate instanceof TestPinotFS);
+    Assert.assertEquals(((TestPinotFS) testPinotFS._delegate).getInitCalled(), 1);
+    Assert.assertEquals(((TestPinotFS) testPinotFS._delegate).getConfiguration().getProperty("accessKey"), "v1");
+    Assert.assertEquals(((TestPinotFS) testPinotFS._delegate).getConfiguration().getProperty("secretKey"), "V2");
+    Assert.assertEquals(((TestPinotFS) testPinotFS._delegate).getConfiguration().getProperty("region"), "us-east");
 
-    Assert.assertTrue(PinotFSFactory.create("file") instanceof LocalPinotFS);
+    NoClosePinotFS pinotFS = (NoClosePinotFS) PinotFSFactory.create("file");
+    Assert.assertTrue(pinotFS._delegate instanceof LocalPinotFS);
   }
 
   public static class TestPinotFS extends BasePinotFS {

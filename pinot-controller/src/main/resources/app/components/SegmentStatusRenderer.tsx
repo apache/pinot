@@ -32,6 +32,7 @@ import { getSegmentLevelDebugDetails } from "../requests";
 import CustomCodemirror from "./CustomCodemirror";
 import CustomDialog from "./CustomDialog";
 import { NotificationContext } from "./Notification/NotificationContext";
+import clsx from "clsx";
 
 const useStyles = makeStyles((theme) => ({
   error: {
@@ -41,10 +42,6 @@ const useStyles = makeStyles((theme) => ({
   success: {
     color: theme.palette.success.main,
     border: `1px solid ${theme.palette.success.main}`,
-  },
-  info: {
-    color: theme.palette.info.main,
-    border: `1px solid ${theme.palette.info.main}`,
   },
   warning: {
     color: theme.palette.warning.main,
@@ -62,10 +59,9 @@ interface SegmentStatusRendererProps {
   tableName: string;
 }
 
-export enum StatusVariant {
+export enum StatusColor {
   Error = "error",
   Warning = "warning",
-  Info = "info",
   Success = "success",
 }
 
@@ -74,16 +70,16 @@ export const SegmentStatusRenderer = ({
   segmentName,
   tableName,
 }: SegmentStatusRendererProps) => {
+  const { dispatch: notify } = useContext(NotificationContext);
   const [statusTooltipTitle, setStatusTooltipTitle] = useState<string>("");
-  const [statusVariant, setStatusVariant] = useState<StatusVariant | null>(
+  const [statusColor, setStatusColor] = useState<StatusColor | null>(
     null
   );
-  const segmentStatusRendererClasses = useStyles();
   const [errorDetailsVisible, setErrorDetailsVisible] =
     useState<boolean>(false);
   const [segmentDebugDetails, setSegmentDebugDetails] =
     useState<SegmentDebugDetails | null>(null);
-  const { dispatch: notify } = useContext(NotificationContext);
+  const segmentStatusRendererClasses = useStyles();
 
   useEffect(() => {
     initializeValues();
@@ -92,20 +88,20 @@ export const SegmentStatusRenderer = ({
   const initializeValues = () => {
     switch (status) {
       case DISPLAY_SEGMENT_STATUS.GOOD: {
-        setStatusVariant(StatusVariant.Success);
-        setStatusTooltipTitle("Segment is in healthy state");
+        setStatusColor(StatusColor.Success);
+        setStatusTooltipTitle("All the servers of this segment are ONLINE/CONSUMING");
 
         break;
       }
       case DISPLAY_SEGMENT_STATUS.BAD: {
-        setStatusVariant(StatusVariant.Error);
-        setStatusTooltipTitle("One or more server is in error state");
+        setStatusColor(StatusColor.Error);
+        setStatusTooltipTitle("One or more servers of this segment are in ERROR state");
 
         break;
       }
       case DISPLAY_SEGMENT_STATUS.PARTIAL: {
-        setStatusVariant(StatusVariant.Warning);
-        setStatusTooltipTitle("External view is in offline state");
+        setStatusColor(StatusColor.Warning);
+        setStatusTooltipTitle("External view is OFFLINE or missing for one or more servers of this segment");
 
         break;
       }
@@ -143,9 +139,7 @@ export const SegmentStatusRenderer = ({
     <>
       <Tooltip arrow title={statusTooltipTitle} placement="top">
         <Chip
-          className={
-            statusVariant ? segmentStatusRendererClasses[statusVariant] : ""
-          }
+          className={clsx([segmentStatusRendererClasses[statusColor]])}
           label={status}
           variant="outlined"
         />

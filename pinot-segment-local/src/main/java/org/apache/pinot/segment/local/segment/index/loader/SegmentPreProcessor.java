@@ -104,8 +104,17 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Update single-column indices, like inverted index, json index etc.
       IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        IndexHandler handler = IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig);
+        IndexHandler handler =
+            IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig, _schema);
         handler.updateIndices(segmentWriter, indexCreatorProvider);
+        if (type == ColumnIndexType.FORWARD_INDEX) {
+          // TODO: Find a way to ensure ForwardIndexHandler is always executed before other handlers instead of
+          // relying on enum ordering.
+          // ForwardIndexHandler may modify the segment metadata while rewriting forward index to create a dictionary
+          // . This new metadata is needed to construct other indexes like RangeIndex.
+          _segmentMetadata = new SegmentMetadataImpl(indexDir);
+          _segmentDirectory.reloadMetadata();
+        }
       }
 
       // Create/modify/remove star-trees if required.
@@ -149,7 +158,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        if (IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig)
+        if (IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig, _schema)
             .needUpdateIndices(segmentReader)) {
           LOGGER.info("Found index type: {} needs updates", type);
           return true;

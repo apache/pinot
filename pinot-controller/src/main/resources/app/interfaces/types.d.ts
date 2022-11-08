@@ -22,6 +22,7 @@ declare module 'Models' {
     records: Array<Array<string | number | boolean>>;
     columns: Array<string>;
     error?: string;
+    isLoading? : boolean
   };
 
   type SchemaDetails = {
@@ -230,6 +231,6 @@ declare module 'Models' {
   export const enum DISPLAY_SEGMENT_STATUS {
     BAD = "BAD",
     GOOD = "GOOD",
-    PARTIAL = "PARTIAL"
+    PARTIAL = "PARTIAL",
   }
 }

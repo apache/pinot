@@ -41,7 +41,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -49,6 +48,7 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class PinotSegmentsMetadataTest {
@@ -156,7 +156,7 @@ public class PinotSegmentsMetadataTest {
     BiMap<String, String> endpoints = serverEndpoints(servers);
     String table = "offline";
     List<String> metadata = testMetadataResponse(table, serverToSegmentsMap, endpoints);
-    Assert.assertEquals(1, metadata.size());
+    assertEquals(1, metadata.size());
   }
 
   @Test
@@ -174,8 +174,8 @@ public class PinotSegmentsMetadataTest {
     BiMap<String, String> endpoints = serverEndpoints(servers);
     String table = "offline";
     List<String> metadata = testMetadataResponse(table, serverToSegmentsMap, endpoints);
-    Assert.assertEquals(1, metadata.size());
-    Assert.assertEquals(expectedNonResponsiveServers, totalResponses - metadata.size());
+    assertEquals(1, metadata.size());
+    assertEquals(expectedNonResponsiveServers, totalResponses - metadata.size());
   }
 
   public static class SegmentsServerMock extends FakeHttpServer {
@@ -199,22 +199,11 @@ public class PinotSegmentsMetadataTest {
     public static final List<String> SEGMENT_SERVERS =
         Arrays.asList("server1", "server2", "server3", "server4", "server5");
     public static final String SEGMENT_METADATA_STR =
-        "{\n"
-            + "  \"segmentName\" : \"testTable_OFFLINE_default_s1\",\n"
-            + "  \"schemaName\" : null,\n"
-            + "  \"crc\" : 1804064321,\n"
-            + "  \"creationTimeMillis\" : 1595127594768,\n"
-            + "  \"creationTimeReadable\" : \"2020-07-19T02:59:54:768 UTC\",\n"
-            + "  \"timeGranularitySec\" : null,\n"
-            + "  \"startTimeMillis\" : null,\n"
-            + "  \"startTimeReadable\" : null,\n"
-            + "  \"endTimeMillis\" : null,\n"
-            + "  \"endTimeReadable\" : null,\n"
-            + "  \"segmentVersion\" : \"v3\",\n"
-            + "  \"creatorName\" : null,\n"
-            + "  \"paddingCharacter\" : \"\\u0000\",\n"
-            + "  \"columns\" : [ ],\n"
-            + "  \"indexes\" : [ { } ]\n"
-            + "}";
+        "{\n" + "  \"segmentName\" : \"testTable_OFFLINE_default_s1\",\n" + "  \"schemaName\" : null,\n"
+            + "  \"crc\" : 1804064321,\n" + "  \"creationTimeMillis\" : 1595127594768,\n"
+            + "  \"creationTimeReadable\" : \"2020-07-19T02:59:54:768 UTC\",\n" + "  \"timeGranularitySec\" : null,\n"
+            + "  \"startTimeMillis\" : null,\n" + "  \"startTimeReadable\" : null,\n" + "  \"endTimeMillis\" : null,\n"
+            + "  \"endTimeReadable\" : null,\n" + "  \"segmentVersion\" : \"v3\",\n" + "  \"creatorName\" : null,\n"
+            + "  \"paddingCharacter\" : \"\\u0000\",\n" + "  \"columns\" : [ ],\n" + "  \"indexes\" : [ { } ]\n" + "}";
   }
 }
