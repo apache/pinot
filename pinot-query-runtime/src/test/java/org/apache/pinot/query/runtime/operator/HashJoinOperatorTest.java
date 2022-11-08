@@ -145,4 +145,23 @@ public class HashJoinOperatorTest {
     Assert.assertEquals(expectedRows.get(1), resultRows.get(1));
     Assert.assertEquals(expectedRows.get(2), resultRows.get(2));
   }
+
+  @Test
+  public void testSemiJoin() {
+//    List<Object[]> leftRows = Arrays.asList(new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"});
+//    when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(leftRows))
+//        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
+//    List<Object[]> rightRows = Arrays.asList(new Object[]{1, "AA"}, new Object[]{2, "Aa"});
+//    when(_rightOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(rightRows))
+//        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
+//
+//    List<RexExpression> joinClauses = new ArrayList<>();
+//    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
+//        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+//        DataSchema.ColumnDataType.STRING
+//    });
+//    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
+//        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.LEFT);
+
+  }
 }
