@@ -20,10 +20,8 @@ package org.apache.pinot.query;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -32,11 +30,8 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.testutils.MockRoutingManagerFactory;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
@@ -48,14 +43,7 @@ public class QueryEnvironmentTestBase {
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
       ImmutableMap.of("a_REALTIME", ImmutableList.of("a3"), "c_OFFLINE", ImmutableList.of("c2", "c3"),
           "d_REALTIME", ImmutableList.of("d2"), "d_OFFLINE", ImmutableList.of("d3"));
-  public static final Schema.SchemaBuilder SCHEMA_BUILDER;
-  public static final Object[][] ROWS = new Object[][]{
-      new Object[]{"foo", "foo", 1},
-      new Object[]{"bar", "bar", 42},
-      new Object[]{"alice", "alice", 1},
-      new Object[]{"bob", "foo", 42},
-      new Object[]{"charlie", "bar", 1},
-  };
+  private static final Schema.SchemaBuilder SCHEMA_BUILDER;
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder()
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -103,20 +91,6 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 IN ('foo', 'bar') AND"
             + " b.col2 NOT IN ('alice', 'charlie')"},
     };
-  }
-
-  public static List<GenericRow> buildRows(String tableName) {
-    List<GenericRow> rows = new ArrayList<>(ROWS.length);
-    for (int i = 0; i < ROWS.length; i++) {
-      GenericRow row = new GenericRow();
-      row.putValue("col1", ROWS[i][0]);
-      row.putValue("col2", ROWS[i][1]);
-      row.putValue("col3", ROWS[i][2]);
-      row.putValue("ts", TableType.OFFLINE.equals(TableNameBuilder.getTableTypeFromTableName(tableName))
-          ? System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2) : System.currentTimeMillis());
-      rows.add(row);
-    }
-    return rows;
   }
 
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,

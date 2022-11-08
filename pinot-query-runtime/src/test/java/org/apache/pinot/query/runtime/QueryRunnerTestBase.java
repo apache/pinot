@@ -18,50 +18,29 @@
  */
 package org.apache.pinot.query.runtime;
 
-import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
-import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
-import org.apache.pinot.query.routing.WorkerInstance;
-import org.apache.pinot.query.service.QueryConfig;
-import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
-import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 
 
 
 public class QueryRunnerTestBase extends QueryTestSet {
-  private static final File INDEX_DIR_S1_A = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableA");
-  private static final File INDEX_DIR_S1_B = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableB");
-  private static final File INDEX_DIR_S1_C = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableC");
-  private static final File INDEX_DIR_S1_D = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableD");
-  private static final File INDEX_DIR_S2_A = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server2_tableA");
-  private static final File INDEX_DIR_S2_C = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server2_tableC");
-  private static final File INDEX_DIR_S2_D = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server2_tableD");
-
   protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
 
   protected QueryEnvironment _queryEnvironment;
@@ -84,9 +63,8 @@ public class QueryRunnerTestBase extends QueryTestSet {
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
   }
 
-  protected void addTableToH2(List<String> tables)
+  protected void addTableToH2(Schema schema, List<String> tables)
       throws SQLException {
-    Schema schema = QueryEnvironmentTestBase.SCHEMA_BUILDER.build();
     List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
     for (String tableName : tables) {
       // create table
@@ -96,9 +74,8 @@ public class QueryRunnerTestBase extends QueryTestSet {
     }
   }
 
-  protected void addDataToH2(Map<String, List<GenericRow>> rowsMap)
+  protected void addDataToH2(Schema schema, Map<String, List<GenericRow>> rowsMap)
       throws SQLException {
-    Schema schema = QueryEnvironmentTestBase.SCHEMA_BUILDER.build();
     List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
     for (Map.Entry<String, List<GenericRow>> entry : rowsMap.entrySet()) {
       String tableName = entry.getKey();
@@ -122,67 +99,6 @@ public class QueryRunnerTestBase extends QueryTestSet {
         h2Statement.execute();
       }
     }
-  }
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1")
-        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
-        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
-        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
-        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("d").build(), "d")
-        .addSegment("a_REALTIME", QueryEnvironmentTestBase.buildRows("a_REALTIME"))
-        .addSegment("a_REALTIME", QueryEnvironmentTestBase.buildRows("a_REALTIME"))
-        .addSegment("b_REALTIME", QueryEnvironmentTestBase.buildRows("b_REALTIME"))
-        .addSegment("c_OFFLINE", QueryEnvironmentTestBase.buildRows("c_OFFLINE"))
-        .addSegment("d_OFFLINE", QueryEnvironmentTestBase.buildRows("d_OFFLINE"));
-    MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server1")
-        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
-        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
-        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("d").build(), "d")
-        .addSegment("a_REALTIME", QueryEnvironmentTestBase.buildRows("a_REALTIME"))
-        .addSegment("c_OFFLINE", QueryEnvironmentTestBase.buildRows("c_OFFLINE"))
-        .addSegment("c_OFFLINE", QueryEnvironmentTestBase.buildRows("c_OFFLINE"))
-        .addSegment("d_OFFLINE", QueryEnvironmentTestBase.buildRows("d_OFFLINE"))
-        .addSegment("d_REALTIME", QueryEnvironmentTestBase.buildRows("d_REALTIME"));
-    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
-    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
-
-    // Setting up H2 for validation
-    setH2Connection();
-    addTableToH2(Arrays.asList("a", "b", "c", "d"));
-    addDataToH2(factory1.buildTableRowsMap());
-    addDataToH2(factory2.buildTableRowsMap());
-
-    _reducerGrpcPort = QueryTestUtils.getAvailablePort();
-    _reducerHostname = String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME);
-    Map<String, Object> reducerConfig = new HashMap<>();
-    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
-    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerGrpcPort, new PinotConfiguration(reducerConfig));
-    _mailboxService.start();
-
-    _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
-        server2.getPort(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap());
-    server1.start();
-    server2.start();
-    // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
-    // this is only use for test identifier purpose.
-    int port1 = server1.getPort();
-    int port2 = server2.getPort();
-    _servers.put(new WorkerInstance("localhost", port1, port1, port1, port1), server1);
-    _servers.put(new WorkerInstance("localhost", port2, port2, port2, port2), server2);
-  }
-
-  @AfterClass
-  public void tearDown() {
-    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
-    for (QueryServerEnclosure server : _servers.values()) {
-      server.shutDown();
-    }
-    _mailboxService.shutdown();
   }
 
   private static List<String> toH2FieldNamesAndTypes(org.apache.pinot.spi.data.Schema pinotSchema) {
