@@ -19,6 +19,7 @@
 package org.apache.pinot.query.testutils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -51,7 +51,7 @@ public class MockRoutingManagerFactory {
   private final Map<String, Schema> _schemaMap;
 
   private final Map<String, ServerInstance> _serverInstances;
-  private final Map<String, RoutingTable> _mockRoutingTableMap;
+  private final Map<String, RoutingTable> _routingTableMap;
   private final List<String> _hybridTables;
 
   private final Map<String, Map<ServerInstance, List<String>>> _tableServerSegmentMap;
@@ -61,7 +61,7 @@ public class MockRoutingManagerFactory {
     _serverInstances = new HashMap<>();
     _schemaMap = new HashMap<>();
     _tableNameMap = new HashMap<>();
-    _mockRoutingTableMap = new HashMap<>();
+    _routingTableMap = new HashMap<>();
 
     _tableServerSegmentMap = new HashMap<>();
     for (int port : ports) {
@@ -95,31 +95,14 @@ public class MockRoutingManagerFactory {
   }
 
   public RoutingManager buildRoutingManager() {
-    // create all the mock routing tables
-    _mockRoutingTableMap.clear();
+    // create all the fake routing tables
+    _routingTableMap.clear();
     for (Map.Entry<String, Map<ServerInstance, List<String>>> tableEntry : _tableServerSegmentMap.entrySet()) {
       String tableNameWithType = tableEntry.getKey();
-      RoutingTable mockRoutingTable = mock(RoutingTable.class);
-      when(mockRoutingTable.getServerInstanceToSegmentsMap()).thenReturn(tableEntry.getValue());
-      _mockRoutingTableMap.put(tableNameWithType, mockRoutingTable);
+      RoutingTable fakeRoutingTable = new RoutingTable(tableEntry.getValue(), Collections.emptyList(), 0);
+      _routingTableMap.put(tableNameWithType, fakeRoutingTable);
     }
-
-    // create the routing manager and the table cache
-    RoutingManager mock = mock(RoutingManager.class);
-    when(mock.getRoutingTable(any())).thenAnswer(invocation -> {
-      BrokerRequest brokerRequest = invocation.getArgument(0);
-      String tableName = brokerRequest.getPinotQuery().getDataSource().getTableName();
-      return _mockRoutingTableMap.getOrDefault(tableName,
-          _mockRoutingTableMap.get(TableNameBuilder.extractRawTableName(tableName)));
-    });
-    when(mock.getEnabledServerInstanceMap()).thenReturn(_serverInstances);
-    // TODO: make time boundary column also configurable, for now we can assume TS column always exist.
-    when(mock.getTimeBoundaryInfo(anyString())).thenAnswer(invocation -> {
-      String tableName = TableNameBuilder.extractRawTableName(invocation.getArgument(0));
-      return _hybridTables.contains(tableName) ? new TimeBoundaryInfo(TIME_BOUNDARY_COLUMN,
-          String.valueOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))) : null;
-    });
-    return mock;
+    return new FakeRoutingManager(_routingTableMap, _serverInstances, _hybridTables);
   }
 
   public TableCache buildTableCache() {
@@ -141,5 +124,42 @@ public class MockRoutingManagerFactory {
     _tableNameMap.put(tableNameWithType, rawTableName);
     _schemaMap.put(rawTableName, schema);
     _schemaMap.put(tableNameWithType, schema);
+  }
+
+  private static class FakeRoutingManager implements RoutingManager {
+    private final Map<String, RoutingTable> _routingTableMap;
+    private final Map<String, ServerInstance> _serverInstances;
+    private final List<String> _hybridTables;
+
+    public FakeRoutingManager(Map<String, RoutingTable> routingTableMap, Map<String, ServerInstance> serverInstances,
+        List<String> hybridTables) {
+      _routingTableMap = routingTableMap;
+      _serverInstances = serverInstances;
+      _hybridTables = hybridTables;
+    }
+
+    @Override
+    public Map<String, ServerInstance> getEnabledServerInstanceMap() {
+      return _serverInstances;
+    }
+
+    @Override
+    public RoutingTable getRoutingTable(BrokerRequest brokerRequest) {
+      String tableName = brokerRequest.getPinotQuery().getDataSource().getTableName();
+      return _routingTableMap.getOrDefault(tableName,
+          _routingTableMap.get(TableNameBuilder.extractRawTableName(tableName)));
+    }
+
+    @Override
+    public boolean routingExists(String tableNameWithType) {
+      return _routingTableMap.containsKey(tableNameWithType);
+    }
+
+    @Override
+    public TimeBoundaryInfo getTimeBoundaryInfo(String tableName) {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      return _hybridTables.contains(rawTableName) ? new TimeBoundaryInfo(TIME_BOUNDARY_COLUMN,
+          String.valueOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))) : null;
+    }
   }
 }
