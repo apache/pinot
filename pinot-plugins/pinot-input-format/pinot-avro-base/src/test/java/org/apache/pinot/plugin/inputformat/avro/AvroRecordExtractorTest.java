@@ -43,6 +43,10 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.SchemaStore;
+import org.apache.avro.specific.SpecificData;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -245,16 +249,221 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
   }
 
   @Test
-  public void testFixedDataType() {
-    Schema avroSchema = createRecord("eventsRecord", null, null, false);
-    Schema fixedSchema = createFixed("fixedSchema", "", "", 4);
-    avroSchema.setFields(Lists.newArrayList(new Schema.Field("fixed_data", fixedSchema)));
+  public void testGenericFixedDataType() {
+    Schema avroSchema = createRecord("EventRecord", null, null, false);
+    Schema fixedSchema = createFixed("FixedSchema", "", "", 4);
+    avroSchema.setFields(Lists.newArrayList(new Schema.Field("fixedData", fixedSchema)));
     GenericRecord genericRecord = new GenericData.Record(avroSchema);
-    genericRecord.put("fixed_data", new GenericData.Fixed(fixedSchema, new byte[] {0, 1, 2, 3}));
+    genericRecord.put("fixedData", new GenericData.Fixed(fixedSchema, new byte[]{0, 1, 2, 3}));
     GenericRow genericRow = new GenericRow();
     AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
     avroRecordExtractor.init(null, null);
     avroRecordExtractor.extract(genericRecord, genericRow);
-    Assert.assertEquals(genericRow.getValue("fixed_data"), new byte[] {0, 1, 2, 3});
+    Assert.assertEquals(genericRow.getValue("fixedData"), new byte[]{0, 1, 2, 3});
+  }
+
+  @Test
+  public void testSpecificFixedDataType() {
+    EventRecord specificRecord = new EventRecord(new FixedSchema(new byte[]{0, 1, 2, 3}));
+    GenericRow outputGenericRow = new GenericRow();
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    avroRecordExtractor.init(null, null);
+    avroRecordExtractor.extract(specificRecord, outputGenericRow);
+    Assert.assertEquals(outputGenericRow.getValue("fixedData"), new byte[]{0, 1, 2, 3});
+  }
+
+  /**
+   * SpecificRecord created for testing Fixed data type
+   */
+  static class EventRecord extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
+    private static final long serialVersionUID = 5451592186784305712L;
+    public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse(
+        "{\"type\":\"record\",\"name\":\"EventRecord\",\"fields\":[{\"name\":\"fixedData\",\"type\":{\"type\":\"fixed\",\"name\":\"FixedSchema\",\"doc\":\"\",\"size\":4}}]}");
+
+    public static org.apache.avro.Schema getClassSchema() {
+      return SCHEMA$;
+    }
+
+    private static SpecificData MODEL$ = new SpecificData();
+
+    private static final BinaryMessageEncoder<EventRecord> ENCODER =
+        new BinaryMessageEncoder<EventRecord>(MODEL$, SCHEMA$);
+
+    private static final BinaryMessageDecoder<EventRecord> DECODER =
+        new BinaryMessageDecoder<EventRecord>(MODEL$, SCHEMA$);
+
+    public static BinaryMessageEncoder<EventRecord> getEncoder() {
+      return ENCODER;
+    }
+
+    public static BinaryMessageDecoder<EventRecord> getDecoder() {
+      return DECODER;
+    }
+
+    public static BinaryMessageDecoder<EventRecord> createDecoder(SchemaStore resolver) {
+      return new BinaryMessageDecoder<EventRecord>(MODEL$, SCHEMA$, resolver);
+    }
+
+    public java.nio.ByteBuffer toByteBuffer()
+        throws java.io.IOException {
+      return ENCODER.encode(this);
+    }
+
+    public static EventRecord fromByteBuffer(java.nio.ByteBuffer b)
+        throws java.io.IOException {
+      return DECODER.decode(b);
+    }
+
+    private FixedSchema fixedData;
+
+    public EventRecord() {
+    }
+
+    public EventRecord(FixedSchema fixedData) {
+      this.fixedData = fixedData;
+    }
+
+    public org.apache.avro.specific.SpecificData getSpecificData() {
+      return MODEL$;
+    }
+
+    public org.apache.avro.Schema getSchema() {
+      return SCHEMA$;
+    }
+
+    // Used by DatumWriter.  Applications should not call.
+    public java.lang.Object get(int field$) {
+      switch (field$) {
+        case 0:
+          return fixedData;
+        default:
+          throw new org.apache.avro.AvroRuntimeException("Bad index");
+      }
+    }
+
+    // Used by DatumReader.  Applications should not call.
+    @SuppressWarnings(value = "unchecked")
+    public void put(int field$, java.lang.Object value$) {
+      switch (field$) {
+        case 0:
+          fixedData = (FixedSchema) value$;
+          break;
+        default:
+          throw new org.apache.avro.AvroRuntimeException("Bad index");
+      }
+    }
+
+    public FixedSchema getFixedData() {
+      return fixedData;
+    }
+
+    public void setFixedData(FixedSchema value) {
+      this.fixedData = value;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static final org.apache.avro.io.DatumWriter<EventRecord> WRITER$ =
+        (org.apache.avro.io.DatumWriter<EventRecord>) MODEL$.createDatumWriter(SCHEMA$);
+
+    @Override
+    public void writeExternal(java.io.ObjectOutput out)
+        throws java.io.IOException {
+      WRITER$.write(this, SpecificData.getEncoder(out));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static final org.apache.avro.io.DatumReader<EventRecord> READER$ =
+        (org.apache.avro.io.DatumReader<EventRecord>) MODEL$.createDatumReader(SCHEMA$);
+
+    @Override
+    public void readExternal(java.io.ObjectInput in)
+        throws java.io.IOException {
+      READER$.read(this, SpecificData.getDecoder(in));
+    }
+
+    @Override
+    protected boolean hasCustomCoders() {
+      return true;
+    }
+
+    @Override
+    public void customEncode(org.apache.avro.io.Encoder out)
+        throws java.io.IOException {
+      out.writeFixed(this.fixedData.bytes(), 0, 4);
+    }
+
+    @Override
+    public void customDecode(org.apache.avro.io.ResolvingDecoder in)
+        throws java.io.IOException {
+      org.apache.avro.Schema.Field[] fieldOrder = in.readFieldOrderIfDiff();
+      if (fieldOrder == null) {
+        if (this.fixedData == null) {
+          this.fixedData = new FixedSchema();
+        }
+        in.readFixed(this.fixedData.bytes(), 0, 4);
+      } else {
+        for (int i = 0; i < 1; i++) {
+          switch (fieldOrder[i].pos()) {
+            case 0:
+              if (this.fixedData == null) {
+                this.fixedData = new FixedSchema();
+              }
+              in.readFixed(this.fixedData.bytes(), 0, 4);
+              break;
+
+            default:
+              throw new java.io.IOException("Corrupt ResolvingDecoder.");
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * SpecificFixed created for testing Fixed data type
+   */
+  static class FixedSchema extends org.apache.avro.specific.SpecificFixed {
+    private static final long serialVersionUID = -1121289150751596161L;
+    public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse(
+        "{\"type\":\"fixed\",\"name\":\"FixedSchema\",\"doc\":\"\",\"size\":4}");
+
+    public static org.apache.avro.Schema getClassSchema() {
+      return SCHEMA$;
+    }
+
+    public org.apache.avro.Schema getSchema() {
+      return SCHEMA$;
+    }
+
+    /** Creates a new FixedSchema */
+    public FixedSchema() {
+      super();
+    }
+
+    /**
+     * Creates a new FixedSchema with the given bytes.
+     * @param bytes The bytes to create the new FixedSchema.
+     */
+    public FixedSchema(byte[] bytes) {
+      super(bytes);
+    }
+
+    private static final org.apache.avro.io.DatumWriter<FixedSchema> WRITER$ =
+        new org.apache.avro.specific.SpecificDatumWriter<FixedSchema>(SCHEMA$);
+
+    @Override
+    public void writeExternal(java.io.ObjectOutput out)
+        throws java.io.IOException {
+      WRITER$.write(this, org.apache.avro.specific.SpecificData.getEncoder(out));
+    }
+
+    private static final org.apache.avro.io.DatumReader<FixedSchema> READER$ =
+        new org.apache.avro.specific.SpecificDatumReader<FixedSchema>(SCHEMA$);
+
+    @Override
+    public void readExternal(java.io.ObjectInput in)
+        throws java.io.IOException {
+      READER$.read(this, org.apache.avro.specific.SpecificData.getDecoder(in));
+    }
   }
 }
