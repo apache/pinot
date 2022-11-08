@@ -201,6 +201,11 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
     setDialogDetails(null);
   };
 
+  const handleSegmentDialogHide = () => {
+    setShowEditConfig(false);
+    setReloadSegmentsOnUpdate(false);
+  }
+
   return fetching ? (
     <AppLoader />
   ) : (
@@ -289,7 +294,7 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
       {/* Segment config edit dialog */}
       <CustomDialog
         open={showEditConfig}
-        handleClose={() => setShowEditConfig(false)}
+        handleClose={handleSegmentDialogHide}
         title="Edit Schema"
         handleSave={saveConfigAction}
       >
