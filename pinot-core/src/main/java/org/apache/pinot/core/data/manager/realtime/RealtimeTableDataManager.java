@@ -437,6 +437,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     String uri = segmentZKMetadata.getDownloadUrl();
     if (!METADATA_URI_FOR_PEER_DOWNLOAD.equals(uri)) {
       try {
+        // TODO: cleanup and consolidate the segment loading logic a bit for OFFLINE and REALTIME tables.
+        //       https://github.com/apache/pinot/issues/9752
         downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, uri);
       } catch (Exception e) {
         _logger.warn("Download segment {} from deepstore uri {} failed.", segmentName, uri, e);
