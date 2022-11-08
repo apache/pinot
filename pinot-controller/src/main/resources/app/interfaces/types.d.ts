@@ -204,4 +204,17 @@ declare module 'Models' {
     TaskExpireTimeMs: string,
     MinionWorkerGroupTag: string
   }
+
+  export const enum SEGMENT_STATUS {
+    ONLINE = "ONLINE",
+    OFFLINE = "OFFLINE",
+    CONSUMING = "CONSUMING",
+    ERROR = "ERROR"
+  } 
+
+  export const enum DISPLAY_SEGMENT_STATUS {
+    BAD = "BAD",
+    GOOD = "GOOD",
+    PARTIAL = "PARTIAL",
+  }
 }

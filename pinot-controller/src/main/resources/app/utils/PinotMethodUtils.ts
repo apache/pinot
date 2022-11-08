@@ -96,7 +96,7 @@ import {
   getTaskRuntimeConfig
 } from '../requests';
 import { baseApi } from './axios-config';
-import Utils from './Utils';
+import Utils, { getDisplaySegmentStatus } from './Utils';
 const JSONbig = require('json-bigint')({'storeAsString': true})
 
 // This method is used to display tenants listing on cluster manager home page
@@ -475,7 +475,7 @@ const getSegmentList = (tableName) => {
       records: Object.keys(idealStateObj).map((key) => {
         return [
           key,
-          getSegmentStatus(idealStateObj[key], externalViewObj[key])
+          getDisplaySegmentStatus(idealStateObj[key], externalViewObj[key])
         ];
       }),
       externalViewObj

@@ -381,6 +381,11 @@ export default function CustomizedTables({
 
   const makeCell = (cellData, rowIndex) => {
     if (Object.prototype.toString.call(cellData) === '[object Object]') {
+      // render custom table cell
+      if (cellData && cellData.customRenderer) {
+        return <>{cellData.customRenderer}</>;
+      }
+
       if (has(cellData, 'component') && cellData.component) {
 
 
