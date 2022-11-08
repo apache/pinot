@@ -276,7 +276,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public String getPeerDownloadScheme() {
+  public String getSegmentPeerDownloadScheme() {
     return _instanceDataManagerConfiguration.getProperty(PEER_DOWNLOAD_SCHEME);
   }
 

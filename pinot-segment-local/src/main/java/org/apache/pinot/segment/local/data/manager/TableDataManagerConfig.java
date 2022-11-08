@@ -103,7 +103,7 @@ public class TableDataManagerConfig {
     defaultConfig.addProperty(TABLE_DELETED_SEGMENTS_CACHE_TTL_MINUTES,
         instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes());
     // allow to be null
-    defaultConfig.addProperty(TABLE_PEER_DOWNLOAD_SCHEME, instanceDataManagerConfig.getPeerDownloadScheme());
+    defaultConfig.addProperty(TABLE_PEER_DOWNLOAD_SCHEME, instanceDataManagerConfig.getSegmentPeerDownloadScheme());
 
 
     // copy auth-related configs

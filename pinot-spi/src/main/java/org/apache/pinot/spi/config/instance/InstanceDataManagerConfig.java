@@ -67,5 +67,5 @@ public interface InstanceDataManagerConfig {
 
   int getDeletedSegmentsCacheTtlMinutes();
 
-  String getPeerDownloadScheme();
+  String getSegmentPeerDownloadScheme();
 }
