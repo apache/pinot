@@ -26,13 +26,13 @@ import {
   Tooltip,
 } from "@material-ui/core";
 import { HelpOutlineOutlined } from "@material-ui/icons";
-import { DISPLAY_SEGMENT_STATUS, SegmentDebugDetails } from "Models";
-import React, { useContext, useEffect, useState } from "react";
 import { getSegmentLevelDebugDetails } from "../requests";
 import CustomCodemirror from "./CustomCodemirror";
 import CustomDialog from "./CustomDialog";
 import { NotificationContext } from "./Notification/NotificationContext";
 import clsx from "clsx";
+import { DISPLAY_SEGMENT_STATUS, SegmentDebugDetails } from "Models";
+import React, { useContext, useEffect, useState } from "react";
 
 const useStyles = makeStyles((theme) => ({
   error: {
