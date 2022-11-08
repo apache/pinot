@@ -33,13 +33,11 @@ public class SegmentGenerationAndPushTaskUtils {
   private SegmentGenerationAndPushTaskUtils() {
   }
 
-  private static final PinotFS LOCAL_PINOT_FS = new LocalPinotFS();
-
   static PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI)
       throws Exception {
     String fileURIScheme = fileURI.getScheme();
     if (fileURIScheme == null) {
-      return LOCAL_PINOT_FS;
+      return new LocalPinotFS();
     }
     // Try to create PinotFS using given Input FileSystem config always
     String fsClass = taskConfigs.get(BatchConfigProperties.INPUT_FS_CLASS);
@@ -49,7 +47,6 @@ public class SegmentGenerationAndPushTaskUtils {
       pinotFS.init(fsProps);
       return pinotFS;
     }
-    // Fallback to use the PinotFS created by Minion Server configs
     return PinotFSFactory.create(fileURIScheme);
   }
 
@@ -57,7 +54,7 @@ public class SegmentGenerationAndPushTaskUtils {
       throws Exception {
     String fileURIScheme = (fileURI == null) ? null : fileURI.getScheme();
     if (fileURIScheme == null) {
-      return LOCAL_PINOT_FS;
+      return new LocalPinotFS();
     }
     // Try to create PinotFS using given Input FileSystem config always
     String fsClass = taskConfigs.get(BatchConfigProperties.OUTPUT_FS_CLASS);
@@ -67,11 +64,10 @@ public class SegmentGenerationAndPushTaskUtils {
       pinotFS.init(fsProps);
       return pinotFS;
     }
-    // Fallback to use the PinotFS created by Minion Server configs
     return PinotFSFactory.create(fileURIScheme);
   }
 
   static PinotFS getLocalPinotFs() {
-    return LOCAL_PINOT_FS;
+    return new LocalPinotFS();
   }
 }

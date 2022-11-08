@@ -144,3 +144,8 @@ rules:
   cache: true
   labels:
     table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.version.(\\w+)\"><>(\\w+)"
+  name: "pinot_broker_version"
+  cache: true
+  labels:
+    version: "$1"

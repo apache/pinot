@@ -39,11 +39,13 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -87,11 +89,13 @@ public class TextIndexHandler implements IndexHandler {
   private final SegmentMetadata _segmentMetadata;
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
+  private final Map<String, Map<String, String>> _columnProperties;
 
   public TextIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
     _fstType = indexLoadingConfig.getFSTIndexType();
     _columnsToAddIdx = indexLoadingConfig.getTextIndexColumns();
+    _columnProperties = indexLoadingConfig.getColumnProperties();
   }
 
   @Override
@@ -179,7 +183,9 @@ public class TextIndexHandler implements IndexHandler {
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         TextIndexCreator textIndexCreator = indexCreatorProvider.newTextIndexCreator(IndexCreationContext.builder()
-            .withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build().forTextIndex(_fstType, true))) {
+            .withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build().forTextIndex(_fstType, true,
+                TextIndexUtils.extractStopWordsInclude(columnName, _columnProperties),
+                TextIndexUtils.extractStopWordsExclude(columnName, _columnProperties)))) {
       if (columnMetadata.isSingleValue()) {
         processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
             columnMetadata);

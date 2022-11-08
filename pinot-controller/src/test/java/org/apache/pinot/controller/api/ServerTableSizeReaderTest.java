@@ -40,10 +40,12 @@ import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class ServerTableSizeReaderTest {
@@ -155,14 +157,14 @@ public class ServerTableSizeReaderTest {
     endpoints.put(_serverList.get(5), _endpointList.get(5));
     Map<String, List<SegmentSizeInfo>> serverSizes =
         reader.getSegmentSizeInfoFromServers(endpoints, "foo", TIMEOUT_MSEC);
-    Assert.assertEquals(serverSizes.size(), 3);
-    Assert.assertTrue(serverSizes.containsKey(_serverList.get(0)));
-    Assert.assertTrue(serverSizes.containsKey(_serverList.get(1)));
-    Assert.assertTrue(serverSizes.containsKey(_serverList.get(5)));
+    assertEquals(serverSizes.size(), 3);
+    assertTrue(serverSizes.containsKey(_serverList.get(0)));
+    assertTrue(serverSizes.containsKey(_serverList.get(1)));
+    assertTrue(serverSizes.containsKey(_serverList.get(5)));
 
-    Assert.assertEquals(serverSizes.get(_serverList.get(0)), _tableInfo1.getSegments());
-    Assert.assertEquals(serverSizes.get(_serverList.get(1)), _tableInfo2.getSegments());
-    Assert.assertEquals(serverSizes.get(_serverList.get(5)), _tableInfo3.getSegments());
+    assertEquals(serverSizes.get(_serverList.get(0)), _tableInfo1.getSegments());
+    assertEquals(serverSizes.get(_serverList.get(1)), _tableInfo2.getSegments());
+    assertEquals(serverSizes.get(_serverList.get(5)), _tableInfo3.getSegments());
   }
 
   @Test
@@ -174,10 +176,10 @@ public class ServerTableSizeReaderTest {
     }
     Map<String, List<SegmentSizeInfo>> serverSizes =
         reader.getSegmentSizeInfoFromServers(endpoints, "foo", TIMEOUT_MSEC);
-    Assert.assertEquals(serverSizes.size(), 3);
-    Assert.assertTrue(serverSizes.containsKey(_serverList.get(0)));
-    Assert.assertTrue(serverSizes.containsKey(_serverList.get(1)));
-    Assert.assertTrue(serverSizes.containsKey(_serverList.get(5)));
+    assertEquals(serverSizes.size(), 3);
+    assertTrue(serverSizes.containsKey(_serverList.get(0)));
+    assertTrue(serverSizes.containsKey(_serverList.get(1)));
+    assertTrue(serverSizes.containsKey(_serverList.get(5)));
     // error and timing out servers are not part of responses
   }
 }

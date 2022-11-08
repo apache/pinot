@@ -19,9 +19,18 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.analysis.CharArraySet;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FSTType;
@@ -63,5 +72,50 @@ public class TextIndexUtils {
 
   public static FSTType getFSTTypeOfIndex(File indexDir, String column) {
     return SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, column) != null ? FSTType.LUCENE : FSTType.NATIVE;
+  }
+
+  @Nonnull
+  public static List<String> extractStopWordsInclude(String colName,
+      Map<String, Map<String, String>> columnProperties) {
+    return extractStopWordsInclude(columnProperties.getOrDefault(colName, null));
+  }
+
+  @Nonnull
+  public static List<String> extractStopWordsExclude(String colName,
+      Map<String, Map<String, String>> columnProperties) {
+    return extractStopWordsExclude(columnProperties.getOrDefault(colName, null));
+  }
+
+  @Nonnull
+  public static List<String> extractStopWordsInclude(Map<String, String> columnProperty) {
+    return parseEntryAsString(columnProperty, FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY);
+  }
+
+  @Nonnull
+  public static List<String> extractStopWordsExclude(Map<String, String> columnProperty) {
+    return parseEntryAsString(columnProperty, FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY);
+  }
+
+  @Nonnull
+  private static List<String> parseEntryAsString(@Nullable Map<String, String> columnProperties,
+      String stopWordKey) {
+    if (columnProperties == null) {
+      return Collections.EMPTY_LIST;
+    }
+    String includeWords = columnProperties.getOrDefault(stopWordKey, "");
+    return Arrays.stream(includeWords.split(FieldConfig.TEXT_INDEX_STOP_WORD_SEPERATOR))
+        .map(String::trim).collect(Collectors.toList());
+  }
+
+  public static StandardAnalyzer getStandardAnalyzerWithCustomizedStopWords(@Nullable List<String> stopWordsInclude,
+     @Nullable List<String> stopWordsExclude) {
+    HashSet<String> stopWordSet = LuceneTextIndexCreator.getDefaultEnglishStopWordsSet();
+    if (stopWordsInclude != null) {
+      stopWordSet.addAll(stopWordsInclude);
+    }
+    if (stopWordsExclude != null) {
+      stopWordsExclude.forEach(stopWordSet::remove);
+    }
+    return new StandardAnalyzer(new CharArraySet(stopWordSet, true));
   }
 }

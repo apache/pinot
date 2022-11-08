@@ -87,6 +87,8 @@ public interface TableDataManager {
    * if forceDownload flag is true. This operation is conducted within a failure handling framework
    * and made transparent to ongoing queries, because the segment is in online serving state.
    *
+   * TODO: Clean up this method to use the schema from the IndexLoadingConfig
+   *
    * @param segmentName the segment to reload
    * @param indexLoadingConfig the latest table config to load segment
    * @param zkMetadata the segment metadata from zookeeper

@@ -71,10 +71,6 @@ public class DataBlockTestUtils {
         case BYTES:
           row[colId] = new ByteArray(RandomStringUtils.random(RANDOM.nextInt(20)).getBytes());
           break;
-        // Just test Double here, all object types will be covered in ObjectCustomSerDeTest.
-        case OBJECT:
-          row[colId] = RANDOM.nextDouble();
-          break;
         case INT_ARRAY:
           int length = RANDOM.nextInt(ARRAY_SIZE);
           int[] intArray = new int[length];
@@ -165,8 +161,6 @@ public class DataBlockTestUtils {
         return dataBlock.getString(rowId, colId);
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
-      case OBJECT:
-        return dataBlock.getCustomObject(rowId, colId);
       case BOOLEAN_ARRAY:
       case INT_ARRAY:
         return dataBlock.getIntArray(rowId, colId);

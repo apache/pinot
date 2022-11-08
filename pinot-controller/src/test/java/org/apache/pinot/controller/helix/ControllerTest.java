@@ -77,16 +77,15 @@ import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.Assert;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
 public class ControllerTest {
-  public static final String DEFAULT_TENANT = "DefaultTenant";
   public static final String LOCAL_HOST = "localhost";
   public static final int DEFAULT_CONTROLLER_PORT = 18998;
   public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
@@ -97,18 +96,18 @@ public class ControllerTest {
   public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   public static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
 
-  // Default static ControllerTest instance settings.
-  // NUM_BROKER_INSTANCES and NUM_SERVER_INSTANCES must be a multiple of MIN_NUM_REPLICAS.
-  public static final int MIN_NUM_REPLICAS = 2;
-  public static final int NUM_BROKER_INSTANCES = 4;
-  public static final int NUM_SERVER_INSTANCES = 4;
-  public static final int TOTAL_NUM_SERVER_INSTANCES = 2 * NUM_SERVER_INSTANCES;
-  public static final int TOTAL_NUM_BROKER_INSTANCES = 2 * NUM_BROKER_INSTANCES;
+  // Default ControllerTest instance settings
+  public static final int DEFAULT_MIN_NUM_REPLICAS = 2;
+  public static final int DEFAULT_NUM_BROKER_INSTANCES = 3;
+  // NOTE: To add HLC realtime table, number of Server instances must be multiple of replicas
+  public static final int DEFAULT_NUM_SERVER_INSTANCES = 4;
 
   /**
    * default static instance used to access all wrapped static instances.
    */
-  private static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
+  public static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
+
+  protected final String _clusterName = getClass().getSimpleName();
 
   protected static HttpClient _httpClient = null;
 
@@ -141,7 +140,7 @@ public class ControllerTest {
   }
 
   public String getHelixClusterName() {
-    return getClass().getSimpleName();
+    return _clusterName;
   }
 
   /**
@@ -581,7 +580,7 @@ public class ControllerTest {
     }
   }
 
-  public Schema createDummySchema(String tableName) {
+  public static Schema createDummySchema(String tableName) {
     Schema schema = new Schema();
     schema.setSchemaName(tableName);
     schema.addField(new DimensionFieldSpec("dimA", FieldSpec.DataType.STRING, true, ""));
@@ -592,7 +591,7 @@ public class ControllerTest {
     return schema;
   }
 
-  public Schema createDummySchemaForUpsertTable(String tableName) {
+  public static Schema createDummySchemaWithPrimaryKey(String tableName) {
     Schema schema = createDummySchema(tableName);
     schema.setPrimaryKeyColumns(Collections.singletonList("dimA"));
     return schema;
@@ -634,13 +633,13 @@ public class ControllerTest {
 
   public TableConfig getOfflineTableConfig(String tableName) {
     TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
-    Assert.assertNotNull(offlineTableConfig);
+    assertNotNull(offlineTableConfig);
     return offlineTableConfig;
   }
 
   public TableConfig getRealtimeTableConfig(String tableName) {
     TableConfig realtimeTableConfig = _helixResourceManager.getRealtimeTableConfig(tableName);
-    Assert.assertNotNull(realtimeTableConfig);
+    assertNotNull(realtimeTableConfig);
     return realtimeTableConfig;
   }
 
@@ -912,7 +911,7 @@ public class ControllerTest {
     properties.put(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS, AllowAllAccessFactory.class.getName());
 
     // Used in PinotTableRestletResourceTest
-    properties.put(ControllerConf.TABLE_MIN_REPLICAS, MIN_NUM_REPLICAS);
+    properties.put(ControllerConf.TABLE_MIN_REPLICAS, DEFAULT_MIN_NUM_REPLICAS);
 
     // Used in PinotControllerAppConfigsTest to test obfuscation
     properties.put("controller.segment.fetcher.auth.token", "*personal*");
@@ -929,11 +928,8 @@ public class ControllerTest {
     startZk();
     startController(getSharedControllerConfiguration());
 
-    addMoreFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
-    addMoreFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
-
-    addMoreFakeBrokerInstancesToAutoJoinHelixCluster(TOTAL_NUM_BROKER_INSTANCES, false);
-    addMoreFakeServerInstancesToAutoJoinHelixCluster(TOTAL_NUM_SERVER_INSTANCES, false);
+    addMoreFakeBrokerInstancesToAutoJoinHelixCluster(DEFAULT_NUM_BROKER_INSTANCES, true);
+    addMoreFakeServerInstancesToAutoJoinHelixCluster(DEFAULT_NUM_SERVER_INSTANCES, true);
   }
 
   /**
@@ -959,24 +955,18 @@ public class ControllerTest {
       startSharedTestSetup();
     }
 
-    // Check number of tenants
-    Assert.assertEquals(getHelixResourceManager().getAllBrokerTenantNames().size(), 1);
-    Assert.assertEquals(getHelixResourceManager().getAllServerTenantNames().size(), 1);
-
-    // Check number of tagged broker and server instances
-    Assert.assertEquals(getTaggedBrokerCount(), NUM_BROKER_INSTANCES);
-    Assert.assertEquals(getTaggedServerCount(), NUM_SERVER_INSTANCES);
+    // In a single tenant cluster, only the default tenant should exist
+    assertEquals(_helixResourceManager.getAllBrokerTenantNames(),
+        Collections.singleton(TagNameUtils.DEFAULT_TENANT_NAME));
+    assertEquals(_helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME).size(),
+        DEFAULT_NUM_BROKER_INSTANCES);
+    assertEquals(_helixResourceManager.getAllServerTenantNames(),
+        Collections.singleton(TagNameUtils.DEFAULT_TENANT_NAME));
+    assertEquals(_helixResourceManager.getAllInstancesForServerTenant(TagNameUtils.DEFAULT_TENANT_NAME).size(),
+        DEFAULT_NUM_SERVER_INSTANCES);
 
     // No pre-existing tables
-    Assert.assertEquals(getHelixResourceManager().getAllTables().size(), 0);
-
-    // Check if tenants have right number of instances.
-    Assert.assertEquals(getHelixResourceManager().getAllInstancesForBrokerTenant("DefaultBroker").size(), 0);
-    Assert.assertEquals(getHelixResourceManager().getAllInstancesForServerTenant("DefaultServer").size(), 0);
-
-    // Check number of untagged instances.
-    Assert.assertEquals(getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(), NUM_BROKER_INSTANCES);
-    Assert.assertEquals(getHelixResourceManager().getOnlineUnTaggedServerInstanceList().size(), NUM_SERVER_INSTANCES);
+    assertEquals(getHelixResourceManager().getAllTables().size(), 0);
   }
 
   /**
@@ -997,23 +987,6 @@ public class ControllerTest {
     if (CollectionUtils.isNotEmpty(schemaNames)) {
       for (String schemaName : schemaNames) {
         getHelixResourceManager().deleteSchema(getHelixResourceManager().getSchema(schemaName));
-      }
-    }
-
-    // Delete broker tenants except default tenant
-    Set<String> brokerTenants = getHelixResourceManager().getAllBrokerTenantNames();
-    for (String tenant : brokerTenants) {
-      if (!tenant.startsWith(DEFAULT_TENANT)) {
-        getHelixResourceManager().deleteBrokerTenantFor(tenant);
-      }
-    }
-
-    // Delete server tenants except default tenant
-    Set<String> serverTenants = getHelixResourceManager().getAllServerTenantNames();
-    for (String tenant : serverTenants) {
-      if (!tenant.startsWith(DEFAULT_TENANT)) {
-        getHelixResourceManager().deleteOfflineServerTenantFor(tenant);
-        getHelixResourceManager().deleteRealtimeServerTenantFor(tenant);
       }
     }
   }

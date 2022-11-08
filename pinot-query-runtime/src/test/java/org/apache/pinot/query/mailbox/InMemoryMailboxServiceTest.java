@@ -20,7 +20,7 @@ package org.apache.pinot.query.mailbox;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -95,10 +95,10 @@ public class InMemoryMailboxServiceTest {
 
   private TransferableBlock getTestTransferableBlock(int index, boolean isEndOfStream) {
     if (isEndOfStream) {
-      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(TEST_DATA_SCHEMA));
+      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
     }
     List<Object[]> rows = new ArrayList<>(index);
     rows.add(new Object[]{index, "test_data"});
-    return new TransferableBlock(rows, TEST_DATA_SCHEMA, BaseDataBlock.Type.ROW);
+    return new TransferableBlock(rows, TEST_DATA_SCHEMA, DataBlock.Type.ROW);
   }
 }

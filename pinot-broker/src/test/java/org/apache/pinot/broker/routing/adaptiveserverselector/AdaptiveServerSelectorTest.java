@@ -279,7 +279,7 @@ public class AdaptiveServerSelectorTest {
     for (int ii = 0; ii < 10; ii++) {
       for (String server : _servers) {
         latencyMap.computeIfAbsent(server,
-            k -> new ExponentialMovingAverage(alpha, autodecayWindowMs, warmupDurationMs, avgInitializationVal));
+            k -> new ExponentialMovingAverage(alpha, autodecayWindowMs, warmupDurationMs, avgInitializationVal, null));
         latencyMap.get(server).compute(2);
 
         serverRoutingStatsManager.recordStatsUponResponseArrival(-1, server, 2);

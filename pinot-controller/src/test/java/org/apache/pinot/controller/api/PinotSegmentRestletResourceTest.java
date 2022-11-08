@@ -31,10 +31,13 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class PinotSegmentRestletResourceTest {
@@ -74,7 +77,7 @@ public class PinotSegmentRestletResourceTest {
     // There should be no segment lineage at this point.
     String segmentLineageResponse = ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
         .forListAllSegmentLineages(TABLE_NAME, TableType.OFFLINE.toString()));
-    Assert.assertEquals(segmentLineageResponse, "");
+    assertEquals(segmentLineageResponse, "");
 
     // Now starts to replace segments.
     List<String> segmentsFrom = Arrays.asList("s0", "s1");
@@ -91,22 +94,20 @@ public class PinotSegmentRestletResourceTest {
     // There should now be two segment lineage entries resulting from the operations above.
     segmentLineageResponse = ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
         .forListAllSegmentLineages(TABLE_NAME, TableType.OFFLINE.toString()));
-    Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"IN_PROGRESS\""));
-    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"s0\",\"s1\"]"));
-    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"some_segment\"]"));
-    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"s2\",\"s3\"]"));
-    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"another_segment\"]"));
+    assertTrue(segmentLineageResponse.contains("\"state\":\"IN_PROGRESS\""));
+    assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"s0\",\"s1\"]"));
+    assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"some_segment\"]"));
+    assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"s2\",\"s3\"]"));
+    assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"another_segment\"]"));
     // Ensures the two entries are sorted in chronological order by timestamp.
-    Assert.assertTrue(
-        segmentLineageResponse.indexOf(segmentLineageId) < segmentLineageResponse.indexOf(nextSegmentLineageId));
+    assertTrue(segmentLineageResponse.indexOf(segmentLineageId) < segmentLineageResponse.indexOf(nextSegmentLineageId));
 
     // List segment lineage should fail for non-existing table
-    Assert.assertThrows(IOException.class, () -> ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder()
-            .forListAllSegmentLineages("non-existing-table", TableType.OFFLINE.toString())));
+    assertThrows(IOException.class, () -> ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
+        .forListAllSegmentLineages("non-existing-table", TableType.OFFLINE.toString())));
 
     // List segment lineage should also fail for invalid table type.
-    Assert.assertThrows(IOException.class, () -> ControllerTest.sendGetRequest(
+    assertThrows(IOException.class, () -> ControllerTest.sendGetRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forListAllSegmentLineages(TABLE_NAME, "invalid-type")));
 
     // Delete segments
@@ -151,13 +152,13 @@ public class PinotSegmentRestletResourceTest {
     String resp = ControllerTest.sendGetRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(TABLE_NAME, entry.getKey()));
     Map<String, String> fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
-    Assert.assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
+    assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // use table name with table type
     resp = ControllerTest.sendGetRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(TABLE_NAME + "_OFFLINE", entry.getKey()));
     fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
-    Assert.assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
+    assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // Add more segments
     for (int i = 0; i < 5; i++) {
@@ -188,10 +189,10 @@ public class PinotSegmentRestletResourceTest {
     Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);
-      Assert.assertTrue(metadata != null);
-      Assert.assertEquals(crcMap.get(segmentName), metadata.getCrc());
+      assertTrue(metadata != null);
+      assertEquals(crcMap.get(segmentName), metadata.getCrc());
     }
-    Assert.assertEquals(crcMap.size(), expectedSize);
+    assertEquals(crcMap.size(), expectedSize);
   }
 
   @AfterClass

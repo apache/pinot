@@ -47,23 +47,27 @@ public final class DataBlockUtils {
   }
 
   public static MetadataBlock getErrorDataBlock(Map<Integer, String> exceptions) {
-    MetadataBlock errorBlock = new MetadataBlock();
+    MetadataBlock errorBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.ERROR);
     for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
       errorBlock.addException(exception.getKey(), exception.getValue());
     }
     return errorBlock;
   }
 
-  public static MetadataBlock getEndOfStreamDataBlock(DataSchema dataSchema) {
+  public static MetadataBlock getEndOfStreamDataBlock() {
     // TODO: add query statistics metadata for the block.
-    return new MetadataBlock(dataSchema);
+    return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
   }
 
-  public static BaseDataBlock getDataBlock(ByteBuffer byteBuffer)
+  public static MetadataBlock getNoOpBlock() {
+    return new MetadataBlock(MetadataBlock.MetadataBlockType.NOOP);
+  }
+
+  public static DataBlock getDataBlock(ByteBuffer byteBuffer)
       throws IOException {
     int versionType = byteBuffer.getInt();
     int version = versionType & ((1 << VERSION_TYPE_SHIFT) - 1);
-    BaseDataBlock.Type type = BaseDataBlock.Type.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
+    DataBlock.Type type = DataBlock.Type.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
     switch (type) {
       case COLUMNAR:
         return new ColumnarDataBlock(byteBuffer);
@@ -76,84 +80,14 @@ public final class DataBlockUtils {
     }
   }
 
-  public static List<Object[]> extractRows(BaseDataBlock dataBlock) {
+  public static List<Object[]> extractRows(DataBlock dataBlock) {
     DataSchema dataSchema = dataBlock.getDataSchema();
     DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    RoaringBitmap[] nullBitmaps = extractNullBitmaps(dataBlock);
     int numRows = dataBlock.getNumberOfRows();
-    int numColumns = columnDataTypes.length;
-
     List<Object[]> rows = new ArrayList<>(numRows);
-    for (int i = 0; i < numRows; i++) {
-      Object[] row = new Object[numColumns];
-      for (int j = 0; j < numColumns; j++) {
-        switch (columnDataTypes[j]) {
-          // Single-value column
-          case INT:
-            row[j] = dataBlock.getInt(i, j);
-            break;
-          case LONG:
-            row[j] = dataBlock.getLong(i, j);
-            break;
-          case FLOAT:
-            row[j] = dataBlock.getFloat(i, j);
-            break;
-          case DOUBLE:
-            row[j] = dataBlock.getDouble(i, j);
-            break;
-          case BIG_DECIMAL:
-            row[j] = dataBlock.getBigDecimal(i, j);
-            break;
-          case BOOLEAN:
-            row[j] = DataSchema.ColumnDataType.BOOLEAN.convert(dataBlock.getInt(i, j));
-            break;
-          case TIMESTAMP:
-            row[j] = new Timestamp(dataBlock.getLong(i, j));
-            break;
-          case STRING:
-            row[j] = dataBlock.getString(i, j);
-            break;
-          case BYTES:
-            row[j] = dataBlock.getBytes(i, j);
-            break;
-
-          // Multi-value column
-          case INT_ARRAY:
-            row[j] = dataBlock.getIntArray(i, j);
-            break;
-          case LONG_ARRAY:
-            row[j] = dataBlock.getLongArray(i, j);
-            break;
-          case FLOAT_ARRAY:
-            row[j] = dataBlock.getFloatArray(i, j);
-            break;
-          case DOUBLE_ARRAY:
-            row[j] = dataBlock.getDoubleArray(i, j);
-            break;
-          case STRING_ARRAY:
-            row[j] = dataBlock.getStringArray(i, j);
-            break;
-          case BOOLEAN_ARRAY:
-            row[j] = DataSchema.ColumnDataType.BOOLEAN_ARRAY.convert(dataBlock.getIntArray(i, j));
-            break;
-          case TIMESTAMP_ARRAY:
-            row[j] = DataSchema.ColumnDataType.TIMESTAMP_ARRAY.convert(dataBlock.getLongArray(i, j));
-            break;
-          default:
-            throw new IllegalStateException(
-                String.format("Unsupported data type: %s for column: %s", columnDataTypes[j],
-                    dataSchema.getColumnName(j)));
-        }
-      }
-      rows.add(row);
-    }
-
-    for (int colId = 0; colId < numColumns; colId++) {
-      RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
-      if (nullBitmap != null) {
-        for (Integer rowId : nullBitmap) {
-          rows.get(rowId)[colId] = null;
-        }
-      }
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      rows.add(extractRowFromDataBlock(dataBlock, rowId, columnDataTypes, nullBitmaps));
     }
     return rows;
   }
@@ -235,5 +169,86 @@ public final class DataBlockUtils {
           break;
       }
     }
+  }
+
+  public static RoaringBitmap[] extractNullBitmaps(DataBlock dataBlock) {
+    DataSchema dataSchema = dataBlock.getDataSchema();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
+    RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+    for (int colId = 0; colId < numColumns; colId++) {
+      nullBitmaps[colId] = dataBlock.getNullRowIds(colId);
+    }
+    return nullBitmaps;
+  }
+
+  public static Object[] extractRowFromDataBlock(DataBlock dataBlock, int rowId, DataSchema.ColumnDataType[] dataTypes,
+      RoaringBitmap[] nullBitmaps) {
+    int numColumns = nullBitmaps.length;
+    Object[] row = new Object[numColumns];
+    for (int colId = 0; colId < numColumns; colId++) {
+      RoaringBitmap nullBitmap = nullBitmaps[colId];
+      if (nullBitmap != null && nullBitmap.contains(rowId)) {
+        row[colId] = null;
+      } else {
+        switch (dataTypes[colId]) {
+          // Single-value column
+          case INT:
+            row[colId] = dataBlock.getInt(rowId, colId);
+            break;
+          case LONG:
+            row[colId] = dataBlock.getLong(rowId, colId);
+            break;
+          case FLOAT:
+            row[colId] = dataBlock.getFloat(rowId, colId);
+            break;
+          case DOUBLE:
+            row[colId] = dataBlock.getDouble(rowId, colId);
+            break;
+          case BIG_DECIMAL:
+            row[colId] = dataBlock.getBigDecimal(rowId, colId);
+            break;
+          case BOOLEAN:
+            row[colId] = DataSchema.ColumnDataType.BOOLEAN.convert(dataBlock.getInt(rowId, colId));
+            break;
+          case TIMESTAMP:
+            row[colId] = new Timestamp(dataBlock.getLong(rowId, colId));
+            break;
+          case STRING:
+            row[colId] = dataBlock.getString(rowId, colId);
+            break;
+          case BYTES:
+            row[colId] = dataBlock.getBytes(rowId, colId);
+            break;
+
+          // Multi-value column
+          case INT_ARRAY:
+            row[colId] = dataBlock.getIntArray(rowId, colId);
+            break;
+          case LONG_ARRAY:
+            row[colId] = dataBlock.getLongArray(rowId, colId);
+            break;
+          case FLOAT_ARRAY:
+            row[colId] = dataBlock.getFloatArray(rowId, colId);
+            break;
+          case DOUBLE_ARRAY:
+            row[colId] = dataBlock.getDoubleArray(rowId, colId);
+            break;
+          case STRING_ARRAY:
+            row[colId] = dataBlock.getStringArray(rowId, colId);
+            break;
+          case BOOLEAN_ARRAY:
+            row[colId] = DataSchema.ColumnDataType.BOOLEAN_ARRAY.convert(dataBlock.getIntArray(rowId, colId));
+            break;
+          case TIMESTAMP_ARRAY:
+            row[colId] = DataSchema.ColumnDataType.TIMESTAMP_ARRAY.convert(dataBlock.getLongArray(rowId, colId));
+            break;
+          default:
+            throw new IllegalStateException(
+                String.format("Unsupported data type: %s for column: %s", dataTypes[colId], colId));
+        }
+      }
+    }
+    return row;
   }
 }

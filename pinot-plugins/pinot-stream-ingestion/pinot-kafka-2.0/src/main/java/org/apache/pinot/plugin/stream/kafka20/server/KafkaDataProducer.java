@@ -78,7 +78,8 @@ public class KafkaDataProducer implements StreamDataProducer {
   @Override
   public void produce(String topic, byte[] key, byte[] payload, GenericRow headers) {
     List<Header> headerList = new ArrayList<>();
-    headerList.add(new RecordHeader("producerTimestamp", String.valueOf(System.currentTimeMillis()).getBytes(
+    long nowMs = System.currentTimeMillis();
+    headerList.add(new RecordHeader("producerTimestamp", String.valueOf(nowMs).getBytes(
         StandardCharsets.UTF_8)));
     if (headers != null) {
       headers.getFieldToValueMap().forEach((k, v) -> {
@@ -88,7 +89,7 @@ public class KafkaDataProducer implements StreamDataProducer {
         }
       });
     }
-    _producer.send(new ProducerRecord<>(topic, null, key, payload, headerList));
+    _producer.send(new ProducerRecord<>(topic, null, nowMs, key, payload, headerList));
     _producer.flush();
   }
 

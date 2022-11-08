@@ -218,14 +218,14 @@ public class TableTierReaderTest {
 
   private TableTierReader.TableTierDetails testRunner(final String[] servers, String tableName, String segmentName)
       throws InvalidConfigException {
-    when(_helix.getServerToSegmentsMap(ArgumentMatchers.anyString()))
-        .thenAnswer(invocationOnMock -> subsetOfServerSegments(servers));
+    when(_helix.getServerToSegmentsMap(ArgumentMatchers.anyString())).thenAnswer(
+        invocationOnMock -> subsetOfServerSegments(servers));
     if (segmentName != null) {
-      when(_helix.getServers(ArgumentMatchers.anyString(), ArgumentMatchers.anyString()))
-          .thenAnswer(invocationOnMock -> new HashSet<>(Arrays.asList(servers)));
+      when(_helix.getServers(ArgumentMatchers.anyString(), ArgumentMatchers.anyString())).thenAnswer(
+          invocationOnMock -> new HashSet<>(Arrays.asList(servers)));
     }
-    when(_helix.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet()))
-        .thenAnswer(invocationOnMock -> serverEndpoints(servers));
+    when(_helix.getDataInstanceAdminEndpoints(ArgumentMatchers.anySet())).thenAnswer(
+        invocationOnMock -> serverEndpoints(servers));
     TableTierReader reader = new TableTierReader(_executor, _connectionManager, _helix);
     return reader.getTableTierDetails(tableName, segmentName, TIMEOUT_MSEC);
   }

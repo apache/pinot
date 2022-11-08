@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.data.Schema;
 
 
 public class IndexHandlerFactory {
@@ -47,7 +48,7 @@ public class IndexHandlerFactory {
   };
 
   public static IndexHandler getIndexHandler(ColumnIndexType type, SegmentMetadataImpl segmentMetadata,
-      IndexLoadingConfig indexLoadingConfig) {
+      IndexLoadingConfig indexLoadingConfig, Schema schema) {
     switch (type) {
       case INVERTED_INDEX:
         return new InvertedIndexHandler(segmentMetadata, indexLoadingConfig);
@@ -64,7 +65,7 @@ public class IndexHandlerFactory {
       case BLOOM_FILTER:
         return new BloomFilterHandler(segmentMetadata, indexLoadingConfig);
       case FORWARD_INDEX:
-        return new ForwardIndexHandler(segmentMetadata, indexLoadingConfig);
+        return new ForwardIndexHandler(segmentMetadata, indexLoadingConfig, schema);
       default:
         return NO_OP_HANDLER;
     }

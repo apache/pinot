@@ -83,7 +83,8 @@ public class ConsumingSegmentInfoReader {
       for (SegmentConsumerInfo info : entry.getValue()) {
         SegmentConsumerInfo.PartitionOffsetInfo partitionOffsetInfo = info.getPartitionOffsetInfo();
         PartitionOffsetInfo offsetInfo = new PartitionOffsetInfo(partitionOffsetInfo.getCurrentOffsets(),
-            partitionOffsetInfo.getLatestUpstreamOffsets(), partitionOffsetInfo.getRecordsLag());
+            partitionOffsetInfo.getLatestUpstreamOffsets(), partitionOffsetInfo.getRecordsLag(),
+            partitionOffsetInfo.getAvailabilityLagMs());
         consumingSegmentInfoMap.computeIfAbsent(info.getSegmentName(), k -> new ArrayList<>()).add(
             new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getLastConsumedTimestamp(),
                 partitionOffsetInfo.getCurrentOffsets(), offsetInfo));
@@ -237,13 +238,18 @@ public class ConsumingSegmentInfoReader {
     @JsonProperty("latestUpstreamOffsetMap")
     public Map<String, String> _latestUpstreamOffsetMap;
 
+    @JsonProperty("availabilityLagMsMap")
+    public Map<String, String> _availabilityLagMap;
+
     public PartitionOffsetInfo(
         @JsonProperty("currentOffsetsMap") Map<String, String> currentOffsetsMap,
         @JsonProperty("latestUpstreamOffsetMap") Map<String, String> latestUpstreamOffsetMap,
-        @JsonProperty("recordsLagMap") Map<String, String> recordsLagMap) {
+        @JsonProperty("recordsLagMap") Map<String, String> recordsLagMap,
+        @JsonProperty("availabilityLagMsMap") Map<String, String> availabilityLagMsMap) {
       _currentOffsetsMap = currentOffsetsMap;
       _latestUpstreamOffsetMap = latestUpstreamOffsetMap;
       _recordsLagMap = recordsLagMap;
+      _availabilityLagMap = availabilityLagMsMap;
     }
   }
 }

@@ -19,6 +19,8 @@
 package org.apache.pinot.common.utils;
 
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -26,20 +28,21 @@ import static org.testng.Assert.assertTrue;
 
 
 public class ExponentialMovingAverageTest {
+  ScheduledExecutorService _executorService = Executors.newSingleThreadScheduledExecutor();
 
   @Test
   public void testAvgInitialization() {
-    assertEquals(new ExponentialMovingAverage(0.5, -1, 0, 1.0).getAverage(), 1.0);
-    assertEquals(new ExponentialMovingAverage(0.5, -1, 0, 0.123).getAverage(), 0.123);
-    assertEquals(new ExponentialMovingAverage(0.5, -1, 0, 88.0).getAverage(), 88.0);
-    assertEquals(new ExponentialMovingAverage(0.5, -1, 0, 0.0).getAverage(), 0.0);
+    assertEquals(new ExponentialMovingAverage(0.5, -1, 0, 1.0, _executorService).getAverage(), 1.0);
+    assertEquals(new ExponentialMovingAverage(0.5, -1, 0, 0.123, _executorService).getAverage(), 0.123);
+    assertEquals(new ExponentialMovingAverage(0.5, -1, 0, 88.0, _executorService).getAverage(), 88.0);
+    assertEquals(new ExponentialMovingAverage(0.5, -1, 0, 0.0, _executorService).getAverage(), 0.0);
   }
 
   @Test
   public void testWarmUpDuration()
       throws InterruptedException {
     // Test 1. Set warmupDurationMs to 5 seconds.
-    ExponentialMovingAverage average = new ExponentialMovingAverage(0.5, -1, 5000, 0.0);
+    ExponentialMovingAverage average = new ExponentialMovingAverage(0.5, -1, 5000, 0.0, _executorService);
     Random rand = new Random();
     for (int ii = 0; ii < 10; ii++) {
       average.compute(rand.nextDouble());
@@ -50,7 +53,7 @@ public class ExponentialMovingAverageTest {
     assertEquals(average.getAverage(), 0.5);
 
     // Test 2
-    average = new ExponentialMovingAverage(0.5, -1, 0, 0.0);
+    average = new ExponentialMovingAverage(0.5, -1, 0, 0.0, _executorService);
     average.compute(1.0);
     assertEquals(average.getAverage(), 0.5);
   }
@@ -58,7 +61,7 @@ public class ExponentialMovingAverageTest {
   @Test
   public void testAverage() {
     // Test 1.
-    ExponentialMovingAverage average = new ExponentialMovingAverage(1.0, -1, 0, 0.0);
+    ExponentialMovingAverage average = new ExponentialMovingAverage(1.0, -1, 0, 0.0, _executorService);
     assertEquals(average.getAverage(), 0.0);
     average.compute(0.5);
     assertEquals(average.getAverage(), 0.5);
@@ -68,7 +71,7 @@ public class ExponentialMovingAverageTest {
     assertEquals(average.getAverage(), 10.0);
 
     // Test 2.
-    average = new ExponentialMovingAverage(0.5, -1, 0, 0.0);
+    average = new ExponentialMovingAverage(0.5, -1, 0, 0.0, _executorService);
     assertEquals(average.getAverage(), 0.0);
     average.compute(0.1);
     assertEquals(average.getAverage(), 0.05);
@@ -78,7 +81,7 @@ public class ExponentialMovingAverageTest {
     assertEquals(average.getAverage(), 0.7625);
 
     // Test 3
-    average = new ExponentialMovingAverage(0.3, -1, 0, 0.0);
+    average = new ExponentialMovingAverage(0.3, -1, 0, 0.0, _executorService);
     assertEquals(average.getAverage(), 0.0);
     average.compute(1.0);
     assertEquals(average.getAverage(), 0.3);
@@ -92,7 +95,7 @@ public class ExponentialMovingAverageTest {
   public void testAutoDecay()
       throws InterruptedException {
     // Test 1: Test decay
-    ExponentialMovingAverage average = new ExponentialMovingAverage(0.3, 10, 0, 0.0);
+    ExponentialMovingAverage average = new ExponentialMovingAverage(0.3, 10, 0, 0.0, _executorService);
     average.compute(10.0);
     double currAvg = average.getAverage();
 
@@ -102,7 +105,7 @@ public class ExponentialMovingAverageTest {
     }
 
     // Test 2: Test no decay
-    average = new ExponentialMovingAverage(1.0, -1, 0, 0);
+    average = new ExponentialMovingAverage(1.0, -1, 0, 0, _executorService);
     average.compute(10.0);
     currAvg = average.getAverage();
 

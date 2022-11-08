@@ -20,8 +20,9 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
 /**
@@ -43,16 +44,18 @@ public class ExponentialMovingAverage {
   /**
    * Constructor
    *
-   * @param alpha Determines how much weightage should be given to the new value. Can only take a value between 0 and 1.
-   * @param autoDecayWindowMs Time interval to periodically decay the average if no updates are received. For
-   *                          example if autoDecayWindowMs = 30s, if average is not updated for a period of 30
-   *                          seconds, we automatically update the average to 0.0 with a weightage of alpha.
-   * @param warmUpDurationMs The initial duration after initialization during which new incoming values are ignored
-   *                         in the average calculation.
+   * @param alpha                Determines how much weightage should be given to the new value. Can only take a value
+   *                             between 0 and 1.
+   * @param autoDecayWindowMs    Time interval to periodically decay the average if no updates are received. For example
+   *                             if autoDecayWindowMs = 30s, if average is not updated for a period of 30 seconds, we
+   *                             automatically update the average to 0.0 with a weightage of alpha.
+   * @param warmUpDurationMs     The initial duration after initialization during which new incoming values are ignored
+   *                             in the average calculation.
    * @param avgInitializationVal The default value to initialize for average.
+   * @param periodicTaskExecutor Executor to schedule periodic tasks like autoDecay.
    */
   public ExponentialMovingAverage(double alpha, long autoDecayWindowMs, long warmUpDurationMs,
-      double avgInitializationVal) {
+      double avgInitializationVal, @Nullable ScheduledExecutorService periodicTaskExecutor) {
     Preconditions.checkState(alpha >= 0.0 && alpha <= 1.0, "Alpha should be between 0 and 1");
     _alpha = alpha;
     Preconditions.checkState(warmUpDurationMs >= 0, "warmUpDurationMs is negative.");
@@ -65,16 +68,16 @@ public class ExponentialMovingAverage {
     _autoDecayWindowMs = autoDecayWindowMs;
 
     if (_autoDecayWindowMs > 0) {
-      // Create a timer to automatically decay the average if updates are not performed in the last _autoDecayWindowMs.
-      Timer timer = new Timer();
-      timer.schedule(new TimerTask() {
+      // Schedule a task to automatically decay the average if updates are not performed in the last _autoDecayWindowMs.
+      Preconditions.checkState(periodicTaskExecutor != null);
+      periodicTaskExecutor.scheduleAtFixedRate(new Runnable() {
         @Override
         public void run() {
           if (_lastUpdatedTimeMs > 0 && (System.currentTimeMillis() - _lastUpdatedTimeMs) > _autoDecayWindowMs) {
             compute(0.0);
           }
         }
-      }, 0, _autoDecayWindowMs);
+      }, 0, _autoDecayWindowMs, TimeUnit.MILLISECONDS);
     }
   }
 
