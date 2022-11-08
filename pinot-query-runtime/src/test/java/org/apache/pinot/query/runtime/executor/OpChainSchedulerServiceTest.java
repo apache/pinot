@@ -205,10 +205,10 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.stopAsync().awaitTerminated();
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected hasNext to be called");
+    scheduler.stopAsync().awaitTerminated();
     Mockito.verify(_scheduler, Mockito.never()).next();
   }
 
