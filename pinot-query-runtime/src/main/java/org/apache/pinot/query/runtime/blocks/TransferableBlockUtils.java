@@ -105,12 +105,12 @@ public final class TransferableBlockUtils {
         }
         rowId++;
         if (rowId % numRowsPerChunk == 0) {
-          blockChunks.add(new TransferableBlock(List.copyOf(chunk), block.getDataSchema(), block.getType()));
-          chunk.clear();
+          blockChunks.add(new TransferableBlock(chunk, block.getDataSchema(), block.getType()));
+          chunk = new ArrayList<>();
         }
       }
       if (chunk.size() > 0) {
-        blockChunks.add(new TransferableBlock(List.copyOf(chunk), block.getDataSchema(), block.getType()));
+        blockChunks.add(new TransferableBlock(chunk, block.getDataSchema(), block.getType()));
       }
     }
     return blockChunks;

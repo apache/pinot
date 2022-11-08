@@ -59,7 +59,7 @@ public class TransferableBlockUtilsTest {
   @DataProvider
   public static Object[][] splitRowCountProvider() {
     // test against smaller than or larger than total data.
-    return new Object[][]{new Object[]{1}, new Object[]{10}, new Object[]{42}, new Object[]{100}};
+    return new Object[][]{new Object[]{2}, new Object[]{10}, new Object[]{42}, new Object[]{100}};
   }
 
   // Test that we only send one block when block size is smaller than maxBlockSize.
