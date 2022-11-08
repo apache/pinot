@@ -19,7 +19,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Grid } from '@material-ui/core';
+import { Checkbox, DialogContent, FormControlLabel, Grid, IconButton, Tooltip } from '@material-ui/core';
 import { RouteComponentProps, useHistory } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { TableData } from 'Models';
@@ -31,11 +31,13 @@ import 'codemirror/mode/javascript/javascript';
 import 'codemirror/mode/sql/sql';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
-import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
 import { NotificationContext } from '../components/Notification/NotificationContext';
 import Utils from '../utils/Utils';
 import CustomButton from '../components/CustomButton';
 import Confirm from '../components/Confirm';
+import CustomCodemirror from '../components/CustomCodemirror';
+import CustomDialog from '../components/CustomDialog';
+import { HelpOutlineOutlined } from '@material-ui/icons';
 
 const useStyles = makeStyles(() => ({
   root: {
@@ -122,6 +124,7 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [schemaJSON, setSchemaJSON] = useState(null);
   const [actionType,setActionType] = useState(null);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
+  const [reloadSegmentsOnUpdate, setReloadSegmentsOnUpdate] = useState(false);
 
   const fetchTableSchema = async () => {
     const result = await PinotMethodUtils.getTableSchemaData(schemaName);
@@ -162,7 +165,7 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
       const result = await PinotMethodUtils.updateTable(schemaName, configObj);
       syncResponse(result);
     } else if(actionType === 'editSchema'){
-      const result = await PinotMethodUtils.updateSchema(schemaJSON.schemaName, configObj);
+      const result = await PinotMethodUtils.updateSchema(schemaJSON.schemaName, configObj, reloadSegmentsOnUpdate);
       syncResponse(result);
     }
   };
@@ -172,6 +175,7 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
       dispatch({type: 'success', message: result.status, show: true});
       setShowEditConfig(false);
       fetchTableJSON();
+      setReloadSegmentsOnUpdate(false);
     } else {
       dispatch({type: 'error', message: result.error, show: true});
     }
@@ -282,13 +286,45 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
           }
         </Grid>
       </Grid>
-      <EditConfigOp
-        showModal={showEditConfig}
-        hideModal={()=>{setShowEditConfig(false);}}
-        saveConfig={saveConfigAction}
-        config={config}
-        handleConfigChange={handleConfigChange}
-      />
+      {/* Segment config edit dialog */}
+      <CustomDialog
+        open={showEditConfig}
+        handleClose={() => setShowEditConfig(false)}
+        title="Edit Schema"
+        handleSave={saveConfigAction}
+      >
+        <DialogContent>
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                color="primary"
+                checked={reloadSegmentsOnUpdate}
+                onChange={(e) => setReloadSegmentsOnUpdate(e.target.checked)}
+                name="reload"
+              />
+            }
+            label="Reload Segments"
+          />
+          <IconButton size="small">
+            <Tooltip
+              title="Reload all segments to make updated schema effective for already ingested data."
+              arrow
+              placement="top"
+            >
+              <HelpOutlineOutlined fontSize="small" />
+            </Tooltip>
+          </IconButton>
+          <CustomCodemirror
+            data={config}
+            isEditable={true}
+            returnCodemirrorValue={(newValue) => {
+              handleConfigChange(newValue);
+            }}
+          />
+        </DialogContent>
+      </CustomDialog>
+
       {confirmDialog && dialogDetails && <Confirm
         openDialog={confirmDialog}
         dialogTitle={dialogDetails.title}
