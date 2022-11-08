@@ -46,7 +46,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Datatable V4 Implementation is a wrapper around the Row-based data block.
  */
 @InterfaceStability.Evolving
-public class DataTableImplV4 extends BaseDataTable {
+public class DataTableImplV4 implements DataTable {
 
   protected static final int HEADER_SIZE = Integer.BYTES * 13;
   // _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
@@ -62,12 +62,23 @@ public class DataTableImplV4 extends BaseDataTable {
   protected byte[] _variableSizeDataBytes;
   protected ByteBuffer _variableSizeData;
   protected Map<String, String> _metadata;
-  private static final int VERSION = 1;
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;
 
   public DataTableImplV4() {
-    super();
+    _numRows = 0;
+    _numColumns = 0;
+    _fixDataSize = 0;
+    _dataSchema = null;
+    _stringDictionary = null;
+    _fixedSizeDataBytes = null;
+    _fixedSizeData = null;
+    _variableSizeDataBytes = null;
+    _variableSizeData = null;
+    _rowSizeInBytes = 0;
+    _columnOffsets = null;
+    _metadata = new HashMap<>();
+    _errCodeToExceptionMap = new HashMap<>();
   }
 
   public DataTableImplV4(int numRows, DataSchema dataSchema, String[] stringDictionary,
