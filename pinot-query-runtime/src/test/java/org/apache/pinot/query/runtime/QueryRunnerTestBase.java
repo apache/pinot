@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -35,12 +34,14 @@ import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
-import org.apache.pinot.query.QueryEnvironmentTestUtils;
+import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
+import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -85,7 +86,7 @@ public class QueryRunnerTestBase extends QueryTestSet {
 
   protected void addTableToH2(List<String> tables)
       throws SQLException {
-    Schema schema = QueryEnvironmentTestUtils.SCHEMA_BUILDER.build();
+    Schema schema = QueryEnvironmentTestBase.SCHEMA_BUILDER.build();
     List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
     for (String tableName : tables) {
       // create table
@@ -97,7 +98,7 @@ public class QueryRunnerTestBase extends QueryTestSet {
 
   protected void addDataToH2(Map<String, List<GenericRow>> rowsMap)
       throws SQLException {
-    Schema schema = QueryEnvironmentTestUtils.SCHEMA_BUILDER.build();
+    Schema schema = QueryEnvironmentTestBase.SCHEMA_BUILDER.build();
     List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
     for (Map.Entry<String, List<GenericRow>> entry : rowsMap.entrySet()) {
       String tableName = entry.getKey();
@@ -127,20 +128,35 @@ public class QueryRunnerTestBase extends QueryTestSet {
   public void setUp()
       throws Exception {
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    QueryServerEnclosure server1 = new QueryServerEnclosure(
-        ImmutableMap.of("a", INDEX_DIR_S1_A, "b", INDEX_DIR_S1_B, "c", INDEX_DIR_S1_C, "d_O", INDEX_DIR_S1_D),
-        QueryEnvironmentTestUtils.SERVER1_SEGMENTS);
-    QueryServerEnclosure server2 = new QueryServerEnclosure(
-        ImmutableMap.of("a", INDEX_DIR_S2_A, "c", INDEX_DIR_S2_C, "d_R", INDEX_DIR_S2_D, "d_O", INDEX_DIR_S1_D),
-        QueryEnvironmentTestUtils.SERVER2_SEGMENTS);
+    MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1")
+        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
+        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
+        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
+        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("d").build(), "d")
+        .addSegment("a_REALTIME", QueryEnvironmentTestBase.buildRows("a_REALTIME"))
+        .addSegment("a_REALTIME", QueryEnvironmentTestBase.buildRows("a_REALTIME"))
+        .addSegment("b_REALTIME", QueryEnvironmentTestBase.buildRows("b_REALTIME"))
+        .addSegment("c_OFFLINE", QueryEnvironmentTestBase.buildRows("c_OFFLINE"))
+        .addSegment("d_OFFLINE", QueryEnvironmentTestBase.buildRows("d_OFFLINE"));
+    MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server1")
+        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
+        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
+        .registerTable(QueryEnvironmentTestBase.SCHEMA_BUILDER.setSchemaName("d").build(), "d")
+        .addSegment("a_REALTIME", QueryEnvironmentTestBase.buildRows("a_REALTIME"))
+        .addSegment("c_OFFLINE", QueryEnvironmentTestBase.buildRows("c_OFFLINE"))
+        .addSegment("c_OFFLINE", QueryEnvironmentTestBase.buildRows("c_OFFLINE"))
+        .addSegment("d_OFFLINE", QueryEnvironmentTestBase.buildRows("d_OFFLINE"))
+        .addSegment("d_REALTIME", QueryEnvironmentTestBase.buildRows("d_REALTIME"));
+    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
+    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
 
     // Setting up H2 for validation
     setH2Connection();
     addTableToH2(Arrays.asList("a", "b", "c", "d"));
-    addDataToH2(server1.getRowsMap());
-    addDataToH2(server2.getRowsMap());
+    addDataToH2(factory1.buildTableRowsMap());
+    addDataToH2(factory2.buildTableRowsMap());
 
-    _reducerGrpcPort = QueryEnvironmentTestUtils.getAvailablePort();
+    _reducerGrpcPort = QueryTestUtils.getAvailablePort();
     _reducerHostname = String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME);
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
@@ -148,8 +164,8 @@ public class QueryRunnerTestBase extends QueryTestSet {
     _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerGrpcPort, new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
-    _queryEnvironment = QueryEnvironmentTestUtils.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
-        server2.getPort());
+    _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
+        server2.getPort(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap());
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
