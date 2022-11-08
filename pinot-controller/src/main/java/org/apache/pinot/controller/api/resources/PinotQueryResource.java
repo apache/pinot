@@ -314,7 +314,8 @@ public class PinotQueryResource {
         LOGGER.info("The http response code is " + responseCode);
       }*/
       if (responseCode != HttpURLConnection.HTTP_OK) {
-        throw new IOException("Failed : HTTP error code : " + responseCode);
+        throw new IOException("Failed : HTTP error code : " + responseCode + ". Root Cause: "
+            + new String(conn.getErrorStream().readAllBytes(), StandardCharsets.UTF_8));
       }
       final byte[] bytes = drain(new BufferedInputStream(conn.getInputStream()));
 
