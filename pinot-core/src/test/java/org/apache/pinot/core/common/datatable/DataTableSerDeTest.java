@@ -42,6 +42,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -100,9 +101,10 @@ public class DataTableSerDeTest {
           .put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(900L))
           .put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(1919199L)).build();
 
-  @Test
-  public void testException()
+  @Test(dataProvider = "versionProvider")
+  public void testException(int dataTableVersion)
       throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
     Exception exception = new UnsupportedOperationException("Caught exception.");
     ProcessingException processingException =
         QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, exception);
@@ -116,11 +118,13 @@ public class DataTableSerDeTest {
 
     String actual = newDataTable.getExceptions().get(QueryException.QUERY_EXECUTION_ERROR.getErrorCode());
     Assert.assertEquals(actual, expected);
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
-  @Test
-  public void testEmptyStrings()
+  @Test(dataProvider = "versionProvider")
+  public void testEmptyStrings(int dataTableVersion)
       throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
     String emptyString = StringUtils.EMPTY;
     String[] emptyStringArray = {StringUtils.EMPTY};
 
@@ -143,11 +147,13 @@ public class DataTableSerDeTest {
       Assert.assertEquals(newDataTable.getString(rowId, 0), emptyString);
       Assert.assertEquals(newDataTable.getStringArray(rowId, 1), emptyStringArray);
     }
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
-  @Test
-  public void testAllDataTypes()
+  @Test(dataProvider = "versionProvider")
+  public void testAllDataTypes(int dataTableVersion)
       throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
     int numColumns = columnDataTypes.length;
     String[] columnNames = new String[numColumns];
@@ -164,6 +170,44 @@ public class DataTableSerDeTest {
     Assert.assertEquals(newDataTable.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
     verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
+  }
+
+  @Test(dataProvider = "versionProvider")
+  public void testExecutionThreadCpuTimeNs(int dataTableVersion)
+      throws IOException {
+    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
+    DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
+    int numColumns = columnDataTypes.length;
+    String[] columnNames = new String[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      columnNames[i] = columnDataTypes[i].name();
+    }
+
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
+
+    DataTable dataTable = dataTableBuilder.build();
+
+    // Disable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
+    DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
+    // When ThreadCpuTimeMeasurement is disabled, no value for
+    // threadCpuTimeNs/systemActivitiesCpuTimeNs/responseSerializationCpuTimeNs.
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
+
+    // Enable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
+    newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
+    // When ThreadCpuTimeMeasurement is enabled, value of responseSerializationCpuTimeNs is not 0.
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
+    Assert.assertTrue(
+        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName())) > 0);
+    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
   @Test
@@ -427,41 +471,6 @@ public class DataTableSerDeTest {
       newDataTable.getMetadata().remove(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName());
     }
     Assert.assertEquals(newDataTable.getMetadata(), EXPECTED_METADATA);
-  }
-
-  @Test
-  public void testExecutionThreadCpuTimeNs()
-      throws IOException {
-    DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
-    int numColumns = columnDataTypes.length;
-    String[] columnNames = new String[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      columnNames[i] = columnDataTypes[i].name();
-    }
-
-    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
-    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
-
-    DataTable dataTable = dataTableBuilder.build();
-
-    // Disable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
-    DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // When ThreadCpuTimeMeasurement is disabled, no value for
-    // threadCpuTimeNs/systemActivitiesCpuTimeNs/responseSerializationCpuTimeNs.
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
-
-    // Enable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(true);
-    newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // When ThreadCpuTimeMeasurement is enabled, value of responseSerializationCpuTimeNs is not 0.
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
-    Assert.assertTrue(
-        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName())) > 0);
   }
 
   @Test
@@ -768,5 +777,13 @@ public class DataTableSerDeTest {
         }
       }
     }
+  }
+
+  @DataProvider(name = "versionProvider")
+  public Object[][] provideVersion() {
+    return new Object[][]{
+        new Object[]{DataTableFactory.VERSION_4},
+        new Object[]{DataTableFactory.VERSION_3},
+    };
   }
 }

@@ -136,10 +136,16 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
           // this is blocking for 100ms and may return null
           TransferableBlock block = mailbox.receive();
           if (block != null) {
+            if (block.isErrorBlock()) {
+              _upstreamErrorBlock = TransferableBlockUtils.getErrorTransferableBlock(
+                  block.getDataBlock().getExceptions());
+              return _upstreamErrorBlock;
+            }
             if (!block.isEndOfStreamBlock()) {
               return block;
+            } else {
+              eosCount++;
             }
-            eosCount++;
           }
         }
       } catch (Exception e) {
