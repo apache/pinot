@@ -20,21 +20,14 @@ package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -61,9 +54,13 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
+/**
+ * all legacy tests.
+ *
+ * @deprecated do not add to this test set. this class will be broken down and clean up.
+ * add your test to appropraite files in {@link org.apache.pinot.query.runtime.queries} instead.
+ */
 public class QueryRunnerTest extends QueryRunnerTestBase {
-  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(
-      ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("query_server_enclosure"));
   public static final Object[][] ROWS = new Object[][]{
       new Object[]{"foo", "foo", 1},
       new Object[]{"bar", "bar", 42},
@@ -109,7 +106,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         .addSegment("b_REALTIME", buildRows("b_REALTIME"))
         .addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
         .addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
-    MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server1")
+    MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2")
         .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
         .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
         .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
@@ -136,7 +133,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.start();
 
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
-        server2.getPort(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap());
+        server2.getPort(), factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(),
+        factory2.buildTableSegmentNameMap());
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
@@ -200,99 +198,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
       Assert.assertTrue(rte.getMessage().contains(exceptionMsg));
-    }
-  }
-
-  private List<Object[]> queryRunner(String sql) {
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
-    Map<String, String> requestMetadataMap =
-        ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
-    MailboxReceiveOperator mailboxReceiveOperator = null;
-    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
-      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
-        MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
-        mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
-            queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(),
-            reduceNode.getDataSchema(), "localhost", _reducerGrpcPort);
-      } else {
-        for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
-          DistributedStagePlan distributedStagePlan =
-              QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
-          EXECUTOR_SERVICE.submit(() -> {
-            _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
-          });
-        }
-      }
-    }
-    Preconditions.checkNotNull(mailboxReceiveOperator);
-    return QueryDispatcher.toResultTable(QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator),
-        queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
-  }
-
-  private List<Object[]> queryH2(String sql)
-      throws Exception {
-    Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    h2statement.execute(sql);
-    ResultSet h2ResultSet = h2statement.getResultSet();
-    int columnCount = h2ResultSet.getMetaData().getColumnCount();
-    List<Object[]> result = new ArrayList<>();
-    while (h2ResultSet.next()) {
-      Object[] row = new Object[columnCount];
-      for (int i = 0; i < columnCount; i++) {
-        row[i] = h2ResultSet.getObject(i + 1);
-      }
-      result.add(row);
-    }
-    return result;
-  }
-
-  private void compareRowEquals(List<Object[]> resultRows, List<Object[]> expectedRows) {
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-
-    Comparator<Object> valueComp = (l, r) -> {
-      if (l == null && r == null) {
-        return 0;
-      } else if (l == null) {
-        return -1;
-      } else if (r == null) {
-        return 1;
-      }
-      if (l instanceof Integer) {
-        return Integer.compare((Integer) l, ((Number) r).intValue());
-      } else if (l instanceof Long) {
-        return Long.compare((Long) l, ((Number) r).longValue());
-      } else if (l instanceof Float) {
-        return Float.compare((Float) l, ((Number) r).floatValue());
-      } else if (l instanceof Double) {
-        return Double.compare((Double) l, ((Number) r).doubleValue());
-      } else if (l instanceof String) {
-        return ((String) l).compareTo((String) r);
-      } else if (l instanceof Boolean) {
-        return ((Boolean) l).compareTo((Boolean) r);
-      } else {
-        throw new RuntimeException("non supported type " + l.getClass());
-      }
-    };
-    Comparator<Object[]> rowComp = (l, r) -> {
-      int cmp = 0;
-      for (int i = 0; i < l.length; i++) {
-        cmp = valueComp.compare(l[i], r[i]);
-        if (cmp != 0) {
-          return cmp;
-        }
-      }
-      return 0;
-    };
-    resultRows.sort(rowComp);
-    expectedRows.sort(rowComp);
-    for (int i = 0; i < resultRows.size(); i++) {
-      Object[] resultRow = resultRows.get(i);
-      Object[] expectedRow = expectedRows.get(i);
-      for (int j = 0; j < resultRow.length; j++) {
-        Assert.assertEquals(valueComp.compare(resultRow[j], expectedRow[j]), 0,
-            "Not match at (" + i + "," + j + ")! Expected: " + expectedRow[j] + " Actual: " + resultRow[j]);
-      }
     }
   }
 

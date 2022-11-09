@@ -20,6 +20,7 @@ package org.apache.pinot.query;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
@@ -43,6 +44,7 @@ public class QueryEnvironmentTestBase {
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
       ImmutableMap.of("a_REALTIME", ImmutableList.of("a3"), "c_OFFLINE", ImmutableList.of("c2", "c3"),
           "d_REALTIME", ImmutableList.of("d2"), "d_OFFLINE", ImmutableList.of("d3"));
+  public static final Map<String, Schema> TABLE_SCHEMAS = new HashMap<>();
   private static final Schema.SchemaBuilder SCHEMA_BUILDER;
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder()
@@ -51,6 +53,10 @@ public class QueryEnvironmentTestBase {
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
         .addMetric("col3", FieldSpec.DataType.INT, 0)
         .setSchemaName("defaultSchemaName");
+    TABLE_SCHEMAS.put("a_REALTIME", SCHEMA_BUILDER.setSchemaName("a").build());
+    TABLE_SCHEMAS.put("b_REALTIME", SCHEMA_BUILDER.setSchemaName("b").build());
+    TABLE_SCHEMAS.put("c_OFFLINE", SCHEMA_BUILDER.setSchemaName("c").build());
+    TABLE_SCHEMAS.put("d", SCHEMA_BUILDER.setSchemaName("d").build());
   }
 
   protected QueryEnvironment _queryEnvironment;
@@ -58,7 +64,7 @@ public class QueryEnvironmentTestBase {
   @BeforeClass
   public void setUp() {
     // the port doesn't matter as we are not actually making a server call.
-    _queryEnvironment = getQueryEnvironment(3, 1, 2, SERVER1_SEGMENTS, SERVER2_SEGMENTS);
+    _queryEnvironment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS);
   }
 
   @DataProvider(name = "testQueryDataProvider")
@@ -94,12 +100,11 @@ public class QueryEnvironmentTestBase {
   }
 
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
-      Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2) {
-    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2)
-        .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
+      Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2) {
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
+    for (Map.Entry<String, Schema> entry : schemaMap.entrySet()) {
+      factory.registerTable(entry.getValue(), entry.getKey());
+    }
     for (Map.Entry<String, List<String>> entry : segmentMap1.entrySet()) {
       for (String segment : entry.getValue()) {
         factory.registerSegment(port1, entry.getKey(), segment);
