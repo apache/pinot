@@ -35,4 +35,32 @@ public class PinotConnectionTest {
     Statement statement = pinotConnection.createStatement();
     Assert.assertNotNull(statement);
   }
+
+  @Test
+  public void setUserAgentTest()
+      throws Exception {
+    StringBuilder appId = new StringBuilder("appId-");
+    for (int i = 0; i < 256; i++) {
+       appId.append(i);
+    }
+    DummyPinotControllerTransport userAgentPinotControllerTransport = DummyPinotControllerTransport
+        .create(appId.toString());
+
+    PinotConnection pinotConnection =
+        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", userAgentPinotControllerTransport);
+    Statement statement = pinotConnection.createStatement();
+    Assert.assertNotNull(statement);
+  }
+
+  @Test
+  public void unsetUserAgentTest()
+      throws Exception {
+    DummyPinotControllerTransport userAgentPinotControllerTransport = DummyPinotControllerTransport
+        .create(null);
+
+    PinotConnection pinotConnection =
+        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", userAgentPinotControllerTransport);
+    Statement statement = pinotConnection.createStatement();
+    Assert.assertNotNull(statement);
+  }
 }

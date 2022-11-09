@@ -145,6 +145,13 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     Map<String, String> props = new HashMap<>();
     props.put(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true");
     columnProperties.put(SKILLS_TEXT_COL_MULTI_TERM_NAME, props);
+    props = new HashMap<>();
+    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, "coordinator");
+    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "it, those");
+    columnProperties.put(SKILLS_TEXT_COL_NAME, props);
+    props = new HashMap<>();
+    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "");
+    columnProperties.put(SKILLS_TEXT_COL_DICT_NAME, props);
     indexLoadingConfig.setColumnProperties(columnProperties);
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
@@ -193,6 +200,13 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     props.put(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true");
     props.put(FieldConfig.TEXT_INDEX_RAW_VALUE, "ILoveCoding");
     columnProperties.put(SKILLS_TEXT_NO_RAW_NAME, props);
+    props = new HashMap<>();
+    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, "coordinator");
+    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "it, those");
+    columnProperties.put(SKILLS_TEXT_COL_NAME, props);
+    props = new HashMap<>();
+    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "");
+    columnProperties.put(SKILLS_TEXT_COL_DICT_NAME, props);
     config.setColumnProperties(columnProperties);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
@@ -206,7 +220,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<GenericRow> rows = new ArrayList<>();
 
     // read the skills file
-    String[] skills = new String[24];
+    String[] skills = new String[28];
     List<String[]> multiValueStringList = new ArrayList<>();
     int skillCount = 0;
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(
@@ -217,7 +231,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         multiValueStringList.add(StringUtils.splitByWholeSeparator(line, ", "));
       }
     }
-    assertEquals(skillCount, 24);
+    assertEquals(skillCount, 28);
 
     // read the query log file (24k queries) and build dataset
     int counter = 0;
@@ -1863,6 +1877,34 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, 0);
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, 'a and or in the are')";
     testInterSegmentAggregationQueryHelper(query, 0);
+
+    // query with words excluded from default stop-words. they should be indexed
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"IT support\" or \"IT manager\"')";
+    testInterSegmentAggregationQueryHelper(query, 8);
+
+    // query with words excluded from default stop-words. they should be indexed
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"IT\"')";
+    testInterSegmentAggregationQueryHelper(query, 16);
+
+    // query without stop-words
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"support\" or \"manager\"')";
+    testInterSegmentAggregationQueryHelper(query, 12);
+
+    // query without stop-words
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"supporting\"')";
+    testInterSegmentAggregationQueryHelper(query, 4);
+
+    // query with included stop-words. they should not be indexed
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'coordinator')";
+    testInterSegmentAggregationQueryHelper(query, 0);
+
+    // query with default stop-words. they should not be indexed
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"IT support\" or \"IT manager\"')";
+    testInterSegmentAggregationQueryHelper(query, 12);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"IT\"')";
+    testInterSegmentAggregationQueryHelper(query, 0);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"support\" or \"manager\"')";
+    testInterSegmentAggregationQueryHelper(query, 12);
 
     // analyzer should prune/ignore the stop words from search expression and consider everything else for a match
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"learned a lot\"')";

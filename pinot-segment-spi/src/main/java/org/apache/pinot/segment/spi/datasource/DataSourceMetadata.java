@@ -50,6 +50,8 @@ public interface DataSourceMetadata {
 
   /**
    * Returns {@code true} if the column is sorted, {@code false} otherwise.
+   *
+   * The result of this method cannot be trusted if null handling is enabled.
    */
   boolean isSorted();
 

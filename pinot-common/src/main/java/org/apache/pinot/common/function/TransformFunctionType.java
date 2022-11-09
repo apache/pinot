@@ -22,10 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import org.apache.commons.lang.StringUtils;
 
 
 public enum TransformFunctionType {
@@ -59,6 +55,7 @@ public enum TransformFunctionType {
   LESS_THAN("less_than"),
   LESS_THAN_OR_EQUAL("less_than_or_equal"),
   IN("in"),
+  NOT_IN("not_in"),
 
   IS_NULL("is_null"),
   IS_NOT_NULL("is_not_null"),
@@ -136,7 +133,7 @@ public enum TransformFunctionType {
   // Geo indexing
   GEOTOH3("geoToH3"),
 
-  //Trigonometry
+  // Trigonometry
   SIN("sin"),
   COS("cos"),
   TAN("tan"),
@@ -151,11 +148,6 @@ public enum TransformFunctionType {
   DEGREES("degrees"),
   RADIANS("radians");
 
-  private static final Set<String> NAMES = Arrays.stream(values()).flatMap(
-      func -> func.getAliases().stream().flatMap(name -> Stream.of(name, StringUtils.remove(name, '_').toUpperCase(),
-          StringUtils.remove(name, '_').toLowerCase(), name.toUpperCase(),
-          name.toLowerCase()))).collect(Collectors.toSet());
-
   private final String _name;
   private final List<String> _aliases;
 
@@ -168,41 +160,11 @@ public enum TransformFunctionType {
     _aliases = Collections.unmodifiableList(all);
   }
 
-  public List<String> getAliases() {
-    return _aliases;
-  }
-
-  public static boolean isTransformFunction(String functionName) {
-    if (NAMES.contains(functionName)) {
-      return true;
-    }
-    // scalar functions
-    if (FunctionRegistry.containsFunction(functionName)) {
-      return true;
-    }
-    return NAMES.contains(StringUtils.remove(functionName, '_').toUpperCase());
-  }
-
-  /**
-   * Returns the corresponding transform function type for the given function name.
-   */
-  public static TransformFunctionType getTransformFunctionType(String functionName) {
-    String upperCaseFunctionName = functionName.toUpperCase();
-    try {
-      return TransformFunctionType.valueOf(upperCaseFunctionName);
-    } catch (IllegalArgumentException e) {
-      if (FunctionRegistry.containsFunction(functionName)) {
-        return SCALAR;
-      }
-      // Support function name of both jsonExtractScalar and json_extract_scalar
-      if (upperCaseFunctionName.contains("_")) {
-        return getTransformFunctionType(StringUtils.remove(upperCaseFunctionName, '_'));
-      }
-      throw new IllegalArgumentException("Invalid transform function name: " + functionName);
-    }
-  }
-
   public String getName() {
     return _name;
+  }
+
+  public List<String> getAliases() {
+    return _aliases;
   }
 }

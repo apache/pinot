@@ -135,13 +135,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
         segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
   }
 
-  // TODO: This test fails when using `llc` consumer mode. Needs investigation
   @Test
   public void testSegmentListApi()
       throws Exception {
     {
-      String jsonOutputStr = sendGetRequest(
-          _controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.OFFLINE.toString()));
+      String jsonOutputStr =
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.OFFLINE.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -149,37 +148,26 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       Assert.assertEquals(segments.size(), 8);
     }
     {
-      String jsonOutputStr = sendGetRequest(
-          _controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.REALTIME.toString()));
+      String jsonOutputStr =
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.REALTIME.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
       JsonNode segments = element.get("REALTIME");
-      Assert.assertEquals(segments.size(), 3);
+      Assert.assertEquals(segments.size(), 24);
     }
     {
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
-      // there should be 2 elements in the array now.
-      int realtimeIndex = 0;
-      int offlineIndex = 1;
-      JsonNode element = array.get(realtimeIndex);
-      if (!element.has("REALTIME")) {
-        realtimeIndex = 1;
-        offlineIndex = 0;
-      }
-      JsonNode offlineElement = array.get(offlineIndex);
-      JsonNode realtimeElement = array.get(realtimeIndex);
-
-      JsonNode realtimeSegments = realtimeElement.get("REALTIME");
-      Assert.assertEquals(realtimeSegments.size(), 3);
-
-      JsonNode offlineSegments = offlineElement.get("OFFLINE");
+      JsonNode offlineSegments = array.get(0).get("OFFLINE");
       Assert.assertEquals(offlineSegments.size(), 8);
+      JsonNode realtimeSegments = array.get(1).get("REALTIME");
+      Assert.assertEquals(realtimeSegments.size(), 24);
     }
   }
 
-  @Test
+  // NOTE: Reload consuming segment will force commit it, so run this test after segment list api test
+  @Test(dependsOnMethods = "testSegmentListApi")
   public void testReload()
       throws Exception {
     super.testReload(true);

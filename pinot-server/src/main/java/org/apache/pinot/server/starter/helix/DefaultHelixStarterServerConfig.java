@@ -59,7 +59,7 @@ public class DefaultHelixStarterServerConfig {
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_CLASS,
         CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_CLASS);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS,
-        "ValidSegmentPruner,DataSchemaSegmentPruner,ColumnValueSegmentPruner,SelectionQuerySegmentPruner");
+        "ColumnValueSegmentPruner,SelectionQuerySegmentPruner");
 
     // request handler factory parameters
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS,

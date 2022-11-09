@@ -64,7 +64,6 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -285,7 +284,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     SegmentZKMetadata segmentZKMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
     Preconditions.checkNotNull(segmentZKMetadata);
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Schema schema = indexLoadingConfig.getSchema();
     Preconditions.checkNotNull(schema);
 
     File segmentDir = new File(_indexDir, segmentName);
@@ -355,9 +354,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         }
       }
 
-      schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema,
-          SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig));
-
       segmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
@@ -381,7 +377,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
 
     // TODO: Change dedup handling to handle segment replacement
-    if (isDedupEnabled()) {
+    if (isDedupEnabled() && immutableSegment instanceof ImmutableSegmentImpl) {
       buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
     }
     super.addSegment(immutableSegment);
@@ -468,6 +464,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private void downloadSegmentFromDeepStore(String segmentName, IndexLoadingConfig indexLoadingConfig, String uri) {
     File segmentTarFile = new File(_indexDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    if (segmentTarFile.exists()) {
+      _logger.warn(
+          "Segment tar file: {} already exists (possibly due to server restart/crash resulting in skipped cleanup). "
+              + "Deleting it before fetching again from uri: {}",
+          segmentName, uri);
+      FileUtils.deleteQuietly(segmentTarFile);
+    }
     try {
       SegmentFetcherFactory.fetchSegmentToLocal(uri, segmentTarFile);
       _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, segmentTarFile,

@@ -81,9 +81,13 @@ public class ConsumingSegmentInfoReader {
     for (Map.Entry<String, List<SegmentConsumerInfo>> entry : serverToSegmentConsumerInfoMap.entrySet()) {
       String serverName = entry.getKey();
       for (SegmentConsumerInfo info : entry.getValue()) {
+        SegmentConsumerInfo.PartitionOffsetInfo partitionOffsetInfo = info.getPartitionOffsetInfo();
+        PartitionOffsetInfo offsetInfo = new PartitionOffsetInfo(partitionOffsetInfo.getCurrentOffsets(),
+            partitionOffsetInfo.getLatestUpstreamOffsets(), partitionOffsetInfo.getRecordsLag(),
+            partitionOffsetInfo.getAvailabilityLagMs());
         consumingSegmentInfoMap.computeIfAbsent(info.getSegmentName(), k -> new ArrayList<>()).add(
             new ConsumingSegmentInfo(serverName, info.getConsumerState(), info.getLastConsumedTimestamp(),
-                info.getPartitionToOffsetMap()));
+                partitionOffsetInfo.getCurrentOffsets(), offsetInfo));
       }
     }
     // Segments which are in CONSUMING state but found no consumer on the server
@@ -203,17 +207,49 @@ public class ConsumingSegmentInfoReader {
     public String _consumerState;
     @JsonProperty("lastConsumedTimestamp")
     public long _lastConsumedTimestamp;
+    @Deprecated
     @JsonProperty("partitionToOffsetMap")
     public Map<String, String> _partitionToOffsetMap;
+    @JsonProperty("partitionOffsetInfo")
+    public PartitionOffsetInfo _partitionOffsetInfo;
+
 
     public ConsumingSegmentInfo(@JsonProperty("serverName") String serverName,
         @JsonProperty("consumerState") String consumerState,
         @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
-        @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap) {
+        @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap,
+        @JsonProperty("partitionOffsetInfo") PartitionOffsetInfo partitionOffsetInfo) {
       _serverName = serverName;
       _consumerState = consumerState;
       _lastConsumedTimestamp = lastConsumedTimestamp;
       _partitionToOffsetMap = partitionToOffsetMap;
+      _partitionOffsetInfo = partitionOffsetInfo;
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  static public class PartitionOffsetInfo {
+    @JsonProperty("currentOffsetsMap")
+    public Map<String, String> _currentOffsetsMap;
+
+    @JsonProperty("recordsLagMap")
+    public Map<String, String> _recordsLagMap;
+
+    @JsonProperty("latestUpstreamOffsetMap")
+    public Map<String, String> _latestUpstreamOffsetMap;
+
+    @JsonProperty("availabilityLagMsMap")
+    public Map<String, String> _availabilityLagMap;
+
+    public PartitionOffsetInfo(
+        @JsonProperty("currentOffsetsMap") Map<String, String> currentOffsetsMap,
+        @JsonProperty("latestUpstreamOffsetMap") Map<String, String> latestUpstreamOffsetMap,
+        @JsonProperty("recordsLagMap") Map<String, String> recordsLagMap,
+        @JsonProperty("availabilityLagMsMap") Map<String, String> availabilityLagMsMap) {
+      _currentOffsetsMap = currentOffsetsMap;
+      _latestUpstreamOffsetMap = latestUpstreamOffsetMap;
+      _recordsLagMap = recordsLagMap;
+      _availabilityLagMap = availabilityLagMsMap;
     }
   }
 }

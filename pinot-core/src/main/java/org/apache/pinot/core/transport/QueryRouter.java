@@ -106,14 +106,10 @@ public class QueryRouter {
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
-      // NOTE: When both OFFLINE and REALTIME request exist, use negative request id for REALTIME to differentiate
-      //       from the OFFLINE one
-      long realtimeRequestId = offlineBrokerRequest == null ? requestId : -requestId;
       for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
-        InstanceRequest instanceRequest =
-            getInstanceRequest(realtimeRequestId, realtimeBrokerRequest, entry.getValue());
+        InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
         requestMap.put(serverRoutingInstance, instanceRequest);
       }
     }
@@ -181,8 +177,7 @@ public class QueryRouter {
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
-    // NOTE: For hybrid table, REALTIME request has negative request id
-    long requestId = Math.abs(Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName())));
+    long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
 
     // Query future might be null if the query is already done (maybe due to failure)

@@ -20,8 +20,8 @@ package org.apache.pinot.query.mailbox;
 
 import io.grpc.ManagedChannel;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -42,16 +42,16 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  *   to open 2 mailboxes, they should use {job_id}_1 and {job_id}_2 to distinguish the 2 different mailbox.</li>
  * </ul>
  */
-public class GrpcMailboxService implements MailboxService<MailboxContent> {
+public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   // channel manager
   private final ChannelManager _channelManager;
   private final String _hostname;
   private final int _mailboxPort;
 
   // maintaining a list of registered mailboxes.
-  private final ConcurrentHashMap<String, ReceivingMailbox<MailboxContent>> _receivingMailboxMap =
+  private final ConcurrentHashMap<String, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap =
       new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<String, SendingMailbox<MailboxContent>> _sendingMailboxMap =
+  private final ConcurrentHashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap =
       new ConcurrentHashMap<>();
 
   public GrpcMailboxService(String hostname, int mailboxPort, PinotConfiguration extraConfig) {
@@ -84,19 +84,24 @@ public class GrpcMailboxService implements MailboxService<MailboxContent> {
    * Register a mailbox, mailbox needs to be registered before use.
    * @param mailboxId the id of the mailbox.
    */
-  public SendingMailbox<MailboxContent> getSendingMailbox(String mailboxId) {
-    return _sendingMailboxMap.computeIfAbsent(mailboxId, (mId) -> new GrpcSendingMailbox(mId, this));
+  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
+    return _sendingMailboxMap.computeIfAbsent(mailboxId.toString(), (mId) -> new GrpcSendingMailbox(mId, this));
   }
 
   /**
    * Register a mailbox, mailbox needs to be registered before use.
    * @param mailboxId the id of the mailbox.
    */
-  public ReceivingMailbox<MailboxContent> getReceivingMailbox(String mailboxId) {
-    return _receivingMailboxMap.computeIfAbsent(mailboxId, (mId) -> new GrpcReceivingMailbox(mId, this));
+  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
+    return _receivingMailboxMap.computeIfAbsent(mailboxId.toString(), (mId) -> new GrpcReceivingMailbox(mId, this));
   }
 
   public ManagedChannel getChannel(String mailboxId) {
     return _channelManager.getChannel(Utils.constructChannelId(mailboxId));
+  }
+
+  @Override
+  public String toString() {
+    return "GrpcMailboxService{" + "_hostname='" + _hostname + '\'' + ", _mailboxPort=" + _mailboxPort + '}';
   }
 }

@@ -20,8 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import com.google.protobuf.ByteString;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,15 +29,14 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.BaseDataBlock;
-import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
-import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -68,12 +65,12 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   private final int _serverPort;
   private final long _jobId;
   private final int _stageId;
-  private final MailboxService<Mailbox.MailboxContent> _mailboxService;
+  private final MailboxService<TransferableBlock> _mailboxService;
   private final DataSchema _dataSchema;
-  private BaseOperator<TransferableBlock> _dataTableBlockBaseOperator;
+  private Operator<TransferableBlock> _dataTableBlockBaseOperator;
 
-  public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
-      BaseOperator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
+  public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService, DataSchema dataSchema,
+      Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
       long jobId, int stageId) {
     _dataSchema = dataSchema;
@@ -89,6 +86,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
           singletonInstance = serverInstance;
         }
       }
+      Preconditions.checkNotNull(singletonInstance, "Unable to find receiving instance for singleton exchange");
       _receivingStageInstances = Collections.singletonList(singletonInstance);
     } else {
       _receivingStageInstances = receivingStageInstances;
@@ -116,7 +114,20 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    TransferableBlock transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+    TransferableBlock transferableBlock;
+    try {
+      transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+    } catch (final Exception e) {
+      // ideally, MailboxSendOperator doesn't ever throw an exception because
+      // it will just get swallowed, in this scenario at least we can forward
+      // any upstream exceptions as an error  block
+      transferableBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+    }
+
+    if (TransferableBlockUtils.isNoOpBlock(transferableBlock)) {
+      return transferableBlock;
+    }
+
     boolean isEndOfStream = TransferableBlockUtils.isEndOfStream(transferableBlock);
     BaseDataBlock.Type type = transferableBlock.getType();
     try {
@@ -186,8 +197,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   }
 
   private void sendDataTableBlockToServers(List<ServerInstance> servers, TransferableBlock transferableBlock,
-      BaseDataBlock.Type type, boolean isEndOfStream)
-      throws IOException {
+      BaseDataBlock.Type type, boolean isEndOfStream) {
     if (isEndOfStream) {
       for (ServerInstance server : servers) {
         sendDataTableBlock(server, transferableBlock, true);
@@ -205,30 +215,17 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   }
 
   private void sendDataTableBlock(ServerInstance serverInstance, TransferableBlock transferableBlock,
-      boolean isEndOfStream)
-      throws IOException {
-    String mailboxId = toMailboxId(serverInstance);
-    SendingMailbox<Mailbox.MailboxContent> sendingMailbox = _mailboxService.getSendingMailbox(mailboxId);
-    Mailbox.MailboxContent mailboxContent = toMailboxContent(mailboxId, transferableBlock.getDataBlock().toBytes(),
-        isEndOfStream);
-    sendingMailbox.send(mailboxContent);
+      boolean isEndOfStream) {
+    MailboxIdentifier mailboxId = toMailboxId(serverInstance);
+    SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService.getSendingMailbox(mailboxId);
+    sendingMailbox.send(transferableBlock);
     if (isEndOfStream) {
       sendingMailbox.complete();
     }
   }
 
-  private Mailbox.MailboxContent toMailboxContent(String mailboxId, byte[] dataBlockBytes, boolean isMetadataBlock)
-      throws IOException {
-    Mailbox.MailboxContent.Builder builder =
-        Mailbox.MailboxContent.newBuilder().setMailboxId(mailboxId).setPayload(ByteString.copyFrom(dataBlockBytes));
-    if (isMetadataBlock) {
-      builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
-    }
-    return builder.build();
-  }
-
-  private String toMailboxId(ServerInstance serverInstance) {
+  private StringMailboxIdentifier toMailboxId(ServerInstance serverInstance) {
     return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), _serverHostName, _serverPort,
-        serverInstance.getHostname(), serverInstance.getQueryMailboxPort()).toString();
+        serverInstance.getHostname(), serverInstance.getQueryMailboxPort());
   }
 }

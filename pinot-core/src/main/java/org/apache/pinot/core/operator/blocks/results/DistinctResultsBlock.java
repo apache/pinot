@@ -24,13 +24,11 @@ import java.util.Collection;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 /**
@@ -70,13 +68,8 @@ public class DistinctResultsBlock extends BaseResultsBlock {
   @Override
   public DataTable getDataTable(QueryContext queryContext)
       throws IOException {
-    String[] columnNames = new String[]{_distinctFunction.getColumnName()};
-    ColumnDataType[] columnDataTypes = new ColumnDataType[]{ColumnDataType.OBJECT};
-    DataTableBuilder dataTableBuilder =
-        DataTableBuilderFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
-    dataTableBuilder.startRow();
-    dataTableBuilder.setColumn(0, _distinctTable);
-    dataTableBuilder.finishRow();
-    return dataTableBuilder.build();
+    Collection<Object[]> rows = getRows(queryContext);
+    return SelectionOperatorUtils.getDataTableFromRows(rows, _distinctTable.getDataSchema(),
+        queryContext.isNullHandlingEnabled());
   }
 }

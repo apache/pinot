@@ -97,7 +97,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
   private static final int NUM_SEGMENTS = 12;
-  private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
   private static final String SEGMENT_UPLOAD_TEST_TABLE = "segmentUploadTestTable";
 
   // For table config refresh test, make an expensive query to ensure the query won't finish in 5ms
@@ -961,69 +960,64 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testLiteralOnlyFunc()
       throws Exception {
-    long currentTsMin = System.currentTimeMillis();
-    long oneHourAgoTsMin = currentTsMin - ONE_HOUR_IN_MS;
+    long queryStartTimeMs = System.currentTimeMillis();
     String sqlQuery =
         "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
             + "today, now(), ago('PT1H'), encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
             + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, toBase64"
             + "(toUtf8('hello!')) as toBase64, fromUtf8(fromBase64('aGVsbG8h')) as fromBase64";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
-    long currentTsMax = System.currentTimeMillis();
-    long oneHourAgoTsMax = currentTsMax - ONE_HOUR_IN_MS;
+    JsonNode response = postQuery(sqlQuery);
+    long queryEndTimeMs = System.currentTimeMillis();
 
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "1");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "currentTs");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(2).asText(), "oneHourAgoTs");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(3).asText(), "abc");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(4).asText(), "today");
-    String nowColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(5).asText();
-    String oneHourAgoColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(6).asText();
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(7).asText(), "encodedUrl");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(8).asText(), "decodedUrl");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(9).asText(), "toBase64");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(10).asText(), "fromBase64");
-    assertTrue(Long.parseLong(nowColumnName) > currentTsMin);
-    assertTrue(Long.parseLong(nowColumnName) < currentTsMax);
-    assertTrue(Long.parseLong(oneHourAgoColumnName) > oneHourAgoTsMin);
-    assertTrue(Long.parseLong(oneHourAgoColumnName) < oneHourAgoTsMax);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    JsonNode columnNames = dataSchema.get("columnNames");
+    assertEquals(columnNames.get(0).asText(), "1");
+    assertEquals(columnNames.get(1).asText(), "currentTs");
+    assertEquals(columnNames.get(2).asText(), "oneHourAgoTs");
+    assertEquals(columnNames.get(3).asText(), "abc");
+    assertEquals(columnNames.get(4).asText(), "today");
+    String nowColumnName = columnNames.get(5).asText();
+    String oneHourAgoColumnName = columnNames.get(6).asText();
+    assertEquals(columnNames.get(7).asText(), "encodedUrl");
+    assertEquals(columnNames.get(8).asText(), "decodedUrl");
+    assertEquals(columnNames.get(9).asText(), "toBase64");
+    assertEquals(columnNames.get(10).asText(), "fromBase64");
 
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "LONG");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(2).asText(), "LONG");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(3).asText(), "STRING");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(4).asText(), "STRING");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(5).asText(), "LONG");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(6).asText(), "LONG");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(7).asText(), "STRING");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(8).asText(), "STRING");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(9).asText(), "STRING");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(10).asText(), "STRING");
+    JsonNode columnDataTypes = dataSchema.get("columnDataTypes");
+    assertEquals(columnDataTypes.get(0).asText(), "LONG");
+    assertEquals(columnDataTypes.get(1).asText(), "LONG");
+    assertEquals(columnDataTypes.get(2).asText(), "LONG");
+    assertEquals(columnDataTypes.get(3).asText(), "STRING");
+    assertEquals(columnDataTypes.get(4).asText(), "STRING");
+    assertEquals(columnDataTypes.get(5).asText(), "LONG");
+    assertEquals(columnDataTypes.get(6).asText(), "LONG");
+    assertEquals(columnDataTypes.get(7).asText(), "STRING");
+    assertEquals(columnDataTypes.get(8).asText(), "STRING");
+    assertEquals(columnDataTypes.get(9).asText(), "STRING");
+    assertEquals(columnDataTypes.get(10).asText(), "STRING");
 
-    int first = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    long second = response.get("resultTable").get("rows").get(0).get(1).asLong();
-    long third = response.get("resultTable").get("rows").get(0).get(2).asLong();
-    String fourth = response.get("resultTable").get("rows").get(0).get(3).asText();
-    assertEquals(first, 1);
-    assertTrue(second > currentTsMin);
-    assertTrue(second < currentTsMax);
-    assertTrue(third > oneHourAgoTsMin);
-    assertTrue(third < oneHourAgoTsMax);
-    assertEquals(fourth, "abc");
-    String todayStr = response.get("resultTable").get("rows").get(0).get(4).asText();
-    String expectedTodayStr =
-        Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
-    assertEquals(todayStr, expectedTodayStr);
-    long nowValue = response.get("resultTable").get("rows").get(0).get(5).asLong();
-    assertEquals(nowValue, Long.parseLong(nowColumnName));
-    long oneHourAgoValue = response.get("resultTable").get("rows").get(0).get(6).asLong();
-    assertEquals(oneHourAgoValue, Long.parseLong(oneHourAgoColumnName));
-    assertEquals(response.get("resultTable").get("rows").get(0).get(7).asText(),
-        "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
-    assertEquals(response.get("resultTable").get("rows").get(0).get(8).asText(),
-        "key1=value 1&key2=value@!$2&key3=value%3");
-    assertEquals(response.get("resultTable").get("rows").get(0).get(9).asText(), "aGVsbG8h");
-    assertEquals(response.get("resultTable").get("rows").get(0).get(10).asText(), "hello!");
+    JsonNode results = resultTable.get("rows").get(0);
+    assertEquals(results.get(0).asInt(), 1);
+    long nowResult = results.get(1).asLong();
+    assertTrue(nowResult >= queryStartTimeMs);
+    assertTrue(nowResult <= queryEndTimeMs);
+    long oneHourAgoResult = results.get(2).asLong();
+    assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
+    assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
+    assertEquals(results.get(3).asText(), "abc");
+    String queryStartTimeDay = Instant.ofEpochMilli(queryStartTimeMs).atZone(ZoneId.of("UTC"))
+        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    String queryEndTimeDay = Instant.ofEpochMilli(queryEndTimeMs).atZone(ZoneId.of("UTC"))
+        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    String dateTimeResult = results.get(4).asText();
+    assertTrue(dateTimeResult.equals(queryStartTimeDay) || dateTimeResult.equals(queryEndTimeDay));
+    assertEquals(results.get(5).asText(), nowColumnName);
+    assertEquals(results.get(6).asText(), oneHourAgoColumnName);
+    assertEquals(results.get(7).asText(), "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
+    assertEquals(results.get(8).asText(), "key1=value 1&key2=value@!$2&key3=value%3");
+    assertEquals(results.get(9).asText(), "aGVsbG8h");
+    assertEquals(results.get(10).asText(), "hello!");
   }
 
   @Test(dependsOnMethods = "testBloomFilterTriggering")
@@ -2299,16 +2293,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     h2Query = "SELECT Carrier, DestAirportID, DestCityName FROM mytable GROUP BY Carrier, DestAirportID, DestCityName";
     testQuery(pinotQuery, h2Query);
 
-    pinotQuery = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime, DepTime LIMIT 1000000";
-    h2Query = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime, DepTime";
+    pinotQuery = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime-DepTime LIMIT 1000000";
+    h2Query = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime-DepTime";
     testQuery(pinotQuery, h2Query);
 
-    pinotQuery = "SELECT ArrTime-DepTime,ArrTime/3,DepTime*2 FROM mytable GROUP BY ArrTime, DepTime LIMIT 1000000";
-    h2Query = "SELECT ArrTime-DepTime,ArrTime/3,DepTime*2 FROM mytable GROUP BY ArrTime, DepTime";
-    testQuery(pinotQuery, h2Query);
-
-    pinotQuery = "SELECT ArrTime+DepTime FROM mytable GROUP BY ArrTime + DepTime LIMIT 1000000";
-    h2Query = "SELECT ArrTime+DepTime FROM mytable GROUP BY ArrTime + DepTime";
+    pinotQuery = "SELECT ArrTime+DepTime AS A FROM mytable GROUP BY A LIMIT 1000000";
+    h2Query = "SELECT ArrTime+DepTime AS A FROM mytable GROUP BY A";
     testQuery(pinotQuery, h2Query);
   }
 

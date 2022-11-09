@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.io.Closeable;
 import java.io.File;
@@ -57,6 +56,8 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLucene
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
@@ -159,10 +160,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
   private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
-  // If the table schema is changed before the consuming segment is committed, newly added columns would appear in
-  // _newlyAddedColumnsFieldMap.
-  private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
-  private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
   private final UpsertConfig.Mode _upsertMode;
   private final String _upsertComparisonColumn;
@@ -202,6 +199,11 @@ public class MutableSegmentImpl implements MutableSegment {
       @Override
       public long getLatestIngestionTimestamp() {
         return _latestIngestionTimeMs;
+      }
+
+      @Override
+      public boolean isMutableSegment() {
+        return true;
       }
     };
 
@@ -322,12 +324,16 @@ public class MutableSegmentImpl implements MutableSegment {
 
       // Text index
       MutableTextIndex textIndex;
+      List<String> stopWordsInclude = null;
+      List<String> stopWordsExclude = null;
       if (textIndexColumns.contains(column)) {
         boolean useNativeTextIndex = false;
         if (_fieldConfigList != null) {
           for (FieldConfig fieldConfig : _fieldConfigList) {
             if (fieldConfig.getName().equals(column)) {
               Map<String, String> properties = fieldConfig.getProperties();
+              stopWordsInclude = TextIndexUtils.extractStopWordsInclude(properties);
+              stopWordsExclude = TextIndexUtils.extractStopWordsExclude(properties);
               if (TextIndexUtils.isFstTypeNative(properties)) {
                 useNativeTextIndex = true;
               }
@@ -343,7 +349,8 @@ public class MutableSegmentImpl implements MutableSegment {
           //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
           //  text indexes remain statically defined. Revisit this after this refactoring has been done.
           RealtimeLuceneTextIndex luceneTextIndex =
-              new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
+              new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName,
+                  stopWordsInclude, stopWordsExclude);
           if (_realtimeLuceneReaders == null) {
             _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
           }
@@ -478,19 +485,6 @@ public class MutableSegmentImpl implements MutableSegment {
       return maxTime;
     }
     return Long.MIN_VALUE;
-  }
-
-  public void addExtraColumns(Schema newSchema) {
-    for (String columnName : newSchema.getColumnNames()) {
-      if (!_schema.getColumnNames().contains(columnName)) {
-        FieldSpec fieldSpec = newSchema.getFieldSpecFor(columnName);
-        _newlyAddedColumnsFieldMap.put(columnName, fieldSpec);
-        if (!fieldSpec.isVirtualColumn()) {
-          _newlyAddedPhysicalColumnsFieldMap.put(columnName, fieldSpec);
-        }
-      }
-    }
-    _logger.info("Newly added columns: " + _newlyAddedColumnsFieldMap);
   }
 
   @Override
@@ -949,40 +943,33 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Override
   public Set<String> getColumnNames() {
-    // Return all column names, virtual and physical.
-    return Sets.union(_schema.getColumnNames(), _newlyAddedColumnsFieldMap.keySet());
+    return _schema.getColumnNames();
   }
 
   @Override
   public Set<String> getPhysicalColumnNames() {
     HashSet<String> physicalColumnNames = new HashSet<>();
-
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       physicalColumnNames.add(fieldSpec.getName());
     }
-    // We should include newly added columns in the physical columns
-    return Sets.union(physicalColumnNames, _newlyAddedPhysicalColumnsFieldMap.keySet());
+    return physicalColumnNames;
   }
 
   @Override
   public DataSource getDataSource(String column) {
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-    if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
-      // Column is either added during ingestion, or was initiated with a virtual column provider
-      if (fieldSpec == null) {
-        // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to
-        // provide values
-        fieldSpec = _newlyAddedColumnsFieldMap.get(column);
-        Preconditions.checkNotNull(fieldSpec,
-            "FieldSpec for " + column + " should not be null. " + "Potentially invalid column name specified.");
-      }
+    IndexContainer indexContainer = _indexContainerMap.get(column);
+    if (indexContainer != null) {
+      // Physical column
+      return indexContainer.toDataSource();
+    } else {
+      // Virtual column
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+      Preconditions.checkState(fieldSpec != null && fieldSpec.isVirtualColumn(), "Failed to find column: %s", column);
       // TODO: Refactor virtual column provider to directly generate data source
       VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
       VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
       return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
           virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
-    } else {
-      return _indexContainerMap.get(column).toDataSource();
     }
   }
 
@@ -999,120 +986,22 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
-      String column = entry.getKey();
-      IndexContainer indexContainer = entry.getValue();
-      Object value;
-      try {
-        value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
-            indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
-      } catch (Exception e) {
-        throw new RuntimeException(
-            String.format("Caught exception while reading value for docId: %d, column: %s", docId, column), e);
-      }
-      if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
-        reuse.putDefaultNullValue(column, value);
-      } else {
-        reuse.putValue(column, value);
-      }
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      recordReader.init(this);
+      recordReader.getRecord(docId, reuse);
+      return reuse;
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while reading record for docId: " + docId, e);
     }
-    return reuse;
   }
 
   @Override
   public Object getValue(int docId, String column) {
-    try {
-      IndexContainer indexContainer = _indexContainerMap.get(column);
-      return getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
-          indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
+    try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(this, column)) {
+      return columnReader.getValue(docId);
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while reading value for docId: %d, column: %s", docId, column), e);
-    }
-  }
-
-  /**
-   * Helper method to read the value for the given document id.
-   */
-  private static Object getValue(int docId, MutableForwardIndex forwardIndex, @Nullable MutableDictionary dictionary,
-      int maxNumMultiValues) {
-    if (dictionary != null) {
-      // Dictionary based
-      if (forwardIndex.isSingleValue()) {
-        int dictId = forwardIndex.getDictId(docId);
-        return dictionary.get(dictId);
-      } else {
-        int[] dictIds = new int[maxNumMultiValues];
-        int numValues = forwardIndex.getDictIdMV(docId, dictIds);
-        Object[] value = new Object[numValues];
-        for (int i = 0; i < numValues; i++) {
-          value[i] = dictionary.get(dictIds[i]);
-        }
-        return value;
-      }
-    } else {
-      // Raw index based
-      if (forwardIndex.isSingleValue()) {
-        switch (forwardIndex.getStoredType()) {
-          case INT:
-            return forwardIndex.getInt(docId);
-          case LONG:
-            return forwardIndex.getLong(docId);
-          case FLOAT:
-            return forwardIndex.getFloat(docId);
-          case DOUBLE:
-            return forwardIndex.getDouble(docId);
-          case BIG_DECIMAL:
-            return forwardIndex.getBigDecimal(docId);
-          case STRING:
-            return forwardIndex.getString(docId);
-          case BYTES:
-            return forwardIndex.getBytes(docId);
-          default:
-            throw new IllegalStateException();
-        }
-      } else {
-        // TODO: support multi-valued column for variable length column types (big decimal, string, bytes)
-        int numValues;
-        Object[] value;
-        switch (forwardIndex.getStoredType()) {
-          case INT:
-            int[] intValues = forwardIndex.getIntMV(docId);
-            numValues = intValues.length;
-            value = new Object[numValues];
-            for (int i = 0; i < numValues; i++) {
-              value[i] = intValues[i];
-            }
-            return value;
-          case LONG:
-            long[] longValues = forwardIndex.getLongMV(docId);
-            numValues = longValues.length;
-            value = new Object[numValues];
-            for (int i = 0; i < numValues; i++) {
-              value[i] = longValues[i];
-            }
-            return value;
-          case FLOAT:
-            float[] floatValues = forwardIndex.getFloatMV(docId);
-            numValues = floatValues.length;
-            value = new Object[numValues];
-            for (int i = 0; i < numValues; i++) {
-              value[i] = floatValues[i];
-            }
-            return value;
-          case DOUBLE:
-            double[] doubleValues = forwardIndex.getDoubleMV(docId);
-            numValues = doubleValues.length;
-            value = new Object[numValues];
-            for (int i = 0; i < numValues; i++) {
-              value[i] = doubleValues[i];
-            }
-            return value;
-          default:
-            throw new IllegalStateException(
-                "No support for MV no dictionary column of type " + forwardIndex.getStoredType());
-        }
-      }
     }
   }
 

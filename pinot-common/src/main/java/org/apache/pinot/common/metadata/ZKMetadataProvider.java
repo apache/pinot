@@ -219,6 +219,12 @@ public class ZKMetadataProvider {
     return setSegmentZKMetadata(propertyStore, tableNameWithType, segmentZKMetadata, -1);
   }
 
+  public static boolean removeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
+      String segmentName) {
+    return propertyStore.remove(constructPropertyStorePathForSegment(tableNameWithType, segmentName),
+        AccessOption.PERSISTENT);
+  }
+
   @Nullable
   public static ZNRecord getZnRecord(ZkHelixPropertyStore<ZNRecord> propertyStore, String path) {
     Stat stat = new Stat();
@@ -248,7 +254,7 @@ public class ZKMetadataProvider {
     }
     try {
       UserConfig userConfig = AccessControlUserConfigUtils.fromZNRecord(znRecord);
-      return (UserConfig) ConfigUtils.applyConfigWithEnvVariables(userConfig);
+      return ConfigUtils.applyConfigWithEnvVariables(userConfig);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting user configuration for user: {}", username, e);
       return null;
@@ -394,6 +400,27 @@ public class ZKMetadataProvider {
     if (schema != null && LOGGER.isDebugEnabled()) {
       LOGGER.debug("Schema name does not match raw table name, schema name: {}, raw table name: {}",
           schema.getSchemaName(), TableNameBuilder.extractRawTableName(tableName));
+    }
+    return schema;
+  }
+
+  /**
+   * Get the schema associated with the given table.
+   */
+  @Nullable
+  public static Schema getTableSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+    Schema schema = getSchema(propertyStore, rawTableName);
+    if (schema != null) {
+      return schema;
+    }
+    String schemaNameFromTableConfig = tableConfig.getValidationConfig().getSchemaName();
+    if (schemaNameFromTableConfig != null) {
+      schema = getSchema(propertyStore, schemaNameFromTableConfig);
+    }
+    if (schema != null && LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Schema name does not match raw table name, schema name: {}, raw table name: {}",
+          schemaNameFromTableConfig, rawTableName);
     }
     return schema;
   }

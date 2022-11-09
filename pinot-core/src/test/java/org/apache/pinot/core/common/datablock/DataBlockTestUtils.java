@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common.datablock;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -42,7 +43,7 @@ public class DataBlockTestUtils {
     DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     Object[] row = new Object[numColumns];
     for (int colId = 0; colId < numColumns; colId++) {
-      switch (columnDataTypes[colId].getStoredType()) {
+      switch (columnDataTypes[colId]) {
         case INT:
           row[colId] = RANDOM.nextInt();
           break;
@@ -58,17 +59,18 @@ public class DataBlockTestUtils {
         case BIG_DECIMAL:
           row[colId] = BigDecimal.valueOf(RANDOM.nextDouble());
           break;
+        case BOOLEAN:
+          row[colId] = RANDOM.nextInt(2) % 2 == 1;
+          break;
+        case TIMESTAMP:
+          row[colId] = new Timestamp(RANDOM.nextLong());
+          break;
         case STRING:
           row[colId] = RandomStringUtils.random(RANDOM.nextInt(20));
           break;
         case BYTES:
           row[colId] = new ByteArray(RandomStringUtils.random(RANDOM.nextInt(20)).getBytes());
           break;
-        // Just test Double here, all object types will be covered in ObjectCustomSerDeTest.
-        case OBJECT:
-          row[colId] = RANDOM.nextDouble();
-          break;
-        case BOOLEAN_ARRAY:
         case INT_ARRAY:
           int length = RANDOM.nextInt(ARRAY_SIZE);
           int[] intArray = new int[length];
@@ -77,7 +79,6 @@ public class DataBlockTestUtils {
           }
           row[colId] = intArray;
           break;
-        case TIMESTAMP_ARRAY:
         case LONG_ARRAY:
           length = RANDOM.nextInt(ARRAY_SIZE);
           long[] longArray = new long[length];
@@ -109,6 +110,22 @@ public class DataBlockTestUtils {
             stringArray[i] = RandomStringUtils.random(RANDOM.nextInt(20));
           }
           row[colId] = stringArray;
+          break;
+        case BOOLEAN_ARRAY:
+          length = RANDOM.nextInt(ARRAY_SIZE);
+          boolean[] booleanArray = new boolean[length];
+          for (int i = 0; i < length; i++) {
+            booleanArray[i] = RANDOM.nextInt(2) % 2 == 1;
+          }
+          row[colId] = booleanArray;
+          break;
+        case TIMESTAMP_ARRAY:
+          length = RANDOM.nextInt(ARRAY_SIZE);
+          Timestamp[] timestampArray = new Timestamp[length];
+          for (int i = 0; i < length; i++) {
+            timestampArray[i] = new Timestamp(RANDOM.nextLong());
+          }
+          row[colId] = timestampArray;
           break;
         default:
           throw new UnsupportedOperationException("Can't fill random data for column type: " + columnDataTypes[colId]);
@@ -144,8 +161,6 @@ public class DataBlockTestUtils {
         return dataBlock.getString(rowId, colId);
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
-      case OBJECT:
-        return dataBlock.getCustomObject(rowId, colId);
       case BOOLEAN_ARRAY:
       case INT_ARRAY:
         return dataBlock.getIntArray(rowId, colId);

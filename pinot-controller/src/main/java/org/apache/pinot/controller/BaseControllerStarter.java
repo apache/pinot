@@ -53,6 +53,7 @@ import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
@@ -66,6 +67,7 @@ import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
@@ -162,6 +164,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbackList;
   protected MinionInstancesCleanupTask _minionInstancesCleanupTask;
   protected TaskMetricsEmitter _taskMetricsEmitter;
+  protected MultiThreadedHttpConnectionManager _connectionManager;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -311,7 +314,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   @Override
   public void start() {
-    LOGGER.info("Starting Pinot controller in mode: {}.", _controllerMode.name());
+    LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
     Utils.logVersions();
 
     // Set up controller metrics
@@ -425,6 +428,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     }
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
+    _connectionManager = new MultiThreadedHttpConnectionManager();
+    _connectionManager.getParams().setConnectionTimeout(_config.getServerAdminRequestTimeoutSeconds() * 1000);
+
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
     LOGGER.info("Init controller periodic tasks scheduler");
@@ -452,8 +458,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
-    final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
-    connectionManager.getParams().setConnectionTimeout(_config.getServerAdminRequestTimeoutSeconds() * 1000);
     // register all the controller objects for injection to jersey resources
     _adminApp.registerBinder(new AbstractBinder() {
       @Override
@@ -465,7 +469,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_segmentCompletionManager).to(SegmentCompletionManager.class);
         bind(_taskManager).to(PinotTaskManager.class);
         bind(_taskManagerStatusCache).to(TaskManagerStatusCache.class);
-        bind(connectionManager).to(HttpConnectionManager.class);
+        bind(_connectionManager).to(HttpConnectionManager.class);
         bind(_executorService).to(Executor.class);
         bind(_controllerMetrics).to(ControllerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
@@ -545,6 +549,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(_config.subset(METRICS_REGISTRY_NAME));
     _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
     _controllerMetrics.initializeGlobalMeters();
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
   }
 
   private void initPinotFSFactory() {
@@ -674,7 +679,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             _executorService);
     periodicTasks.add(_segmentStatusChecker);
     _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-        _executorService);
+        _executorService, _connectionManager);
     periodicTasks.add(_segmentRelocator);
     _minionInstancesCleanupTask =
         new MinionInstancesCleanupTask(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
@@ -744,6 +749,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
       LOGGER.info("Disconnecting helix participant zk manager");
       _helixParticipantManager.disconnect();
+
+      LOGGER.info("Shutting down http connection manager");
+      _connectionManager.shutdown();
 
       LOGGER.info("Shutting down executor service");
       _executorService.shutdownNow();

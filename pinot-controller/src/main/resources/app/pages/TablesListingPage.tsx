@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import { Grid, makeStyles } from '@material-ui/core';
 import { TableData } from 'Models';
 import AppLoader from '../components/AppLoader';
@@ -34,83 +34,120 @@ const useStyles = makeStyles(() => ({
     padding: 20,
     backgroundColor: 'white',
     maxHeight: 'calc(100vh - 70px)',
-    overflowY: 'auto'
+    overflowY: 'auto',
   },
   operationDiv: {
     border: '1px #BDCCD9 solid',
     borderRadius: 4,
-    marginBottom: 20
-  }
+    marginBottom: 20,
+  },
 }));
 
 const TableTooltipData = [
   null,
-  "Uncompressed size of all data segments",
-  "Estimated size of all data segments, in case any servers are not reachable for actual size",
+  'Uncompressed size of all data segments',
+  'Estimated size of all data segments, in case any servers are not reachable for actual size',
   null,
-  "GOOD if all replicas of all segments are up"
+  'GOOD if all replicas of all segments are up',
 ];
 
 const TablesListingPage = () => {
   const classes = useStyles();
 
-  const [fetching, setFetching] = useState(true);
-  const [schemaDetails,setSchemaDetails] = useState<TableData>({
-    columns: [],
-    records: []
+  const [schemaDetails, setSchemaDetails] = useState<TableData>({
+    columns: PinotMethodUtils.allSchemaDetailsColumnHeader,
+    records: [],
+    isLoading: true,
   });
   const [tableData, setTableData] = useState<TableData>({
-    columns: [],
-    records: []
+    columns: PinotMethodUtils.allTableDetailsColumnHeader,
+    records: [],
+    isLoading: true,
   });
   const [showSchemaModal, setShowSchemaModal] = useState(false);
-  const [showAddOfflineTableModal, setShowAddOfflineTableModal] = useState(false);
-  const [showAddRealtimeTableModal, setShowAddRealtimeTableModal] = useState(false);
+  const [showAddOfflineTableModal, setShowAddOfflineTableModal] = useState(
+    false
+  );
+  const [showAddRealtimeTableModal, setShowAddRealtimeTableModal] = useState(
+    false
+  );
+
+  const loading = 'Loading...';
 
   const fetchData = async () => {
-    !fetching && setFetching(true);
-    const tablesResponse = await PinotMethodUtils.getQueryTablesList({bothType: true});
+    const tablesResponse = await PinotMethodUtils.getQueryTablesList({
+      bothType: true,
+    });
     const tablesList = [];
-    tablesResponse.records.map((record)=>{
+    const tableData = [];
+    const tableColumnHeaders = [
+      'Table Name',
+      'Reported Size',
+      'Estimated Size',
+      'Number of Segments',
+      'Status',
+    ];
+    tablesResponse.records.map((record) => {
       tablesList.push(...record);
     });
+    tablesList.map((table) => {
+      tableData.push([table, loading, loading, loading, loading]);
+    });
+    // Set the table data to "Loading..." at first as tableSize can take minutes to fetch
+    // for larger tables.
+    setTableData({
+      columns: tableColumnHeaders,
+      records: tableData,
+      isLoading: false,
+    });
+
+    // Set just the column headers so these do not have to load with the data
+    setSchemaDetails({
+      columns: PinotMethodUtils.allSchemaDetailsColumnHeader,
+      records: [],
+      isLoading: true,
+    });
+
+    // these implicitly set isLoading=false by leaving it undefined
     const tableDetails = await PinotMethodUtils.getAllTableDetails(tablesList);
-    const schemaDetailsData = await PinotMethodUtils.getAllSchemaDetails();
     setTableData(tableDetails);
-    setSchemaDetails(schemaDetailsData)
-    setFetching(false);
+    const schemaDetailsData = await PinotMethodUtils.getAllSchemaDetails();
+    setSchemaDetails(schemaDetailsData);
   };
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  return fetching ? (
+  return tableData.isLoading && schemaDetails.isLoading ? (
     <AppLoader />
   ) : (
     <Grid item xs className={classes.gridContainer}>
       <div className={classes.operationDiv}>
-        <SimpleAccordion
-          headerTitle="Operations"
-          showSearchBox={false}
-        >
+        <SimpleAccordion headerTitle="Operations" showSearchBox={false}>
           <div>
             <CustomButton
-              onClick={()=>{setShowSchemaModal(true)}}
+              onClick={() => {
+                setShowSchemaModal(true);
+              }}
               tooltipTitle="Define the dimensions, metrics and date time columns of your data"
               enableTooltip={true}
             >
               Add Schema
             </CustomButton>
             <CustomButton
-              onClick={()=>{setShowAddOfflineTableModal(true)}}
+              onClick={() => {
+                setShowAddOfflineTableModal(true);
+              }}
               tooltipTitle="Create a Pinot table to ingest from batch data sources, such as S3"
               enableTooltip={true}
             >
               Add Offline Table
             </CustomButton>
             <CustomButton
-              onClick={()=>{setShowAddRealtimeTableModal(true)}}
+              onClick={() => {
+                setShowAddRealtimeTableModal(true);
+              }}
               tooltipTitle="Create a Pinot table to ingest from stream data sources, such as Kafka"
               enableTooltip={true}
             >
@@ -129,36 +166,39 @@ const TablesListingPage = () => {
         tooltipData={TableTooltipData}
       />
       <CustomizedTables
-          title="Schemas"
-          data={schemaDetails}
-          showSearchBox={true}
-          inAccordionFormat={true}
-          addLinks
-          baseURL="/tenants/schema/"
+        title="Schemas"
+        data={schemaDetails}
+        showSearchBox={true}
+        inAccordionFormat={true}
+        addLinks
+        baseURL="/tenants/schema/"
       />
-      {
-        showSchemaModal &&
+      {showSchemaModal && (
         <AddSchemaOp
-          hideModal={()=>{setShowSchemaModal(false);}}
+          hideModal={() => {
+            setShowSchemaModal(false);
+          }}
           fetchData={fetchData}
         />
-      }
-      {
-        showAddOfflineTableModal &&
+      )}
+      {showAddOfflineTableModal && (
         <AddOfflineTableOp
-          hideModal={()=>{setShowAddOfflineTableModal(false);}}
+          hideModal={() => {
+            setShowAddOfflineTableModal(false);
+          }}
           fetchData={fetchData}
-          tableType={"OFFLINE"}
+          tableType={'OFFLINE'}
         />
-      }
-      {
-        showAddRealtimeTableModal &&
+      )}
+      {showAddRealtimeTableModal && (
         <AddRealtimeTableOp
-          hideModal={()=>{setShowAddRealtimeTableModal(false);}}
+          hideModal={() => {
+            setShowAddRealtimeTableModal(false);
+          }}
           fetchData={fetchData}
-          tableType={"REALTIME"}
+          tableType={'REALTIME'}
         />
-      }
+      )}
     </Grid>
   );
 };

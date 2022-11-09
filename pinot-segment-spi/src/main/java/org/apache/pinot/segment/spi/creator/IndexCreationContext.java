@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.spi.creator;
 
 import java.io.File;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -106,7 +108,8 @@ public interface IndexCreationContext {
           .withTotalDocs(columnMetadata.getTotalDocs())
           .withDictionary(columnMetadata.hasDictionary())
           .withMinValue(columnMetadata.getMinValue())
-          .withMaxValue(columnMetadata.getMaxValue());
+          .withMaxValue(columnMetadata.getMaxValue())
+          .withMaxNumberOfMultiValueElements(columnMetadata.getMaxNumberOfMultiValues());
     }
 
     public Builder withLengthOfLongestEntry(int lengthOfLongestEntry) {
@@ -306,8 +309,9 @@ public interface IndexCreationContext {
       return new Range(this, rangeIndexVersion);
     }
 
-    public Text forTextIndex(FSTType fstType, boolean commitOnClose) {
-      return new Text(this, fstType, commitOnClose);
+    public Text forTextIndex(FSTType fstType, boolean commitOnClose, List<String> stopWordsInclude,
+        List<String> stopWordExclude) {
+      return new Text(this, fstType, commitOnClose, stopWordsInclude, stopWordExclude);
     }
   }
 
@@ -480,15 +484,31 @@ public interface IndexCreationContext {
     private final FSTType _fstType;
     private final String[] _sortedUniqueElementsArray;
 
+    @Nullable
+    public List<String> getStopWordsInclude() {
+      return _stopWordsInclude;
+    }
+
+    @Nullable
+    public List<String> getStopWordsExclude() {
+      return _stopWordsExclude;
+    }
+
+    private final List<String> _stopWordsInclude;
+    private final List<String> _stopWordsExclude;
+
     /**
      * For text indexes
      */
-    public Text(IndexCreationContext wrapped, FSTType fstType, boolean commitOnClose) {
+    public Text(IndexCreationContext wrapped, FSTType fstType, boolean commitOnClose, List<String> stopWordsInclude,
+        List<String> stopWordExclude) {
       super(wrapped);
       _commitOnClose = commitOnClose;
       _fstType = fstType;
       _sortedUniqueElementsArray = null;
       _isFst = false;
+      _stopWordsInclude = stopWordsInclude;
+      _stopWordsExclude = stopWordExclude;
     }
 
     /**
@@ -500,6 +520,8 @@ public interface IndexCreationContext {
       _fstType = fstType;
       _sortedUniqueElementsArray = sortedUniqueElementsArray;
       _isFst = true;
+      _stopWordsInclude = Collections.EMPTY_LIST;
+      _stopWordsExclude = Collections.EMPTY_LIST;
     }
 
     public boolean isCommitOnClose() {

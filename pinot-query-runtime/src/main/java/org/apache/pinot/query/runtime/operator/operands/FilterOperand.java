@@ -24,14 +24,33 @@ import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.OperatorUtils;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public abstract class FilterOperand extends TransformOperand {
 
-  @SuppressWarnings({"unchecked", "rawtypes"})
   public static FilterOperand toFilterOperand(RexExpression rexExpression, DataSchema dataSchema) {
-    Preconditions.checkState(rexExpression instanceof RexExpression.FunctionCall);
-    RexExpression.FunctionCall functionCall = (RexExpression.FunctionCall) rexExpression;
+    if (rexExpression instanceof RexExpression.FunctionCall) {
+      return toFilterOperand((RexExpression.FunctionCall) rexExpression, dataSchema);
+    } else if (rexExpression instanceof RexExpression.InputRef) {
+      return toFilterOperand((RexExpression.InputRef) rexExpression, dataSchema);
+    } else if (rexExpression instanceof RexExpression.Literal) {
+      return toFilterOperand((RexExpression.Literal) rexExpression);
+    } else {
+      throw new UnsupportedOperationException("Unsupported expression on filter conversion: " + rexExpression);
+    }
+  }
+
+  public static FilterOperand toFilterOperand(RexExpression.Literal literal) {
+    return new BooleanLiteral(literal);
+  }
+
+  public static FilterOperand toFilterOperand(RexExpression.InputRef inputRef, DataSchema dataSchema) {
+    return new BooleanInputRef(inputRef, dataSchema);
+  }
+
+  public static FilterOperand toFilterOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
+
     switch (OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName())) {
       case "AND":
         return new And(functionCall.getFunctionOperands(), dataSchema);
@@ -88,12 +107,56 @@ public abstract class FilterOperand extends TransformOperand {
           }
         };
       default:
-        throw new UnsupportedOperationException("Unsupported filter predicate: " + functionCall.getFunctionName());
+        return new BooleanFunction(functionCall, dataSchema);
     }
   }
 
   @Override
   public abstract Boolean apply(Object[] row);
+
+  private static class BooleanFunction extends FilterOperand {
+    private final FunctionOperand _func;
+
+    public BooleanFunction(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
+      FunctionOperand func = (FunctionOperand) TransformOperand.toTransformOperand(functionCall, dataSchema);
+      Preconditions.checkState(func.getResultType() == DataSchema.ColumnDataType.BOOLEAN);
+      _func = func;
+    }
+
+    @Override
+    public Boolean apply(Object[] row) {
+      return (Boolean) _func.apply(row);
+    }
+  }
+
+  private static class BooleanInputRef extends FilterOperand {
+    private final RexExpression.InputRef _inputRef;
+
+    public BooleanInputRef(RexExpression.InputRef inputRef, DataSchema dataSchema) {
+      Preconditions.checkState(dataSchema.getColumnDataType(inputRef.getIndex())
+          == DataSchema.ColumnDataType.BOOLEAN);
+      _inputRef = inputRef;
+    }
+
+    @Override
+    public Boolean apply(Object[] row) {
+      return (boolean) row[_inputRef.getIndex()];
+    }
+  }
+
+  private static class BooleanLiteral extends FilterOperand {
+    private final Object _literalValue;
+
+    public BooleanLiteral(RexExpression.Literal literal) {
+      Preconditions.checkState(literal.getDataType() == FieldSpec.DataType.BOOLEAN);
+      _literalValue = literal.getValue();
+    }
+
+    @Override
+    public Boolean apply(Object[] row) {
+      return (boolean) _literalValue;
+    }
+  }
 
   private static class And extends FilterOperand {
     List<FilterOperand> _childOperands;

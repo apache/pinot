@@ -71,8 +71,11 @@ public class QueryRunnerExceptionTest extends QueryRunnerTestBase {
         // Function with incorrect argument signature should throw runtime exception
         new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
             "ArithmeticFunctions.least(double,double) with arguments"},
-        // Function that tries to cast String to Number should throw runtime exception
-        new Object[]{"SELECT a.col2, b.col1 FROM a JOIN b ON a.col1 = b.col3", "transform function: cast"},
+        // TODO: this error is thrown but not returned through mailbox. need another test for asserting failure
+        // during stage runtime init.
+        // standard SqlOpTable function that runs out of signature list in actual impl throws not found exception
+        // new Object[]{"SELECT CASE WHEN col3 > 10 THEN 1 WHEN col3 > 20 THEN 2 WHEN col3 > 30 THEN 3 "
+        //    + "WHEN col3 > 40 THEN 4 WHEN col3 > 50 THEN 5 WHEN col3 > 60 THEN '6' ELSE 0 END FROM a", "caseWhen"},
     };
   }
 }

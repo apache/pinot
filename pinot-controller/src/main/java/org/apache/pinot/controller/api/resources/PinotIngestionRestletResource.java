@@ -94,8 +94,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 public class PinotIngestionRestletResource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotIngestionRestletResource.class);
-  // directory to use under the controller datadir. Controller config can be added for this later if needed.
-  private static final String UPLOAD_DIR = "upload_dir";
+  // directory to use under the controller local temp dir. Controller config can be added for this later if needed.
+  private static final String INGESTION_DIR = "ingestion_dir";
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
@@ -218,7 +218,7 @@ public class PinotIngestionRestletResource {
 
     FileIngestionHelper fileIngestionHelper =
         new FileIngestionHelper(tableConfig, schema, batchConfigMap, getControllerUri(),
-            new File(_controllerConf.getDataDir(), UPLOAD_DIR), authProvider);
+            new File(_controllerConf.getLocalTempDir(), INGESTION_DIR), authProvider);
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }
 

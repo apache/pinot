@@ -22,6 +22,7 @@ declare module 'Models' {
     records: Array<Array<string | number | boolean>>;
     columns: Array<string>;
     error?: string;
+    isLoading? : boolean
   };
 
   type SchemaDetails = {
@@ -196,5 +197,25 @@ declare module 'Models' {
       jobType: string,
       tableName: string
     }
+  }
+  
+  export interface TaskRuntimeConfig {
+    ConcurrentTasksPerWorker: string,
+    TaskTimeoutMs: string,
+    TaskExpireTimeMs: string,
+    MinionWorkerGroupTag: string
+  }
+
+  export const enum SEGMENT_STATUS {
+    ONLINE = "ONLINE",
+    OFFLINE = "OFFLINE",
+    CONSUMING = "CONSUMING",
+    ERROR = "ERROR"
+  } 
+
+  export const enum DISPLAY_SEGMENT_STATUS {
+    BAD = "BAD",
+    GOOD = "GOOD",
+    PARTIAL = "PARTIAL",
   }
 }

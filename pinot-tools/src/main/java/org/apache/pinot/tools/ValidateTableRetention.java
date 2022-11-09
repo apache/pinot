@@ -40,7 +40,7 @@ public class ValidateTableRetention extends AbstractBaseCommand implements Comma
           + " default: " + TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD)
   private long _durationInDaysThreshold = TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
       description = "Print this message.")
   private boolean _help = false;
 

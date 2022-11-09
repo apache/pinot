@@ -289,6 +289,8 @@ public class CommonConstants {
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
 
+        public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
+
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
         public static final String PRESERVE_TYPE = "preserveType";

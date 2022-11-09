@@ -53,7 +53,8 @@ function checkOut() {
   git pull origin master 1>&2 || exit 1
   # Pull the tag list so that we can check out by tag name
   git fetch --tags 1>&2 || exit 1
-  git checkout $commitHash 1>&2 || exit 1
+  # Return different error code if old version is not on master
+  git checkout $commitHash 1>&2 || exit 22 # invalid argument error code
 
   popd
 }

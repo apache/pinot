@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime;
 
+import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,12 +28,12 @@ import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -41,8 +42,8 @@ import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -50,10 +51,16 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
-import org.apache.pinot.query.runtime.utils.ServerRequestUtils;
+import org.apache.pinot.query.runtime.plan.ServerRequestPlanVisitor;
+import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +75,7 @@ public class QueryRunner {
   private WorkerQueryExecutor _workerExecutor;
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
-  private MailboxService<Mailbox.MailboxContent> _mailboxService;
+  private MailboxService<TransferableBlock> _mailboxService;
   private String _hostname;
   private int _port;
 
@@ -84,7 +91,7 @@ public class QueryRunner {
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
     _helixManager = helixManager;
     try {
-      _mailboxService = new GrpcMailboxService(_hostname, _port, config);
+      _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config, instanceDataManager, serverMetrics);
       _workerExecutor = new WorkerQueryExecutor();
@@ -113,13 +120,14 @@ public class QueryRunner {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
       // server executor.
-      List<ServerQueryRequest> serverQueryRequests =
-          ServerRequestUtils.constructServerQueryRequest(distributedStagePlan, requestMetadataMap,
-              _helixPropertyStore);
+      List<ServerPlanRequestContext> serverQueryRequests = constructServerQueryRequests(distributedStagePlan,
+          requestMetadataMap, _helixPropertyStore, _mailboxService);
 
       // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
-      List<BaseDataBlock> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
-      for (ServerQueryRequest request : serverQueryRequests) {
+      List<DataBlock> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
+      for (ServerPlanRequestContext requestContext : serverQueryRequests) {
+        ServerQueryRequest request = new ServerQueryRequest(requestContext.getInstanceRequest(),
+            new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
         serverQueryResults.add(processServerQuery(request, executorService));
       }
 
@@ -140,8 +148,44 @@ public class QueryRunner {
     }
   }
 
-  private BaseDataBlock processServerQuery(ServerQueryRequest serverQueryRequest, ExecutorService executorService) {
-    BaseDataBlock dataBlock;
+  private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
+      Map<String, String> requestMetadataMap, ZkHelixPropertyStore<ZNRecord> helixPropertyStore,
+      MailboxService<TransferableBlock> mailboxService) {
+    StageMetadata stageMetadata = distributedStagePlan.getMetadataMap().get(distributedStagePlan.getStageId());
+    Preconditions.checkState(stageMetadata.getScannedTables().size() == 1,
+        "Server request for V2 engine should only have 1 scan table per request.");
+    String rawTableName = stageMetadata.getScannedTables().get(0);
+    Map<String, List<String>> tableToSegmentListMap = stageMetadata.getServerInstanceToSegmentsMap()
+        .get(distributedStagePlan.getServerInstance());
+    List<ServerPlanRequestContext> requests = new ArrayList<>();
+    for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
+      String tableType = tableEntry.getKey();
+      // ZkHelixPropertyStore extends from ZkCacheBaseDataAccessor so it should not cause too much out-of-the-box
+      // network traffic. but there's chance to improve this:
+      // TODO: use TableDataManager: it is already getting tableConfig and Schema when processing segments.
+      if (TableType.OFFLINE.name().equals(tableType)) {
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
+            TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
+        Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
+            TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
+        requests.add(ServerRequestPlanVisitor.build(mailboxService, distributedStagePlan, requestMetadataMap,
+            tableConfig, schema, stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, tableEntry.getValue()));
+      } else if (TableType.REALTIME.name().equals(tableType)) {
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
+            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
+        Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
+            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
+        requests.add(ServerRequestPlanVisitor.build(mailboxService, distributedStagePlan, requestMetadataMap,
+            tableConfig, schema, stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, tableEntry.getValue()));
+      } else {
+        throw new IllegalArgumentException("Unsupported table type key: " + tableType);
+      }
+    }
+    return requests;
+  }
+
+  private DataBlock processServerQuery(ServerQueryRequest serverQueryRequest, ExecutorService executorService) {
+    DataBlock dataBlock;
     try {
       InstanceResponseBlock instanceResponse = _serverExecutor.execute(serverQueryRequest, executorService);
       if (!instanceResponse.getExceptions().isEmpty()) {
@@ -172,13 +216,13 @@ public class QueryRunner {
   private static class LeafStageTransferableBlockOperator extends BaseOperator<TransferableBlock> {
     private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
 
-    private final BaseDataBlock _errorBlock;
-    private final List<BaseDataBlock> _baseDataBlocks;
+    private final DataBlock _errorBlock;
+    private final List<DataBlock> _baseDataBlocks;
     private final DataSchema _dataSchema;
     private boolean _hasTransferred;
     private int _currentIndex;
 
-    private LeafStageTransferableBlockOperator(List<BaseDataBlock> baseDataBlocks, DataSchema dataSchema) {
+    private LeafStageTransferableBlockOperator(List<DataBlock> baseDataBlocks, DataSchema dataSchema) {
       _baseDataBlocks = baseDataBlocks;
       _dataSchema = dataSchema;
       _errorBlock = baseDataBlocks.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
@@ -209,7 +253,7 @@ public class QueryRunner {
           return new TransferableBlock(_baseDataBlocks.get(_currentIndex++));
         } else {
           _currentIndex = -1;
-          return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(_dataSchema));
+          return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
         }
       }
     }

@@ -32,15 +32,18 @@ public class SegmentConsumerInfo {
   private final String _consumerState;
   private final long _lastConsumedTimestamp;
   private final Map<String, String> _partitionToOffsetMap;
+  private final PartitionOffsetInfo _partitionOffsetInfo;
 
   public SegmentConsumerInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("consumerState") String consumerState,
       @JsonProperty("lastConsumedTimestamp") long lastConsumedTimestamp,
-      @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap) {
+      @JsonProperty("partitionToOffsetMap") Map<String, String> partitionToOffsetMap,
+      @JsonProperty("partitionOffsetInfo") PartitionOffsetInfo partitionOffsetInfo) {
     _segmentName = segmentName;
     _consumerState = consumerState;
     _lastConsumedTimestamp = lastConsumedTimestamp;
     _partitionToOffsetMap = partitionToOffsetMap;
+    _partitionOffsetInfo = partitionOffsetInfo;
   }
 
   public String getSegmentName() {
@@ -57,5 +60,51 @@ public class SegmentConsumerInfo {
 
   public Map<String, String> getPartitionToOffsetMap() {
     return _partitionToOffsetMap;
+  }
+
+  public PartitionOffsetInfo getPartitionOffsetInfo() {
+    return _partitionOffsetInfo;
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  static public class PartitionOffsetInfo {
+    @JsonProperty("currentOffsets")
+    public Map<String, String> _currentOffsets;
+
+    @JsonProperty("recordsLag")
+    public Map<String, String> _recordsLag;
+
+    @JsonProperty("latestUpstreamOffsets")
+    public Map<String, String> _latestUpstreamOffsets;
+
+    @JsonProperty("availabilityLagMs")
+    public Map<String, String> _availabilityLagMs;
+
+    public PartitionOffsetInfo(
+        @JsonProperty("currentOffsets") Map<String, String> currentOffsets,
+        @JsonProperty("latestUpstreamOffsets") Map<String, String> latestUpstreamOffsets,
+        @JsonProperty("recordsLag") Map<String, String> recordsLag,
+        @JsonProperty("availabilityLagMs") Map<String, String> availabilityLagMs) {
+      _currentOffsets = currentOffsets;
+      _latestUpstreamOffsets = latestUpstreamOffsets;
+      _recordsLag = recordsLag;
+      _availabilityLagMs = availabilityLagMs;
+    }
+
+    public Map<String, String> getCurrentOffsets() {
+      return _currentOffsets;
+    }
+
+    public Map<String, String> getRecordsLag() {
+      return _recordsLag;
+    }
+
+    public Map<String, String> getLatestUpstreamOffsets() {
+      return _latestUpstreamOffsets;
+    }
+
+    public Map<String, String> getAvailabilityLagMs() {
+      return _availabilityLagMs;
+    }
   }
 }

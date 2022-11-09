@@ -39,6 +39,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.tools.utils.JarUtils;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +83,16 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
       String tableName = tableResource.getKey();
       URL resourceUrl = getClass().getClassLoader().getResource(tableResource.getValue());
       Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResource.getValue());
-      File resourceFile = new File(resourceUrl.getFile());
+      File resourceFile;
+      if ("jar".equals(resourceUrl.getProtocol())) {
+        String[] splits = resourceUrl.getFile().split("!");
+        File tempUnpackDir = new File(_tempDir.getAbsolutePath() + File.separator + splits[1]);
+        TestUtils.ensureDirectoriesExistAndEmpty(tempUnpackDir);
+        JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), tempUnpackDir.getAbsolutePath());
+        resourceFile = tempUnpackDir;
+      } else {
+        resourceFile = new File(resourceUrl.getFile());
+      }
       File dataFile = new File(resourceFile.getAbsolutePath(), "rawdata" + File.separator + tableName + ".avro");
       Assert.assertTrue(dataFile.exists(), "Unable to load resource file from URL: " + dataFile);
       File schemaFile = new File(resourceFile.getPath(), tableName + "_schema.json");

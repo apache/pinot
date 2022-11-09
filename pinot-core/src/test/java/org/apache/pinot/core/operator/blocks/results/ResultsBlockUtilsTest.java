@@ -21,14 +21,11 @@ package org.apache.pinot.core.operator.blocks.results;
 import java.io.IOException;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 
 
 public class ResultsBlockUtilsTest {
@@ -74,15 +71,9 @@ public class ResultsBlockUtilsTest {
     queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCT a, b FROM testTable WHERE foo = 'bar'");
     dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
-    assertEquals(dataSchema.getColumnNames(), new String[]{"distinct_a:b"});
-    assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.OBJECT});
-    assertEquals(dataTable.getNumberOfRows(), 1);
-    DataTable.CustomObject customObject = dataTable.getCustomObject(0, 0);
-    assertNotNull(customObject);
-    DistinctTable distinctTable = ObjectSerDeUtils.deserialize(customObject);
-    assertEquals(distinctTable.size(), 0);
-    assertEquals(distinctTable.getDataSchema().getColumnNames(), new String[]{"a", "b"});
-    assertEquals(distinctTable.getDataSchema().getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+    assertEquals(dataSchema.getColumnNames(), new String[]{"a", "b"});
+    assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING,
+        DataSchema.ColumnDataType.STRING});
+    assertEquals(dataTable.getNumberOfRows(), 0);
   }
 }

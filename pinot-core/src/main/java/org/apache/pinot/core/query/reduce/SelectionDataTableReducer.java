@@ -118,7 +118,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
         droppedServers.add(entry.getKey());
         iterator.remove();
       } else {
-        dataSchema.upgradeToCover(dataSchemaToCompare);
+        dataSchema = DataSchema.upgradeToCover(dataSchema, dataSchemaToCompare);
       }
     }
     return droppedServers;

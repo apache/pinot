@@ -24,10 +24,11 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.Obfuscator;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -53,8 +54,7 @@ public class PinotControllerAppConfigsTest {
     ControllerConf expectedControllerConf = TEST_INSTANCE.getControllerConfig();
     PinotAppConfigs expected = new PinotAppConfigs(expectedControllerConf);
 
-    String configsJson =
-        ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forAppConfigs());
+    String configsJson = ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forAppConfigs());
     PinotAppConfigs actual = JsonUtils.stringToObject(configsJson, PinotAppConfigs.class);
 
     // RuntimeConfig is not checked as it has information that can change during the test run.
@@ -62,18 +62,18 @@ public class PinotControllerAppConfigsTest {
     PinotAppConfigs.SystemConfig actualSystemConfig = actual.getSystemConfig();
     PinotAppConfigs.SystemConfig expectedSystemConfig = expected.getSystemConfig();
 
-    Assert.assertEquals(actualSystemConfig.getName(), expectedSystemConfig.getName());
-    Assert.assertEquals(actualSystemConfig.getVersion(), expectedSystemConfig.getVersion());
-    Assert.assertEquals(actualSystemConfig.getAvailableProcessors(), expectedSystemConfig.getAvailableProcessors());
-    Assert.assertEquals(actualSystemConfig.getTotalPhysicalMemory(), expectedSystemConfig.getTotalPhysicalMemory());
-    Assert.assertEquals(actualSystemConfig.getTotalSwapSpace(), expectedSystemConfig.getTotalSwapSpace());
+    assertEquals(actualSystemConfig.getName(), expectedSystemConfig.getName());
+    assertEquals(actualSystemConfig.getVersion(), expectedSystemConfig.getVersion());
+    assertEquals(actualSystemConfig.getAvailableProcessors(), expectedSystemConfig.getAvailableProcessors());
+    assertEquals(actualSystemConfig.getTotalPhysicalMemory(), expectedSystemConfig.getTotalPhysicalMemory());
+    assertEquals(actualSystemConfig.getTotalSwapSpace(), expectedSystemConfig.getTotalSwapSpace());
 
     // tests Equals on obfuscated expected and actual
     Obfuscator obfuscator = new Obfuscator();
     String obfuscatedExpectedJson = obfuscator.toJsonString(expected);
     PinotAppConfigs obfuscatedExpected = JsonUtils.stringToObject(obfuscatedExpectedJson, PinotAppConfigs.class);
-    Assert.assertEquals(actual.getJvmConfig(), obfuscatedExpected.getJvmConfig());
-    Assert.assertEquals(actual.getPinotConfig(), obfuscatedExpected.getPinotConfig());
+    assertEquals(actual.getJvmConfig(), obfuscatedExpected.getJvmConfig());
+    assertEquals(actual.getPinotConfig(), obfuscatedExpected.getPinotConfig());
   }
 
   @AfterClass

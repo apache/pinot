@@ -21,8 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.BaseDataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -34,12 +33,12 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
 
 public class FilterOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "FILTER";
-  private final BaseOperator<TransferableBlock> _upstreamOperator;
+  private final Operator<TransferableBlock> _upstreamOperator;
   private final FilterOperand _filterOperand;
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public FilterOperator(BaseOperator<TransferableBlock> upstreamOperator, DataSchema dataSchema, RexExpression filter) {
+  public FilterOperator(Operator<TransferableBlock> upstreamOperator, DataSchema dataSchema, RexExpression filter) {
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = FilterOperand.toFilterOperand(filter, dataSchema);
@@ -71,21 +70,20 @@ public class FilterOperator extends BaseOperator<TransferableBlock> {
       throws Exception {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
-    }
-    if (!TransferableBlockUtils.isEndOfStream(block)) {
-      List<Object[]> resultRows = new ArrayList<>();
-      List<Object[]> container = block.getContainer();
-      for (Object[] row : container) {
-        if (_filterOperand.apply(row)) {
-          resultRows.add(row);
-        }
-      }
-      return new TransferableBlock(resultRows, _dataSchema, BaseDataBlock.Type.ROW);
     } else if (block.isErrorBlock()) {
       _upstreamErrorBlock = block;
       return _upstreamErrorBlock;
-    } else {
-      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(_dataSchema));
+    } else if (TransferableBlockUtils.isEndOfStream(block) || TransferableBlockUtils.isNoOpBlock(block)) {
+      return block;
     }
+
+    List<Object[]> resultRows = new ArrayList<>();
+    List<Object[]> container = block.getContainer();
+    for (Object[] row : container) {
+      if (_filterOperand.apply(row)) {
+        resultRows.add(row);
+      }
+    }
+    return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW);
   }
 }

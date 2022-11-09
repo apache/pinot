@@ -95,6 +95,11 @@ public class QueryTestSet {
             + " WHERE a.col1 IN ('foo') AND b.col2 NOT IN ('')"},
 
         // Range conditions with continuous and non-continuous range.
+        // Calcite default compilation will convert multiple `=` and `<>` into range IN and NOT IN search predicates.
+        new Object[]{"SELECT a.col1, SUM(CASE WHEN a.col2 = 'foo' OR a.col2 = 'alice' THEN 1 ELSE 0 END) AS match_sum, "
+            + " SUM(CASE WHEN a.col2 <> 'foo' AND a.col2 <> 'alice' THEN 1 ELSE 0 END) as unmatch_sum "
+            + " FROM a WHERE a.ts >= 1600000000 GROUP BY a.col1"},
+
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
             + " WHERE a.col3 IN (1, 2, 3) OR (a.col3 > 10 AND a.col3 < 50)"},
 
@@ -109,6 +114,8 @@ public class QueryTestSet {
 
         // Inequality JOIN & partial filter pushdown
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3"},
+        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND "
+            + "((a.col1 <> 'foo' AND b.col2 <> 'bar') or (a.col1 <> 'bar' AND b.col2 <> 'foo'))"},
 
         new Object[]{"SELECT * FROM a, b WHERE a.col1 > b.col2 AND a.col3 > b.col3"},
 
@@ -190,12 +197,32 @@ public class QueryTestSet {
         //   - distinct value done via GROUP BY with empty expr aggregation list.
         new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
             + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3"},
+        new Object[]{"SELECT col3 FROM a GROUP BY col3, col1"},
+        new Object[]{"SELECT col1 FROM a GROUP BY col3, col1"},
+        new Object[]{"SELECT AVG(col3) FROM (SELECT col1, col3 FROM a WHERE col3 > 1 GROUP BY col1, col3)"},
 
         // Test optimized constant literal.
         new Object[]{"SELECT col1 FROM a WHERE col3 > 0 AND col3 < -5"},
         new Object[]{"SELECT COALESCE(SUM(col3), 0) FROM a WHERE col1 = 'foo' AND col1 = 'bar'"},
         new Object[]{"SELECT SUM(CAST(col3 AS INTEGER)) FROM a HAVING MIN(col3) BETWEEN 1 AND 0"},
         new Object[]{"SELECT col1, COUNT(col3) FROM a GROUP BY col1 HAVING SUM(col3) > 40 AND SUM(col3) < 30"},
+
+        // Test SQL functions
+        // TODO split these SQL functions into separate test files to share between planner and runtime
+        // LIKE function
+        new Object[]{"SELECT col1 FROM a WHERE col2 LIKE '%o%'"},
+        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE a.col2 LIKE b.col1"},
+        new Object[]{"SELECT a.col1 LIKE b.col1 FROM a JOIN b ON a.col3 = b.col3"},
+
+        // COALESCE function
+        new Object[]{"SELECT a.col1, COALESCE(b.col3, 0) FROM a LEFT JOIN b ON a.col1 = b.col2"},
+        new Object[]{"SELECT a.col1, COALESCE(a.col3, 0) FROM a WHERE COALESCE(a.col2, 'bar') = 'bar'"},
+
+        // CASE WHEN function
+        new Object[]{"SELECT MAX(CAST((CASE WHEN col3 > 0 THEN 1 WHEN col3 > 10 then 2 ELSE 0 END) AS INTEGER)) "
+            + " FROM a"},
+        new Object[]{"SELECT col2, CASE WHEN SUM(col3) > 0 THEN 1 WHEN SUM(col3) > 10 then 2 WHEN SUM(col3) > 100 "
+            + " THEN 3 ELSE 0 END FROM a GROUP BY col2"}
     };
   }
 }

@@ -26,10 +26,12 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -49,6 +51,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -72,10 +75,40 @@ public class DebugResource {
   @ApiOperation(value = "Get segments debug info for this table",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
   public List<SegmentServerDebugInfo> getSegmentsDebugInfo(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableNameWithType) {
-
+      @ApiParam(value = "Name of the table (with type)", required = true) @PathParam("tableName")
+          String tableNameWithType) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     return getSegmentServerDebugInfo(tableNameWithType, tableType);
+  }
+
+  @GET
+  @Path("segments/{tableName}/{segmentName}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get segment debug info",
+      notes = "This is a debug endpoint, and won't maintain backward compatibility")
+  public SegmentServerDebugInfo getSegmentDebugInfo(
+      @ApiParam(value = "Name of the table (with type)", required = true) @PathParam("tableName")
+          String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    Map<String, SegmentErrorInfo> segmentErrorsMap = tableDataManager.getSegmentErrors();
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    try {
+      SegmentConsumerInfo segmentConsumerInfo = getSegmentConsumerInfo(segmentDataManager, tableType);
+      long segmentSize = getSegmentSize(segmentDataManager);
+      SegmentErrorInfo segmentErrorInfo = segmentErrorsMap.get(segmentName);
+      return new SegmentServerDebugInfo(segmentName, FileUtils.byteCountToDisplaySize(segmentSize), segmentConsumerInfo,
+          segmentErrorInfo);
+    } catch (Exception e) {
+      throw new WebApplicationException(
+          "Caught exception when getting consumer info for table: " + tableNameWithType + " segment: " + segmentName);
+    } finally {
+      if (segmentDataManager != null) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
   }
 
   private List<SegmentServerDebugInfo> getSegmentServerDebugInfo(String tableNameWithType, TableType tableType) {
@@ -134,11 +167,25 @@ public class DebugResource {
     SegmentConsumerInfo segmentConsumerInfo = null;
     if (tableType == TableType.REALTIME) {
       RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-      String segmentName = segmentDataManager.getSegmentName();
+      Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState();
+      Map<String, String> currentOffsets = realtimeSegmentDataManager.getPartitionToCurrentOffset();
+      Map<String, String> upstreamLatest = partitionStateMap.entrySet().stream().collect(
+          Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString()));
+      Map<String, String> recordsLagMap = new HashMap<>();
+      Map<String, String> availabilityLagMsMap = new HashMap<>();
+      realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
+        recordsLagMap.put(k, v.getRecordsLag());
+        availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
+      });
+
       segmentConsumerInfo =
-          new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
+          new SegmentConsumerInfo(
+              segmentDataManager.getSegmentName(),
+              realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(),
-              realtimeSegmentDataManager.getPartitionToCurrentOffset());
+              currentOffsets,
+              new SegmentConsumerInfo.PartitionOffsetInfo(currentOffsets,
+                  upstreamLatest, recordsLagMap, availabilityLagMsMap));
     }
     return segmentConsumerInfo;
   }

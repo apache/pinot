@@ -298,4 +298,11 @@ public class HadoopPinotFS extends BasePinotFS {
     }
     return hadoopConf;
   }
+
+  @Override
+  public void close()
+      throws IOException {
+    _hadoopFS.close();
+    super.close();
+  }
 }

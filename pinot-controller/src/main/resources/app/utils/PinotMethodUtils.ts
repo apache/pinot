@@ -92,10 +92,11 @@ import {
   requestDeleteUser,
   requestUpdateUser,
   getTaskProgress,
-  getSegmentReloadStatus
+  getSegmentReloadStatus,
+  getTaskRuntimeConfig
 } from '../requests';
 import { baseApi } from './axios-config';
-import Utils from './Utils';
+import Utils, { getDisplaySegmentStatus } from './Utils';
 const JSONbig = require('json-bigint')({'storeAsString': true})
 
 // This method is used to display tenants listing on cluster manager home page
@@ -351,8 +352,9 @@ const getSchemaObject = async (schemaName) =>{
       return schemaObj;
   }
 
+const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Total Columns"];
+
 const getAllSchemaDetails = async () => {
-  const columnHeaders = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Total Columns"]
   let schemaDetails:Array<any> = [];
   let promiseArr = [];
   const {data} = await getSchemaList()
@@ -370,19 +372,20 @@ const getAllSchemaDetails = async () => {
     return schemaObj;
   })
   return {
-    columns: columnHeaders,
+    columns: allSchemaDetailsColumnHeader,
     records: schemaDetails
   };
 }
 
+const allTableDetailsColumnHeader = [
+  'Table Name',
+  'Reported Size',
+  'Estimated Size',
+  'Number of Segments',
+  'Status',
+];
+
 const getAllTableDetails = (tablesList) => {
-  const columnHeaders = [
-    'Table Name',
-    'Reported Size',
-    'Estimated Size',
-    'Number of Segments',
-    'Status',
-  ];
   if (tablesList.length) {
     const promiseArr = [];
     tablesList.map((name) => {
@@ -432,13 +435,13 @@ const getAllTableDetails = (tablesList) => {
         }
       });
       return {
-        columns: columnHeaders,
+        columns: allTableDetailsColumnHeader,
         records: finalRecordsArr,
       };
     });
   }
   return {
-    columns: columnHeaders,
+    columns: allTableDetailsColumnHeader,
     records: []
   };
 };
@@ -474,7 +477,7 @@ const getSegmentList = (tableName) => {
       records: Object.keys(idealStateObj).map((key) => {
         return [
           key,
-          getSegmentStatus(idealStateObj[key], externalViewObj[key])
+          getDisplaySegmentStatus(idealStateObj[key], externalViewObj[key])
         ];
       }),
       externalViewObj
@@ -827,6 +830,12 @@ const getTasksList = async (tableName, taskType) => {
   return finalResponse;
 };
 
+const getTaskRuntimeConfigData = async (taskName: string) => {
+  const response = await getTaskRuntimeConfig(taskName);
+  
+  return response.data;
+}
+
 const getTaskDebugData = async (taskName) => {
   const debugRes = await getTaskDebug(taskName);
   return debugRes;
@@ -1089,6 +1098,7 @@ export default {
   getTableSchemaData,
   getQueryResults,
   getTenantTableData,
+  allTableDetailsColumnHeader,
   getAllTableDetails,
   getTableSummaryData,
   getSegmentList,
@@ -1117,6 +1127,7 @@ export default {
   fetchSegmentReloadStatus,
   getTaskTypeDebugData,
   getTableData,
+  getTaskRuntimeConfigData,
   getTaskInfo,
   stopAllTasks,
   resumeAllTasks,
@@ -1146,6 +1157,7 @@ export default {
   saveSchemaAction,
   saveTableAction,
   getSchemaData,
+  allSchemaDetailsColumnHeader,
   getAllSchemaDetails,
   getTableState,
   getAuthInfo,

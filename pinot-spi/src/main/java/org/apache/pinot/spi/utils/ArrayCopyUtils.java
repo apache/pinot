@@ -563,4 +563,16 @@ public class ArrayCopyUtils {
       copyToTimestamp(src[i], dest[i], rowLength);
     }
   }
+
+  public static void copy(boolean[] src, int[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i] ? 1 : 0;
+    }
+  }
+
+  public static void copy(Timestamp[] src, long[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i].getTime();
+    }
+  }
 }

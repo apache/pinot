@@ -42,8 +42,7 @@ public class SegmentCompletionProtocolDeserTest {
     // Test with all params
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET.toString())
-            .withSegmentLocation(SEGMENT_LOCATION).withSplitCommit(true)
+            .withStreamPartitionMsgOffset(OFFSET.toString()).withSegmentLocation(SEGMENT_LOCATION).withSplitCommit(true)
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
@@ -75,8 +74,8 @@ public class SegmentCompletionProtocolDeserTest {
     // Test with all params
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET.toString())
-            .withSegmentLocation(SEGMENT_LOCATION).withSplitCommit(true).withControllerVipUrl(CONTROLLER_VIP_URL)
+            .withStreamPartitionMsgOffset(OFFSET.toString()).withSegmentLocation(SEGMENT_LOCATION).withSplitCommit(true)
+            .withControllerVipUrl(CONTROLLER_VIP_URL)
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
@@ -93,8 +92,8 @@ public class SegmentCompletionProtocolDeserTest {
   public void testJsonNullSegmentLocationAndVip() {
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET.toString())
-            .withSplitCommit(false).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+            .withStreamPartitionMsgOffset(OFFSET.toString()).withSplitCommit(false)
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
     JsonNode jsonNode = JsonUtils.objectToJsonNode(response);
@@ -110,8 +109,8 @@ public class SegmentCompletionProtocolDeserTest {
   public void testJsonResponseWithoutSplitCommit() {
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET.toString())
-            .withSplitCommit(false).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+            .withStreamPartitionMsgOffset(OFFSET.toString()).withSplitCommit(false)
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
     JsonNode jsonNode = JsonUtils.objectToJsonNode(response);
@@ -129,9 +128,8 @@ public class SegmentCompletionProtocolDeserTest {
     // regardless
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET.toString())
-            .withSegmentLocation(SEGMENT_LOCATION).withSplitCommit(false)
-            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+            .withStreamPartitionMsgOffset(OFFSET.toString()).withSegmentLocation(SEGMENT_LOCATION)
+            .withSplitCommit(false).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
     JsonNode jsonNode = JsonUtils.objectToJsonNode(response);
@@ -149,9 +147,8 @@ public class SegmentCompletionProtocolDeserTest {
     // regardless
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET.toString())
-            .withControllerVipUrl(CONTROLLER_VIP_URL).withSplitCommit(false)
-            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+            .withStreamPartitionMsgOffset(OFFSET.toString()).withControllerVipUrl(CONTROLLER_VIP_URL)
+            .withSplitCommit(false).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
     JsonNode jsonNode = JsonUtils.objectToJsonNode(response);

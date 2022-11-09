@@ -26,6 +26,7 @@ import Typography from '@material-ui/core/Typography';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import SearchBar from './SearchBar';
 import { FormControlLabel, Switch, Tooltip } from '@material-ui/core';
+import clsx from 'clsx';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -46,7 +47,8 @@ const useStyles = makeStyles((theme: Theme) =>
     },
     details: {
       flexDirection: 'column',
-      padding: '0'
+      padding: '0',
+      overflow: "auto"
     },
     formControl: {
       marginRight: 0,
@@ -68,7 +70,8 @@ type Props = {
     toggleChangeHandler: (event: React.ChangeEvent<HTMLInputElement>) => void;
     toggleName: string;
     toggleValue: boolean;
-  }
+  },
+  detailsContainerClass?: string
 };
 
 export default function SimpleAccordion({
@@ -79,7 +82,8 @@ export default function SimpleAccordion({
   handleSearch,
   recordCount,
   children,
-  accordionToggleObject
+  accordionToggleObject,
+  detailsContainerClass
 }: Props) {
   const classes = useStyles();
 
@@ -115,7 +119,7 @@ export default function SimpleAccordion({
           />
         }
       </AccordionSummary>
-      <AccordionDetails className={classes.details}>
+      <AccordionDetails className={clsx(classes.details, detailsContainerClass)}>
         {showSearchBox ?
           <SearchBar
             // searchOnRight={true}

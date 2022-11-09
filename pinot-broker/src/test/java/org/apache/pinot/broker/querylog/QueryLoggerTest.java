@@ -190,8 +190,6 @@ public class QueryLoggerTest {
   public void shouldHandleRaceConditionsWithDroppedQueries()
       throws InterruptedException {
     // Given:
-    // first and third request get dropped
-    final CountDownLatch dropLogLatch = new CountDownLatch(1);
     final CountDownLatch logLatch = new CountDownLatch(1);
     Mockito.when(_logRateLimiter.tryAcquire())
         .thenReturn(false)
@@ -201,10 +199,12 @@ public class QueryLoggerTest {
           // this one will unblock the tryAcquire, but only after
           // the first thread has reached _droppedRateLimiter#tryAcquire()
           logLatch.await();
-          dropLogLatch.countDown();
           return true;
         });
 
+    // ensure that the tryAcquire only succeeds after three other
+    // logs have went through (see logAndDecrement)
+    final CountDownLatch dropLogLatch = new CountDownLatch(3);
     Mockito.when(_droppedRateLimiter.tryAcquire())
         .thenAnswer(invocation -> {
           logLatch.countDown();
@@ -219,10 +219,17 @@ public class QueryLoggerTest {
 
     // When:
     try {
-      executorService.submit(() -> queryLogger.log(params)); // this one gets dropped
-      executorService.submit(() -> queryLogger.log(params)); // this one succeeds, but blocks
-      executorService.submit(() -> queryLogger.log(params)); // this one gets dropped
-      executorService.submit(() -> queryLogger.log(params)); // this one succeeds, and unblocks (2)
+      // use logAndDecrement on all invocations since any one of them could
+      // be the one that blocks
+      Runnable logAndDecrement = () -> {
+        queryLogger.log(params);
+        dropLogLatch.countDown();
+      };
+
+      executorService.submit(logAndDecrement); // 1 this one gets dropped
+      executorService.submit(logAndDecrement); // 2 this one succeeds, but blocks
+      executorService.submit(logAndDecrement); // 3 this one gets dropped
+      executorService.submit(logAndDecrement); // 4 this one succeeds, and unblocks (2)
     } finally {
       executorService.shutdown();
       Assert.assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS), "expected shutdown to complete");

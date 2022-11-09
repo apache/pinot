@@ -26,6 +26,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -38,6 +42,8 @@ import org.testng.annotations.Test;
 
 
 public class QueryRunnerTest extends QueryRunnerTestBase {
+  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(
+      ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("query_server_enclosure"));
 
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows)
@@ -71,13 +77,15 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedStagePlan distributedStagePlan =
               QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
+          EXECUTOR_SERVICE.submit(() -> {
+            _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
+          });
         }
       }
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
     return QueryDispatcher.toResultTable(QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator),
-        queryPlan.getQueryResultFields()).getRows();
+        queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
   }
 
   private List<Object[]> queryH2(String sql)
@@ -118,8 +126,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         return Double.compare((Double) l, ((Number) r).doubleValue());
       } else if (l instanceof String) {
         return ((String) l).compareTo((String) r);
+      } else if (l instanceof Boolean) {
+        return ((Boolean) l).compareTo((Boolean) r);
       } else {
-        throw new RuntimeException("non supported type");
+        throw new RuntimeException("non supported type " + l.getClass());
       }
     };
     Comparator<Object[]> rowComp = (l, r) -> {
@@ -159,6 +169,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         //   - on intermediate stage
         new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
             + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+
+        // test regexpLike
+        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLike(a.col2, b.col1)", 9},
+        new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
     };
   }
 }

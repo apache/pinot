@@ -31,7 +31,7 @@ import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.readers.IntermediateSegmentRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -162,15 +162,16 @@ public class IntermediateSegmentTest {
 
     // Ingest data.
     ingestDataToIntermediateSegment(segmentGeneratorConfig, intermediateSegment);
-    IntermediateSegmentRecordReader intermediateSegmentRecordReader =
-        new IntermediateSegmentRecordReader(intermediateSegment);
+    PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
+    recordReader.init(intermediateSegment);
 
     // Build the segment from intermediate segment.
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, intermediateSegmentRecordReader);
+    driver.init(segmentGeneratorConfig, recordReader);
     driver.build();
 
     // Destroy intermediate segment after the segment creation.
+    recordReader.close();
     intermediateSegment.destroy();
 
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), ReadMode.heap);

@@ -62,6 +62,7 @@ import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
@@ -494,7 +495,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   @Override
   public void start()
       throws Exception {
-    LOGGER.info("Starting Pinot server");
+    LOGGER.info("Starting Pinot server (Version: {})", PinotVersion.VERSION);
     long startTimeMs = System.currentTimeMillis();
 
     // install default SSL context if necessary (even if not force-enabled everywhere)

@@ -54,7 +54,7 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
   private static final String TEXT_COLUMN_NAME = "skills";
   private static final String TEXT_COLUMN_NAME_NATIVE = "skills_native";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
-  private static final int NUM_SKILLS = 24;
+  private static final int NUM_SKILLS = 28;
   private static final int NUM_MATCHING_SKILLS = 4;
   private static final int NUM_RECORDS = NUM_SKILLS * 1000;
   private static final int NUM_MATCHING_RECORDS = NUM_MATCHING_SKILLS * 1000;
@@ -70,12 +70,6 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
   @Override
   public String getTimeColumnName() {
     return TIME_COLUMN_NAME;
-  }
-
-  // TODO: Support Lucene index on HLC consuming segments
-  @Override
-  protected boolean useLlc() {
-    return true;
   }
 
   @Nullable

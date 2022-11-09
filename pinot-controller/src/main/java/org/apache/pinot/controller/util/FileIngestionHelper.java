@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.controller.api.resources.SuccessResponse;
@@ -70,16 +71,16 @@ public class FileIngestionHelper {
   private final Schema _schema;
   private final Map<String, String> _batchConfigMap;
   private final URI _controllerUri;
-  private final File _uploadDir;
+  private final File _ingestionDir;
   private final AuthProvider _authProvider;
 
   public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap,
-      URI controllerUri, File uploadDir, AuthProvider authProvider) {
+      URI controllerUri, File ingestionDir, AuthProvider authProvider) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfigMap = batchConfigMap;
     _controllerUri = controllerUri;
-    _uploadDir = uploadDir;
+    _ingestionDir = ingestionDir;
     _authProvider = authProvider;
   }
 
@@ -89,8 +90,11 @@ public class FileIngestionHelper {
   public SuccessResponse buildSegmentAndPush(DataPayload payload)
       throws Exception {
     String tableNameWithType = _tableConfig.getTableName();
-    File workingDir = new File(_uploadDir,
-        String.format("%s_%s_%d", WORKING_DIR_PREFIX, tableNameWithType, System.currentTimeMillis()));
+    // 1. append a timestamp for easy debugging
+    // 2. append a random string to avoid using the same working directory when multiple tasks are running in parallel
+    File workingDir = new File(_ingestionDir,
+        String.format("%s_%s_%d_%s", WORKING_DIR_PREFIX, tableNameWithType, System.currentTimeMillis(),
+            RandomStringUtils.random(10, true, false)));
     LOGGER.info("Starting ingestion of {} payload to table: {} using working dir: {}", payload._payloadType,
         tableNameWithType, workingDir.getAbsolutePath());
 

@@ -30,12 +30,12 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 
 public class ExceptionResultsBlock extends BaseResultsBlock {
 
-  public ExceptionResultsBlock(ProcessingException processingException, Exception e) {
-    addToProcessingExceptions(QueryException.getException(processingException, e));
+  public ExceptionResultsBlock(ProcessingException processingException, Throwable t) {
+    addToProcessingExceptions(QueryException.getException(processingException, t));
   }
 
-  public ExceptionResultsBlock(Exception e) {
-    this(QueryException.QUERY_EXECUTION_ERROR, e);
+  public ExceptionResultsBlock(Throwable t) {
+    this(QueryException.QUERY_EXECUTION_ERROR, t);
   }
 
   @Nullable
