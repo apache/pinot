@@ -61,7 +61,8 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * The <code>ForwardIndexDisabledMultiValueQueriesTestWithReload</code> class sets up the index segment for the
+ * TODO: Find a good way to consolidate this with ForwardIndexDisabledMultiValueQueriesTest
+ * The <code>ForwardIndexDisabledMultiValueQueriesWithReloadTest</code> class sets up the index segment for the
  * no forward index multi-value queries test with reload.
  * <p>There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
  * the index segment. Selected columns information are as following:
@@ -79,12 +80,12 @@ import static org.testng.Assert.assertTrue;
  *   <li>daysSinceEpoch, TIME, INT, 1, T, F, F, F, F</li>
  * </ul>
  */
-public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQueriesTest {
+public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQueriesTest {
   private static final String AVRO_DATA = "data" + File.separator + "test_data-mv.avro";
   private static final String SEGMENT_NAME_1 = "testTable_1756015688_1756015688";
   private static final String SEGMENT_NAME_2 = "testTable_1756015689_1756015689";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(),
-      "ForwardIndexDisabledMultiValueQueriesTestWithReload");
+      "ForwardIndexDisabledMultiValueQueriesWithReloadTest");
 
   private static final String SELECT_STAR_QUERY = "SELECT * FROM testTable";
 
@@ -142,8 +143,9 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
     fieldConfigList.add(new FieldConfig("column6", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(), null,
         Collections.singletonMap(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString())));
     // Build table config based on segment 1 as it contains both columns under no forward index
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(Arrays.asList("column5"))
-        .setTableName("testTable").setTimeColumnName("daysSinceEpoch").setNoDictionaryColumns(Arrays.asList("column7"))
+    _noDictionaryColumns = new ArrayList<>(Arrays.asList("column5", "column7"));
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
+        .setTimeColumnName("daysSinceEpoch").setNoDictionaryColumns(_noDictionaryColumns)
         .setFieldConfigList(fieldConfigList).build();
 
     // Create the segment generator config.
@@ -156,7 +158,6 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
     segmentGeneratorConfig.setInvertedIndexCreationColumns(_invertedIndexColumns);
     _forwardIndexDisabledColumns = new ArrayList<>(Arrays.asList("column6"));
     segmentGeneratorConfig.setForwardIndexDisabledColumns(_forwardIndexDisabledColumns);
-    _noDictionaryColumns = new ArrayList<>(Arrays.asList("column7"));
     segmentGeneratorConfig.setRawIndexCreationColumns(_noDictionaryColumns);
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -235,8 +236,6 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 399_976L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 536_360L);
-    assertNotNull(brokerResponseNative.getProcessingExceptions());
-    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
     DataSchema dataSchema = new DataSchema(new String[]{"column1", "column5", "column7"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
             DataSchema.ColumnDataType.INT_ARRAY});
@@ -253,7 +252,7 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
     // Column 5
     assertEquals((String) firstRow[1], "AKXcXcIqsqOJFsdwxZ");
 
-    // Disable forward index for some columns
+    // Disable forward index for column7
     disableForwardIndexForSomeColumns();
 
     // Run the same query and validate that an exception is thrown since column7 has forward index disabled
@@ -274,8 +273,6 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 199_900L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
-    assertNotNull(brokerResponseNative.getProcessingExceptions());
-    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
     dataSchema = new DataSchema(new String[]{"column1", "column5"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
     assertEquals(resultTable.getDataSchema(), dataSchema);
@@ -314,8 +311,6 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 120_000L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
-    assertNotNull(brokerResponseNative.getProcessingExceptions());
-    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
     DataSchema dataSchema = new DataSchema(new String[]{"column1", "column7", "column9"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.INT});
@@ -325,7 +320,7 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
       assertEquals(resultRow.length, 3);
     }
 
-    // Disable forward index for some columns
+    // Disable forward index for column7
     disableForwardIndexForSomeColumns();
 
     // Run the same query and validate that an exception is thrown since column7 has forward index disabled
@@ -355,8 +350,6 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 800000L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
-    assertNotNull(brokerResponseNative.getProcessingExceptions());
-    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
     assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column7"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT}));
     List<Object[]> resultRows = resultTable.getRows();
@@ -367,7 +360,7 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
       previousVal = (int) resultRow[0];
     }
 
-    // Disable forward index for some columns
+    // Disable forward index for column7
     disableForwardIndexForSomeColumns();
 
     // Run the same query and validate that an exception is thrown since column7 has forward index disabled
@@ -406,8 +399,6 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 400_000L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
-    assertNotNull(brokerResponseNative.getProcessingExceptions());
-    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
     assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"max(arraylength(column7))"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE}));
     List<Object[]> resultRows = resultTable.getRows();
@@ -430,8 +421,6 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 400_000L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
-    assertNotNull(brokerResponseNative.getProcessingExceptions());
-    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
     assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"summv(column7)", "avgmv(column7)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE}));
     resultRows = resultTable.getRows();
@@ -441,7 +430,7 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
       assertEquals(resultRow[1], 7.997853562582668E8);
     }
 
-    // Disable forward index for some columns
+    // Disable forward index for column7
     disableForwardIndexForSomeColumns();
 
     // The same query without forward index should fail
@@ -468,8 +457,6 @@ public class ForwardIndexDisabledMultiValueQueriesTestWithReload extends BaseQue
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 399_512L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
-    assertNotNull(brokerResponseNative.getProcessingExceptions());
-    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
     assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "max(column1)", "sum(column9)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE,
             DataSchema.ColumnDataType.DOUBLE}));

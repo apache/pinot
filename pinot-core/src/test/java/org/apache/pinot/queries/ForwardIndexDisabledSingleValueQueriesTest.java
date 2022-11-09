@@ -747,7 +747,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     // Column 11
     assertEquals((String) firstRow[3], "o");
 
-    // Disable forward index for some columns
+    // Disable forward index for columns: column9 and column11
     disableForwardIndexForSomeColumns();
 
     // Run the same query and validate that an exception is thrown since both column9 and column11 are on the SELECT
@@ -921,7 +921,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       previousColumn1 = (Integer) resultRow[0];
     }
 
-    // Disable forward index for some columns
+    // Disable forward index for columns: column9 and column11
     disableForwardIndexForSomeColumns();
 
     // Run the same query and validate that an exception is thrown since column9 has forward index disabled
@@ -1119,7 +1119,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       assertTrue(resultRow[0].toString().endsWith("-gFuH"));
     }
 
-    // Disable forward index for some columns
+    // Disable forward index for columns: column9 and column11
     disableForwardIndexForSomeColumns();
 
     // Run the same query and validate that an exception is thrown since both column9 and column11 are on the SELECT
@@ -1483,7 +1483,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       previousVal = (int) resultRow[0];
     }
 
-    // Disable forward index for some columns
+    // Disable forward index for columns: column9 and column11
     disableForwardIndexForSomeColumns();
 
     // Run the same query and validate that an exception is thrown since column9 has forward index disabled
@@ -1627,7 +1627,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       previousVal = (double) resultRow[0];
     }
 
-    // Disable forward index for some columns
+    // Disable forward index for columns: column9 and column11
     disableForwardIndexForSomeColumns();
 
     // Run the same query and validate that an exception is thrown since column9 has forward index disabled

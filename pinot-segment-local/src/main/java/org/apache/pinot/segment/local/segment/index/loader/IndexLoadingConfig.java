@@ -512,7 +512,8 @@ public class IndexLoadingConfig {
    */
   @VisibleForTesting
   public void setForwardIndexDisabledColumns(Set<String> forwardIndexDisabledColumns) {
-    _forwardIndexDisabledColumns = forwardIndexDisabledColumns == null ? new HashSet<>() : forwardIndexDisabledColumns;
+    _forwardIndexDisabledColumns = forwardIndexDisabledColumns == null ? Collections.emptySet()
+        : forwardIndexDisabledColumns;
   }
 
   public Set<String> getNoDictionaryColumns() {

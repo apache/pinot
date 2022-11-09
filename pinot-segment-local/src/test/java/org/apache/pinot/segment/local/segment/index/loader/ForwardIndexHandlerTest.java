@@ -26,9 +26,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
@@ -56,6 +58,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -621,8 +624,13 @@ public class ForwardIndexHandlerTest {
 
     indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
     fwdIndexHandler = new ForwardIndexHandler(existingSegmentMetadata, indexLoadingConfig, null);
-    operationMap = fwdIndexHandler.computeOperation(writer);
-    assertEquals(operationMap, Collections.EMPTY_MAP);
+    try {
+      fwdIndexHandler.computeOperation(writer);
+      Assert.fail("Trying to recreate forward index should fail for now");
+    } catch (UnsupportedOperationException e) {
+      assertEquals(e.getMessage(), String.format("Recreating forward index for column: %s "
+          + "is not yet supported. Please backfill or refresh the data for now.", config.getName()));
+    }
 
     // Tear down
     segmentLocalFSDirectory.close();
@@ -923,6 +931,9 @@ public class ForwardIndexHandlerTest {
   @Test
   public void testDisableForwardIndexForSingleDictColumn()
       throws Exception {
+    // Must include columns which already have forward index disabled as enabling forward index is not yet supported
+    Set<String> forwardIndexDisabledColumns = new HashSet<>(SV_FORWARD_INDEX_DISABLED_COLUMNS);
+    forwardIndexDisabledColumns.addAll(MV_FORWARD_INDEX_DISABLED_COLUMNS);
     for (String column : DICT_ENABLED_COLUMNS_WITH_FORWARD_INDEX) {
       SegmentMetadataImpl existingSegmentMetadata = new SegmentMetadataImpl(_segmentDirectory);
       SegmentDirectory segmentLocalFSDirectory =
@@ -930,8 +941,9 @@ public class ForwardIndexHandlerTest {
       SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
 
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
-      indexLoadingConfig.getForwardIndexDisabledColumns().add(column);
-      indexLoadingConfig.getInvertedIndexColumns().add(column);
+      forwardIndexDisabledColumns.add(column);
+      indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
+      indexLoadingConfig.setInvertedIndexColumns(forwardIndexDisabledColumns);
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(existingSegmentMetadata, indexLoadingConfig, _schema);
       IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
@@ -1022,20 +1034,20 @@ public class ForwardIndexHandlerTest {
   @Test
   public void testDisableForwardIndexForSingleRawColumn()
       throws Exception {
+    // Must include columns which already have forward index disabled as enabling forward index is not yet supported
+    Set<String> forwardIndexDisabledColumns = new HashSet<>(SV_FORWARD_INDEX_DISABLED_COLUMNS);
+    forwardIndexDisabledColumns.addAll(MV_FORWARD_INDEX_DISABLED_COLUMNS);
     for (String column : _noDictionaryColumns) {
-      if (column.equals(DIM_PASS_THROUGH_SORTED_LONG)) {
-        // Sorted columns should not be dictionary disabled. Skip this test
-        continue;
-      }
       SegmentMetadataImpl existingSegmentMetadata = new SegmentMetadataImpl(_segmentDirectory);
       SegmentDirectory segmentLocalFSDirectory =
           new SegmentLocalFSDirectory(_segmentDirectory, existingSegmentMetadata, ReadMode.mmap);
       SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
 
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
-      indexLoadingConfig.getForwardIndexDisabledColumns().add(column);
-      indexLoadingConfig.getNoDictionaryColumns().remove(column);
-      indexLoadingConfig.getInvertedIndexColumns().add(column);
+      forwardIndexDisabledColumns.add(column);
+      indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
+      indexLoadingConfig.getNoDictionaryColumns().removeAll(forwardIndexDisabledColumns);
+      indexLoadingConfig.setInvertedIndexColumns(forwardIndexDisabledColumns);
       ForwardIndexHandler fwdIndexHandler =
           new ForwardIndexHandler(existingSegmentMetadata, indexLoadingConfig, _schema);
       IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();

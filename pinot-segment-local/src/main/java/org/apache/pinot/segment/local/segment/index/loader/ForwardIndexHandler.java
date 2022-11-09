@@ -203,6 +203,12 @@ public class ForwardIndexHandler implements IndexHandler {
 
     for (String column : existingAllColumns) {
       if (existingForwardIndexColumns.contains(column) && newForwardIndexDisabledColumns.contains(column)) {
+        // Existing column has a forward index. New column config disables the forward index
+        Preconditions.checkState(!newNoDictColumns.contains(column),
+            String.format("Must enable dictionary to disable the forward index for column: %s", column));
+        Preconditions.checkState(_indexLoadingConfig.getInvertedIndexColumns().contains(column),
+            String.format("Must enable inverted index to disable the forward index for column: %s", column));
+
         ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
         if (columnMetadata != null && columnMetadata.isSorted()) {
           // Check if the column is sorted. If sorted, disabling forward index should be a no-op. Do not return an
@@ -211,7 +217,6 @@ public class ForwardIndexHandler implements IndexHandler {
           continue;
         }
 
-        // Existing column has a forward index. New column config disables the forward index
         if (existingDictColumns.contains(column)) {
           columnOperationMap.put(column, Operation.DISABLE_FORWARD_INDEX_FOR_DICT_COLUMN);
         } else {
@@ -222,12 +227,13 @@ public class ForwardIndexHandler implements IndexHandler {
           && !newForwardIndexDisabledColumns.contains(column)) {
         // TODO: Add support: existing column has its forward index disabled. New column config enables the forward
         //       index
-        LOGGER.warn("Enabling forward index on a forward index disabled column {} is not yet supported", column);
+        throw new UnsupportedOperationException(String.format("Recreating forward index for column: %s is not yet "
+            + "supported. Please backfill or refresh the data for now.", column));
       } else if (existingForwardIndexDisabledColumns.contains(column)
           && newForwardIndexDisabledColumns.contains(column)) {
         // Forward index is disabled for the existing column and should remain disabled based on the latest config
         Preconditions.checkState(existingDictColumns.contains(column) && !newNoDictColumns.contains(column),
-            String.format("Not allowed to disable the dictionary for forward index disabled column %s", column));
+            String.format("Not allowed to disable the dictionary for a column: %s without forward index", column));
       } else if (existingNoDictColumns.contains(column) && !newNoDictColumns.contains(column)) {
         // Existing column is RAW. New column is dictionary enabled.
         if (_schema == null || _indexLoadingConfig.getTableConfig() == null) {
