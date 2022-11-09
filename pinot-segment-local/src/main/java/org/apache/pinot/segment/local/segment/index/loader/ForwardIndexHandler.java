@@ -152,12 +152,17 @@ public class ForwardIndexHandler implements IndexHandler {
 
     for (String column : existingAllColumns) {
       if (existingNoDictColumns.contains(column) && !newNoDictColumns.contains(column)) {
+        // Existing column is RAW. New column is dictionary enabled.
         if (_schema == null || _indexLoadingConfig.getTableConfig() == null) {
           // This can only happen in tests.
           LOGGER.warn("Cannot enable dictionary for column={} as schema or tableConfig is null.", column);
           continue;
         }
-        // Existing column is RAW. New column is dictionary enabled.
+
+        // Note that RAW columns cannot be sorted.
+        ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
+        Preconditions.checkState(!existingColMetadata.isSorted(), "Raw column=" + column + " cannot be sorted.");
+
         columnOperationMap.put(column, Operation.ENABLE_DICTIONARY);
       } else if (existingNoDictColumns.contains(column) && newNoDictColumns.contains(column)) {
         // Both existing and new column is RAW forward index encoded. Check if compression needs to be changed.
@@ -439,9 +444,8 @@ public class ForwardIndexHandler implements IndexHandler {
     File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENSION);
     String fwdIndexFileExtension;
     if (isSingleValue) {
-      fwdIndexFileExtension =
-          existingColMetadata.isSorted() ? V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION
-              : V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+      // Raw columns cannot be sorted.
+      fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
     } else {
       fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
     }

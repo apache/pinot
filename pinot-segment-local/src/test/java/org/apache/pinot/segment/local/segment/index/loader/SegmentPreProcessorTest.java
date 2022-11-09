@@ -356,33 +356,66 @@ public class SegmentPreProcessorTest {
   }
 
   @Test
-  public void testForwardIndexHandlerEnableDictionary()
+  public void testSimpleEnableDictionarySV()
       throws Exception {
     // Add raw columns in indexingConfig so that the ForwardIndexHandler doesn't end up converting them to dictionary
     // enabled columns
-    _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW_MV);
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW);
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_RAW);
 
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
-    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26, null, true, 0,
-        DataType.STRING, 100000);
-    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
-        0, ChunkCompressionType.LZ4, false, DataType.STRING, 100000);
-    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
-        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
+        true, 0, DataType.STRING, 100000);
     validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_INT_COL_RAW, 42242, 16, _schema, false, false, false, 0, true,
         0, ChunkCompressionType.LZ4, false, DataType.INT, 100000);
 
     // Convert the segment to V3.
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
 
-    // TEST 2: Run reload with no-changes.
-    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26, null, true, 0,
+    // TEST 2: Enable dictionary on EXISTING_STRING_COL_RAW
+    _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_STRING_COL_RAW);
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, null, true, 0,
         DataType.STRING, 100000);
 
-    // TEST 3: EXISTING_STRING_COL_RAW. Enable dictionary. Also add inverted index and text index. Reload code path
+    // TEST 3: Enable dictionary on EXISTING_INT_COL_RAW
+    _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_INT_COL_RAW);
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, null, true, 0,
+        DataType.INT, 100000);
+  }
+
+  @Test
+  public void testSimpleEnableDictionaryMV()
+      throws Exception {
+    // Add raw columns in indexingConfig so that the ForwardIndexHandler doesn't end up converting them to dictionary
+    // enabled columns
+    _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW_MV);
+
+    // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
+    constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+        ChunkCompressionType.LZ4, false, 13, DataType.INT, 106688);
+
+    // Convert the segment to V3.
+    new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
+
+    // TEST 2: Enable dictionary on EXISTING_STRING_COL_RAW
+    _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_INT_COL_RAW_MV);
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
+        DataType.INT, 106688);
+  }
+
+  @Test
+  public void testEnableDictAndOtherIndexesSV()
+      throws Exception {
+    // Add raw columns in indexingConfig so that the ForwardIndexHandler doesn't end up converting them to dictionary
+    // enabled columns
+    _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW);
+    _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_RAW);
+    constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
+
+    // TEST 1: EXISTING_STRING_COL_RAW. Enable dictionary. Also add inverted index and text index. Reload code path
     // will create dictionary, inverted index and text index.
     _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_STRING_COL_RAW);
     _indexLoadingConfig.getInvertedIndexColumns().add(EXISTING_STRING_COL_RAW);
@@ -394,7 +427,7 @@ public class SegmentPreProcessorTest {
     validateIndex(ColumnIndexType.TEXT_INDEX, EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, true, 0,
         null, false, DataType.STRING, 100000);
 
-    // TEST4: EXISTING_STRING_COL_RAW. Enable dictionary on a raw column that already has text index.
+    // TEST 2: EXISTING_STRING_COL_RAW. Enable dictionary on a raw column that already has text index.
     List<String> textIndexCols = new ArrayList<>();
     textIndexCols.add(EXISTING_STRING_COL_RAW);
     constructV1Segment(Collections.emptyList(), textIndexCols, Collections.emptyList());
@@ -410,7 +443,7 @@ public class SegmentPreProcessorTest {
     // Add it back so that this column is not rewritten for the other tests below.
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_RAW);
 
-    // TEST 5: EXISTING_INT_COL_RAW. Enable dictionary on a column that already has range index.
+    // TEST 3: EXISTING_INT_COL_RAW. Enable dictionary on a column that already has range index.
     List<String> rangeIndexCols = new ArrayList<>();
     rangeIndexCols.add(EXISTING_INT_COL_RAW);
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), rangeIndexCols);
@@ -427,14 +460,18 @@ public class SegmentPreProcessorTest {
         null, false, DataType.INT, 100000);
     // Add it back so that this column is not rewritten for the other tests below.
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW);
+  }
 
-    // TEST 6: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column. Also enable inverted index and range index.
+  @Test
+  public void testEnableDictAndOtherIndexesMV()
+      throws Exception {
+    // Add raw columns in indexingConfig so that the ForwardIndexHandler doesn't end up converting them to dictionary
+    // enabled columns
+    _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW_MV);
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
-    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
-        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
 
-    // Enable dictionary and inverted index.
+    // TEST 1: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column. Also enable inverted index and range index.
     _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_INT_COL_RAW_MV);
     _indexLoadingConfig.getInvertedIndexColumns().add(EXISTING_INT_COL_RAW_MV);
     _indexLoadingConfig.getRangeIndexColumns().add(EXISTING_INT_COL_RAW_MV);
@@ -442,6 +479,23 @@ public class SegmentPreProcessorTest {
         DataType.INT, 106688);
     validateIndex(ColumnIndexType.INVERTED_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
         false, 13, null, false, DataType.INT, 106688);
+    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
+        false, 13, null, false, DataType.INT, 106688);
+
+    // TEST 2: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column that already has range index.
+    List<String> rangeIndexCols = new ArrayList<>();
+    rangeIndexCols.add(EXISTING_INT_COL_RAW_MV);
+    constructV1Segment(Collections.emptyList(), Collections.emptyList(), rangeIndexCols);
+    new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
+    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
+    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
+
+    // Enable dictionary.
+    _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_INT_COL_RAW_MV);
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
+        DataType.INT, 106688);
     validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
         false, 13, null, false, DataType.INT, 106688);
   }
