@@ -67,9 +67,9 @@ public class QueryTestExecutor extends QueryRunnerTestBase {
     setH2Connection();
 
     // Scan through all the test cases.
-    for (Map.Entry<String, TestCase> testCaseEntry : getTestCases().entrySet()) {
+    for (Map.Entry<String, QueryTestCase> testCaseEntry : getTestCases().entrySet()) {
       String testCaseName = testCaseEntry.getKey();
-      TestCase testCase = testCaseEntry.getValue();
+      QueryTestCase testCase = testCaseEntry.getValue();
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
       for (Map.Entry<String, Map<String, String>> e : testCase._tables.entrySet()) {
@@ -82,11 +82,12 @@ public class QueryTestExecutor extends QueryRunnerTestBase {
         factory2.registerTable(pinotSchema, tableNameWithType);
       }
       for (Map.Entry<String, List<List<Object>>> e : testCase._inputs.entrySet()) {
+        Map<String, String> tableColumnMap = testCase._tables.get(e.getKey());
         String tableName = testCaseName + "_" + e.getKey();
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
         // TODO: able to select add rows to server1 or server2 (now default server1)
         // TODO: able to select add rows to existing segment or create new one (now default create one segment)
-        factory1.addSegment(tableNameWithType, toRow(e.getValue()));
+        factory1.addSegment(tableNameWithType, toRow(tableColumnMap, e.getValue()));
       }
       // add all the tables to H2
       for (Map.Entry<String, Schema> e: schemaMap.entrySet()) {
@@ -130,38 +131,47 @@ public class QueryTestExecutor extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
+  // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProvider")
-  public void testQueryTestCases()
+  public void testQueryTestCases(String testCaseName, String sql)
       throws Exception {
-    for (Map.Entry<String, TestCase> testCaseEntry : getTestCases().entrySet()) {
-      String sql = replaceTableName(testCaseEntry.getKey(), testCaseEntry.getValue()._sql);
-      List<Object[]> resultRows = queryRunner(sql);
-      // query H2 for data
-      List<Object[]> expectedRows = queryH2(sql);
-      compareRowEquals(resultRows, expectedRows);
+    // query pinot
+    List<Object[]> resultRows = queryRunner(sql);
+    // query H2 for data
+    List<Object[]> expectedRows = queryH2(sql);
+    compareRowEquals(resultRows, expectedRows);
+  }
+
+  @DataProvider
+  private static Object[][] testResourceQueryTestCaseProvider()
+      throws Exception {
+    Map<String, QueryTestCase> testCaseMap = getTestCases();
+    Object[][] providerContent = new Object[testCaseMap.size()][];
+    int idx = 0;
+    for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
+      String testCaseName = testCaseEntry.getKey();
+      String testSql = replaceTableName(testCaseName, testCaseEntry.getValue()._sql);
+      Object[] testEntry = new Object[]{testCaseName, testSql};
+      providerContent[idx++] = testEntry;
     }
+    return providerContent;
   }
 
   private static String replaceTableName(String testCaseName, String sql) {
     Matcher matcher = TABLE_NAME_REPLACE_PATTERN.matcher(sql);
-    return matcher.replaceAll("$1_" + testCaseName);
+    return matcher.replaceAll(testCaseName + "_$1");
   }
 
-  @DataProvider
-  private static Object[][] testResourceQueryTestCaseProvider() {
-    return new Object[][]{};
-  }
-
-  private static Map<String, TestCase> getTestCases()
+  private static Map<String, QueryTestCase> getTestCases()
       throws Exception {
-    Map<String, TestCase> testCaseMap = new HashMap<>();
+    Map<String, QueryTestCase> testCaseMap = new HashMap<>();
     for (String testCaseName : QUERY_TEST_RESOURCE_FILES) {
       String testCaseFile = QUERY_TEST_RESOURCE_FOLDER + File.separator + testCaseName;
       // TODO: support JAR test as well, right now it has to be run in a checked-out repo
       URL testFileUrl = QueryTestExecutor.class.getClassLoader().getResource(testCaseFile);
       if (testFileUrl != null && new File(testFileUrl.getFile()).exists()) {
-        Map<String, TestCase> testCases = MAPPER.readValue(new File(testFileUrl.getFile()),
-            new TypeReference<Map<String, TestCase>>() { });
+        Map<String, QueryTestCase> testCases = MAPPER.readValue(new File(testFileUrl.getFile()),
+            new TypeReference<Map<String, QueryTestCase>>() { });
         // TODO: potential test case conflicts between files, address later by throwing during setUp if already exist.
         testCaseMap.putAll(testCases);
       }

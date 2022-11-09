@@ -163,18 +163,19 @@ public class QueryRunnerTestBase extends QueryTestSet {
       builder.addSingleValueDimension(dataType.getKey(), FieldSpec.DataType.valueOf(dataType.getValue()));
     }
     // ts is built in
-    builder.addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS");
+    builder.addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:SECONDS");
     builder.setSchemaName(schemaName);
     return builder.build();
   }
 
-  protected List<GenericRow> toRow(List<List<Object>> value) {
+  protected List<GenericRow> toRow(Map<String, String> columnMap, List<List<Object>> value) {
     List<GenericRow> result = new ArrayList<>(value.size());
     for (int rowId = 0; rowId < value.size(); rowId++) {
       GenericRow row = new GenericRow();
       List<Object> rawRow = value.get(rowId);
-      for (int colId = 0; colId < rawRow.size(); colId++) {
-        row.putValue("col" + colId, rawRow.get(colId));
+      int colId = 0;
+      for (Map.Entry<String, String> column : columnMap.entrySet()) {
+        row.putValue(column.getKey(), rawRow.get(colId++));
       }
       row.putValue("ts", System.currentTimeMillis());
       result.add(row);
@@ -253,7 +254,7 @@ public class QueryRunnerTestBase extends QueryTestSet {
     return fieldNamesAndTypes;
   }
 
-  public static class TestCase {
+  public static class QueryTestCase {
     @JsonProperty("sql")
     public String _sql;
     @JsonProperty("description")
