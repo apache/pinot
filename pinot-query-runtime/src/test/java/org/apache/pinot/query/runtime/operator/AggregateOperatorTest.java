@@ -42,6 +42,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.DOUBLE;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
 
 
 public class AggregateOperatorTest {
@@ -247,6 +248,31 @@ public class AggregateOperatorTest {
 
     // When:
     AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group);
+  }
+
+  @Test
+  public void shouldReturnErrorBlockOnUnexpectedInputType() {
+    // Given:
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
+    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
+
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
+    Mockito.when(_input.nextBlock())
+        // TODO: it is necessary to produce two values here, the operator only throws on second
+        // (see the comment in Aggregate operator)
+        .thenReturn(block(inSchema, new Object[]{2, "foo"}, new Object[]{2, "foo"}))
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
+    AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group);
+
+    // When:
+    TransferableBlock block = operator.nextBlock();
+
+    // Then:
+    Assert.assertTrue(block.isErrorBlock(), "expected ERROR block from invalid computation");
+    Assert.assertTrue(block.getDataBlock().getExceptions().get(1000).contains("String cannot be cast to class"),
+        "expected it to fail with class cast exception");
   }
 
   private static TransferableBlock block(DataSchema schema, Object[]... rows) {
