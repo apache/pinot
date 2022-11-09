@@ -107,7 +107,7 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
     addIPv4Row(records, "96.141.228.254/26", "96.141.227.254", false);
     addIPv4Row(records, "3.175.47.128/26", "3.175.48.178", false);
 
-    addIPv4Row(records, "10.3.168.0/22", "1.2.3.1", false);
+    addIPv4Row(records, "10.3.128.1/22", "1.2.3.1", false);
     addIPv4Row(records, "1.2.3.128/26", "1.2.5.1", false);
     addIPv4Row(records, "1.2.3.128/26", "1.1.3.1", false);
 
@@ -174,6 +174,30 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
     rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0)[0], _expectedNumberIpv6Contains * 4);
+
+    // called in CASE statement
+    query = String.format("select (case when isSubnetOf('105.25.245.115/27', %s) then 'case1' when "
+        + "isSubnetOf('2001:db8:85a3::8a2e:370:7334/62', %s) then 'case2' else 'case3' "
+        + "end) as col1 from %s order by col1 limit 100", IPv4_ADDRESS_COLUMN, IPv6_ADDRESS_COLUMN, RAW_TABLE_NAME);
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.STRING
+    });
+    rows = resultTable.getRows();
+    for (int i = 0; i < rows.size(); i++) {
+      Object[] row = rows.get(i);
+      if (i < 4) {
+        // case 1
+        assertEquals("case1", row[0]);
+      } else if (i < 8) {
+        // case 2
+        assertEquals("case2", row[0]);
+      } else {
+        assertEquals("case3", row[0]);
+      }
+    }
   }
 
   private void addIPv4Row(List<GenericRow> records, String prefix, String address, boolean expectedBool) {

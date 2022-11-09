@@ -377,7 +377,7 @@ public class LiteralOnlyBrokerRequestTest {
 
     // second argument should not be a prefix
     request = JsonUtils.stringToJsonNode(
-        "{\"sql\":\"SELECT isSubnetOf('10.3.168.0/22', '3.175.47.239/26') as" + " booleanCol\"}");
+        "{\"sql\":\"SELECT isSubnetOf('1.2.3.128/26', '3.175.47.239/26') as" + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     Assert.assertTrue(
