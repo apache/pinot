@@ -120,9 +120,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
     // Setting up H2 for validation
     setH2Connection();
-    addTableToH2(SCHEMA_BUILDER.build(), Arrays.asList("a", "b", "c", "d"));
-    addDataToH2(SCHEMA_BUILDER.build(), factory1.buildTableRowsMap());
-    addDataToH2(SCHEMA_BUILDER.build(), factory2.buildTableRowsMap());
+    Schema schema = SCHEMA_BUILDER.build();
+    for (String tableName : Arrays.asList("a", "b", "c", "d")) {
+      addTableToH2(tableName, schema);
+      addDataToH2(tableName, schema, factory1.buildTableRowsMap().get(tableName));
+      addDataToH2(tableName, schema, factory2.buildTableRowsMap().get(tableName));
+    }
 
     _reducerGrpcPort = QueryTestUtils.getAvailablePort();
     _reducerHostname = String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME);

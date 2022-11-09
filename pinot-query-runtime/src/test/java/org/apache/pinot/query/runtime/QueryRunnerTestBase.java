@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;
@@ -156,10 +157,10 @@ public class QueryRunnerTestBase extends QueryTestSet {
   // --------------------------------------------------------------------------
   // TEST CASES PREP
   // --------------------------------------------------------------------------
-  protected Schema constructSchema(String schemaName, List<String> dataTypes) {
+  protected Schema constructSchema(String schemaName, Map<String, String> dataTypes) {
     Schema.SchemaBuilder builder = new Schema.SchemaBuilder();
-    for (int i = 0; i < dataTypes.size(); i++) {
-      builder.addSingleValueDimension("col" + i, FieldSpec.DataType.valueOf(dataTypes.get(i)));
+    for (Map.Entry<String, String> dataType : dataTypes.entrySet()) {
+      builder.addSingleValueDimension(dataType.getKey(), FieldSpec.DataType.valueOf(dataType.getValue()));
     }
     // ts is built in
     builder.addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS");
@@ -167,13 +168,13 @@ public class QueryRunnerTestBase extends QueryTestSet {
     return builder.build();
   }
 
-  protected List<GenericRow> toRow(List<Object[]> value) {
+  protected List<GenericRow> toRow(List<List<Object>> value) {
     List<GenericRow> result = new ArrayList<>(value.size());
     for (int rowId = 0; rowId < value.size(); rowId++) {
       GenericRow row = new GenericRow();
-      Object[] rawRow = value.get(rowId);
-      for (int colId = 0; colId < rawRow.length; colId++) {
-        row.putValue("col" + colId, rawRow[colId]);
+      List<Object> rawRow = value.get(rowId);
+      for (int colId = 0; colId < rawRow.size(); colId++) {
+        row.putValue("col" + colId, rawRow.get(colId));
       }
       row.putValue("ts", System.currentTimeMillis());
       result.add(row);
@@ -195,34 +196,29 @@ public class QueryRunnerTestBase extends QueryTestSet {
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
   }
 
-  protected void addTableToH2(Schema schema, List<String> tables)
+  protected void addTableToH2(String tableName, Schema schema)
       throws SQLException {
     List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
-    for (String tableName : tables) {
-      // create table
-      _h2Connection.prepareCall("DROP TABLE IF EXISTS " + tableName).execute();
-      _h2Connection.prepareCall("CREATE TABLE " + tableName + " (" + StringUtil.join(",",
-          h2FieldNamesAndTypes.toArray(new String[h2FieldNamesAndTypes.size()])) + ")").execute();
-    }
+    // create table
+    _h2Connection.prepareCall("DROP TABLE IF EXISTS " + tableName).execute();
+    _h2Connection.prepareCall("CREATE TABLE " + tableName + " (" + StringUtil.join(",",
+        h2FieldNamesAndTypes.toArray(new String[h2FieldNamesAndTypes.size()])) + ")").execute();
   }
 
-  protected void addDataToH2(Schema schema, Map<String, List<GenericRow>> rowsMap)
+  protected void addDataToH2(String tableName, Schema schema, List<GenericRow> rows)
       throws SQLException {
-    List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
-    for (Map.Entry<String, List<GenericRow>> entry : rowsMap.entrySet()) {
-      String tableName = entry.getKey();
-      // remove the "_O" and "_R" suffix b/c H2 doesn't understand realtime/offline split
-      if (tableName.contains("_")) {
-        tableName = tableName.substring(0, tableName.length() - 2);
-      }
-      // insert data into table
+    if (rows != null && rows.size() > 0) {
+      // prepare the statement for ingestion
+      List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
       StringBuilder params = new StringBuilder("?");
       for (int i = 0; i < h2FieldNamesAndTypes.size() - 1; i++) {
         params.append(",?");
       }
       PreparedStatement h2Statement =
           _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");
-      for (GenericRow row : entry.getValue()) {
+
+      // insert data into table
+      for (GenericRow row : rows) {
         int h2Index = 1;
         for (String fieldName : schema.getColumnNames()) {
           Object value = row.getValue(fieldName);
@@ -246,6 +242,9 @@ public class QueryRunnerTestBase extends QueryTestSet {
         case STRING:
           fieldType = "varchar(128)";
           break;
+        case DOUBLE:
+          fieldType = "double";
+          break;
         default:
           throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
       }
@@ -255,9 +254,15 @@ public class QueryRunnerTestBase extends QueryTestSet {
   }
 
   public static class TestCase {
+    @JsonProperty("sql")
     public String _sql;
-    public String _name;
-    public Map<String, List<String>> _tableSchemas;
-    public Map<String, List<Object[]>> _tableInputs;
+    @JsonProperty("description")
+    public String _description;
+    @JsonProperty("tables")
+    public Map<String, Map<String, String>> _tables;
+    @JsonProperty("inputs")
+    public Map<String, List<List<Object>>> _inputs;
+    @JsonProperty("extraProps")
+    public Map<String, Object> _extraProps;
   }
 }

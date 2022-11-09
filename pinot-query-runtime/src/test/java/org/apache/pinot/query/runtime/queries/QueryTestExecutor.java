@@ -18,10 +18,16 @@
  */
 package org.apache.pinot.query.runtime.queries;
 
-import java.util.Collections;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
+import java.io.File;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -38,12 +44,17 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public abstract class QueryTestCaseRunner extends QueryRunnerTestBase {
-
-  public abstract List<TestCase> getTestCases();
+public class QueryTestExecutor extends QueryRunnerTestBase {
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final Pattern TABLE_NAME_REPLACE_PATTERN = Pattern.compile("\\{([\\w\\d]+)\\}");
+  private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
+  private static final List<String> QUERY_TEST_RESOURCE_FILES = ImmutableList.of(
+      "BasicQuery.json"
+  );
 
   @BeforeClass
   public void setUp()
@@ -54,11 +65,15 @@ public abstract class QueryTestCaseRunner extends QueryRunnerTestBase {
     MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2");
     // Setting up H2 for validation
     setH2Connection();
-    for (TestCase testCase : getTestCases()) {
-      // table will be registered on both size.
+
+    // Scan through all the test cases.
+    for (Map.Entry<String, TestCase> testCaseEntry : getTestCases().entrySet()) {
+      String testCaseName = testCaseEntry.getKey();
+      TestCase testCase = testCaseEntry.getValue();
+      // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
-      for (Map.Entry<String, List<String>> e : testCase._tableSchemas.entrySet()) {
-        String tableName = e.getKey();
+      for (Map.Entry<String, Map<String, String>> e : testCase._tables.entrySet()) {
+        String tableName = testCaseName + "_" + e.getKey();
         // TODO: able to choose table type, now default to OFFLINE
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
         org.apache.pinot.spi.data.Schema pinotSchema = constructSchema(tableName, e.getValue());
@@ -66,17 +81,20 @@ public abstract class QueryTestCaseRunner extends QueryRunnerTestBase {
         factory1.registerTable(pinotSchema, tableNameWithType);
         factory2.registerTable(pinotSchema, tableNameWithType);
       }
-      for (Map.Entry<String, List<Object[]>> e : testCase._tableInputs.entrySet()) {
-        String tableName = e.getKey();
+      for (Map.Entry<String, List<List<Object>>> e : testCase._inputs.entrySet()) {
+        String tableName = testCaseName + "_" + e.getKey();
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
         // TODO: able to select add rows to server1 or server2 (now default server1)
         // TODO: able to select add rows to existing segment or create new one (now default create one segment)
         factory1.addSegment(tableNameWithType, toRow(e.getValue()));
       }
-      // add all the tables to
-      for (Map.Entry<String, Schema> entry: schemaMap.entrySet()) {
-        addTableToH2(entry.getValue(), Collections.singletonList(entry.getKey()));
-        addDataToH2(entry.getValue(), factory1.buildTableRowsMap());
+      // add all the tables to H2
+      for (Map.Entry<String, Schema> e: schemaMap.entrySet()) {
+        String tableName = e.getKey();
+        Schema schema = e.getValue();
+        addTableToH2(tableName, schema);
+        addDataToH2(tableName, schema, factory1.buildTableRowsMap().get(tableName));
+        addDataToH2(tableName, schema, factory2.buildTableRowsMap().get(tableName));
       }
     }
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
@@ -112,15 +130,42 @@ public abstract class QueryTestCaseRunner extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
-  @Test
-  public void testTestCases()
+  @Test(dataProvider = "testResourceQueryTestCaseProvider")
+  public void testQueryTestCases()
       throws Exception {
-    for (TestCase testCase : getTestCases()) {
-      String sql = testCase._sql;
+    for (Map.Entry<String, TestCase> testCaseEntry : getTestCases().entrySet()) {
+      String sql = replaceTableName(testCaseEntry.getKey(), testCaseEntry.getValue()._sql);
       List<Object[]> resultRows = queryRunner(sql);
       // query H2 for data
       List<Object[]> expectedRows = queryH2(sql);
       compareRowEquals(resultRows, expectedRows);
     }
+  }
+
+  private static String replaceTableName(String testCaseName, String sql) {
+    Matcher matcher = TABLE_NAME_REPLACE_PATTERN.matcher(sql);
+    return matcher.replaceAll("$1_" + testCaseName);
+  }
+
+  @DataProvider
+  private static Object[][] testResourceQueryTestCaseProvider() {
+    return new Object[][]{};
+  }
+
+  private static Map<String, TestCase> getTestCases()
+      throws Exception {
+    Map<String, TestCase> testCaseMap = new HashMap<>();
+    for (String testCaseName : QUERY_TEST_RESOURCE_FILES) {
+      String testCaseFile = QUERY_TEST_RESOURCE_FOLDER + File.separator + testCaseName;
+      // TODO: support JAR test as well, right now it has to be run in a checked-out repo
+      URL testFileUrl = QueryTestExecutor.class.getClassLoader().getResource(testCaseFile);
+      if (testFileUrl != null && new File(testFileUrl.getFile()).exists()) {
+        Map<String, TestCase> testCases = MAPPER.readValue(new File(testFileUrl.getFile()),
+            new TypeReference<Map<String, TestCase>>() { });
+        // TODO: potential test case conflicts between files, address later by throwing during setUp if already exist.
+        testCaseMap.putAll(testCases);
+      }
+    }
+    return testCaseMap;
   }
 }
