@@ -52,6 +52,7 @@ public class QueryTestExecutor extends QueryRunnerTestBase {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern TABLE_NAME_REPLACE_PATTERN = Pattern.compile("\\{([\\w\\d]+)\\}");
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
+  // TODO: refactor and load test dynamically using the reousrce utils in pinot-tools
   private static final List<String> QUERY_TEST_RESOURCE_FILES = ImmutableList.of(
       "BasicQuery.json"
   );
@@ -66,13 +67,16 @@ public class QueryTestExecutor extends QueryRunnerTestBase {
     // Setting up H2 for validation
     setH2Connection();
 
+    // TODO: all test data are loaded upfront b/c the mock server and brokers needs to be in sync.
+    // doing it dynamically should be our next step.
+
     // Scan through all the test cases.
     for (Map.Entry<String, QueryTestCase> testCaseEntry : getTestCases().entrySet()) {
       String testCaseName = testCaseEntry.getKey();
       QueryTestCase testCase = testCaseEntry.getValue();
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
-      for (Map.Entry<String, Map<String, String>> e : testCase._tables.entrySet()) {
+      for (Map.Entry<String, List<ColumnAndType>> e : testCase._tables.entrySet()) {
         String tableName = testCaseName + "_" + e.getKey();
         // TODO: able to choose table type, now default to OFFLINE
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
@@ -82,12 +86,12 @@ public class QueryTestExecutor extends QueryRunnerTestBase {
         factory2.registerTable(pinotSchema, tableNameWithType);
       }
       for (Map.Entry<String, List<List<Object>>> e : testCase._inputs.entrySet()) {
-        Map<String, String> tableColumnMap = testCase._tables.get(e.getKey());
+        List<ColumnAndType> columnAndTypes = testCase._tables.get(e.getKey());
         String tableName = testCaseName + "_" + e.getKey();
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
         // TODO: able to select add rows to server1 or server2 (now default server1)
         // TODO: able to select add rows to existing segment or create new one (now default create one segment)
-        factory1.addSegment(tableNameWithType, toRow(tableColumnMap, e.getValue()));
+        factory1.addSegment(tableNameWithType, toRow(columnAndTypes, e.getValue()));
       }
       // add all the tables to H2
       for (Map.Entry<String, Schema> e: schemaMap.entrySet()) {

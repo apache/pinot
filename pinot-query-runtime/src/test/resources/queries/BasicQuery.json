@@ -4,7 +4,10 @@
     "description": "basic test case example",
     "sql": "SELECT * FROM {tbl}",
     "tables": {
-      "tbl": { "col1": "STRING", "col2": "INT" }
+      "tbl": [
+        {"name": "col1", "type": "STRING"},
+        {"name": "col2", "type": "INT"}
+      ]
     },
     "inputs": {
       "tbl": [
@@ -17,8 +20,15 @@
     "description": "basic test demonstrate the configurable element in test case framework",
     "sql": "SELECT {tbl1}.col1, {tbl1}.col2, {tbl2}.col3 FROM {tbl1} JOIN {tbl2} ON {tbl1}.col1 = {tbl2}.col1",
     "tables": {
-      "tbl1": { "col1": "STRING", "col2": "INT" },
-      "tbl2": { "col1": "STRING", "col2": "INT", "col3": "DOUBLE" }
+      "tbl1": [
+        {"name": "col1", "type": "STRING"},
+        {"name": "col2", "type": "INT"}
+      ],
+      "tbl2": [
+        {"name": "col1", "type": "STRING"},
+        {"name": "col2", "type": "INT"},
+        {"name": "col3", "type": "DOUBLE"}
+      ]
     },
     "extraProps": {
       "comment": "TODO: these demonstrate how extra properties are used, but not implemented",

@@ -157,26 +157,27 @@ public class QueryRunnerTestBase extends QueryTestSet {
   // --------------------------------------------------------------------------
   // TEST CASES PREP
   // --------------------------------------------------------------------------
-  protected Schema constructSchema(String schemaName, Map<String, String> dataTypes) {
+  protected Schema constructSchema(String schemaName, List<ColumnAndType> columnAndTypes) {
     Schema.SchemaBuilder builder = new Schema.SchemaBuilder();
-    for (Map.Entry<String, String> dataType : dataTypes.entrySet()) {
-      builder.addSingleValueDimension(dataType.getKey(), FieldSpec.DataType.valueOf(dataType.getValue()));
+    for (ColumnAndType columnAndType : columnAndTypes) {
+      builder.addSingleValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
     }
-    // ts is built in
+    // TODO: ts is built-in, but we should allow user overwrite
     builder.addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:SECONDS");
     builder.setSchemaName(schemaName);
     return builder.build();
   }
 
-  protected List<GenericRow> toRow(Map<String, String> columnMap, List<List<Object>> value) {
+  protected List<GenericRow> toRow(List<ColumnAndType> columnAndTypes, List<List<Object>> value) {
     List<GenericRow> result = new ArrayList<>(value.size());
     for (int rowId = 0; rowId < value.size(); rowId++) {
       GenericRow row = new GenericRow();
       List<Object> rawRow = value.get(rowId);
       int colId = 0;
-      for (Map.Entry<String, String> column : columnMap.entrySet()) {
-        row.putValue(column.getKey(), rawRow.get(colId++));
+      for (ColumnAndType columnAndType : columnAndTypes) {
+        row.putValue(columnAndType._name, rawRow.get(colId++));
       }
+      // TODO: ts is built-in, but we should allow user overwrite
       row.putValue("ts", System.currentTimeMillis());
       result.add(row);
     }
@@ -260,10 +261,17 @@ public class QueryRunnerTestBase extends QueryTestSet {
     @JsonProperty("description")
     public String _description;
     @JsonProperty("tables")
-    public Map<String, Map<String, String>> _tables;
+    public Map<String, List<ColumnAndType>> _tables;
     @JsonProperty("inputs")
     public Map<String, List<List<Object>>> _inputs;
     @JsonProperty("extraProps")
     public Map<String, Object> _extraProps;
+  }
+
+  public static class ColumnAndType {
+    @JsonProperty("name")
+    String _name;
+    @JsonProperty("type")
+    String _type;
   }
 }
