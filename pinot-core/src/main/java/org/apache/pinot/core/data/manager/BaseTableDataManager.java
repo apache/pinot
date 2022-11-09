@@ -531,6 +531,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     } catch (AttemptsExceededException e) {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,
           _tableNameWithType, uri, tarFile);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, 1L);
       if (_tableDataManagerConfig.getTablePeerDownloadScheme() == null) {
         throw e;
       }
@@ -538,7 +539,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       downloadSuccess = true;
       return tarFile;
     } finally {
-      if(!downloadSuccess) {
+      if (!downloadSuccess) {
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1L);
       }
       if (_segmentDownloadSemaphore != null) {
@@ -548,18 +549,20 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   // not thread safe. Caller should invoke it with safe concurrency control.
-  private void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata, File destTarFile) throws Exception {
+  @VisibleForTesting
+  void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata, File destTarFile) throws Exception {
+    Preconditions.checkArgument(_tableDataManagerConfig.getTablePeerDownloadScheme()!=null,
+            "Download peers require non null peer download scheme");
     List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, _tableDataManagerConfig.getTablePeerDownloadScheme(), _helixManager);
     try {
       // Next download the segment from a randomly chosen server using configured scheme.
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(peerSegmentURIs, destTarFile, zkMetadata.getCrypterName());
-      LOGGER.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURIs, destTarFile,
+      LOGGER.info("Fetched segment {} from peers: {} to: {} of size: {}", segmentName, peerSegmentURIs, destTarFile,
               destTarFile.length());
     } catch (AttemptsExceededException e) {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from peers {} to: {}", segmentName,
               _tableNameWithType, peerSegmentURIs, destTarFile);
-      throw e;
-    } catch (Exception e) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1L);
       throw e;
     }
   }
