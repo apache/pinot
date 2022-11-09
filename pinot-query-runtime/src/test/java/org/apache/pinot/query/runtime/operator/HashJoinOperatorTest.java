@@ -21,7 +21,9 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -119,5 +121,49 @@ public class HashJoinOperatorTest {
     Assert.assertEquals(expectedRows.get(0), resultRows.get(0));
     Assert.assertEquals(expectedRows.get(1), resultRows.get(1));
     Assert.assertEquals(expectedRows.get(2), resultRows.get(2));
+  }
+
+  @Test
+  public void testRightJoinNotSupported(){
+    BaseOperator<TransferableBlock> leftOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
+    BaseOperator<TransferableBlock> rightOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_2);
+
+    List<RexExpression> joinClauses = new ArrayList<>();
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+        DataSchema.ColumnDataType.STRING
+    });
+    HashJoinOperator join = new HashJoinOperator(leftOperator, rightOperator, resultSchema,
+        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.RIGHT);
+    TransferableBlock result = join.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = join.nextBlock();
+    }
+    Assert.assertTrue(result.isErrorBlock());
+    MetadataBlock errorBlock = (MetadataBlock) result.getDataBlock();
+    Assert.assertEquals(errorBlock.getExceptions().size(), 1);
+    Assert.assertEquals(errorBlock.getExceptions().get(1000), "Right join is not supported");
+  }
+
+  @Test
+  public void testSemiJoinNotSupported(){
+    BaseOperator<TransferableBlock> leftOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
+    BaseOperator<TransferableBlock> rightOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_2);
+
+    List<RexExpression> joinClauses = new ArrayList<>();
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+        DataSchema.ColumnDataType.STRING
+    });
+    HashJoinOperator join = new HashJoinOperator(leftOperator, rightOperator, resultSchema,
+        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.SEMI);
+    TransferableBlock result = join.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = join.nextBlock();
+    }
+    Assert.assertTrue(result.isErrorBlock());
+    MetadataBlock errorBlock = (MetadataBlock) result.getDataBlock();
+    Assert.assertEquals(errorBlock.getExceptions().size(), 1);
+    Assert.assertEquals(errorBlock.getExceptions().get(1000), "Semi join is not supported");
   }
 }
