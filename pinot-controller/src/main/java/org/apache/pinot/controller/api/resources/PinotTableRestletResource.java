@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
+import com.google.common.collect.MapDifference;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -689,16 +690,19 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("/tables/{tableName}/rebalance/status")
-  @ApiOperation(value = "Table rebalance status", notes = "Provides status after rebalancing table")
+  @ApiOperation(value = "Table rebalance status", notes = "Get segments without the same state in EV and IS ")
   public String getTableRebalanceStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
     try {
         String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
-        RebalanceResult.Status status = _pinotHelixResourceManager.rebalanceTableStatus(tableNameWithType);
+
+        Map<String, MapDifference.ValueDifference<Map<String, String>>> view =
+            _pinotHelixResourceManager.rebalanceTableStatus(tableNameWithType);
+
         ObjectNode data = JsonUtils.newObjectNode();
-        data.put("status", status.toString());
-      return data.toString();
+        data.put("segments", (JsonNode) view);
+        return data.toString();
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }

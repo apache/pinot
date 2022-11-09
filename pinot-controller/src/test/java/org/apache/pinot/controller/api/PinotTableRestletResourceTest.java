@@ -28,7 +28,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.pinot.controller.api.resources.TableAndSchemaConfig;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -510,10 +509,7 @@ public class PinotTableRestletResourceTest {
 
     _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).build();
 
-    Assert.assertTrue(Objects.equals(response, "{\"status\":\"IN_PROGRESS\"}")
-        || Objects.equals(response, "{\"status\":\"DONE\"}")
-        || Objects.equals(response,
-        "{\"status\":\"NO_OP\"}"));
+      Assert.assertEquals(response, "{\"segments\":null}");
   }
 
   @Test

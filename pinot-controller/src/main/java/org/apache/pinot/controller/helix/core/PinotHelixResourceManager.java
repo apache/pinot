@@ -25,6 +25,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.MapDifference;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -3057,17 +3058,14 @@ public class PinotHelixResourceManager {
     return new TableRebalancer(_helixZkManager).rebalance(tableConfig, rebalanceConfig);
   }
 
-  public RebalanceResult.Status rebalanceTableStatus(String tableNameWithType)
+  public Map<String, MapDifference.ValueDifference<Map<String, String>>> rebalanceTableStatus(String tableNameWithType)
       throws TableNotFoundException {
-
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
-
     IdealState idealState = getHelixAdmin().getResourceIdealState(getHelixClusterName(), tableNameWithType);
     ExternalView externalView = getHelixAdmin().getResourceExternalView(getHelixClusterName(), tableNameWithType);
-
     return new TableRebalancer(_helixZkManager).rebalanceStatus(tableNameWithType, idealState, externalView);
   }
 
