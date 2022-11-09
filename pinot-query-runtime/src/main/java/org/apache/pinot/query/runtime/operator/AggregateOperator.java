@@ -75,14 +75,13 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       .put("COUNT", AggregateOperator::mergeCount)
       .build();
 
-  private final Map<String, Merger> _mergers;
   private final Operator<TransferableBlock> _inputOperator;
   // TODO: Deal with the case where _aggCalls is empty but we have groupSet setup, which means this is a Distinct call.
   private final List<RexExpression.FunctionCall> _aggCalls;
   private final List<RexExpression> _groupSet;
 
   private final DataSchema _resultSchema;
-  private final Holder[] _holders;
+  private final Accumulator[] _accumulators;
   private final Map<Key, Object[]> _groupByKeyHolder;
   private TransferableBlock _upstreamErrorBlock;
 
@@ -104,17 +103,20 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _upstreamErrorBlock = null;
-    _mergers = mergers;
 
     // we expect all agg calls to be aggregate function calls
     _aggCalls = aggCalls.stream()
         .map(RexExpression.FunctionCall.class::cast)
         .collect(Collectors.toList());
 
-    _holders = new Holder[_aggCalls.size()];
+    _accumulators = new Accumulator[_aggCalls.size()];
     for (int i = 0; i < _aggCalls.size(); i++) {
       RexExpression.FunctionCall agg = _aggCalls.get(i);
-      _holders[i] = new Holder(agg, mergers);
+      String functionName = agg.getFunctionName();
+      if (!mergers.containsKey(functionName)) {
+        throw new IllegalStateException("Unexpected value: " + functionName);
+      }
+      _accumulators[i] = new Accumulator(agg, mergers.get(functionName));
     }
 
     _groupByKeyHolder = new HashMap<>();
@@ -162,8 +164,8 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       Object[] row = new Object[_aggCalls.size() + _groupSet.size()];
       Object[] keyElements = e.getValue();
       System.arraycopy(keyElements, 0, row, 0, keyElements.length);
-      for (int i = 0; i < _holders.length; i++) {
-        row[i + _groupSet.size()] = _holders[i]._result.get(e.getKey());
+      for (int i = 0; i < _accumulators.length; i++) {
+        row[i + _groupSet.size()] = _accumulators[i]._results.get(e.getKey());
       }
       rows.add(row);
     }
@@ -199,17 +201,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         Key key = extraRowKey(row, _groupSet);
         _groupByKeyHolder.put(key, key.getValues());
         for (int i = 0; i < _aggCalls.size(); i++) {
-          Map<Key, Object> keys = _holders[i]._result;
-
-          // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
-          Object currentRes = keys.get(key);
-          if (currentRes == null) {
-            keys.put(key, _holders[i].getValue(row));
-          } else {
-            Merger merger = _mergers.get(_aggCalls.get(i).getFunctionName());
-            Object mergedResult = merger.apply(currentRes, _holders[i].getValue(row));
-            _holders[i]._result.put(key, mergedResult);
-          }
+          _accumulators[i].accumulate(key, row);
         }
       }
     }
@@ -241,16 +233,14 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     return new Key(keyElements);
   }
 
-  private static class Holder {
+  private static class Accumulator {
     final int _inputRef;
     final Object _literal;
-    final Map<Key, Object> _result = new HashMap<>();
+    final Map<Key, Object> _results = new HashMap<>();
+    final Merger _merger;
 
-    Holder(RexExpression.FunctionCall aggCall, Map<String, Merger> mergers) {
-      if (!mergers.containsKey(aggCall.getFunctionName())) {
-        throw new IllegalStateException("Unexpected value: " + aggCall.getFunctionName());
-      }
-
+    Accumulator(RexExpression.FunctionCall aggCall, Merger merger) {
+      _merger = merger;
       // agg function operand should either be a InputRef or a Literal
       RexExpression rexExpression = toAggregationFunctionOperand(aggCall);
       if (rexExpression instanceof RexExpression.InputRef) {
@@ -262,16 +252,27 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       }
     }
 
+    void accumulate(Key key, Object[] row) {
+      Map<Key, Object> keys = _results;
+
+      // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
+      Object currentRes = keys.get(key);
+      Object value = _inputRef == -1 ? _literal : row[_inputRef];
+
+      if (currentRes == null) {
+        keys.put(key, value);
+      } else {
+        Object mergedResult = _merger.apply(currentRes, value);
+        _results.put(key, mergedResult);
+      }
+    }
+
     private RexExpression toAggregationFunctionOperand(RexExpression.FunctionCall rexExpression) {
       List<RexExpression> functionOperands = rexExpression.getFunctionOperands();
       Preconditions.checkState(functionOperands.size() < 2, "aggregate functions cannot have more than one operand");
       return functionOperands.size() > 0
           ? functionOperands.get(0)
           : new RexExpression.Literal(FieldSpec.DataType.INT, 1);
-    }
-
-    Object getValue(Object[] row) {
-      return _inputRef == -1 ? _literal : row[_inputRef];
     }
   }
 }
