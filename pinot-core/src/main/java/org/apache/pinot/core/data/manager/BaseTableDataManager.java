@@ -554,6 +554,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkArgument(_tableDataManagerConfig.getTablePeerDownloadScheme()!=null,
             "Download peers require non null peer download scheme");
     List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, _tableDataManagerConfig.getTablePeerDownloadScheme(), _helixManager);
+    if (peerSegmentURIs.isEmpty()) {
+      String msg = String.format("segment %s doesn't have any peers", segmentName);
+      LOGGER.warn(msg);
+      throw new RuntimeException(msg);
+    }
     try {
       // Next download the segment from a randomly chosen server using configured scheme.
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(peerSegmentURIs, destTarFile, zkMetadata.getCrypterName());
