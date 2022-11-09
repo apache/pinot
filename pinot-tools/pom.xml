@@ -281,6 +281,7 @@
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-launcher_${scala.version}</artifactId>
       <version>${spark.version}</version>
+      <scope>provided</scope>
       <exclusions>
         <exclusion>
           <groupId>org.scala-lang</groupId>
