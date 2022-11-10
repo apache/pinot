@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -132,7 +131,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       return;
     }
 
-    Collection<Object[]> container = rightBlock.getContainer();
+    List<Object[]> container = rightBlock.getContainer();
     // put all the rows into corresponding hash collections keyed by the key selector function.
     for (Object[] row : container) {
       List<Object[]> hashCollection =
@@ -151,7 +150,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     }
 
     List<Object[]> rows = new ArrayList<>();
-    Collection<Object[]> container = leftBlock.getContainer();
+    List<Object[]> container = leftBlock.getContainer();
     for (Object[] leftRow : container) {
       List<Object[]> hashCollection = _broadcastHashTable.getOrDefault(
           new Key(_leftKeySelector.getKey(leftRow)), Collections.emptyList());

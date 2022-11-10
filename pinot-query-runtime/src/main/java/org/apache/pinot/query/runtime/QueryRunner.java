@@ -20,9 +20,11 @@ package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
@@ -245,7 +247,7 @@ public class QueryRunner {
           InstanceResponseBlock responseBlock = _baseResultBlock.get(_currentIndex++);
           BaseResultsBlock resultsBlock = responseBlock.getResultsBlock();
           if (resultsBlock != null) {
-            return new TransferableBlock(resultsBlock.getRows(responseBlock.getQueryContext()),
+            return new TransferableBlock(toList(resultsBlock.getRows(responseBlock.getQueryContext())),
                 responseBlock.getDataSchema(), DataBlock.Type.ROW);
           } else {
             return new TransferableBlock(Collections.emptyList(), responseBlock.getDataSchema(),
@@ -256,6 +258,21 @@ public class QueryRunner {
           return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
         }
       }
+    }
+  }
+
+  private static List<Object[]> toList(Collection<Object[]> collections) {
+    if (collections instanceof List) {
+      return (List<Object[]>) collections;
+    } else if (collections instanceof PriorityQueue) {
+      PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) collections;
+      List<Object[]> sortedList = new ArrayList<>(priorityQueue.size());
+      while (!priorityQueue.isEmpty()) {
+        sortedList.add(priorityQueue.poll());
+      }
+      return sortedList;
+    } else {
+      throw new UnsupportedOperationException("Unsupported collection type: " + collections.getClass());
     }
   }
 

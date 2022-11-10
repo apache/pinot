@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -94,23 +93,16 @@ public final class TransferableBlockUtils {
       int numRowsPerChunk = maxBlockSize / estimatedRowSizeInBytes;
       Preconditions.checkState(numRowsPerChunk > 0, "row size too large for query engine to handle, abort!");
 
-      Collection<Object[]> allRows = block.getContainer();
+      int totalNumRows = block.getNumRows();
+      List<Object[]> allRows = block.getContainer();
       DataSchema dataSchema = block.getDataSchema();
-      int rowId = 0;
-      List<Object[]> chunk = new ArrayList<>(numRowsPerChunk);
-      for (Object[] row : allRows) {
+      int currentRow = 0;
+      while (currentRow < totalNumRows) {
+        List<Object[]> chunk = allRows.subList(currentRow, Math.min(currentRow + numRowsPerChunk, allRows.size()));
         if (needsCanonicalize) {
-          chunk.add(canonicalizeRow(row, dataSchema));
-        } else {
-          chunk.add(row);
+          canonicalizeRows(chunk, dataSchema);
         }
-        rowId++;
-        if (rowId % numRowsPerChunk == 0) {
-          blockChunks.add(new TransferableBlock(chunk, block.getDataSchema(), block.getType()));
-          chunk = new ArrayList<>();
-        }
-      }
-      if (chunk.size() > 0) {
+        currentRow += numRowsPerChunk;
         blockChunks.add(new TransferableBlock(chunk, block.getDataSchema(), block.getType()));
       }
       return blockChunks;
@@ -118,6 +110,13 @@ public final class TransferableBlockUtils {
       return Collections.singletonList(block);
     } else {
       throw new IllegalArgumentException("Unsupported data block type: " + type);
+    }
+  }
+
+  // In-place canonicalize rows
+  private static void canonicalizeRows(List<Object[]> rows, DataSchema dataSchema) {
+    for (int i = 0; i < rows.size(); i++) {
+      rows.set(i, canonicalizeRow(rows.get(i), dataSchema));
     }
   }
 

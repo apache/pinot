@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.util.Collection;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -94,7 +94,7 @@ public class DataBlockBuilder {
     }
   }
 
-  public static RowDataBlock buildFromRows(Collection<Object[]> rows, DataSchema dataSchema)
+  public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema)
       throws IOException {
     DataBlockBuilder rowBuilder = new DataBlockBuilder(dataSchema, DataBlock.Type.ROW);
     // TODO: consolidate these null utils into data table utils.
@@ -229,7 +229,7 @@ public class DataBlockBuilder {
     return buildRowBlock(rowBuilder);
   }
 
-  public static ColumnarDataBlock buildFromColumns(Collection<Object[]> columns, DataSchema dataSchema)
+  public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema)
       throws IOException {
     DataBlockBuilder columnarBuilder = new DataBlockBuilder(dataSchema, DataBlock.Type.COLUMNAR);
 

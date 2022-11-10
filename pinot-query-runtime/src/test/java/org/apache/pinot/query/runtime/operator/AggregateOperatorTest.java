@@ -21,8 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -151,7 +149,7 @@ public class AggregateOperatorTest {
     Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.isNoOpBlock(), "First block should be no-op (not yet constructed)");
     Assert.assertTrue(block2.getNumRows() > 0, "Second block is the result");
-    Assert.assertEquals(block2.getContainer().iterator().next(), new Object[]{2, 1},
+    Assert.assertEquals(block2.getContainer().get(0), new Object[]{2, 1},
         "Expected two columns (group by key, agg value)");
     Assert.assertTrue(block3.isEndOfStreamBlock(), "Third block is EOS (done processing)");
   }
@@ -180,7 +178,7 @@ public class AggregateOperatorTest {
     Assert.assertTrue(block1.isNoOpBlock(), "First block should be no-op (not yet constructed)");
     Assert.assertTrue(block2.getNumRows() > 0, "Second block is the result");
     // second value is 1 (the literal) instead of 3 (the col val)
-    Assert.assertEquals(block2.getContainer().iterator().next(), new Object[]{2, 1},
+    Assert.assertEquals(block2.getContainer().get(0), new Object[]{2, 1},
         "Expected two columns (group by key, agg value)");
     Assert.assertTrue(block3.isEndOfStreamBlock(), "Third block is EOS (done processing)");
   }
@@ -213,7 +211,7 @@ public class AggregateOperatorTest {
     // should call merger twice, one from second row in first block and two from the first row
     // in second block
     Mockito.verify(merger, Mockito.times(2)).apply(Mockito.any(), Mockito.any());
-    Assert.assertEquals(resultBlock.getContainer().iterator().next(), new Object[]{1, 12d},
+    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, 12d},
         "Expected two columns (group by key, agg value)");
   }
 
@@ -229,12 +227,11 @@ public class AggregateOperatorTest {
     while (result.isNoOpBlock()) {
       result = sum0GroupBy1.getNextBlock();
     }
-    Collection<Object[]> resultRows = result.getContainer();
-    Iterator<Object[]> resultIt = resultRows.iterator();
+    List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{"Aa", 1}, new Object[]{"BB", 5.0});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultIt.next(), expectedRows.get(0));
-    Assert.assertEquals(resultIt.next(), expectedRows.get(1));
+    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
+    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
   }
 
   @Test(

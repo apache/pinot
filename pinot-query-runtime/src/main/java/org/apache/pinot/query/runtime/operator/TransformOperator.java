@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -89,7 +88,7 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
     }
 
     List<Object[]> resultRows = new ArrayList<>();
-    Collection<Object[]> container = block.getContainer();
+    List<Object[]> container = block.getContainer();
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
       for (int i = 0; i < _resultColumnSize; i++) {
