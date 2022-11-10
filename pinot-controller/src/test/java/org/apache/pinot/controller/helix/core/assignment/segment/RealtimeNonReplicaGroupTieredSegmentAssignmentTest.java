@@ -269,6 +269,32 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     assertEquals(_segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, null, null,
         new BaseConfiguration()), currentAssignment);
 
+    // Rebalance without COMPLETED instance partitions and with tierInstancePartitions should move ONLINE segments to
+    // Tiers and CONSUMING segments to CONSUMING tenant.
+    newAssignment =
+        _segmentAssignment.rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, _sortedTiers,
+            _tierInstancePartitionsMap, new BaseConfiguration());
+
+    numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, INSTANCES_TIER_A);
+    assertEquals(numSegmentsAssignedPerInstance.length, NUM_INSTANCES_TIER_A);
+    expectedMinNumSegmentsPerInstance = expectedOnTierA / NUM_INSTANCES_TIER_A;
+    for (int i = 0; i < NUM_INSTANCES_TIER_A; i++) {
+      assertTrue(numSegmentsAssignedPerInstance[i] >= expectedMinNumSegmentsPerInstance);
+    }
+
+    numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, INSTANCES_TIER_B);
+    assertEquals(numSegmentsAssignedPerInstance.length, NUM_INSTANCES_TIER_B);
+    expectedMinNumSegmentsPerInstance = expectedOnTierB / NUM_INSTANCES_TIER_B;
+    for (int i = 0; i < NUM_INSTANCES_TIER_B; i++) {
+      assertTrue(numSegmentsAssignedPerInstance[i] >= expectedMinNumSegmentsPerInstance);
+    }
+
+    numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, CONSUMING_INSTANCES);
+    assertEquals(numSegmentsAssignedPerInstance.length, NUM_CONSUMING_INSTANCES);
+
     // Bootstrap
     rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
