@@ -28,7 +28,6 @@ import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -45,7 +44,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 public class DataBlockBuilder {
   private final DataSchema _dataSchema;
-  private final BaseDataBlock.Type _blockType;
+  private final DataBlock.Type _blockType;
   private final DataSchema.ColumnDataType[] _columnDataTypes;
 
   private int[] _columnOffsets;
@@ -63,7 +62,7 @@ public class DataBlockBuilder {
   private final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);
 
-  private DataBlockBuilder(DataSchema dataSchema, BaseDataBlock.Type blockType) {
+  private DataBlockBuilder(DataSchema dataSchema, DataBlock.Type blockType) {
     _dataSchema = dataSchema;
     _columnDataTypes = dataSchema.getColumnDataTypes();
     _blockType = blockType;

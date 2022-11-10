@@ -28,7 +28,7 @@ import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -67,12 +67,13 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   private final int _stageId;
   private final MailboxService<TransferableBlock> _mailboxService;
   private final DataSchema _dataSchema;
+  private final boolean _isLeafStageSender;
   private Operator<TransferableBlock> _dataTableBlockBaseOperator;
 
   public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService, DataSchema dataSchema,
       Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
-      long jobId, int stageId) {
+      long jobId, int stageId, boolean isLeafStageSender) {
     _dataSchema = dataSchema;
     _mailboxService = mailboxService;
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
@@ -98,6 +99,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     _stageId = stageId;
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(_exchangeType),
         String.format("Exchange type '%s' is not supported yet", _exchangeType));
+    _isLeafStageSender = isLeafStageSender;
   }
 
   @Override
@@ -129,7 +131,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     }
 
     boolean isEndOfStream = TransferableBlockUtils.isEndOfStream(transferableBlock);
-    BaseDataBlock.Type type = transferableBlock.getType();
+    DataBlock.Type type = transferableBlock.getType();
     try {
       switch (_exchangeType) {
         case SINGLETON:
@@ -182,8 +184,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
       for (int i = 0; i < partitionSize; i++) {
         temporaryRows.add(new ArrayList<>());
       }
-      for (int rowId = 0; rowId < transferableBlock.getNumRows(); rowId++) {
-        Object[] row = TransferableBlockUtils.getRow(transferableBlock, rowId);
+      for (Object[] row : transferableBlock.getContainer()) {
         int partitionId = keySelector.computeHash(row) % partitionSize;
         temporaryRows.get(partitionId).add(row);
       }
@@ -197,7 +198,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   }
 
   private void sendDataTableBlockToServers(List<ServerInstance> servers, TransferableBlock transferableBlock,
-      BaseDataBlock.Type type, boolean isEndOfStream) {
+      DataBlock.Type type, boolean isEndOfStream) {
     if (isEndOfStream) {
       for (ServerInstance server : servers) {
         sendDataTableBlock(server, transferableBlock, true);
@@ -205,7 +206,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     } else {
       // Split the block only when it is not end of stream block.
       List<TransferableBlock> chunks = TransferableBlockUtils.splitBlock(transferableBlock, type,
-          MAX_MAILBOX_CONTENT_SIZE_BYTES);
+          MAX_MAILBOX_CONTENT_SIZE_BYTES, _isLeafStageSender);
       for (ServerInstance server : servers) {
         for (TransferableBlock chunk : chunks) {
           sendDataTableBlock(server, chunk, false);
