@@ -87,8 +87,6 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(),
       "ForwardIndexDisabledMultiValueQueriesWithReloadTest");
 
-  private static final String SELECT_STAR_QUERY = "SELECT * FROM testTable";
-
   // Build the segment schema.
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName("testTable")
       .addMetric("column1", FieldSpec.DataType.INT)
@@ -299,25 +297,28 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
       throws Exception {
     // Distinct query without filters including column7
     // This is just a sanity check to ensure the query works when forward index is enabled
-    String query = "SELECT DISTINCT column1, column7, column9 FROM testTable LIMIT 10";
+    String query = "SELECT DISTINCT column1, column7, column9 FROM testTable ORDER BY column1 LIMIT 10";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
     assertTrue(brokerResponseNative.getProcessingExceptions() == null
         || brokerResponseNative.getProcessingExceptions().size() == 0);
     ResultTable resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
-    assertEquals(brokerResponseNative.getNumDocsScanned(), 40000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 400000L);
     assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
-    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 120_000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 1200000L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
     DataSchema dataSchema = new DataSchema(new String[]{"column1", "column7", "column9"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.INT});
     assertEquals(resultTable.getDataSchema(), dataSchema);
     List<Object[]> resultRows = resultTable.getRows();
+    int previousColumn1 = Integer.MIN_VALUE;
     for (Object[] resultRow : resultRows) {
       assertEquals(resultRow.length, 3);
+      assertTrue(previousColumn1 <= (int) resultRow[0]);
+      previousColumn1 = (int) resultRow[0];
     }
 
     // Disable forward index for column7
