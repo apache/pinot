@@ -38,6 +38,7 @@ import org.testng.annotations.Test;
 
 public class TransferableBlockUtilsTest {
   private static final int TOTAL_ROW_COUNT = 50;
+  private static final int TEST_EST_BYTES_PER_COLUMN = 8;
   private static final List<DataSchema.ColumnDataType> EXCLUDE_DATA_TYPES = ImmutableList.of(
       DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.JSON, DataSchema.ColumnDataType.BYTES,
       DataSchema.ColumnDataType.BYTES_ARRAY);
@@ -67,15 +68,15 @@ public class TransferableBlockUtilsTest {
   public void testSplitBlockUtils(int splitRowCount)
       throws Exception {
     DataSchema dataSchema = getDataSchema();
-    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TOTAL_ROW_COUNT, 1);
     // compare serialized split
+    int estRowSizeInBytes = dataSchema.size() * TEST_EST_BYTES_PER_COLUMN;
+    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TOTAL_ROW_COUNT, 1);
     RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    int rowSizeInBytes = rowBlock.getRowSizeInBytes();
     validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rowBlock),
-        DataBlock.Type.ROW, rowSizeInBytes * splitRowCount + 1), rows, dataSchema);
+        DataBlock.Type.ROW, estRowSizeInBytes * splitRowCount + 1), rows, dataSchema);
     // compare non-serialized split
     validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rows, dataSchema, DataBlock.Type.ROW),
-        DataBlock.Type.ROW, rowSizeInBytes * splitRowCount + 1), rows, dataSchema);
+        DataBlock.Type.ROW, estRowSizeInBytes * splitRowCount + 1), rows, dataSchema);
   }
 
   @Test
