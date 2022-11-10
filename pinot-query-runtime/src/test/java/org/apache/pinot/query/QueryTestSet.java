@@ -24,7 +24,7 @@ import org.testng.annotations.DataProvider;
 /**
  * all legacy test query sets.
  *
- * @deprecated do not add to this test set. this class will be broken down and clean up.
+ * @deprecated do not add to this test set. this class will be broken down and clean up. pinot-query-runtime/src/main/java/org/apache/pinot/query/runtime/plan/PhysicalPlanVisitor.java
  * add your test to appropraite files in {@link org.apache.pinot.query.runtime.queries} instead.
  */
 public class QueryTestSet {
