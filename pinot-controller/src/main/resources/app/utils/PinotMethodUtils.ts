@@ -352,13 +352,28 @@ const getSchemaObject = async (schemaName) =>{
       return schemaObj;
   }
 
+// This method is used to display schema listing on the tables listing page
+// API: /schemas
+// Expected Output: {columns: [], records: []}
+const getListingSchemaList = () => {
+  return getSchemaList().then((results) => {
+    const responseObj = {
+      columns: ['Schemas'],
+      records: []
+    };
+    results.data.forEach((result)=>{
+      responseObj.records.push([result]);
+    });
+    return responseObj;
+  })
+};
+
 const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Total Columns"];
 
-const getAllSchemaDetails = async () => {
+const getAllSchemaDetails = async (schemaList) => {
   let schemaDetails:Array<any> = [];
   let promiseArr = [];
-  const {data} = await getSchemaList()
-  promiseArr = data.map(async (o)=>{
+  promiseArr = schemaList.map(async (o)=>{
     return await getSchema(o);
   });
   const results = await Promise.all(promiseArr);
@@ -1157,6 +1172,7 @@ export default {
   saveSchemaAction,
   saveTableAction,
   getSchemaData,
+  getQuerySchemaList: getListingSchemaList,
   allSchemaDetailsColumnHeader,
   getAllSchemaDetails,
   getTableState,
