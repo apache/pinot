@@ -29,6 +29,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
+import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -126,6 +127,15 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
 
       _logger.info("Rebalancing tier: {} for table: {} with bootstrap: {}, instance partitions: {}", tierName,
           _tableNameWithType, bootstrap, tierInstancePartitions);
+
+      // Set the default assignment strategy in case if it not set already
+      // Assuming all tiers use the same assignment strategy
+      if (segmentAssignmentStrategy == null) {
+        segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
+            .getSegmentAssignmentStrategy(_helixManager, _tableConfig, instancePartitionsType.toString(),
+                tierInstancePartitions);
+      }
+
       newTierAssignments.add(reassignSegments(tierName, tierCurrentAssignment, tierInstancePartitions, bootstrap,
           segmentAssignmentStrategy, instancePartitionsType));
     }
