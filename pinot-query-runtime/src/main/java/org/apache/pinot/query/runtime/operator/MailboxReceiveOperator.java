@@ -47,12 +47,9 @@ import org.slf4j.LoggerFactory;
 public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
-
   private final MailboxService<TransferableBlock> _mailboxService;
   private final RelDistribution.Type _exchangeType;
-  private final KeySelector<Object[], Object[]> _keySelector;
   private final List<ServerInstance> _sendingStageInstances;
-  private final DataSchema _dataSchema;
   private final String _hostName;
   private final int _port;
   private final long _jobId;
@@ -62,10 +59,9 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private int _serverIdx;
   private TransferableBlock _upstreamErrorBlock;
 
-  public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService, DataSchema dataSchema,
-      List<ServerInstance> sendingStageInstances, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object[]> keySelector, String hostName, int port, long jobId, int stageId) {
-    _dataSchema = dataSchema;
+  public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService,
+      List<ServerInstance> sendingStageInstances, RelDistribution.Type exchangeType, String hostName,
+      int port, long jobId, int stageId) {
     _mailboxService = mailboxService;
     _exchangeType = exchangeType;
     if (_exchangeType == RelDistribution.Type.SINGLETON) {
@@ -77,7 +73,6 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
           singletonInstance = serverInstance;
         }
       }
-
       if (singletonInstance == null) {
         // TODO: fix WorkerManager assignment, this should not happen if we properly assign workers.
         // see: https://github.com/apache/pinot/issues/9592
@@ -94,7 +89,6 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     _stageId = stageId;
     _timeout = System.nanoTime() + QueryConfig.DEFAULT_TIMEOUT_NANO;
     _upstreamErrorBlock = null;
-    _keySelector = keySelector;
     _serverIdx = 0;
   }
 

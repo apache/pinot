@@ -22,7 +22,7 @@ package org.apache.pinot.query.service;
  * Configuration for setting up query runtime.
  */
 public class QueryConfig {
-  public static final long DEFAULT_TIMEOUT_NANO = 100_000_000_000L;
+  public static final long DEFAULT_TIMEOUT_NANO = 100_000_000_000L; // 100 seconds
 
   public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
   public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
