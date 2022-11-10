@@ -51,7 +51,7 @@ import org.testng.Assert;
 
 
 
-public class QueryRunnerTestBase extends QueryTestSet {
+public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
 
   protected QueryEnvironment _queryEnvironment;

@@ -48,7 +48,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class QueryTestExecutor extends QueryRunnerTestBase {
+public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern TABLE_NAME_REPLACE_PATTERN = Pattern.compile("\\{([\\w\\d]+)\\}");
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
@@ -172,7 +172,7 @@ public class QueryTestExecutor extends QueryRunnerTestBase {
     for (String testCaseName : QUERY_TEST_RESOURCE_FILES) {
       String testCaseFile = QUERY_TEST_RESOURCE_FOLDER + File.separator + testCaseName;
       // TODO: support JAR test as well, right now it has to be run in a checked-out repo
-      URL testFileUrl = QueryTestExecutor.class.getClassLoader().getResource(testCaseFile);
+      URL testFileUrl = ResourceBasedQueriesTest.class.getClassLoader().getResource(testCaseFile);
       if (testFileUrl != null && new File(testFileUrl.getFile()).exists()) {
         Map<String, QueryTestCase> testCases = MAPPER.readValue(new File(testFileUrl.getFile()),
             new TypeReference<Map<String, QueryTestCase>>() { });
