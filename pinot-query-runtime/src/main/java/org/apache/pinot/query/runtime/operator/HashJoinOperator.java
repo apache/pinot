@@ -36,7 +36,6 @@ import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
-import org.apache.zookeeper.Op;
 
 
 /**
@@ -50,6 +49,7 @@ import org.apache.zookeeper.Op;
  * We currently support left join, inner join and semi join.
  * The output is in the format of [left_row, right_row]
  */
+// TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "BROADCAST_HASH_JOIN";
 
@@ -68,8 +68,14 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
       DataSchema outputSchema, JoinNode.JoinKeys joinKeys, List<RexExpression> joinClauses, JoinRelType joinType) {
+    // TODO: Move precondition check to constructor and handle error in upstream.
+    // TODO: Fix semi join bug. (https://github.com/apache/pinot/issues/9757)
+    Preconditions.checkState(joinType != JoinRelType.SEMI, "Semi join is not supported");
+    Preconditions.checkState(joinType != JoinRelType.RIGHT, "Right join is not supported");
     _leftKeySelector = joinKeys.getLeftJoinKeySelector();
     _rightKeySelector = joinKeys.getRightJoinKeySelector();
+    Preconditions.checkState(_leftKeySelector != null, "LeftKeySelector for join cannot be null");
+    Preconditions.checkState(_rightKeySelector != null, "RightKeySelector for join cannot be null");
     _leftTableOperator = leftTableOperator;
     _rightTableOperator = rightTableOperator;
     _resultSchema = outputSchema;
@@ -99,15 +105,6 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      // TODO: Move precondition check to constructor and handle error in upstream.
-      // TODO: Fix inequi join bug. (https://github.com/apache/pinot/issues/9728)
-      // TODO: Fix semi join bug. (https://github.com/apache/pinot/issues/9757)
-      // TODO: Handle the case where _leftKeySelector and _rightKeySelector could be null.
-      Preconditions.checkState(_joinClauseEvaluators.isEmpty(), "NonEquiJoin is not supported");
-      Preconditions.checkState(_joinType != JoinRelType.SEMI, "Semi join is not supported");
-      Preconditions.checkState(_joinType != JoinRelType.RIGHT, "Right join is not supported");
-      Preconditions.checkState(_leftKeySelector != null, "LeftKeySelector for join cannot be null");
-      Preconditions.checkState(_rightKeySelector != null, "RightKeySelector for join cannot be null");
       if (!_isHashTableBuilt) {
         // Build JOIN hash table
         buildBroadcastHashTable();
@@ -159,6 +156,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     List<Object[]> rows = new ArrayList<>();
     List<Object[]> container = leftBlock.getContainer();
     for (Object[] leftRow : container) {
+      // NOTE: Empty key selector will give wrong
       List<Object[]> hashCollection = _broadcastHashTable.getOrDefault(
           new Key(_leftKeySelector.getKey(leftRow)), Collections.emptyList());
       // If it is a left join and right table is empty, we return left rows.
@@ -168,7 +166,10 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         // If it is other type of join.
         for (Object[] rightRow : hashCollection) {
           Object[] resultRow = joinRow(leftRow, rightRow);
-          rows.add(resultRow);
+          if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
+              evaluator -> evaluator.apply(resultRow))) {
+            rows.add(resultRow);
+          }
         }
       }
     }

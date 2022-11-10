@@ -18,23 +18,52 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import io.netty.handler.codec.serialization.ObjectEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import javax.xml.crypto.Data;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.when;
 
 public class HashJoinOperatorTest {
+  private AutoCloseable _mocks;
+
+  @Mock
+  private Operator<TransferableBlock> _leftOperator;
+
+  @Mock
+  private Operator<TransferableBlock> _rightOperator;
+
+  @BeforeMethod
+  public void setUp() {
+    _mocks = MockitoAnnotations.openMocks(this);
+  }
+
+  @AfterMethod
+  public void tearDown()
+      throws Exception {
+    _mocks.close();
+  }
+
   private static JoinNode.JoinKeys getJoinKeys(List<Integer> leftIdx, List<Integer> rightIdx) {
     FieldSelectionKeySelector leftSelect = new FieldSelectionKeySelector(leftIdx);
     FieldSelectionKeySelector rightSelect = new FieldSelectionKeySelector(rightIdx);
@@ -43,9 +72,16 @@ public class HashJoinOperatorTest {
 
   @Test
   public void testHashJoinKeyCollisionInnerJoin() {
-    BaseOperator<TransferableBlock> leftOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
-    BaseOperator<TransferableBlock> rightOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_cl"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_cl"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+
     List<RexExpression> joinClauses = new ArrayList<>();
+    Mockito.when(_leftOperator.nextBlock())
+        .thenReturn(block(leftSchema, new Object[]{1, "Aa"}))
+        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
+
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
@@ -125,8 +161,15 @@ public class HashJoinOperatorTest {
 
   @Test
   public void testRightJoinNotSupported(){
-    BaseOperator<TransferableBlock> leftOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
-    BaseOperator<TransferableBlock> rightOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_2);
+    List<Object[]> rows = Arrays.asList(new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"});
+
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
+
+
+    when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(rows))
+        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
+    when(_rightOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(rows))
+        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
 
     List<RexExpression> joinClauses = new ArrayList<>();
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
@@ -165,5 +208,30 @@ public class HashJoinOperatorTest {
     MetadataBlock errorBlock = (MetadataBlock) result.getDataBlock();
     Assert.assertEquals(errorBlock.getExceptions().size(), 1);
     Assert.assertEquals(errorBlock.getExceptions().get(1000), "Semi join is not supported");
+  }
+
+  @Test
+  public void testInequiJoin(){
+    BaseOperator<TransferableBlock> leftOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
+    BaseOperator<TransferableBlock> rightOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_2);
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+        DataSchema.ColumnDataType.STRING
+    });
+    List<RexExpression> joinClauses = new ArrayList<>();
+    List<RexExpression> functionOperands = new ArrayList<>();
+    functionOperands.add(new RexExpression.InputRef(0));
+    functionOperands.add(new RexExpression.Literal(FieldSpec.DataType.INT, 2));
+    joinClauses.add(
+        new RexExpression.FunctionCall(SqlKind.NOT_EQUALS, FieldSpec.DataType.INT, "NOT_EQUALS", functionOperands));
+    HashJoinOperator join = new HashJoinOperator(leftOperator, rightOperator, resultSchema,
+        getJoinKeys(new ArrayList<>(),new ArrayList<>()), joinClauses, JoinRelType.INNER);
+
+    TransferableBlock result = join.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = join.nextBlock();
+    }
+    List<Object[]> rows = result.getContainer();
+
   }
 }
