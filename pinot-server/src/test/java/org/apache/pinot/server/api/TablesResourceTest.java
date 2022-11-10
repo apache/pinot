@@ -34,6 +34,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
@@ -104,28 +105,31 @@ public class TablesResourceTest extends BaseResourceTest {
   @Test
   public void getTableMetadata()
       throws Exception {
-    String tableMetadataPath = "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/metadata";
+    for (TableType tableType : TableType.values()) {
+      String tableMetadataPath = "/tables/" + TableNameBuilder.forType(tableType).tableNameWithType(TABLE_NAME)
+          + "/metadata";
 
-    JsonNode jsonResponse =
-        JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath).request().get(String.class));
-    TableMetadataInfo metadataInfo = JsonUtils.jsonNodeToObject(jsonResponse, TableMetadataInfo.class);
-    Assert.assertNotNull(metadataInfo);
-    Assert.assertEquals(metadataInfo.getNumSegments(), 2);
-    Assert.assertEquals(metadataInfo.getTableName(), TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME));
-    Assert.assertEquals(metadataInfo.getColumnLengthMap().size(), 0);
-    Assert.assertEquals(metadataInfo.getColumnCardinalityMap().size(), 0);
-    Assert.assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 0);
+      JsonNode jsonResponse =
+          JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath).request().get(String.class));
+      TableMetadataInfo metadataInfo = JsonUtils.jsonNodeToObject(jsonResponse, TableMetadataInfo.class);
+      Assert.assertNotNull(metadataInfo);
+      Assert.assertEquals(metadataInfo.getTableName(), TableNameBuilder.forType(tableType)
+          .tableNameWithType(TABLE_NAME));
+      Assert.assertEquals(metadataInfo.getColumnLengthMap().size(), 0);
+      Assert.assertEquals(metadataInfo.getColumnCardinalityMap().size(), 0);
+      Assert.assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 0);
 
-    jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath)
-        .queryParam("columns", "column1").queryParam("columns", "column2").request().get(String.class));
-    metadataInfo = JsonUtils.jsonNodeToObject(jsonResponse, TableMetadataInfo.class);
-    Assert.assertEquals(metadataInfo.getColumnLengthMap().size(), 2);
-    Assert.assertEquals(metadataInfo.getColumnCardinalityMap().size(), 2);
-    Assert.assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 2);
-    Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().get("column1")
-        .containsKey(ColumnIndexType.DICTIONARY.getIndexName()));
-    Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().get("column2")
-        .containsKey(ColumnIndexType.FORWARD_INDEX.getIndexName()));
+      jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath)
+          .queryParam("columns", "column1").queryParam("columns", "column2").request().get(String.class));
+      metadataInfo = JsonUtils.jsonNodeToObject(jsonResponse, TableMetadataInfo.class);
+      Assert.assertEquals(metadataInfo.getColumnLengthMap().size(), 2);
+      Assert.assertEquals(metadataInfo.getColumnCardinalityMap().size(), 2);
+      Assert.assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 2);
+      Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().get("column1")
+          .containsKey(ColumnIndexType.DICTIONARY.getIndexName()));
+      Assert.assertTrue(metadataInfo.getColumnIndexSizeMap().get("column2")
+          .containsKey(ColumnIndexType.FORWARD_INDEX.getIndexName()));
+    }
 
     // No such table
     Response response = _webTarget.path("/tables/noSuchTable/metadata").request().get(Response.class);
