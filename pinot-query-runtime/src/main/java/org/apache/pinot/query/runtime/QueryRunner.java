@@ -213,13 +213,10 @@ public class QueryRunner {
 
     private final InstanceResponseBlock _errorBlock;
     private final List<InstanceResponseBlock> _baseResultBlock;
-    private final DataSchema _dataSchema;
-    private boolean _hasTransferred;
     private int _currentIndex;
 
     private LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema) {
       _baseResultBlock = baseResultBlock;
-      _dataSchema = dataSchema;
       _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
       _currentIndex = 0;
     }

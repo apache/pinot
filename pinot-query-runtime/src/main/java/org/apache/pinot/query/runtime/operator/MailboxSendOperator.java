@@ -28,7 +28,7 @@ import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -131,7 +131,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     }
 
     boolean isEndOfStream = TransferableBlockUtils.isEndOfStream(transferableBlock);
-    BaseDataBlock.Type type = transferableBlock.getType();
+    DataBlock.Type type = transferableBlock.getType();
     try {
       switch (_exchangeType) {
         case SINGLETON:
@@ -198,7 +198,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   }
 
   private void sendDataTableBlockToServers(List<ServerInstance> servers, TransferableBlock transferableBlock,
-      BaseDataBlock.Type type, boolean isEndOfStream) {
+      DataBlock.Type type, boolean isEndOfStream) {
     if (isEndOfStream) {
       for (ServerInstance server : servers) {
         sendDataTableBlock(server, transferableBlock, true);
