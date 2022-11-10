@@ -151,7 +151,7 @@ public class AggregateOperatorTest {
     Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.isNoOpBlock(), "First block should be no-op (not yet constructed)");
     Assert.assertTrue(block2.getNumRows() > 0, "Second block is the result");
-    Assert.assertEquals(block2.getContainer().get(0), new Object[]{2, 1},
+    Assert.assertEquals(block2.getContainer().iterator().next(), new Object[]{2, 1},
         "Expected two columns (group by key, agg value)");
     Assert.assertTrue(block3.isEndOfStreamBlock(), "Third block is EOS (done processing)");
   }
@@ -180,7 +180,7 @@ public class AggregateOperatorTest {
     Assert.assertTrue(block1.isNoOpBlock(), "First block should be no-op (not yet constructed)");
     Assert.assertTrue(block2.getNumRows() > 0, "Second block is the result");
     // second value is 1 (the literal) instead of 3 (the col val)
-    Assert.assertEquals(block2.getContainer().get(0), new Object[]{2, 1},
+    Assert.assertEquals(block2.getContainer().iterator().next(), new Object[]{2, 1},
         "Expected two columns (group by key, agg value)");
     Assert.assertTrue(block3.isEndOfStreamBlock(), "Third block is EOS (done processing)");
   }
@@ -213,7 +213,7 @@ public class AggregateOperatorTest {
     // should call merger twice, one from second row in first block and two from the first row
     // in second block
     Mockito.verify(merger, Mockito.times(2)).apply(Mockito.any(), Mockito.any());
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, 12d},
+    Assert.assertEquals(resultBlock.getContainer().iterator().next(), new Object[]{1, 12d},
         "Expected two columns (group by key, agg value)");
   }
 
