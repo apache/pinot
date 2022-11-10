@@ -109,8 +109,8 @@ public class DataBlockBuilder {
       nullPlaceholders[colId] = columnDataTypes[colId].convert(storedColumnDataTypes[colId].getNullPlaceholder());
     }
     rowBuilder._numRows = rows.size();
-    int rowId = 0;
-    for (Object[] row : rows) {
+    for (int rowId = 0; rowId < rows.size(); rowId++) {
+      Object[] row = rows.get(rowId);
       ByteBuffer byteBuffer = ByteBuffer.allocate(rowBuilder._rowSizeInBytes);
       for (int colId = 0; colId < rowBuilder._numColumns; colId++) {
         Object value = row[colId];
@@ -220,7 +220,6 @@ public class DataBlockBuilder {
         }
       }
       rowBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
-      rowId++;
     }
     // Write null bitmaps after writing data.
     for (RoaringBitmap nullBitmap : nullBitmaps) {
@@ -244,8 +243,8 @@ public class DataBlockBuilder {
       nullBitmaps[colId] = new RoaringBitmap();
       nullPlaceholders[colId] = columnDataTypes[colId].convert(storedColumnDataTypes[colId].getNullPlaceholder());
     }
-    int colId = 0;
-    for (Object[] column : columns) {
+    for (int colId = 0; colId < columns.size(); colId++) {
+      Object[] column = columns.get(colId);
       columnarBuilder._numRows = column.length;
       ByteBuffer byteBuffer = ByteBuffer.allocate(columnarBuilder._numRows * columnarBuilder._columnSizeInBytes[colId]);
       Object value;
@@ -465,7 +464,6 @@ public class DataBlockBuilder {
                   columnarBuilder._dataSchema.getColumnName(colId)));
       }
       columnarBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
-      colId++;
     }
     // Write null bitmaps after writing data.
     for (RoaringBitmap nullBitmap : nullBitmaps) {
