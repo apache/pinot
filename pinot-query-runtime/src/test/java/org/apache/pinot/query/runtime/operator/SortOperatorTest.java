@@ -136,6 +136,30 @@ public class SortOperatorTest {
   }
 
   @Test
+  public void shouldConsumeAndSortOnNonZeroIdxCollation() {
+    // Given:
+    List<RexExpression> collation = collation(1);
+    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
+    DataSchema schema = new DataSchema(new String[]{"ignored", "sort"}, new DataSchema.ColumnDataType[]{INT, INT});
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema);
+
+    Mockito.when(_input.nextBlock())
+        .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{2, 1}))
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    // When:
+    op.nextBlock(); // consume, create NOOP
+    TransferableBlock block = op.nextBlock(); // construct
+    TransferableBlock block2 = op.nextBlock(); // eos
+
+    // Then:
+    Assert.assertEquals(block.getNumRows(), 2);
+    Assert.assertEquals(block.getContainer().get(0), new Object[]{2, 1});
+    Assert.assertEquals(block.getContainer().get(1), new Object[]{1, 2});
+    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+  }
+
+  @Test
   public void shouldConsumeAndSortInputOneBlockWithTwoRowsNonNumeric() {
     // Given:
     List<RexExpression> collation = collation(0);
@@ -304,13 +328,13 @@ public class SortOperatorTest {
   @Test
   public void shouldBreakTiesUsingSecondCollationKey() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
+    List<RexExpression> collation = collation(0, 1);
+    List<Direction> directions = ImmutableList.of(Direction.ASCENDING, Direction.ASCENDING);
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
     SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema);
 
     Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}))
+        .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
@@ -319,9 +343,35 @@ public class SortOperatorTest {
     TransferableBlock block2 = op.nextBlock(); // eos
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
+    Assert.assertEquals(block.getNumRows(), 3);
     Assert.assertEquals(block.getContainer().get(0), new Object[]{1, 1});
     Assert.assertEquals(block.getContainer().get(1), new Object[]{1, 2});
+    Assert.assertEquals(block.getContainer().get(2), new Object[]{1, 3});
+    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+  }
+
+  @Test
+  public void shouldBreakTiesUsingSecondCollationKeyWithDifferentDirection() {
+    // Given:
+    List<RexExpression> collation = collation(0, 1);
+    List<Direction> directions = ImmutableList.of(Direction.ASCENDING, Direction.DESCENDING);
+    DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
+    SortOperator op = new SortOperator(_input, collation, directions, 10, 0, schema);
+
+    Mockito.when(_input.nextBlock())
+        .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    // When:
+    op.nextBlock(); // consume, create NOOP
+    TransferableBlock block = op.nextBlock(); // construct
+    TransferableBlock block2 = op.nextBlock(); // eos
+
+    // Then:
+    Assert.assertEquals(block.getNumRows(), 3);
+    Assert.assertEquals(block.getContainer().get(0), new Object[]{1, 3});
+    Assert.assertEquals(block.getContainer().get(1), new Object[]{1, 2});
+    Assert.assertEquals(block.getContainer().get(2), new Object[]{1, 1});
     Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
