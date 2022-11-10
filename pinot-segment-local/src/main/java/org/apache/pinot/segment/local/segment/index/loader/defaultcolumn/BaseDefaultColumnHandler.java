@@ -554,12 +554,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
     }
 
-    try (NullValueVectorCreator nullValueVectorCreator = new NullValueVectorCreator(_indexDir, fieldSpec.getName())) {
-      for (int docId = 0; docId < totalDocs; docId++) {
-        nullValueVectorCreator.setNull(docId);
-      }
+    if (!_segmentWriter.hasIndexFor(column, ColumnIndexType.NULLVALUE_VECTOR)) {
+      try (NullValueVectorCreator nullValueVectorCreator = new NullValueVectorCreator(_indexDir, fieldSpec.getName())) {
+        for (int docId = 0; docId < totalDocs; docId++) {
+          nullValueVectorCreator.setNull(docId);
+        }
 
-      nullValueVectorCreator.seal();
+        nullValueVectorCreator.seal();
+      }
     }
 
     // Add the column metadata information to the metadata properties.
