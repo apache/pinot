@@ -177,11 +177,6 @@ public class FunctionRegistry {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
-    @ScalarFunction(names = {"timeConvert", "time_convert"})
-    public static long timeConvert(String timeConvertInput, String fromFormat, String toFormat) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
     @ScalarFunction(names = {"textContains", "text_contains"})
     public static boolean textContains(String text, String pattern) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");

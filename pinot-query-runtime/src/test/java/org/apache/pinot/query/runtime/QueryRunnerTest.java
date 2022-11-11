@@ -230,15 +230,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
         new Object[]{"SELECT regexp_like(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
 
-        // test function with underscore works (using round_decimal)
+        // test function with @ScalarFunction annotation and alias works (using round_decimal)
         new Object[]{"SELECT roundDecimal(col3) FROM a", 15},
         new Object[]{"SELECT round_decimal(col3) FROM a", 15},
-        new Object[]{"SELECT roundDecimal(COUNT(*)) FROM a", 1},
-        new Object[]{"SELECT round_decimal(COUNT(*)) FROM a", 1},
-
-        // test ScalarFunction registered but will throw on intermediate stage works on leaf.
-        new Object[]{"SELECT timeConvert(ts, 'MILLISECONDS', 'SECONDS') FROM a", 15},
-        new Object[]{"SELECT time_convert(ts, 'MILLISECONDS', 'SECONDS') FROM a", 15},
+        new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5},
+        new Object[]{"SELECT col1, round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
     };
   }
 
@@ -248,11 +244,22 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // Function with incorrect argument signature should throw runtime exception when casting string to numeric
         new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
             "For input string:"},
-        // TODO: this error is thrown but not returned through mailbox. need another test for asserting failure
-        // during stage runtime init.
-        // standard SqlOpTable function that runs out of signature list in actual impl throws not found exception
-        // new Object[]{"SELECT CASE WHEN col3 > 10 THEN 1 WHEN col3 > 20 THEN 2 WHEN col3 > 30 THEN 3 "
-        //    + "WHEN col3 > 40 THEN 4 WHEN col3 > 50 THEN 5 WHEN col3 > 60 THEN '6' ELSE 0 END FROM a", "caseWhen"},
+
+        // Scalar function that doesn't have a valid use should throw an exception on the leaf stage
+        //   - predicate only functions:
+        new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"},
+        new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index"},
+        new Object[]{"SELECT * FROM a WHERE textContains(col1, 'f')", "supported only on native text index"},
+        new Object[]{"SELECT * FROM a WHERE text_contains(col1, 'f')", "supported only on native text index"},
+
+        //  - transform only functions
+        new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"},
+        new Object[]{"SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String"},
+
+        //  - PlaceholderScalarFunction registered will throw on intermediate stage, but works on leaf stage.
+        new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Illegal Json Path"},
+        new Object[]{"SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
+            "PlaceholderScalarFunctions.jsonExtractScalar"},
     };
   }
 }
