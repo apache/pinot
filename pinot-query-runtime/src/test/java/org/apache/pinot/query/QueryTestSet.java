@@ -21,12 +21,6 @@ package org.apache.pinot.query;
 import org.testng.annotations.DataProvider;
 
 
-/**
- * all legacy test query sets.
- *
- * @deprecated do not add to this test set. this class will be broken down and clean up. pinot-query-runtime/src/main/java/org/apache/pinot/query/runtime/plan/PhysicalPlanVisitor.java
- * add your test to appropraite files in {@link org.apache.pinot.query.runtime.queries} instead.
- */
 public class QueryTestSet {
 
   @DataProvider(name = "testSql")
@@ -169,8 +163,7 @@ public class QueryTestSet {
             + "  (SELECT a.col2 AS joinKey, MAX(a.col3) AS maxVal FROM a GROUP BY a.col2) AS i "
             + "  ON b.col1 = i.joinKey"},
 
-        // Sub-query with predicate clause to SEMI JOIN.
-        new Object[]{"SELECT * FROM b WHERE b.col1 IN (SELECT a.col2 FROM a)"},
+        // Sub-query with IN clause to SEMI JOIN.
         new Object[]{"SELECT b.col1, b.col2, SUM(b.col3) * 100 / COUNT(b.col3) FROM b WHERE b.col1 IN "
             + " (SELECT a.col2 FROM a WHERE a.col2 != 'foo') GROUP BY b.col1, b.col2"},
         new Object[]{"SELECT SUM(b.col3) FROM b WHERE b.col3 > (SELECT AVG(a.col3) FROM a WHERE a.col2 != 'bar')"},
