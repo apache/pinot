@@ -79,9 +79,6 @@ public class FunctionRegistry {
         }
       }
     }
-    for (Method method : PlaceholderScalarFunctions.class.getMethods()) {
-      FunctionRegistry.registerCalciteNamedFunctionMap(method.getName(), method, false);
-    }
     LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_INFO_MAP.size(),
         FUNCTION_INFO_MAP.keySet(), System.currentTimeMillis() - startTimeMs);
   }
@@ -164,41 +161,40 @@ public class FunctionRegistry {
    */
   private static class PlaceholderScalarFunctions {
 
+    @ScalarFunction(names = {"jsonExtractScalar", "json_extract_scalar"})
     public static Object jsonExtractScalar(String jsonFieldName, String jsonPath, String resultsType) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
+    @ScalarFunction(names = {"jsonExtractScalar", "json_extract_scalar"})
     public static Object jsonExtractScalar(String jsonFieldName, String jsonPath, String resultsType,
         Object defaultValue) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
+    @ScalarFunction(names = {"jsonExtractKey", "json_extract_key"})
     public static String jsonExtractKey(String jsonFieldName, String jsonPath) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
+    @ScalarFunction(names = {"timeConvert", "time_convert"})
     public static long timeConvert(String timeConvertInput, String fromFormat, String toFormat) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
-    public static long extract(String extractFormat, long timestamp) {
+    @ScalarFunction(names = {"textContains", "text_contains"})
+    public static boolean textContains(String text, String pattern) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
-    // CHECKSTYLE:OFF
-    // @formatter:off
-    public static boolean text_contains(String text, String pattern) {
+    @ScalarFunction(names = {"textMatch", "text_match"})
+    public static boolean textMatch(String text, String pattern) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
-    public static boolean text_match(String text, String pattern) {
+    @ScalarFunction(names = {"jsonMatch", "json_match"})
+    public static boolean jsonMatch(String text, String pattern) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
-
-    public static boolean json_match(String text, String pattern) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-    // CHECKSTYLE:ON
-    // @formatter:ON
   }
 }

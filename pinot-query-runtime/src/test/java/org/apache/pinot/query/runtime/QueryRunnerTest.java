@@ -223,9 +223,22 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
             + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
         new Object[]{"SELECT dateTrunc('DAY', CAST(MAX(a.col3) AS BIGINT)) FROM a", 1},
 
-        // test regexpLike
+        // ScalarFunction
+        // test function can be used in predicate/leaf/intermediate stage (using regexpLike)
         new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLike(a.col2, b.col1)", 9},
+        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexp_like(a.col2, b.col1)", 9},
         new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
+        new Object[]{"SELECT regexp_like(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
+
+        // test function with underscore works (using round_decimal)
+        new Object[]{"SELECT roundDecimal(col3) FROM a", 15},
+        new Object[]{"SELECT round_decimal(col3) FROM a", 15},
+        new Object[]{"SELECT roundDecimal(COUNT(*)) FROM a", 1},
+        new Object[]{"SELECT round_decimal(COUNT(*)) FROM a", 1},
+
+        // test ScalarFunction registered but will throw on intermediate stage works on leaf.
+        new Object[]{"SELECT timeConvert(ts, 'MILLISECONDS', 'SECONDS') FROM a", 15},
+        new Object[]{"SELECT time_convert(ts, 'MILLISECONDS', 'SECONDS') FROM a", 15},
     };
   }
 
