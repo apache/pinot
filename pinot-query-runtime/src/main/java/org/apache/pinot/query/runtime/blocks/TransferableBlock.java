@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -47,6 +48,12 @@ public class TransferableBlock implements Block {
   private List<Object[]> _container;
 
   public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType) {
+    this(container, dataSchema, containerType, false);
+  }
+
+  @VisibleForTesting
+  TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType,
+      boolean isErrorBlock) {
     _container = container;
     _dataSchema = dataSchema;
     _type = containerType;

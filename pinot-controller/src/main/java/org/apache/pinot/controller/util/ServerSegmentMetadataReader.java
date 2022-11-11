@@ -88,6 +88,7 @@ public class ServerSegmentMetadataReader {
     final Map<String, Double> columnLengthMap = new HashMap<>();
     final Map<String, Double> columnCardinalityMap = new HashMap<>();
     final Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
+    final Map<String, Map<String, Double>> columnIndexSizeMap = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         TableMetadataInfo tableMetadataInfo =
@@ -98,6 +99,12 @@ public class ServerSegmentMetadataReader {
         tableMetadataInfo.getColumnLengthMap().forEach((k, v) -> columnLengthMap.merge(k, v, Double::sum));
         tableMetadataInfo.getColumnCardinalityMap().forEach((k, v) -> columnCardinalityMap.merge(k, v, Double::sum));
         tableMetadataInfo.getMaxNumMultiValuesMap().forEach((k, v) -> maxNumMultiValuesMap.merge(k, v, Double::sum));
+        tableMetadataInfo.getColumnIndexSizeMap().forEach((k, v) -> columnIndexSizeMap.merge(k, v, (l, r) -> {
+            for (Map.Entry<String, Double> e : r.entrySet()) {
+              l.put(e.getKey(), l.getOrDefault(e.getKey(), 0d) + e.getValue());
+            }
+            return l;
+          }));
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
@@ -107,6 +114,10 @@ public class ServerSegmentMetadataReader {
     columnLengthMap.replaceAll((k, v) -> v / finalTotalNumSegments);
     columnCardinalityMap.replaceAll((k, v) -> v / finalTotalNumSegments);
     maxNumMultiValuesMap.replaceAll((k, v) -> v / finalTotalNumSegments);
+    columnIndexSizeMap.replaceAll((k, v) -> {
+      v.replaceAll((key, value) -> v.get(key) / finalTotalNumSegments);
+      return v;
+    });
 
     // Since table segments may have multiple replicas, divide diskSizeInBytes, numRows and numSegments by numReplica
     // to avoid double counting, for columnAvgLengthMap, columnAvgCardinalityMap and maxNumMultiValuesMap, dividing by
@@ -117,7 +128,7 @@ public class ServerSegmentMetadataReader {
 
     TableMetadataInfo aggregateTableMetadataInfo =
         new TableMetadataInfo(tableNameWithType, totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
-            columnCardinalityMap, maxNumMultiValuesMap);
+            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap);
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
           serverUrls.size());
