@@ -488,17 +488,17 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Rebalance table
     ControllerTest.sendPostRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(tableName, "offline"),
+        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(tableName, "offline"),
         null);
 
     // Check rebalance status
     String response = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalanceStatus(tableName, "offline"),
+        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableRebalanceStatus(tableName, "offline"),
         null);
 
     _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).build();
 
-      Assert.assertEquals(response, "{\"segments\":null}");
+      assertEquals(response, "{\"segments\":null}");
   }
 
   @Test
