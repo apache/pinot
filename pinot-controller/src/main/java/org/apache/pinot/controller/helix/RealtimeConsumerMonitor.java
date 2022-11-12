@@ -1,7 +1,24 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.controller.helix;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -28,8 +45,8 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
       LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics,
       ExecutorService executorService) {
     super("RealtimeConsumerMonitor", controllerConfig.getRealtimeConsumerMonitorRunFrequency(),
-        controllerConfig.getRealtimeConsumerMonitorInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
-        controllerMetrics);
+        controllerConfig.getRealtimeConsumerMonitorInitialDelayInSeconds(), pinotHelixResourceManager,
+        leadControllerManager, controllerMetrics);
     _consumingSegmentInfoReader = new ConsumingSegmentInfoReader(executorService, new SimpleHttpConnectionManager(),
         pinotHelixResourceManager);
   }
@@ -45,8 +62,8 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
       ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap segmentsInfoMap =
           _consumingSegmentInfoReader.getConsumingSegmentsInfo(tableNameWithType, 10000);
       Map<String, List<Long>> partitionToLagSet = new HashMap<>();
-      for (List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> info :
-          segmentsInfoMap._segmentToConsumingInfoMap.values()) {
+      for (List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> info
+          : segmentsInfoMap._segmentToConsumingInfoMap.values()) {
         info.forEach(segment -> {
           segment._partitionOffsetInfo._recordsLagMap.forEach((k, v) -> {
             if (!PartitionLagState.NOT_CALCULATED.equals(v)) {
@@ -62,9 +79,6 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
         });
       }
       partitionToLagSet.forEach((partition, lagSet) -> {
-        System.out.println("Info - "
-            + _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.MAX_CONSUMPTION_RECORDS_LAG) + " - "
-            + Arrays.toString(lagSet.toArray()));
         _controllerMetrics.setValueOfPartitionGauge(tableNameWithType, Integer.parseInt(partition),
             ControllerGauge.MAX_CONSUMPTION_RECORDS_LAG, Collections.max(lagSet));
       });
@@ -73,7 +87,5 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
     }
   }
 
-  public static final class Context {
-
-  }
+  public static final class Context { }
 }

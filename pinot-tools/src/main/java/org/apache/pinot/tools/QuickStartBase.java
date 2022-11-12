@@ -78,13 +78,13 @@ public abstract class QuickStartBase {
 
   protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = ImmutableMap.<String, String>builder()
       .put("airlineStats", "examples/stream/airlineStats")
-      .put("githubEvents", "examples/minions/stream/githubEvents")
-      .put("meetupRsvp", "examples/stream/meetupRsvp")
-      .put("meetupRsvpJson", "examples/stream/meetupRsvpJson")
-      .put("meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType")
-      .put("upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp")
-      .put("upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp")
-      .put("upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp")
+//      .put("githubEvents", "examples/minions/stream/githubEvents")
+//      .put("meetupRsvp", "examples/stream/meetupRsvp")
+//      .put("meetupRsvpJson", "examples/stream/meetupRsvpJson")
+//      .put("meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType")
+//      .put("upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp")
+//      .put("upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp")
+//      .put("upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp")
       .build();
 
   protected File _dataDir = FileUtils.getTempDirectory();
