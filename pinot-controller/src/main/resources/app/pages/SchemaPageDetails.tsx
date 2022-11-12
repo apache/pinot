@@ -309,7 +309,7 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 name="reload"
               />
             }
-            label="Reload Segments"
+            label="Reload all segments"
           />
           <IconButton size="small">
             <Tooltip
