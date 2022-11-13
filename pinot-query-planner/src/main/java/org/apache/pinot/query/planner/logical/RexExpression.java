@@ -204,6 +204,7 @@ public interface RexExpression {
   class FunctionCall implements RexExpression {
     @ProtoProperties
     private SqlKind _sqlKind;
+    // TODO: Make sure _sqlKind matches _functionName.
     @ProtoProperties
     private FieldSpec.DataType _dataType;
     @ProtoProperties

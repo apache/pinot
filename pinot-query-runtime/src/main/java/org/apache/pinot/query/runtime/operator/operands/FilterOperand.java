@@ -41,22 +41,24 @@ public abstract class FilterOperand extends TransformOperand {
     }
   }
 
-  public static FilterOperand toFilterOperand(RexExpression.Literal literal) {
+  private static FilterOperand toFilterOperand(RexExpression.Literal literal) {
     return new BooleanLiteral(literal);
   }
 
-  public static FilterOperand toFilterOperand(RexExpression.InputRef inputRef, DataSchema dataSchema) {
+  private static FilterOperand toFilterOperand(RexExpression.InputRef inputRef, DataSchema dataSchema) {
     return new BooleanInputRef(inputRef, dataSchema);
   }
 
-  public static FilterOperand toFilterOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
-
+  private static FilterOperand toFilterOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
     switch (OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName())) {
       case "AND":
+        Preconditions.checkState(functionCall.getFunctionOperands().size() >=2, "AND takes >=2 argument");
         return new And(functionCall.getFunctionOperands(), dataSchema);
       case "OR":
+        Preconditions.checkState(functionCall.getFunctionOperands().size() >=2, "OR takes >=2 argument");
         return new Or(functionCall.getFunctionOperands(), dataSchema);
       case "NOT":
+        Preconditions.checkState(functionCall.getFunctionOperands().size() == 1, "NOT takes one argument");
         return new Not(toFilterOperand(functionCall.getFunctionOperands().get(0), dataSchema));
       case "equals":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
@@ -134,7 +136,7 @@ public abstract class FilterOperand extends TransformOperand {
 
     public BooleanInputRef(RexExpression.InputRef inputRef, DataSchema dataSchema) {
       Preconditions.checkState(dataSchema.getColumnDataType(inputRef.getIndex())
-          == DataSchema.ColumnDataType.BOOLEAN);
+          == DataSchema.ColumnDataType.BOOLEAN, "Input has to be boolean type");
       _inputRef = inputRef;
     }
 
@@ -148,7 +150,8 @@ public abstract class FilterOperand extends TransformOperand {
     private final Object _literalValue;
 
     public BooleanLiteral(RexExpression.Literal literal) {
-      Preconditions.checkState(literal.getDataType() == FieldSpec.DataType.BOOLEAN);
+      Preconditions.checkState(literal.getDataType() == FieldSpec.DataType.BOOLEAN,
+          "Only boolean literal is supported as filter");
       _literalValue = literal.getValue();
     }
 
