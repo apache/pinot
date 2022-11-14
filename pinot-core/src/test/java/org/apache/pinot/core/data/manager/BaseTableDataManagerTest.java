@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,6 +39,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
+import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -62,11 +64,17 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -614,6 +622,61 @@ public class BaseTableDataManagerTest {
     }
   }
 
+  // case 2: if the attempt to download from deep storage exceeds, invoke downloadFromPeers.
+  @Test
+  public void testDownloadAndDecryptCase2() throws Exception {
+    File tempInput = new File(TEMP_DIR, "tmp.txt");
+    FileUtils.write(tempInput, "this is from somewhere remote");
+
+    SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
+    String backupCopyURI = "file://" + tempInput.getAbsolutePath();
+    when(zkmd.getDownloadUrl()).thenReturn(backupCopyURI);
+
+    TableDataManagerConfig config = createDefaultTableDataManagerConfig();
+    when(config.getTablePeerDownloadScheme()).thenReturn("http");
+    BaseTableDataManager tmgr = createSpyOfflineTableManager(config);
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-download-decrypt-peer");
+
+    // As the case 2 description says, we need to mock the static method fetchAndDecryptSegmentToLocal to
+    // throw the AttemptExceed exception; Due to the constrain that mockito static cannot do argument matching,
+    // e.g., any(), we have to pass exact argument value when mocking fetchAndDecryptSegmentToLocal.
+    // However, the first argument File is internally created, which cannot be mocked.
+    // Luckily, the File class's equal method only compares the path. Thus, we can create a file with identical path
+    // and use it to mock the fetchAndDecryptSegmentToLocal
+    File destFile = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    doNothing().when(tmgr).downloadFromPeersWithoutStreaming("seg01", zkmd, destFile);
+    try (MockedStatic<SegmentFetcherFactory> mockSegFactory = mockStatic(SegmentFetcherFactory.class)) {
+      mockSegFactory.when(() -> SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(backupCopyURI, destFile, null))
+          .thenThrow(new AttemptsExceededException("fake attempt exceeds exception"));
+      tmgr.downloadAndDecrypt("seg01", zkmd, tempRootDir);
+    }
+    verify(tmgr, times(1)).downloadFromPeersWithoutStreaming("seg01", zkmd, destFile);
+  }
+
+  // happy case: down
+  @Test
+  public void testdownloadFromPeersWithoutStreaming() throws Exception {
+    File tempInput = new File(TEMP_DIR, "tmp.txt");
+    FileUtils.write(tempInput, "this is from somewhere remote");
+
+    String backupCopyURI = "file://" + tempInput.getAbsolutePath();
+    URI uri = new URI(backupCopyURI);
+
+    TableDataManagerConfig config = createDefaultTableDataManagerConfig();
+    when(config.getTablePeerDownloadScheme()).thenReturn("http");
+    HelixManager mockedHelix = mock(HelixManager.class);
+    BaseTableDataManager tmgr = createTableManager(config, mockedHelix);
+    File tempRootDir = tmgr.getTmpSegmentDataDir("test-download-peer-without-streaming");
+    File destFile = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    try (MockedStatic<PeerServerSegmentFinder> mockPeerSegFinder = mockStatic(PeerServerSegmentFinder.class)) {
+      mockPeerSegFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(
+          "seg01", "http", mockedHelix))
+          .thenReturn(Collections.singletonList(uri));
+      tmgr.downloadFromPeersWithoutStreaming("seg01", mock(SegmentZKMetadata.class), destFile);
+    }
+    assertEquals(FileUtils.readFileToString(destFile), "this is from somewhere remote");
+  }
+
   @Test
   public void testUntarAndMoveSegment()
       throws IOException {
@@ -661,10 +724,7 @@ public class BaseTableDataManagerTest {
   }
 
   private static BaseTableDataManager createTableManager() {
-    TableDataManagerConfig config = mock(TableDataManagerConfig.class);
-    when(config.getTableName()).thenReturn(TABLE_NAME_WITH_TYPE);
-    when(config.getDataDir()).thenReturn(TABLE_DATA_DIR.getAbsolutePath());
-    when(config.getAuthConfig()).thenReturn(new MapConfiguration(Collections.emptyMap()));
+    TableDataManagerConfig config = createDefaultTableDataManagerConfig();
 
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
@@ -672,6 +732,32 @@ public class BaseTableDataManagerTest {
         new TableDataManagerParams(0, false, -1));
     tableDataManager.start();
     return tableDataManager;
+  }
+
+  private static BaseTableDataManager createTableManager(TableDataManagerConfig config, HelixManager helixManager) {
+    OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
+    tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), helixManager, null,
+        new TableDataManagerParams(0, false, -1));
+    tableDataManager.start();
+    return tableDataManager;
+  }
+
+  private static OfflineTableDataManager createSpyOfflineTableManager(TableDataManagerConfig tableDataManagerConfig) {
+    OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
+    tableDataManager.init(tableDataManagerConfig, "dummyInstance", mock(ZkHelixPropertyStore.class),
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null,
+        new TableDataManagerParams(0, false, -1));
+    tableDataManager.start();
+    return Mockito.spy(tableDataManager);
+  }
+
+  private static TableDataManagerConfig createDefaultTableDataManagerConfig() {
+    TableDataManagerConfig config = mock(TableDataManagerConfig.class);
+    when(config.getTableName()).thenReturn(TABLE_NAME_WITH_TYPE);
+    when(config.getDataDir()).thenReturn(TABLE_DATA_DIR.getAbsolutePath());
+    when(config.getAuthConfig()).thenReturn(new MapConfiguration(Collections.emptyMap()));
+    return config;
   }
 
   private static SegmentZKMetadata createRawSegment(TableConfig tableConfig, String segName, SegmentVersion segVer,
