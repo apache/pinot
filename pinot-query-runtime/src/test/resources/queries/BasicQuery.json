@@ -2,16 +2,16 @@
 {
   "basic_test": {
     "tables": {
-      "tbl": [
-        {"name": "col1", "type": "STRING"},
-        {"name": "col2", "type": "INT"}
-      ]
-    },
-    "inputs": {
-      "tbl": [
-        ["foo", 1],
-        ["bar", 2]
-      ]
+      "tbl" : {
+        "schema": [
+          {"name": "col1", "type": "STRING"},
+          {"name": "col2", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", 1],
+          ["bar", 2]
+        ]
+      }
     },
     "queries": [
       {
@@ -25,25 +25,27 @@
   },
   "framework_test": {
     "tables": {
-      "tbl1": [
-        {"name": "col1", "type": "STRING"},
-        {"name": "col2", "type": "INT"}
-      ],
-      "tbl2": [
-        {"name": "col1", "type": "STRING"},
-        {"name": "col2", "type": "INT"},
-        {"name": "col3", "type": "DOUBLE"}
-      ]
-    },
-    "inputs": {
-      "tbl1": [
-        ["foo", 1],
-        ["bar", 2]
-      ],
-      "tbl2": [
-        ["foo", 1, 3.1416],
-        ["bar", 2, 2.2183]
-      ]
+      "tbl1" : {
+        "schema": [
+          {"name": "col1", "type": "STRING"},
+          {"name": "col2", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", 1],
+          ["bar", 2]
+        ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "col1", "type": "STRING"},
+          {"name": "col2", "type": "INT"},
+          {"name": "col3", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          ["foo", 1, 3.1416],
+          ["bar", 2, 2.7183]
+        ]
+      }
     },
     "queries": [
       {

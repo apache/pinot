@@ -1,26 +1,28 @@
 {
   "special_syntax": {
     "tables": {
-      "tbl1": [
-        {"name": "col1", "type": "STRING"},
-        {"name": "col2", "type": "STRING"},
-        {"name": "col3", "type": "INT"}
-      ],
-      "tbl2": [
-        {"name": "col1", "type": "STRING"},
-        {"name": "col2", "type": "STRING"},
-        {"name": "col3", "type": "INT"}
-      ]
-    },
-    "inputs": {
-      "tbl1": [
-        ["foo", "alice", 1],
-        ["bar", "bob", 2]
-      ],
-      "tbl2": [
-        ["foo", "bob", 3],
-        ["alice", "alice", 4]
-      ]
+      "tbl1" : {
+        "schema": [
+          {"name": "col1", "type": "STRING"},
+          {"name": "col2", "type": "STRING"},
+          {"name": "col3", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", "alice", 1],
+          ["bar", "bob", 2]
+        ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "col1", "type": "STRING"},
+          {"name": "col2", "type": "STRING"},
+          {"name": "col3", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", "bob", 3],
+          ["alice", "alice", 4]
+        ]
+      }
     },
     "queries": [
       {

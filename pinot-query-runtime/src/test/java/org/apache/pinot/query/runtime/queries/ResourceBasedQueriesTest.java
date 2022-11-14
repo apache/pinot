@@ -78,22 +78,18 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       QueryTestCase testCase = testCaseEntry.getValue();
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
-      for (Map.Entry<String, List<ColumnAndType>> e : testCase._tables.entrySet()) {
-        String tableName = testCaseName + "_" + e.getKey();
+      for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
+        String tableName = testCaseName + "_" + tableEntry.getKey();
         // TODO: able to choose table type, now default to OFFLINE
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
-        org.apache.pinot.spi.data.Schema pinotSchema = constructSchema(tableName, e.getValue());
+        org.apache.pinot.spi.data.Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
         schemaMap.put(tableName, pinotSchema);
         factory1.registerTable(pinotSchema, tableNameWithType);
         factory2.registerTable(pinotSchema, tableNameWithType);
-      }
-      for (Map.Entry<String, List<List<Object>>> e : testCase._inputs.entrySet()) {
-        List<ColumnAndType> columnAndTypes = testCase._tables.get(e.getKey());
-        String tableName = testCaseName + "_" + e.getKey();
-        String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+        List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
         // TODO: able to select add rows to server1 or server2 (now default server1)
         // TODO: able to select add rows to existing segment or create new one (now default create one segment)
-        factory1.addSegment(tableNameWithType, toRow(columnAndTypes, e.getValue()));
+        factory1.addSegment(tableNameWithType, toRow(columnAndTypes, tableEntry.getValue()._inputs));
       }
 
       // Process extra properties
@@ -167,8 +163,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     List<Object[]> providerContent = new ArrayList<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
       String testCaseName = testCaseEntry.getKey();
-      List<QueryCase> queryCases = testCaseEntry.getValue()._queries;
-      for (QueryCase queryCase : queryCases) {
+      List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
+      for (QueryTestCase.Query queryCase : queryCases) {
         if (queryCase._outputs != null && !queryCase._outputs.isEmpty()) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           List<List<Object>> orgRows = queryCase._outputs;
@@ -191,8 +187,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     List<Object[]> providerContent = new ArrayList<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
       String testCaseName = testCaseEntry.getKey();
-      List<QueryCase> queryCases = testCaseEntry.getValue()._queries;
-      for (QueryCase queryCase : queryCases) {
+      List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
+      for (QueryTestCase.Query queryCase : queryCases) {
         if (queryCase._outputs == null || queryCase._outputs.isEmpty()) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           Object[] testEntry = new Object[]{testCaseName, sql};
