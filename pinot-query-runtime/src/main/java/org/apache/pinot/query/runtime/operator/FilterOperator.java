@@ -30,7 +30,19 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
 
-
+/*
+   FilterOperator apply filter on rows from upstreamOperator.
+   There are three types of filter operands
+   1) inputRef
+   2) Literal
+   3) FunctionOperand
+   All three types' result has to be a boolean to be used to filter rows.
+   FunctionOperand supports,
+    1) AND, OR, NOT functions to combine operands.
+    2) Binary Operand: equals, notEquals, greaterThan, greaterThanOrEqual, lessThan, lessThanOrEqual
+    3) All boolean scalar functions we have that take tranformOperand.
+    Note: Scalar functions are the ones we have in v1 engine and only do function name and arg # matching.
+ */
 public class FilterOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "FILTER";
   private final Operator<TransferableBlock> _upstreamOperator;

@@ -50,12 +50,13 @@ public abstract class FilterOperand extends TransformOperand {
   }
 
   private static FilterOperand toFilterOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
+    // TODO: Move these functions out of this class.
     switch (OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName())) {
       case "AND":
-        Preconditions.checkState(functionCall.getFunctionOperands().size() >=2, "AND takes >=2 argument");
+        Preconditions.checkState(functionCall.getFunctionOperands().size() >= 2, "AND takes >=2 argument");
         return new And(functionCall.getFunctionOperands(), dataSchema);
       case "OR":
-        Preconditions.checkState(functionCall.getFunctionOperands().size() >=2, "OR takes >=2 argument");
+        Preconditions.checkState(functionCall.getFunctionOperands().size() >= 2, "OR takes >=2 argument");
         return new Or(functionCall.getFunctionOperands(), dataSchema);
       case "NOT":
         Preconditions.checkState(functionCall.getFunctionOperands().size() == 1, "NOT takes one argument");
@@ -64,48 +65,48 @@ public abstract class FilterOperand extends TransformOperand {
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
-                _resultType.convert(_rhs.apply(row))) == 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
+                == 0;
           }
         };
       case "notEquals":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
-                _resultType.convert(_rhs.apply(row))) != 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
+                != 0;
           }
         };
       case "greaterThan":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
-                _resultType.convert(_rhs.apply(row))) > 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
+                > 0;
           }
         };
       case "greaterThanOrEqual":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
-                _resultType.convert(_rhs.apply(row))) >= 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
+                >= 0;
           }
         };
       case "lessThan":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
-                _resultType.convert(_rhs.apply(row))) < 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
+                < 0;
           }
         };
       case "lessThanOrEqual":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(
-                _resultType.convert(_rhs.apply(row))) <= 0;
+            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
+                <= 0;
           }
         };
       default:
@@ -135,8 +136,8 @@ public abstract class FilterOperand extends TransformOperand {
     private final RexExpression.InputRef _inputRef;
 
     public BooleanInputRef(RexExpression.InputRef inputRef, DataSchema dataSchema) {
-      Preconditions.checkState(dataSchema.getColumnDataType(inputRef.getIndex())
-          == DataSchema.ColumnDataType.BOOLEAN, "Input has to be boolean type");
+      Preconditions.checkState(dataSchema.getColumnDataType(inputRef.getIndex()) == DataSchema.ColumnDataType.BOOLEAN,
+          "Input has to be boolean type");
       _inputRef = inputRef;
     }
 
@@ -163,6 +164,7 @@ public abstract class FilterOperand extends TransformOperand {
 
   private static class And extends FilterOperand {
     List<FilterOperand> _childOperands;
+
     public And(List<RexExpression> childExprs, DataSchema dataSchema) {
       _childOperands = new ArrayList<>(childExprs.size());
       for (RexExpression childExpr : childExprs) {
@@ -183,6 +185,7 @@ public abstract class FilterOperand extends TransformOperand {
 
   private static class Or extends FilterOperand {
     List<FilterOperand> _childOperands;
+
     public Or(List<RexExpression> childExprs, DataSchema dataSchema) {
       _childOperands = new ArrayList<>(childExprs.size());
       for (RexExpression childExpr : childExprs) {
@@ -203,6 +206,7 @@ public abstract class FilterOperand extends TransformOperand {
 
   private static class Not extends FilterOperand {
     FilterOperand _childOperand;
+
     public Not(FilterOperand childOperand) {
       _childOperand = childOperand;
     }
@@ -219,6 +223,7 @@ public abstract class FilterOperand extends TransformOperand {
     protected final DataSchema.ColumnDataType _resultType;
 
     public Predicate(List<RexExpression> functionOperands, DataSchema dataSchema) {
+      Preconditions.checkState(functionOperands.size() == 2);
       _lhs = TransformOperand.toTransformOperand(functionOperands.get(0), dataSchema);
       _rhs = TransformOperand.toTransformOperand(functionOperands.get(1), dataSchema);
       if (_lhs._resultType != null && _lhs._resultType != DataSchema.ColumnDataType.OBJECT) {
