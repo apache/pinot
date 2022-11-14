@@ -18,15 +18,14 @@
  */
 package org.apache.pinot.common.utils.fetcher;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URI;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Collections;
-
-import com.google.common.base.Preconditions;
 import org.apache.pinot.common.auth.AuthConfig;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.crypt.PinotCrypter;

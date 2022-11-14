@@ -118,7 +118,7 @@ public class TableDataManagerConfig {
 
     _tableDataManagerConfig.addProperty(TABLE_IS_DIMENSION, tableConfig.isDimTable());
     SegmentsValidationAndRetentionConfig segmentConfig = tableConfig.getValidationConfig();
-    if(segmentConfig!=null && segmentConfig.getPeerSegmentDownloadScheme()!=null) {
+    if (segmentConfig != null && segmentConfig.getPeerSegmentDownloadScheme() != null) {
       _tableDataManagerConfig.setProperty(TABLE_PEER_DOWNLOAD_SCHEME, segmentConfig.getPeerSegmentDownloadScheme());
     }
 

@@ -549,11 +549,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   // not thread safe. Caller should invoke it with safe concurrency control.
-  @VisibleForTesting
-  void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata, File destTarFile) throws Exception {
-    Preconditions.checkArgument(_tableDataManagerConfig.getTablePeerDownloadScheme()!=null,
+  void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata,
+      File destTarFile) throws Exception {
+    Preconditions.checkArgument(_tableDataManagerConfig.getTablePeerDownloadScheme() != null,
             "Download peers require non null peer download scheme");
-    List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, _tableDataManagerConfig.getTablePeerDownloadScheme(), _helixManager);
+    List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName,
+        _tableDataManagerConfig.getTablePeerDownloadScheme(), _helixManager);
     if (peerSegmentURIs.isEmpty()) {
       String msg = String.format("segment %s doesn't have any peers", segmentName);
       LOGGER.warn(msg);
