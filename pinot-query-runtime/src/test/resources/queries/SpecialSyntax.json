@@ -1,10 +1,5 @@
 {
   "special_syntax": {
-    "description": "test special syntax that cannot be supported by reference engine",
-    "sql": [
-      "SELECT {tbl1}.col1, {tbl2}.col3 FROM {tbl1} JOIN {tbl2} USING (col1)",
-      "SELECT {tbl1}.col1, {tbl2}.col3 FROM {tbl1} JOIN {tbl2} USING (col2)"
-    ],
     "tables": {
       "tbl1": [
         {"name": "col1", "type": "STRING"},
@@ -27,14 +22,22 @@
         ["alice", "alice", 4]
       ]
     },
-    "outputs": [
-      [
-        ["foo", 3]
-      ],
-      [
-        ["bar", 3],
-        ["foo", 4]
-      ]
+    "queries": [
+      {
+        "description": "test join with using clause",
+        "sql": "SELECT {tbl1}.col1, {tbl2}.col3 FROM {tbl1} JOIN {tbl2} USING (col1)",
+        "outputs": [
+          ["foo", 3]
+        ]
+      },
+      {
+        "description": "test join with using clause but join with columns not being selected",
+        "sql": "SELECT {tbl1}.col1, {tbl2}.col3 FROM {tbl1} JOIN {tbl2} USING (col2)",
+        "outputs": [
+          ["bar", 3],
+          ["foo", 4]
+        ]
+      }
     ]
   }
 }

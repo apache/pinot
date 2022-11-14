@@ -28,6 +28,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -256,18 +257,27 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   public static class QueryTestCase {
-    @JsonProperty("sql")
-    public List<String> _sql;
-    @JsonProperty("description")
-    public String _description;
+    public static final String REQUIRED_H2_KEY = "requireH2";
+    public static final String BLOCK_SIZE_KEY = "blockSize";
+    public static final String SERVER_ASSIGN_STRATEGY_KEY = "serverSelectionStrategy";
+
     @JsonProperty("tables")
     public Map<String, List<ColumnAndType>> _tables;
     @JsonProperty("inputs")
-    public Map<String, List<List<Object>>> _inputs;
-    @JsonProperty("outputs")
-    public List<List<List<Object>>> _outputs;
+    public Map<String, List<List<Object>>> _inputs;;
+    @JsonProperty("queries")
+    public List<QueryCase> _queries;
     @JsonProperty("extraProps")
-    public Map<String, Object> _extraProps;
+    public Map<String, Object> _extraProps = Collections.emptyMap();
+  }
+
+  public static class QueryCase {
+    @JsonProperty("sql")
+    public String _sql;
+    @JsonProperty("description")
+    public String _description;
+    @JsonProperty("outputs")
+    public List<List<Object>> _outputs = Collections.emptyList();
   }
 
   public static class ColumnAndType {

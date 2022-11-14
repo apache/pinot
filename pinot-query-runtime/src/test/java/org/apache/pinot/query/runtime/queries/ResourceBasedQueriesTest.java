@@ -95,8 +95,11 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         // TODO: able to select add rows to existing segment or create new one (now default create one segment)
         factory1.addSegment(tableNameWithType, toRow(columnAndTypes, e.getValue()));
       }
-      // Add all test cases without explicit output to the tables on H2
-      if (testCaseEntry.getValue()._outputs == null || testCaseEntry.getValue()._outputs.isEmpty()) {
+
+      // Process extra properties
+      Map<String, Object> _extraProps = testCaseEntry.getValue()._extraProps;
+      if ((boolean) _extraProps.getOrDefault(QueryTestCase.REQUIRED_H2_KEY, false)) {
+        // Add all test cases without explicit output to the tables on H2
         for (Map.Entry<String, Schema> e : schemaMap.entrySet()) {
           String tableName = e.getKey();
           Schema schema = e.getValue();
@@ -141,78 +144,63 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
-  public void testQueryTestCasesWithH2(String testCaseName, List<String> sqlList)
+  public void testQueryTestCasesWithH2(String testCaseName, String sql)
       throws Exception {
-    for (String sql : sqlList) {
-      // query pinot
-      List<Object[]> resultRows = queryRunner(sql);
-      // query H2 for data
-      List<Object[]> expectedRows = queryH2(sql);
-      compareRowEquals(resultRows, expectedRows);
-    }
+    // query pinot
+    List<Object[]> resultRows = queryRunner(sql);
+    // query H2 for data
+    List<Object[]> expectedRows = queryH2(sql);
+    compareRowEquals(resultRows, expectedRows);
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
-  public void testQueryTestCasesWithOutput(String testCaseName, List<String> sqlList,
-      List<List<Object[]>> expectedRowsList)
+  public void testQueryTestCasesWithOutput(String testCaseName, String sql, List<Object[]> expectedRows)
       throws Exception {
-    for (int i = 0; i < sqlList.size(); i++) {
-      String sql = sqlList.get(i);
-      List<Object[]> expectedRows = expectedRowsList.get(i);
-      List<Object[]> resultRows = queryRunner(sql);
-      compareRowEquals(resultRows, expectedRows);
-    }
+    List<Object[]> resultRows = queryRunner(sql);
+    compareRowEquals(resultRows, expectedRows);
   }
 
   @DataProvider
   private static Object[][] testResourceQueryTestCaseProviderBoth()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
-    Object[][] providerContent = new Object[testCaseMap.size()][];
-    int idx = 0;
+    List<Object[]> providerContent = new ArrayList<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
-      if (testCaseEntry.getValue()._outputs != null && !testCaseEntry.getValue()._outputs.isEmpty()) {
-        String testCaseName = testCaseEntry.getKey();
-        List<String> orgSqlList = testCaseEntry.getValue()._sql;
-        List<String> sqlList = new ArrayList<>(orgSqlList.size());
-        for (String orgSql : orgSqlList) {
-          sqlList.add(replaceTableName(testCaseName, orgSql));
-        }
-        List<List<List<Object>>> outputObjs = testCaseEntry.getValue()._outputs;
-        List<List<Object[]>> expectedRowsList = new ArrayList<>(outputObjs.size());
-        for (List<List<Object>> orgOutputRows : outputObjs) {
-          List<Object[]> expectedRows = new ArrayList<>(orgOutputRows.size());
-          for (List<Object> objs : orgOutputRows) {
+      String testCaseName = testCaseEntry.getKey();
+      List<QueryCase> queryCases = testCaseEntry.getValue()._queries;
+      for (QueryCase queryCase : queryCases) {
+        if (queryCase._outputs != null && !queryCase._outputs.isEmpty()) {
+          String sql = replaceTableName(testCaseName, queryCase._sql);
+          List<List<Object>> orgRows = queryCase._outputs;
+          List<Object[]> expectedRows = new ArrayList<>(orgRows.size());
+          for (List<Object> objs : orgRows) {
             expectedRows.add(objs.toArray());
           }
-          expectedRowsList.add(expectedRows);
+          Object[] testEntry = new Object[]{testCaseName, sql, expectedRows};
+          providerContent.add(testEntry);
         }
-        Object[] testEntry = new Object[]{testCaseName, sqlList, expectedRowsList};
-        providerContent[idx++] = testEntry;
       }
     }
-    return providerContent;
+    return providerContent.toArray(new Object[][]{});
   }
 
   @DataProvider
   private static Object[][] testResourceQueryTestCaseProviderInputOnly()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
-    Object[][] providerContent = new Object[testCaseMap.size()][];
-    int idx = 0;
+    List<Object[]> providerContent = new ArrayList<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
-      if (testCaseEntry.getValue()._outputs == null || testCaseEntry.getValue()._outputs.isEmpty()) {
-        String testCaseName = testCaseEntry.getKey();
-        List<String> orgSqlList = testCaseEntry.getValue()._sql;
-        List<String> sqlList = new ArrayList<>(orgSqlList.size());
-        for (String orgSql : orgSqlList) {
-          sqlList.add(replaceTableName(testCaseName, orgSql));
+      String testCaseName = testCaseEntry.getKey();
+      List<QueryCase> queryCases = testCaseEntry.getValue()._queries;
+      for (QueryCase queryCase : queryCases) {
+        if (queryCase._outputs == null || queryCase._outputs.isEmpty()) {
+          String sql = replaceTableName(testCaseName, queryCase._sql);
+          Object[] testEntry = new Object[]{testCaseName, sql};
+          providerContent.add(testEntry);
         }
-        Object[] testEntry = new Object[]{testCaseName, sqlList};
-        providerContent[idx++] = testEntry;
       }
     }
-    return providerContent;
+    return providerContent.toArray(new Object[][]{});
   }
 
   private static String replaceTableName(String testCaseName, String sql) {
