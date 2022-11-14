@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -28,6 +29,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -150,7 +152,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       Object[] expectedRow = expectedRows.get(i);
       for (int j = 0; j < resultRow.length; j++) {
         Assert.assertEquals(valueComp.compare(resultRow[j], expectedRow[j]), 0,
-            "Not match at (" + i + "," + j + ")! Expected: " + expectedRow[j] + " Actual: " + resultRow[j]);
+            "Not match at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow)
+                + " Actual: " + Arrays.toString(resultRow));
       }
     }
   }
@@ -256,11 +259,14 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     return fieldNamesAndTypes;
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class QueryTestCase {
-    public static final String REQUIRED_H2_KEY = "requireH2";
     public static final String BLOCK_SIZE_KEY = "blockSize";
     public static final String SERVER_ASSIGN_STRATEGY_KEY = "serverSelectionStrategy";
 
+    // ignores the entire query test case
+    @JsonProperty("ignored")
+    public boolean _ignored;
     @JsonProperty("tables")
     public Map<String, Table> _tables;
     @JsonProperty("queries")
@@ -275,7 +281,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public List<List<Object>> _inputs;
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Query {
+      // ignores just a single query test from the test case
+      @JsonProperty("ignored")
+      public boolean _ignored;
       @JsonProperty("sql")
       public String _sql;
       @JsonProperty("description")

@@ -18,10 +18,7 @@
         "description": "basic test case example",
         "sql": "SELECT * FROM {tbl}"
       }
-    ],
-    "extraProps": {
-      "requireH2": true
-    }
+    ]
   },
   "framework_test": {
     "tables": {
@@ -58,7 +55,6 @@
       }
     ],
     "extraProps": {
-      "requireH2": true,
       "comment": "TODO: these demonstrate how extra properties are used but the following keys are not supported yet",
       "blockSize": 2,
       "serverSelectionStrategy": "RANDOM"

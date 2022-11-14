@@ -161,6 +161,7 @@ public final class RelToStageConverter {
       case TIME:
       case TIMESTAMP:
         return DataSchema.ColumnDataType.TIMESTAMP;
+      case CHAR:
       case VARCHAR:
         return DataSchema.ColumnDataType.STRING;
       case BINARY:
