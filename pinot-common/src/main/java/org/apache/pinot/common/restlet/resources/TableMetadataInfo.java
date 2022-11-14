@@ -42,13 +42,15 @@ public class TableMetadataInfo {
   private final Map<String, Double> _columnLengthMap;
   private final Map<String, Double> _columnCardinalityMap;
   private final Map<String, Double> _maxNumMultiValuesMap;
+  private final Map<String, Map<String, Double>> _columnIndexSizeMap;
 
   @JsonCreator
   public TableMetadataInfo(@JsonProperty("tableName") String tableName,
       @JsonProperty("diskSizeInBytes") long sizeInBytes, @JsonProperty("numSegments") long numSegments,
       @JsonProperty("numRows") long numRows, @JsonProperty("columnLengthMap") Map<String, Double> columnLengthMap,
       @JsonProperty("columnCardinalityMap") Map<String, Double> columnCardinalityMap,
-      @JsonProperty("maxNumMultiValuesMap") Map<String, Double> maxNumMultiValuesMap) {
+      @JsonProperty("maxNumMultiValuesMap") Map<String, Double> maxNumMultiValuesMap,
+      @JsonProperty("columnIndexSizeMap") Map<String, Map<String, Double>> columnIndexSizeMap) {
     _tableName = tableName;
     _diskSizeInBytes = sizeInBytes;
     _numSegments = numSegments;
@@ -56,6 +58,7 @@ public class TableMetadataInfo {
     _columnLengthMap = columnLengthMap;
     _columnCardinalityMap = columnCardinalityMap;
     _maxNumMultiValuesMap = maxNumMultiValuesMap;
+    _columnIndexSizeMap = columnIndexSizeMap;
   }
 
   public String getTableName() {
@@ -84,5 +87,9 @@ public class TableMetadataInfo {
 
   public Map<String, Double> getMaxNumMultiValuesMap() {
     return _maxNumMultiValuesMap;
+  }
+
+  public Map<String, Map<String, Double>> getColumnIndexSizeMap() {
+    return _columnIndexSizeMap;
   }
 }

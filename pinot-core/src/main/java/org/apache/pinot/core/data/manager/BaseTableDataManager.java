@@ -474,7 +474,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
   private File downloadSegmentFromDeepStore(String segmentName, SegmentZKMetadata zkMetadata)
       throws Exception {
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
-    FileUtils.forceMkdir(tempRootDir);
     if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
       try {
         File untaredSegDir = downloadAndStreamUntarWithRateLimit(segmentName, zkMetadata, tempRootDir,
@@ -622,8 +621,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @VisibleForTesting
-  protected File getTmpSegmentDataDir(String segmentName) {
-    return new File(_resourceTmpDir, segmentName);
+  protected File getTmpSegmentDataDir(String segmentName)
+      throws IOException {
+    File tmpDir = new File(_resourceTmpDir, segmentName);
+    if (tmpDir.exists()) {
+      FileUtils.deleteQuietly(tmpDir);
+    }
+    FileUtils.forceMkdir(tmpDir);
+    return tmpDir;
   }
 
   /**
@@ -674,7 +679,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * object may be created when trying to load the segment, but it's closed if the method
    * returns false; otherwise it's opened and to be referred by ImmutableSegment object.
    */
-  private boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
+  protected boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
       SegmentZKMetadata zkMetadata) {
     // Try to recover the segment from potential segment reloading failure.
     String segmentTier = zkMetadata.getTier();

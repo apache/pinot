@@ -171,7 +171,10 @@ public class LoaderTest {
     assertTrue(ImmutableSegmentLoader.needPreprocess(segmentDir, _v3IndexLoadingConfig, null));
 
     // The segment is in v3 format now, not leading to reprocess.
-    ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig);
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig);
+    // Need to reset `segmentDir` to point to the correct index directory after the above load since the path changes
+    segmentDir = _localSegmentDirectoryLoader.load(immutableSegment.getSegmentMetadata().getIndexDir().toURI(),
+        new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_pinotConfiguration).build());
     segmentDir.reloadMetadata();
     assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDir, _v3IndexLoadingConfig, null));
   }

@@ -20,7 +20,7 @@
 import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
   IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
-  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig
+  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig, SegmentDebugDetails
 } from 'Models';
 
 const headers = {
@@ -28,7 +28,7 @@ const headers = {
   'Accept': 'text/plain, */*; q=0.01'
 };
 
-import { baseApi, transformApi } from '../utils/axios-config';
+import { baseApi, baseApiWithErrors, transformApi } from '../utils/axios-config';
 
 export const getTenants = (): Promise<AxiosResponse<Tenants>> =>
   baseApi.get('/tenants');
@@ -243,6 +243,11 @@ export const authenticateUser = (authToken): Promise<AxiosResponse<OperationResp
 
 export const getSegmentDebugInfo = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`debug/tables/${tableName}?type=${tableType}&verbosity=10`);
+
+export const getSegmentLevelDebugDetails = async (tableName: string, segmentName: string): Promise<SegmentDebugDetails> => {
+  const response = await baseApiWithErrors.get(`debug/segments/${tableName}/${segmentName}`);
+  return response.data;
+}
 
 export const requestTable = (): Promise<AxiosResponse<TableList>> =>
     baseApi.get(`/tables`);
