@@ -41,7 +41,7 @@ public class LiteralValueOperatorTest {
             new RexExpression.Literal(DataType.STRING, "foo"),
             new RexExpression.Literal(DataType.INT, 1)),
         ImmutableList.of(
-            new RexExpression.Literal(DataType.STRING, "bar"),
+            new RexExpression.Literal(DataType.STRING, ""),
             new RexExpression.Literal(DataType.INT, 2))
     );
     LiteralValueOperator operator = new LiteralValueOperator(schema, literals);
@@ -51,7 +51,21 @@ public class LiteralValueOperatorTest {
 
     // Then:
     Assert.assertEquals(transferableBlock.getContainer().get(0), new Object[]{"foo", 1});
-    Assert.assertEquals(transferableBlock.getContainer().get(1), new Object[]{"bar", 2});
+    Assert.assertEquals(transferableBlock.getContainer().get(1), new Object[]{"", 2});
     Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
+  }
+
+  @Test
+  public void shouldHandleEmptyLiteralRows() {
+    // Given:
+    DataSchema schema = new DataSchema(new String[]{}, new ColumnDataType[]{});
+    List<List<RexExpression>> literals = ImmutableList.of(ImmutableList.of());
+    LiteralValueOperator operator = new LiteralValueOperator(schema, literals);
+
+    // When:
+    TransferableBlock transferableBlock = operator.nextBlock();
+
+    // Then:
+    Assert.assertEquals(transferableBlock.getContainer().get(0), new Object[]{});
   }
 }
