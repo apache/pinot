@@ -40,7 +40,7 @@ public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_AUTH = "auth";
   private static final String TABLE_DELETED_SEGMENTS_CACHE_SIZE = "deletedSegmentsCacheSize";
   private static final String TABLE_DELETED_SEGMENTS_CACHE_TTL_MINUTES = "deletedSegmentsCacheTTL";
-  private static final String TABLE_PEER_DOWNLOAD_SCHEME = "peer.download.scheme";
+  private static final String TABLE_PEER_DOWNLOAD_SCHEME = "peerDownloadScheme";
 
   private final Configuration _tableDataManagerConfig;
 
