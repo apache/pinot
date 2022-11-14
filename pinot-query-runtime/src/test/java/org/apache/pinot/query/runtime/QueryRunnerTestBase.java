@@ -257,13 +257,15 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
 
   public static class QueryTestCase {
     @JsonProperty("sql")
-    public String _sql;
+    public List<String> _sql;
     @JsonProperty("description")
     public String _description;
     @JsonProperty("tables")
     public Map<String, List<ColumnAndType>> _tables;
     @JsonProperty("inputs")
     public Map<String, List<List<Object>>> _inputs;
+    @JsonProperty("outputs")
+    public List<List<List<Object>>> _outputs;
     @JsonProperty("extraProps")
     public Map<String, Object> _extraProps;
   }
