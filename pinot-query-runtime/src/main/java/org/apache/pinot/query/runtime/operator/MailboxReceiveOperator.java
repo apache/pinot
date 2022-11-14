@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
