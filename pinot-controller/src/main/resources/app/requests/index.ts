@@ -51,8 +51,15 @@ export const getSchemaList = (): Promise<AxiosResponse<OperationResponse>> =>
 export const getSchema = (name: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/schemas/${name}`);
 
-export const putSchema = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.put(`/schemas/${name}`, params, { headers });
+export const putSchema = (name: string, params: string, reload?: boolean): Promise<AxiosResponse<OperationResponse>> => {
+  let queryParams = {};
+  
+  if(reload) {
+    queryParams["reload"] = reload;
+  }
+
+  return baseApi.put(`/schemas/${name}`, params, { headers, params: queryParams });
+}
 
 export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<IdealState>> =>
   baseApi.get(`/segments/${tableName}/${segmentName}/metadata?columns=*`);
