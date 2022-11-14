@@ -123,7 +123,8 @@ public abstract class FilterOperand extends TransformOperand {
 
     public BooleanFunction(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
       FunctionOperand func = (FunctionOperand) TransformOperand.toTransformOperand(functionCall, dataSchema);
-      Preconditions.checkState(func.getResultType() == DataSchema.ColumnDataType.BOOLEAN);
+      Preconditions.checkState(func.getResultType() == DataSchema.ColumnDataType.BOOLEAN,
+          "Expecting boolean result type but got type:" + func.getResultType());
       _func = func;
     }
 
@@ -137,8 +138,9 @@ public abstract class FilterOperand extends TransformOperand {
     private final RexExpression.InputRef _inputRef;
 
     public BooleanInputRef(RexExpression.InputRef inputRef, DataSchema dataSchema) {
-      Preconditions.checkState(dataSchema.getColumnDataType(inputRef.getIndex()) == DataSchema.ColumnDataType.BOOLEAN,
-          "Input has to be boolean type");
+      DataSchema.ColumnDataType inputType = dataSchema.getColumnDataType(inputRef.getIndex());
+      Preconditions.checkState(inputType == DataSchema.ColumnDataType.BOOLEAN,
+          "Input has to be boolean type but got type:" + inputType);
       _inputRef = inputRef;
     }
 
@@ -153,7 +155,7 @@ public abstract class FilterOperand extends TransformOperand {
 
     public BooleanLiteral(RexExpression.Literal literal) {
       Preconditions.checkState(literal.getDataType() == FieldSpec.DataType.BOOLEAN,
-          "Only boolean literal is supported as filter");
+          "Only boolean literal is supported as filter, but got type:" + literal.getDataType());
       _literalValue = literal.getValue();
     }
 
@@ -224,7 +226,8 @@ public abstract class FilterOperand extends TransformOperand {
     protected final DataSchema.ColumnDataType _resultType;
 
     public Predicate(List<RexExpression> functionOperands, DataSchema dataSchema) {
-      Preconditions.checkState(functionOperands.size() == 2);
+      Preconditions.checkState(functionOperands.size() == 2,
+          "Expected 2 function ops for Predicate but got:" + functionOperands.size());
       _lhs = TransformOperand.toTransformOperand(functionOperands.get(0), dataSchema);
       _rhs = TransformOperand.toTransformOperand(functionOperands.get(1), dataSchema);
       if (_lhs._resultType != null && _lhs._resultType != DataSchema.ColumnDataType.OBJECT) {
