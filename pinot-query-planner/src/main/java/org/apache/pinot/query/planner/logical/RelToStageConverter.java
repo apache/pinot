@@ -167,7 +167,8 @@ public final class RelToStageConverter {
       case VARBINARY:
         return DataSchema.ColumnDataType.BYTES;
       default:
-        throw new IllegalStateException("Unexpected RelDataTypeField: " + relDataTypeField.getType());
+        throw new IllegalStateException("Unexpected RelDataTypeField: " + relDataTypeField.getType() + " for column: "
+            + relDataTypeField.getName());
     }
   }
 }

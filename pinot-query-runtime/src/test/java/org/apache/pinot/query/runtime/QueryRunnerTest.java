@@ -200,7 +200,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
-      Assert.assertTrue(rte.getMessage().contains(exceptionMsg));
+      Assert.assertTrue(rte.getMessage().contains(exceptionMsg), "Exception should contain: " + exceptionMsg
+          + "! but found: " + rte.getMessage());
     }
   }
 
@@ -216,9 +217,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // test dateTrunc
         //   - on leaf stage
         new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 10},
+        new Object[]{"SELECT dateTrunc('DAY', CAST(col3 AS BIGINT)) FROM a LIMIT 10", 10},
         //   - on intermediate stage
         new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
             + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+        new Object[]{"SELECT dateTrunc('DAY', CAST(MAX(a.col3) AS BIGINT)) FROM a", 1},
 
         // test regexpLike
         new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLike(a.col2, b.col1)", 9},
@@ -229,9 +232,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
     return new Object[][] {
-        // Function with incorrect argument signature should throw runtime exception
+        // Function with incorrect argument signature should throw runtime exception when casting string to numeric
         new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
-            "ArithmeticFunctions.least(double,double) with arguments"},
+            "For input string:"},
         // TODO: this error is thrown but not returned through mailbox. need another test for asserting failure
         // during stage runtime init.
         // standard SqlOpTable function that runs out of signature list in actual impl throws not found exception

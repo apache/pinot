@@ -54,10 +54,8 @@ public class RexExpressionUtils {
         rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     Preconditions.checkState(operands.size() == 1, "CAST takes exactly 2 arguments");
     RelDataType castType = rexCall.getType();
-    // add the 2nd argument as the source type info.
-    operands.add(new RexExpression.Literal(FieldSpec.DataType.STRING,
-        RexExpression.toPinotDataType(rexCall.getOperands().get(0).getType()).name()));
-    return new RexExpression.FunctionCall(rexCall.getKind(), RexExpression.toDataType(rexCall.getType()), "CAST",
+    operands.add(new RexExpression.Literal(FieldSpec.DataType.STRING, RexExpression.toPinotDataType(castType).name()));
+    return new RexExpression.FunctionCall(rexCall.getKind(), RexExpression.toDataType(castType), "CAST",
         operands);
   }
 
