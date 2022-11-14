@@ -50,16 +50,17 @@ public abstract class FilterOperand extends TransformOperand {
   }
 
   private static FilterOperand toFilterOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
+    int operandSize = functionCall.getFunctionOperands().size();
     // TODO: Move these functions out of this class.
     switch (OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName())) {
       case "AND":
-        Preconditions.checkState(functionCall.getFunctionOperands().size() >= 2, "AND takes >=2 argument");
+        Preconditions.checkState(operandSize >= 2, "AND takes >=2 argument, passed in argument size:" + operandSize);
         return new And(functionCall.getFunctionOperands(), dataSchema);
       case "OR":
-        Preconditions.checkState(functionCall.getFunctionOperands().size() >= 2, "OR takes >=2 argument");
+        Preconditions.checkState(operandSize >= 2, "OR takes >=2 argument, passed in argument size:" + operandSize);
         return new Or(functionCall.getFunctionOperands(), dataSchema);
       case "NOT":
-        Preconditions.checkState(functionCall.getFunctionOperands().size() == 1, "NOT takes one argument");
+        Preconditions.checkState(operandSize == 1, "NOT takes one argument, passed in argument size:" + operandSize);
         return new Not(toFilterOperand(functionCall.getFunctionOperands().get(0), dataSchema));
       case "equals":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {

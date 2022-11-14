@@ -55,7 +55,7 @@ public class FilterOperatorTest {
   }
 
   @Test
-  public void testUpstreamErrorBlock() {
+  public void shouldPropagateUpstreamErrorBlock() {
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("filterError")));
     RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
@@ -70,26 +70,33 @@ public class FilterOperatorTest {
   }
 
   @Test
-  public void testUpstreamEos() {
+  public void shouldPropagateUpstreamEOS() {
     RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
 
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT
     });
-    Mockito.when(_upstreamOperator.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{0}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    Mockito.when(_upstreamOperator.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     FilterOperator op = new FilterOperator(_upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertFalse(dataBlock.isErrorBlock());
-    List<Object[]> result = dataBlock.getContainer();
-    Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0)[0], 0);
-    dataBlock = op.getNextBlock();
     Assert.assertTrue(dataBlock.isEndOfStreamBlock());
   }
 
   @Test
-  public void testTrueBooleanFilter() {
+  public void shouldPropagateUpstreamNoop() {
+    RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
+
+    DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT
+    });
+    Mockito.when(_upstreamOperator.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
+    FilterOperator op = new FilterOperator(_upstreamOperator, inputSchema, booleanLiteral);
+    TransferableBlock dataBlock = op.getNextBlock();
+    Assert.assertTrue(dataBlock.isNoOpBlock());
+  }
+
+  @Test
+  public void shouldHandleTrueBooleanLiteralFilter() {
     RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
 
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{
@@ -108,7 +115,7 @@ public class FilterOperatorTest {
   }
 
   @Test
-  public void testFalseBooleanFilter() {
+  public void shouldHandleFalseBooleanLiteralFilter() {
     RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, false);
 
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{
@@ -124,7 +131,7 @@ public class FilterOperatorTest {
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*boolean literal.*")
-  public void testBadTypeLiteralFilter() {
+  public void shouldThrowOnNonBooleanTypeBooleanLiteral() {
     RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.STRING, "false");
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT
@@ -136,7 +143,7 @@ public class FilterOperatorTest {
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Input has to be "
       + "boolean type.*")
-  public void testInputRefFilterBadType() {
+  public void shouldThrowOnNonBooleanTypeInputRef() {
     RexExpression ref0 = new RexExpression.InputRef(0);
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT
@@ -147,7 +154,7 @@ public class FilterOperatorTest {
   }
 
   @Test
-  public void testInputRefFilter() {
+  public void shouldHandleBooleanInputRef() {
     RexExpression ref1 = new RexExpression.InputRef(1);
     DataSchema inputSchema = new DataSchema(new String[]{"intCol", "boolCol"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.BOOLEAN
@@ -164,7 +171,7 @@ public class FilterOperatorTest {
   }
 
   @Test
-  public void testAndFilter() {
+  public void shouldHandleAndFilter() {
     DataSchema inputSchema = new DataSchema(new String[]{"boolCol0", "boolCol1"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.BOOLEAN
     });
@@ -184,7 +191,7 @@ public class FilterOperatorTest {
   }
 
   @Test
-  public void testOrFilter() {
+  public void shouldHandleOrFilter() {
     DataSchema inputSchema = new DataSchema(new String[]{"boolCol0", "boolCol1"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.BOOLEAN
     });
@@ -206,29 +213,27 @@ public class FilterOperatorTest {
   }
 
   @Test
-  public void testNotFilter() {
+  public void shouldHandleNotFilter() {
     DataSchema inputSchema = new DataSchema(new String[]{"boolCol0", "boolCol1"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.BOOLEAN
     });
     Mockito.when(_upstreamOperator.nextBlock()).thenReturn(
         OperatorTestUtil.block(inputSchema, new Object[]{true, true}, new Object[]{false, false},
             new Object[]{true, false}));
-    RexExpression.FunctionCall orCall = new RexExpression.FunctionCall(SqlKind.OR, FieldSpec.DataType.BOOLEAN, "OR",
+    RexExpression.FunctionCall notCall = new RexExpression.FunctionCall(SqlKind.NOT, FieldSpec.DataType.BOOLEAN, "NOT",
         ImmutableList.of(new RexExpression.InputRef(0)));
 
-    FilterOperator op = new FilterOperator(_upstreamOperator, inputSchema, orCall);
+    FilterOperator op = new FilterOperator(_upstreamOperator, inputSchema, notCall);
     TransferableBlock dataBlock = op.getNextBlock();
     Assert.assertFalse(dataBlock.isErrorBlock());
     List<Object[]> result = dataBlock.getContainer();
-    Assert.assertEquals(result.size(), 2);
-    Assert.assertEquals(result.get(0)[0], true);
-    Assert.assertEquals(result.get(0)[1], true);
-    Assert.assertEquals(result.get(1)[0], true);
-    Assert.assertEquals(result.get(1)[1], false);
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0)[0], false);
+    Assert.assertEquals(result.get(0)[1], false);
   }
 
   @Test
-  public void testPredicateFilter() {
+  public void shouldHandleGreaterThanFilter() {
     DataSchema inputSchema = new DataSchema(new String[]{"int0", "int1"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT
     });
@@ -247,7 +252,7 @@ public class FilterOperatorTest {
   }
 
   @Test
-  public void testBooleanFunction() {
+  public void shouldHandleBooleanFunction() {
     DataSchema inputSchema = new DataSchema(new String[]{"string1"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.STRING
     });
@@ -268,7 +273,7 @@ public class FilterOperatorTest {
 
   @Test(expectedExceptions = NullPointerException.class, expectedExceptionsMessageRegExp = ".*Cannot find function "
       + "with Name: startsWithError.*")
-  public void testUnfoundFunction() {
+  public void shouldThrowOnUnfoundFunction() {
     DataSchema inputSchema = new DataSchema(new String[]{"string1"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.STRING
     });
