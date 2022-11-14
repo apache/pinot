@@ -97,8 +97,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       }
 
       // Process extra properties
-      Map<String, Object> _extraProps = testCaseEntry.getValue()._extraProps;
-      if ((boolean) _extraProps.getOrDefault(QueryTestCase.REQUIRED_H2_KEY, false)) {
+      Map<String, Object> extraProps = testCaseEntry.getValue()._extraProps;
+      if ((boolean) extraProps.getOrDefault(QueryTestCase.REQUIRED_H2_KEY, false)) {
         // Add all test cases without explicit output to the tables on H2
         for (Map.Entry<String, Schema> e : schemaMap.entrySet()) {
           String tableName = e.getKey();
