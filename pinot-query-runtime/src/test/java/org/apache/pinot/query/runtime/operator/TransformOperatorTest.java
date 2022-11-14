@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -217,5 +218,29 @@ public class TransformOperatorTest {
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
     Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*transform operand "
+      + "should not be empty.*")
+  public void testWrongNumTransform() {
+    DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
+    });
+    TransformOperator transform = new TransformOperator(_upstreamOp, resultSchema, new ArrayList<>(), upStreamSchema);
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*doesn't match "
+      + "transform operand size.*")
+  public void testMismatchedSchemaOperandSize() {
+    DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
+    });
+    RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
+    TransformOperator transform =
+        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(ref0), upStreamSchema);
   }
 };

@@ -53,8 +53,9 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
 
   public TransformOperator(Operator<TransferableBlock> upstreamOperator, DataSchema resultSchema,
       List<RexExpression> transforms, DataSchema upstreamDataSchema) {
-    Preconditions.checkState(!transforms.isEmpty());
-    Preconditions.checkState(resultSchema.size() == transforms.size());
+    Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
+    Preconditions.checkState(resultSchema.size() == transforms.size(),
+        "result schema size:" + resultSchema.size() + " doesn't match transform operand size:" + transforms.size());
     _upstreamOperator = upstreamOperator;
     _resultColumnSize = transforms.size();
     _transformOperandsList = new ArrayList<>(_resultColumnSize);
