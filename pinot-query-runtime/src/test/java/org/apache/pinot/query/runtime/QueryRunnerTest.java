@@ -217,9 +217,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // test dateTrunc
         //   - on leaf stage
         new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 10},
+        new Object[]{"SELECT dateTrunc('DAY', CAST(col3 AS BIGINT)) FROM a LIMIT 10", 10},
         //   - on intermediate stage
         new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
             + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+        new Object[]{"SELECT dateTrunc('DAY', CAST(MAX(a.col3) AS BIGINT)) FROM a", 1},
 
         // test regexpLike
         new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLike(a.col2, b.col1)", 9},
