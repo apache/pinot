@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +55,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
   // TODO: refactor and load test dynamically using the reousrce utils in pinot-tools
   private static final List<String> QUERY_TEST_RESOURCE_FILES = ImmutableList.of(
-      "BasicQuery.json"
+      "BasicQuery.json",
+      "SpecialSyntax.json"
   );
 
   @BeforeClass
@@ -76,30 +78,31 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       QueryTestCase testCase = testCaseEntry.getValue();
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
-      for (Map.Entry<String, List<ColumnAndType>> e : testCase._tables.entrySet()) {
-        String tableName = testCaseName + "_" + e.getKey();
+      for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
+        String tableName = testCaseName + "_" + tableEntry.getKey();
         // TODO: able to choose table type, now default to OFFLINE
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
-        org.apache.pinot.spi.data.Schema pinotSchema = constructSchema(tableName, e.getValue());
+        org.apache.pinot.spi.data.Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
         schemaMap.put(tableName, pinotSchema);
         factory1.registerTable(pinotSchema, tableNameWithType);
         factory2.registerTable(pinotSchema, tableNameWithType);
-      }
-      for (Map.Entry<String, List<List<Object>>> e : testCase._inputs.entrySet()) {
-        List<ColumnAndType> columnAndTypes = testCase._tables.get(e.getKey());
-        String tableName = testCaseName + "_" + e.getKey();
-        String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+        List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
         // TODO: able to select add rows to server1 or server2 (now default server1)
         // TODO: able to select add rows to existing segment or create new one (now default create one segment)
-        factory1.addSegment(tableNameWithType, toRow(columnAndTypes, e.getValue()));
+        factory1.addSegment(tableNameWithType, toRow(columnAndTypes, tableEntry.getValue()._inputs));
       }
-      // add all the tables to H2
-      for (Map.Entry<String, Schema> e: schemaMap.entrySet()) {
-        String tableName = e.getKey();
-        Schema schema = e.getValue();
-        addTableToH2(tableName, schema);
-        addDataToH2(tableName, schema, factory1.buildTableRowsMap().get(tableName));
-        addDataToH2(tableName, schema, factory2.buildTableRowsMap().get(tableName));
+
+      // Process extra properties
+      Map<String, Object> extraProps = testCaseEntry.getValue()._extraProps;
+      if ((boolean) extraProps.getOrDefault(QueryTestCase.REQUIRED_H2_KEY, false)) {
+        // Add all test cases without explicit output to the tables on H2
+        for (Map.Entry<String, Schema> e : schemaMap.entrySet()) {
+          String tableName = e.getKey();
+          Schema schema = e.getValue();
+          addTableToH2(tableName, schema);
+          addDataToH2(tableName, schema, factory1.buildTableRowsMap().get(tableName));
+          addDataToH2(tableName, schema, factory2.buildTableRowsMap().get(tableName));
+        }
       }
     }
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
@@ -136,8 +139,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   // TODO: name the test using testCaseName for testng reports
-  @Test(dataProvider = "testResourceQueryTestCaseProvider")
-  public void testQueryTestCases(String testCaseName, String sql)
+  @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
+  public void testQueryTestCasesWithH2(String testCaseName, String sql)
       throws Exception {
     // query pinot
     List<Object[]> resultRows = queryRunner(sql);
@@ -146,19 +149,54 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     compareRowEquals(resultRows, expectedRows);
   }
 
+  @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
+  public void testQueryTestCasesWithOutput(String testCaseName, String sql, List<Object[]> expectedRows)
+      throws Exception {
+    List<Object[]> resultRows = queryRunner(sql);
+    compareRowEquals(resultRows, expectedRows);
+  }
+
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProvider()
+  private static Object[][] testResourceQueryTestCaseProviderBoth()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
-    Object[][] providerContent = new Object[testCaseMap.size()][];
-    int idx = 0;
+    List<Object[]> providerContent = new ArrayList<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
       String testCaseName = testCaseEntry.getKey();
-      String testSql = replaceTableName(testCaseName, testCaseEntry.getValue()._sql);
-      Object[] testEntry = new Object[]{testCaseName, testSql};
-      providerContent[idx++] = testEntry;
+      List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
+      for (QueryTestCase.Query queryCase : queryCases) {
+        if (queryCase._outputs != null && !queryCase._outputs.isEmpty()) {
+          String sql = replaceTableName(testCaseName, queryCase._sql);
+          List<List<Object>> orgRows = queryCase._outputs;
+          List<Object[]> expectedRows = new ArrayList<>(orgRows.size());
+          for (List<Object> objs : orgRows) {
+            expectedRows.add(objs.toArray());
+          }
+          Object[] testEntry = new Object[]{testCaseName, sql, expectedRows};
+          providerContent.add(testEntry);
+        }
+      }
     }
-    return providerContent;
+    return providerContent.toArray(new Object[][]{});
+  }
+
+  @DataProvider
+  private static Object[][] testResourceQueryTestCaseProviderInputOnly()
+      throws Exception {
+    Map<String, QueryTestCase> testCaseMap = getTestCases();
+    List<Object[]> providerContent = new ArrayList<>();
+    for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
+      String testCaseName = testCaseEntry.getKey();
+      List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
+      for (QueryTestCase.Query queryCase : queryCases) {
+        if (queryCase._outputs == null || queryCase._outputs.isEmpty()) {
+          String sql = replaceTableName(testCaseName, queryCase._sql);
+          Object[] testEntry = new Object[]{testCaseName, sql};
+          providerContent.add(testEntry);
+        }
+      }
+    }
+    return providerContent.toArray(new Object[][]{});
   }
 
   private static String replaceTableName(String testCaseName, String sql) {
@@ -166,6 +204,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     return matcher.replaceAll(testCaseName + "_$1");
   }
 
+  // TODO: cache this test case generator
   private static Map<String, QueryTestCase> getTestCases()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = new HashMap<>();

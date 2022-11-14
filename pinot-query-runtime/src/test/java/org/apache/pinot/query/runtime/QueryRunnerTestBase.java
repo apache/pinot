@@ -28,6 +28,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -157,9 +158,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   // --------------------------------------------------------------------------
   // TEST CASES PREP
   // --------------------------------------------------------------------------
-  protected Schema constructSchema(String schemaName, List<ColumnAndType> columnAndTypes) {
+  protected Schema constructSchema(String schemaName, List<QueryTestCase.ColumnAndType> columnAndTypes) {
     Schema.SchemaBuilder builder = new Schema.SchemaBuilder();
-    for (ColumnAndType columnAndType : columnAndTypes) {
+    for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
       builder.addSingleValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
     }
     // TODO: ts is built-in, but we should allow user overwrite
@@ -168,13 +169,13 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     return builder.build();
   }
 
-  protected List<GenericRow> toRow(List<ColumnAndType> columnAndTypes, List<List<Object>> value) {
+  protected List<GenericRow> toRow(List<QueryTestCase.ColumnAndType> columnAndTypes, List<List<Object>> value) {
     List<GenericRow> result = new ArrayList<>(value.size());
     for (int rowId = 0; rowId < value.size(); rowId++) {
       GenericRow row = new GenericRow();
       List<Object> rawRow = value.get(rowId);
       int colId = 0;
-      for (ColumnAndType columnAndType : columnAndTypes) {
+      for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
         row.putValue(columnAndType._name, rawRow.get(colId++));
       }
       // TODO: ts is built-in, but we should allow user overwrite
@@ -256,22 +257,38 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   public static class QueryTestCase {
-    @JsonProperty("sql")
-    public String _sql;
-    @JsonProperty("description")
-    public String _description;
-    @JsonProperty("tables")
-    public Map<String, List<ColumnAndType>> _tables;
-    @JsonProperty("inputs")
-    public Map<String, List<List<Object>>> _inputs;
-    @JsonProperty("extraProps")
-    public Map<String, Object> _extraProps;
-  }
+    public static final String REQUIRED_H2_KEY = "requireH2";
+    public static final String BLOCK_SIZE_KEY = "blockSize";
+    public static final String SERVER_ASSIGN_STRATEGY_KEY = "serverSelectionStrategy";
 
-  public static class ColumnAndType {
-    @JsonProperty("name")
-    String _name;
-    @JsonProperty("type")
-    String _type;
+    @JsonProperty("tables")
+    public Map<String, Table> _tables;
+    @JsonProperty("queries")
+    public List<Query> _queries;
+    @JsonProperty("extraProps")
+    public Map<String, Object> _extraProps = Collections.emptyMap();
+
+    public static class Table {
+      @JsonProperty("schema")
+      public List<ColumnAndType> _schema;
+      @JsonProperty("inputs")
+      public List<List<Object>> _inputs;
+    }
+
+    public static class Query {
+      @JsonProperty("sql")
+      public String _sql;
+      @JsonProperty("description")
+      public String _description;
+      @JsonProperty("outputs")
+      public List<List<Object>> _outputs = Collections.emptyList();
+    }
+
+    public static class ColumnAndType {
+      @JsonProperty("name")
+      String _name;
+      @JsonProperty("type")
+      String _type;
+    }
   }
 }
