@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -39,18 +40,21 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
   private final Operator<TransferableBlock> _upstreamOperator;
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
+  // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public TransformOperator(Operator<TransferableBlock> upstreamOperator, DataSchema dataSchema,
+  public TransformOperator(Operator<TransferableBlock> upstreamOperator, DataSchema resultSchema,
       List<RexExpression> transforms, DataSchema upstreamDataSchema) {
+    Preconditions.checkState(!transforms.isEmpty());
+    Preconditions.checkState(resultSchema.size() == transforms.size());
     _upstreamOperator = upstreamOperator;
     _resultColumnSize = transforms.size();
     _transformOperandsList = new ArrayList<>(_resultColumnSize);
     for (RexExpression rexExpression : transforms) {
       _transformOperandsList.add(TransformOperand.toTransformOperand(rexExpression, upstreamDataSchema));
     }
-    _resultSchema = dataSchema;
+    _resultSchema = resultSchema;
   }
 
   @Override
