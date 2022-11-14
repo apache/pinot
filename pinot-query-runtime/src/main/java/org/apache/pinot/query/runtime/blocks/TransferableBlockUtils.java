@@ -19,8 +19,9 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterators;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -64,7 +65,7 @@ public final class TransferableBlockUtils {
    *
    * @see TransferableBlockUtils#splitBlock(TransferableBlock, DataBlock.Type, int, boolean)
    */
-  public static List<TransferableBlock> splitBlock(TransferableBlock block, DataBlock.Type type, int maxBlockSize) {
+  public static Iterator<TransferableBlock> splitBlock(TransferableBlock block, DataBlock.Type type, int maxBlockSize) {
     return splitBlock(block, type, maxBlockSize, false);
   }
 
@@ -84,7 +85,7 @@ public final class TransferableBlockUtils {
    *                          from leaf stage.
    * @return a list of data block chunks
    */
-  public static List<TransferableBlock> splitBlock(TransferableBlock block, DataBlock.Type type, int maxBlockSize,
+  public static Iterator<TransferableBlock> splitBlock(TransferableBlock block, DataBlock.Type type, int maxBlockSize,
       boolean needsCanonicalize) {
     List<TransferableBlock> blockChunks = new ArrayList<>();
     if (type == DataBlock.Type.ROW) {
@@ -105,9 +106,9 @@ public final class TransferableBlockUtils {
         currentRow += numRowsPerChunk;
         blockChunks.add(new TransferableBlock(chunk, block.getDataSchema(), block.getType()));
       }
-      return blockChunks;
+      return blockChunks.iterator();
     } else if (type == DataBlock.Type.METADATA) {
-      return Collections.singletonList(block);
+      return Iterators.singletonIterator(block);
     } else {
       throw new IllegalArgumentException("Unsupported data block type: " + type);
     }
