@@ -34,6 +34,13 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 
 /**
  * This basic {@code TransformOperator} implement basic transformations.
+ *
+ * This operator performs three kinds of transform
+ * - InputRef transform, which reads from certain input column based on column index
+ * - Literal transform, which outputs literal value
+ * - Function transform, which runs a function on function operands. Function operands and be any of 3 the transform.
+ * Note: Function transform only runs functions from v1 engine scalar function factory, which only does argument count
+ * and canonicalized function name matching (lower case).
  */
 public class TransformOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "TRANSFORM";
