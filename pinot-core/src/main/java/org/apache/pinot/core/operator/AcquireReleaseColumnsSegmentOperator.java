@@ -92,6 +92,7 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
     return Collections.singletonList(_childOperator);
   }
 
+  @Override
   public IndexSegment getIndexSegment() {
     return _indexSegment;
   }

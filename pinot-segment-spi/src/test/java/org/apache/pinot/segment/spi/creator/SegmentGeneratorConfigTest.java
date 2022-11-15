@@ -18,16 +18,12 @@
  */
 package org.apache.pinot.segment.spi.creator;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.TimestampConfig;
-import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -106,61 +102,50 @@ public class SegmentGeneratorConfigTest {
   }
 
   @Test
-  public void testExtractTimestampIndexConfigsFromTableConfig() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("t1").setFieldConfigList(
-        ImmutableList.of(new FieldConfig("f1", FieldConfig.EncodingType.DICTIONARY, null,
-                ImmutableList.of(FieldConfig.IndexType.TIMESTAMP), FieldConfig.CompressionCodec.ZSTANDARD,
-                new TimestampConfig(ImmutableList.of(TimestampIndexGranularity.DAY)), ImmutableMap.of()),
-            new FieldConfig("f2", FieldConfig.EncodingType.DICTIONARY, null,
-                ImmutableList.of(FieldConfig.IndexType.TIMESTAMP), FieldConfig.CompressionCodec.LZ4,
-                new TimestampConfig(ImmutableList.of(TimestampIndexGranularity.WEEK)), ImmutableMap.of()),
-            new FieldConfig("f3", FieldConfig.EncodingType.DICTIONARY, null,
-                ImmutableList.of(FieldConfig.IndexType.TIMESTAMP), FieldConfig.CompressionCodec.PASS_THROUGH,
-                new TimestampConfig(ImmutableList.of(TimestampIndexGranularity.MONTH)), ImmutableMap.of()))).build();
-    Map<String, List<TimestampIndexGranularity>> timestampIndexGranularityMap =
-        SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig);
-    Assert.assertEquals(3, timestampIndexGranularityMap.size());
-    Assert.assertTrue(timestampIndexGranularityMap.containsKey("f1"));
-    Assert.assertTrue(timestampIndexGranularityMap.get("f1").contains(TimestampIndexGranularity.DAY));
-    Assert.assertTrue(timestampIndexGranularityMap.containsKey("f2"));
-    Assert.assertTrue(timestampIndexGranularityMap.get("f2").contains(TimestampIndexGranularity.WEEK));
-    Assert.assertTrue(timestampIndexGranularityMap.containsKey("f3"));
-    Assert.assertTrue(timestampIndexGranularityMap.get("f3").contains(TimestampIndexGranularity.MONTH));
-  }
+  public void inferNameGeneratorType() {
+    // Time column is data type STRING and in SDF
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("date").build();
+    Schema schema = new Schema.SchemaBuilder().addDateTime("date", FieldSpec.DataType.STRING,
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS").build();
 
-  @Test
-  public void testUpdateSchemaWithTimestampIndexes() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("t1").setFieldConfigList(
-        ImmutableList.of(new FieldConfig("f1", FieldConfig.EncodingType.DICTIONARY, null,
-                ImmutableList.of(FieldConfig.IndexType.TIMESTAMP), FieldConfig.CompressionCodec.ZSTANDARD,
-                new TimestampConfig(ImmutableList.of(TimestampIndexGranularity.DAY)), ImmutableMap.of()),
-            new FieldConfig("f2", FieldConfig.EncodingType.DICTIONARY, null,
-                ImmutableList.of(FieldConfig.IndexType.TIMESTAMP), FieldConfig.CompressionCodec.LZ4,
-                new TimestampConfig(ImmutableList.of(TimestampIndexGranularity.WEEK)), ImmutableMap.of()),
-            new FieldConfig("f3", FieldConfig.EncodingType.DICTIONARY, null,
-                ImmutableList.of(FieldConfig.IndexType.TIMESTAMP), FieldConfig.CompressionCodec.PASS_THROUGH,
-                new TimestampConfig(ImmutableList.of(TimestampIndexGranularity.MONTH)), ImmutableMap.of()))).build();
-    Map<String, List<TimestampIndexGranularity>> timestampIndexGranularityMap =
-        SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig);
-    Schema schema = new Schema.SchemaBuilder()
-        .addDateTime("f1", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:SECONDS")
-        .addDateTime("f2", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:SECONDS")
-        .addDateTime("f3", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:SECONDS")
-        .build();
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
 
-    // No update when no timestampIndexGranularityMap
-    Assert.assertEquals(schema, SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema, ImmutableMap.of()));
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof NormalizedDateSegmentNameGenerator);
 
-    Schema updatedSchema =
-        SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema, timestampIndexGranularityMap);
-    Assert.assertEquals(6, updatedSchema.getAllFieldSpecs().size());
-    Assert.assertTrue(updatedSchema.hasColumn("$f1$DAY"));
-    Assert.assertTrue(updatedSchema.hasColumn("$f2$WEEK"));
-    Assert.assertTrue(updatedSchema.hasColumn("$f3$MONTH"));
-    Assert.assertTrue(timestampIndexGranularityMap.get("f1").contains(TimestampIndexGranularity.DAY));
-    Assert.assertTrue(timestampIndexGranularityMap.containsKey("f2"));
-    Assert.assertTrue(timestampIndexGranularityMap.get("f2").contains(TimestampIndexGranularity.WEEK));
-    Assert.assertTrue(timestampIndexGranularityMap.containsKey("f3"));
-    Assert.assertTrue(timestampIndexGranularityMap.get("f3").contains(TimestampIndexGranularity.MONTH));
+    // Use name generator if defined
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setSegmentNameGenerator(new FixedSegmentNameGenerator("test"));
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof FixedSegmentNameGenerator);
+
+    // Use fixed segment generator if segment name defined
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setSegmentName("test");
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof FixedSegmentNameGenerator);
+
+    // Default to simple name generator with prefix when time column is not in SDF
+    schema = new Schema.SchemaBuilder().addDateTime("date", FieldSpec.DataType.STRING,
+        "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setSegmentNamePrefix("prefix");
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof SimpleSegmentNameGenerator);
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator().toString().contains("tableName=prefix"));
+
+    // Default to simple name generator with table prefix
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof SimpleSegmentNameGenerator);
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator().toString().contains("tableName=testTable"));
+
+    // Table config has no time column defined
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof SimpleSegmentNameGenerator);
   }
 }

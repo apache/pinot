@@ -612,7 +612,7 @@ public class ClusterIntegrationTestUtils {
       comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet, orderByColumns,
           pinotQuery, h2Query, h2NumRows, pinotNumRecordsSelected);
     } else {
-      if (queryContext.getGroupByExpressions() == null) {
+      if (queryContext.getGroupByExpressions() == null && !QueryContextUtils.isDistinctQuery(queryContext)) {
         // aggregation only
 
         // compare the single row
@@ -853,7 +853,7 @@ public class ClusterIntegrationTestUtils {
     return value;
   }
 
-  private static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
+  public static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
     // Fuzzy compare expected value and actual value
     boolean error = false;
     if (NumberUtils.isParsable(h2Value)) {

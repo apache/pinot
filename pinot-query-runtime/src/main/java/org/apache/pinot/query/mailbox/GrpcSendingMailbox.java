@@ -18,18 +18,25 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+
 
 /**
  * GRPC implementation of the {@link SendingMailbox}.
  */
-public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
+public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   private final GrpcMailboxService _mailboxService;
   private final String _mailboxId;
   private final AtomicBoolean _initialized = new AtomicBoolean(false);
@@ -58,12 +65,13 @@ public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
   }
 
   @Override
-  public void send(MailboxContent data)
+  public void send(TransferableBlock block)
       throws UnsupportedOperationException {
     if (!_initialized.get()) {
       // initialization is special
       init();
     }
+    MailboxContent data = toMailboxContent(block.getDataBlock());
     _statusStreamObserver.send(data);
     _totalMsgSent.incrementAndGet();
   }
@@ -76,5 +84,18 @@ public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
   @Override
   public String getMailboxId() {
     return _mailboxId;
+  }
+
+  private MailboxContent toMailboxContent(DataBlock dataBlock) {
+    try {
+      Mailbox.MailboxContent.Builder builder = Mailbox.MailboxContent.newBuilder().setMailboxId(_mailboxId)
+          .setPayload(ByteString.copyFrom(dataBlock.toBytes()));
+      if (dataBlock instanceof MetadataBlock) {
+        builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
+      }
+      return builder.build();
+    } catch (IOException e) {
+      throw new RuntimeException("Error converting to mailbox content", e);
+    }
   }
 }

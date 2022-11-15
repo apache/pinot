@@ -577,7 +577,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Public API to schedule tasks (all task types) for the given table. It might be called from the non-leader
    * controller. Returns a map from the task type to the task scheduled.
    */
-  @Nullable
   public synchronized Map<String, String> scheduleTasks(String tableNameWithType) {
     return scheduleTasks(Collections.singletonList(tableNameWithType), false);
   }

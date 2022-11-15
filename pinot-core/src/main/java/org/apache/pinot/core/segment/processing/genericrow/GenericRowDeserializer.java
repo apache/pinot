@@ -23,6 +23,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -81,6 +82,15 @@ public class GenericRowDeserializer {
             buffer.putValue(fieldName, _dataBuffer.getDouble(offset));
             offset += Double.BYTES;
             break;
+          case BIG_DECIMAL: {
+            int numBytes = _dataBuffer.getInt(offset);
+            offset += Integer.BYTES;
+            byte[] bigDecimalBytes = new byte[numBytes];
+            _dataBuffer.copyTo(offset, bigDecimalBytes);
+            offset += numBytes;
+            buffer.putValue(fieldName, BigDecimalUtils.deserialize(bigDecimalBytes));
+            break;
+          }
           case STRING: {
             int numBytes = _dataBuffer.getInt(offset);
             offset += Integer.BYTES;
@@ -231,6 +241,24 @@ public class GenericRowDeserializer {
             byte[] bytes2 = new byte[numBytes2];
             _dataBuffer.copyTo(offset2, bytes2);
             int result = ByteArray.compare(bytes1, bytes2);
+            if (result != 0) {
+              return result;
+            }
+            offset1 += numBytes1;
+            offset2 += numBytes2;
+            break;
+          }
+          case BIG_DECIMAL: {
+            int numBytes1 = _dataBuffer.getInt(offset1);
+            offset1 += Integer.BYTES;
+            byte[] bigDecimalBytes1 = new byte[numBytes1];
+            _dataBuffer.copyTo(offset1, bigDecimalBytes1);
+            int numBytes2 = _dataBuffer.getInt(offset2);
+            offset2 += Integer.BYTES;
+            byte[] bigDecimalBytes2 = new byte[numBytes2];
+            _dataBuffer.copyTo(offset2, bigDecimalBytes2);
+            int result =
+                BigDecimalUtils.deserialize(bigDecimalBytes1).compareTo(BigDecimalUtils.deserialize(bigDecimalBytes2));
             if (result != 0) {
               return result;
             }

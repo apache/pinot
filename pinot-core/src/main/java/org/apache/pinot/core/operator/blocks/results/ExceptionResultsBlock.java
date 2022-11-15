@@ -18,28 +18,40 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
+import java.util.Collection;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public class ExceptionResultsBlock extends BaseResultsBlock {
 
-  public ExceptionResultsBlock(ProcessingException processingException, Exception e) {
-    addToProcessingExceptions(QueryException.getException(processingException, e));
+  public ExceptionResultsBlock(ProcessingException processingException, Throwable t) {
+    addToProcessingExceptions(QueryException.getException(processingException, t));
   }
 
-  public ExceptionResultsBlock(Exception e) {
-    this(QueryException.QUERY_EXECUTION_ERROR, e);
+  public ExceptionResultsBlock(Throwable t) {
+    this(QueryException.QUERY_EXECUTION_ERROR, t);
+  }
+
+  @Nullable
+  @Override
+  public DataSchema getDataSchema(QueryContext queryContext) {
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public Collection<Object[]> getRows(QueryContext queryContext) {
+    return null;
   }
 
   @Override
-  public DataTable getDataTable(QueryContext queryContext)
-      throws Exception {
-    DataTable dataTable = DataTableBuilderUtils.getEmptyDataTable();
-    attachMetadataToDataTable(dataTable);
-    return dataTable;
+  public DataTable getDataTable(QueryContext queryContext) {
+    return DataTableBuilderFactory.getEmptyDataTable();
   }
 }

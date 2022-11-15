@@ -80,7 +80,6 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -88,6 +87,7 @@ import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -97,7 +97,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@SuppressWarnings("UnstableApiUsage")
 @ThreadSafe
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
@@ -106,6 +105,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
+  private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
 
   protected final PinotConfiguration _config;
   protected final BrokerRoutingManager _routingManager;
@@ -179,17 +179,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   Set<ServerInstance> getRunningServers(long requestId) {
     Preconditions.checkState(_queriesById != null, "Query cancellation is not enabled on broker");
     QueryServers queryServers = _queriesById.get(requestId);
-    if (queryServers == null) {
-      return Collections.emptySet();
-    }
-    Set<ServerInstance> runningServers = new HashSet<>();
-    if (queryServers._offlineRoutingTable != null) {
-      runningServers.addAll(queryServers._offlineRoutingTable.keySet());
-    }
-    if (queryServers._realtimeRoutingTable != null) {
-      runningServers.addAll(queryServers._realtimeRoutingTable.keySet());
-    }
-    return runningServers;
+    return queryServers != null ? queryServers._servers : Collections.emptySet();
   }
 
   @Override
@@ -201,23 +191,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (queryServers == null) {
       return false;
     }
+    // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils for
+    //       details
+    String globalQueryId = getGlobalQueryId(requestId);
     List<String> serverUrls = new ArrayList<>();
-    if (queryServers._offlineRoutingTable != null) {
-      for (ServerInstance server : queryServers._offlineRoutingTable.keySet()) {
-        serverUrls.add(String.format("%s/query/%s", server.getAdminEndpoint(), getGlobalQueryId(requestId)));
-      }
-    }
-    if (queryServers._realtimeRoutingTable != null) {
-      // NOTE: When the query is sent to both OFFLINE and REALTIME table, the REALTIME one has negative request id to
-      //       differentiate from the OFFLINE one
-      long realtimeRequestId = queryServers._offlineRoutingTable == null ? requestId : -requestId;
-      for (ServerInstance server : queryServers._realtimeRoutingTable.keySet()) {
-        serverUrls.add(String.format("%s/query/%s", server.getAdminEndpoint(), getGlobalQueryId(realtimeRequestId)));
-      }
-    }
-    if (serverUrls.isEmpty()) {
-      LOGGER.debug("No servers running the query: {} right now", queryServers._query);
-      return true;
+    for (ServerInstance serverInstance : queryServers._servers) {
+      serverUrls.add(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId));
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
     CompletionService<DeleteMethod> completionService =
@@ -549,8 +528,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Send empty response since we don't need to evaluate either offline or realtime request.
       BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
       // Extract source info from incoming request
-      _queryLogger.log(new QueryLogger.QueryLogParams(
-          requestId, query, requestContext, tableName, 0, new ServerStats(),
+      _queryLogger.log(new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, 0, new ServerStats(),
           brokerResponse, System.nanoTime(), requesterIdentity));
       return brokerResponse;
     }
@@ -608,7 +586,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     List<ProcessingException> exceptions = new ArrayList<>();
     if (numUnavailableSegments > 0) {
-      String errorMessage = String.format("%d segments %s unavailable", numUnavailableSegments, unavailableSegments);
+      String errorMessage;
+      if (numUnavailableSegments > MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION) {
+        errorMessage = String.format("%d segments unavailable, sampling %d: %s", numUnavailableSegments,
+            MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION,
+            unavailableSegments.subList(0, MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION));
+      } else {
+        errorMessage = String.format("%d segments unavailable: %s", numUnavailableSegments, unavailableSegments);
+      }
       exceptions.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
     }
 
@@ -684,9 +669,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         LOGGER.debug("Remove track of running query: {}", requestId);
       }
     } else {
-      brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-          offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-          requestContext);
+      brokerResponse =
+          processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest, offlineRoutingTable,
+              realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
     }
 
     brokerResponse.setExceptions(exceptions);
@@ -710,9 +695,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Extract source info from incoming request
     _queryLogger.log(
-        new QueryLogger.QueryLogParams(
-            requestId, query, requestContext, tableName, numUnavailableSegments, serverStats, brokerResponse,
-            totalTimeMs, requesterIdentity));
+        new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, numUnavailableSegments, serverStats,
+            brokerResponse, totalTimeMs, requesterIdentity));
     return brokerResponse;
   }
 
@@ -753,12 +737,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         String granularString = function.getOperands().get(0).getLiteral().getStringValue().toUpperCase();
         Expression timeExpression = function.getOperands().get(1);
         if (((function.getOperandsSize() == 2) || (function.getOperandsSize() == 3 && "MILLISECONDS".equalsIgnoreCase(
-            function.getOperands().get(2).getLiteral().getStringValue())))
-            && TimestampIndexGranularity.isValidTimeGranularity(granularString)
-            && timeExpression.getIdentifier() != null) {
+            function.getOperands().get(2).getLiteral().getStringValue()))) && TimestampIndexUtils.isValidGranularity(
+            granularString) && timeExpression.getIdentifier() != null) {
           String timeColumn = timeExpression.getIdentifier().getName();
-          String timeColumnWithGranularity = TimestampIndexGranularity.getColumnNameWithGranularity(timeColumn,
-              TimestampIndexGranularity.valueOf(granularString));
+          String timeColumnWithGranularity = TimestampIndexUtils.getColumnWithGranularity(timeColumn, granularString);
           if (timestampIndexColumns.contains(timeColumnWithGranularity)) {
             pinotQuery.putToExpressionOverrideHints(expression,
                 RequestUtils.getIdentifierExpression(timeColumnWithGranularity));
@@ -1669,15 +1651,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Helper class to track the query plaintext and the requested servers.
    */
   private static class QueryServers {
-    private final String _query;
-    private final Map<ServerInstance, List<String>> _offlineRoutingTable;
-    private final Map<ServerInstance, List<String>> _realtimeRoutingTable;
+    final String _query;
+    final Set<ServerInstance> _servers = new HashSet<>();
 
-    public QueryServers(String query, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
+    QueryServers(String query, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
         @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable) {
       _query = query;
-      _offlineRoutingTable = offlineRoutingTable;
-      _realtimeRoutingTable = realtimeRoutingTable;
+      if (offlineRoutingTable != null) {
+        _servers.addAll(offlineRoutingTable.keySet());
+      }
+      if (realtimeRoutingTable != null) {
+        _servers.addAll(realtimeRoutingTable.keySet());
+      }
     }
   }
 }

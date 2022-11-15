@@ -128,6 +128,7 @@ public class StarTreeLoaderUtils {
             throws IOException {
           // NOTE: Close the indexes managed by the star-tree (dictionary is managed inside the ColumnIndexContainer).
           for (DataSource dataSource : dataSourceMap.values()) {
+            // Forward index cannot be null here
             dataSource.getForwardIndex().close();
           }
         }

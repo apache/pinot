@@ -18,14 +18,15 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.io.IOException;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -33,30 +34,41 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class SortOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "SORT";
-  private final BaseOperator<TransferableBlock> _upstreamOperator;
+  private final Operator<TransferableBlock> _upstreamOperator;
   private final int _fetch;
   private final int _offset;
   private final DataSchema _dataSchema;
   private final PriorityQueue<Object[]> _rows;
   private final int _numRowsToKeep;
 
+  private boolean _readyToConstruct;
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
 
-  public SortOperator(BaseOperator<TransferableBlock> upstreamOperator, List<RexExpression> collationKeys,
+  public SortOperator(Operator<TransferableBlock> upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema) {
+    this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
+        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY);
+  }
+
+  @VisibleForTesting
+  SortOperator(Operator<TransferableBlock> upstreamOperator, List<RexExpression> collationKeys,
+      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
+      int maxHolderCapacity) {
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
     _offset = offset;
     _dataSchema = dataSchema;
     _upstreamErrorBlock = null;
     _isSortedBlockConstructed = false;
-    _numRowsToKeep = _fetch > 0 ? Math.min(SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
-        _fetch + (Math.max(_offset, 0))) : SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY;
+    _numRowsToKeep = _fetch > 0
+        ? Math.min(maxHolderCapacity, _fetch + (Math.max(_offset, 0)))
+        : maxHolderCapacity;
     _rows = new PriorityQueue<>(_numRowsToKeep,
         new SortComparator(collationKeys, collationDirections, dataSchema, false));
   }
@@ -83,11 +95,13 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
-  private TransferableBlock produceSortedBlock()
-      throws IOException {
+  private TransferableBlock produceSortedBlock() {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
+    } else if (!_readyToConstruct) {
+      return TransferableBlockUtils.getNoOpTransferableBlock();
     }
+
     if (!_isSortedBlockConstructed) {
       LinkedList<Object[]> rows = new LinkedList<>();
       while (_rows.size() > _offset) {
@@ -96,30 +110,38 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
       }
       _isSortedBlockConstructed = true;
       if (rows.size() == 0) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       } else {
-        return new TransferableBlock(rows, _dataSchema, BaseDataBlock.Type.ROW);
+        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }
     } else {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
   }
 
   private void consumeInputBlocks() {
     if (!_isSortedBlockConstructed) {
       TransferableBlock block = _upstreamOperator.nextBlock();
-      while (!TransferableBlockUtils.isEndOfStream(block)) {
-        BaseDataBlock dataBlock = block.getDataBlock();
-        int numRows = dataBlock.getNumberOfRows();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
-          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
-        }
-        block = _upstreamOperator.nextBlock();
-      }
       // setting upstream error block
       if (block.isErrorBlock()) {
         _upstreamErrorBlock = block;
+        return;
+      } else if (TransferableBlockUtils.isEndOfStream(block)) {
+        _readyToConstruct = true;
+        return;
+      } else if (TransferableBlockUtils.isNoOpBlock(block)) {
+        return;
+      }
+
+      DataBlock dataBlock = block.getDataBlock();
+      int numRows = dataBlock.getNumberOfRows();
+      if (numRows > 0) {
+        RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
+              dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
       }
     }
   }

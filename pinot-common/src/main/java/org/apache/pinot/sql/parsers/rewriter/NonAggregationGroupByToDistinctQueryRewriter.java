@@ -18,58 +18,73 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
+/**
+ * Rewrite non-aggregation group-by query to distinct query.
+ * The query can be rewritten only if select expression set and group-by expression set are the same.
+ *
+ * E.g.
+ * SELECT col1, col2 FROM foo GROUP BY col1, col2 --> SELECT DISTINCT col1, col2 FROM foo
+ * SELECT col1, col2 FROM foo GROUP BY col2, col1 --> SELECT DISTINCT col1, col2 FROM foo
+ * SELECT col1 + col2 FROM foo GROUP BY col1 + col2 --> SELECT DISTINCT col1 + col2 FROM foo
+ * SELECT col1 AS c1 FROM foo GROUP BY col1 --> SELECT DISTINCT col1 AS c1 FROM foo
+ * SELECT col1, col1 AS c1, col2 FROM foo GROUP BY col1, col2 --> SELECT DISTINCT col1, col1 AS ci, col2 FROM foo
+ *
+ * Unsupported queries:
+ * SELECT col1 FROM foo GROUP BY col1, col2 (not equivalent to SELECT DISTINCT col1 FROM foo)
+ * SELECT col1 + col2 FROM foo GROUP BY col1, col2 (not equivalent to SELECT col1 + col2 FROM foo)
+ */
 public class NonAggregationGroupByToDistinctQueryRewriter implements QueryRewriter {
-  /**
-   * Rewrite non-aggregate group by query to distinct query.
-   * E.g.
-   * ```
-   *   SELECT col1+col2*5 FROM foo GROUP BY col1, col2 => SELECT distinct col1+col2*5 FROM foo
-   *   SELECT col1, col2 FROM foo GROUP BY col1, col2 => SELECT distinct col1, col2 FROM foo
-   * ```
-   * @param pinotQuery
-   */
+
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {
-    boolean hasAggregation = false;
+    if (pinotQuery.getGroupByListSize() == 0) {
+      return pinotQuery;
+    }
     for (Expression select : pinotQuery.getSelectList()) {
       if (CalciteSqlParser.isAggregateExpression(select)) {
-        hasAggregation = true;
+        return pinotQuery;
       }
     }
     if (pinotQuery.getOrderByList() != null) {
       for (Expression orderBy : pinotQuery.getOrderByList()) {
         if (CalciteSqlParser.isAggregateExpression(orderBy)) {
-          hasAggregation = true;
+          return pinotQuery;
         }
       }
     }
-    if (!hasAggregation && pinotQuery.getGroupByListSize() > 0) {
-      Set<String> selectIdentifiers = CalciteSqlParser.extractIdentifiers(pinotQuery.getSelectList(), true);
-      Set<String> groupByIdentifiers = CalciteSqlParser.extractIdentifiers(pinotQuery.getGroupByList(), true);
-      if (groupByIdentifiers.containsAll(selectIdentifiers)) {
-        Expression distinctExpression = RequestUtils.getFunctionExpression("distinct");
-        for (Expression select : pinotQuery.getSelectList()) {
-          distinctExpression.getFunctionCall().addToOperands(select);
-        }
-        pinotQuery.setSelectList(Arrays.asList(distinctExpression));
-        pinotQuery.setGroupByList(Collections.emptyList());
+
+    // This rewriter is applied after AliasApplier, so all the alias in group-by are already replaced with expressions
+    Set<Expression> selectExpressions = new HashSet<>();
+    for (Expression select : pinotQuery.getSelectList()) {
+      Function function = select.getFunctionCall();
+      if (function != null && function.getOperator().equals("as")) {
+        selectExpressions.add(function.getOperands().get(0));
       } else {
-        selectIdentifiers.removeAll(groupByIdentifiers);
-        throw new SqlCompilationException(String.format(
-            "For non-aggregation group by query, all the identifiers in select clause should be in groupBys. Found "
-                + "identifier: %s", Arrays.toString(selectIdentifiers.toArray(new String[0]))));
+        selectExpressions.add(select);
       }
     }
-    return pinotQuery;
+    Set<Expression> groupByExpressions = new HashSet<>(pinotQuery.getGroupByList());
+    if (selectExpressions.equals(groupByExpressions)) {
+      Expression distinct = RequestUtils.getFunctionExpression("distinct");
+      distinct.getFunctionCall().setOperands(pinotQuery.getSelectList());
+      pinotQuery.setSelectList(Collections.singletonList(distinct));
+      pinotQuery.setGroupByList(null);
+      return pinotQuery;
+    } else {
+      throw new SqlCompilationException(String.format(
+          "For non-aggregation group-by query, select expression set and group-by expression set should be the same. "
+              + "Found select: %s, group-by: %s", selectExpressions, groupByExpressions));
+    }
   }
 }

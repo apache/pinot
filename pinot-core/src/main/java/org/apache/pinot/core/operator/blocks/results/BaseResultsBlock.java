@@ -19,14 +19,17 @@
 package org.apache.pinot.core.operator.blocks.results;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
@@ -155,16 +158,29 @@ public abstract class BaseResultsBlock implements Block {
     _numServerThreads = numServerThreads;
   }
 
-  public abstract DataTable getDataTable(QueryContext queryContext)
-      throws Exception;
+  /**
+   * Returns the data schema for the results. Return {@code null} when the block only contains metadata.
+   */
+  @Nullable
+  public abstract DataSchema getDataSchema(QueryContext queryContext);
 
-  protected void attachMetadataToDataTable(DataTable dataTable) {
-    if (CollectionUtils.isNotEmpty(_processingExceptions)) {
-      for (ProcessingException exception : _processingExceptions) {
-        dataTable.addException(exception);
-      }
-    }
-    Map<String, String> metadata = dataTable.getMetadata();
+  /**
+   * Returns the rows for the results. Return {@code null} when the block only contains metadata.
+   */
+  @Nullable
+  public abstract Collection<Object[]> getRows(QueryContext queryContext);
+
+  /**
+   * Returns a data table without metadata or exception attached.
+   */
+  public abstract DataTable getDataTable(QueryContext queryContext)
+      throws IOException;
+
+  /**
+   * Returns the metadata for the results.
+   */
+  public Map<String, String> getResultsMetadata() {
+    Map<String, String> metadata = new HashMap<>();
     metadata.put(MetadataKey.TOTAL_DOCS.getName(), Long.toString(_numTotalDocs));
     metadata.put(MetadataKey.NUM_DOCS_SCANNED.getName(), Long.toString(_numDocsScanned));
     metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), Long.toString(_numEntriesScannedInFilter));
@@ -174,6 +190,7 @@ public abstract class BaseResultsBlock implements Block {
     metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(),
         Integer.toString(_numConsumingSegmentsProcessed));
     metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), Integer.toString(_numConsumingSegmentsMatched));
+    return metadata;
   }
 
   @Override

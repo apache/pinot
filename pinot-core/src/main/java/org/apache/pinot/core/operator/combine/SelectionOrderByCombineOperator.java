@@ -104,9 +104,16 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator<Selecti
       return;
     }
 
-    PriorityQueue<Object[]> mergedRows = (PriorityQueue<Object[]>) mergedBlock.getRows();
+    PriorityQueue<Object[]> mergedRows = mergedBlock.getRowsAsPriorityQueue();
     Collection<Object[]> rowsToMerge = blockToMerge.getRows();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
+  }
+
+  @Override
+  protected SelectionResultsBlock convertToMergeableBlock(SelectionResultsBlock resultsBlock) {
+    // This may create a copy or return the same instance. Anyway, this operator is the owner of the
+    // value now, so it can mutate it.
+    return resultsBlock.convertToPriorityQueueBased();
   }
 }

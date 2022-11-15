@@ -28,6 +28,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
+@Test(groups = "stateless")
 public class ControllerPeriodicTaskStarterStatelessTest extends ControllerTest {
 
   @BeforeClass

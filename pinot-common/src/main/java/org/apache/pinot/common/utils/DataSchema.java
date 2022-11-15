@@ -83,16 +83,21 @@ public class DataSchema {
     return _columnDataTypes;
   }
 
+  /**
+   * Lazy compute the _storeColumnDataTypes field.
+   */
   @JsonIgnore
   public ColumnDataType[] getStoredColumnDataTypes() {
-    if (_storedColumnDataTypes == null) {
+    ColumnDataType[] storedColumnDataTypes = _storedColumnDataTypes;
+    if (storedColumnDataTypes == null) {
       int numColumns = _columnDataTypes.length;
-      _storedColumnDataTypes = new ColumnDataType[numColumns];
+      storedColumnDataTypes = new ColumnDataType[numColumns];
       for (int i = 0; i < numColumns; i++) {
-        _storedColumnDataTypes[i] = _columnDataTypes[i].getStoredType();
+        storedColumnDataTypes[i] = _columnDataTypes[i].getStoredType();
       }
+      _storedColumnDataTypes = storedColumnDataTypes;
     }
-    return _storedColumnDataTypes;
+    return storedColumnDataTypes;
   }
 
   /**
@@ -126,29 +131,34 @@ public class DataSchema {
    * <code>LONG</code>.
    * <p>NOTE: The given data schema should be type compatible with this one.
    *
+   * @param originalSchema the original Data schema
    * @param anotherDataSchema Data schema to cover
    */
-  public void upgradeToCover(DataSchema anotherDataSchema) {
-    int numColumns = _columnDataTypes.length;
+  public static DataSchema upgradeToCover(DataSchema originalSchema, DataSchema anotherDataSchema) {
+    int numColumns = originalSchema._columnDataTypes.length;
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      ColumnDataType thisColumnDataType = _columnDataTypes[i];
+      ColumnDataType thisColumnDataType = originalSchema._columnDataTypes[i];
       ColumnDataType thatColumnDataType = anotherDataSchema._columnDataTypes[i];
       if (thisColumnDataType != thatColumnDataType) {
         if (thisColumnDataType.isArray()) {
           if (thisColumnDataType.isWholeNumberArray() && thatColumnDataType.isWholeNumberArray()) {
-            _columnDataTypes[i] = ColumnDataType.LONG_ARRAY;
+            columnDataTypes[i] = ColumnDataType.LONG_ARRAY;
           } else {
-            _columnDataTypes[i] = ColumnDataType.DOUBLE_ARRAY;
+            columnDataTypes[i] = ColumnDataType.DOUBLE_ARRAY;
           }
         } else {
           if (thisColumnDataType.isWholeNumber() && thatColumnDataType.isWholeNumber()) {
-            _columnDataTypes[i] = ColumnDataType.LONG;
+            columnDataTypes[i] = ColumnDataType.LONG;
           } else {
-            _columnDataTypes[i] = ColumnDataType.DOUBLE;
+            columnDataTypes[i] = ColumnDataType.DOUBLE;
           }
         }
+      } else {
+        columnDataTypes[i] = originalSchema._columnDataTypes[i];
       }
     }
+    return new DataSchema(originalSchema._columnNames, columnDataTypes);
   }
 
   public byte[] toBytes()
@@ -246,18 +256,18 @@ public class DataSchema {
     FLOAT(0f),
     DOUBLE(0d),
     BIG_DECIMAL(BigDecimal.ZERO),
-    BOOLEAN(0) /* Stored as INT */,
-    TIMESTAMP(0L) /* Stored as LONG */,
+    BOOLEAN(INT, 0),
+    TIMESTAMP(LONG, 0L),
     STRING(""),
-    JSON("") /* Stored as STRING */,
+    JSON(STRING, ""),
     BYTES(new ByteArray(new byte[0])),
     OBJECT(null),
     INT_ARRAY(new int[0]),
     LONG_ARRAY(new long[0]),
     FLOAT_ARRAY(new float[0]),
     DOUBLE_ARRAY(new double[0]),
-    BOOLEAN_ARRAY(new int[0]) /* Stored as INT_ARRAY */,
-    TIMESTAMP_ARRAY(new long[0]) /* Stored as LONG_ARRAY */,
+    BOOLEAN_ARRAY(INT_ARRAY, new int[0]),
+    TIMESTAMP_ARRAY(LONG_ARRAY, new long[0]),
     STRING_ARRAY(new String[0]),
     BYTES_ARRAY(new byte[0][]);
 
@@ -270,10 +280,19 @@ public class DataSchema {
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
 
+    // stored data type.
+    private final ColumnDataType _storedColumnDataType;
+
     // Placeholder for null. We need a placeholder for null so that it can be serialized in the data table
     private final Object _nullPlaceholder;
 
     ColumnDataType(Object nullPlaceHolder) {
+      _storedColumnDataType = this;
+      _nullPlaceholder = nullPlaceHolder;
+    }
+
+    ColumnDataType(ColumnDataType storedColumnDataType, Object nullPlaceHolder) {
+      _storedColumnDataType = storedColumnDataType;
       _nullPlaceholder = nullPlaceHolder;
     }
 
@@ -285,20 +304,7 @@ public class DataSchema {
      * Returns the data type stored in Pinot.
      */
     public ColumnDataType getStoredType() {
-      switch (this) {
-        case BOOLEAN:
-          return INT;
-        case TIMESTAMP:
-          return LONG;
-        case JSON:
-          return STRING;
-        case BOOLEAN_ARRAY:
-          return INT_ARRAY;
-        case TIMESTAMP_ARRAY:
-          return LONG_ARRAY;
-        default:
-          return this;
-      }
+      return _storedColumnDataType;
     }
 
     public boolean isNumber() {

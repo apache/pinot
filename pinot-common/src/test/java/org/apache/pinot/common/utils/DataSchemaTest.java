@@ -82,7 +82,7 @@ public class DataSchemaTest {
     DataSchema incompatibleDataSchema = new DataSchema(anotherColumnNames, COLUMN_DATA_TYPES);
     Assert.assertFalse(dataSchema.isTypeCompatibleWith(incompatibleDataSchema));
 
-    dataSchema.upgradeToCover(compatibleDataSchema);
+    dataSchema = DataSchema.upgradeToCover(dataSchema, compatibleDataSchema);
     DataSchema upgradedDataSchema = new DataSchema(COLUMN_NAMES, UPGRADED_COLUMN_DATA_TYPES);
     Assert.assertEquals(dataSchema, upgradedDataSchema);
   }

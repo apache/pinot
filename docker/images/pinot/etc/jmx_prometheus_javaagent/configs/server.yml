@@ -118,3 +118,8 @@ rules:
     table: "$1"
     tableType: "$2"
     partition: "$3"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.version.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_version"
+  cache: true
+  labels:
+    version: "$1"

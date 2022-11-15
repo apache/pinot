@@ -289,6 +289,8 @@ public class CommonConstants {
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
 
+        public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
+
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
         public static final String PRESERVE_TYPE = "preserveType";
@@ -745,6 +747,7 @@ public class CommonConstants {
     public static final String INDEX_VERSION = "segment.index.version";
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
+    public static final String TIER = "segment.tier";
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String PUSH_TIME = "segment.push.time";
     public static final String REFRESH_TIME = "segment.refresh.time";
@@ -779,6 +782,10 @@ public class CommonConstants {
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
     }
+  }
+
+  public static class Tier {
+    public static final String BACKEND_PROP_DATA_DIR = "dataDir";
   }
 
   public static class Query {

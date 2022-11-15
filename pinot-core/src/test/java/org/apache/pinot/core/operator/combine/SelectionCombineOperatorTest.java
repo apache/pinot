@@ -116,7 +116,7 @@ public class SelectionCombineOperatorTest {
     RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder()
         .setTableNameWithType(REALTIME_TABLE_NAME).setSegmentName(segmentName).setSchema(SCHEMA).setCapacity(100000)
         .setAvgNumMultiValues(2).setNoDictionaryColumns(Collections.emptySet())
-        .setJsonIndexColumns(Collections.emptySet()).setVarLengthDictionaryColumns(Collections.emptySet())
+        .setJsonIndexConfigs(Collections.emptyMap()).setVarLengthDictionaryColumns(Collections.emptySet())
         .setInvertedIndexColumns(Collections.emptySet()).setSegmentZKMetadata(new SegmentZKMetadata(segmentName))
         .setMemoryManager(new DirectMemoryManager(segmentName)).setStatsHistory(statsHistory).setAggregateMetrics(false)
         .setNullHandlingEnabled(true).setIngestionAggregationConfigs(Collections.emptyList()).build();
@@ -224,7 +224,7 @@ public class SelectionCombineOperatorTest {
     SelectionResultsBlock combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) combineResult.getRows();
+    PriorityQueue<Object[]> selectionResult = combineResult.getRowsAsPriorityQueue();
     assertNotNull(selectionResult);
     assertEquals(selectionResult.size(), 10);
     int expectedValue = 9;
@@ -248,7 +248,7 @@ public class SelectionCombineOperatorTest {
     combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn DESC");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    selectionResult = (PriorityQueue<Object[]>) combineResult.getRows();
+    selectionResult = combineResult.getRowsAsPriorityQueue();
     assertNotNull(selectionResult);
     assertEquals(selectionResult.size(), 10);
     expectedValue = NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT / 2 + 40;
@@ -272,7 +272,7 @@ public class SelectionCombineOperatorTest {
     combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 10000");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    selectionResult = (PriorityQueue<Object[]>) combineResult.getRows();
+    selectionResult = combineResult.getRowsAsPriorityQueue();
     assertNotNull(selectionResult);
     assertEquals(selectionResult.size(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
     // Should not early-terminate

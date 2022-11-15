@@ -281,7 +281,7 @@ public class KafkaPartitionLevelConsumerTest {
           consumer.fetchMessages(new LongMsgOffset(0), new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), 10000);
       Assert.assertEquals(batch1.getMessageCount(), 500);
       for (int i = 0; i < batch1.getMessageCount(); i++) {
-        final byte[] msg = batch1.getStreamMessage(i).getValue();
+        final byte[] msg = (byte[]) batch1.getStreamMessage(i).getValue();
         Assert.assertEquals(new String(msg), "sample_msg_" + i);
         Assert.assertNotNull(batch1.getMetadataAtIndex(i));
       }
@@ -290,7 +290,7 @@ public class KafkaPartitionLevelConsumerTest {
           consumer.fetchMessages(new LongMsgOffset(500), new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), 10000);
       Assert.assertEquals(batch2.getMessageCount(), 500);
       for (int i = 0; i < batch2.getMessageCount(); i++) {
-        final byte[] msg = batch2.getStreamMessage(i).getValue();
+        final byte[] msg = (byte[]) batch2.getStreamMessage(i).getValue();
         Assert.assertEquals(new String(msg), "sample_msg_" + (500 + i));
         Assert.assertNotNull(batch1.getMetadataAtIndex(i));
       }
@@ -298,7 +298,7 @@ public class KafkaPartitionLevelConsumerTest {
       final MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(35), 10000);
       Assert.assertEquals(batch3.getMessageCount(), 25);
       for (int i = 0; i < batch3.getMessageCount(); i++) {
-        final byte[] msg = batch3.getStreamMessage(i).getValue();
+        final byte[] msg = (byte[]) batch3.getStreamMessage(i).getValue();
         Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
         Assert.assertNotNull(batch1.getMetadataAtIndex(i));
       }
@@ -388,7 +388,7 @@ public class KafkaPartitionLevelConsumerTest {
     MessageBatch batch1 = consumer.fetchMessages(new LongMsgOffset(0), new LongMsgOffset(400), 10000);
     Assert.assertEquals(batch1.getMessageCount(), 200);
     for (int i = 0; i < batch1.getMessageCount(); i++) {
-      byte[] msg = batch1.getStreamMessage(i).getValue();
+      byte[] msg = (byte[]) batch1.getStreamMessage(i).getValue();
       Assert.assertEquals(new String(msg), "sample_msg_" + (i + 200));
     }
     Assert.assertEquals(batch1.getOffsetOfNextBatch().toString(), "400");
@@ -400,7 +400,7 @@ public class KafkaPartitionLevelConsumerTest {
     MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(201), new LongMsgOffset(401), 10000);
     Assert.assertEquals(batch3.getMessageCount(), 200);
     for (int i = 0; i < batch3.getMessageCount(); i++) {
-      byte[] msg = batch3.getStreamMessage(i).getValue();
+      byte[] msg = (byte[]) batch3.getStreamMessage(i).getValue();
       Assert.assertEquals(new String(msg), "sample_msg_" + (i + 201));
     }
     Assert.assertEquals(batch3.getOffsetOfNextBatch().toString(), "401");
@@ -408,7 +408,7 @@ public class KafkaPartitionLevelConsumerTest {
     MessageBatch batch4 = consumer.fetchMessages(new LongMsgOffset(0), null, 10000);
     Assert.assertEquals(batch4.getMessageCount(), 500);
     for (int i = 0; i < batch4.getMessageCount(); i++) {
-      byte[] msg = batch4.getStreamMessage(i).getValue();
+      byte[] msg = (byte[]) batch4.getStreamMessage(i).getValue();
       Assert.assertEquals(new String(msg), "sample_msg_" + (i + 200));
     }
     Assert.assertEquals(batch4.getOffsetOfNextBatch().toString(), "700");

@@ -634,6 +634,7 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public void close()
       throws IOException {
+    _s3Client.close();
     super.close();
   }
 }

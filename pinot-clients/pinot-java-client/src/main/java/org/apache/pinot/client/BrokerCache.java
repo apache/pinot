@@ -104,6 +104,7 @@ public class BrokerCache {
         DEFAULT_CONTROLLER_CONNECT_TIMEOUT_MS));
     int handshakeTimeoutMs = Integer.parseInt(properties.getProperty("controllerHandshakeTimeoutMs",
         DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS));
+    String appId = properties.getProperty("appId");
     boolean tlsV10Enabled = Boolean.parseBoolean(properties.getProperty("controllerTlsV10Enabled",
         DEFAULT_CONTROLLER_TLS_V10_ENABLED))
         || Boolean.parseBoolean(System.getProperties().getProperty("controller.tlsV10Enabled",
@@ -113,7 +114,7 @@ public class BrokerCache {
     builder.setReadTimeout(readTimeoutMs)
         .setConnectTimeout(connectTimeoutMs)
         .setHandshakeTimeout(handshakeTimeoutMs)
-        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua_broker_cache"))
+        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua_broker_cache", appId))
         .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
 
     _client = Dsl.asyncHttpClient(builder.build());

@@ -64,7 +64,6 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -285,7 +284,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     SegmentZKMetadata segmentZKMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
     Preconditions.checkNotNull(segmentZKMetadata);
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Schema schema = indexLoadingConfig.getSchema();
     Preconditions.checkNotNull(schema);
 
     File segmentDir = new File(_indexDir, segmentName);
@@ -296,25 +295,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     boolean isHLCSegment = SegmentName.isHighLevelConsumerSegmentName(segmentName);
     if (segmentZKMetadata.getStatus().isCompleted()) {
-      if (segmentDir.exists()) {
-        // Local segment exists, try to load it
-        try {
-          addSegment(ImmutableSegmentLoader.load(segmentDir, indexLoadingConfig, schema));
-          return;
-        } catch (Exception e) {
-          if (!isHLCSegment) {
-            // For LLC and uploaded segments, delete the local copy and download a new copy
-            _logger.error("Caught exception while loading segment: {}, downloading a new copy", segmentName, e);
-            FileUtils.deleteQuietly(segmentDir);
-          } else {
-            // For HLC segments, throw out the exception because there is no way to recover (controller does not have a
-            // copy of the segment)
-            throw new RuntimeException("Failed to load local HLC segment: " + segmentName, e);
-          }
-        }
+      if (isHLCSegment && !segmentDir.exists()) {
+        throw new RuntimeException("Failed to find local copy for committed HLC segment: " + segmentName);
+      }
+      if (tryLoadExistingSegment(segmentName, indexLoadingConfig, segmentZKMetadata)) {
+        // The existing completed segment has been loaded successfully
+        return;
       } else {
-        if (isHLCSegment) {
-          throw new RuntimeException("Failed to find local copy for committed HLC segment: " + segmentName);
+        if (!isHLCSegment) {
+          // For LLC and uploaded segments, delete the local copy and download a new copy
+          _logger.error("Failed to load LLC segment: {}, downloading a new copy", segmentName);
+          FileUtils.deleteQuietly(segmentDir);
+        } else {
+          // For HLC segments, throw out the exception because there is no way to recover (controller does not have a
+          // copy of the segment)
+          throw new RuntimeException("Failed to load local HLC segment: " + segmentName);
         }
       }
       // Local segment doesn't exist or cannot load, download a new copy
@@ -355,9 +350,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         }
       }
 
-      schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema,
-          SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig));
-
       segmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
@@ -381,7 +373,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
 
     // TODO: Change dedup handling to handle segment replacement
-    if (isDedupEnabled()) {
+    if (isDedupEnabled() && immutableSegment instanceof ImmutableSegmentImpl) {
       buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
     }
     super.addSegment(immutableSegment);
@@ -445,6 +437,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     String uri = segmentZKMetadata.getDownloadUrl();
     if (!METADATA_URI_FOR_PEER_DOWNLOAD.equals(uri)) {
       try {
+        // TODO: cleanup and consolidate the segment loading logic a bit for OFFLINE and REALTIME tables.
+        //       https://github.com/apache/pinot/issues/9752
         downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, uri);
       } catch (Exception e) {
         _logger.warn("Download segment {} from deepstore uri {} failed.", segmentName, uri, e);
@@ -467,39 +461,38 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private void downloadSegmentFromDeepStore(String segmentName, IndexLoadingConfig indexLoadingConfig, String uri) {
-    File segmentTarFile = new File(_indexDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    // This could leave temporary directories in _indexDir if JVM shuts down before the temp directory is deleted.
+    // This is fine since the temporary directories are deleted when the table data manager calls init.
+    File tempRootDir = null;
     try {
+      tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "." + System.currentTimeMillis());
+      File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
       SegmentFetcherFactory.fetchSegmentToLocal(uri, segmentTarFile);
       _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, segmentTarFile,
           segmentTarFile.length());
-      untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile);
+      untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile, tempRootDir);
     } catch (Exception e) {
       _logger.warn("Failed to download segment {} from deep store: ", segmentName, e);
       throw new RuntimeException(e);
     } finally {
-      FileUtils.deleteQuietly(segmentTarFile);
+      FileUtils.deleteQuietly(tempRootDir);
     }
   }
 
   /**
    * Untars the new segment and replaces the existing segment.
    */
-  private void untarAndMoveSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, File segmentTarFile)
+  private void untarAndMoveSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, File segmentTarFile,
+      File tempRootDir)
       throws IOException {
-    // This could leave temporary directories in _indexDir if JVM shuts down before the temp directory is deleted.
-    // This is fine since the temporary directories are deleted when the table data manager calls init.
-    File tempSegmentDir = getTmpSegmentDataDir("tmp-" + segmentName + "." + System.currentTimeMillis());
-    try {
-      File tempIndexDir = TarGzCompressionUtils.untar(segmentTarFile, tempSegmentDir).get(0);
-      _logger.info("Uncompressed file {} into tmp dir {}", segmentTarFile, tempSegmentDir);
-      File indexDir = new File(_indexDir, segmentName);
-      FileUtils.deleteQuietly(indexDir);
-      FileUtils.moveDirectory(tempIndexDir, indexDir);
-      _logger.info("Replacing LLC Segment {}", segmentName);
-      replaceLLSegment(segmentName, indexLoadingConfig);
-    } finally {
-      FileUtils.deleteQuietly(tempSegmentDir);
-    }
+    File untarDir = new File(tempRootDir, segmentName);
+    File untaredSegDir = TarGzCompressionUtils.untar(segmentTarFile, untarDir).get(0);
+    _logger.info("Uncompressed file {} into tmp dir {}", segmentTarFile, untarDir);
+    File indexDir = new File(_indexDir, segmentName);
+    FileUtils.deleteQuietly(indexDir);
+    FileUtils.moveDirectory(untaredSegDir, indexDir);
+    _logger.info("Replacing LLC Segment {}", segmentName);
+    replaceLLSegment(segmentName, indexLoadingConfig);
   }
 
   private boolean isPeerSegmentDownloadEnabled(TableConfig tableConfig) {
@@ -511,20 +504,22 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private void downloadSegmentFromPeer(String segmentName, String downloadScheme,
       IndexLoadingConfig indexLoadingConfig) {
-    File segmentTarFile = new File(_indexDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File tempRootDir = null;
     try {
+      tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "." + System.currentTimeMillis());
+      File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
       // First find servers hosting the segment in a ONLINE state.
       List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
       // Next download the segment from a randomly chosen server using configured scheme.
       SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(peerSegmentURIs, segmentTarFile);
       _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURIs, segmentTarFile,
           segmentTarFile.length());
-      untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile);
+      untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile, tempRootDir);
     } catch (Exception e) {
       _logger.warn("Download and move segment {} from peer with scheme {} failed.", segmentName, downloadScheme, e);
       throw new RuntimeException(e);
     } finally {
-      FileUtils.deleteQuietly(segmentTarFile);
+      FileUtils.deleteQuietly(tempRootDir);
     }
   }
 

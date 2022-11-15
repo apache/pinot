@@ -80,7 +80,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
       description = "Comma separated bloom filter columns to be created (non-batch load).")
   private String _bloomFilterColumns;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
       description = "Print this message.")
   private boolean _help = false;
 
@@ -193,12 +193,11 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
       throws Exception {
     PerfBenchmarkRunner perfBenchmarkRunner = new PerfBenchmarkRunner();
     CommandLine commandLine = new CommandLine(perfBenchmarkRunner);
-    commandLine.parseArgs(args);
-
-    if (perfBenchmarkRunner._help) {
-      perfBenchmarkRunner.printUsage();
-    } else {
-      perfBenchmarkRunner.execute();
+    CommandLine.ParseResult result = commandLine.parseArgs(args);
+    if (result.isUsageHelpRequested() || result.matchedArgs().size() == 0) {
+      commandLine.usage(System.out);
+      return;
     }
+    commandLine.execute();
   }
 }

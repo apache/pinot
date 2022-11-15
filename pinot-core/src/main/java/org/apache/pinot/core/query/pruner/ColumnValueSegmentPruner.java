@@ -19,21 +19,20 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.core.query.prefetch.FetchPlanner;
+import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
 import org.apache.pinot.segment.spi.FetchContext;
@@ -43,7 +42,6 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -75,11 +73,13 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
 
   private int _inPredicateThreshold;
+  private FetchPlanner _fetchPlanner;
 
   @Override
   public void init(PinotConfiguration config) {
     _inPredicateThreshold =
         config.getProperty(IN_PREDICATE_THRESHOLD, Server.DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD);
+    _fetchPlanner = FetchPlannerRegistry.getPlanner();
   }
 
   @Override
@@ -93,47 +93,25 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
       return segments;
     }
     FilterContext filter = Objects.requireNonNull(query.getFilter());
-
-    // Extract EQ/IN/RANGE predicate columns
-    Set<String> eqInColumns = new HashSet<>();
-    Set<String> rangeColumns = new HashSet<>();
     ValueCache cachedValues = new ValueCache();
-    extractPredicateColumns(filter, eqInColumns, rangeColumns, cachedValues);
-
-    if (eqInColumns.isEmpty() && rangeColumns.isEmpty()) {
-      return segments;
-    }
-
     int numSegments = segments.size();
     List<IndexSegment> selectedSegments = new ArrayList<>(numSegments);
-
-    if (!eqInColumns.isEmpty() && query.isEnablePrefetch()) {
-      Map[] dataSourceCaches = new Map[numSegments];
+    if (query.isEnablePrefetch()) {
       FetchContext[] fetchContexts = new FetchContext[numSegments];
       try {
         // Prefetch bloom filter for columns within the EQ/IN predicate if exists
         for (int i = 0; i < numSegments; i++) {
           IndexSegment segment = segments.get(i);
-          Map<String, DataSource> dataSourceCache = new HashMap<>();
-          Map<String, List<ColumnIndexType>> columnToIndexList = new HashMap<>();
-          for (String column : eqInColumns) {
-            DataSource dataSource = segment.getDataSource(column);
-            dataSourceCache.put(column, dataSource);
-            if (dataSource.getBloomFilter() != null) {
-              columnToIndexList.put(column, Collections.singletonList(ColumnIndexType.BLOOM_FILTER));
-            }
-          }
-          dataSourceCaches[i] = dataSourceCache;
-          if (!columnToIndexList.isEmpty()) {
-            FetchContext fetchContext =
-                new FetchContext(UUID.randomUUID(), segment.getSegmentName(), columnToIndexList);
+          FetchContext fetchContext = _fetchPlanner.planFetchForPruning(segment, query);
+          if (!fetchContext.isEmpty()) {
             segment.prefetch(fetchContext);
             fetchContexts[i] = fetchContext;
           }
         }
-
         // Prune segments
+        Map[] dataSourceCaches = new Map[numSegments];
         for (int i = 0; i < numSegments; i++) {
+          dataSourceCaches[i] = new HashMap<>();
           IndexSegment segment = segments.get(i);
           FetchContext fetchContext = fetchContexts[i];
           if (fetchContext != null) {
@@ -170,60 +148,6 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
       }
     }
     return selectedSegments;
-  }
-
-  /**
-   * Extracts predicate columns from the given filter.
-   */
-  private void extractPredicateColumns(FilterContext filter, Set<String> eqInColumns, Set<String> rangeColumns,
-      ValueCache valueCache) {
-    switch (filter.getType()) {
-      case AND:
-      case OR:
-        for (FilterContext child : filter.getChildren()) {
-          extractPredicateColumns(child, eqInColumns, rangeColumns, valueCache);
-        }
-        break;
-      case NOT:
-        // Do not track the predicates under NOT filter
-        break;
-      case PREDICATE:
-        Predicate predicate = filter.getPredicate();
-
-        // Only prune columns
-        ExpressionContext lhs = predicate.getLhs();
-        if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
-          break;
-        }
-        String column = lhs.getIdentifier();
-
-        Predicate.Type predicateType = predicate.getType();
-        switch (predicateType) {
-          case EQ: {
-            eqInColumns.add(column);
-            valueCache.add((EqPredicate) predicate);
-            break;
-          }
-          case IN: {
-            InPredicate inPredicate = (InPredicate) predicate;
-            if (inPredicate.getValues().size() <= _inPredicateThreshold) {
-              eqInColumns.add(column);
-              valueCache.add(inPredicate);
-            }
-            break;
-          }
-          case RANGE: {
-            rangeColumns.add(column);
-            break;
-          }
-          default: {
-            break;
-          }
-        }
-        break;
-      default:
-        throw new IllegalStateException();
-    }
   }
 
   private boolean pruneSegment(IndexSegment segment, FilterContext filter, Map<String, DataSource> dataSourceCache,
@@ -476,26 +400,35 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     // structure. This is specially useful in the IN expression.
     private final Map<Predicate, Object> _cache = new IdentityHashMap<>();
 
-    public void add(EqPredicate pred) {
-      _cache.put(pred, new CachedValue(pred.getValue()));
+    private CachedValue add(EqPredicate pred) {
+      CachedValue val = new CachedValue(pred.getValue());
+      _cache.put(pred, val);
+      return val;
     }
 
-    public void add(InPredicate pred) {
-      List<CachedValue> list = new ArrayList<>(pred.getValues().size());
+    private List<CachedValue> add(InPredicate pred) {
+      List<CachedValue> vals = new ArrayList<>(pred.getValues().size());
       for (String value : pred.getValues()) {
-        list.add(new CachedValue(value));
+        vals.add(new CachedValue(value));
       }
-      _cache.put(pred, list);
+      _cache.put(pred, vals);
+      return vals;
     }
 
     public CachedValue get(EqPredicate pred, DataType dt) {
       CachedValue cachedValue = (CachedValue) _cache.get(pred);
+      if (cachedValue == null) {
+        cachedValue = add(pred);
+      }
       cachedValue.ensureDataType(dt);
       return cachedValue;
     }
 
     public List<CachedValue> get(InPredicate pred, DataType dt) {
       List<CachedValue> cachedValues = (List<CachedValue>) _cache.get(pred);
+      if (cachedValues == null) {
+        cachedValues = add(pred);
+      }
       for (CachedValue cachedValue : cachedValues) {
         cachedValue.ensureDataType(dt);
       }

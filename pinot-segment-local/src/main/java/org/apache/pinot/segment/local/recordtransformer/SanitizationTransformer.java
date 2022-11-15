@@ -49,6 +49,11 @@ public class SanitizationTransformer implements RecordTransformer {
   }
 
   @Override
+  public boolean isNoOp() {
+    return _stringColumnMaxLengthMap.isEmpty();
+  }
+
+  @Override
   public GenericRow transform(GenericRow record) {
     for (Map.Entry<String, Integer> entry : _stringColumnMaxLengthMap.entrySet()) {
       String stringColumn = entry.getKey();

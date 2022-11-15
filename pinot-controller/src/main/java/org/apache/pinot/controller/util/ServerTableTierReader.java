@@ -64,6 +64,7 @@ public class ServerTableTierReader {
       }
       serverUrls.add(tierUri);
     }
+    LOGGER.debug("Getting table tier info with serverUrls: {}", serverUrls);
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =

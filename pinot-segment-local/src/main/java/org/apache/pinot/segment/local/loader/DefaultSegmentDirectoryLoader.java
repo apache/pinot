@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.loader;
 
 import java.io.File;
 import java.net.URI;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
@@ -28,6 +29,8 @@ import org.apache.pinot.segment.spi.loader.SegmentLoader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -35,6 +38,7 @@ import org.apache.pinot.spi.utils.ReadMode;
  */
 @SegmentLoader(name = "default")
 public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultSegmentDirectoryLoader.class);
 
   /**
    * Creates and loads the {@link SegmentLocalFSDirectory} which is the default implementation of
@@ -53,5 +57,15 @@ public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
     }
     return new SegmentLocalFSDirectory(directory,
         ReadMode.valueOf(segmentDirectoryConfigs.getProperty(IndexLoadingConfig.READ_MODE_KEY)));
+  }
+
+  @Override
+  public void delete(SegmentDirectoryLoaderContext segmentLoaderContext)
+      throws Exception {
+    File indexDir = new File(segmentLoaderContext.getTableDataDir(), segmentLoaderContext.getSegmentName());
+    if (indexDir.exists()) {
+      FileUtils.deleteQuietly(indexDir);
+      LOGGER.info("Deleted segment directory {} on default tier", indexDir);
+    }
   }
 }

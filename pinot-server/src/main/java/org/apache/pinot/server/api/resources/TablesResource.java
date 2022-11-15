@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.DefaultValue;
@@ -79,6 +80,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.HttpRequesterIdentity;
@@ -88,6 +90,7 @@ import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -208,6 +211,7 @@ public class TablesResource {
     Map<String, Double> columnLengthMap = new HashMap<>();
     Map<String, Double> columnCardinalityMap = new HashMap<>();
     Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
+    Map<String, Map<String, Double>> columnIndexSizesMap = new HashMap<>();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
@@ -254,6 +258,13 @@ public class TablesResource {
               int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
+            for (Map.Entry<ColumnIndexType, Long> entry : columnMetadata.getIndexSizeMap().entrySet()) {
+              String indexName = entry.getKey().getIndexName();
+              Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
+              Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + entry.getValue();
+              columnIndexSizes.put(indexName, indexSize);
+              columnIndexSizesMap.put(column, columnIndexSizes);
+            }
           }
         }
       }
@@ -268,7 +279,7 @@ public class TablesResource {
 
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
-            totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap);
+            totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
@@ -492,11 +503,12 @@ public class TablesResource {
   @Path("tables/{realtimeTableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the info for consumers of this REALTIME table",
-      notes = "Get consumers info from the table data manager")
+      notes = "Get consumers info from the table data manager. Note that the partitionToOffsetMap has been deprecated "
+          + "and will be removed in the next release. The info is now embedded within each partition's state as "
+          + "currentOffsetsMap")
   public List<SegmentConsumerInfo> getConsumingSegmentsInfo(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
           String realtimeTableName) {
-
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
     if (TableType.OFFLINE == tableType) {
       throw new WebApplicationException("Cannot get consuming segment info for OFFLINE table: " + realtimeTableName);
@@ -511,11 +523,26 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          String segmentName = segmentDataManager.getSegmentName();
+          Map<String, ConsumerPartitionState> partitionStateMap =
+              realtimeSegmentDataManager.getConsumerPartitionState();
+          Map<String, String> recordsLagMap = new HashMap<>();
+          Map<String, String> availabilityLagMsMap = new HashMap<>();
+          realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {
+            recordsLagMap.put(k, v.getRecordsLag());
+            availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
+          });
+          @Deprecated Map<String, String> partitiionToOffsetMap =
+              realtimeSegmentDataManager.getPartitionToCurrentOffset();
           segmentConsumerInfoList.add(
-              new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
+              new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
+                  realtimeSegmentDataManager.getConsumerState().toString(),
                   realtimeSegmentDataManager.getLastConsumedTimestamp(),
-                  realtimeSegmentDataManager.getPartitionToCurrentOffset()));
+                  partitiionToOffsetMap,
+                  new SegmentConsumerInfo.PartitionOffsetInfo(
+                      partitiionToOffsetMap,
+                      partitionStateMap.entrySet().stream().collect(
+                          Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
+                      ), recordsLagMap, availabilityLagMsMap)));
         }
       }
     } catch (Exception e) {

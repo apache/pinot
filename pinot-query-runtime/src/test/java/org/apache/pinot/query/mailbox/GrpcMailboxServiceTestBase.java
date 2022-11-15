@@ -20,8 +20,8 @@ package org.apache.pinot.query.mailbox;
 
 import java.util.Collections;
 import java.util.TreeMap;
-import org.apache.pinot.query.QueryEnvironmentTestUtils;
 import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -35,9 +35,9 @@ public abstract class GrpcMailboxServiceTestBase {
   public void setUp()
       throws Exception {
     PinotConfiguration extraConfig = new PinotConfiguration(Collections.singletonMap(
-        QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_BYTES_SIZE, 4_000_000));
+        QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 4_000_000));
     for (int i = 0; i < MAILBOX_TEST_SIZE; i++) {
-      int availablePort = QueryEnvironmentTestUtils.getAvailablePort();
+      int availablePort = QueryTestUtils.getAvailablePort();
       GrpcMailboxService grpcMailboxService = new GrpcMailboxService("localhost", availablePort, extraConfig);
       grpcMailboxService.start();
       _mailboxServices.put(availablePort, grpcMailboxService);

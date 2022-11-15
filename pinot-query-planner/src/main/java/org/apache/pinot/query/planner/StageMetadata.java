@@ -97,4 +97,11 @@ public class StageMetadata implements Serializable {
   public void setTimeBoundaryInfo(TimeBoundaryInfo timeBoundaryInfo) {
     _timeBoundaryInfo = timeBoundaryInfo;
   }
+
+  @Override
+  public String toString() {
+    return "StageMetadata{" + "_scannedTables=" + _scannedTables + ", _serverInstances=" + _serverInstances
+        + ", _serverInstanceToSegmentsMap=" + _serverInstanceToSegmentsMap + ", _timeBoundaryInfo=" + _timeBoundaryInfo
+        + '}';
+  }
 }

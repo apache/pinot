@@ -55,13 +55,13 @@ public interface MessageBatch<T> {
     return (byte[]) getMessageAtIndex(index);
   }
 
-  default StreamMessage getStreamMessage(int index) {
+  default StreamMessage<T> getStreamMessage(int index) {
     return new LegacyStreamMessage(getMessageBytesAtIndex(index));
   }
 
   class LegacyStreamMessage extends StreamMessage {
     public LegacyStreamMessage(byte[] value) {
-      super(value);
+      super(value, value.length);
     }
   }
   /**

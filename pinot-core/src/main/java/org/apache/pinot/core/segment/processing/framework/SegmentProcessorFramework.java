@@ -132,7 +132,7 @@ public class SegmentProcessorFramework {
           .createSegmentNameGenerator(tableConfig, schema, segmentNamePrefix, segmentNamePostfix, fixedSegmentName,
               false));
     } else {
-      // SimpleSegmentNameGenerator is used by default.
+      // SegmentNameGenerator will be inferred by the SegmentGeneratorConfig.
       generatorConfig.setSegmentNamePrefix(segmentNamePrefix);
       generatorConfig.setSegmentNamePostfix(segmentNamePostfix);
     }

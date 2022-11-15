@@ -57,8 +57,8 @@ public class InTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     int numArguments = arguments.size();
-    Preconditions.checkArgument(numArguments >= 2,
-        "At least 2 arguments are required for IN transform function: expression, values");
+    Preconditions.checkArgument(numArguments >= 2, "At least 2 arguments are required for [%s] "
+        + "transform function: (expression, values)", getName());
     _mainFunction = arguments.get(0);
 
     boolean allLiteralValues = true;
@@ -119,13 +119,13 @@ public class InTransformFunction extends BaseTransformFunction {
           throw new IllegalStateException();
       }
     } else {
-      Preconditions.checkArgument(_mainFunction.getResultMetadata().isSingleValue(),
-          "The first argument for IN transform function must be single-valued when there are non-literal values");
+      Preconditions.checkArgument(_mainFunction.getResultMetadata().isSingleValue(), "The first argument for [%s] "
+          + "transform function must be single-valued when there are non-literal values", getName());
       _valueFunctions = new TransformFunction[numArguments - 1];
       for (int i = 1; i < numArguments; i++) {
         TransformFunction valueFunction = arguments.get(i);
-        Preconditions.checkArgument(valueFunction.getResultMetadata().isSingleValue(),
-            "The values for IN transform function must be single-valued");
+        Preconditions.checkArgument(valueFunction.getResultMetadata().isSingleValue(), "The values for [%s] "
+                + "transform function must be single-valued", getName());
         _valueFunctions[i - 1] = valueFunction;
       }
     }

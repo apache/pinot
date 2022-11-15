@@ -19,24 +19,29 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterators;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 public final class TransferableBlockUtils {
+  private static final int MEDIAN_COLUMN_SIZE_BYTES = 8;
+
   private TransferableBlockUtils() {
     // do not instantiate.
   }
 
-  public static TransferableBlock getEndOfStreamTransferableBlock(DataSchema dataSchema) {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(dataSchema));
+  public static TransferableBlock getEndOfStreamTransferableBlock() {
+    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+  }
+
+  public static TransferableBlock getNoOpTransferableBlock() {
+    return new TransferableBlock(DataBlockUtils.getNoOpBlock());
   }
 
   public static TransferableBlock getErrorTransferableBlock(Exception e) {
@@ -51,40 +56,85 @@ public final class TransferableBlockUtils {
     return transferableBlock.isEndOfStreamBlock();
   }
 
+  public static boolean isNoOpBlock(TransferableBlock transferableBlock) {
+    return transferableBlock.isNoOpBlock();
+  }
+
   /**
-   *  Split a block into multiple block so that each block size is within maxBlockSize.
-   *  Currently, we only support split for row type dataBlock.
-   *  For columnar data block, we return the original data block.
-   *  Metadata data block split is not supported.
+   * Split block into multiple blocks. Default without any clean up.
    *
-   *  When row size is greater than maxBlockSize, we pack each row as a separate block.
+   * @see TransferableBlockUtils#splitBlock(TransferableBlock, DataBlock.Type, int, boolean)
    */
-  public static List<TransferableBlock> splitBlock(TransferableBlock block, BaseDataBlock.Type type, int maxBlockSize) {
+  public static Iterator<TransferableBlock> splitBlock(TransferableBlock block, DataBlock.Type type, int maxBlockSize) {
+    return splitBlock(block, type, maxBlockSize, false);
+  }
+
+  /**
+   *
+   *  Split a block into multiple block so that each block size is within maxBlockSize. Currently,
+   *  <ul>
+   *    <li>For row data block, we split for row type dataBlock.</li>
+   *    <li>For columnar data block, exceptions are thrown.</li>
+   *    <li>For metadata block, split is not supported.</li>
+   *  </ul>
+   *
+   * @param block the data block
+   * @param type type of block
+   * @param maxBlockSize Each chunk of data is estimated to be less than maxBlockSize
+   * @param needsCanonicalize whether we need to canonicalize the input rows. set to true if the block is constructed
+   *                          from leaf stage.
+   * @return a list of data block chunks
+   */
+  public static Iterator<TransferableBlock> splitBlock(TransferableBlock block, DataBlock.Type type, int maxBlockSize,
+      boolean needsCanonicalize) {
     List<TransferableBlock> blockChunks = new ArrayList<>();
-    if (type != BaseDataBlock.Type.ROW) {
-      return Collections.singletonList(block);
-    } else {
-      int rowSizeInBytes = ((RowDataBlock) block.getDataBlock()).getRowSizeInBytes();
-      int numRowsPerChunk = maxBlockSize / rowSizeInBytes;
+    if (type == DataBlock.Type.ROW) {
+      // Use estimated row size, this estimate is not accurate and is used to estimate numRowsPerChunk only.
+      int estimatedRowSizeInBytes = block.getDataSchema().getColumnNames().length * MEDIAN_COLUMN_SIZE_BYTES;
+      int numRowsPerChunk = maxBlockSize / estimatedRowSizeInBytes;
       Preconditions.checkState(numRowsPerChunk > 0, "row size too large for query engine to handle, abort!");
 
       int totalNumRows = block.getNumRows();
       List<Object[]> allRows = block.getContainer();
+      DataSchema dataSchema = block.getDataSchema();
       int currentRow = 0;
       while (currentRow < totalNumRows) {
         List<Object[]> chunk = allRows.subList(currentRow, Math.min(currentRow + numRowsPerChunk, allRows.size()));
+        if (needsCanonicalize) {
+          canonicalizeRows(chunk, dataSchema);
+        }
         currentRow += numRowsPerChunk;
         blockChunks.add(new TransferableBlock(chunk, block.getDataSchema(), block.getType()));
       }
+      return blockChunks.iterator();
+    } else if (type == DataBlock.Type.METADATA) {
+      return Iterators.singletonIterator(block);
+    } else {
+      throw new IllegalArgumentException("Unsupported data block type: " + type);
     }
-    return blockChunks;
   }
 
-  public static Object[] getRow(TransferableBlock transferableBlock, int rowId) {
-    if (transferableBlock.isContainerBlock() && transferableBlock.getType() == BaseDataBlock.Type.ROW) {
-      return transferableBlock.getContainer().get(rowId);
-    } else {
-      return SelectionOperatorUtils.extractRowFromDataTable(transferableBlock.getDataBlock(), rowId);
+  // In-place canonicalize rows
+  private static void canonicalizeRows(List<Object[]> rows, DataSchema dataSchema) {
+    for (int i = 0; i < rows.size(); i++) {
+      rows.set(i, canonicalizeRow(rows.get(i), dataSchema));
     }
+  }
+
+  /**
+   * This util is used to canonicalize row generated from V1 engine, which is stored using
+   * {@link DataSchema#getStoredColumnDataTypes()} format. However, the transferable block ser/de stores data in the
+   * {@link DataSchema#getColumnDataTypes()} format.
+   *
+   * @param row un-canonicalize row.
+   * @param dataSchema data schema desired for the row.
+   * @return canonicalize row.
+   */
+  private static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema) {
+    Object[] resultRow = new Object[row.length];
+    for (int colId = 0; colId < row.length; colId++) {
+      resultRow[colId] = dataSchema.getColumnDataType(colId).convert(row[colId]);
+    }
+    return resultRow;
   }
 }

@@ -100,4 +100,9 @@ public class QueryOptionsUtils {
   public static boolean isServerReturnFinalResult(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT));
   }
+
+  @Nullable
+  public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
+    return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
+  }
 }

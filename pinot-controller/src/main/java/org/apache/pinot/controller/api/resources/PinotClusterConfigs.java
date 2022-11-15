@@ -30,11 +30,11 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -117,14 +117,17 @@ public class PinotClusterConfigs {
     try {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(body);
       HelixAdmin admin = _pinotHelixResourceManager.getHelixAdmin();
-      HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
-          .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
+      HelixConfigScope configScope =
+          new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
+              _pinotHelixResourceManager.getHelixClusterName()).build();
       Iterator<String> fieldNamesIterator = jsonNode.fieldNames();
+      Map<String, String> properties = new TreeMap<>();
       while (fieldNamesIterator.hasNext()) {
         String key = fieldNamesIterator.next();
-        String value = jsonNode.get(key).textValue();
-        admin.setConfig(configScope, Collections.singletonMap(key, value));
+        JsonNode valueNode = jsonNode.get(key);
+        properties.put(key, valueNode.isNull() ? null : valueNode.asText());
       }
+      admin.setConfig(configScope, properties);
       return new SuccessResponse("Updated cluster config.");
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER, "Error converting request to cluster config.",
@@ -150,7 +153,7 @@ public class PinotClusterConfigs {
       HelixAdmin admin = _pinotHelixResourceManager.getHelixAdmin();
       HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
           .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
-      admin.removeConfig(configScope, Arrays.asList(configName));
+      admin.removeConfig(configScope, Collections.singletonList(configName));
       return new SuccessResponse("Deleted cluster config: " + configName);
     } catch (Exception e) {
       String errStr = "Failed to delete cluster config: " + configName;

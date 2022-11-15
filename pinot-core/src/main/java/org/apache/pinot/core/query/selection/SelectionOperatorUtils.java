@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.selection;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -231,11 +232,11 @@ public class SelectionOperatorUtils {
    * @param dataSchema data schema.
    * @param nullHandlingEnabled whether null handling is enabled.
    * @return data table.
-   * @throws Exception
+   * @throws IOException
    */
   public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema,
       boolean nullHandlingEnabled)
-      throws Exception {
+      throws IOException {
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
 
@@ -419,6 +420,24 @@ public class SelectionOperatorUtils {
   }
 
   /**
+   * Extract a selection row from {@link DataTable} with potential null values. (Broker side)
+   *
+   * @param dataTable data table.
+   * @param rowId row id.
+   * @return selection row.
+   */
+  public static Object[] extractRowFromDataTableWithNullHandling(DataTable dataTable, int rowId,
+      RoaringBitmap[] nullBitmaps) {
+    Object[] row = extractRowFromDataTable(dataTable, rowId);
+    for (int colId = 0; colId < nullBitmaps.length; colId++) {
+      if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+        row[colId] = null;
+      }
+    }
+    return row;
+  }
+
+  /**
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries without <code>ORDER BY</code>.
    * (Broker side)
    */
@@ -435,13 +454,7 @@ public class SelectionOperatorUtils {
         }
         for (int rowId = 0; rowId < numRows; rowId++) {
           if (rows.size() < limit) {
-            Object[] row = extractRowFromDataTable(dataTable, rowId);
-            for (int colId = 0; colId < numColumns; colId++) {
-              if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-                row[colId] = null;
-              }
-            }
-            rows.add(row);
+            rows.add(extractRowFromDataTableWithNullHandling(dataTable, rowId, nullBitmaps));
           } else {
             break;
           }

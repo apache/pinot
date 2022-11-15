@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.logical;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelNode;
@@ -34,7 +33,6 @@ import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
-import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
@@ -118,8 +116,6 @@ public final class RelToStageConverter {
 
   private static StageNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
     JoinRelType joinType = node.getJoinType();
-    Preconditions.checkState(node.getCondition() instanceof RexCall);
-    RexCall joinCondition = (RexCall) node.getCondition();
 
     // Parse out all equality JOIN conditions
     JoinInfo joinInfo = node.analyzeCondition();
@@ -171,7 +167,8 @@ public final class RelToStageConverter {
       case VARBINARY:
         return DataSchema.ColumnDataType.BYTES;
       default:
-        throw new IllegalStateException("Unexpected RelDataTypeField: " + relDataTypeField.getType());
+        throw new IllegalStateException("Unexpected RelDataTypeField: " + relDataTypeField.getType() + " for column: "
+            + relDataTypeField.getName());
     }
   }
 }

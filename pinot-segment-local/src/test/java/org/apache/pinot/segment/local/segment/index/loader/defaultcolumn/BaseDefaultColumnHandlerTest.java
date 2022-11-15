@@ -70,7 +70,7 @@ public class BaseDefaultColumnHandlerTest {
     driver.build();
     _segmentDirectory = new File(_indexDir, driver.getSegmentName());
     _committedSegmentMetadata = new SegmentMetadataImpl(_segmentDirectory);
-    _writer = new SegmentLocalFSDirectory(_indexDir, _committedSegmentMetadata, ReadMode.mmap).createWriter();
+    _writer = new SegmentLocalFSDirectory(_segmentDirectory, _committedSegmentMetadata, ReadMode.mmap).createWriter();
   }
 
   @AfterMethod

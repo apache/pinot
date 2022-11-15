@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -66,10 +67,13 @@ public class DataFetcher {
     for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
       String column = entry.getKey();
       DataSource dataSource = entry.getValue();
-      ColumnValueReader columnValueReader =
-          new ColumnValueReader(dataSource.getForwardIndex(), dataSource.getDictionary());
-      _columnValueReaderMap.put(column, columnValueReader);
       DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+      ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
+      Preconditions.checkState(forwardIndexReader != null,
+          "Forward index disabled for column: %s, cannot create DataFetcher!", column);
+      ColumnValueReader columnValueReader =
+          new ColumnValueReader(forwardIndexReader, dataSource.getDictionary());
+      _columnValueReaderMap.put(column, columnValueReader);
       if (!dataSourceMetadata.isSingleValue()) {
         maxNumValuesPerMVEntry = Math.max(maxNumValuesPerMVEntry, dataSourceMetadata.getMaxNumValuesPerMVEntry());
       }

@@ -86,9 +86,15 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
-   * Removes a segment from a table.
+   * Offloads a segment from table but not dropping its data from server.
    */
-  void removeSegment(String tableNameWithType, String segmentName)
+  void offloadSegment(String tableNameWithType, String segmentName)
+      throws Exception;
+
+  /**
+   * Delete segment data from the server physically.
+   */
+  void deleteSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
   /**
@@ -104,6 +110,15 @@ public interface InstanceDataManager {
    * @param segmentRefreshSemaphore semaphore to control concurrent segment reloads/refresh
    */
   void reloadAllSegments(String tableNameWithType, boolean forceDownload,
+      SegmentRefreshSemaphore segmentRefreshSemaphore)
+      throws Exception;
+
+  /**
+   * Reload a list of segments in a table.
+   * @param segmentNames is the list of segment to reload
+   * @param segmentRefreshSemaphore semaphore to control concurrent segment reloads/refresh
+   */
+  void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
       SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception;
 

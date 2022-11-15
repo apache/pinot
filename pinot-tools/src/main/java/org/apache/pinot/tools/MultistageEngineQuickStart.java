@@ -81,8 +81,8 @@ public class MultistageEngineQuickStart extends Quickstart {
 
   @Override
   public String[] getDefaultBatchTableDirectories() {
-    List<String> tableDirs = new ArrayList<>(Arrays.asList(DEFAULT_OFFLINE_TABLE_DIRECTORIES));
-    tableDirs.addAll(Arrays.asList(MULTI_STAGE_TABLE_DIRECTORIES));
+    List<String> tableDirs = new ArrayList<>(Arrays.asList(MULTI_STAGE_TABLE_DIRECTORIES));
+    tableDirs.addAll(Arrays.asList(DEFAULT_OFFLINE_TABLE_DIRECTORIES));
     return tableDirs.toArray(new String[]{});
   }
 

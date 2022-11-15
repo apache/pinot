@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -72,7 +73,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   // For upsert
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private ThreadSafeMutableRoaringBitmap _validDocIds;
-  private PinotSegmentRecordReader _pinotSegmentRecordReader;
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
@@ -261,13 +261,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         LOGGER.error("Failed to close star-tree. Continuing with error.", e);
       }
     }
-    if (_pinotSegmentRecordReader != null) {
-      try {
-        _pinotSegmentRecordReader.close();
-      } catch (IOException e) {
-        LOGGER.error("Failed to close record reader. Continuing with error.", e);
-      }
-    }
   }
 
   @Override
@@ -283,31 +276,22 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    try {
-      if (_pinotSegmentRecordReader == null) {
-        _pinotSegmentRecordReader = new PinotSegmentRecordReader();
-        _pinotSegmentRecordReader.init(this);
-      }
-      _pinotSegmentRecordReader.getRecord(reuse, docId);
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      recordReader.init(this);
+      recordReader.getRecord(docId, reuse);
       return reuse;
     } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Failed to use PinotSegmentRecordReader to read immutable segment for docId: %d", docId), e);
+      throw new RuntimeException("Caught exception while reading record for docId: " + docId, e);
     }
   }
 
   @Override
   public Object getValue(int docId, String column) {
-    try {
-      if (_pinotSegmentRecordReader == null) {
-        _pinotSegmentRecordReader = new PinotSegmentRecordReader();
-        _pinotSegmentRecordReader.init(this);
-      }
-      return _pinotSegmentRecordReader.getValue(docId, column);
+    try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(this, column)) {
+      return columnReader.getValue(docId);
     } catch (Exception e) {
       throw new RuntimeException(
-          String.format("Failed to use PinotSegmentRecordReader to read value from immutable segment"
-              + " for docId: %d, column: %s", docId, column), e);
+          String.format("Caught exception while reading value for docId: %d, column: %s", docId, column), e);
     }
   }
 }

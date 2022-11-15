@@ -83,6 +83,8 @@ public interface RexExpression {
         return PinotDataType.LONG;
       case FLOAT:
         return PinotDataType.FLOAT;
+      // TODO: support DECIMAL properly.
+      case DECIMAL:
       case DOUBLE:
         return PinotDataType.DOUBLE;
       case CHAR:
@@ -91,8 +93,7 @@ public interface RexExpression {
       case BOOLEAN:
         return PinotDataType.BOOLEAN;
       default:
-        // TODO: do not assume byte type.
-        return PinotDataType.BYTES;
+        throw new IllegalArgumentException("Unsupported data type: " + type);
     }
   }
 

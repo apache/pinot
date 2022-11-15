@@ -83,6 +83,11 @@ public class StringMailboxIdentifier implements MailboxIdentifier {
   }
 
   @Override
+  public boolean isLocal() {
+    return _fromHost.equals(_toHost) && _fromPort == _toPort;
+  }
+
+  @Override
   public String toString() {
     return _mailboxIdString;
   }

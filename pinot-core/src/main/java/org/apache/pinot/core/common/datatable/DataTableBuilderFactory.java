@@ -18,7 +18,11 @@
  */
 package org.apache.pinot.core.common.datatable;
 
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
+import org.apache.pinot.common.datatable.DataTableImplV2;
+import org.apache.pinot.common.datatable.DataTableImplV3;
+import org.apache.pinot.common.datatable.DataTableImplV4;
 import org.apache.pinot.common.utils.DataSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +58,22 @@ public class DataTableBuilderFactory {
         return new DataTableBuilderV2V3(dataSchema, _version);
       case DataTableFactory.VERSION_4:
         return new DataTableBuilderV4(dataSchema);
+      default:
+        throw new IllegalStateException("Unsupported data table version: " + _version);
+    }
+  }
+
+  /**
+   * Returns an empty data table without data.
+   */
+  public static DataTable getEmptyDataTable() {
+    switch (_version) {
+      case DataTableFactory.VERSION_2:
+        return new DataTableImplV2();
+      case DataTableFactory.VERSION_3:
+        return new DataTableImplV3();
+      case DataTableFactory.VERSION_4:
+        return new DataTableImplV4();
       default:
         throw new IllegalStateException("Unsupported data table version: " + _version);
     }

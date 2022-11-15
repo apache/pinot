@@ -44,6 +44,21 @@
       </Policies>
       <DefaultRolloverStrategy max="10"/>
     </RollingFile>
+    <RollingFile
+        name="controllerHelixLog"
+        fileName="${env:LOG_DIR}/pinotControllerHelix.log"
+        filePattern="${env:LOG_DIR}/pinotControllerHelix.%d{yyyy-MM-dd}.%i.log.gz"
+        immediateFlush="false">
+      <PatternLayout>
+        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
+      </PatternLayout>
+      <Policies>
+        <OnStartupTriggeringPolicy/>
+        <SizeBasedTriggeringPolicy size="20 MB"/>
+        <TimeBasedTriggeringPolicy/>
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingFile>
   </Appenders>
   <Loggers>
     <Root level="info" additivity="false">
@@ -52,6 +67,10 @@
       <!-- Direct most logs to the log file -->
       <AppenderRef ref="controllerLog"/>
     </Root>
+    <!-- Output helix logs to dedicated files -->
+    <Logger name="org.apache.helix" level="info" additivity="false">
+      <AppenderRef ref="controllerHelixLog"/>
+    </Logger>
     <!-- Output controller starter logs to the console -->
     <Logger name="org.apache.pinot.controller.ControllerStarter" level="info" additivity="false">
       <AppenderRef ref="console"/>
