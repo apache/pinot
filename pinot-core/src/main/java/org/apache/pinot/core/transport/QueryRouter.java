@@ -120,7 +120,8 @@ public class QueryRouter {
 
     // Create the asynchronous query response with the request map
     AsyncQueryResponse asyncQueryResponse =
-        new AsyncQueryResponse(this, requestId, requestMap.keySet(), System.currentTimeMillis(), timeoutMs);
+        new AsyncQueryResponse(this, requestId, requestMap.keySet(), System.currentTimeMillis(), timeoutMs,
+            _serverRoutingStatsManager);
     _asyncQueryResponseMap.put(requestId, asyncQueryResponse);
     for (Map.Entry<ServerRoutingInstance, InstanceRequest> entry : requestMap.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
@@ -153,8 +154,6 @@ public class QueryRouter {
       AsyncQueryResponse asyncQueryResponse, Exception e) {
     LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
         serverRoutingInstance, e);
-    _serverRoutingStatsManager.recordStatsUponResponseArrival(requestId, serverRoutingInstance.getInstanceId(),
-        (int) asyncQueryResponse.getTimeoutMs());
     asyncQueryResponse.markQueryFailed(serverRoutingInstance, e);
   }
 
@@ -188,20 +187,12 @@ public class QueryRouter {
     // Query future might be null if the query is already done (maybe due to failure)
     if (asyncQueryResponse != null) {
       asyncQueryResponse.receiveDataTable(serverRoutingInstance, dataTable, responseSize, deserializationTimeMs);
-
-      // Record query completion stats immediately after receiving the response from the server instead of waiting
-      // for the reduce phase.
-      long latencyMs = asyncQueryResponse.getServerResponseDelayMs(serverRoutingInstance);
-      _serverRoutingStatsManager.recordStatsUponResponseArrival(requestId, serverRoutingInstance.getInstanceId(),
-          latencyMs);
     }
   }
 
   void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
       asyncQueryResponse.markServerDown(serverRoutingInstance, exception);
-      _serverRoutingStatsManager.recordStatsUponResponseArrival(asyncQueryResponse.getRequestId(),
-          serverRoutingInstance.getInstanceId(), (int) asyncQueryResponse.getTimeoutMs());
     }
   }
 
