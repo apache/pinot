@@ -56,7 +56,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   // TODO: refactor and load test dynamically using the reousrce utils in pinot-tools
   private static final List<String> QUERY_TEST_RESOURCE_FILES = ImmutableList.of(
       "BasicQuery.json",
-      "SpecialSyntax.json"
+      "SpecialSyntax.json",
+      "LexicalStructure.json",
+      "ValueExpressions.json"
   );
 
   @BeforeClass
@@ -76,6 +78,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     for (Map.Entry<String, QueryTestCase> testCaseEntry : getTestCases().entrySet()) {
       String testCaseName = testCaseEntry.getKey();
       QueryTestCase testCase = testCaseEntry.getValue();
+      if (testCase._ignored) {
+        continue;
+      }
+
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
       for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
@@ -92,9 +98,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         factory1.addSegment(tableNameWithType, toRow(columnAndTypes, tableEntry.getValue()._inputs));
       }
 
-      // Process extra properties
-      Map<String, Object> extraProps = testCaseEntry.getValue()._extraProps;
-      if ((boolean) extraProps.getOrDefault(QueryTestCase.REQUIRED_H2_KEY, false)) {
+      boolean anyHaveOutput = testCase._queries.stream().anyMatch(q -> q._outputs != null && !q._outputs.isEmpty());
+
+      if (anyHaveOutput) {
+        boolean allHaveOutput = testCase._queries.stream().allMatch(q -> q._outputs != null && !q._outputs.isEmpty());
+        if (!allHaveOutput) {
+          throw new IllegalArgumentException("Cannot support one test where some queries require H2 and others don't");
+        }
+      }
+
+      if (!anyHaveOutput) {
         // Add all test cases without explicit output to the tables on H2
         for (Map.Entry<String, Schema> e : schemaMap.entrySet()) {
           String tableName = e.getKey();
@@ -163,8 +176,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     List<Object[]> providerContent = new ArrayList<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
       String testCaseName = testCaseEntry.getKey();
+      if (testCaseEntry.getValue()._ignored) {
+        continue;
+      }
+
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
+        if (queryCase._ignored) {
+          continue;
+        }
+
         if (queryCase._outputs != null && !queryCase._outputs.isEmpty()) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           List<List<Object>> orgRows = queryCase._outputs;
@@ -186,9 +207,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
+      if (testCaseEntry.getValue()._ignored) {
+        continue;
+      }
+
       String testCaseName = testCaseEntry.getKey();
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
+        if (queryCase._ignored) {
+          continue;
+        }
         if (queryCase._outputs == null || queryCase._outputs.isEmpty()) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           Object[] testEntry = new Object[]{testCaseName, sql};

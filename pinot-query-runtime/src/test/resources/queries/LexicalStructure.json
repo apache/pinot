@@ -1,0 +1,184 @@
+{
+  "unquoted_identifiers": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "alphabet", "type": "STRING"},
+          {"name": "alpha123", "type": "STRING"},
+          {"name": "ignoreCASE", "type": "STRING"},
+          {"name": "has_underscore", "type": "STRING"},
+          {"name": "has$dollar$sign", "type": "STRING"}
+        ],
+        "inputs": [
+          ["1", "2", "3", "4", "5"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "4.1.1",
+        "description": "unquoted identifier support",
+        "sql": "SELECT * FROM {tbl}"
+      }
+    ]
+  },
+  "quoted_identifiers": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "\"case_matters\"", "type": "STRING"},
+          {"name": "\"CASE_matters\"", "type": "STRING"},
+          {"name": "\"CASE_MATTERS\"", "type": "STRING"},
+          {"name": "\"%illegal.symbols%\"", "type": "STRING"}
+        ],
+        "inputs": [
+          ["1", "2", "3", "4"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "ignored": true,
+        "comment": "we don't properly handle default case resolution",
+        "psql": "4.1.1",
+        "description": "unquoted identifier support",
+        "sql": "SELECT * FROM {tbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "error is: Column 'case_matters' is not found in any table. not sure if test framework or real bug",
+        "psql": "4.1.1",
+        "description": "unquoted identifier support",
+        "sql": "SELECT \"case_matters\", \"CASE_matters\", \"CASE_MATTERS\", \"%illegal.symbols%\" FROM {tbl}"
+      }
+    ]
+  },
+  "unicode_escapes": {
+    "ignored": true,
+    "comment": "ignored because we don't support U& identifiers",
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "U&\"d\\0061t\\+000061\"", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [
+      {
+        "psql": "4.1.1",
+        "description": "quoted identifier support",
+        "sql": "SELECT * FROM {tbl}"
+      }
+    ]
+  },
+  "c_string_constants": {
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [{
+      "psql": ["4.1.2.1", "4.1.2.2"],
+      "description": "constants with c-style escapes",
+      "sql": "SELECT data, 'foo', 'foo\nbar', concat(data, 'foo\tbar', '') FROM {tbl}"
+    }]
+  },
+  "unicode_string_constants": {
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [{
+      "psql": "4.1.2.3",
+      "description": "constants with unicode escapes",
+      "sql": "SELECT data, U&'d\\0061ta' FROM {tbl}",
+      "outputs": [["1", "data"]]
+    }]
+  },
+  "dollar_string_constants": {
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [{
+      "psql": "4.1.2.4",
+      "ignored": true,
+      "comment": "unsupported",
+      "description": "constants with $ escapes",
+      "sql": "SELECT data, $$Dianne's horse$$, $tag$Dianne's\nhorse$tag$ FROM {tbl}"
+    }]
+  },
+  "bit_string_constants": {
+    "ignored": true,
+    "comment": "bit string constants not supported",
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [{
+      "psql": "4.1.2.5",
+      "description": "bit string constant support",
+      "sql": "SELECT data, B'1001', X'1FF' FROM {tbl}",
+      "outputs": [["1", "bytes", "bytes"]]
+    }]
+  },
+  "numeric_constants": {
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [{
+      "psql": "4.1.2.6",
+      "description": "numeric constant supports",
+      "sql": "SELECT data, 42, 3.5, 4., .001, 5e2, 1.925e-3 FROM {tbl}"
+    }]
+  },
+  "constant_casting": {
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [{
+      "psql": "4.1.2.7",
+      "description": "constant casting",
+      "sql": "SELECT data, CAST ('42' AS INT) FROM {tbl}"
+    }]
+  },
+  "comments": {
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [{
+      "psql": "4.1.5",
+      "description": "testing comment support",
+      "sql": "---this is a comment\nSELECT data FROM {tbl}"
+    }]
+  },
+  "operator_precedence" : {
+    "comments": "we don't support ^ or array[x] yet in v2, unary minus is broken",
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "INT"}],
+        "inputs": [[3]]
+      }
+    },
+    "queries": [{
+      "psql": "4.1.6",
+      "description": "testing operator precedence",
+      "sql": "SELECT NOT +{tbl}.data * 2 - 2 = -8 and true or false, data * 2 between 4 and 7 FROM {tbl}"
+    }]
+  }
+}
