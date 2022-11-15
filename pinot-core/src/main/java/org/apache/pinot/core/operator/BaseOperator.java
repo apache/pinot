@@ -36,7 +36,7 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
        runner's flag is raised. If the runner thread has already acted upon the flag and reset it, then the runner
        itself will cancel all worker's futures. Therefore, the worker will interrupt even if we only kill the runner
        thread. */
-    if (Thread.interrupted() || Tracing.ThreadAccountantOps.isRootThreadInterrupted()) {
+    if (Tracing.ThreadAccountantOps.isInterrupted()) {
       throw new EarlyTerminationException();
     }
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {

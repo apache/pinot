@@ -269,8 +269,8 @@ public class Tracing {
       Tracing.getThreadAccountant().startWatcherTask();
     }
 
-    public static boolean isRootThreadInterrupted() {
-      return Tracing.getThreadAccountant().isRootThreadInterrupted();
+    public static boolean isInterrupted() {
+      return Thread.interrupted() || Tracing.getThreadAccountant().isRootThreadInterrupted();
     }
   }
 }
