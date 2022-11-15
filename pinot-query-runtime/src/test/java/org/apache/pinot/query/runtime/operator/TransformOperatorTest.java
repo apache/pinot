@@ -163,7 +163,7 @@ public class TransformOperatorTest {
   }
 
   @Test
-  public void shouldPropoageUpstreamError() {
+  public void shouldPropagateUpstreamError() {
     DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
     });

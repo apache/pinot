@@ -206,7 +206,6 @@ public interface RexExpression {
     private SqlKind _sqlKind;
     @ProtoProperties
     private FieldSpec.DataType _dataType;
-    // TODO: Make sure _functionName and _sqlKind are matching.
     @ProtoProperties
     private String _functionName;
     @ProtoProperties

@@ -30,7 +30,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.OperatorUtils;
 
 /*
-   Functions that apply to TransformOperator.
+ * FunctionOperands are generated from {@link RexExpression}s.
  */
 public class FunctionOperand extends TransformOperand {
   private final List<TransformOperand> _childOperandList;
