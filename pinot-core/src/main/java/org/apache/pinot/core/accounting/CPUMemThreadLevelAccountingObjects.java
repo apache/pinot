@@ -23,7 +23,8 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.accounting.ExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -33,12 +34,15 @@ public class CPUMemThreadLevelAccountingObjects {
 
   public static class StatsDigest {
 
-    final long[] _statsEntries;
+    // The current usage sampling for each thread
+    final long[] _currentStatsSample;
+    // The previous usage sampling for each thread
     final long[] _lastStatSample;
+    // The aggregated usage sampling for the finished tasks of a (still) running queries
     final HashMap<String, Long> _finishedTaskStatAggregator;
 
     StatsDigest(int numThreads) {
-      _statsEntries = new long[numThreads];
+      _currentStatsSample = new long[numThreads];
       _lastStatSample = new long[numThreads];
       _finishedTaskStatAggregator = new HashMap<>();
     }
@@ -72,15 +76,19 @@ public class CPUMemThreadLevelAccountingObjects {
     }
   }
 
-  public static class TaskEntry implements ExecutionContext {
+  public static class TaskEntry implements ThreadExecutionContext {
     private final String _queryId;
     private final int _taskId;
-    private final Thread _rootThread;
+    private final Thread _anchorThread;
 
-    public TaskEntry(String queryId, int taskId, Thread rootThread) {
+    public boolean isAnchorThread() {
+      return _taskId == CommonConstants.Accounting.ANCHOR_TASK_ID;
+    }
+
+    public TaskEntry(String queryId, int taskId, Thread anchorThread) {
       _queryId = queryId;
       _taskId = taskId;
-      _rootThread = rootThread;
+      _anchorThread = anchorThread;
     }
 
     public static boolean isSameTask(TaskEntry currentTaskStatus, TaskEntry lastQueryTask) {
@@ -102,13 +110,13 @@ public class CPUMemThreadLevelAccountingObjects {
       return _taskId;
     }
 
-    public Thread getRootThread() {
-      return _rootThread;
+    public Thread getAnchorThread() {
+      return _anchorThread;
     }
 
     @Override
     public String toString() {
-      return "TaskEntry{" + "_queryId='" + _queryId + '\'' + ", _taskId=" + _taskId + ", _rootThread=" + _rootThread
+      return "TaskEntry{" + "_queryId='" + _queryId + '\'' + ", _taskId=" + _taskId + ", _rootThread=" + _anchorThread
           + '}';
     }
   }

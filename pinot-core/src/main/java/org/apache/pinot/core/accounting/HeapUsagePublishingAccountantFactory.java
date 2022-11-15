@@ -24,8 +24,8 @@ import java.util.Timer;
 import java.util.TimerTask;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -38,18 +38,18 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFactory {
 
   @Override
-  public ThreadAccountant init(int numPqr, int numPqw, PinotConfiguration config) {
+  public ThreadResourceUsageAccountant init(int numRunnerThreads, int numWorkerThreads, PinotConfiguration config) {
     int period = config.getProperty(CommonConstants.Accounting.CONFIG_OF_HEAP_USAGE_PUBLISH_PERIOD,
         CommonConstants.Accounting.DEFAULT_HEAP_USAGE_PUBLISH_PERIOD);
-    return new HeapUsagePublishingAccountantFactory.HeapUsagePublishingAccountant(period);
+    return new HeapUsagePublishingResourceUsageAccountant(period);
   }
 
-  public static class HeapUsagePublishingAccountant extends Tracing.DefaultThreadAccountant {
+  public static class HeapUsagePublishingResourceUsageAccountant extends Tracing.DefaultThreadResourceUsageAccountant {
     static final MemoryMXBean MEMORY_MX_BEAN = ManagementFactory.getMemoryMXBean();
     private final Timer _timer;
     private final int _period;
 
-    public HeapUsagePublishingAccountant(int period) {
+    public HeapUsagePublishingResourceUsageAccountant(int period) {
       _period = period;
       _timer = new Timer("HeapUsagePublishingAccountant", true);
     }

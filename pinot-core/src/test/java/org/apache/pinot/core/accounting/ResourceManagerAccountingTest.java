@@ -31,13 +31,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory.PerQueryCPUMemAccountant;
+import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant;
 import org.apache.pinot.core.accounting.utils.RunnerWorkerThreadOffsetProvider;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.spi.accounting.ExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
@@ -59,21 +59,20 @@ public class ResourceManagerAccountingTest {
       throws Exception {
     ResourceManager rm = getResourceManager(2, 5, 1, 3, Collections.emptyMap());
     Future[] futures = new Future[2001];
-    Set<Integer> runnerThreadIds = ConcurrentHashMap.newKeySet();
-    Set<Integer> workerThreadIds = ConcurrentHashMap.newKeySet();
+    Set<Integer> threadIds = ConcurrentHashMap.newKeySet();
 
-    RunnerWorkerThreadOffsetProvider runnerWorkerThreadOffsetProvider = new RunnerWorkerThreadOffsetProvider(2);
+    RunnerWorkerThreadOffsetProvider runnerWorkerThreadOffsetProvider = new RunnerWorkerThreadOffsetProvider();
 
     for (int i = 0; i < 1000; i++) {
       int finalI = i;
       futures[i + 1000] = rm.getQueryWorkers().submit(() -> {
         int id = runnerWorkerThreadOffsetProvider.get();
-        workerThreadIds.add(id);
+        threadIds.add(id);
         futures[2000].cancel(true);
       });
       futures[i] = rm.getQueryRunners().submit(() -> {
         int id = runnerWorkerThreadOffsetProvider.get();
-        runnerThreadIds.add(id);
+        threadIds.add(id);
         futures[2500 - finalI] = null;
       });
     }
@@ -83,16 +82,15 @@ public class ResourceManagerAccountingTest {
       } catch (Exception ignored) {
       }
     }
-    Assert.assertEquals(runnerThreadIds.size(), 2);
-    Assert.assertEquals(workerThreadIds.size(), 5);
+    Assert.assertEquals(threadIds.size(), 7);
 
-    Assert.assertTrue(runnerThreadIds.contains(0));
-    Assert.assertTrue(runnerThreadIds.contains(1));
-    Assert.assertTrue(workerThreadIds.contains(2));
-    Assert.assertTrue(workerThreadIds.contains(3));
-    Assert.assertTrue(workerThreadIds.contains(4));
-    Assert.assertTrue(workerThreadIds.contains(5));
-    Assert.assertTrue(workerThreadIds.contains(6));
+    Assert.assertTrue(threadIds.contains(0));
+    Assert.assertTrue(threadIds.contains(1));
+    Assert.assertTrue(threadIds.contains(2));
+    Assert.assertTrue(threadIds.contains(3));
+    Assert.assertTrue(threadIds.contains(4));
+    Assert.assertTrue(threadIds.contains(5));
+    Assert.assertTrue(threadIds.contains(6));
   }
 
   /**
@@ -104,7 +102,7 @@ public class ResourceManagerAccountingTest {
   @SuppressWarnings("unused")
   public void testCPUtimeProvider()
       throws Exception {
-    LogManager.getLogger(PerQueryCPUMemAccountant.class).setLevel(Level.DEBUG);
+    LogManager.getLogger(PerQueryCPUMemResourceUsageAccountant.class).setLevel(Level.DEBUG);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.DEBUG);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
@@ -127,13 +125,13 @@ public class ResourceManagerAccountingTest {
         Tracing.ThreadAccountantOps.setupRunner(queryId);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
-        ExecutionContext executionContext = Tracing.getThreadAccountant().getExecutionContext();
+        ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
         for (int j = 0; j < 10; j++) {
           int finalJ = j;
           rm.getQueryWorkers().submit(() -> {
             ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
             Tracing.ThreadAccountantOps.setupWorker(finalJ, threadResourceUsageProvider,
-                executionContext);
+                threadExecutionContext);
             for (int i = 0; i < (finalJ + 1) * 10; i++) {
               Tracing.ThreadAccountantOps.sample();
               for (int m = 0; m < 1000; m++) {
@@ -168,7 +166,7 @@ public class ResourceManagerAccountingTest {
   @SuppressWarnings("unused")
   public void testThreadMemoryAccounting()
       throws Exception {
-    LogManager.getLogger(PerQueryCPUMemAccountant.class).setLevel(Level.DEBUG);
+    LogManager.getLogger(PerQueryCPUMemResourceUsageAccountant.class).setLevel(Level.DEBUG);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.DEBUG);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
@@ -189,13 +187,13 @@ public class ResourceManagerAccountingTest {
         Tracing.ThreadAccountantOps.setupRunner(queryId);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
-        ExecutionContext executionContext = Tracing.getThreadAccountant().getExecutionContext();
+        ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
         for (int j = 0; j < 10; j++) {
           int finalJ = j;
           rm.getQueryWorkers().submit(() -> {
             ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
             Tracing.ThreadAccountantOps.setupWorker(finalJ, threadResourceUsageProvider,
-                executionContext);
+                threadExecutionContext);
             long[][] a = new long[1000][];
             for (int i = 0; i < (finalJ + 1) * 10; i++) {
               Tracing.ThreadAccountantOps.sample();
@@ -275,7 +273,7 @@ public class ResourceManagerAccountingTest {
   @SuppressWarnings("unused")
   public void testThreadMemory()
       throws Exception {
-    LogManager.getLogger(PerQueryCPUMemAccountant.class).setLevel(Level.DEBUG);
+    LogManager.getLogger(PerQueryCPUMemResourceUsageAccountant.class).setLevel(Level.DEBUG);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.DEBUG);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
@@ -300,13 +298,13 @@ public class ResourceManagerAccountingTest {
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
         Future[] futuresThread = new Future[10];
-        ExecutionContext executionContext = Tracing.getThreadAccountant().getExecutionContext();
+        ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
         for (int j = 0; j < 10; j++) {
           int finalJ = j;
           futuresThread[j] = rm.getQueryWorkers().submit(() -> {
             ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
             Tracing.ThreadAccountantOps.setupWorker(finalJ, threadResourceUsageProvider,
-                executionContext);
+                threadExecutionContext);
             long[][] a = new long[1000][];
             for (int i = 0; i < (finalK + 1) * 80; i++) {
               Tracing.ThreadAccountantOps.sample();

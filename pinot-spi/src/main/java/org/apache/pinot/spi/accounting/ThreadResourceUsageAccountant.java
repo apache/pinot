@@ -21,17 +21,18 @@ package org.apache.pinot.spi.accounting;
 import javax.annotation.Nullable;
 
 
-public interface ThreadAccountant {
+public interface ThreadResourceUsageAccountant {
 
   /**
-   * clear thread accounting info
+   * clear thread accounting info when a task finishes execution on a thread
    */
   void clear();
 
   /**
-   * check if the corresponding runner thread of current thread is interrupted
+   * check if the corresponding anchor thread of current thread is interrupted
+   * so that when we preempt a task we only call interrupt on the anchor thread
    */
-  boolean isRootThreadInterrupted();
+  boolean isAnchorThreadInterrupted();
 
   /**
    * Task tracking info
@@ -39,10 +40,12 @@ public interface ThreadAccountant {
    * @param taskId a unique task id
    * @param parentContext the parent execution context, null for root(runner) thread
    */
-  void createExecutionContext(String queryId, int taskId, @Nullable ExecutionContext parentContext);
+  void createExecutionContext(String queryId, int taskId, @Nullable ThreadExecutionContext parentContext);
 
-
-  ExecutionContext getExecutionContext();
+  /**
+   * get the executon context of current thread
+   */
+  ThreadExecutionContext getThreadExecutionContext();
 
   /**
    * set resource usage provider
@@ -50,14 +53,9 @@ public interface ThreadAccountant {
   void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider);
 
   /**
-   * operator call to update thread cpu time
+   * call to sample usage
    */
-  void sampleThreadCPUTime();
-
-  /**
-   * operator call to update thread bytes allocated
-   */
-  void sampleThreadBytesAllocated();
+  void sampleUsage();
 
   /**
    * start the periodical task
@@ -65,8 +63,8 @@ public interface ThreadAccountant {
   void startWatcherTask();
 
   /**
-   * get error message if the query is killed
+   * get error status if the query is preempted
    * @return empty string if N/A
    */
-  String getErrorMsg();
+  Exception getErrorStatus();
 }

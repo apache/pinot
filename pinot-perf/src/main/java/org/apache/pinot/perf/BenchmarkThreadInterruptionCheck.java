@@ -38,18 +38,37 @@ import org.openjdk.jmh.runner.options.TimeValue;
 
 
 /**
+ * TOTAL_LOOPS = 10_000_000
  * BenchmarkThreadInterruptionCheck.benchInterruptionCheckTime    avgt    8   86.242 ±  5.375  ms/op
  * BenchmarkThreadInterruptionCheck.benchMaskingTime              avgt    8  170.389 ± 18.277  ms/op
  * BenchmarkThreadInterruptionCheck.benchModuloTime               avgt    8  181.029 ± 20.284  ms/op
  * BenchmarkThreadInterruptionCheck.benchmarkWorkload             avgt    8  164.734 ± 18.122  ms/op
  * BenchmarkThreadInterruptionCheck.benchmarkWorkloadWithTiling1  avgt    8  169.854 ±  9.057  ms/op
  * BenchmarkThreadInterruptionCheck.benchmarkWorkloadWithTiling2  avgt    8  181.711 ± 21.245  ms/op
+ *
+ * TOTAL_LOOPS = 100_000
+ * Benchmark                                                      Mode  Cnt  Score   Error  Units
+ * BenchmarkThreadInterruptionCheck.benchInterruptionCheckTime    avgt    8  0.822 ± 0.014  ms/op
+ * BenchmarkThreadInterruptionCheck.benchMaskingTime              avgt    8  1.618 ± 0.037  ms/op
+ * BenchmarkThreadInterruptionCheck.benchModuloTime               avgt    8  1.678 ± 0.012  ms/op
+ * BenchmarkThreadInterruptionCheck.benchmarkWorkload             avgt    8  1.590 ± 0.020  ms/op
+ * BenchmarkThreadInterruptionCheck.benchmarkWorkloadWithTiling1  avgt    8  2.089 ± 0.231  ms/op
+ * BenchmarkThreadInterruptionCheck.benchmarkWorkloadWithTiling2  avgt    8  1.776 ± 0.044  ms/op
+ *
+ * TOTAL_LOOPS = 10_000
+ * Benchmark                                                      Mode  Cnt  Score   Error  Units
+ * BenchmarkThreadInterruptionCheck.benchInterruptionCheckTime    avgt    8  0.092 ± 0.004  ms/op
+ * BenchmarkThreadInterruptionCheck.benchMaskingTime              avgt    8  0.139 ± 0.005  ms/op
+ * BenchmarkThreadInterruptionCheck.benchModuloTime               avgt    8  0.168 ± 0.034  ms/op
+ * BenchmarkThreadInterruptionCheck.benchmarkWorkload             avgt    8  0.141 ± 0.003  ms/op
+ * BenchmarkThreadInterruptionCheck.benchmarkWorkloadWithTiling1  avgt    8  0.155 ± 0.008  ms/op
+ * BenchmarkThreadInterruptionCheck.benchmarkWorkloadWithTiling2  avgt    8  0.182 ± 0.011  ms/op
  */
 @State(Scope.Benchmark)
 public class BenchmarkThreadInterruptionCheck {
 
   static final int MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK_MASK = 0b1_1111_1111_1111;
-  static final int TOTAL_LOOPS = 10_000_000;
+  static final int TOTAL_LOOPS = 100_000;
   static final int LOOP_TILE_SIZE = 10_000;
 
   public static void main(String[] args)
@@ -61,14 +80,14 @@ public class BenchmarkThreadInterruptionCheck {
     new Runner(opt).run();
   }
 
-//  @Benchmark
-//  @BenchmarkMode(Mode.AverageTime)
-//  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-//  public void benchInterruptionCheckTime(Blackhole bh) {
-//    for (int i = 0; i < TOTAL_LOOPS; i++) {
-//      bh.consume(Tracing.ThreadAccountantOps.isInterrupted());
-//    }
-//  }
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public void benchInterruptionCheckTime(Blackhole bh) {
+    for (int i = 0; i < TOTAL_LOOPS; i++) {
+      bh.consume(Tracing.ThreadAccountantOps.isInterrupted());
+    }
+  }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)

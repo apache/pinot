@@ -697,7 +697,8 @@ public class CommonConstants {
   }
 
   public static class Accounting {
-    public static final int INVALID_TASK_ID = -1;
+    public static final int ANCHOR_TASK_ID = -1;
+    public static final int IGNORED_TASK_ID = -2;
     public static final String CONFIG_OF_FACTORY_NAME = "accounting.factory.name";
 
     public static final String CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = "accounting.enable.thread.cpu.sampling";

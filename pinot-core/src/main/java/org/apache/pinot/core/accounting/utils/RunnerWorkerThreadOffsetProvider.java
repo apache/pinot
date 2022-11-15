@@ -20,7 +20,6 @@ package org.apache.pinot.core.accounting.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -29,26 +28,11 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public class RunnerWorkerThreadOffsetProvider {
 
-  private final int _numQueryRunnerThreads;
   // Thread local variable containing each thread's ID
   private final AtomicInteger _atomicInteger = new AtomicInteger(0);
-  private final ThreadLocal<Integer> _threadId;
-  public RunnerWorkerThreadOffsetProvider(int numQueryRunnerThreads) {
-    _numQueryRunnerThreads = numQueryRunnerThreads;
-    _threadId = ThreadLocal.withInitial(() -> {
-          String threadName = Thread.currentThread().getName();
-          if (threadName.startsWith(CommonConstants.ExecutorService.PINOT_QUERY_RUNNER_NAME_PREFIX)) {
-            return Integer.parseInt(
-                threadName.substring(CommonConstants.ExecutorService.PINOT_QUERY_RUNNER_NAME_PREFIX.length()));
-          } else if (threadName.startsWith(CommonConstants.ExecutorService.PINOT_QUERY_WORKER_NAME_PREFIX)) {
-            return Integer.parseInt(
-                threadName.substring(CommonConstants.ExecutorService.PINOT_QUERY_WORKER_NAME_PREFIX.length()))
-                + _numQueryRunnerThreads;
-          } else {
-            return _atomicInteger.getAndIncrement();
-          }
-        }
-    );
+  private final ThreadLocal<Integer> _threadId = ThreadLocal.withInitial(_atomicInteger::getAndIncrement);
+
+  public RunnerWorkerThreadOffsetProvider() {
   }
 
   @VisibleForTesting
@@ -56,7 +40,10 @@ public class RunnerWorkerThreadOffsetProvider {
     _atomicInteger.set(0);
   }
 
-  // Returns the current thread's unique ID, assigning it if necessary
+  // TODO: make this not dependent on numRunnerThreads
+  /**
+   * Returns the current thread's unique ID, assigning it if necessary
+   */
   public int get() {
     return _threadId.get();
   }

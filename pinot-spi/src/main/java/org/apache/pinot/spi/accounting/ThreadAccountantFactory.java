@@ -22,5 +22,5 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public interface ThreadAccountantFactory {
-  ThreadAccountant init(int numPqr, int numPqw, PinotConfiguration config);
+  ThreadResourceUsageAccountant init(int numRunnerThreads, int numWorkerThreads, PinotConfiguration config);
 }

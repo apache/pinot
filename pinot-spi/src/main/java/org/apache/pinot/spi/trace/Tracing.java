@@ -21,10 +21,9 @@ package org.apache.pinot.spi.trace;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.spi.accounting.ExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -54,11 +53,11 @@ public class Tracing {
    * registered. The thread accountant registered here will be used for thread usage/ task status accountant, so long
    * as it is registered before the first call to {@see getThreadAccountant} or {@see ThreadAccountantOps}.
    */
-  private static final AtomicReference<ThreadAccountant> ACCOUNTANT_REGISTRATION = new AtomicReference<>();
+  private static final AtomicReference<ThreadResourceUsageAccountant> ACCOUNTANT_REGISTRATION = new AtomicReference<>();
 
   private static final class Holder {
     static final Tracer TRACER = TRACER_REGISTRATION.get() == null ? createDefaultTracer() : TRACER_REGISTRATION.get();
-    static final ThreadAccountant ACCOUNTANT = ACCOUNTANT_REGISTRATION.get() == null
+    static final ThreadResourceUsageAccountant ACCOUNTANT = ACCOUNTANT_REGISTRATION.get() == null
         ? createDefaultThreadAccountant() : ACCOUNTANT_REGISTRATION.get();
   }
 
@@ -75,11 +74,11 @@ public class Tracing {
   /**
    * Registration point to allow customization of thread accounting behavior. Registration will be successful
    * if this was the first attempt to register and registration happened before first use of the thread accountant.
-   * @param threadAccountant the threadAccountant implementation
+   * @param threadResourceUsageAccountant the threadAccountant implementation
    * @return true if the registration was successful.
    */
-  public static boolean register(ThreadAccountant threadAccountant) {
-    return ACCOUNTANT_REGISTRATION.compareAndSet(null, threadAccountant);
+  public static boolean register(ThreadResourceUsageAccountant threadResourceUsageAccountant) {
+    return ACCOUNTANT_REGISTRATION.compareAndSet(null, threadResourceUsageAccountant);
   }
 
   /**
@@ -92,7 +91,7 @@ public class Tracing {
   /**
    * @return the registered threadAccountant.
    */
-  public static ThreadAccountant getThreadAccountant() {
+  public static ThreadResourceUsageAccountant getThreadAccountant() {
     return Holder.ACCOUNTANT;
   }
 
@@ -121,9 +120,9 @@ public class Tracing {
    * {@see initializeThreadAccountant} not loading any class
    * @return default thread accountant that only tracks the corresponding runner thread of each worker thread
    */
-  private static DefaultThreadAccountant createDefaultThreadAccountant() {
+  private static DefaultThreadResourceUsageAccountant createDefaultThreadAccountant() {
     LOGGER.info("Using default thread accountant");
-    return new DefaultThreadAccountant();
+    return new DefaultThreadResourceUsageAccountant();
   }
 
   /**
@@ -156,24 +155,24 @@ public class Tracing {
   /**
    * Default accountant that is used to enable worker thread cancellation upon runner thread's interruption
    */
-  public static class DefaultThreadAccountant implements ThreadAccountant {
+  public static class DefaultThreadResourceUsageAccountant implements ThreadResourceUsageAccountant {
 
-    // worker thread's corresponding runner thread, worker will also interrupt if it finds runner's flag is raised
-    private final ThreadLocal<Thread> _rootThread;
+    // worker thread's corresponding anchor thread, worker will also interrupt if it finds anchor's flag is raised
+    private final ThreadLocal<Thread> _anchorThread;
 
-    public DefaultThreadAccountant() {
-      _rootThread = new ThreadLocal<>();
+    public DefaultThreadResourceUsageAccountant() {
+      _anchorThread = new ThreadLocal<>();
     }
 
     @Override
-    public boolean isRootThreadInterrupted() {
-      Thread thread = _rootThread.get();
+    public boolean isAnchorThreadInterrupted() {
+      Thread thread = _anchorThread.get();
       return thread != null && thread.isInterrupted();
     }
 
     @Override
     public void clear() {
-      _rootThread.set(null);
+      _anchorThread.set(null);
     }
 
     @Override
@@ -181,34 +180,30 @@ public class Tracing {
     }
 
     @Override
-    public void sampleThreadCPUTime() {
-    }
-
-    @Override
-    public void sampleThreadBytesAllocated() {
+    public void sampleUsage() {
     }
 
     @Override
     public final void createExecutionContext(String queryId, int taskId,
-        ExecutionContext parentContext) {
-      _rootThread.set(parentContext == null ? Thread.currentThread() : parentContext.getRootThread());
+        ThreadExecutionContext parentContext) {
+      _anchorThread.set(parentContext == null ? Thread.currentThread() : parentContext.getAnchorThread());
       createExecutionContextInner(queryId, taskId, parentContext);
     }
 
-    public void createExecutionContextInner(String queryId, int taskId, ExecutionContext parentContext) {
+    public void createExecutionContextInner(String queryId, int taskId, ThreadExecutionContext parentContext) {
     }
 
     @Override
-    public ExecutionContext getExecutionContext() {
-      return new ExecutionContext() {
+    public ThreadExecutionContext getThreadExecutionContext() {
+      return new ThreadExecutionContext() {
         @Override
         public String getQueryId() {
           return null;
         }
 
         @Override
-        public Thread getRootThread() {
-          return _rootThread.get();
+        public Thread getAnchorThread() {
+          return _anchorThread.get();
         }
       };
     }
@@ -218,8 +213,8 @@ public class Tracing {
     }
 
     @Override
-    public String getErrorMsg() {
-      return StringUtils.EMPTY;
+    public Exception getErrorStatus() {
+      return null;
     }
   }
 
@@ -233,19 +228,18 @@ public class Tracing {
 
     public static void setupRunner(String queryId) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
-      Tracing.getThreadAccountant().createExecutionContext(queryId, CommonConstants.Accounting.INVALID_TASK_ID,
+      Tracing.getThreadAccountant().createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID,
           null);
     }
 
     public static void setupWorker(int taskId, ThreadResourceUsageProvider threadResourceUsageProvider,
-        ExecutionContext executionContext) {
+        ThreadExecutionContext threadExecutionContext) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(threadResourceUsageProvider);
-      Tracing.getThreadAccountant().createExecutionContext(null, taskId, executionContext);
+      Tracing.getThreadAccountant().createExecutionContext(null, taskId, threadExecutionContext);
     }
 
     public static void sample() {
-      Tracing.getThreadAccountant().sampleThreadCPUTime();
-      Tracing.getThreadAccountant().sampleThreadBytesAllocated();
+      Tracing.getThreadAccountant().sampleUsage();
     }
 
     public static void clear() {
@@ -254,6 +248,7 @@ public class Tracing {
 
     public static void initializeThreadAccountant(int numPqr, int numPqw, PinotConfiguration config) {
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
+      LOGGER.info("Config-specified accountant factory name {}", factoryName);
       try {
         ThreadAccountantFactory threadAccountantFactory =
             (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
@@ -270,7 +265,7 @@ public class Tracing {
     }
 
     public static boolean isInterrupted() {
-      return Thread.interrupted() || Tracing.getThreadAccountant().isRootThreadInterrupted();
+      return Thread.interrupted() || Tracing.getThreadAccountant().isAnchorThreadInterrupted();
     }
   }
 }

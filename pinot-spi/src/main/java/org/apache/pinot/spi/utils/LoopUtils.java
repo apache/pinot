@@ -28,7 +28,7 @@ public class LoopUtils {
   }
   public static final int MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK = 0b1_1111_1111_1111;
 
-  // Check for thread interruption, every time after merging 10_000 keys
+  // Check for thread interruption, every time after merging 8192 keys
   public static void checkMergePhaseInterruption(int mergedKeys) {
     if ((mergedKeys & MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0
         && (Tracing.ThreadAccountantOps.isInterrupted())) {

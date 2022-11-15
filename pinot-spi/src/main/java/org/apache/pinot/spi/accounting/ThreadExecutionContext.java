@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.spi.accounting;
 
-public interface ExecutionContext {
+/**
+ * The context for task execution information of a thread
+ */
+public interface ThreadExecutionContext {
 
    /**
     * get query id of the execution context
@@ -28,7 +31,7 @@ public interface ExecutionContext {
 
    /**
     *
-    * @return get the root thread of execution context
+    * @return get the anchor thread of execution context
     */
-   Thread getRootThread();
+   Thread getAnchorThread();
 }

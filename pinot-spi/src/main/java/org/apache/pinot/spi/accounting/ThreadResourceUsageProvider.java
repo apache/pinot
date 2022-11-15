@@ -28,24 +28,30 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The {@code ThreadResourceUsageProvider} class providing the functionality of measuring the CPU time
- * and allocate bytes for the current thread.
+ * and allocateBytes (JVM heap) for the current thread.
  */
 public class ThreadResourceUsageProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThreadResourceUsageProvider.class);
+
+  // used for getting the memory allocation function in hotspot jvm through reflection
   private static final String SUN_THREAD_MXBEAN_CLASS_NAME = "com.sun.management.ThreadMXBean";
   private static final String SUN_THREAD_MXBEAN_IS_THREAD_ALLOCATED_MEMORY_SUPPORTED_NAME
       = "isThreadAllocatedMemorySupported";
   private static final String SUN_THREAD_MXBEAN_IS_THREAD_ALLOCATED_MEMORY_ENABLED_NAME
       = "isThreadAllocatedMemoryEnabled";
+  private static final String SUN_THREAD_MXBEAN_SET_THREAD_ALLOCATED_MEMORY_ENABLED_NAME
+      = "setThreadAllocatedMemoryEnabled";
   private static final String SUN_THREAD_MXBEAN_GET_BYTES_ALLOCATED_NAME = "getThreadAllocatedBytes";
   private static final Method SUN_THREAD_MXBEAN_GET_BYTES_ALLOCATED_METHOD;
 
   private static final ThreadMXBean MX_BEAN = ManagementFactory.getThreadMXBean();
   private static final boolean IS_CURRENT_THREAD_CPU_TIME_SUPPORTED = MX_BEAN.isCurrentThreadCpuTimeSupported();
   private static final boolean IS_THREAD_ALLOCATED_MEMORY_SUPPORTED;
-  private static final boolean IS_THREAD_ALLOCATED_MEMORY_ENABLED;
+  private static final boolean IS_THREAD_ALLOCATED_MEMORY_ENABLED_DEFAULT;
   private static boolean _isThreadCpuTimeMeasurementEnabled = false;
   private static boolean _isThreadMemoryMeasurementEnabled = false;
+
+  // reference point for start time/bytes
   private final long _startTimeNs;
   private final long _startBytesAllocated;
 
@@ -76,8 +82,22 @@ public class ThreadResourceUsageProvider {
   }
 
   public static void setThreadMemoryMeasurementEnabled(boolean enable) {
-    _isThreadMemoryMeasurementEnabled = enable && IS_THREAD_ALLOCATED_MEMORY_SUPPORTED
-        && IS_THREAD_ALLOCATED_MEMORY_ENABLED;
+
+    boolean isThreadAllocateMemoryEnabled = IS_THREAD_ALLOCATED_MEMORY_ENABLED_DEFAULT;
+    // if the jvm default enabling config is different
+    if (enable != IS_THREAD_ALLOCATED_MEMORY_ENABLED_DEFAULT) {
+      try {
+        Class<?> sunThreadMXBeanClass = Class.forName(SUN_THREAD_MXBEAN_CLASS_NAME);
+        sunThreadMXBeanClass.getMethod(SUN_THREAD_MXBEAN_SET_THREAD_ALLOCATED_MEMORY_ENABLED_NAME, Boolean.TYPE)
+            .invoke(MX_BEAN, enable);
+        isThreadAllocateMemoryEnabled = (boolean) sunThreadMXBeanClass
+            .getMethod(SUN_THREAD_MXBEAN_IS_THREAD_ALLOCATED_MEMORY_ENABLED_NAME)
+            .invoke(MX_BEAN);
+      } catch (ClassNotFoundException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
+        LOGGER.error("Not able to call isThreadAllocatedMemoryEnabled or setThreadAllocatedMemoryEnabled, ", e);
+      }
+    }
+    _isThreadMemoryMeasurementEnabled = enable && IS_THREAD_ALLOCATED_MEMORY_SUPPORTED && isThreadAllocateMemoryEnabled;
   }
 
   public long getThreadTimeNs() {
@@ -124,10 +144,10 @@ public class ThreadResourceUsageProvider {
     } catch (IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
       LOGGER.error("Not able to call isThreadAllocatedMemoryEnabled, ", e);
     }
-    IS_THREAD_ALLOCATED_MEMORY_ENABLED = isThreadAllocateMemoryEnabled;
+    IS_THREAD_ALLOCATED_MEMORY_ENABLED_DEFAULT = isThreadAllocateMemoryEnabled;
 
     Method threadAllocateBytes = null;
-    if (IS_THREAD_ALLOCATED_MEMORY_SUPPORTED && IS_THREAD_ALLOCATED_MEMORY_ENABLED) {
+    if (IS_THREAD_ALLOCATED_MEMORY_SUPPORTED) {
       try {
         threadAllocateBytes = sunThreadMXBeanClass
             .getMethod(SUN_THREAD_MXBEAN_GET_BYTES_ALLOCATED_NAME, long.class);
@@ -140,6 +160,7 @@ public class ThreadResourceUsageProvider {
   static {
     LOGGER.info("Current thread cpu time measurement supported: {}", IS_CURRENT_THREAD_CPU_TIME_SUPPORTED);
     LOGGER.info("Current thread allocated bytes measurement supported: {}", IS_THREAD_ALLOCATED_MEMORY_SUPPORTED);
-    LOGGER.info("Current thread allocated bytes measurement enabled: {}", IS_THREAD_ALLOCATED_MEMORY_ENABLED);
+    LOGGER.info("Current thread allocated bytes measurement enabled default: {}",
+        IS_THREAD_ALLOCATED_MEMORY_ENABLED_DEFAULT);
   }
 }

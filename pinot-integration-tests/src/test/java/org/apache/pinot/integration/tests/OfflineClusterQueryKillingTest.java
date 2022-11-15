@@ -92,7 +92,8 @@ public class OfflineClusterQueryKillingTest extends BaseClusterIntegrationTestSe
   public void setUp()
       throws Exception {
     // Setup logging and resource accounting
-    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemAccountant.class).setLevel(Level.DEBUG);
+    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
+        .setLevel(Level.DEBUG);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.DEBUG);
     LogManager.getLogger(Tracing.class).setLevel(Level.DEBUG);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.DEBUG);
@@ -142,7 +143,7 @@ public class OfflineClusterQueryKillingTest extends BaseClusterIntegrationTestSe
     serverConf.setProperty(ServerConf.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.0f);
     serverConf.setProperty(ServerConf.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.95f);
+        + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.60f);
     serverConf.setProperty(
         ServerConf.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_ENABLE_VERBOSE, true);
     serverConf.setProperty(
