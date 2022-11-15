@@ -100,6 +100,9 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "Dedup related config")
   private DedupConfig _dedupConfig;
 
+  @JsonPropertyDescription(value = "Dimension Table related config")
+  private DimensionTableConfig _dimensionTableConfig;
+
   @JsonPropertyDescription(value = "Config related to ingesting data into the table")
   private IngestionConfig _ingestionConfig;
 
@@ -303,6 +306,15 @@ public class TableConfig extends BaseJsonConfig {
 
   public void setDedupConfig(DedupConfig dedupConfig) {
     _dedupConfig = dedupConfig;
+  }
+
+  @Nullable
+  public DimensionTableConfig getDimensionTableConfig() {
+    return _dimensionTableConfig;
+  }
+
+  public void setDimensionTableConfig(DimensionTableConfig dimensionTableConfig) {
+    _dimensionTableConfig = dimensionTableConfig;
   }
 
   @JsonProperty(INGESTION_CONFIG_KEY)

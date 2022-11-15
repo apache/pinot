@@ -16,23 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager.offline;
+package org.apache.pinot.spi.config.table;
 
-import java.util.List;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public interface DimensionTable<T> {
+public class DimensionTableConfig extends BaseJsonConfig {
+  private final boolean _optimizeMemory;
 
-  List<String> getPrimaryKeyColumns();
+  @JsonCreator
+  public DimensionTableConfig(@JsonProperty(value = "optimizeMemory", required = true) boolean optimizeMemory) {
+    _optimizeMemory = optimizeMemory;
+  }
 
-  GenericRow get(PrimaryKey pk);
-
-  boolean put(PrimaryKey pk, T value);
-
-  boolean isEmpty();
-
-  FieldSpec getFieldSpecFor(String columnName);
+  public boolean isOptimizeMemory() {
+    return _optimizeMemory;
+  }
 }

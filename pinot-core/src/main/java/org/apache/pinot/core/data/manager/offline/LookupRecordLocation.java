@@ -18,21 +18,23 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import java.util.List;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.segment.spi.IndexSegment;
 
 
-public interface DimensionTable<T> {
+public class LookupRecordLocation {
+  private final IndexSegment _indexSegment;
+  private final int _docId;
 
-  List<String> getPrimaryKeyColumns();
+  public LookupRecordLocation(IndexSegment indexSegment, int docId) {
+    _indexSegment = indexSegment;
+    _docId = docId;
+  }
 
-  GenericRow get(PrimaryKey pk);
+  public IndexSegment getIndexSegment() {
+    return _indexSegment;
+  }
 
-  boolean put(PrimaryKey pk, T value);
-
-  boolean isEmpty();
-
-  FieldSpec getFieldSpecFor(String columnName);
+  public int getDocId() {
+    return _docId;
+  }
 }

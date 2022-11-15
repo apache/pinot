@@ -32,6 +32,8 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.config.table.DimensionTableConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -78,16 +80,31 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       AtomicReferenceFieldUpdater.newUpdater(DimensionTableDataManager.class, DimensionTable.class, "_dimensionTable");
 
   private volatile DimensionTable _dimensionTable;
+  private boolean _isMemoryOptimized = true;
 
   @Override
   protected void doInit() {
     super.doInit();
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkState(schema != null, "Failed to find schema for dimension table: %s", _tableNameWithType);
+
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
     Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
-    _dimensionTable = new DimensionTable(schema, primaryKeyColumns);
+
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
+    if (tableConfig != null) {
+      DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
+      if (dimensionTableConfig != null) {
+        _isMemoryOptimized = dimensionTableConfig.isOptimizeMemory();
+      }
+    }
+
+    if (_isMemoryOptimized) {
+      _dimensionTable = new MemoryOptimizedDimensionTable(schema, primaryKeyColumns);
+    } else {
+      _dimensionTable = new FastLookupDimensionTable(schema, primaryKeyColumns);
+    }
   }
 
   @Override
@@ -125,13 +142,18 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     DimensionTable replacement;
     do {
       snapshot = _dimensionTable;
-      replacement = createDimensionTable();
+      if (_isMemoryOptimized) {
+        replacement = createMemOptimisedDimensionTable();
+      } else {
+        replacement = createDimensionTable();
+      }
     } while (!UPDATER.compareAndSet(this, snapshot, replacement));
   }
 
   private DimensionTable createDimensionTable() {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkState(schema != null, "Failed to find schema for dimension table: %s", _tableNameWithType);
+
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
     Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
@@ -156,7 +178,43 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
           }
         }
       }
-      return new DimensionTable(schema, primaryKeyColumns, lookupTable);
+        return new FastLookupDimensionTable(schema, primaryKeyColumns, lookupTable);
+    } finally {
+      for (SegmentDataManager segmentManager : segmentManagers) {
+        releaseSegment(segmentManager);
+      }
+    }
+  }
+
+  private DimensionTable createMemOptimisedDimensionTable() {
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for dimension table: %s", _tableNameWithType);
+
+    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+    Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
+        "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
+
+    Map<PrimaryKey, LookupRecordLocation> lookupTable = new HashMap<>();
+    List<SegmentDataManager> segmentManagers = acquireAllSegments();
+    try {
+      for (SegmentDataManager segmentManager : segmentManagers) {
+        IndexSegment indexSegment = segmentManager.getSegment();
+        int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
+        if (numTotalDocs > 0) {
+          try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+            recordReader.init(indexSegment);
+            for (int i = 0; i < numTotalDocs; i++) {
+              GenericRow row = new GenericRow();
+              recordReader.getRecord(i, row);
+              lookupTable.put(row.getPrimaryKey(primaryKeyColumns), new LookupRecordLocation(indexSegment, i));
+            }
+          } catch (Exception e) {
+            throw new RuntimeException(
+                "Caught exception while reading records from segment: " + indexSegment.getSegmentName());
+          }
+        }
+      }
+      return new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable);
     } finally {
       for (SegmentDataManager segmentManager : segmentManagers) {
         releaseSegment(segmentManager);
