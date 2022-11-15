@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,7 +33,9 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,14 +44,21 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeConsumerMonitor.class);
   private final ConsumingSegmentInfoReader _consumingSegmentInfoReader;
 
-  public RealtimeConsumerMonitor(ControllerConf controllerConfig, PinotHelixResourceManager pinotHelixResourceManager,
+  @VisibleForTesting
+  public RealtimeConsumerMonitor(ControllerConf controllerConf, PinotHelixResourceManager pinotHelixResourceManager,
+      LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics,
+      ConsumingSegmentInfoReader consumingSegmentInfoReader) {
+    super("RealtimeConsumerMonitor", controllerConf.getRealtimeConsumerMonitorRunFrequency(),
+        controllerConf.getRealtimeConsumerMonitorInitialDelayInSeconds(), pinotHelixResourceManager,
+        leadControllerManager, controllerMetrics);
+    _consumingSegmentInfoReader = consumingSegmentInfoReader;
+  }
+
+  public RealtimeConsumerMonitor(ControllerConf controllerConf, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics,
       ExecutorService executorService) {
-    super("RealtimeConsumerMonitor", controllerConfig.getRealtimeConsumerMonitorRunFrequency(),
-        controllerConfig.getRealtimeConsumerMonitorInitialDelayInSeconds(), pinotHelixResourceManager,
-        leadControllerManager, controllerMetrics);
-    _consumingSegmentInfoReader = new ConsumingSegmentInfoReader(executorService, new SimpleHttpConnectionManager(),
-        pinotHelixResourceManager);
+    this(controllerConf, pinotHelixResourceManager, leadControllerManager, controllerMetrics,
+        new ConsumingSegmentInfoReader(executorService, new SimpleHttpConnectionManager(), pinotHelixResourceManager));
   }
 
   @Override
@@ -58,10 +68,15 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
 
   @Override
   protected void processTable(String tableNameWithType) {
+    if (!TableType.REALTIME.equals(TableNameBuilder.getTableTypeFromTableName(tableNameWithType))) {
+      return;
+    }
     try {
       ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap segmentsInfoMap =
           _consumingSegmentInfoReader.getConsumingSegmentsInfo(tableNameWithType, 10000);
       Map<String, List<Long>> partitionToLagSet = new HashMap<>();
+      Map<String, List<Long>> partitionToAvailabilityLagSet = new HashMap<>();
+
       for (List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> info
           : segmentsInfoMap._segmentToConsumingInfoMap.values()) {
         info.forEach(segment -> {
@@ -76,11 +91,27 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
               }
             }
           });
+          segment._partitionOffsetInfo._availabilityLagMap.forEach((k, v) -> {
+            if (!PartitionLagState.NOT_CALCULATED.equals(v)) {
+              try {
+                long availabilityLagMs = Long.parseLong(v);
+                partitionToAvailabilityLagSet.computeIfAbsent(k, k1 -> new ArrayList<>());
+                partitionToAvailabilityLagSet.get(k).add(availabilityLagMs);
+              } catch (NumberFormatException nfe) {
+                // skip this as we are unable to parse the lag string
+              }
+            }
+          });
         });
       }
       partitionToLagSet.forEach((partition, lagSet) -> {
         _controllerMetrics.setValueOfPartitionGauge(tableNameWithType, Integer.parseInt(partition),
-            ControllerGauge.MAX_CONSUMPTION_RECORDS_LAG, Collections.max(lagSet));
+            ControllerGauge.MAX_RECORDS_LAG, Collections.max(lagSet));
+      });
+
+      partitionToAvailabilityLagSet.forEach((partition, lagSet) -> {
+        _controllerMetrics.setValueOfPartitionGauge(tableNameWithType, Integer.parseInt(partition),
+            ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS, Collections.max(lagSet));
       });
     } catch (Exception e) {
       LOGGER.error("Failed to fetch consuming segments info. Unable to update table consumption status metrics");
