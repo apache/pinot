@@ -201,6 +201,7 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_mailbox.receive()).thenReturn(null);
     MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
+    // Receive NoOpBlock.
     Assert.assertTrue(receiveOp.nextBlock().isNoOpBlock());
   }
 
