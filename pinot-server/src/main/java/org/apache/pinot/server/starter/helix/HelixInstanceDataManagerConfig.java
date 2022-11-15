@@ -47,6 +47,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String INSTANCE_ID = "id";
   // Key of instance data directory
   public static final String INSTANCE_DATA_DIR = "dataDir";
+  // Key of instance metadata directory
+  public static final String INSTANCE_METADATA_DIR = "metadataDir";
   // Key of consumer directory
   public static final String CONSUMER_DIR = "consumerDir";
   // Key of instance segment tar directory
@@ -163,6 +165,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getInstanceDataDir() {
     return _instanceDataManagerConfiguration.getProperty(INSTANCE_DATA_DIR);
+  }
+
+  @Override
+  public String getInstanceMetadataDir() {
+    return _instanceDataManagerConfiguration.getProperty(INSTANCE_METADATA_DIR, getInstanceDataDir());
   }
 
   @Override

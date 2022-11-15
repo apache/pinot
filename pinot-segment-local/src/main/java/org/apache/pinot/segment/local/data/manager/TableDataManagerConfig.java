@@ -33,6 +33,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_TYPE = "dataManagerType";
   private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
+  private static final String TABLE_DATA_MANAGER_METADATA_DIRECTORY = "metadataDirectory";
   private static final String TABLE_DATA_MANAGER_CONSUMER_DIRECTORY = "consumerDirectory";
   private static final String TABLE_DATA_MANAGER_NAME = "name";
   private static final String TABLE_IS_DIMENSION = "isDimTable";
@@ -56,6 +57,10 @@ public class TableDataManagerConfig {
 
   public String getDataDir() {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_DATA_DIRECTORY);
+  }
+
+  public String getMetaDataDir() {
+    return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_METADATA_DIRECTORY);
   }
 
   public String getConsumerDir() {

@@ -421,6 +421,7 @@ public class CommonConstants {
   public static class Server {
     public static final String CONFIG_OF_INSTANCE_ID = "pinot.server.instance.id";
     public static final String CONFIG_OF_INSTANCE_DATA_DIR = "pinot.server.instance.dataDir";
+    public static final String CONFIG_OF_INSTANCE_METADATA_DIR = "pinot.server.instance.metadataDir";
     public static final String CONFIG_OF_CONSUMER_DIR = "pinot.server.instance.consumerDir";
     public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR = "pinot.server.instance.segmentTarDir";
     public static final String CONFIG_OF_INSTANCE_READ_MODE = "pinot.server.instance.readMode";

@@ -29,6 +29,8 @@ public interface InstanceDataManagerConfig {
 
   String getInstanceDataDir();
 
+  String getInstanceMetadataDir();
+
   String getConsumerDir();
 
   String getInstanceSegmentTarDir();

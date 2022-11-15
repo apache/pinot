@@ -91,6 +91,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected ServerMetrics _serverMetrics;
   protected String _tableNameWithType;
   protected String _tableDataDir;
+  protected File _tableMetaDataDir;
   protected File _indexDir;
   protected File _resourceTmpDir;
   protected Logger _logger;
@@ -128,6 +129,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
       Preconditions.checkState(_indexDir.mkdirs(), "Unable to create index directory at %s. "
           + "Please check for available space and write-permissions for this directory.", _indexDir);
     }
+
+    String tableMetaDataDir = tableDataManagerConfig.getMetaDataDir();
+    _tableMetaDataDir = new File(tableMetaDataDir);
+    if (!_tableMetaDataDir.exists()) {
+      Preconditions.checkState(_tableMetaDataDir.mkdirs(), "Unable to create metadata directory at %s. "
+          + "Please check for available space and write-permissions for this directory.", _tableMetaDataDir);
+    }
+
     _resourceTmpDir = new File(_indexDir, "tmp");
     // This is meant to cleanup temp resources from TableDataManager. But other code using this same
     // directory will have those deleted as well.
@@ -320,6 +329,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public File getTableDataDir() {
     return _indexDir;
+  }
+
+  @Override
+  public File getTableMetaDataDir() {
+    return _tableMetaDataDir;
   }
 
   @Override

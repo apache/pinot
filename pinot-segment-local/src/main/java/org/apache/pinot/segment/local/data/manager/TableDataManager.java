@@ -183,6 +183,11 @@ public interface TableDataManager {
   File getTableDataDir();
 
   /**
+   * Returns the dir which contains the table metadata e.g. upsert.
+   */
+  File getTableMetaDataDir();
+
+  /**
    * Add error related to segment, if any. The implementation
    * is expected to cache last 'N' errors for the table, related to
    * segment transitions.
