@@ -297,7 +297,7 @@ public class ForwardIndexHandlerTest {
     byte[][] tempBytesRows = new byte[rowLength][];
     BigDecimal[] tempBigDecimalRows = new BigDecimal[rowLength];
 
-    int maxNumberOfMVEntries = random.nextInt(500);
+    int maxNumberOfMVEntries = random.nextInt(500) + 1;
     String[][] tempMVStringRows = new String[rowLength][maxNumberOfMVEntries];
     Integer[][] tempMVIntRows = new Integer[rowLength][maxNumberOfMVEntries];
     Long[][] tempMVLongRows = new Long[rowLength][maxNumberOfMVEntries];
@@ -314,7 +314,7 @@ public class ForwardIndexHandlerTest {
         tempBigDecimalRows[i] = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(1001));
 
         // Avoid creating empty arrays.
-        int numMVElements = random.nextInt(maxNumberOfMVEntries - 1) + 1;
+        int numMVElements = random.nextInt(maxNumberOfMVEntries) + 1;
         for (int j = 0; j < numMVElements; j++) {
           tempMVIntRows[i][j] = 1001;
           tempMVLongRows[i][j] = 1001L;
@@ -330,7 +330,7 @@ public class ForwardIndexHandlerTest {
         tempBigDecimalRows[i] = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i));
 
         // Avoid creating empty arrays.
-        int numMVElements = random.nextInt(maxNumberOfMVEntries - 1) + 1;
+        int numMVElements = random.nextInt(maxNumberOfMVEntries) + 1;
         for (int j = 0; j < numMVElements; j++) {
           tempMVIntRows[i][j] = j;
           tempMVLongRows[i][j] = (long) j;
