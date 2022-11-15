@@ -128,6 +128,7 @@ public class QueryServerEnclosure {
 
   public void shutDown() {
     _queryRunner.shutDown();
+    _scheduler.stopAsync().awaitTerminated();
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {

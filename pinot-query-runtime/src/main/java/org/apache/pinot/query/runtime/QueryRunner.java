@@ -50,12 +50,15 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
+import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.query.runtime.plan.ServerRequestPlanVisitor;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.service.QueryConfig;
@@ -77,7 +80,6 @@ public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
   // This is a temporary before merging the 2 type of executor.
   private ServerQueryExecutorV1Impl _serverExecutor;
-  private WorkerQueryExecutor _workerExecutor;
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
   private MailboxService<TransferableBlock> _mailboxService;
@@ -99,8 +101,6 @@ public class QueryRunner {
       _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config, instanceDataManager, serverMetrics);
-      _workerExecutor = new WorkerQueryExecutor();
-      _workerExecutor.init(config, serverMetrics, _mailboxService, _hostname, _port);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -110,11 +110,9 @@ public class QueryRunner {
     _helixPropertyStore = _helixManager.getHelixPropertyStore();
     _mailboxService.start();
     _serverExecutor.start();
-    _workerExecutor.start();
   }
 
   public void shutDown() {
-    _workerExecutor.shutDown();
     _serverExecutor.shutDown();
     _mailboxService.shutdown();
   }
@@ -149,7 +147,11 @@ public class QueryRunner {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
     } else {
-      _workerExecutor.processQuery(distributedStagePlan, requestMetadataMap, scheduler);
+      long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
+      StageNode stageRoot = distributedStagePlan.getStageRoot();
+      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot, new PlanRequestContext(
+          _mailboxService, requestId, stageRoot.getStageId(), _hostname, _port, distributedStagePlan.getMetadataMap()));
+      scheduler.register(rootOperator);
     }
   }
 
