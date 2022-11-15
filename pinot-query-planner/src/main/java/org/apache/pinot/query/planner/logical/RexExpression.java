@@ -202,9 +202,11 @@ public interface RexExpression {
   }
 
   class FunctionCall implements RexExpression {
+    // the underlying SQL operator kind of this function.
+    // It can be either a standard SQL operator or an extended function kind.
+    // @see #SqlKind.FUNCTION, #SqlKind.OTHER, #SqlKind.OTHER_FUNCTION
     @ProtoProperties
     private SqlKind _sqlKind;
-    // TODO: Make sure _sqlKind matches _functionName.
     @ProtoProperties
     private FieldSpec.DataType _dataType;
     @ProtoProperties
