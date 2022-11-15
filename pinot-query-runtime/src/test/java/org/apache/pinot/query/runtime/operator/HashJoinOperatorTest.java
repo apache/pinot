@@ -32,7 +32,6 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-
 public class HashJoinOperatorTest {
   private static JoinNode.JoinKeys getJoinKeys(List<Integer> leftIdx, List<Integer> rightIdx) {
     FieldSelectionKeySelector leftSelect = new FieldSelectionKeySelector(leftIdx);
@@ -49,8 +48,9 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
-    HashJoinOperator join = new HashJoinOperator(leftOperator, rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.INNER);
+    HashJoinOperator join =
+        new HashJoinOperator(leftOperator, rightOperator, resultSchema, getJoinKeys(Arrays.asList(1), Arrays.asList(1)),
+            joinClauses, JoinRelType.INNER);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -73,13 +73,14 @@ public class HashJoinOperatorTest {
     BaseOperator<TransferableBlock> leftOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
     BaseOperator<TransferableBlock> rightOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_2);
     List<RexExpression> joinClauses = new ArrayList<>();
-    
+
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
-    HashJoinOperator join = new HashJoinOperator(leftOperator, rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.INNER);
+    HashJoinOperator join =
+        new HashJoinOperator(leftOperator, rightOperator, resultSchema, getJoinKeys(Arrays.asList(1), Arrays.asList(1)),
+            joinClauses, JoinRelType.INNER);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -103,8 +104,9 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
-    HashJoinOperator join = new HashJoinOperator(leftOperator, rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.LEFT);
+    HashJoinOperator join =
+        new HashJoinOperator(leftOperator, rightOperator, resultSchema, getJoinKeys(Arrays.asList(1), Arrays.asList(1)),
+            joinClauses, JoinRelType.LEFT);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {

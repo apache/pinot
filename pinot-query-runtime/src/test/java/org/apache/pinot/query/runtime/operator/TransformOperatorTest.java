@@ -60,7 +60,7 @@ public class TransformOperatorTest {
   }
 
   @Test
-  public void testRefTransform() {
+  public void shouldHandleRefTransform() {
     DataSchema upStreamSchema = new DataSchema(new String[]{"intCol", "strCol"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
@@ -84,7 +84,7 @@ public class TransformOperatorTest {
   }
 
   @Test
-  public void testLiteralTransform() {
+  public void shouldHandleLiteralTransform() {
     DataSchema upStreamSchema = new DataSchema(new String[]{"boolCol", "strCol"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.STRING
     });
@@ -108,7 +108,7 @@ public class TransformOperatorTest {
   }
 
   @Test
-  public void testPlusMinusFuncTransform() {
+  public void shouldHandlePlusMinusFuncTransform() {
     DataSchema upStreamSchema =
         new DataSchema(new String[]{"doubleCol1", "doubleCol2"}, new DataSchema.ColumnDataType[]{
             DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
@@ -137,7 +137,7 @@ public class TransformOperatorTest {
   }
 
   @Test
-  public void testTypeMismatchFuncTransform() {
+  public void shouldThrowOnTypeMismatchFuncTransform() {
     DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
     });
@@ -163,7 +163,7 @@ public class TransformOperatorTest {
   }
 
   @Test
-  public void testUpstreamError() {
+  public void shouldPropoageUpstreamError() {
     DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
     });
