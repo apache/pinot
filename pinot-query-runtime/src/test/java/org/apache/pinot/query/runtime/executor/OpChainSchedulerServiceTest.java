@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
-import com.google.common.collect.ImmutableList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -71,7 +70,7 @@ public class OpChainSchedulerServiceTest {
   }
 
   private OpChain getChain(Operator<TransferableBlock> operator) {
-    return new OpChain(operator, ImmutableList.of());
+    return new OpChain(operator);
   }
 
   @Test
@@ -91,7 +90,7 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.register(new OpChain(_operatorA, ImmutableList.of()));
+    scheduler.register(new OpChain(_operatorA));
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
@@ -114,7 +113,7 @@ public class OpChainSchedulerServiceTest {
     });
 
     // When:
-    scheduler.register(new OpChain(_operatorA, ImmutableList.of()));
+    scheduler.register(new OpChain(_operatorA));
     scheduler.startAsync().awaitRunning();
 
     // Then:
@@ -141,7 +140,7 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.register(new OpChain(_operatorA, ImmutableList.of()));
+    scheduler.register(new OpChain(_operatorA));
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
@@ -182,8 +181,8 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.register(new OpChain(_operatorA, ImmutableList.of()));
-    scheduler.register(new OpChain(_operatorB, ImmutableList.of()));
+    scheduler.register(new OpChain(_operatorA));
+    scheduler.register(new OpChain(_operatorB));
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");

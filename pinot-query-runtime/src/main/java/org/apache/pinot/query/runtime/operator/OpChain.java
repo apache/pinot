@@ -19,11 +19,9 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Suppliers;
-import java.util.List;
 import java.util.function.Supplier;
 import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
@@ -34,25 +32,19 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 public class OpChain {
 
   private final Operator<TransferableBlock> _root;
-  private final List<MailboxIdentifier> _inputMailboxes;
   // TODO: build timers that are partial-execution aware
   private final Supplier<ThreadTimer> _timer;
 
-  public OpChain(Operator<TransferableBlock> root, List<MailboxIdentifier> inputMailboxes) {
+  public OpChain(Operator<TransferableBlock> root) {
     _root = root;
-    _inputMailboxes = inputMailboxes;
 
-    // use memoized supplier so that the timing doesn't start until the first time we get
-    // the timer
+    // use memoized supplier so that the timing doesn't start until the
+    // first time we get the timer
     _timer = Suppliers.memoize(ThreadTimer::new)::get;
   }
 
   public Operator<TransferableBlock> getRoot() {
     return _root;
-  }
-
-  public List<MailboxIdentifier> getInputMailboxes() {
-    return _inputMailboxes;
   }
 
   public ThreadTimer getAndStartTimer() {

@@ -48,7 +48,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
 
   // anything that is guarded by this monitor should be non-blocking
   private final Monitor _monitor = new Monitor();
-  protected final Monitor.Guard _hasNextOrClosing = new Monitor.Guard(_monitor) {
+  private final Monitor.Guard _hasNextOrClosing = new Monitor.Guard(_monitor) {
     @Override
     public boolean isSatisfied() {
       return _scheduler.hasNext() || !isRunning();
