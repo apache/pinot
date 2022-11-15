@@ -86,6 +86,7 @@ public class SegmentPreProcessorTest {
   // For create inverted indices tests.
   private static final String COLUMN1_NAME = "column1";
   private static final String COLUMN7_NAME = "column7";
+  private static final String COLUMN10_NAME = "column10";
   private static final String COLUMN13_NAME = "column13";
   private static final String NO_SUCH_COLUMN_NAME = "noSuchColumn";
   private static final String NEW_COLUMN_INVERTED_INDEX = "newStringMVDimension";
@@ -279,8 +280,6 @@ public class SegmentPreProcessorTest {
     textIndexColumns.add(NEWLY_ADDED_STRING_COL_RAW);
     textIndexColumns.add(NEWLY_ADDED_STRING_MV_COL_RAW);
     _indexLoadingConfig.setTextIndexColumns(textIndexColumns);
-    _indexLoadingConfig.getNoDictionaryColumns().add(NEWLY_ADDED_STRING_COL_RAW);
-    _indexLoadingConfig.getNoDictionaryColumns().add(NEWLY_ADDED_STRING_MV_COL_RAW);
 
     // Create a segment in V3, add a new raw column with text index enabled
     constructV3Segment();
@@ -360,11 +359,6 @@ public class SegmentPreProcessorTest {
   @Test
   public void testSimpleEnableDictionarySV()
       throws Exception {
-    // Add raw columns in indexingConfig so that the ForwardIndexHandler doesn't end up converting them to dictionary
-    // enabled columns
-    _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW);
-    _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_RAW);
-
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
@@ -452,6 +446,9 @@ public class SegmentPreProcessorTest {
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
     validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW, 42242, 16, _schema, false, false, false, 0, true,
         0, ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+    long oldRangeIndexSize =
+        new SegmentMetadataImpl(_indexDir).getColumnMetadataFor(EXISTING_INT_COL_RAW).getIndexSizeMap()
+            .get(ColumnIndexType.RANGE_INDEX);
     // At this point, the segment has range index. Now the reload path should create a dictionary and rewrite the
     // range index.
     _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_INT_COL_RAW);
@@ -460,6 +457,10 @@ public class SegmentPreProcessorTest {
         DataType.INT, 100000);
     validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, true, 0,
         null, false, DataType.INT, 100000);
+    long newRangeIndexSize =
+        new SegmentMetadataImpl(_indexDir).getColumnMetadataFor(EXISTING_INT_COL_RAW).getIndexSizeMap()
+            .get(ColumnIndexType.RANGE_INDEX);
+    assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
     // Add it back so that this column is not rewritten for the other tests below.
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW);
   }
@@ -500,6 +501,129 @@ public class SegmentPreProcessorTest {
         DataType.INT, 106688);
     validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
         false, 13, null, false, DataType.INT, 106688);
+  }
+
+  @Test
+  public void testSimpleDisableDictionary()
+      throws Exception {
+    // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing dict columns.
+    constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26, null, true, 0,
+        DataType.STRING, 100000);
+    validateIndex(ColumnIndexType.FORWARD_INDEX, COLUMN10_NAME, 3960, 12, _schema, false, true, false, 0, true, 0, null,
+        false, DataType.INT, 100000);
+
+    // Convert the segment to V3.
+    new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
+
+    // TEST 2: Disable dictionary for EXISTING_STRING_COL_DICT.
+    _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_DICT);
+    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
+        true, 0, DataType.STRING, 100000);
+
+    // TEST 3: Disable dictionary for COLUMN10_NAME
+    _indexLoadingConfig.getNoDictionaryColumns().add(COLUMN10_NAME);
+    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4, true,
+        0, DataType.INT, 100000);
+  }
+
+  @Test
+  public void testDisableDictAndOtherIndexesSV()
+      throws Exception {
+    // Validate No-op.
+    constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
+
+    // TEST 1: Disable dictionary on a column that has inverted index. Should be a no-op and column should still have
+    // a dictionary.
+    _indexLoadingConfig.getNoDictionaryColumns().add(COLUMN1_NAME);
+    checkForwardIndexCreation(COLUMN1_NAME, 51594, 16, _schema, false, true, false, 0, null, true, 0, DataType.INT,
+        100000);
+
+    // TEST 2: Disable dictionary. Also remove inverted index on column1.
+    _indexLoadingConfig.getNoDictionaryColumns().add(COLUMN1_NAME);
+    _indexLoadingConfig.getInvertedIndexColumns().remove(COLUMN1_NAME);
+    checkForwardIndexCreation(COLUMN1_NAME, 51594, 16, _schema, false, false, false, 0, null, true, 0, DataType.INT,
+        100000);
+
+    // TEST 3: Disable dictionary for a column (Column10) that has range index.
+    List<String> rangeIndexCols = new ArrayList<>();
+    rangeIndexCols.add(COLUMN10_NAME);
+    constructV1Segment(Collections.emptyList(), Collections.emptyList(), rangeIndexCols);
+    new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
+    validateIndex(ColumnIndexType.FORWARD_INDEX, COLUMN10_NAME, 3960, 12, _schema, false, true, false, 0, true, 0, null,
+        false, DataType.INT, 100000);
+    validateIndex(ColumnIndexType.RANGE_INDEX, COLUMN10_NAME, 3960, 12, _schema, false, true, false, 0, true, 0, null,
+        false, DataType.INT, 100000);
+    long oldRangeIndexSize = new SegmentMetadataImpl(_indexDir).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeMap()
+        .get(ColumnIndexType.RANGE_INDEX);
+
+
+    _indexLoadingConfig.getNoDictionaryColumns().add(COLUMN10_NAME);
+    _indexLoadingConfig.getRangeIndexColumns().add(COLUMN10_NAME);
+    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4, true,
+        0, DataType.INT, 100000);
+    validateIndex(ColumnIndexType.RANGE_INDEX, COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, true, 0,
+        ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+    long newRangeIndexSize = new SegmentMetadataImpl(_indexDir).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeMap()
+        .get(ColumnIndexType.RANGE_INDEX);
+    assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
+
+    // TEST4: Disable dictionary but add text index.
+    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26, true,
+        0, null, false, DataType.STRING, 100000);
+
+    _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_DICT);
+    _indexLoadingConfig.getTextIndexColumns().add(EXISTING_STRING_COL_DICT);
+    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
+        true, 0, DataType.STRING, 100000);
+    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, true,
+        0, null, false, DataType.STRING, 100000);
+  }
+
+  @Test
+  public void testDisableDictAndOtherIndexesMV()
+      throws Exception {
+    // Set up: Enable dictionary on MV column6 and validate.
+    constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+
+    _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_INT_COL_RAW_MV);
+    _indexLoadingConfig.getRangeIndexColumns().add(EXISTING_INT_COL_RAW_MV);
+    new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
+        DataType.INT, 106688);
+    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
+        false, 13, null, false, DataType.INT, 106688);
+
+    // TEST 1: Disable dictionary on a column where range index is already enabled.
+    _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW_MV);
+    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0, null, false, 13,
+        DataType.INT, 106688);
+    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+        false, 13, null, false, DataType.INT, 106688);
+
+    // TEST 2. Disable dictionary on a column where inverted index is enabled. Should be a no-op.
+    constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
+    validateIndex(ColumnIndexType.FORWARD_INDEX, COLUMN7_NAME, 359, 9, _newColumnsSchemaWithForwardIndexDisabled, false,
+        true, false, 0, false, 24, null, false, DataType.INT, 134090);
+    validateIndex(ColumnIndexType.INVERTED_INDEX, COLUMN7_NAME, 359, 9, _newColumnsSchemaWithForwardIndexDisabled,
+        false, true, false, 0, false, 24, null, false, DataType.INT, 134090);
+
+    _indexLoadingConfig.getNoDictionaryColumns().add(COLUMN7_NAME);
+    checkForwardIndexCreation(COLUMN7_NAME, 359, 9, _schema, false, true, false, 0, null, false, 24, DataType.INT,
+        134090);
+    validateIndex(ColumnIndexType.INVERTED_INDEX, COLUMN7_NAME, 359, 9, _newColumnsSchemaWithForwardIndexDisabled,
+        false, true, false, 0, false, 24, null, false, DataType.INT, 134090);
+
+    // TEST 3: Disable dictionary and disable inverted index on column7.
+    constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
+
+    _indexLoadingConfig.getNoDictionaryColumns().add(COLUMN7_NAME);
+    _indexLoadingConfig.getInvertedIndexColumns().remove(COLUMN7_NAME);
+    checkForwardIndexCreation(COLUMN7_NAME, 359, 9, _schema, false, false, false, 0, null, false, 24, DataType.INT,
+        134090);
   }
 
   @Test
