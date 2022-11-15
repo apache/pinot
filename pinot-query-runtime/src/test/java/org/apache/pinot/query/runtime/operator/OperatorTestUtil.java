@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.Arrays;
 import java.util.List;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -56,5 +57,9 @@ public class OperatorTestUtil {
 
   public static DataSchema getDataSchema(String operatorName) {
     return MOCK_OPERATOR_FACTORY.getDataSchema(operatorName);
+  }
+
+  public static TransferableBlock block(DataSchema schema, Object[]... rows) {
+    return new TransferableBlock(Arrays.asList(rows), schema, DataBlock.Type.ROW);
   }
 }
