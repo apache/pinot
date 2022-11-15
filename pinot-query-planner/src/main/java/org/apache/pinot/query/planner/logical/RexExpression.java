@@ -207,10 +207,13 @@ public interface RexExpression {
     // @see #SqlKind.FUNCTION, #SqlKind.OTHER, #SqlKind.OTHER_FUNCTION
     @ProtoProperties
     private SqlKind _sqlKind;
+    // the return data type of the function.
     @ProtoProperties
     private FieldSpec.DataType _dataType;
+    // the name of the SQL function. For standard SqlKind it should match the SqlKind ENUM name.
     @ProtoProperties
     private String _functionName;
+    // the list of RexExpressions that represents the operands to the function.
     @ProtoProperties
     private List<RexExpression> _functionOperands;
 
