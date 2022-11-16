@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.utils.DataSchema;
 
 
 public final class TransferableBlockUtils {
@@ -61,15 +60,6 @@ public final class TransferableBlockUtils {
   }
 
   /**
-   * Split block into multiple blocks. Default without any clean up.
-   *
-   * @see TransferableBlockUtils#splitBlock(TransferableBlock, DataBlock.Type, int, boolean)
-   */
-  public static Iterator<TransferableBlock> splitBlock(TransferableBlock block, DataBlock.Type type, int maxBlockSize) {
-    return splitBlock(block, type, maxBlockSize, false);
-  }
-
-  /**
    *
    *  Split a block into multiple block so that each block size is within maxBlockSize. Currently,
    *  <ul>
@@ -81,12 +71,9 @@ public final class TransferableBlockUtils {
    * @param block the data block
    * @param type type of block
    * @param maxBlockSize Each chunk of data is estimated to be less than maxBlockSize
-   * @param needsCanonicalize whether we need to canonicalize the input rows. set to true if the block is constructed
-   *                          from leaf stage.
    * @return a list of data block chunks
    */
-  public static Iterator<TransferableBlock> splitBlock(TransferableBlock block, DataBlock.Type type, int maxBlockSize,
-      boolean needsCanonicalize) {
+  public static Iterator<TransferableBlock> splitBlock(TransferableBlock block, DataBlock.Type type, int maxBlockSize) {
     List<TransferableBlock> blockChunks = new ArrayList<>();
     if (type == DataBlock.Type.ROW) {
       // Use estimated row size, this estimate is not accurate and is used to estimate numRowsPerChunk only.
@@ -96,13 +83,9 @@ public final class TransferableBlockUtils {
 
       int totalNumRows = block.getNumRows();
       List<Object[]> allRows = block.getContainer();
-      DataSchema dataSchema = block.getDataSchema();
       int currentRow = 0;
       while (currentRow < totalNumRows) {
         List<Object[]> chunk = allRows.subList(currentRow, Math.min(currentRow + numRowsPerChunk, allRows.size()));
-        if (needsCanonicalize) {
-          canonicalizeRows(chunk, dataSchema);
-        }
         currentRow += numRowsPerChunk;
         blockChunks.add(new TransferableBlock(chunk, block.getDataSchema(), block.getType()));
       }
@@ -112,29 +95,5 @@ public final class TransferableBlockUtils {
     } else {
       throw new IllegalArgumentException("Unsupported data block type: " + type);
     }
-  }
-
-  // In-place canonicalize rows
-  private static void canonicalizeRows(List<Object[]> rows, DataSchema dataSchema) {
-    for (int i = 0; i < rows.size(); i++) {
-      rows.set(i, canonicalizeRow(rows.get(i), dataSchema));
-    }
-  }
-
-  /**
-   * This util is used to canonicalize row generated from V1 engine, which is stored using
-   * {@link DataSchema#getStoredColumnDataTypes()} format. However, the transferable block ser/de stores data in the
-   * {@link DataSchema#getColumnDataTypes()} format.
-   *
-   * @param row un-canonicalize row.
-   * @param dataSchema data schema desired for the row.
-   * @return canonicalize row.
-   */
-  private static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema) {
-    Object[] resultRow = new Object[row.length];
-    for (int colId = 0; colId < row.length; colId++) {
-      resultRow[colId] = dataSchema.getColumnDataType(colId).convert(row[colId]);
-    }
-    return resultRow;
   }
 }
