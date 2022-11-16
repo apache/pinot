@@ -230,6 +230,7 @@ public abstract class FilterOperand extends TransformOperand {
           "Expected 2 function ops for Predicate but got:" + functionOperands.size());
       _lhs = TransformOperand.toTransformOperand(functionOperands.get(0), dataSchema);
       _rhs = TransformOperand.toTransformOperand(functionOperands.get(1), dataSchema);
+      // TODO: correctly handle type hoisting. here we favor left type first. which is not correct for say 2 < 2.3
       if (_lhs._resultType != null && _lhs._resultType != DataSchema.ColumnDataType.OBJECT) {
         _resultType = _lhs._resultType;
       } else if (_rhs._resultType != null && _rhs._resultType != DataSchema.ColumnDataType.OBJECT) {
