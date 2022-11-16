@@ -18,17 +18,18 @@
  */
 
 import React from 'react';
-import _ from 'lodash';
+import get from 'lodash/get';
+import has from 'lodash/has';
 import InstanceTable from './InstanceTable';
 
 const Instances = ({ instances, clusterName }) => {
   const order = ['Controller', 'Broker', 'Server', 'Minion'];
   return (
     <>
-      {_(order)
-        .filter((key) => _.has(instances, key))
+      {order
+        .filter((key) => has(instances, key))
         .map((key) => {
-          const value = _.get(instances, key, []);
+          const value = get(instances, key, []);
           return (
             <InstanceTable
               key={key}
@@ -37,8 +38,7 @@ const Instances = ({ instances, clusterName }) => {
               clusterName={clusterName}
             />
           );
-        })
-        .value()}
+        })}
     </>
   );
 };
