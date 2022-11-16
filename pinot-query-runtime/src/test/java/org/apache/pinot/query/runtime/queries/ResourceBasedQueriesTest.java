@@ -24,11 +24,14 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -43,6 +46,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -58,7 +62,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       "BasicQuery.json",
       "SpecialSyntax.json",
       "LexicalStructure.json",
-      "ValueExpressions.json"
+      "ValueExpressions.json",
+      "NumericTypes.json"
   );
 
   @BeforeClass
@@ -153,20 +158,46 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
-  public void testQueryTestCasesWithH2(String testCaseName, String sql)
+  public void testQueryTestCasesWithH2(String testCaseName, String sql, String expect)
       throws Exception {
     // query pinot
-    List<Object[]> resultRows = queryRunner(sql);
-    // query H2 for data
-    List<Object[]> expectedRows = queryH2(sql);
-    compareRowEquals(resultRows, expectedRows);
+    runQuery(sql, expect).ifPresent(rows -> {
+      try {
+        compareRowEquals(rows, queryH2(sql));
+      } catch (Exception e) {
+        Assert.fail(e.getMessage());
+      }
+    });
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
-  public void testQueryTestCasesWithOutput(String testCaseName, String sql, List<Object[]> expectedRows)
+  public void testQueryTestCasesWithOutput(String testCaseName, String sql, List<Object[]> expectedRows, String expect)
       throws Exception {
-    List<Object[]> resultRows = queryRunner(sql);
-    compareRowEquals(resultRows, expectedRows);
+    runQuery(sql, expect).ifPresent(rows -> compareRowEquals(rows, expectedRows));
+  }
+
+  private Optional<List<Object[]>> runQuery(String sql, final String except) {
+    try {
+      // query pinot
+      List<Object[]> resultRows = queryRunner(sql);
+
+      Assert.assertNull(except,
+        "Expected error with message '" + except + "'. But instead rows were returned: "
+            + resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")));
+
+      return Optional.of(resultRows);
+    } catch (Exception e) {
+      if (except == null) {
+        throw e;
+      } else {
+        Pattern pattern = Pattern.compile(except);
+        Assert.assertTrue(pattern.matcher(e.getMessage()).matches(),
+            String.format("Caught exception %s, but it did not match the expected pattern %s.",
+                e.getMessage(), except));
+      }
+    }
+
+    return Optional.empty();
   }
 
   @DataProvider
@@ -193,7 +224,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           for (List<Object> objs : orgRows) {
             expectedRows.add(objs.toArray());
           }
-          Object[] testEntry = new Object[]{testCaseName, sql, expectedRows};
+          Object[] testEntry = new Object[]{testCaseName, sql, expectedRows, queryCase._expectedException};
           providerContent.add(testEntry);
         }
       }
@@ -219,7 +250,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         }
         if (queryCase._outputs == null || queryCase._outputs.isEmpty()) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
-          Object[] testEntry = new Object[]{testCaseName, sql};
+          Object[] testEntry = new Object[]{testCaseName, sql, queryCase._expectedException};
           providerContent.add(testEntry);
         }
       }
