@@ -1,0 +1,31 @@
+{
+  "fixed_char": {
+    "ignored": true,
+    "comment": "we don't support fixed length string types",
+    "psql": "8.3"
+  },
+  "varchar": {
+    "tables": {
+      "varchar": {
+        "schema": [
+          {"name": "str", "type": "STRING"}
+        ],
+        "inputs": [
+          ["foo"],
+          ["value with spaces"],
+          ["Οὐχὶ (greek)"],
+          ["แสน (thai)"],
+          ["верстке (russian)"],
+          ["∀x∈ℝ (mathematics)"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "8.3",
+        "description": "test different UTF8 string values",
+        "sql": "SELECT * FROM {varchar}"
+      }
+    ]
+  }
+}

@@ -145,7 +145,11 @@ public class DataBlockBuilder {
             setColumn(rowBuilder, byteBuffer, (String) value);
             break;
           case BYTES:
-            setColumn(rowBuilder, byteBuffer, (ByteArray) value);
+            if (value instanceof byte[]) {
+              setColumn(rowBuilder, byteBuffer, new ByteArray((byte[]) value));
+            } else {
+              setColumn(rowBuilder, byteBuffer, (ByteArray) value);
+            }
             break;
           case OBJECT:
             setColumn(rowBuilder, byteBuffer, value);
