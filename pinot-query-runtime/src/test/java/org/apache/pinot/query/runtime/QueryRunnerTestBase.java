@@ -22,6 +22,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.mchange.util.AssertException;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -36,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.Collectors;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -109,7 +112,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected void compareRowEquals(List<Object[]> resultRows, List<Object[]> expectedRows) {
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
+    Assert.assertEquals(resultRows.size(), expectedRows.size(),
+        String.format("Mismatched number of results. expected: %s, actual: %s",
+            expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
+            resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n"))));
 
     Comparator<Object> valueComp = (l, r) -> {
       if (l == null && r == null) {
@@ -131,6 +137,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         return ((String) l).compareTo((String) r);
       } else if (l instanceof Boolean) {
         return ((Boolean) l).compareTo((Boolean) r);
+      } else if (l instanceof BigDecimal) {
+        if (r instanceof BigDecimal) {
+          return ((BigDecimal) l).compareTo((BigDecimal) r);
+        } else {
+          return ((BigDecimal) l).compareTo(new BigDecimal((String) r));
+        }
       } else {
         throw new RuntimeException("non supported type " + l.getClass());
       }
@@ -151,6 +163,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       Object[] resultRow = resultRows.get(i);
       Object[] expectedRow = expectedRows.get(i);
       for (int j = 0; j < resultRow.length; j++) {
+        if (j >= expectedRow.length) {
+          throw new AssertException(String.format("Unexpected row size mismatch. Expected: %s, Actual: %s",
+              Arrays.toString(expectedRow), Arrays.toString(resultRow)));
+        }
         Assert.assertEquals(valueComp.compare(resultRow[j], expectedRow[j]), 0,
             "Not match at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow)
                 + " Actual: " + Arrays.toString(resultRow));
@@ -248,8 +264,14 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         case STRING:
           fieldType = "varchar(128)";
           break;
+        case FLOAT:
+          fieldType = "real";
+          break;
         case DOUBLE:
           fieldType = "double";
+          break;
+        case BIG_DECIMAL:
+          fieldType = "NUMERIC";
           break;
         default:
           throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
@@ -292,6 +314,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public String _description;
       @JsonProperty("outputs")
       public List<List<Object>> _outputs = Collections.emptyList();
+      @JsonProperty("expect")
+      public String _expect;
     }
 
     public static class ColumnAndType {
