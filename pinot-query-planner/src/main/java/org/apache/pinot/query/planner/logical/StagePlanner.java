@@ -24,11 +24,14 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.logical.LogicalExchange;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.physical.ShuffleRewriteVisitor;
+import org.apache.pinot.query.planner.physical.SmartShuffleRewriteVisitor;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.StageNode;
@@ -43,11 +46,13 @@ import org.apache.pinot.query.routing.WorkerManager;
 public class StagePlanner {
   private final PlannerContext _plannerContext;
   private final WorkerManager _workerManager;
+  private final TableCache _tableCache;
   private int _stageIdCounter;
 
-  public StagePlanner(PlannerContext plannerContext, WorkerManager workerManager) {
+  public StagePlanner(PlannerContext plannerContext, WorkerManager workerManager, TableCache tableCache) {
     _plannerContext = plannerContext;
     _workerManager = workerManager;
+    _tableCache = tableCache;
   }
 
   /**
@@ -63,7 +68,6 @@ public class StagePlanner {
 
     // walk the plan and create stages.
     StageNode globalStageRoot = walkRelPlan(relRootNode, getNewStageId());
-    ShuffleRewriteVisitor.optimizeShuffles(globalStageRoot);
 
     // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
     // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
@@ -81,6 +85,9 @@ public class StagePlanner {
     for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
       _workerManager.assignWorkerToStage(e.getKey(), e.getValue());
     }
+
+    // Run physical optimizations
+    runPhysicalOptimizers(queryPlan);
 
     return queryPlan;
   }
@@ -102,6 +109,16 @@ public class StagePlanner {
     }
   }
 
+  // Could run CBO here later
+  private void runPhysicalOptimizers(QueryPlan queryPlan) {
+    StageNode globalStageRoot = queryPlan.getQueryStageMap().get(0);
+    // TODO: Hide shuffle rewriter behind an interface
+    if (_plannerContext.getOptions().getOrDefault("useColocatedJoin", "false").equals("true")) {
+      SmartShuffleRewriteVisitor.optimizeShuffles(globalStageRoot, queryPlan.getStageMetadataMap(), _tableCache);
+    } else {
+      ShuffleRewriteVisitor.optimizeShuffles(globalStageRoot);
+    }
+  }
 
   private StageNode createSendReceivePair(StageNode nextStageRoot, RelDistribution distribution, int currentStageId) {
     List<Integer> distributionKeys = distribution.getKeys();

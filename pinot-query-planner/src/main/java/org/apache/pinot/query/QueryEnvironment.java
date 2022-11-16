@@ -49,6 +49,7 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -78,11 +79,14 @@ public class QueryEnvironment {
   // Pinot extensions
   private final Collection<RelOptRule> _logicalRuleSet;
   private final WorkerManager _workerManager;
+  private final TableCache _tableCache;
 
-  public QueryEnvironment(TypeFactory typeFactory, CalciteSchema rootSchema, WorkerManager workerManager) {
+  public QueryEnvironment(TypeFactory typeFactory, CalciteSchema rootSchema, WorkerManager workerManager,
+      TableCache tableCache) {
     _typeFactory = typeFactory;
     _rootSchema = rootSchema;
     _workerManager = workerManager;
+    _tableCache = tableCache;
 
     // catalog
     Properties catalogReaderConfigProperties = new Properties();
@@ -217,7 +221,7 @@ public class QueryEnvironment {
 
   private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext) {
     // 5. construct a dispatchable query plan.
-    StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager);
+    StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager, _tableCache);
     return queryStagePlanner.makePlan(relRoot);
   }
 

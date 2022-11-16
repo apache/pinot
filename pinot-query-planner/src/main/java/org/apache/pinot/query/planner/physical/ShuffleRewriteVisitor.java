@@ -16,11 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.logical;
+package org.apache.pinot.query.planner.physical;
 
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.AggregateNode;
