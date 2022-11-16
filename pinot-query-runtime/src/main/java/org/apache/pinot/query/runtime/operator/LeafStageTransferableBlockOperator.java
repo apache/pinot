@@ -39,7 +39,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 /**
  * Leaf-stage transfer block operator is used to wrap around the leaf stage process results. They are passed to the
  * Pinot server to execute query thus only one {@link DataTable} were returned. However, to conform with the
- * intermediate stage operators. an additional {@link MetadataBlock} needs to be transfer after the data block.
+ * intermediate stage operators. An additional {@link MetadataBlock} needs to be transferred after the data block.
  *
  * <p>In order to achieve this:
  * <ul>
