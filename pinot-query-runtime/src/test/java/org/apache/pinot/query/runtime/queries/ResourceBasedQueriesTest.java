@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.queries;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
-import com.mchange.util.AssertException;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
