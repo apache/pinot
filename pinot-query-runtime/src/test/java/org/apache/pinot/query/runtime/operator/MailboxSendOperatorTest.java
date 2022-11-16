@@ -75,7 +75,7 @@ public class MailboxSendOperatorTest {
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(
         _mailboxService, _input, ImmutableList.of(_server), RelDistribution.Type.HASH_DISTRIBUTED, _selector,
-        false, server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
+        server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
     Mockito.when(_input.nextBlock())
         .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
 
@@ -92,7 +92,7 @@ public class MailboxSendOperatorTest {
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(
         _mailboxService, _input, ImmutableList.of(_server), RelDistribution.Type.HASH_DISTRIBUTED, _selector,
-        false, server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
+        server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
     TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!"));
     Mockito.when(_input.nextBlock())
         .thenReturn(errorBlock);
@@ -110,7 +110,7 @@ public class MailboxSendOperatorTest {
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(
         _mailboxService, _input, ImmutableList.of(_server), RelDistribution.Type.HASH_DISTRIBUTED, _selector,
-        false, server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
+        server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
     Mockito.when(_input.nextBlock())
         .thenThrow(new RuntimeException("foo!"));
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
@@ -129,7 +129,7 @@ public class MailboxSendOperatorTest {
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(
         _mailboxService, _input, ImmutableList.of(_server), RelDistribution.Type.HASH_DISTRIBUTED, _selector,
-        false, server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
+        server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
     TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
     Mockito.when(_input.nextBlock())
         .thenReturn(eosBlock);
@@ -147,7 +147,7 @@ public class MailboxSendOperatorTest {
     // Given:
     MailboxSendOperator operator = new MailboxSendOperator(
         _mailboxService, _input, ImmutableList.of(_server), RelDistribution.Type.HASH_DISTRIBUTED, _selector,
-        false, server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
+        server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
     TransferableBlock dataBlock = block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
     Mockito.when(_input.nextBlock())
         .thenReturn(dataBlock);

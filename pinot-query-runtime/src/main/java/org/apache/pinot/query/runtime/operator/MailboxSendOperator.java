@@ -70,16 +70,16 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
       Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
-      long jobId, int stageId, boolean isLeafStageSender) {
+      long jobId, int stageId) {
     this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
-        isLeafStageSender, server -> toMailboxId(server, jobId, stageId, hostName, port), BlockExchange::getExchange);
+        server -> toMailboxId(server, jobId, stageId, hostName, port), BlockExchange::getExchange);
   }
 
   @VisibleForTesting
   MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
       Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
-      boolean isLeafStageSender, MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory) {
+      MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory) {
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
 
     List<MailboxIdentifier> receivingMailboxes;
@@ -102,8 +102,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
           .collect(Collectors.toList());
     }
 
-    BlockSplitter splitter = (block, type, size)
-        -> TransferableBlockUtils.splitBlock(block, type, size, isLeafStageSender);
+    BlockSplitter splitter = TransferableBlockUtils::splitBlock;
     _exchange = blockExchangeFactory.build(mailboxService, receivingMailboxes, exchangeType, keySelector, splitter);
 
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
