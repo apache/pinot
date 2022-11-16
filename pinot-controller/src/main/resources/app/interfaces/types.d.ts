@@ -22,6 +22,7 @@ declare module 'Models' {
     records: Array<Array<string | number | boolean>>;
     columns: Array<string>;
     error?: string;
+    isLoading? : boolean
   };
 
   type SchemaDetails = {
@@ -203,5 +204,33 @@ declare module 'Models' {
     TaskTimeoutMs: string,
     TaskExpireTimeMs: string,
     MinionWorkerGroupTag: string
+  }
+
+  export interface SegmentDebugDetails {
+    segmentName: string;
+    serverState: {
+      [key: string]: {
+        idealState: SEGMENT_STATUS,
+        externalView: SEGMENT_STATUS,
+        errorInfo?: {
+          timeStamp: string,
+          errorMessage: string,
+          stackTrace: string
+        }
+      }
+    }
+  }
+
+  export const enum SEGMENT_STATUS {
+    ONLINE = "ONLINE",
+    OFFLINE = "OFFLINE",
+    CONSUMING = "CONSUMING",
+    ERROR = "ERROR"
+  } 
+
+  export const enum DISPLAY_SEGMENT_STATUS {
+    BAD = "BAD",
+    GOOD = "GOOD",
+    PARTIAL = "PARTIAL",
   }
 }

@@ -48,8 +48,8 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -102,7 +102,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
   private List<String> _invertedIndexColumns;
   private List<String> _forwardIndexDisabledColumns;
 
-  @BeforeClass
+  @BeforeMethod
   public void buildSegment()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
@@ -195,7 +195,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
     return immutableSegment;
   }
 
-  @AfterClass
+  @AfterMethod
   public void deleteAndDestroySegment() {
     FileUtils.deleteQuietly(INDEX_DIR);
     _indexSegments.forEach((IndexSegment::destroy));

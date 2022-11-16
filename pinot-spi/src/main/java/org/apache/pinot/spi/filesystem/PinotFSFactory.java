@@ -41,7 +41,7 @@ public class PinotFSFactory {
   private static final String CLASS = "class";
   private static final Map<String, PinotFS> PINOT_FS_MAP = new HashMap<String, PinotFS>() {
     {
-      put(LOCAL_PINOT_FS_SCHEME, new LocalPinotFS());
+      put(LOCAL_PINOT_FS_SCHEME, new NoClosePinotFS(new LocalPinotFS()));
     }
   };
 
@@ -50,7 +50,7 @@ public class PinotFSFactory {
       LOGGER.info("Initializing PinotFS for scheme {}, classname {}", scheme, fsClassName);
       PinotFS pinotFS = PluginManager.get().createInstance(fsClassName);
       pinotFS.init(fsConfiguration);
-      PINOT_FS_MAP.put(scheme, pinotFS);
+      PINOT_FS_MAP.put(scheme, new NoClosePinotFS(pinotFS));
     } catch (Exception e) {
       LOGGER.error("Could not instantiate file system for class {} with scheme {}", fsClassName, scheme, e);
       throw new RuntimeException(e);
@@ -86,7 +86,7 @@ public class PinotFSFactory {
   public static void shutdown()
       throws IOException {
     for (PinotFS pinotFS : PINOT_FS_MAP.values()) {
-      pinotFS.close();
+      ((NoClosePinotFS) pinotFS)._delegate.close();
     }
   }
 }

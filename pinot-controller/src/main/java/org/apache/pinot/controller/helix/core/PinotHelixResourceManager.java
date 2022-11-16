@@ -1954,8 +1954,6 @@ public class PinotHelixResourceManager {
     }
 
     // Remove all stored segments for the table
-
-    // Remove all stored segments for the table
     Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
     _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFromPropertyStore(realtimeTableName),
         retentionPeriodMs);

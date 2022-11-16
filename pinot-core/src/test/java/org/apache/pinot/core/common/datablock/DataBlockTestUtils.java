@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -60,7 +60,7 @@ public class DataBlockTestUtils {
           row[colId] = BigDecimal.valueOf(RANDOM.nextDouble());
           break;
         case BOOLEAN:
-          row[colId] = RANDOM.nextInt(2) % 2 == 1;
+          row[colId] = RANDOM.nextBoolean();
           break;
         case TIMESTAMP:
           row[colId] = new Timestamp(RANDOM.nextLong());
@@ -70,10 +70,6 @@ public class DataBlockTestUtils {
           break;
         case BYTES:
           row[colId] = new ByteArray(RandomStringUtils.random(RANDOM.nextInt(20)).getBytes());
-          break;
-        // Just test Double here, all object types will be covered in ObjectCustomSerDeTest.
-        case OBJECT:
-          row[colId] = RANDOM.nextDouble();
           break;
         case INT_ARRAY:
           int length = RANDOM.nextInt(ARRAY_SIZE);
@@ -119,7 +115,7 @@ public class DataBlockTestUtils {
           length = RANDOM.nextInt(ARRAY_SIZE);
           boolean[] booleanArray = new boolean[length];
           for (int i = 0; i < length; i++) {
-            booleanArray[i] = RANDOM.nextInt(2) % 2 == 1;
+            booleanArray[i] = RANDOM.nextBoolean();
           }
           row[colId] = booleanArray;
           break;
@@ -142,7 +138,7 @@ public class DataBlockTestUtils {
     return row;
   }
 
-  public static Object getElement(BaseDataBlock dataBlock, int rowId, int colId,
+  public static Object getElement(DataBlock dataBlock, int rowId, int colId,
       DataSchema.ColumnDataType columnDataType) {
     RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
     if (nullBitmap != null) {
@@ -165,8 +161,6 @@ public class DataBlockTestUtils {
         return dataBlock.getString(rowId, colId);
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
-      case OBJECT:
-        return dataBlock.getCustomObject(rowId, colId);
       case BOOLEAN_ARRAY:
       case INT_ARRAY:
         return dataBlock.getIntArray(rowId, colId);

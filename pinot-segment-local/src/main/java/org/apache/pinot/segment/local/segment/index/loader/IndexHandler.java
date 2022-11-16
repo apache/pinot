@@ -39,4 +39,12 @@ public interface IndexHandler {
    */
   boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
       throws Exception;
+
+  /**
+   * Performs any cleanup actions required after the indexes have been updated.
+   * Should be called only after all IndexHandlers have run.
+   */
+  default void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
+    throws Exception {
+  }
 }

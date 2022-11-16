@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
 /**
@@ -43,12 +44,13 @@ public class AsyncQueryResponse implements QueryResponse {
   private final CountDownLatch _countDownLatch;
   private final long _maxEndTimeMs;
   private final long _timeoutMs;
+  private final ServerRoutingStatsManager _serverRoutingStatsManager;
 
   private volatile ServerRoutingInstance _failedServer;
   private volatile Exception _exception;
 
   public AsyncQueryResponse(QueryRouter queryRouter, long requestId, Set<ServerRoutingInstance> serversQueried,
-      long startTimeMs, long timeoutMs) {
+      long startTimeMs, long timeoutMs, ServerRoutingStatsManager serverRoutingStatsManager) {
     _queryRouter = queryRouter;
     _requestId = requestId;
     int numServersQueried = serversQueried.size();
@@ -59,6 +61,7 @@ public class AsyncQueryResponse implements QueryResponse {
     _countDownLatch = new CountDownLatch(numServersQueried);
     _timeoutMs = timeoutMs;
     _maxEndTimeMs = startTimeMs + timeoutMs;
+    _serverRoutingStatsManager = serverRoutingStatsManager;
   }
 
   @Override
@@ -84,6 +87,17 @@ public class AsyncQueryResponse implements QueryResponse {
       _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
       return _responseMap;
     } finally {
+      // Update ServerRoutingStats.
+      for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
+        ServerResponse response = entry.getValue();
+        if (response == null || response.getDataTable() == null) {
+          // These are servers from which a response was not received. So update query response stats for such
+          // servers with maximum latency i.e timeout value.
+          _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, entry.getKey().getInstanceId(),
+              _timeoutMs);
+        }
+      }
+
       _queryRouter.markQueryDone(_requestId);
     }
   }
@@ -134,7 +148,15 @@ public class AsyncQueryResponse implements QueryResponse {
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
-    _responseMap.get(serverRoutingInstance).receiveDataTable(dataTable, responseSize, deserializationTimeMs);
+    ServerResponse response = _responseMap.get(serverRoutingInstance);
+    response.receiveDataTable(dataTable, responseSize, deserializationTimeMs);
+
+    // Record query completion stats immediately after receiving the response from the server instead of waiting
+    // for all servers to respond. This helps to keep the stats up-to-date.
+    long latencyMs = response.getResponseDelayMs();
+    _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, serverRoutingInstance.getInstanceId(),
+        latencyMs);
+
     _numServersResponded.getAndIncrement();
     _countDownLatch.countDown();
   }

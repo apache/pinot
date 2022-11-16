@@ -18,26 +18,53 @@
  */
 package org.apache.pinot.query;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.testutils.MockRoutingManagerFactory;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
 
 public class QueryEnvironmentTestBase {
+  public static final Map<String, List<String>> SERVER1_SEGMENTS =
+      ImmutableMap.of("a_REALTIME", ImmutableList.of("a1", "a2"), "b_REALTIME", ImmutableList.of("b1"), "c_OFFLINE",
+          ImmutableList.of("c1"), "d_OFFLINE", ImmutableList.of("d1"));
+  public static final Map<String, List<String>> SERVER2_SEGMENTS =
+      ImmutableMap.of("a_REALTIME", ImmutableList.of("a3"), "c_OFFLINE", ImmutableList.of("c2", "c3"),
+          "d_REALTIME", ImmutableList.of("d2"), "d_OFFLINE", ImmutableList.of("d3"));
+  public static final Map<String, Schema> TABLE_SCHEMAS = new HashMap<>();
+  private static final Schema.SchemaBuilder SCHEMA_BUILDER;
+  static {
+    SCHEMA_BUILDER = new Schema.SchemaBuilder()
+        .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
+        .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
+        .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
+        .addMetric("col3", FieldSpec.DataType.INT, 0)
+        .setSchemaName("defaultSchemaName");
+    TABLE_SCHEMAS.put("a_REALTIME", SCHEMA_BUILDER.setSchemaName("a").build());
+    TABLE_SCHEMAS.put("b_REALTIME", SCHEMA_BUILDER.setSchemaName("b").build());
+    TABLE_SCHEMAS.put("c_OFFLINE", SCHEMA_BUILDER.setSchemaName("c").build());
+    TABLE_SCHEMAS.put("d", SCHEMA_BUILDER.setSchemaName("d").build());
+  }
+
   protected QueryEnvironment _queryEnvironment;
 
   @BeforeClass
   public void setUp() {
     // the port doesn't matter as we are not actually making a server call.
-    RoutingManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(1, 2);
-    _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(QueryEnvironmentTestUtils.mockTableCache())),
-        new WorkerManager("localhost", 3, routingManager));
+    _queryEnvironment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS);
   }
 
   @DataProvider(name = "testQueryDataProvider")
@@ -70,5 +97,28 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 IN ('foo', 'bar') AND"
             + " b.col2 NOT IN ('alice', 'charlie')"},
     };
+  }
+
+  public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
+      Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2) {
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
+    for (Map.Entry<String, Schema> entry : schemaMap.entrySet()) {
+      factory.registerTable(entry.getValue(), entry.getKey());
+    }
+    for (Map.Entry<String, List<String>> entry : segmentMap1.entrySet()) {
+      for (String segment : entry.getValue()) {
+        factory.registerSegment(port1, entry.getKey(), segment);
+      }
+    }
+    for (Map.Entry<String, List<String>> entry : segmentMap2.entrySet()) {
+      for (String segment : entry.getValue()) {
+        factory.registerSegment(port2, entry.getKey(), segment);
+      }
+    }
+    RoutingManager routingManager = factory.buildRoutingManager();
+    TableCache tableCache = factory.buildTableCache();
+    return new QueryEnvironment(new TypeFactory(new TypeSystem()),
+        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
+        new WorkerManager("localhost", reducerPort, routingManager));
   }
 }

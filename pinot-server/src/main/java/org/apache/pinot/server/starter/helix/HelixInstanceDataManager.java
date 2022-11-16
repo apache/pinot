@@ -159,9 +159,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       throws Exception {
     LOGGER.info("Adding segment: {} to table: {}", segmentName, offlineTableName);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
-    Preconditions.checkNotNull(tableConfig);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", offlineTableName);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
     _tableDataManagerMap.computeIfAbsent(offlineTableName, k -> createTableDataManager(k, tableConfig))
-        .addSegment(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig));
+        .addSegment(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema));
     LOGGER.info("Added segment: {} to table: {}", segmentName, offlineTableName);
   }
 
@@ -170,9 +171,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       throws Exception {
     LOGGER.info("Adding segment: {} to table: {}", segmentName, realtimeTableName);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, realtimeTableName);
-    Preconditions.checkNotNull(tableConfig);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", realtimeTableName);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", realtimeTableName);
     _tableDataManagerMap.computeIfAbsent(realtimeTableName, k -> createTableDataManager(k, tableConfig))
-        .addSegment(segmentName, tableConfig, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig));
+        .addSegment(segmentName, tableConfig, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema));
     LOGGER.info("Added segment: {} to table: {}", segmentName, realtimeTableName);
   }
 
@@ -405,8 +408,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       segmentLock.lock();
 
       // Reloads an existing segment, and the local segment metadata is existing as asserted above.
-      tableDataManager.reloadSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig),
-          zkMetadata, segmentMetadata, schema, forceDownload);
+      tableDataManager.reloadSegment(segmentName,
+          new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema), zkMetadata, segmentMetadata, schema,
+          forceDownload);
       LOGGER.info("Reloaded segment: {} of table: {}", segmentName, tableNameWithType);
     } finally {
       segmentLock.unlock();
@@ -418,12 +422,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       throws Exception {
     LOGGER.info("Adding or replacing segment: {} for table: {}", segmentName, tableNameWithType);
 
-    // Get updated table config and segment metadata from Zookeeper.
+    // Get updated table config, schema and segment metadata from Zookeeper.
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-    Preconditions.checkNotNull(tableConfig);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
     SegmentZKMetadata zkMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
-    Preconditions.checkNotNull(zkMetadata);
+    Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s", segmentName,
+        tableNameWithType);
 
     // This method might modify the file on disk. Use segment lock to prevent race condition
     Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
@@ -435,8 +441,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       SegmentMetadata localMetadata = getSegmentMetadata(tableNameWithType, segmentName);
 
       _tableDataManagerMap.computeIfAbsent(tableNameWithType, k -> createTableDataManager(k, tableConfig))
-          .addOrReplaceSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), zkMetadata,
-              localMetadata);
+          .addOrReplaceSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema),
+              zkMetadata, localMetadata);
       LOGGER.info("Added or replaced segment: {} of table: {}", segmentName, tableNameWithType);
     } finally {
       segmentLock.unlock();

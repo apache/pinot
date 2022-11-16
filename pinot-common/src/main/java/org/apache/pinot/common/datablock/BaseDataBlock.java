@@ -18,18 +18,15 @@
  */
 package org.apache.pinot.common.datablock;
 
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.datatable.DataTableImplV3;
 import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.request.context.ThreadTimer;
@@ -80,7 +77,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * difference is the data layout in FIXED_SIZE_DATA and VARIABLE_SIZE_DATA section, see each impl for details.
  */
 @SuppressWarnings("DuplicatedCode")
-public abstract class BaseDataBlock implements DataTable {
+public abstract class BaseDataBlock implements DataBlock {
   protected static final int HEADER_SIZE = Integer.BYTES * 13;
   // _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
   protected Map<Integer, String> _errCodeToExceptionMap;
@@ -207,7 +204,7 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Override
   public int getVersion() {
-    return DataTableFactory.VERSION_4;
+    return 0;
   }
 
   /**
@@ -350,20 +347,6 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Nullable
   @Override
-  public CustomObject getCustomObject(int rowId, int colId) {
-    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
-    int type = _variableSizeData.getInt();
-    if (size == 0) {
-      assert type == CustomObject.NULL_TYPE_VALUE;
-      return null;
-    }
-    ByteBuffer buffer = _variableSizeData.slice();
-    buffer.limit(size);
-    return new CustomObject(type, buffer);
-  }
-
-  @Nullable
-  @Override
   public RoaringBitmap getNullRowIds(int colId) {
     // _fixedSizeData stores two ints per col's null bitmap: offset, and length.
     int position = _fixDataSize + colId * Integer.BYTES * 2;
@@ -441,12 +424,6 @@ public abstract class BaseDataBlock implements DataTable {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     writeLeadingSections(dataOutputStream);
-
-    // Add table serialization time metadata if thread timer is enabled.
-    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
-      long responseSerializationCpuTimeNs = threadTimer.getThreadTimeNs();
-      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(responseSerializationCpuTimeNs));
-    }
 
     // Write metadata: length followed by actual metadata bytes.
     // NOTE: We ignore metadata serialization time in "responseSerializationCpuTimeNs" as it's negligible while
@@ -532,80 +509,14 @@ public abstract class BaseDataBlock implements DataTable {
     }
   }
 
-  /**
-   * Serialize metadata section to bytes.
-   * Format of the bytes looks like:
-   * [numEntries, bytesOfKV2, bytesOfKV2, bytesOfKV3]
-   * For each KV pair:
-   * - if the value type is String, encode it as: [enumKeyOrdinal, valueLength, Utf8EncodedValue].
-   * - if the value type is int, encode it as: [enumKeyOrdinal, bigEndianRepresentationOfIntValue]
-   * - if the value type is long, encode it as: [enumKeyOrdinal, bigEndianRepresentationOfLongValue]
-   *
-   * Unlike V2, where numeric metadata values (int and long) in V3 are encoded in UTF-8 in the wire format,
-   * in V3 big endian representation is used.
-   */
   private byte[] serializeMetadata()
       throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-
-    dataOutputStream.writeInt(_metadata.size());
-
-    for (Map.Entry<String, String> entry : _metadata.entrySet()) {
-      MetadataKey key = MetadataKey.getByName(entry.getKey());
-      // Ignore unknown keys.
-      if (key == null) {
-        continue;
-      }
-      String value = entry.getValue();
-      dataOutputStream.writeInt(key.getId());
-      if (key.getValueType() == MetadataValueType.INT) {
-        dataOutputStream.write(Ints.toByteArray(Integer.parseInt(value)));
-      } else if (key.getValueType() == MetadataValueType.LONG) {
-        dataOutputStream.write(Longs.toByteArray(Long.parseLong(value)));
-      } else {
-        byte[] valueBytes = value.getBytes(UTF_8);
-        dataOutputStream.writeInt(valueBytes.length);
-        dataOutputStream.write(valueBytes);
-      }
-    }
-
-    return byteArrayOutputStream.toByteArray();
+    return new byte[0];
   }
 
-  /**
-   * Even though the wire format of V3 uses UTF-8 for string/bytes and big-endian for numeric values,
-   * the in-memory representation is STRING based for processing the metadata before serialization
-   * (by the server as it adds the statistics in metadata) and after deserialization (by the broker as it receives
-   * DataTable from each server and aggregates the values).
-   * This is to make V3 implementation keep the consumers of Map<String, String> getMetadata() API in the code happy
-   * by internally converting it.
-   *
-   * This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
-   */
   private Map<String, String> deserializeMetadata(ByteBuffer buffer)
       throws IOException {
-    int numEntries = buffer.getInt();
-    Map<String, String> metadata = new HashMap<>();
-    for (int i = 0; i < numEntries; i++) {
-      int keyId = buffer.getInt();
-      MetadataKey key = MetadataKey.getById(keyId);
-      // Ignore unknown keys.
-      if (key == null) {
-        continue;
-      }
-      if (key.getValueType() == MetadataValueType.INT) {
-        String value = "" + buffer.getInt();
-        metadata.put(key.getName(), value);
-      } else if (key.getValueType() == MetadataValueType.LONG) {
-        String value = "" + buffer.getLong();
-        metadata.put(key.getName(), value);
-      } else {
-        String value = DataTableUtils.decodeString(buffer);
-        metadata.put(key.getName(), value);
-      }
-    }
-    return metadata;
+    return Collections.emptyMap();
   }
 
   private byte[] serializeExceptions()
@@ -679,30 +590,5 @@ public abstract class BaseDataBlock implements DataTable {
       stringBuilder.append("\n");
     }
     return stringBuilder.toString();
-  }
-
-  public enum Type {
-    ROW(0),
-    COLUMNAR(1),
-    METADATA(2);
-
-    private final int _ordinal;
-
-    Type(int ordinal) {
-      _ordinal = ordinal;
-    }
-
-    public static Type fromOrdinal(int ordinal) {
-      switch (ordinal) {
-        case 0:
-          return ROW;
-        case 1:
-          return COLUMNAR;
-        case 2:
-          return METADATA;
-        default:
-          throw new IllegalArgumentException("Invalid ordinal: " + ordinal);
-      }
-    }
   }
 }

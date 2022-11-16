@@ -23,18 +23,13 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.mockito.Mockito.when;
 
 
 public class HashJoinOperatorTest {
@@ -43,33 +38,19 @@ public class HashJoinOperatorTest {
     FieldSelectionKeySelector rightSelect = new FieldSelectionKeySelector(rightIdx);
     return new JoinNode.JoinKeys(leftSelect, rightSelect);
   }
-  @Mock
-  Operator<TransferableBlock> _leftOperator;
-
-  @Mock
-  Operator<TransferableBlock> _rightOperator;
-
-  @BeforeMethod
-  public void setup() {
-    MockitoAnnotations.initMocks(this);
-  }
 
   @Test
   public void testHashJoinKeyCollisionInnerJoin() {
-    // "Aa" and "BB" have same hash code in java.
-    List<Object[]> rows = Arrays.asList(new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"});
-    when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(rows))
-        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
-    when(_rightOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(rows))
-        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
-
+    BaseOperator<TransferableBlock> leftOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
+    BaseOperator<TransferableBlock> rightOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
     List<RexExpression> joinClauses = new ArrayList<>();
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.INNER);
+    HashJoinOperator join =
+        new HashJoinOperator(leftOperator, rightOperator, resultSchema, getJoinKeys(Arrays.asList(1), Arrays.asList(1)),
+            joinClauses, JoinRelType.INNER);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -89,20 +70,17 @@ public class HashJoinOperatorTest {
 
   @Test
   public void testInnerJoin() {
-    List<Object[]> leftRows = Arrays.asList(new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"});
-    when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(leftRows))
-        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
-    List<Object[]> rightRows = Arrays.asList(new Object[]{1, "AA"}, new Object[]{2, "Aa"});
-    when(_rightOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(rightRows))
-        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
-
+    BaseOperator<TransferableBlock> leftOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
+    BaseOperator<TransferableBlock> rightOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_2);
     List<RexExpression> joinClauses = new ArrayList<>();
+
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.INNER);
+    HashJoinOperator join =
+        new HashJoinOperator(leftOperator, rightOperator, resultSchema, getJoinKeys(Arrays.asList(1), Arrays.asList(1)),
+            joinClauses, JoinRelType.INNER);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -118,20 +96,17 @@ public class HashJoinOperatorTest {
 
   @Test
   public void testLeftJoin() {
-    List<Object[]> leftRows = Arrays.asList(new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"});
-    when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(leftRows))
-        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
-    List<Object[]> rightRows = Arrays.asList(new Object[]{1, "AA"}, new Object[]{2, "Aa"});
-    when(_rightOperator.nextBlock()).thenReturn(OperatorTestUtil.getRowDataBlock(rightRows))
-        .thenReturn(OperatorTestUtil.getEndOfStreamRowBlock());
+    BaseOperator<TransferableBlock> leftOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
+    BaseOperator<TransferableBlock> rightOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_2);
 
     List<RexExpression> joinClauses = new ArrayList<>();
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.LEFT);
+    HashJoinOperator join =
+        new HashJoinOperator(leftOperator, rightOperator, resultSchema, getJoinKeys(Arrays.asList(1), Arrays.asList(1)),
+            joinClauses, JoinRelType.LEFT);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {

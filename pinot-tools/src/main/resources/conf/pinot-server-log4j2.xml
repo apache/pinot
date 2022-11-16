@@ -31,6 +31,11 @@
         <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
       </PatternLayout>
     </RandomAccessFile>
+    <RandomAccessFile name="serverHelixLog" fileName="pinotServerHelix.log" immediateFlush="false">
+      <PatternLayout>
+        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
+      </PatternLayout>
+    </RandomAccessFile>
   </Appenders>
   <Loggers>
     <Root level="info" additivity="false">
@@ -39,6 +44,10 @@
       <!-- Direct most logs to the log file -->
       <AppenderRef ref="serverLog"/>
     </Root>
+    <!-- Output helix logs to a dedicated file-->
+    <Logger name="org.apache.helix" level="info" additivity="false">
+      <AppenderRef ref="serverHelixLog"/>
+    </Logger>
     <!-- Output server starter logs to the console -->
     <Logger name="org.apache.pinot.server.starter.helix.HelixServerStarter" level="info" additivity="false">
       <AppenderRef ref="console"/>

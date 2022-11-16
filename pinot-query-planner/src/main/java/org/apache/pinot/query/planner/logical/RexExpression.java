@@ -83,6 +83,8 @@ public interface RexExpression {
         return PinotDataType.LONG;
       case FLOAT:
         return PinotDataType.FLOAT;
+      // TODO: support DECIMAL properly.
+      case DECIMAL:
       case DOUBLE:
         return PinotDataType.DOUBLE;
       case CHAR:
@@ -91,8 +93,7 @@ public interface RexExpression {
       case BOOLEAN:
         return PinotDataType.BOOLEAN;
       default:
-        // TODO: do not assume byte type.
-        return PinotDataType.BYTES;
+        throw new IllegalArgumentException("Unsupported data type: " + type);
     }
   }
 
@@ -202,12 +203,18 @@ public interface RexExpression {
   }
 
   class FunctionCall implements RexExpression {
+    // the underlying SQL operator kind of this function.
+    // It can be either a standard SQL operator or an extended function kind.
+    // @see #SqlKind.FUNCTION, #SqlKind.OTHER, #SqlKind.OTHER_FUNCTION
     @ProtoProperties
     private SqlKind _sqlKind;
+    // the return data type of the function.
     @ProtoProperties
     private FieldSpec.DataType _dataType;
+    // the name of the SQL function. For standard SqlKind it should match the SqlKind ENUM name.
     @ProtoProperties
     private String _functionName;
+    // the list of RexExpressions that represents the operands to the function.
     @ProtoProperties
     private List<RexExpression> _functionOperands;
 

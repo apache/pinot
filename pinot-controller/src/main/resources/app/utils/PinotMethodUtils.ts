@@ -96,7 +96,7 @@ import {
   getTaskRuntimeConfig
 } from '../requests';
 import { baseApi } from './axios-config';
-import Utils from './Utils';
+import Utils, { getDisplaySegmentStatus } from './Utils';
 const JSONbig = require('json-bigint')({'storeAsString': true})
 
 // This method is used to display tenants listing on cluster manager home page
@@ -352,8 +352,9 @@ const getSchemaObject = async (schemaName) =>{
       return schemaObj;
   }
 
+const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Total Columns"];
+
 const getAllSchemaDetails = async () => {
-  const columnHeaders = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Total Columns"]
   let schemaDetails:Array<any> = [];
   let promiseArr = [];
   const {data} = await getSchemaList()
@@ -371,19 +372,20 @@ const getAllSchemaDetails = async () => {
     return schemaObj;
   })
   return {
-    columns: columnHeaders,
+    columns: allSchemaDetailsColumnHeader,
     records: schemaDetails
   };
 }
 
+const allTableDetailsColumnHeader = [
+  'Table Name',
+  'Reported Size',
+  'Estimated Size',
+  'Number of Segments',
+  'Status',
+];
+
 const getAllTableDetails = (tablesList) => {
-  const columnHeaders = [
-    'Table Name',
-    'Reported Size',
-    'Estimated Size',
-    'Number of Segments',
-    'Status',
-  ];
   if (tablesList.length) {
     const promiseArr = [];
     tablesList.map((name) => {
@@ -433,13 +435,13 @@ const getAllTableDetails = (tablesList) => {
         }
       });
       return {
-        columns: columnHeaders,
+        columns: allTableDetailsColumnHeader,
         records: finalRecordsArr,
       };
     });
   }
   return {
-    columns: columnHeaders,
+    columns: allTableDetailsColumnHeader,
     records: []
   };
 };
@@ -475,7 +477,7 @@ const getSegmentList = (tableName) => {
       records: Object.keys(idealStateObj).map((key) => {
         return [
           key,
-          getSegmentStatus(idealStateObj[key], externalViewObj[key])
+          getDisplaySegmentStatus(idealStateObj[key], externalViewObj[key])
         ];
       }),
       externalViewObj
@@ -892,8 +894,8 @@ const updateTable = (tableName: string, table: string) => {
   })
 };
 
-const updateSchema = (schemaName: string, schema: string) => {
-  return putSchema(schemaName, schema).then((res)=>{
+const updateSchema = (schemaName: string, schema: string, reload?: boolean) => {
+  return putSchema(schemaName, schema, reload).then((res)=>{
     return res.data;
   })
 };
@@ -1096,6 +1098,7 @@ export default {
   getTableSchemaData,
   getQueryResults,
   getTenantTableData,
+  allTableDetailsColumnHeader,
   getAllTableDetails,
   getTableSummaryData,
   getSegmentList,
@@ -1154,6 +1157,7 @@ export default {
   saveSchemaAction,
   saveTableAction,
   getSchemaData,
+  allSchemaDetailsColumnHeader,
   getAllSchemaDetails,
   getTableState,
   getAuthInfo,

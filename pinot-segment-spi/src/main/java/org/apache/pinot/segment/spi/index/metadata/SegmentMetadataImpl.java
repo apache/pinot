@@ -53,11 +53,11 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
@@ -304,11 +304,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     for (Object o : src) {
       String column = o.toString();
       if (!column.isEmpty() && !dest.contains(column)) {
-        if (column.charAt(0) == '$') {
-          // Skip virtual columns starting with '$', but keep time column with granularity as physical column.
-          if (!TimestampIndexGranularity.isValidTimeColumnWithGranularityName(column)) {
-            continue;
-          }
+        // Skip virtual columns starting with '$', but keep time column with granularity as physical column
+        if (column.charAt(0) == '$' && !TimestampIndexUtils.isValidColumnWithGranularity(column)) {
+          continue;
         }
         dest.add(column);
       }

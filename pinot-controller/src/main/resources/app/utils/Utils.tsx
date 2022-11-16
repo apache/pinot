@@ -22,6 +22,7 @@ import React from 'react';
 import ReactDiffViewer, {DiffMethod} from 'react-diff-viewer';
 import { map, isEqual, findIndex, findLast } from 'lodash';
 import app_state from '../app_state';
+import { DISPLAY_SEGMENT_STATUS, SEGMENT_STATUS } from 'Models';
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
   if (ascendingFlag) {
@@ -343,6 +344,34 @@ const splitStringByLastUnderscore = (str: string) => {
   let beforeUnderscore = str.substring(0, str.lastIndexOf("_"));
   let afterUnderscore = str.substring(str.lastIndexOf("_") + 1, str.length);
   return [beforeUnderscore, afterUnderscore];
+}
+
+export const getDisplaySegmentStatus = (idealState, externalView): DISPLAY_SEGMENT_STATUS => {
+  const externalViewStatesArray = Object.values(externalView || {});
+
+  // if EV contains ERROR state then segment is in Bad state
+  if(externalViewStatesArray.includes(SEGMENT_STATUS.ERROR)) {
+    return DISPLAY_SEGMENT_STATUS.BAD;
+  }
+
+  // if EV status is CONSUMING or ONLINE then segment is in Good state
+  if(externalViewStatesArray.every((status) => status === SEGMENT_STATUS.CONSUMING || status === SEGMENT_STATUS.ONLINE)) {
+    return DISPLAY_SEGMENT_STATUS.GOOD;
+  }
+
+  // If EV state is OFFLINE and EV matches IS then segment is in Good state.
+  if(externalViewStatesArray.includes(SEGMENT_STATUS.OFFLINE) && isEqual(idealState, externalView)) {
+    return DISPLAY_SEGMENT_STATUS.GOOD;
+  }
+
+  // If EV is empty or EV state is OFFLINE and does not matches IS then segment is in Partial state.
+  // PARTIAL state can also be interpreted as we're waiting for segments to converge
+  if(externalViewStatesArray.length === 0 || externalViewStatesArray.includes(SEGMENT_STATUS.OFFLINE) && !isEqual(idealState, externalView)) {
+    return DISPLAY_SEGMENT_STATUS.PARTIAL;
+  }
+
+  // does not match any condition -> assume PARTIAL state as we are waiting for segments to converge 
+  return DISPLAY_SEGMENT_STATUS.PARTIAL;
 }
 
 export default {
