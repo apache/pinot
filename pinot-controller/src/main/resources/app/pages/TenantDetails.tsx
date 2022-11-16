@@ -184,6 +184,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         {
           customRenderer: (
             <SegmentStatusRenderer
+              segmentName={name}
+              tableName={tableName}
               status={status as DISPLAY_SEGMENT_STATUS}
             />
           ),

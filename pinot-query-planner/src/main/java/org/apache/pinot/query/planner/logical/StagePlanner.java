@@ -41,7 +41,7 @@ import org.apache.pinot.query.routing.WorkerManager;
  * This class is non-threadsafe. Do not reuse the stage planner for multiple query plans.
  */
 public class StagePlanner {
-  private final PlannerContext _plannerContext;
+  private final PlannerContext _plannerContext;   // DO NOT REMOVE.
   private final WorkerManager _workerManager;
   private int _stageIdCounter;
 

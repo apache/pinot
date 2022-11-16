@@ -29,7 +29,9 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.OperatorUtils;
 
-
+/*
+ * FunctionOperands are generated from {@link RexExpression}s.
+ */
 public class FunctionOperand extends TransformOperand {
   private final List<TransformOperand> _childOperandList;
   private final FunctionInvoker _functionInvoker;
@@ -48,6 +50,7 @@ public class FunctionOperand extends TransformOperand {
     Preconditions.checkNotNull(functionInfo, "Cannot find function with Name: " + functionCall.getFunctionName());
     _functionInvoker = new FunctionInvoker(functionInfo);
     _resultName = computeColumnName(functionCall.getFunctionName(), _childOperandList);
+    // TODO: Check type match between functionCall's data type and result type.
     _resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
     _reusableOperandHolder = new Object[operandExpressions.size()];
   }

@@ -50,7 +50,7 @@ public class FunctionRegistry {
   // TODO: consolidate the following 2
   // This FUNCTION_INFO_MAP is used by Pinot server to look up function by # of arguments
   private static final Map<String, Map<Integer, FunctionInfo>> FUNCTION_INFO_MAP = new HashMap<>();
-  // This FUNCTION_MAP is used by Calcite function catalog tolook up function by function signature.
+  // This FUNCTION_MAP is used by Calcite function catalog to look up function by function signature.
   private static final NameMultimap<Function> FUNCTION_MAP = new NameMultimap<>();
 
   /**

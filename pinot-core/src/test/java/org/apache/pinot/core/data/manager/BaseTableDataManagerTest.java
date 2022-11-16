@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.data.manager;
 
-import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +35,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
@@ -49,7 +48,6 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -61,7 +59,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.util.TestUtils;
@@ -69,9 +66,6 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher.RETRY_COUNT_CONFIG_KEY;
-import static org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher.RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY;
-import static org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher.RETRY_WAIT_MS_CONFIG_KEY;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -94,7 +88,7 @@ public class BaseTableDataManagerTest {
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
-    initSegmentFetcher();
+    TableDataManagerTestUtils.initSegmentFetcher();
   }
 
   @AfterMethod
@@ -117,7 +111,7 @@ public class BaseTableDataManagerTest {
 
     BaseTableDataManager tmgr = createTableManager();
     assertFalse(tmgr.getSegmentDataDir(segName).exists());
-    tmgr.reloadSegment(segName, createIndexLoadingConfig(), zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -130,7 +124,7 @@ public class BaseTableDataManagerTest {
     String segName = "seg01";
     SegmentZKMetadata zkmd = createRawSegment(tableConfig, segName, SegmentVersion.v3, 5);
     String tierName = "coolTier";
-    when(zkmd.getTier()).thenReturn(tierName);
+    zkmd.setTier(tierName);
 
     // Mock the case where segment is loaded but its CRC is different from
     // the one in zk, thus raw segment is downloaded and loaded.
@@ -141,7 +135,8 @@ public class BaseTableDataManagerTest {
     BaseTableDataManager tmgr = createTableManager();
     File defaultSegDir = tmgr.getSegmentDataDir(segName);
     assertFalse(defaultSegDir.exists());
-    tmgr.reloadSegment(segName, createIndexLoadingConfig("tierBased", tableConfig), zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null),
+        zkmd, llmd, null, false);
     assertTrue(defaultSegDir.exists());
     llmd = new SegmentMetadataImpl(defaultSegDir);
     assertEquals(llmd.getTotalDocs(), 5);
@@ -151,7 +146,7 @@ public class BaseTableDataManagerTest {
     when(llmd.getCrc()).thenReturn("0");
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
     tmgr = createTableManager();
-    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
+    IndexLoadingConfig loadingCfg = TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null);
     tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg.getTableConfig());
     assertTrue(segDirOnTier.exists());
@@ -167,23 +162,23 @@ public class BaseTableDataManagerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v1, 5);
-    String segCrc = getCRC(localSegDir, SegmentVersion.v1);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v1);
 
     // Same CRCs so load the local segment directory directly.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
+    when(zkmd.getCrc()).thenReturn(segCrc);
     SegmentMetadata llmd = mock(SegmentMetadata.class);
-    when(llmd.getCrc()).thenReturn(segCrc);
+    when(llmd.getCrc()).thenReturn(Long.toString(segCrc));
 
     BaseTableDataManager tmgr = createTableManager();
-    tmgr.reloadSegment(segName, createIndexLoadingConfig(), zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
 
     FileUtils.deleteQuietly(localSegDir);
     try {
-      tmgr.reloadSegment(segName, createIndexLoadingConfig(), zkmd, llmd, null, false);
+      tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false);
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
@@ -197,19 +192,20 @@ public class BaseTableDataManagerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v1, 5);
-    String segCrc = getCRC(localSegDir, SegmentVersion.v1);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v1);
 
     // Same CRCs so load the local segment directory directly.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
+    when(zkmd.getCrc()).thenReturn(segCrc);
     String tierName = "coolTier";
     when(zkmd.getTier()).thenReturn(tierName);
     SegmentMetadata llmd = mock(SegmentMetadata.class);
-    when(llmd.getCrc()).thenReturn(segCrc);
+    when(llmd.getCrc()).thenReturn(Long.toString(segCrc));
 
     // No dataDir for coolTier, thus stay on default tier.
     BaseTableDataManager tmgr = createTableManager();
-    tmgr.reloadSegment(segName, createIndexLoadingConfig("tierBased", tableConfig), zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null),
+        zkmd, llmd, null, false);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -217,10 +213,10 @@ public class BaseTableDataManagerTest {
 
     // Configured dataDir for coolTier, thus move to new dir.
     llmd = mock(SegmentMetadata.class);
-    when(llmd.getCrc()).thenReturn(segCrc);
+    when(llmd.getCrc()).thenReturn(Long.toString(segCrc));
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
     tmgr = createTableManager();
-    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
+    IndexLoadingConfig loadingCfg = TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null);
     tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg.getTableConfig());
     assertTrue(segDirOnTier.exists());
@@ -236,16 +232,16 @@ public class BaseTableDataManagerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v1, 5);
-    String segCrc = getCRC(localSegDir, SegmentVersion.v1);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v1);
 
     // Same CRCs so load the local segment directory directly.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
+    when(zkmd.getCrc()).thenReturn(segCrc);
     SegmentMetadata llmd = mock(SegmentMetadata.class);
-    when(llmd.getCrc()).thenReturn(segCrc);
+    when(llmd.getCrc()).thenReturn(Long.toString(segCrc));
 
     // Require to use v3 format.
-    IndexLoadingConfig idxCfg = createIndexLoadingConfig();
+    IndexLoadingConfig idxCfg = TableDataManagerTestUtils.createIndexLoadingConfig();
     idxCfg.setSegmentVersion(SegmentVersion.v3);
 
     BaseTableDataManager tmgr = createTableManager();
@@ -262,18 +258,18 @@ public class BaseTableDataManagerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v3, 5);
-    String segCrc = getCRC(localSegDir, SegmentVersion.v3);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v3);
     assertFalse(hasInvertedIndex(localSegDir, STRING_COLUMN, SegmentVersion.v3));
     assertFalse(hasInvertedIndex(localSegDir, LONG_COLUMN, SegmentVersion.v3));
 
     // Same CRCs so load the local segment directory directly.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
+    when(zkmd.getCrc()).thenReturn(segCrc);
     SegmentMetadata llmd = mock(SegmentMetadata.class);
-    when(llmd.getCrc()).thenReturn(segCrc);
+    when(llmd.getCrc()).thenReturn(Long.toString(segCrc));
 
     // Require to add indices.
-    IndexLoadingConfig idxCfg = createIndexLoadingConfig();
+    IndexLoadingConfig idxCfg = TableDataManagerTestUtils.createIndexLoadingConfig();
     idxCfg.setSegmentVersion(SegmentVersion.v3);
     idxCfg.setInvertedIndexColumns(new HashSet<>(Arrays.asList(STRING_COLUMN, LONG_COLUMN)));
 
@@ -291,8 +287,9 @@ public class BaseTableDataManagerTest {
       throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
-    SegmentZKMetadata zkmd = createRawSegment(tableConfig, segName, SegmentVersion.v3, 5);
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v3, 5);
+    SegmentZKMetadata zkmd = TableDataManagerTestUtils.makeRawSegment(segName, localSegDir,
+        new File(TEMP_DIR, segName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION), false);
 
     // Same CRC but force to download.
     BaseTableDataManager tmgr = createTableManager();
@@ -302,14 +299,14 @@ public class BaseTableDataManagerTest {
     // Remove the local segment dir. Segment reloading fails unless force to download.
     FileUtils.deleteQuietly(localSegDir);
     try {
-      tmgr.reloadSegment(segName, createIndexLoadingConfig(), zkmd, llmd, null, false);
+      tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false);
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
       assertTrue(e.getMessage().contains("does not exist or is not a directory"));
     }
 
-    tmgr.reloadSegment(segName, createIndexLoadingConfig(), zkmd, llmd, null, true);
+    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, true);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
 
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
@@ -331,7 +328,7 @@ public class BaseTableDataManagerTest {
 
     BaseTableDataManager tmgr = createTableManager();
     assertFalse(tmgr.getSegmentDataDir(segName).exists());
-    tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig(), zkmd, llmd);
+    tmgr.addOrReplaceSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -344,7 +341,7 @@ public class BaseTableDataManagerTest {
     String segName = "seg01";
     SegmentZKMetadata zkmd = createRawSegment(tableConfig, segName, SegmentVersion.v3, 5);
     String tierName = "coolTier";
-    when(zkmd.getTier()).thenReturn(tierName);
+    zkmd.setTier(tierName);
 
     // Mock the case where segment is loaded but its CRC is different from
     // the one in zk, thus raw segment is downloaded and loaded.
@@ -355,7 +352,8 @@ public class BaseTableDataManagerTest {
     BaseTableDataManager tmgr = createTableManager();
     File defaultSegDir = tmgr.getSegmentDataDir(segName);
     assertFalse(defaultSegDir.exists());
-    tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig("tierBased", tableConfig), zkmd, llmd);
+    tmgr.addOrReplaceSegment(segName,
+        TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null), zkmd, llmd);
     assertTrue(defaultSegDir.exists());
     llmd = new SegmentMetadataImpl(defaultSegDir);
     assertEquals(llmd.getTotalDocs(), 5);
@@ -365,7 +363,7 @@ public class BaseTableDataManagerTest {
     when(llmd.getCrc()).thenReturn("0");
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
     tmgr = createTableManager();
-    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
+    IndexLoadingConfig loadingCfg = TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null);
     tmgr.addOrReplaceSegment(segName, loadingCfg, zkmd, llmd);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg.getTableConfig());
     assertTrue(segDirOnTier.exists());
@@ -386,7 +384,7 @@ public class BaseTableDataManagerTest {
 
     BaseTableDataManager tmgr = createTableManager();
     assertFalse(tmgr.getSegmentDataDir("seg01").exists());
-    tmgr.addOrReplaceSegment("seg01", createIndexLoadingConfig(), zkmd, llmd);
+    tmgr.addOrReplaceSegment("seg01", TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd);
     // As CRC is same, the index dir is left as is, so not get created by the test.
     assertFalse(tmgr.getSegmentDataDir("seg01").exists());
   }
@@ -397,22 +395,22 @@ public class BaseTableDataManagerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v3, 5);
-    String segCrc = getCRC(localSegDir, SegmentVersion.v3);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v3);
 
     // Make local and remote CRC same to skip downloading raw segment.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
+    when(zkmd.getCrc()).thenReturn(segCrc);
     when(zkmd.getDownloadUrl()).thenReturn("file://somewhere");
 
     BaseTableDataManager tmgr = createTableManager();
-    tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig(), zkmd, null);
+    tmgr.addOrReplaceSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, null);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     SegmentMetadataImpl llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
 
     FileUtils.deleteQuietly(localSegDir);
     try {
-      tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig(), zkmd, null);
+      tmgr.addOrReplaceSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, null);
       fail();
     } catch (Exception e) {
       // As expected, when local segment dir is missing, it tries to download
@@ -427,18 +425,19 @@ public class BaseTableDataManagerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v3, 5);
-    String segCrc = getCRC(localSegDir, SegmentVersion.v3);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v3);
 
     // Make local and remote CRC same to skip downloading raw segment.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
+    when(zkmd.getCrc()).thenReturn(segCrc);
     when(zkmd.getDownloadUrl()).thenReturn("file://somewhere");
     String tierName = "coolTier";
     when(zkmd.getTier()).thenReturn(tierName);
 
     // No dataDir for coolTier, thus stay on default tier.
     BaseTableDataManager tmgr = createTableManager();
-    tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig("tierBased", tableConfig), zkmd, null);
+    tmgr.addOrReplaceSegment(segName,
+        TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null), zkmd, null);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     SegmentMetadataImpl llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -446,7 +445,7 @@ public class BaseTableDataManagerTest {
 
     // Configured dataDir for coolTier, thus move to new dir.
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
-    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
+    IndexLoadingConfig loadingCfg = TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg.getTableConfig());
     assertFalse(segDirOnTier.exists());
     // Move segDir to new tier to see if addOrReplaceSegment() can load segDir from new tier directly.
@@ -464,18 +463,18 @@ public class BaseTableDataManagerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v3, 5);
-    String segCrc = getCRC(localSegDir, SegmentVersion.v3);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v3);
 
     // Make local and remote CRC same to skip downloading raw segment.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
+    when(zkmd.getCrc()).thenReturn(segCrc);
 
     BaseTableDataManager tmgr = createTableManager();
     File backup = tmgr.getSegmentDataDir(segName + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
     localSegDir.renameTo(backup);
 
     assertFalse(tmgr.getSegmentDataDir(segName).exists());
-    tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig(), zkmd, null);
+    tmgr.addOrReplaceSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, null);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     SegmentMetadataImpl llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -496,7 +495,7 @@ public class BaseTableDataManagerTest {
     localSegDir.renameTo(backup);
 
     assertFalse(tmgr.getSegmentDataDir(segName).exists());
-    tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig(), zkmd, null);
+    tmgr.addOrReplaceSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, null);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     SegmentMetadataImpl llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -508,14 +507,14 @@ public class BaseTableDataManagerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v1, 5);
-    String segCrc = getCRC(localSegDir, SegmentVersion.v1);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v1);
 
     // Make local and remote CRC same to skip downloading raw segment.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
+    when(zkmd.getCrc()).thenReturn(segCrc);
 
     // Require to use v3 format.
-    IndexLoadingConfig idxCfg = createIndexLoadingConfig();
+    IndexLoadingConfig idxCfg = TableDataManagerTestUtils.createIndexLoadingConfig();
     idxCfg.setSegmentVersion(SegmentVersion.v3);
 
     BaseTableDataManager tmgr = createTableManager();
@@ -532,14 +531,14 @@ public class BaseTableDataManagerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v3, 5);
-    String segCrc = getCRC(localSegDir, SegmentVersion.v3);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v3);
 
     // Make local and remote CRC same to skip downloading raw segment.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
+    when(zkmd.getCrc()).thenReturn(segCrc);
 
     // Require to use v1 format.
-    IndexLoadingConfig idxCfg = createIndexLoadingConfig();
+    IndexLoadingConfig idxCfg = TableDataManagerTestUtils.createIndexLoadingConfig();
     idxCfg.setSegmentVersion(SegmentVersion.v1);
 
     BaseTableDataManager tmgr = createTableManager();
@@ -557,16 +556,16 @@ public class BaseTableDataManagerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     String segName = "seg01";
     File localSegDir = createSegment(tableConfig, segName, SegmentVersion.v3, 5);
-    String segCrc = getCRC(localSegDir, SegmentVersion.v3);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v3);
     assertFalse(hasInvertedIndex(localSegDir, STRING_COLUMN, SegmentVersion.v3));
     assertFalse(hasInvertedIndex(localSegDir, LONG_COLUMN, SegmentVersion.v3));
 
     // Make local and remote CRC same to skip downloading raw segment.
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
+    when(zkmd.getCrc()).thenReturn(segCrc);
 
     // Require to add indices.
-    IndexLoadingConfig idxCfg = createIndexLoadingConfig();
+    IndexLoadingConfig idxCfg = TableDataManagerTestUtils.createIndexLoadingConfig();
     idxCfg.setSegmentVersion(SegmentVersion.v3);
     idxCfg.setInvertedIndexColumns(new HashSet<>(Arrays.asList(STRING_COLUMN, LONG_COLUMN)));
 
@@ -606,7 +605,7 @@ public class BaseTableDataManagerTest {
     try {
       // Set maxRetry to 0 to cause retry failure immediately.
       Map<String, Object> properties = new HashMap<>();
-      properties.put(RETRY_COUNT_CONFIG_KEY, 0);
+      properties.put(BaseSegmentFetcher.RETRY_COUNT_CONFIG_KEY, 0);
       SegmentFetcherFactory.init(new PinotConfiguration(properties));
       tmgr.downloadAndDecrypt("seg01", zkmd, tempRootDir);
       fail();
@@ -661,36 +660,6 @@ public class BaseTableDataManagerTest {
     }
   }
 
-  private static void initSegmentFetcher()
-      throws Exception {
-    Map<String, Object> properties = new HashMap<>();
-    properties.put(RETRY_COUNT_CONFIG_KEY, 3);
-    properties.put(RETRY_WAIT_MS_CONFIG_KEY, 100);
-    properties.put(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, 5);
-    SegmentFetcherFactory.init(new PinotConfiguration(properties));
-
-    // Setup crypter
-    properties.put("class.fakePinotCrypter", FakePinotCrypter.class.getName());
-    PinotCrypterFactory.init(new PinotConfiguration(properties));
-  }
-
-  private static IndexLoadingConfig createIndexLoadingConfig() {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-    return indexLoadingConfig;
-  }
-
-  private static IndexLoadingConfig createIndexLoadingConfig(String segDirLoader, TableConfig tableConfig) {
-    InstanceDataManagerConfig idmc = mock(InstanceDataManagerConfig.class);
-    when(idmc.getSegmentDirectoryLoader()).thenReturn(segDirLoader);
-    when(idmc.getConfig()).thenReturn(new PinotConfiguration());
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(idmc, tableConfig);
-    indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-    return indexLoadingConfig;
-  }
-
   private static BaseTableDataManager createTableManager() {
     TableDataManagerConfig config = mock(TableDataManagerConfig.class);
     when(config.getTableName()).thenReturn(TABLE_NAME_WITH_TYPE);
@@ -708,17 +677,9 @@ public class BaseTableDataManagerTest {
   private static SegmentZKMetadata createRawSegment(TableConfig tableConfig, String segName, SegmentVersion segVer,
       int rowCnt)
       throws Exception {
-    File segDir = createSegment(tableConfig, segName, segVer, rowCnt);
-    String segCrc = getCRC(segDir, SegmentVersion.v3);
-
-    SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    File tempTar = new File(TEMP_DIR, segName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarGzCompressionUtils.createTarGzFile(segDir, tempTar);
-    when(zkmd.getDownloadUrl()).thenReturn("file://" + tempTar.getAbsolutePath());
-    when(zkmd.getCrc()).thenReturn(Long.valueOf(segCrc));
-
-    FileUtils.deleteQuietly(segDir);
-    return zkmd;
+    File localSegDir = createSegment(tableConfig, segName, segVer, rowCnt);
+    return TableDataManagerTestUtils.makeRawSegment(segName, localSegDir,
+        new File(TEMP_DIR, segName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION), true);
   }
 
   private static File createSegment(TableConfig tableConfig, String segName, SegmentVersion segVer, int rowCnt)
@@ -742,18 +703,6 @@ public class BaseTableDataManagerTest {
     return new File(TABLE_DATA_DIR, segName);
   }
 
-  private static String getCRC(File segDir, SegmentVersion segVer)
-      throws IOException {
-    File parentDir = segDir;
-    if (segVer == SegmentVersion.v3) {
-      parentDir = new File(segDir, "v3");
-    }
-    File crcFile = new File(parentDir, V1Constants.SEGMENT_CREATION_META);
-    try (DataInputStream ds = new DataInputStream(new FileInputStream(crcFile))) {
-      return String.valueOf(ds.readLong());
-    }
-  }
-
   private static boolean hasInvertedIndex(File segDir, String colName, SegmentVersion segVer)
       throws IOException {
     File parentDir = segDir;
@@ -765,8 +714,8 @@ public class BaseTableDataManagerTest {
   }
 
   private TableConfig createTableConfigWithTier(String tierName, File dataDir) {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(Collections
-        .singletonList(new TierConfig(tierName, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "3d", null,
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
+        Collections.singletonList(new TierConfig(tierName, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "3d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null,
             Collections.singletonMap("dataDir", dataDir.getAbsolutePath())))).build();
   }

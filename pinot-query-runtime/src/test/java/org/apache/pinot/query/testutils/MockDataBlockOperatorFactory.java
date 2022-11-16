@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.datablock.BaseDataBlock;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -62,7 +62,7 @@ public class MockDataBlockOperatorFactory {
         return _invocationCount >= _rowsMap.get(operatorName).size()
             ? TransferableBlockUtils.getEndOfStreamTransferableBlock()
             : new TransferableBlock(_rowsMap.get(operatorName).get(_invocationCount++),
-                _operatorSchemaMap.get(operatorName), BaseDataBlock.Type.ROW);
+                _operatorSchemaMap.get(operatorName), DataBlock.Type.ROW);
       }
     });
     return operator;

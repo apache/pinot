@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.io.IOException;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -52,14 +52,23 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
 
   public SortOperator(Operator<TransferableBlock> upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema) {
+    this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
+        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY);
+  }
+
+  @VisibleForTesting
+  SortOperator(Operator<TransferableBlock> upstreamOperator, List<RexExpression> collationKeys,
+      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
+      int maxHolderCapacity) {
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
     _offset = offset;
     _dataSchema = dataSchema;
     _upstreamErrorBlock = null;
     _isSortedBlockConstructed = false;
-    _numRowsToKeep = _fetch > 0 ? Math.min(SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
-        _fetch + (Math.max(_offset, 0))) : SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY;
+    _numRowsToKeep = _fetch > 0
+        ? Math.min(maxHolderCapacity, _fetch + (Math.max(_offset, 0)))
+        : maxHolderCapacity;
     _rows = new PriorityQueue<>(_numRowsToKeep,
         new SortComparator(collationKeys, collationDirections, dataSchema, false));
   }
@@ -86,8 +95,7 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
-  private TransferableBlock produceSortedBlock()
-      throws IOException {
+  private TransferableBlock produceSortedBlock() {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
     } else if (!_readyToConstruct) {

@@ -909,8 +909,8 @@ const updateTable = (tableName: string, table: string) => {
   })
 };
 
-const updateSchema = (schemaName: string, schema: string) => {
-  return putSchema(schemaName, schema).then((res)=>{
+const updateSchema = (schemaName: string, schema: string, reload?: boolean) => {
+  return putSchema(schemaName, schema, reload).then((res)=>{
     return res.data;
   })
 };

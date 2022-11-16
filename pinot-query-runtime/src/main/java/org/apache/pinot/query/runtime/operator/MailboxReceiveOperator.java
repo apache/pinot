@@ -19,8 +19,10 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
@@ -52,6 +54,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private final RelDistribution.Type _exchangeType;
   private final KeySelector<Object[], Object[]> _keySelector;
   private final List<ServerInstance> _sendingStageInstances;
+  private final List<MailboxIdentifier> _sendingMailboxes;
   private final DataSchema _dataSchema;
   private final String _hostName;
   private final int _port;
@@ -96,6 +99,8 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     _upstreamErrorBlock = null;
     _keySelector = keySelector;
     _serverIdx = 0;
+
+    _sendingMailboxes = _sendingStageInstances.stream().map(this::toMailboxId).collect(Collectors.toList());
   }
 
   @Override
@@ -169,5 +174,9 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private MailboxIdentifier toMailboxId(ServerInstance serverInstance) {
     return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), serverInstance.getHostname(),
         serverInstance.getQueryMailboxPort(), _hostName, _port);
+  }
+
+  public Collection<MailboxIdentifier> getSendingMailboxes() {
+    return _sendingMailboxes;
   }
 }

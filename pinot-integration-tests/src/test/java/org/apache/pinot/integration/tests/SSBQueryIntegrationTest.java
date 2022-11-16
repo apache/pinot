@@ -44,7 +44,6 @@ import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -54,7 +53,6 @@ import org.yaml.snakeyaml.Yaml;
 
 public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(SSBQueryIntegrationTest.class);
-  private static final int MIN_AVAILABLE_CORE_REQUIREMENT = 4;
   private static final Map<String, String> SSB_QUICKSTART_TABLE_RESOURCES = ImmutableMap.of(
       "customer", "examples/batch/ssb/customer",
       "dates", "examples/batch/ssb/dates",
@@ -66,10 +64,6 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    if (Runtime.getRuntime().availableProcessors() < MIN_AVAILABLE_CORE_REQUIREMENT) {
-      throw new SkipException("Skip SSB query testing. Insufficient core count: "
-          + Runtime.getRuntime().availableProcessors());
-    }
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster

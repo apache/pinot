@@ -208,6 +208,21 @@ declare module 'Models' {
     MinionWorkerGroupTag: string
   }
 
+  export interface SegmentDebugDetails {
+    segmentName: string;
+    serverState: {
+      [key: string]: {
+        idealState: SEGMENT_STATUS,
+        externalView: SEGMENT_STATUS,
+        errorInfo?: {
+          timeStamp: string,
+          errorMessage: string,
+          stackTrace: string
+        }
+      }
+    }
+  }
+
   export const enum SEGMENT_STATUS {
     ONLINE = "ONLINE",
     OFFLINE = "OFFLINE",

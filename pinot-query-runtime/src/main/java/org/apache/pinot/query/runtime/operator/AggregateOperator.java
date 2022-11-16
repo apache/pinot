@@ -56,24 +56,7 @@ import org.roaringbitmap.RoaringBitmap;
  * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  */
 public class AggregateOperator extends BaseOperator<TransferableBlock> {
-
-  interface Merger extends BiFunction<Object, Object, Object> {
-  }
-
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
-  private static final Map<String, Merger> MERGERS = ImmutableMap
-      .<String, Merger>builder()
-      .put("SUM", AggregateOperator::mergeSum)
-      .put("$SUM", AggregateOperator::mergeSum)
-      .put("$SUM0", AggregateOperator::mergeSum)
-      .put("MIN", AggregateOperator::mergeMin)
-      .put("$MIN", AggregateOperator::mergeMin)
-      .put("$MIN0", AggregateOperator::mergeMin)
-      .put("MAX", AggregateOperator::mergeMax)
-      .put("$MAX", AggregateOperator::mergeMax)
-      .put("$MAX0", AggregateOperator::mergeMax)
-      .put("COUNT", AggregateOperator::mergeCount)
-      .build();
 
   private final Operator<TransferableBlock> _inputOperator;
   // TODO: Deal with the case where _aggCalls is empty but we have groupSet setup, which means this is a Distinct call.
@@ -94,7 +77,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
   public AggregateOperator(Operator<TransferableBlock> inputOperator, DataSchema dataSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet) {
-    this(inputOperator, dataSchema, aggCalls, groupSet, MERGERS);
+    this(inputOperator, dataSchema, aggCalls, groupSet, AggregateOperator.Accumulator.MERGERS);
   }
 
   @VisibleForTesting
@@ -233,7 +216,25 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     return new Key(keyElements);
   }
 
+  interface Merger extends BiFunction<Object, Object, Object> {
+  }
+
   private static class Accumulator {
+
+    private static final Map<String, Merger> MERGERS = ImmutableMap
+        .<String, Merger>builder()
+        .put("SUM", AggregateOperator::mergeSum)
+        .put("$SUM", AggregateOperator::mergeSum)
+        .put("$SUM0", AggregateOperator::mergeSum)
+        .put("MIN", AggregateOperator::mergeMin)
+        .put("$MIN", AggregateOperator::mergeMin)
+        .put("$MIN0", AggregateOperator::mergeMin)
+        .put("MAX", AggregateOperator::mergeMax)
+        .put("$MAX", AggregateOperator::mergeMax)
+        .put("$MAX0", AggregateOperator::mergeMax)
+        .put("COUNT", AggregateOperator::mergeCount)
+        .build();
+
     final int _inputRef;
     final Object _literal;
     final Map<Key, Object> _results = new HashMap<>();

@@ -186,19 +186,9 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     boolean bootstrap =
         config.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
 
-    // TODO: remove this check after we also refactor consuming segments assignment strategy
-    // See https://github.com/apache/pinot/issues/9047
-    SegmentAssignmentStrategy segmentAssignmentStrategy = null;
-    if (completedInstancePartitions != null) {
-      // Gets Segment assignment strategy for instance partitions
-      segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
-          .getSegmentAssignmentStrategy(_helixManager, _tableConfig, InstancePartitionsType.COMPLETED.toString(),
-              completedInstancePartitions);
-    }
-
     // Rebalance tiers first
     Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
-        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap, segmentAssignmentStrategy,
+        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap,
             InstancePartitionsType.COMPLETED);
 
     List<Map<String, Map<String, String>>> newTierAssignments = pair.getLeft();
@@ -218,8 +208,11 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     if (completedInstancePartitions != null) {
       // When COMPLETED instance partitions are provided, reassign COMPLETED segments in a balanced way (relocate
       // COMPLETED segments to offload them from CONSUMING instances to COMPLETED instances)
-      _logger
-          .info("Reassigning COMPLETED segments with COMPLETED instance partitions for table: {}", _tableNameWithType);
+      SegmentAssignmentStrategy segmentAssignmentStrategy =
+          SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(_helixManager, _tableConfig,
+              InstancePartitionsType.COMPLETED.toString(), completedInstancePartitions);
+      _logger.info("Reassigning COMPLETED segments with COMPLETED instance partitions for table: {}",
+          _tableNameWithType);
       newAssignment = reassignSegments(InstancePartitionsType.COMPLETED.toString(), completedSegmentAssignment,
           completedInstancePartitions, bootstrap, segmentAssignmentStrategy, InstancePartitionsType.COMPLETED);
     } else {
