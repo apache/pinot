@@ -27,6 +27,16 @@
     "queries": [
       {
         "psql": "7.2.1.1",
+        "description": "Basic From table",
+        "sql": "SELECT * FROM {tbl1}"
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "Basic From table with Alias",
+        "sql": "SELECT a.num, a.name FROM {tbl1} AS a"
+      },
+      {
+        "psql": "7.2.1.1",
         "description": "INNER JOIN",
         "sql": "SELECT * FROM {tbl1} INNER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
       },
@@ -115,6 +125,7 @@
           {"name": "doubleCol1", "type": "DOUBLE"}
         ],
         "inputs": [
+          ["bar", "charlie", 2, 2.0],
           ["foo", "bob", 3, 3.1416],
           ["alice", "alice", 4, 2.7183]
         ]
@@ -128,6 +139,10 @@
       {
         "description": "join with functional results",
         "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON MOD({tbl1}.intCol1, 2) = MOD({tbl2}.intCol1, 3)"
+      },
+      {
+        "description": "join with multiple columns and mixed types",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 AND {tbl1}.intCol1 = {tbl2}.intCol1 AND {tbl1}.intCol1 = {tbl2}.doubleCol1"
       },
       {
         "description": "join with mixed equality and inequality conditions",
@@ -203,4 +218,4 @@
       }
     ]
   }
-}
+},
