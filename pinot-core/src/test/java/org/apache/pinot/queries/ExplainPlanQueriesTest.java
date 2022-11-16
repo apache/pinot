@@ -269,6 +269,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     when(tableDataManagerConfig.getTableDataManagerType()).thenReturn("OFFLINE");
     when(tableDataManagerConfig.getTableName()).thenReturn(RAW_TABLE_NAME);
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
+    when(tableDataManagerConfig.getMetaDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getMaxParallelSegmentBuilds()).thenReturn(4);
     when(instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit()).thenReturn(-1L);

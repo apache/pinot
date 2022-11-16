@@ -93,6 +93,8 @@ public class TableDataManagerConfig {
     defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableNameWithType);
     defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY,
         instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_METADATA_DIRECTORY,
+        instanceDataManagerConfig.getInstanceMetadataDir() + "/" + tableNameWithType);
     defaultConfig.addProperty(TABLE_DATA_MANAGER_CONSUMER_DIRECTORY, instanceDataManagerConfig.getConsumerDir());
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     Preconditions.checkNotNull(tableType);

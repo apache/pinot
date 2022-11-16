@@ -117,6 +117,7 @@ public class DimensionTableDataManagerTest {
       config = mock(TableDataManagerConfig.class);
       when(config.getTableName()).thenReturn(TABLE_NAME);
       when(config.getDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+      when(config.getMetaDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     }
     tableDataManager.init(config, "dummyInstance", helixManager.getHelixPropertyStore(),
         new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), helixManager, null,

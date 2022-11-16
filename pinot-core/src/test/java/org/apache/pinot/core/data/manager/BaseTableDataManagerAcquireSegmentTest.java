@@ -123,6 +123,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
       config = mock(TableDataManagerConfig.class);
       when(config.getTableName()).thenReturn(TABLE_NAME);
       when(config.getDataDir()).thenReturn(_tmpDir.getAbsolutePath());
+      when(config.getMetaDataDir()).thenReturn(_tmpDir.getAbsolutePath());
       when(config.getAuthConfig()).thenReturn(new MapConfiguration(new HashMap<>()));
       when(config.getTableDeletedSegmentsCacheSize()).thenReturn(DELETED_SEGMENTS_CACHE_SIZE);
       when(config.getTableDeletedSegmentsCacheTtlMinutes()).thenReturn(DELETED_SEGMENTS_TTL_MINUTES);

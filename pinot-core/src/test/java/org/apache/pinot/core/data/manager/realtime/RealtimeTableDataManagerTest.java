@@ -203,6 +203,7 @@ public class RealtimeTableDataManagerTest {
     TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
     when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME_WITH_TYPE);
     when(tableDataManagerConfig.getDataDir()).thenReturn(TABLE_DATA_DIR.getAbsolutePath());
+    when(tableDataManagerConfig.getMetaDataDir()).thenReturn(TABLE_DATA_DIR.getAbsolutePath());
     return tableDataManagerConfig;
   }
 

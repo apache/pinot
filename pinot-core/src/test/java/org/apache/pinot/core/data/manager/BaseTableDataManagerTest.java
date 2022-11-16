@@ -664,6 +664,7 @@ public class BaseTableDataManagerTest {
     TableDataManagerConfig config = mock(TableDataManagerConfig.class);
     when(config.getTableName()).thenReturn(TABLE_NAME_WITH_TYPE);
     when(config.getDataDir()).thenReturn(TABLE_DATA_DIR.getAbsolutePath());
+//    when(config.getMetaDataDir()).thenReturn(TABLE_DATA_DIR.getAbsolutePath());
     when(config.getAuthConfig()).thenReturn(new MapConfiguration(Collections.emptyMap()));
 
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
