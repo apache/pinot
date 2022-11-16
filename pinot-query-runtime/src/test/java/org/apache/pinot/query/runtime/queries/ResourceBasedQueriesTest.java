@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -161,27 +162,19 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void testQueryTestCasesWithH2(String testCaseName, String sql, String expect)
       throws Exception {
     // query pinot
-    Optional<List<Object[]>> resultRows = runQuery(sql, expect);
-    if (!resultRows.isPresent()) {
-      // successfully caught error
-      return;
-    }
-
-    // query H2 for data
-    List<Object[]> expectedRows = queryH2(sql);
-    compareRowEquals(resultRows.get(), expectedRows);
+    runQuery(sql, expect).ifPresent(rows -> {
+      try {
+        compareRowEquals(rows, queryH2(sql));
+      } catch (Exception e) {
+        Assert.fail(e.getMessage());
+      }
+    });
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithOutput(String testCaseName, String sql, List<Object[]> expectedRows, String expect)
       throws Exception {
-    Optional<List<Object[]>> resultRows = runQuery(sql, expect);
-    if (!resultRows.isPresent()) {
-      // successfully caught error
-      return;
-    }
-
-    compareRowEquals(resultRows.get(), expectedRows);
+    runQuery(sql, expect).ifPresent(rows -> compareRowEquals(rows, expectedRows));
   }
 
   private Optional<List<Object[]>> runQuery(String sql, final String except) {
@@ -189,24 +182,22 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       // query pinot
       List<Object[]> resultRows = queryRunner(sql);
 
-      if (except != null) {
-        throw new AssertException("Expected error with message '" + except + "'. But instead rows were returned: "
+      Assert.assertNull(except,
+        "Expected error with message '" + except + "'. But instead rows were returned: "
             + resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")));
-      }
 
-      return Optional.ofNullable(resultRows);
-    } catch (AssertException e) {
-      throw e;
+      return Optional.of(resultRows);
     } catch (Exception e) {
       if (except == null) {
         throw e;
       } else {
         Pattern pattern = Pattern.compile(except);
-        if (!pattern.matcher(e.getMessage()).matches()) {
-          throw e;
-        }
+        Assert.assertTrue(pattern.matcher(e.getMessage()).matches(),
+            String.format("Caught exception %s, but it did not match the expected pattern %s.",
+                e.getMessage(), except));
       }
     }
+
     return Optional.empty();
   }
 
@@ -234,7 +225,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           for (List<Object> objs : orgRows) {
             expectedRows.add(objs.toArray());
           }
-          Object[] testEntry = new Object[]{testCaseName, sql, expectedRows, queryCase._expect};
+          Object[] testEntry = new Object[]{testCaseName, sql, expectedRows, queryCase._expectedException};
           providerContent.add(testEntry);
         }
       }
@@ -260,7 +251,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         }
         if (queryCase._outputs == null || queryCase._outputs.isEmpty()) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
-          Object[] testEntry = new Object[]{testCaseName, sql, queryCase._expect};
+          Object[] testEntry = new Object[]{testCaseName, sql, queryCase._expectedException};
           providerContent.add(testEntry);
         }
       }

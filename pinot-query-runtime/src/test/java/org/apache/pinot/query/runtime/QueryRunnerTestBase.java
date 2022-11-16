@@ -314,8 +314,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public String _description;
       @JsonProperty("outputs")
       public List<List<Object>> _outputs = Collections.emptyList();
-      @JsonProperty("expect")
-      public String _expect;
+      @JsonProperty("expectedException")
+      public String _expectedException;
     }
 
     public static class ColumnAndType {

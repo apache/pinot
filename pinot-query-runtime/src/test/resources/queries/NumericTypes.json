@@ -32,7 +32,7 @@
         "comment": "we don't properly support overflow behavior because we return doubles",
         "description": "overflow behavior",
         "sql": "SELECT int32 + 1, int32 - 1, int64 + 1, int64 -1 FROM {ints}",
-        "expect": "*out of range*"
+        "expectedException": "*out of range*"
       }
     ]
   },
