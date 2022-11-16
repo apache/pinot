@@ -483,7 +483,9 @@ public class ObjectSerDeUtils {
 
     @Override
     public HyperLogLog deserialize(ByteBuffer byteBuffer) {
-      return deserialize(byteBuffer.rewind().asIntBuffer());
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return deserialize(bytes);
     }
 
     private HyperLogLog deserialize(IntBuffer intBuf) {
