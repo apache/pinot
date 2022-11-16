@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.mchange.util.AssertException;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -162,8 +161,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (int i = 0; i < resultRows.size(); i++) {
       Object[] resultRow = resultRows.get(i);
       Object[] expectedRow = expectedRows.get(i);
-      Assert.assertTrue(resultRow.length == expectedRow.length, String.format("Unexpected row size mismatch. Expected: %s, Actual: %s",
-              Arrays.toString(expectedRow), Arrays.toString(resultRow)))
+      Assert.assertEquals(expectedRow.length, resultRow.length,
+          String.format("Unexpected row size mismatch. Expected: %s, Actual: %s", Arrays.toString(expectedRow),
+              Arrays.toString(resultRow)));
       for (int j = 0; j < resultRow.length; j++) {
         Assert.assertEquals(valueComp.compare(resultRow[j], expectedRow[j]), 0,
             "Not match at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow)
