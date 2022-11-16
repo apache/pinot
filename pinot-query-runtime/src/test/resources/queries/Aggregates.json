@@ -1,19 +1,57 @@
 {
-  "simple_aggregate": {
+  "general_aggregate": {
     "tables": {
       "tbl": {
         "schema": [
-          {"name": "int", "type": "INT"},
-          {"name": "double", "type": "DOUBLE"}
+          {
+            "name": "int_col",
+            "type": "INT"
+          },
+          {
+            "name": "double_col",
+            "type": "DOUBLE"
+          },
+          {
+            "name": "string_col",
+            "type": "STRING"
+          }
         ],
         "inputs": [
-          [3, 300],
-          [4, 400],
-          [10, 100],
-          [100, 1],
-          [101, 1.01],
-          [150, 1.5],
-          [175, 1.75]
+          [
+            2,
+            300,
+            "a"
+          ],
+          [
+            2,
+            400,
+            "a"
+          ],
+          [
+            3,
+            100,
+            "b"
+          ],
+          [
+            100,
+            1,
+            "b"
+          ],
+          [
+            101,
+            1.01,
+            "c"
+          ],
+          [
+            150,
+            1.5,
+            "c"
+          ],
+          [
+            175,
+            1.75,
+            "c"
+          ]
         ]
       }
     },
@@ -21,8 +59,237 @@
       {
         "ignored": true,
         "psql": "4.2.7",
-        "description": "average",
-        "sql": "SELECT avg(int) FROM {tbl}"
+        "ignored": true,
+        "comments": "result error:average doesn't work because we round up but h2 round down for integer",
+        "description": "average int",
+        "sql": "SELECT avg(int_col) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "average double",
+        "sql": "SELECT avg(double_col) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "average double with filter",
+        "sql": "SELECT avg(double_col) FROM {tbl} WHERE double_col >= 100"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "sum double",
+        "sql": "SELECT sum(double_col) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "sum int",
+        "sql": "SELECT sum(int_col) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "max double",
+        "sql": "SELECT max(double_col) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "max int",
+        "sql": "SELECT max(int_col) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "count int",
+        "sql": "SELECT count(int_col) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "count double",
+        "sql": "SELECT count(double_col) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "count, sum group by order by",
+        "sql": "select string_col, count(int_col), sum(double_col) from {tbl} group by string_col order by string_col;"
+      },
+      {
+        "psql": "4.2.7",
+        "ignored": true,
+        "comments": "parse error",
+        "description": "aggregate having",
+        "sql": "select string_col, count(int_col) from {tbl} a group by string_col order by string_col having exists(select 1 from {tbl} b where count(int_col) = b.int_col);"
+      },
+      {
+        "psql": "4.2.7",
+        "ignored": true,
+        "comments": "plan error",
+        "description": "outer aggregate",
+        "sql": "select  (select max((select i.int_col from {tbl} i where i.int_col = o.int_col))) from {tbl} o;"
+      }
+    ]
+  },
+  "min_max": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {
+            "name": "intCol",
+            "type": "INT"
+          }
+        ],
+        "inputs": [
+          [
+            11
+          ],
+          [
+            12
+          ]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "4.2.7",
+        "description": "min, max",
+        "sql": "SELECT min(intCol), max(intCol) FROM {tbl}"
+      }
+    ]
+  },
+  "nested_aggregate": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {
+            "name": "intCol",
+            "type": "INT"
+          }
+        ],
+        "inputs": [
+          [
+            11
+          ],
+          [
+            12
+          ],
+          [
+            13
+          ],
+          [
+            14
+          ]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "4.2.7",
+        "ignored": true,
+        "description": "nested",
+        "comments": "this should throw an error",
+        "sql": "SELECT min(max(intCol)) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "ignored": true,
+        "description": "nested",
+        "comments": "this should throw an error",
+        "sql": "SELECT (SELECT max(min({tbl})) FROM {tbl}) from {tbl};"
+      }
+    ]
+  },
+  "aggregate_filter": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {
+            "name": "int_col",
+            "type": "INT"
+          },
+          {
+            "name": "double_col",
+            "type": "DOUBLE"
+          },
+          {
+            "name": "string_col",
+            "type": "STRING"
+          }
+        ],
+        "inputs": [
+          [
+            2,
+            300,
+            "a"
+          ],
+          [
+            2,
+            400,
+            "a"
+          ],
+          [
+            3,
+            100,
+            "b"
+          ],
+          [
+            0.001,
+            1,
+            "b"
+          ],
+          [
+            101,
+            1.01,
+            "c"
+          ],
+          [
+            150,
+            1.5,
+            "c"
+          ],
+          [
+            175,
+            1.75,
+            "c"
+          ],
+          [
+            -10000,
+            1.75,
+            "c"
+          ],
+          [
+            -2,
+            0.5,
+            "c"
+          ]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "4.2.7",
+        "description": "filter",
+        "sql": "SELECT min(int_col) FROM {tbl} WHERE int_col < 100"
+      },
+      {
+        "psql": "4.2.7",
+        "ignored": true,
+        "description": "filter",
+        "comments": "rounding error",
+        "sql": "SELECT sum(1 /int_col) FROM {tbl} WHERE int_col > 0"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "filter",
+        "comments": "rounding error",
+        "sql": "SELECT sum(1 /double_col) FROM {tbl} WHERE double_col < 1"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "filter",
+        "sql": "SELECT sum(double_col) FROM {tbl} WHERE string_col > 'a'"
+      },
+      {
+        "psql": "4.2.7",
+        "ignored": true,
+        "comments": "parsing error",
+        "description": "filter",
+        "sql": "SELECT min(double_col ORDER BY int_col) FROM {tbl}"
       }
     ]
   }
