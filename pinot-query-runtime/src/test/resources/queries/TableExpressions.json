@@ -16,24 +16,12 @@
       }
     },
     "queries": [
-      {
-        "sql": "SELECT * FROM {tbl} WHERE intCol > 5"
-      },
-      {
-        "sql": "SELECT * FROM {tbl} WHERE strCol IN ('foo', 'bar')"
-      },
-      {
-        "sql": "SELECT * FROM {tbl} WHERE intCol IN (196883, 42)"
-      },
-      {
-        "sql": "SELECT * FROM {tbl} WHERE strCol IN (SELECT strCol FROM {tbl} WHERE intCol > 100)"
-      },
-      {
-        "sql": "SELECT * FROM {tbl} WHERE intCol < (SELECT SUM(intCol) FROM {tbl} AS b WHERE strCol BETWEEN 'bar' AND 'foo')"
-      },
-      {
-        "sql": "SELECT * FROM {tbl} WHERE intCol BETWEEN 0 AND 100 AND strCol BETWEEN 'bar' AND 'foo'"
-      },
+      { "sql": "SELECT * FROM {tbl} WHERE intCol > 5" },
+      { "sql": "SELECT * FROM {tbl} WHERE strCol IN ('foo', 'bar')" },
+      { "sql": "SELECT * FROM {tbl} WHERE intCol IN (196883, 42)" },
+      { "sql": "SELECT * FROM {tbl} WHERE strCol IN (SELECT strCol FROM {tbl} WHERE intCol > 100)" },
+      { "sql": "SELECT * FROM {tbl} WHERE intCol < (SELECT SUM(intCol) FROM {tbl} AS b WHERE strCol BETWEEN 'bar' AND 'foo')" },
+      { "sql": "SELECT * FROM {tbl} WHERE intCol BETWEEN 0 AND 100 AND strCol BETWEEN 'bar' AND 'foo'" },
       {
         "ignored": true,
         "comments": "Relation Decorrelator not supported",
@@ -91,21 +79,15 @@
       }
     },
     "queries": [
-      {
-        "sql": "SELECT strCol FROM {tbl1} GROUP BY strCol"
-      },
-      {
-        "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol"
-      },
-      {
-        "sql": "SELECT strCol, b.strCol2, (sum(a.intCol) * b.intCol) AS colAlias FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol = b.strCol1 GROUP BY strCol, b.strCol2, b.intCol"
-      },
-      {
-        "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol HAVING SUM(intCol) > 3"
-      },
-      {
-        "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol HAVING AVG(intCol) > 1 AND MIN(intCol) < 10"
-      }
+      { "sql": "SELECT strCol FROM {tbl1} GROUP BY strCol" },
+      { "sql": "SELECT strCol FROM {tbl1} GROUP BY strCol, intCol" },
+      { "sql": "SELECT strCol, intCol FROM {tbl1} GROUP BY strCol, intCol" },
+      { "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol" },
+      { "sql": "SELECT strCol, b.strCol2, (sum(a.intCol) * b.intCol) AS colAlias FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol = b.strCol1 GROUP BY strCol, b.strCol2, b.intCol" },
+      { "sql": "SELECT MOD(b.intCol, 2), sum(a.intCol) AS colAlias FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol = b.strCol1 GROUP BY MOD(b.intCol, 2)" },
+      { "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol HAVING SUM(intCol) > 3" },
+      { "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol HAVING AVG(intCol) > 1 AND MIN(intCol) < 10" },
+      { "sql": "SELECT strCol, b.strCol2, (sum(a.intCol) * b.intCol) AS colAlias FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol = b.strCol1 GROUP BY strCol, b.strCol2, b.intCol HAVING avg(a.intCol) < 100" }
     ]
   }
 }
