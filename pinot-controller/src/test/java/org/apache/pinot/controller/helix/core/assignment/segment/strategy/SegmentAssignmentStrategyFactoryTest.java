@@ -97,9 +97,9 @@ public class SegmentAssignmentStrategyFactoryTest {
   }
 
   @Test
-  public void testBalancedNumSegmentAssignmentStrategyforRealtimeTables() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).build();
-
+  public void testBalancedNumSegmentAssignmentStrategyForRealtimeTables() {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setLLC(true).build();
     InstancePartitions instancePartitions = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
     instancePartitions.setInstances(0, 0, INSTANCES);
 
@@ -107,6 +107,7 @@ public class SegmentAssignmentStrategyFactoryTest {
         .getSegmentAssignmentStrategy(null, tableConfig, InstancePartitionsType.COMPLETED.toString(),
             instancePartitions);
     Assert.assertNotNull(segmentAssignmentStrategy);
+
     Assert.assertTrue(segmentAssignmentStrategy instanceof BalancedNumSegmentAssignmentStrategy);
   }
 
