@@ -314,7 +314,7 @@ public class ForwardIndexHandlerTest {
         tempBigDecimalRows[i] = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(1001));
 
         // Avoid creating empty arrays.
-        int numMVElements = random.nextInt(maxNumberOfMVEntries) + 1;
+        int numMVElements = random.nextInt(maxNumberOfMVEntries - 1) + 1;
         for (int j = 0; j < numMVElements; j++) {
           tempMVIntRows[i][j] = 1001;
           tempMVLongRows[i][j] = 1001L;
@@ -330,7 +330,7 @@ public class ForwardIndexHandlerTest {
         tempBigDecimalRows[i] = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i));
 
         // Avoid creating empty arrays.
-        int numMVElements = random.nextInt(maxNumberOfMVEntries) + 1;
+        int numMVElements = random.nextInt(maxNumberOfMVEntries - 1) + 1;
         for (int j = 0; j < numMVElements; j++) {
           tempMVIntRows[i][j] = j;
           tempMVLongRows[i][j] = (long) j;
