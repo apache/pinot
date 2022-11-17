@@ -33,7 +33,6 @@ import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
-import org.apache.calcite.rex.RexLiteral;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.stage.AggregateNode;
@@ -88,8 +87,8 @@ public final class RelToStageConverter {
   }
 
   private static StageNode convertLogicalSort(LogicalSort node, int currentStageId) {
-    int fetch = node.fetch == null ? 0 : ((RexLiteral) node.fetch).getValueAs(Integer.class);
-    int offset = node.offset == null ? 0 : ((RexLiteral) node.offset).getValueAs(Integer.class);
+    int fetch = node.fetch == null ? 0 : IntExprRexVisitor.INSTANCE.visit(node.fetch);
+    int offset = node.offset == null ? 0 : IntExprRexVisitor.INSTANCE.visit(node.offset);
     return new SortNode(currentStageId, node.getCollation().getFieldCollations(), fetch, offset,
         toDataSchema(node.getRowType()));
   }

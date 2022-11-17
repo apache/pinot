@@ -19,13 +19,12 @@
 package org.apache.pinot.core.query.selection;
 
 import java.util.Collection;
-import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -129,36 +128,22 @@ public class SelectionOperatorService {
    * <p>Should be called after method "reduceWithOrdering()".
    */
   public ResultTable renderResultTableWithOrdering() {
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
-    int numColumns = columnIndices.length;
-
-    // Construct the result data schema
-    String[] columnNames = _dataSchema.getColumnNames();
-    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
-    String[] resultColumnNames = new String[numColumns];
-    ColumnDataType[] resultColumnDataTypes = new ColumnDataType[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      int columnIndex = columnIndices[i];
-      resultColumnNames[i] = columnNames[columnIndex];
-      resultColumnDataTypes[i] = columnDataTypes[columnIndex];
-    }
-    DataSchema resultDataSchema = new DataSchema(resultColumnNames, resultColumnDataTypes);
-
-    // Extract the result rows
-    LinkedList<Object[]> rowsInSelectionResults = new LinkedList<>();
-    while (_rows.size() > _offset) {
-      Object[] row = _rows.poll();
-      assert row != null;
-      Object[] extractedRow = new Object[numColumns];
-      for (int i = 0; i < numColumns; i++) {
-        Object value = row[columnIndices[i]];
-        if (value != null) {
-          extractedRow[i] = resultColumnDataTypes[i].convertAndFormat(value);
-        }
+    Iterator<Object[]> rows = new Iterator<Object[]>() {
+      @Override
+      public boolean hasNext() {
+        return _rows.size() > _offset;
       }
-      rowsInSelectionResults.addFirst(extractedRow);
-    }
 
-    return new ResultTable(resultDataSchema, rowsInSelectionResults);
+      @Override
+      public Object[] next() {
+        return _rows.poll();
+      }
+    };
+
+    return SelectionOperatorUtils.arrangeColumnsToMatchProjection(
+        _dataSchema,
+        rows,
+        _selectionColumns,
+        ResultTable::new);
   }
 }

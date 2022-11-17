@@ -28,10 +28,12 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.BiFunction;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -646,5 +648,43 @@ public class SelectionOperatorUtils {
       queue.poll();
       queue.offer(value);
     }
+  }
+
+  public static <T> T arrangeColumnsToMatchProjection(DataSchema dataSchema, Iterator<Object[]> rows,
+      List<String> selections, BiFunction<DataSchema, List<Object[]>, T> factory) {
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selections, dataSchema);
+    int numColumns = columnIndices.length;
+
+    // Construct the result data schema
+    String[] columnNames = dataSchema.getColumnNames();
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    String[] resultColumnNames = new String[numColumns];
+    ColumnDataType[] resultColumnDataTypes = new ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      int columnIndex = columnIndices[i];
+      resultColumnNames[i] = columnNames[columnIndex];
+      resultColumnDataTypes[i] = columnDataTypes[columnIndex];
+    }
+    DataSchema resultDataSchema = new DataSchema(resultColumnNames, resultColumnDataTypes);
+
+    // Extract the result rows
+    LinkedList<Object[]> rowsInSelectionResults = new LinkedList<>();
+    while (rows.hasNext()) {
+      Object[] row = rows.next();
+      assert row != null;
+      Object[] extractedRow = new Object[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        Object value = row[columnIndices[i]];
+        if (value != null) {
+          extractedRow[i] = resultColumnDataTypes[i].convertAndFormat(value);
+        }
+      }
+      // note: the iterator returns elements in reverse order so that we can respect
+      // the OFFSET parameter without iterating unnecessarily over the offset skipped
+      // rows
+      rowsInSelectionResults.addFirst(extractedRow);
+    }
+
+    return factory.apply(resultDataSchema, rowsInSelectionResults);
   }
 }

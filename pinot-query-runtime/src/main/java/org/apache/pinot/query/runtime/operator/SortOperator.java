@@ -106,7 +106,7 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
       LinkedList<Object[]> rows = new LinkedList<>();
       while (_rows.size() > _offset) {
         Object[] row = _rows.poll();
-          rows.addFirst(row);
+        rows.addFirst(row);
       }
       _isSortedBlockConstructed = true;
       if (rows.size() == 0) {

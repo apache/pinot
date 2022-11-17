@@ -61,6 +61,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final List<String> QUERY_TEST_RESOURCE_FILES = ImmutableList.of(
       "BasicQuery.json",
       "FromExpressions.json",
+      "OrderBy.json",
       "SpecialSyntax.json",
       "LexicalStructure.json",
       "SelectExpressions.json",

@@ -116,4 +116,21 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator<Selecti
     // value now, so it can mutate it.
     return resultsBlock.convertToPriorityQueueBased();
   }
+
+  @Override
+  protected BaseResultsBlock processFinalBlock(BaseResultsBlock finalBlock) {
+    DataSchema dataSchema = finalBlock.getDataSchema(_queryContext);
+    Collection<Object[]> rows = finalBlock.getRows(_queryContext);
+
+    // null check covers error conditions
+    if (!_queryContext.isServerReturnFinalResult() || dataSchema == null || rows == null) {
+      return finalBlock;
+    }
+
+    return SelectionOperatorUtils.arrangeColumnsToMatchProjection(dataSchema,
+        rows.iterator(),
+        SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema),
+        SelectionResultsBlock::new
+    );
+  }
 }
