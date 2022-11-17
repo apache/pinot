@@ -29,7 +29,7 @@
       },
       {
         "psql": "8.4.2",
-        "ignore": true,
+        "ignored": true,
         "comments": [
           "in order to specify bytea constants using escape syntax, we need type casting",
           "which we don't support. also, calcite doesn't support the escape syntax for bytes"
