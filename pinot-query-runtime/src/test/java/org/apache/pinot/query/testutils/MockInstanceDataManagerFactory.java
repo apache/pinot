@@ -108,8 +108,7 @@ public class MockInstanceDataManagerFactory {
       tableDataManagers.put(e.getKey(), tableDataManager);
     }
     for (Map.Entry<String, TableDataManager> e : tableDataManagers.entrySet()) {
-      when(instanceDataManager.getTableDataManager(matches(String.format("%s.*", e.getKey())))).thenReturn(
-          e.getValue());
+      when(instanceDataManager.getTableDataManager(e.getKey())).thenAnswer(inv -> e.getValue());
     }
     return instanceDataManager;
   }
