@@ -24,7 +24,6 @@ import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +47,6 @@ import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
-import org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush.SegmentGenerationAndPushTaskUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
@@ -258,7 +256,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
                 segmentZKMetadataCustomMapModifier.toJsonString());
 
         URI outputSegmentTarURI = moveSegmentToOutputPinotFS(pinotTaskConfig.getConfigs(), convertedTarredSegmentFile);
-        LOGGER.info("Moved generated segment from [{}] to location: [{}]", convertedTarredSegmentFile, outputSegmentTarURI);
+        LOGGER.info("Moved generated segment from [{}] to location: [{}]",
+            convertedTarredSegmentFile, outputSegmentTarURI);
 
         List<Header> httpHeaders = new ArrayList<>();
         httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
@@ -317,7 +316,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
         case TAR:
           try (PinotFS pinotFS = TaskUtils.getLocalPinotFs()) {
-            MinionPushUtils.pushSegments(spec, pinotFS, Arrays.asList(outputSegmentTarURI.toString()), headers, parameters);
+            MinionPushUtils.pushSegments(
+                spec, pinotFS, Arrays.asList(outputSegmentTarURI.toString()), headers, parameters);
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
           }

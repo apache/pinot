@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -593,8 +592,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
 
         Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
         if (outputDirURI != null) {
-          URI outputSegmentDirURI = SegmentGenerationUtils.getRelativeOutputPath(outputDirURI, downloadURI, outputDirURI);
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
+          URI outputSegmentDirURI = SegmentGenerationUtils.getRelativeOutputPath(
+              outputDirURI, downloadURI, outputDirURI);
+          singleFileGenerationTaskConfig.put(
+              BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
         }
         if ((outputDirURI == null) || (pushMode == null)) {
           singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
@@ -608,7 +609,6 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     } catch (Exception e) {
       return batchConfigMap;
     }
-
   }
 
   private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, long maxEndTimeMsOfCurrentLevel,
