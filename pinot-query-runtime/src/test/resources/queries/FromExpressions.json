@@ -237,7 +237,7 @@
         "sql": "SELECT * FROM {tbl_empty} JOIN {tbl1} ON {tbl1}.intCol1 = {tbl_empty}.intCol1"
       },
       {
-        "description": "join with an empty right table using LEFT OUTER",
+        "description": "join with an empty left table using LEFT OUTER",
         "sql": "SELECT * FROM {tbl_empty} LEFT JOIN {tbl1} ON {tbl1}.intCol1 = {tbl_empty}.intCol1"
       }
     ]
