@@ -21,7 +21,9 @@ package org.apache.pinot.segment.local.segment.store;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -42,7 +45,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
   private final Map<IndexKey, PinotDataBuffer> _indexBuffers = new HashMap<>();
-
+  // Different from the other column-index entries, starTree index is multi-column index and has its own index map,
+  // thus manage it separately.
+  private PinotDataBuffer _starTreeIndexDataBuffer;
   /**
    * @param segmentDirectory File pointing to segment directory
    * @param segmentMetadata segment metadata. Metadata must be fully initialized
@@ -76,6 +81,29 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
+  public PinotDataBuffer getStarTreeIndex()
+      throws IOException {
+    if (_starTreeIndexDataBuffer != null) {
+      return _starTreeIndexDataBuffer;
+    }
+    File indexFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
+    if (_readMode == ReadMode.heap) {
+      _starTreeIndexDataBuffer =
+          PinotDataBuffer.loadFile(indexFile, 0, indexFile.length(), ByteOrder.BIG_ENDIAN, "Star-tree V2 data buffer");
+    } else {
+      _starTreeIndexDataBuffer = PinotDataBuffer.mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.BIG_ENDIAN,
+          "Star-tree V2 data buffer");
+    }
+    return _starTreeIndexDataBuffer;
+  }
+
+  @Override
+  public InputStream getStarTreeIndexMap()
+      throws IOException {
+    return new FileInputStream(new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
+  }
+
+  @Override
   public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
       throws IOException {
     IndexKey key = new IndexKey(column, type);
@@ -93,6 +121,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       throws IOException {
     for (PinotDataBuffer dataBuffer : _indexBuffers.values()) {
       dataBuffer.close();
+    }
+    if (_starTreeIndexDataBuffer != null) {
+      _starTreeIndexDataBuffer.close();
     }
   }
 

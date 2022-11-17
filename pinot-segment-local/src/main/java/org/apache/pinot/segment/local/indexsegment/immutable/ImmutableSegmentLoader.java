@@ -197,13 +197,10 @@ public class ImmutableSegmentLoader {
       }
     }
 
-    // FIXME: star tree only works with local SegmentDirectory
     // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
-    if (segmentMetadata.getStarTreeV2MetadataList() != null && localIndexDir != null) {
-      starTreeIndexContainer =
-          new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(localIndexDir), segmentMetadata,
-              indexContainerMap, indexLoadingConfig.getReadMode());
+    if (segmentMetadata.getStarTreeV2MetadataList() != null) {
+      starTreeIndexContainer = new StarTreeIndexContainer(segmentReader, segmentMetadata, indexContainerMap);
     }
 
     ImmutableSegmentImpl segment =

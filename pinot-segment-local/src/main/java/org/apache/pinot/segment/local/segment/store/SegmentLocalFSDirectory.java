@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -357,6 +358,18 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     @Override
     public String toString() {
       return _segmentDirectory.toString();
+    }
+
+    @Override
+    public PinotDataBuffer getStarTreeIndex()
+        throws IOException {
+      return _columnIndexDirectory.getStarTreeIndex();
+    }
+
+    @Override
+    public InputStream getStarTreeIndexMap()
+        throws IOException {
+      return _columnIndexDirectory.getStarTreeIndexMap();
     }
   }
 

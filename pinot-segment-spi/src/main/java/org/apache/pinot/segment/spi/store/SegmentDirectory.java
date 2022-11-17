@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.store;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Set;
@@ -185,6 +186,19 @@ public abstract class SegmentDirectory implements Closeable {
     }
 
     public abstract String toString();
+
+    public PinotDataBuffer getStarTreeIndex()
+        throws IOException {
+      throw new UnsupportedOperationException();
+    }
+
+    /**
+     * The caller should close the input stream.
+     */
+    public InputStream getStarTreeIndexMap()
+        throws IOException {
+      throw new UnsupportedOperationException();
+    }
   }
 
   /**
