@@ -21,8 +21,10 @@ package org.apache.pinot.plugin.minion.tasks;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,8 +48,17 @@ import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
+import org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush.SegmentGenerationAndPushTaskUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +76,10 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseMultipleSegmentsConversionExecutor.class);
   private static final String CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID = "lineageEntryId";
+
+  private static final int DEFUALT_PUSH_ATTEMPTS = 5;
+  private static final int DEFAULT_PUSH_PARALLELISM = 1;
+  private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
 
   protected MinionConf _minionConf;
 
@@ -242,6 +257,11 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
                 segmentZKMetadataCustomMapModifier.toJsonString());
 
+        URI outputSegmentTarURI = moveSegmentToOutputPinotFS(pinotTaskConfig.getConfigs(), convertedTarredSegmentFile);
+        LOGGER.info("Moved generated segment from [{}] to location: [{}]", convertedTarredSegmentFile, outputSegmentTarURI);
+
+
+        //TODO: Pass on these headers to push segment call
         List<Header> httpHeaders = new ArrayList<>();
         httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
         httpHeaders.addAll(AuthProviderUtils.toRequestHeaders(authProvider));
@@ -253,9 +273,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             TableNameBuilder.extractRawTableName(tableNameWithType));
         List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
-        SegmentConversionUtils
-            .uploadSegment(configs, httpHeaders, parameters, tableNameWithType, resultSegmentName, uploadURL,
-                convertedTarredSegmentFile);
+        pushSegment(tableNameWithType, pinotTaskConfig.getConfigs(), outputSegmentTarURI, httpHeaders, parameters);
+//        SegmentConversionUtils
+//            .uploadSegment(configs, httpHeaders, parameters, tableNameWithType, resultSegmentName, uploadURL,
+//                convertedTarredSegmentFile);
         if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
         }
@@ -273,6 +294,97 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       return segmentConversionResults;
     } finally {
       FileUtils.deleteQuietly(tempDataDir);
+    }
+  }
+
+  private void pushSegment(String tableName, Map<String, String> taskConfigs, URI outputSegmentTarURI,
+      List<Header> headers, List<NameValuePair> parameters) throws Exception {
+    String pushMode = taskConfigs.get(BatchConfigProperties.PUSH_MODE);
+    LOGGER.info("Trying to push Pinot segment with push mode {} from {}", pushMode, outputSegmentTarURI);
+
+    PushJobSpec pushJobSpec = new PushJobSpec();
+    pushJobSpec.setPushAttempts(DEFUALT_PUSH_ATTEMPTS);
+    pushJobSpec.setPushParallelism(DEFAULT_PUSH_PARALLELISM);
+    pushJobSpec.setPushRetryIntervalMillis(DEFAULT_PUSH_RETRY_INTERVAL_MILLIS);
+    pushJobSpec.setSegmentUriPrefix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_PREFIX));
+    pushJobSpec.setSegmentUriSuffix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_SUFFIX));
+
+    SegmentGenerationJobSpec spec = generatePushJobSpec(tableName, taskConfigs, pushJobSpec);
+
+    URI outputSegmentDirURI = null;
+    if (taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
+      outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
+    }
+    try (PinotFS outputFileFS = TaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
+      switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
+        case TAR:
+          try (PinotFS pinotFS = TaskUtils.getLocalPinotFs()) {
+            MinionPushUtils.pushSegments(spec, pinotFS, Arrays.asList(outputSegmentTarURI.toString()), headers, parameters);
+          } catch (RetriableOperationException | AttemptsExceededException e) {
+            throw new RuntimeException(e);
+          }
+          break;
+        case URI:
+          try {
+            List<String> segmentUris = new ArrayList<>();
+            URI updatedURI = MinionPushUtils.generateSegmentTarURI(outputSegmentDirURI, outputSegmentTarURI,
+                pushJobSpec.getSegmentUriPrefix(), pushJobSpec.getSegmentUriSuffix());
+            segmentUris.add(updatedURI.toString());
+            MinionPushUtils.sendSegmentUris(spec, segmentUris, headers, parameters);
+          } catch (RetriableOperationException | AttemptsExceededException e) {
+            throw new RuntimeException(e);
+          }
+          break;
+        case METADATA:
+          try {
+            Map<String, String> segmentUriToTarPathMap =
+                MinionPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
+                    new String[]{outputSegmentTarURI.toString()});
+            MinionPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, headers, parameters);
+          } catch (RetriableOperationException | AttemptsExceededException e) {
+            throw new RuntimeException(e);
+          }
+          break;
+        default:
+          throw new UnsupportedOperationException("Unrecognized push mode - " + pushMode);
+      }
+    }
+  }
+
+  private SegmentGenerationJobSpec generatePushJobSpec(String tableName, Map<String, String> taskConfigs,
+      PushJobSpec pushJobSpec) {
+
+    TableSpec tableSpec = new TableSpec();
+    tableSpec.setTableName(tableName);
+
+    PinotClusterSpec pinotClusterSpec = new PinotClusterSpec();
+    pinotClusterSpec.setControllerURI(taskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI));
+    PinotClusterSpec[] pinotClusterSpecs = new PinotClusterSpec[]{pinotClusterSpec};
+
+    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
+    spec.setPushJobSpec(pushJobSpec);
+    spec.setTableSpec(tableSpec);
+    spec.setPinotClusterSpecs(pinotClusterSpecs);
+    spec.setAuthToken(taskConfigs.get(BatchConfigProperties.AUTH_TOKEN));
+
+    return spec;
+  }
+
+  private URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile)
+      throws Exception {
+    if (!taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
+      return localSegmentTarFile.toURI();
+    }
+    URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
+    try (PinotFS outputFileFS = TaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
+      URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
+      if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
+          outputSegmentDirURI)) {
+        LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentDirURI));
+      } else {
+        outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
+      }
+      return outputSegmentTarURI;
     }
   }
 
