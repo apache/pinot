@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -38,6 +40,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -51,6 +54,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -105,6 +109,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
   private static final int DEFAULT_NUM_PARALLEL_BUCKETS = 1;
   private static final String REFRESH = "REFRESH";
+  private static final BatchConfigProperties.SegmentPushType DEFAULT_SEGMENT_PUSH_TYPE =
+      BatchConfigProperties.SegmentPushType.TAR;
 
   // This is the metric that keeps track of the task delay in the number of time buckets. For example, if we see this
   // number to be 7 and merge task is configured with "bucketTimePeriod = 1d", this means that we have 7 days of
@@ -540,12 +546,12 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
 
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
     for (int i = 0; i < segmentNamesList.size(); i++) {
-      Map<String, String> configs = new HashMap<>();
+      String downloadURL = StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR);
+      Map<String, String> configs = getPushTaskConfig(mergeConfigs, downloadURL);
       configs.put(MinionConstants.TABLE_NAME_KEY, offlineTableName);
       configs.put(MinionConstants.SEGMENT_NAME_KEY,
           StringUtils.join(segmentNamesList.get(i), MinionConstants.SEGMENT_NAME_SEPARATOR));
-      configs.put(MinionConstants.DOWNLOAD_URL_KEY,
-          StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR));
+      configs.put(MinionConstants.DOWNLOAD_URL_KEY, downloadURL);
       configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
       configs.put(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY, "true");
 
@@ -569,6 +575,35 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     }
 
     return pinotTaskConfigs;
+  }
+
+  private Map<String, String> getPushTaskConfig(Map<String, String> batchConfigMap, String downloadUrl) {
+
+    try {
+      URI downloadURI = URI.create(downloadUrl);
+      URI outputDirURI = null;
+      if (!downloadURI.getScheme().contentEquals("http")) {
+        String outputDir = downloadUrl.substring(0, downloadUrl.lastIndexOf("/"));
+        outputDirURI = URI.create(outputDir);
+      }
+      String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
+
+      Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
+      if (outputDirURI != null) {
+        URI outputSegmentDirURI =
+            SegmentGenerationUtils.getRelativeOutputPath(outputDirURI, downloadURI, outputDirURI);
+        singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
+      }
+      if ((outputDirURI == null) || (pushMode == null)) {
+        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
+      } else {
+        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
+      }
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _clusterInfoAccessor.getVipUrl());
+      return singleFileGenerationTaskConfig;
+    } catch (Exception e) {
+      return batchConfigMap;
+    }
   }
 
   private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, long maxEndTimeMsOfCurrentLevel,

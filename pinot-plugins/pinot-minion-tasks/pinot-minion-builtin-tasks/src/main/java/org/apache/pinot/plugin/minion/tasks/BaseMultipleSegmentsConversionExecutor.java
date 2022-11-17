@@ -260,8 +260,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         URI outputSegmentTarURI = moveSegmentToOutputPinotFS(pinotTaskConfig.getConfigs(), convertedTarredSegmentFile);
         LOGGER.info("Moved generated segment from [{}] to location: [{}]", convertedTarredSegmentFile, outputSegmentTarURI);
 
-
-        //TODO: Pass on these headers to push segment call
         List<Header> httpHeaders = new ArrayList<>();
         httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
         httpHeaders.addAll(AuthProviderUtils.toRequestHeaders(authProvider));
