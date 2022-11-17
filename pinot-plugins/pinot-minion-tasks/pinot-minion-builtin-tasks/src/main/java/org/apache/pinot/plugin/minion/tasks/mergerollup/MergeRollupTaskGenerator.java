@@ -561,6 +561,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         }
       }
 
+      configs.put(BatchConfigProperties.OVERWRITE_OUTPUT, taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT));
       configs.put(MergeRollupTask.MERGE_TYPE_KEY, mergeConfigs.get(MergeTask.MERGE_TYPE_KEY));
       configs.put(MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
       configs.put(MergeTask.PARTITION_BUCKET_TIME_PERIOD_KEY, mergeConfigs.get(MergeTask.BUCKET_TIME_PERIOD_KEY));

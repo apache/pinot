@@ -50,6 +50,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -160,6 +161,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("100days.maxNumRecordsPerTask", "15000");
     tableTaskConfigs.put("ActualElapsedTime.aggregationType", "min");
     tableTaskConfigs.put("WeatherDelay.aggregationType", "sum");
+    tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
     return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
@@ -169,6 +171,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("150days.bufferTimePeriod", "1d");
     tableTaskConfigs.put("150days.bucketTimePeriod", "150d");
     tableTaskConfigs.put("150days.roundBucketTimePeriod", "7d");
+    tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
     return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
@@ -185,6 +188,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("90days.bucketTimePeriod", "90d");
     tableTaskConfigs.put("90days.maxNumRecordsPerSegment", "100000");
     tableTaskConfigs.put("90days.maxNumRecordsPerTask", "100000");
+    tableTaskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
     return new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
   }
 
