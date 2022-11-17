@@ -209,12 +209,36 @@
           ["foo", 1, "foo"],
           ["bar", 2, "foo"]
         ]
+      },
+      "tbl_empty" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "strCol2", "type": "STRING"}
+        ],
+        "inputs": [ ]
       }
     },
     "queries": [
       {
         "description": "join 3 tables, mixed join conditions",
         "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.intCol1 > {tbl2}.doubleCol1 JOIN {tbl3} ON {tbl1}.strCol1 = {tbl3}.strCol2"
+      },
+      {
+        "description": "join with an empty right table",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl_empty} ON {tbl1}.intCol1 = {tbl_empty}.intCol1"
+      },
+      {
+        "description": "join with an empty right table using LEFT OUTER",
+        "sql": "SELECT * FROM {tbl1} LEFT JOIN {tbl_empty} ON {tbl1}.intCol1 = {tbl_empty}.intCol1"
+      },
+      {
+        "description": "join with an empty left table",
+        "sql": "SELECT * FROM {tbl_empty} JOIN {tbl1} ON {tbl1}.intCol1 = {tbl_empty}.intCol1"
+      },
+      {
+        "description": "join with an empty right table using LEFT OUTER",
+        "sql": "SELECT * FROM {tbl_empty} LEFT JOIN {tbl1} ON {tbl1}.intCol1 = {tbl_empty}.intCol1"
       }
     ]
   }
