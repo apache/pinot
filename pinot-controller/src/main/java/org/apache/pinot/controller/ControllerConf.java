@@ -224,7 +224,7 @@ public class ControllerConf extends PinotConfiguration {
     private static final String RT_CONSUMER_MONITOR_INITIAL_DELAY_IN_SECONDS =
         "controller.realtimeConsumerMonitor.initialDelayInSeconds";
 
-    private static final int DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS = 60;
+    private static final int DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS = -1; // Disabled by default
   }
 
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
@@ -599,7 +599,7 @@ public class ControllerConf extends PinotConfiguration {
   public int getRealtimeConsumerMonitorRunFrequency() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.RT_CONSUMER_MONITOR_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElse(
-            ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS);
+            ControllerPeriodicTasksConf.DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS);
   }
 
   public long getRealtimeConsumerMonitorInitialDelayInSeconds() {

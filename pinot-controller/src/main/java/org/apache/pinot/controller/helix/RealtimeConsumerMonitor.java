@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeConsumerMonitor.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeConsumerMonitor.class);
+  private static final int DEFAULT_TIMEOUT_MS = 10000;
   private final ConsumingSegmentInfoReader _consumingSegmentInfoReader;
 
   @VisibleForTesting
@@ -73,7 +74,7 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
     }
     try {
       ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap segmentsInfoMap =
-          _consumingSegmentInfoReader.getConsumingSegmentsInfo(tableNameWithType, 10000);
+          _consumingSegmentInfoReader.getConsumingSegmentsInfo(tableNameWithType, DEFAULT_TIMEOUT_MS);
       Map<String, List<Long>> partitionToLagSet = new HashMap<>();
       Map<String, List<Long>> partitionToAvailabilityLagSet = new HashMap<>();
 
@@ -84,8 +85,7 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
             if (!PartitionLagState.NOT_CALCULATED.equals(v)) {
               try {
                 long recordsLag = Long.parseLong(v);
-                partitionToLagSet.computeIfAbsent(k, k1 -> new ArrayList<>());
-                partitionToLagSet.get(k).add(recordsLag);
+                partitionToLagSet.computeIfAbsent(k, k1 -> new ArrayList<>()).add(recordsLag);
               } catch (NumberFormatException nfe) {
                 // skip this as we are unable to parse the lag string
               }
@@ -95,8 +95,7 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
             if (!PartitionLagState.NOT_CALCULATED.equals(v)) {
               try {
                 long availabilityLagMs = Long.parseLong(v);
-                partitionToAvailabilityLagSet.computeIfAbsent(k, k1 -> new ArrayList<>());
-                partitionToAvailabilityLagSet.get(k).add(availabilityLagMs);
+                partitionToAvailabilityLagSet.computeIfAbsent(k, k1 -> new ArrayList<>()).add(availabilityLagMs);
               } catch (NumberFormatException nfe) {
                 // skip this as we are unable to parse the lag string
               }
