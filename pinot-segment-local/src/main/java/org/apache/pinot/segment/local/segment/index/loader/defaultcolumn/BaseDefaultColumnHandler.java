@@ -43,6 +43,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsorte
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
@@ -548,6 +549,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         int[] dictIds = {0};
         for (int docId = 0; docId < totalDocs; docId++) {
           mvFwdIndexCreator.putDictIdMV(dictIds);
+        }
+      }
+    }
+
+    if (_indexLoadingConfig.getTableConfig() != null
+        && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
+        && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled()) {
+      if (!_segmentWriter.hasIndexFor(column, ColumnIndexType.NULLVALUE_VECTOR)) {
+        try (NullValueVectorCreator nullValueVectorCreator =
+            new NullValueVectorCreator(_indexDir, fieldSpec.getName())) {
+          for (int docId = 0; docId < totalDocs; docId++) {
+            nullValueVectorCreator.setNull(docId);
+          }
+
+          nullValueVectorCreator.seal();
         }
       }
     }
