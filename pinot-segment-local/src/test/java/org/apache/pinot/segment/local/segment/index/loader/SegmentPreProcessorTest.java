@@ -163,7 +163,7 @@ public class SegmentPreProcessorTest {
     ingestionConfig.setSegmentTimeValueCheck(false);
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch")
-            .setIngestionConfig(ingestionConfig).build();
+            .setIngestionConfig(ingestionConfig).setNullHandlingEnabled(true).build();
     _indexLoadingConfig = getDefaultIndexLoadingConfig();
 
     // We specify two columns without inverted index ('column1', 'column13'), one non-existing column ('noSuchColumn')
@@ -219,6 +219,8 @@ public class SegmentPreProcessorTest {
     indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_RAW);
     indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW_MV);
     indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW);
+
+    indexLoadingConfig.setTableConfig(_tableConfig);
     return indexLoadingConfig;
   }
 
