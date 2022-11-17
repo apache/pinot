@@ -547,7 +547,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
     for (int i = 0; i < segmentNamesList.size(); i++) {
       String downloadURL = StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR);
-      Map<String, String> configs = getPushTaskConfig(mergeConfigs, downloadURL);
+      Map<String, String> configs = getPushTaskConfig(taskConfigs, downloadURL);
       configs.put(MinionConstants.TABLE_NAME_KEY, offlineTableName);
       configs.put(MinionConstants.SEGMENT_NAME_KEY,
           StringUtils.join(segmentNamesList.get(i), MinionConstants.SEGMENT_NAME_SEPARATOR));
@@ -578,33 +578,37 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  private Map<String, String> getPushTaskConfig(Map<String, String> batchConfigMap, String downloadUrl) {
-
+  private Map<String, String> getPushTaskConfig(Map<String, String> batchConfigMap, String downloadUrls) {
     try {
-      URI downloadURI = URI.create(downloadUrl);
-      URI outputDirURI = null;
-      if (!downloadURI.getScheme().contentEquals("http")) {
-        String outputDir = downloadUrl.substring(0, downloadUrl.lastIndexOf("/"));
-        outputDirURI = URI.create(outputDir);
-      }
-      String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
+      String[] downloadURLList = downloadUrls.split(MinionConstants.SEGMENT_NAME_SEPARATOR);
+      if (downloadURLList.length > 0) {
+        String downloadUrl = downloadURLList[0];
+        URI downloadURI = URI.create(downloadUrl);
+        URI outputDirURI = null;
+        if (!downloadURI.getScheme().contentEquals("http")) {
+          String outputDir = downloadUrl.substring(0, downloadUrl.lastIndexOf("/"));
+          outputDirURI = URI.create(outputDir);
+        }
+        String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
 
-      Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
-      if (outputDirURI != null) {
-        URI outputSegmentDirURI =
-            SegmentGenerationUtils.getRelativeOutputPath(outputDirURI, downloadURI, outputDirURI);
-        singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
+        Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
+        if (outputDirURI != null) {
+          URI outputSegmentDirURI = SegmentGenerationUtils.getRelativeOutputPath(outputDirURI, downloadURI, outputDirURI);
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
+        }
+        if ((outputDirURI == null) || (pushMode == null)) {
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
+        } else {
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
+        }
+        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _clusterInfoAccessor.getVipUrl());
+        return singleFileGenerationTaskConfig;
       }
-      if ((outputDirURI == null) || (pushMode == null)) {
-        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
-      } else {
-        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
-      }
-      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _clusterInfoAccessor.getVipUrl());
-      return singleFileGenerationTaskConfig;
+      return batchConfigMap;
     } catch (Exception e) {
       return batchConfigMap;
     }
+
   }
 
   private long getMergeRollupTaskDelayInNumTimeBuckets(long watermarkMs, long maxEndTimeMsOfCurrentLevel,
