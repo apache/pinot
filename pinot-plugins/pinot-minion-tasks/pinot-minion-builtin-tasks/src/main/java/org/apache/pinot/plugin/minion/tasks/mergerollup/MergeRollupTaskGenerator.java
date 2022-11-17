@@ -106,6 +106,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   private static final int DEFAULT_NUM_PARALLEL_BUCKETS = 1;
   private static final String REFRESH = "REFRESH";
   private static final String DELIMITER_IN_SEGMENT_NAME = "_";
+  private static final int MAX_INVALID_PARTITION_SEQ = -1;
 
   // This is the metric that keeps track of the task delay in the number of time buckets. For example, if we see this
   // number to be 7 and merge task is configured with "bucketTimePeriod = 1d", this means that we have 7 days of
@@ -350,7 +351,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           for (List<SegmentZKMetadata> selectedSegmentsPerBucket : selectedSegmentsForAllBuckets) {
             pinotTaskConfigsForTable.addAll(
                 createPinotTaskConfigs(selectedSegmentsPerBucket, offlineTableName, maxNumRecordsPerTask, mergeLevel,
-                    null, mergeConfigs, taskConfigs));
+                    MAX_INVALID_PARTITION_SEQ, mergeConfigs, taskConfigs));
           }
         } else {
           // For partitioned table, schedule separate tasks for each partitionId (partitionId is constructed from
@@ -384,18 +385,18 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
               }
             }
 
-            for (Map.Entry<List<Integer>, List<SegmentZKMetadata>> entry : partitionToSegments.entrySet()) {
-              List<Integer> partition = entry.getKey();
-              List<SegmentZKMetadata> partitionedSegments = entry.getValue();
+            int partitionSeq = 0;
+            for (List<SegmentZKMetadata> partitionedSegments : partitionToSegments.values()) {
               pinotTaskConfigsForTable.addAll(
                   createPinotTaskConfigs(partitionedSegments, offlineTableName, maxNumRecordsPerTask, mergeLevel,
-                      partition, mergeConfigs, taskConfigs));
+                      partitionSeq, mergeConfigs, taskConfigs));
+              partitionSeq++;
             }
 
             if (!outlierSegments.isEmpty()) {
               pinotTaskConfigsForTable.addAll(
                   createPinotTaskConfigs(outlierSegments, offlineTableName, maxNumRecordsPerTask, mergeLevel,
-                      null, mergeConfigs, taskConfigs));
+                      MAX_INVALID_PARTITION_SEQ, mergeConfigs, taskConfigs));
             }
           }
         }
@@ -519,7 +520,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
    * Create pinot task configs with selected segments and configs
    */
   private List<PinotTaskConfig> createPinotTaskConfigs(List<SegmentZKMetadata> selectedSegments,
-      String offlineTableName, int maxNumRecordsPerTask, String mergeLevel, List<Integer> partition,
+      String offlineTableName, int maxNumRecordsPerTask, String mergeLevel, int partitionSeq,
       Map<String, String> mergeConfigs, Map<String, String> taskConfigs) {
     int numRecordsPerTask = 0;
     List<List<String>> segmentNamesList = new ArrayList<>();
@@ -542,13 +543,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     }
 
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
-    StringBuilder partitionSuffixBuilder = new StringBuilder();
-    if (partition != null && !partition.isEmpty()) {
-      for (int columnPartition : partition) {
-        partitionSuffixBuilder.append(DELIMITER_IN_SEGMENT_NAME).append(columnPartition);
-      }
+    String partitionSeqSuffix = "";
+    if (partitionSeq > MAX_INVALID_PARTITION_SEQ) {
+      partitionSeqSuffix = DELIMITER_IN_SEGMENT_NAME + partitionSeq;
     }
-    String partitionSuffix = partitionSuffixBuilder.toString();
     for (int i = 0; i < segmentNamesList.size(); i++) {
       Map<String, String> configs = new HashMap<>();
       configs.put(MinionConstants.TABLE_NAME_KEY, offlineTableName);
@@ -572,10 +570,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       configs.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
           mergeConfigs.get(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY));
 
+      // Segment name conflict happens when the current method "createPinotTaskConfigs" is invoked more than once within
+      // the same epoch millisecond, which may happen when there are multiple partitions.
+      // To prevent such name conflict, we include a partitionSeqSuffix to the segment name.
       configs.put(MergeRollupTask.SEGMENT_NAME_PREFIX_KEY,
           MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + DELIMITER_IN_SEGMENT_NAME
-              + System.currentTimeMillis() + partitionSuffix + DELIMITER_IN_SEGMENT_NAME + i + DELIMITER_IN_SEGMENT_NAME
-              + TableNameBuilder.extractRawTableName(offlineTableName));
+              + System.currentTimeMillis() + partitionSeqSuffix + DELIMITER_IN_SEGMENT_NAME + i
+              + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(offlineTableName));
       pinotTaskConfigs.add(new PinotTaskConfig(MergeRollupTask.TASK_TYPE, configs));
     }
 
