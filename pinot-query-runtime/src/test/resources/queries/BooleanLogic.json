@@ -26,6 +26,10 @@
       {
         "description": "should support boolean literals",
         "sql": "select b = true, b = false FROM {bools}"
+      },
+      {
+        "description": "should support boolean inequality ",
+        "sql": "select b != true, b <> false FROM {bools}"
       }
     ]
   },
