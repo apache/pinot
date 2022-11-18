@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -256,9 +257,16 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
                 segmentZKMetadataCustomMapModifier.toJsonString());
 
-        URI outputSegmentTarURI = moveSegmentToOutputPinotFS(pinotTaskConfig.getConfigs(), convertedTarredSegmentFile);
-        LOGGER.info("Moved generated segment from [{}] to location: [{}]",
-            convertedTarredSegmentFile, outputSegmentTarURI);
+        String pushMode = configs.get(BatchConfigProperties.PUSH_MODE);
+        URI outputSegmentTarURI;
+        if(BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())
+            != BatchConfigProperties.SegmentPushType.TAR) {
+          outputSegmentTarURI = moveSegmentToOutputPinotFS(configs, convertedTarredSegmentFile);
+          LOGGER.info("Moved generated segment from [{}] to location: [{}]", convertedTarredSegmentFile,
+              outputSegmentTarURI);
+        } else {
+          outputSegmentTarURI = convertedTarredSegmentFile.toURI();
+        }
 
         List<Header> httpHeaders = new ArrayList<>();
         httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
@@ -271,10 +279,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             TableNameBuilder.extractRawTableName(tableNameWithType));
         List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
-        pushSegment(tableNameWithType, pinotTaskConfig.getConfigs(), outputSegmentTarURI, httpHeaders, parameters);
-//        SegmentConversionUtils
-//            .uploadSegment(configs, httpHeaders, parameters, tableNameWithType, resultSegmentName, uploadURL,
-//                convertedTarredSegmentFile);
+        pushSegment(tableNameWithType, configs, outputSegmentTarURI, httpHeaders, parameters);
         if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
         }
