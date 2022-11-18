@@ -328,7 +328,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
   }
 
-  private Map<String, String> getPushTaskConfig(String tableName, Map<String, String> batchConfigMap, String downloadUrls) {
+  private Map<String, String> getPushTaskConfig(String tableName,
+      Map<String, String> batchConfigMap, String downloadUrls) {
     try {
       String[] downloadURLList = downloadUrls.split(MinionConstants.URL_SEPARATOR);
       if (downloadURLList.length > 0) {
