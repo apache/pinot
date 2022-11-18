@@ -18,52 +18,61 @@
  */
 package org.apache.pinot.query.planner.stage;
 
-public abstract class BaseDepthFirstStageNodeVisitor<T, C> implements StageNodeVisitor<T, C> {
+public abstract class DefaultPostOrderTraversalVisitor<T, C> implements StageNodeVisitor<T, C> {
 
-  public abstract T visitNode(StageNode stageNode, C context);
+  public abstract T process(StageNode stageNode, C context);
 
   @Override
   public T visitAggregate(AggregateNode node, C context) {
-    return visitNode(node, context);
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
   }
 
   @Override
   public T visitFilter(FilterNode node, C context) {
-    return visitNode(node, context);
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
   }
 
   @Override
   public T visitJoin(JoinNode node, C context) {
-    return visitNode(node, context);
+    node.getInputs().get(0).visit(this, context);
+    node.getInputs().get(1).visit(this, context);
+    return process(node, context);
   }
 
   @Override
   public T visitMailboxReceive(MailboxReceiveNode node, C context) {
-    return visitNode(node, context);
+    node.getSender().visit(this, context);
+    return process(node, context);
   }
 
   @Override
   public T visitMailboxSend(MailboxSendNode node, C context) {
-    return visitNode(node, context);
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
   }
 
   @Override
   public T visitProject(ProjectNode node, C context) {
-    return visitNode(node, context);
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
   }
 
   @Override
   public T visitSort(SortNode node, C context) {
-    return visitNode(node, context);
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
   }
 
   @Override
   public T visitTableScan(TableScanNode node, C context) {
-    return visitNode(node, context);
+    return process(node, context);
   }
 
   @Override
   public T visitValue(ValueNode node, C context) {
-    return visitNode(node, context);
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
   }
 }

@@ -25,44 +25,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.planner.stage.BaseDepthFirstStageNodeVisitor;
+import org.apache.pinot.query.planner.stage.DefaultPostOrderTraversalVisitor;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 
 
-public class PhysicalStageVisitor
-    extends BaseDepthFirstStageNodeVisitor<Integer, PhysicalStageVisitor.PhysicalStageInfo> {
+public class PhysicalStageTraversalVisitor
+    extends DefaultPostOrderTraversalVisitor<Integer, PhysicalStageTraversalVisitor.PhysicalStageInfo> {
 
   public static PhysicalStageInfo go(StageNode rootStageNode) {
     PhysicalStageInfo physicalStageInfo = new PhysicalStageInfo();
-    rootStageNode.visit(new PhysicalStageVisitor(), physicalStageInfo);
+    rootStageNode.visit(new PhysicalStageTraversalVisitor(), physicalStageInfo);
     return physicalStageInfo;
   }
 
   @Override
-  public Integer visitNode(StageNode stageNode, PhysicalStageInfo context) {
+  public Integer process(StageNode stageNode, PhysicalStageInfo context) {
     int currentStageId = stageNode.getStageId();
-    if (context.isRootStageNodeSet(currentStageId)) {
-      context.setRootStageNode(currentStageId, stageNode);
-    }
+    context.setRootStageNode(currentStageId, stageNode);
     if (isLeafNode(stageNode)) {
       context.addLeafNode(currentStageId, stageNode);
     }
-    if (CollectionUtils.isNotEmpty(stageNode.getInputs())) {
-      for (StageNode childStageNode : stageNode.getInputs()) {
-        childStageNode.visit(this, context);
-      }
+    if (stageNode instanceof JoinNode) {
+      context.markJoinStage(stageNode.getStageId());
     }
-    return 0;
-  }
-
-  @Override
-  public Integer visitJoin(JoinNode joinNode, PhysicalStageInfo context) {
-    context.markJoinStage(joinNode.getStageId());
-    visitNode(joinNode, context);
     return 0;
   }
 
@@ -77,13 +65,13 @@ public class PhysicalStageVisitor
     private final Map<Integer, StageNode> _rootStageNode;
     private final Map<Integer, List<StageNode>> _leafNodes;
     private final Set<Integer> _joinStages;
-    private final Map<Integer, Set<Integer>> _partitionKeysCache;
+    private final Map<Integer, Set<Integer>> _senderInputPartitionKeys;
 
     public PhysicalStageInfo() {
       _rootStageNode = new HashMap<>();
       _leafNodes = new HashMap<>();
-      _joinStages =  new HashSet<>();
-      _partitionKeysCache = new HashMap<>();
+      _joinStages = new HashSet<>();
+      _senderInputPartitionKeys = new HashMap<>();
     }
 
     public Map<Integer, StageNode> getRootStageNode() {
@@ -115,11 +103,11 @@ public class PhysicalStageVisitor
     }
 
     public void setPartitionKeys(Integer stageId, Set<Integer> partitionKeys) {
-      _partitionKeysCache.put(stageId, partitionKeys);
+      _senderInputPartitionKeys.put(stageId, partitionKeys);
     }
 
     public Set<Integer> getPartitionKeys(Integer stageId) {
-      return _partitionKeysCache.get(stageId);
+      return _senderInputPartitionKeys.get(stageId);
     }
   }
 }

@@ -1,6 +1,25 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.query.planner.physical;
 
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -10,8 +29,8 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.planner.logical.PhysicalStageVisitor;
-import org.apache.pinot.query.planner.logical.PhysicalStageVisitor.PhysicalStageInfo;
+import org.apache.pinot.query.planner.logical.PhysicalStageTraversalVisitor;
+import org.apache.pinot.query.planner.logical.PhysicalStageTraversalVisitor.PhysicalStageInfo;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
@@ -39,14 +58,12 @@ import org.apache.pinot.spi.config.table.TableConfig;
 public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, PhysicalStageInfo> {
   private TableCache _tableCache;
   private Map<Integer, StageMetadata> _stageMetadataMap;
+  private Map<Integer, Integer> _equivalentPkey;
   private boolean _canSkipShuffleForJoin;
 
-  /**
-   * Optimizes shuffles while maintaining partial order among high-level stages.
-   */
   public static void optimizeShuffles(StageNode rootStageNode, Map<Integer, StageMetadata> stageMetadataMap,
       TableCache tableCache) {
-    PhysicalStageInfo info = PhysicalStageVisitor.go(rootStageNode);
+    PhysicalStageInfo info = PhysicalStageTraversalVisitor.go(rootStageNode);
     for (int stageId = stageMetadataMap.size() - 1; stageId >= 0; stageId--) {
       StageNode stageNode = info.getRootStageNode().get(stageId);
       stageNode.visit(new SmartShuffleRewriteVisitor(tableCache, stageMetadataMap), info);
@@ -56,6 +73,7 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
   private SmartShuffleRewriteVisitor(TableCache tableCache, Map<Integer, StageMetadata> stageMetadataMap) {
     _tableCache = tableCache;
     _stageMetadataMap = stageMetadataMap;
+    _equivalentPkey = new HashMap<>();
     _canSkipShuffleForJoin = false;
   }
 
@@ -89,10 +107,22 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
     List<MailboxReceiveNode> innerLeafNodes = context.getLeafNodes().get(node.getStageId()).stream()
         .map(x -> (MailboxReceiveNode) x).collect(Collectors.toList());
     Preconditions.checkState(innerLeafNodes.size() == 2);
+
+    // Currently, JOIN criteria is guaranteed to only have one FieldSelectionKeySelector
+    FieldSelectionKeySelector leftJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getLeftJoinKeySelector();
+    FieldSelectionKeySelector rightJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getRightJoinKeySelector();
+    for (int i = 0; i < leftJoinKey.getColumnIndices().size(); i++) {
+      int leftIdx = leftJoinKey.getColumnIndices().get(i);
+      int rightIdx = rightJoinKey.getColumnIndices().get(i);
+      _equivalentPkey.put(leftIdx, rightIdx);
+      _equivalentPkey.put(rightIdx, leftIdx);
+    }
+
     if (canServerAssignmentAllowShuffleSkip(node.getStageId(), innerLeafNodes.get(0).getSenderStageId(),
         innerLeafNodes.get(1).getSenderStageId())) {
       if (canSkipShuffleForJoin(innerLeafNodes.get(0), (MailboxSendNode) innerLeafNodes.get(0).getSender(), context)) {
-        if (canSkipShuffleForJoin(innerLeafNodes.get(1), (MailboxSendNode) innerLeafNodes.get(1).getSender(), context)) {
+        if (canSkipShuffleForJoin(innerLeafNodes.get(1),
+            (MailboxSendNode) innerLeafNodes.get(1).getSender(), context)) {
           _stageMetadataMap.get(node.getStageId()).setServerInstances(
               _stageMetadataMap.get(innerLeafNodes.get(0).getSenderStageId()).getServerInstances());
           _canSkipShuffleForJoin = true;
@@ -103,10 +133,6 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
     // TODO: This is copy-pasted from ShuffleRewriteVisitor. Make it re-usable.
     Set<Integer> leftPKs = node.getInputs().get(0).visit(this, context);
     Set<Integer> rightPks = node.getInputs().get(1).visit(this, context);
-
-    // Currently, JOIN criteria is guaranteed to only have one FieldSelectionKeySelector
-    FieldSelectionKeySelector leftJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getLeftJoinKeySelector();
-    FieldSelectionKeySelector rightJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getRightJoinKeySelector();
 
     int leftDataSchemaSize = node.getInputs().get(0).getDataSchema().size();
     Set<Integer> partitionKeys = new HashSet<>();
@@ -132,11 +158,11 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
     Set<Integer> oldPartitionKeys = context.getPartitionKeys(node.getSenderStageId());
     // If the current stage is not a join-stage, then we already know sender's distribution
     if (!context.isJoinStage(node.getStageId())) {
-      if (canSkipShuffle(oldPartitionKeys, selector)) {
+      if (selector == null) {
+        return new HashSet<>();
+      } else if (canSkipShuffle(oldPartitionKeys, selector)) {
         node.setExchangeType(RelDistribution.Type.SINGLETON);
         return oldPartitionKeys;
-      } else if (selector == null) {
-        return new HashSet<>();
       }
       return new HashSet<>(((FieldSelectionKeySelector) selector).getColumnIndices());
     }
@@ -228,9 +254,9 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
     Set<ServerInstance> leftServerInstances = new HashSet<>(_stageMetadataMap.get(leftStageId).getServerInstances());
     List<ServerInstance> rightServerInstances = _stageMetadataMap.get(rightStageId).getServerInstances();
     List<ServerInstance> currentServerInstances = _stageMetadataMap.get(currentStageId).getServerInstances();
-    return leftServerInstances.containsAll(rightServerInstances) &&
-        leftServerInstances.size() == rightServerInstances.size() &&
-        currentServerInstances.containsAll(leftServerInstances);
+    return leftServerInstances.containsAll(rightServerInstances)
+        && leftServerInstances.size() == rightServerInstances.size()
+        && currentServerInstances.containsAll(leftServerInstances);
   }
 
   private boolean canSkipShuffleForJoin(MailboxReceiveNode mailboxReceiveNode, MailboxSendNode mailboxSendNode,
@@ -245,10 +271,18 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
     return canSkipShuffle(oldPartitionKeys, selector);
   }
 
-  private static boolean canSkipShuffle(Set<Integer> partitionKeys, KeySelector<Object[], Object[]> keySelector) {
+  private boolean canSkipShuffle(Set<Integer> partitionKeys, KeySelector<Object[], Object[]> keySelector) {
     if (!partitionKeys.isEmpty() && keySelector != null) {
       Set<Integer> targetSet = new HashSet<>(((FieldSelectionKeySelector) keySelector).getColumnIndices());
-      return targetSet.containsAll(partitionKeys);
+      boolean canSkip = true;
+      for (Integer senderPkey : partitionKeys) {
+        if (targetSet.contains(senderPkey)
+            || (_equivalentPkey.containsKey(senderPkey) && targetSet.contains(_equivalentPkey.get(senderPkey)))) {
+        } else {
+          canSkip = false;
+        }
+      }
+      return canSkip;
     }
     return false;
   }
