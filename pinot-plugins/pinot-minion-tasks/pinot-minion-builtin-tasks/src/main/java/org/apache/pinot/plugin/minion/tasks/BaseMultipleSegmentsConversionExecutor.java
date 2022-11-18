@@ -47,6 +47,7 @@ import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
+import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
@@ -316,7 +317,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
         case TAR:
           try (PinotFS pinotFS = TaskUtils.getLocalPinotFs()) {
-            MinionPushUtils.pushSegments(
+            SegmentPushUtils.pushSegments(
                 spec, pinotFS, Arrays.asList(outputSegmentTarURI.toString()), headers, parameters);
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
@@ -325,10 +326,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         case URI:
           try {
             List<String> segmentUris = new ArrayList<>();
-            URI updatedURI = MinionPushUtils.generateSegmentTarURI(outputSegmentDirURI, outputSegmentTarURI,
+            URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputSegmentDirURI, outputSegmentTarURI,
                 pushJobSpec.getSegmentUriPrefix(), pushJobSpec.getSegmentUriSuffix());
             segmentUris.add(updatedURI.toString());
-            MinionPushUtils.sendSegmentUris(spec, segmentUris, headers, parameters);
+            SegmentPushUtils.sendSegmentUris(spec, segmentUris, headers, parameters);
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
           }
@@ -336,9 +337,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         case METADATA:
           try {
             Map<String, String> segmentUriToTarPathMap =
-                MinionPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
+                SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
                     new String[]{outputSegmentTarURI.toString()});
-            MinionPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, headers, parameters);
+            SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, headers, parameters);
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
           }
