@@ -20,7 +20,33 @@
       { "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}" },
       { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
       { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
-      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
+      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 >= i2" }
+    ]
+  },
+  "boolean_comp": {
+    "psql": "9.2",
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "i1", "type": "BOOLEAN"},
+          {"name": "i2", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [true, true], [true, false], [false, true], [false, false]
+        ]
+      }
+    },
+    "queries": [
+      { "sql": "SELECT i1 < i2, i2 < i1 FROM {tbl}" },
+      { "sql": "SELECT i1 <= i2, i2 <= i1 FROM {tbl}" },
+      { "sql": "SELECT i1 > i2, i2 > i1 FROM {tbl}" },
+      { "sql": "SELECT i1 >= i2, i2 >= i1 FROM {tbl}" },
+      { "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}" },
+      { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
+      { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
+      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 >= i2" }
     ]
   },
   "floats_comp": {
@@ -44,7 +70,8 @@
       { "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}" },
       { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
       { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
-      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
+      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 >= i2" }
     ]
   },
   "doubles_comp": {
@@ -68,7 +95,8 @@
       { "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}" },
       { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
       { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
-      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
+      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 >= i2" }
     ]
   },
   "numerics_comp": {
@@ -92,7 +120,12 @@
       { "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}" },
       { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
       { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
-      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
+      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
+      {
+        "ignored": true,
+        "comment": "fails with IllegalStateException... not sure why!",
+        "sql": "SELECT * FROM {tbl} WHERE i1 >= i2"
+      }
     ]
   },
   "strings_comp": {
@@ -122,7 +155,8 @@
       { "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}" },
       { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
       { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
-      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
+      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 >= i2" }
     ]
   },
   "timestamps_comp": {
@@ -149,7 +183,8 @@
       { "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}" },
       { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
       { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
-      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
+      { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 >= i2" }
     ]
   },
   "int_x_bigint_comp": {
