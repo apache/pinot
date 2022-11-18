@@ -271,6 +271,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         case BIG_DECIMAL:
           fieldType = "NUMERIC";
           break;
+        case BOOLEAN:
+          fieldType = "BOOLEAN";
+          break;
         default:
           throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
       }
