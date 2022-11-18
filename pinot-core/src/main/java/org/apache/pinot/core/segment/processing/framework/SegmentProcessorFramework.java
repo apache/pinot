@@ -142,28 +142,31 @@ public class SegmentProcessorFramework {
     for (Map.Entry<String, GenericRowFileManager> entry : partitionToFileManagerMap.entrySet()) {
       String partitionId = entry.getKey();
       GenericRowFileManager fileManager = entry.getValue();
-      GenericRowFileReader fileReader = fileManager.getFileReader();
-      int numRows = fileReader.getNumRows();
-      int numSortFields = fileReader.getNumSortFields();
-      LOGGER.info("Start creating segments on partition: {}, numRows: {}, numSortFields: {}", partitionId, numRows,
-          numSortFields);
-      GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
-      for (int startRowId = 0; startRowId < numRows; startRowId += maxNumRecordsPerSegment, sequenceId++) {
-        int endRowId = Math.min(startRowId + maxNumRecordsPerSegment, numRows);
-        LOGGER.info("Start creating segment of sequenceId: {} with row range: {} to {}", sequenceId, startRowId,
-            endRowId);
-        observer.accept(String.format(
-            "Creating segment of sequentId: %d with data from partition: %s and row range: [%d, %d) out of [0, %d)",
-            sequenceId, partitionId, startRowId, endRowId, numRows));
-        generatorConfig.setSequenceId(sequenceId);
-        GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
-        SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-        driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
-            TransformPipeline.getPassThroughPipeline());
-        driver.build();
-        outputSegmentDirs.add(driver.getOutputDirectory());
+      try {
+        GenericRowFileReader fileReader = fileManager.getFileReader();
+        int numRows = fileReader.getNumRows();
+        int numSortFields = fileReader.getNumSortFields();
+        LOGGER.info("Start creating segments on partition: {}, numRows: {}, numSortFields: {}", partitionId, numRows,
+            numSortFields);
+        GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+        for (int startRowId = 0; startRowId < numRows; startRowId += maxNumRecordsPerSegment, sequenceId++) {
+          int endRowId = Math.min(startRowId + maxNumRecordsPerSegment, numRows);
+          LOGGER.info("Start creating segment of sequenceId: {} with row range: {} to {}", sequenceId, startRowId,
+              endRowId);
+          observer.accept(String.format(
+              "Creating segment of sequentId: %d with data from partition: %s and row range: [%d, %d) out of [0, %d)",
+              sequenceId, partitionId, startRowId, endRowId, numRows));
+          generatorConfig.setSequenceId(sequenceId);
+          GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
+          SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+          driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
+              TransformPipeline.getPassThroughPipeline());
+          driver.build();
+          outputSegmentDirs.add(driver.getOutputDirectory());
+        }
+      } finally {
+        fileManager.cleanUp();
       }
-      fileManager.cleanUp();
     }
     FileUtils.deleteDirectory(_mapperOutputDir);
     FileUtils.deleteDirectory(_reducerOutputDir);
