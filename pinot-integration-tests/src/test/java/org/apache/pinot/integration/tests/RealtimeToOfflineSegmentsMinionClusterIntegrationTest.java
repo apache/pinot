@@ -45,6 +45,7 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -113,8 +114,12 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
             new TimestampConfig(Arrays.asList(TimestampIndexGranularity.HOUR, TimestampIndexGranularity.DAY,
                 TimestampIndexGranularity.WEEK, TimestampIndexGranularity.MONTH)), null);
     realtimeTableConfig.setFieldConfigList(Collections.singletonList(tsFieldConfig));
+
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
+
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>())));
+        Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfigs)));
     addTableConfig(realtimeTableConfig);
 
     TableConfig offlineTableConfig = createOfflineTableConfig();

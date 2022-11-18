@@ -560,7 +560,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         }
       }
 
-      configs.put(BatchConfigProperties.OVERWRITE_OUTPUT, taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT));
+      configs.put(BatchConfigProperties.OVERWRITE_OUTPUT,
+          taskConfigs.getOrDefault(BatchConfigProperties.OVERWRITE_OUTPUT, "false"));
       configs.put(MergeRollupTask.MERGE_TYPE_KEY, mergeConfigs.get(MergeTask.MERGE_TYPE_KEY));
       configs.put(MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
       configs.put(MergeTask.PARTITION_BUCKET_TIME_PERIOD_KEY, mergeConfigs.get(MergeTask.BUCKET_TIME_PERIOD_KEY));
@@ -579,7 +580,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
 
   private Map<String, String> getPushTaskConfig(Map<String, String> batchConfigMap, String downloadUrls) {
     try {
-      String[] downloadURLList = downloadUrls.split(MinionConstants.SEGMENT_NAME_SEPARATOR);
+      String[] downloadURLList = downloadUrls.split(MinionConstants.URL_SEPARATOR);
       if (downloadURLList.length > 0) {
         String downloadUrl = downloadURLList[0];
         URI downloadURI = URI.create(downloadUrl);

@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import com.google.common.base.Preconditions;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,6 +31,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
@@ -41,6 +43,7 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -82,6 +85,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
   private static final String DEFAULT_BUCKET_PERIOD = "1d";
   private static final String DEFAULT_BUFFER_PERIOD = "2d";
+  private static final BatchConfigProperties.SegmentPushType DEFAULT_SEGMENT_PUSH_TYPE =
+      BatchConfigProperties.SegmentPushType.TAR;
 
   @Override
   public String getTaskType() {
@@ -204,7 +209,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         continue;
       }
 
-      Map<String, String> configs = new HashMap<>();
+      Map<String, String> configs = getPushTaskConfig(taskConfigs,
+          StringUtils.join(downloadURLs, MinionConstants.URL_SEPARATOR));
       configs.put(MinionConstants.TABLE_NAME_KEY, realtimeTableName);
       configs.put(MinionConstants.SEGMENT_NAME_KEY, StringUtils.join(segmentNames, ","));
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, StringUtils.join(downloadURLs, MinionConstants.URL_SEPARATOR));
@@ -320,5 +326,39 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, -1);
     }
     return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
+  }
+
+  private Map<String, String> getPushTaskConfig(Map<String, String> batchConfigMap, String downloadUrls) {
+    try {
+      String[] downloadURLList = downloadUrls.split(MinionConstants.URL_SEPARATOR);
+      if (downloadURLList.length > 0) {
+        String downloadUrl = downloadURLList[0];
+        URI downloadURI = URI.create(downloadUrl);
+        URI outputDirURI = null;
+        if (!downloadURI.getScheme().contentEquals("http")) {
+          String outputDir = downloadUrl.substring(0, downloadUrl.lastIndexOf("/"));
+          outputDirURI = URI.create(outputDir);
+        }
+        String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
+
+        Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
+        if (outputDirURI != null) {
+          URI outputSegmentDirURI = SegmentGenerationUtils.getRelativeOutputPath(
+              outputDirURI, downloadURI, outputDirURI);
+          singleFileGenerationTaskConfig.put(
+              BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
+        }
+        if ((outputDirURI == null) || (pushMode == null)) {
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
+        } else {
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
+        }
+        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _clusterInfoAccessor.getVipUrl());
+        return singleFileGenerationTaskConfig;
+      }
+      return batchConfigMap;
+    } catch (Exception e) {
+      return batchConfigMap;
+    }
   }
 }

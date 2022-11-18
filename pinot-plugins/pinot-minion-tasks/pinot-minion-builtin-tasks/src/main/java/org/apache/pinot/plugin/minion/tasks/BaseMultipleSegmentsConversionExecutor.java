@@ -258,7 +258,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
         String pushMode = configs.get(BatchConfigProperties.PUSH_MODE);
         URI outputSegmentTarURI;
-        if(BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())
+        if (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())
             != BatchConfigProperties.SegmentPushType.TAR) {
           outputSegmentTarURI = moveSegmentToOutputPinotFS(configs, convertedTarredSegmentFile);
           LOGGER.info("Moved generated segment from [{}] to location: [{}]", convertedTarredSegmentFile,
@@ -278,7 +278,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             TableNameBuilder.extractRawTableName(tableNameWithType));
         List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
-        pushSegment(tableNameWithType, configs, outputSegmentTarURI, httpHeaders, parameters);
+        pushSegment(tableNameParameter.getValue(), configs, outputSegmentTarURI, httpHeaders, parameters);
         if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
         }
