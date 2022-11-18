@@ -137,11 +137,11 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     BaseResultsBlock mergedBlock;
     try {
       mergedBlock = mergeResults();
-    } catch (InterruptedException e) {
+    } catch (InterruptedException | EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
       throw new QueryCancelledException(
-          "Cancelled while merging results blocks" + (killedErrorMsg == null ? StringUtils.EMPTY
-              : " " + killedErrorMsg), e);
+          "Cancelled while merging results blocks"
+              + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg), e);
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
       mergedBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));

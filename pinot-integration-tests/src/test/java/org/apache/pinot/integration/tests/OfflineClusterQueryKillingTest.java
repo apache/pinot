@@ -49,6 +49,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.junit.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -57,6 +59,7 @@ import org.testng.annotations.Test;
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
 public class OfflineClusterQueryKillingTest extends BaseClusterIntegrationTestSet {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterQueryKillingTest.class);
   public static final String STRING_DIM_SV1 = "stringDimSV1";
   public static final String STRING_DIM_SV2 = "stringDimSV2";
   public static final String INT_DIM_SV1 = "intDimSV1";
@@ -181,7 +184,7 @@ public class OfflineClusterQueryKillingTest extends BaseClusterIntegrationTestSe
   public void testDigestOOM()
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY);
-    System.out.println(queryResponse);
+    LOGGER.info("testDigestOOM: {}", queryResponse);
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }
@@ -200,8 +203,7 @@ public class OfflineClusterQueryKillingTest extends BaseClusterIntegrationTestSe
           try {
             queryResponse1.set(postQuery(OOM_QUERY));
             countDownLatch.countDown();
-          } catch (Exception e) {
-            e.printStackTrace();
+          } catch (Exception ignored) {
           }
         }
     );
@@ -210,8 +212,7 @@ public class OfflineClusterQueryKillingTest extends BaseClusterIntegrationTestSe
           try {
             queryResponse2.set(postQuery(DIGEST_QUERY_1));
             countDownLatch.countDown();
-          } catch (Exception e) {
-            e.printStackTrace();
+          } catch (Exception ignored) {
           }
         }
     );
@@ -220,12 +221,12 @@ public class OfflineClusterQueryKillingTest extends BaseClusterIntegrationTestSe
           try {
             queryResponse3.set(postQuery(COUNT_STAR_QUERY));
             countDownLatch.countDown();
-          } catch (Exception e) {
-            e.printStackTrace();
+          } catch (Exception ignored) {
           }
         }
     );
     countDownLatch.await();
+    LOGGER.info("testDigestOOMMultipleQueries: {}", queryResponse1);
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed because"));
     Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
