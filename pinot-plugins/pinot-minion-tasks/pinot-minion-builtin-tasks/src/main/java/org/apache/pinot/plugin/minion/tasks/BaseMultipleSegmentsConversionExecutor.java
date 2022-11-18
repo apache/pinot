@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -318,10 +317,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     if (taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     }
-    try (PinotFS outputFileFS = TaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
+    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
       switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
         case TAR:
-          try (PinotFS pinotFS = TaskUtils.getLocalPinotFs()) {
+          try (PinotFS pinotFS = MinionTaskUtils.getLocalPinotFs()) {
             SegmentPushUtils.pushSegments(
                 spec, pinotFS, Arrays.asList(outputSegmentTarURI.toString()), headers, parameters);
           } catch (RetriableOperationException | AttemptsExceededException e) {
@@ -380,7 +379,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       return localSegmentTarFile.toURI();
     }
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    try (PinotFS outputFileFS = TaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
+    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
       URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
       if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
           outputSegmentDirURI)) {

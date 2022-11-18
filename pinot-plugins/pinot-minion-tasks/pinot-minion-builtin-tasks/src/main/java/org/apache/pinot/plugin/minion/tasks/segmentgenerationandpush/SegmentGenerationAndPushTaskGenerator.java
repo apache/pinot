@@ -41,6 +41,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -323,7 +324,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
   private List<URI> getInputFilesFromDirectory(Map<String, String> batchConfigMap, URI inputDirURI,
       Set<String> existingSegmentInputFileURIs)
       throws Exception {
-    try (PinotFS inputDirFS = SegmentGenerationAndPushTaskUtils.getInputPinotFS(batchConfigMap, inputDirURI)) {
+    try (PinotFS inputDirFS = MinionTaskUtils.getInputPinotFS(batchConfigMap, inputDirURI)) {
 
       String includeFileNamePattern = batchConfigMap.get(BatchConfigProperties.INCLUDE_FILE_NAME_PATTERN);
       String excludeFileNamePattern = batchConfigMap.get(BatchConfigProperties.EXCLUDE_FILE_NAME_PATTERN);

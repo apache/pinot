@@ -29,11 +29,11 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
-public class TaskUtils {
-  private TaskUtils() {
+public class MinionTaskUtils {
+  private MinionTaskUtils() {
   }
 
-  static PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI)
+  public static PinotFS getInputPinotFS(Map<String, String> taskConfigs, URI fileURI)
       throws Exception {
     String fileURIScheme = fileURI.getScheme();
     if (fileURIScheme == null) {
@@ -50,7 +50,7 @@ public class TaskUtils {
     return PinotFSFactory.create(fileURIScheme);
   }
 
-  static PinotFS getOutputPinotFS(Map<String, String> taskConfigs, URI fileURI)
+  public static PinotFS getOutputPinotFS(Map<String, String> taskConfigs, URI fileURI)
       throws Exception {
     String fileURIScheme = (fileURI == null) ? null : fileURI.getScheme();
     if (fileURIScheme == null) {
@@ -67,7 +67,7 @@ public class TaskUtils {
     return PinotFSFactory.create(fileURIScheme);
   }
 
-  static PinotFS getLocalPinotFs() {
+  public static PinotFS getLocalPinotFs() {
     return new LocalPinotFS();
   }
 }
