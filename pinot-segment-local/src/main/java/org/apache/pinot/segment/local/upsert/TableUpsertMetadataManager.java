@@ -33,7 +33,13 @@ import org.apache.pinot.spi.data.Schema;
 @ThreadSafe
 public interface TableUpsertMetadataManager extends Closeable {
 
-  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, ServerMetrics serverMetrics);
+  @Deprecated
+  default void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
+      ServerMetrics serverMetrics) {
+    init(tableConfig, schema, serverMetrics);
+  }
+
+  void init(TableConfig tableConfig, Schema schema, ServerMetrics serverMetrics);
 
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 

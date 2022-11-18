@@ -22,7 +22,6 @@ import java.io.File;
 import java.net.URL;
 import java.util.Collections;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
@@ -65,7 +64,7 @@ public class MutableSegmentImplUpsertTest {
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     _partitionUpsertMetadataManager =
-        TableUpsertMetadataManagerFactory.create(_tableConfig, _schema, mock(TableDataManager.class),
+        TableUpsertMetadataManagerFactory.create(_tableConfig, _schema,
             mock(ServerMetrics.class)).getOrCreatePartitionManager(0);
     _mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(),

@@ -187,7 +187,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           _tableUpsertMetadataManager);
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics);
+      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig, schema, _serverMetrics);
     }
   }
 
