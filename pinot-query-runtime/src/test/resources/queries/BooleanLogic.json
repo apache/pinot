@@ -12,6 +12,18 @@
         "sql": "select b FROM {bools}"
       },
       {
+        "description": "should support booleans",
+        "sql": "select true, false FROM {bools}"
+      },
+      {
+        "description": "should support booleans",
+        "sql": "select b FROM {bools} WHERE b"
+      },
+      {
+        "description": "should support booleans",
+        "sql": "select b FROM {bools} WHERE b = false"
+      },
+      {
         "description": "should support boolean literals",
         "sql": "select b = true, b = false FROM {bools}"
       }
@@ -100,6 +112,14 @@
       {
         "description": "should support NOT with order of precedence",
         "sql": "select NOT b1 AND b2, NOT b1 OR b2 FROM {bools}"
+      },
+      {
+        "description": "should support cascade",
+        "sql": "select (b1 AND b2) = true FROM {bools}"
+      },
+      {
+        "description": "should support combine",
+        "sql": "select (b1 AND b2) OR (b1 AND b1) FROM {bools}"
       }
     ]
   }
