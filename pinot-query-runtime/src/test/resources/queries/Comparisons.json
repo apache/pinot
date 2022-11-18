@@ -1,5 +1,5 @@
 {
-  "ints": {
+  "ints_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -23,7 +23,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "floats": {
+  "floats_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -47,7 +47,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "doubles": {
+  "doubles_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -71,7 +71,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "numerics": {
+  "numerics_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -95,7 +95,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "strings": {
+  "strings_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -125,7 +125,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "timestamps": {
+  "timestamps_comp": {
     "ignored": true,
     "comment": "we don't support timestamp comparisons",
     "psql": "9.2",
@@ -152,7 +152,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "int_x_bigint": {
+  "int_x_bigint_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -176,7 +176,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "int_x_float": {
+  "int_x_float_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -200,7 +200,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "int_x_double": {
+  "int_x_double_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -224,7 +224,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "int_x_numeric": {
+  "int_x_numeric_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -248,7 +248,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "float_x_bigint": {
+  "float_x_bigint_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -272,7 +272,7 @@
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" }
     ]
   },
-  "float_x_double": {
+  "float_x_double_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -313,7 +313,7 @@
       }
     ]
   },
-  "float_x_numeric": {
+  "float_x_numeric_comp": {
     "psql": "9.2",
     "tables": {
       "tbl": {
