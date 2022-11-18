@@ -54,7 +54,7 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
-  private static final Set<JoinRelType> SUPPORTED_EXCHANGE_TYPES = ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT);
+  private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES = ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT);
   private final HashMap<Key, List<Object[]>> _broadcastHashTable;
   private final Operator<TransferableBlock> _leftTableOperator;
   private final Operator<TransferableBlock> _rightTableOperator;
@@ -69,7 +69,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
       DataSchema outputSchema, JoinNode.JoinKeys joinKeys, List<RexExpression> joinClauses, JoinRelType joinType) {
-    Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(joinType),
+    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(joinType),
         "Join type: " + joinType + " is not supported!");
     _leftKeySelector = joinKeys.getLeftJoinKeySelector();
     _rightKeySelector = joinKeys.getRightJoinKeySelector();
