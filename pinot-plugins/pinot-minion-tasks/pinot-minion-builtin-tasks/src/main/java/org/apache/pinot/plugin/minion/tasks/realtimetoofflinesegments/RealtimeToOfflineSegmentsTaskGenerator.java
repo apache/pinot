@@ -209,7 +209,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         continue;
       }
 
-      Map<String, String> configs = getPushTaskConfig(taskConfigs,
+      Map<String, String> configs = getPushTaskConfig(realtimeTableName, taskConfigs,
           StringUtils.join(downloadURLs, MinionConstants.URL_SEPARATOR));
       configs.put(MinionConstants.TABLE_NAME_KEY, realtimeTableName);
       configs.put(MinionConstants.SEGMENT_NAME_KEY, StringUtils.join(segmentNames, ","));
@@ -328,7 +328,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
   }
 
-  private Map<String, String> getPushTaskConfig(Map<String, String> batchConfigMap, String downloadUrls) {
+  private Map<String, String> getPushTaskConfig(String tableName, Map<String, String> batchConfigMap, String downloadUrls) {
     try {
       String[] downloadURLList = downloadUrls.split(MinionConstants.URL_SEPARATOR);
       if (downloadURLList.length > 0) {
@@ -337,18 +337,15 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         URI outputDirURI = null;
         if (!downloadURI.getScheme().contentEquals("http")) {
           String outputDir = downloadUrl.substring(0, downloadUrl.lastIndexOf("/"));
-          outputDirURI = URI.create(outputDir);
+          outputDirURI = SegmentGenerationUtils.getDirectoryURI(outputDir);
+        } else {
+          outputDirURI = SegmentGenerationUtils.getDirectoryURI(_clusterInfoAccessor.getDataDir() + "/" + tableName);
         }
         String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
 
         Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
-        if (outputDirURI != null) {
-          URI outputSegmentDirURI = SegmentGenerationUtils.getRelativeOutputPath(
-              outputDirURI, downloadURI, outputDirURI);
-          singleFileGenerationTaskConfig.put(
-              BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputSegmentDirURI.toString());
-        }
-        if ((outputDirURI == null) || (pushMode == null)) {
+        singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDirURI.toString());
+        if (pushMode == null) {
           singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
         } else {
           singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
@@ -358,6 +355,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       }
       return batchConfigMap;
     } catch (Exception e) {
+      LOGGER.warn("Error occurred while generating push task config", e);
       return batchConfigMap;
     }
   }
