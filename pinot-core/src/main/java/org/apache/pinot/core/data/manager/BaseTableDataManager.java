@@ -554,10 +554,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkArgument(_tableDataManagerConfig.getTablePeerDownloadScheme() != null,
             "Download peers require non null peer download scheme");
     List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName,
-        _tableDataManagerConfig.getTablePeerDownloadScheme(), _helixManager);
+        _tableDataManagerConfig.getTablePeerDownloadScheme(), _helixManager, _tableNameWithType);
     if (peerSegmentURIs.isEmpty()) {
       String msg = String.format("segment %s doesn't have any peers", segmentName);
       LOGGER.warn(msg);
+      // HelixStateTransitionHandler would catch the runtime exception and mark the segment state as Error
       throw new RuntimeException(msg);
     }
     try {

@@ -670,7 +670,7 @@ public class BaseTableDataManagerTest {
     File destFile = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     try (MockedStatic<PeerServerSegmentFinder> mockPeerSegFinder = mockStatic(PeerServerSegmentFinder.class)) {
       mockPeerSegFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(
-          "seg01", "http", mockedHelix))
+          "seg01", "http", mockedHelix, TABLE_NAME_WITH_TYPE))
           .thenReturn(Collections.singletonList(uri));
       tmgr.downloadFromPeersWithoutStreaming("seg01", mock(SegmentZKMetadata.class), destFile);
     }
