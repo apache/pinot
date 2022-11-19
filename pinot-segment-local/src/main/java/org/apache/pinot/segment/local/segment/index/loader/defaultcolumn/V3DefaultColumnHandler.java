@@ -74,6 +74,11 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
     File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
     LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
+
+    File nullValueVectorFile = new File(_indexDir, column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
+    if (nullValueVectorFile.exists()) {
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, nullValueVectorFile, ColumnIndexType.NULLVALUE_VECTOR);
+    }
     return true;
   }
 }

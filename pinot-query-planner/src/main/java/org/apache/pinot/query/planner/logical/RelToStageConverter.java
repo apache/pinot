@@ -161,13 +161,15 @@ public final class RelToStageConverter {
       case TIME:
       case TIMESTAMP:
         return DataSchema.ColumnDataType.TIMESTAMP;
+      case CHAR:
       case VARCHAR:
         return DataSchema.ColumnDataType.STRING;
       case BINARY:
       case VARBINARY:
         return DataSchema.ColumnDataType.BYTES;
       default:
-        throw new IllegalStateException("Unexpected RelDataTypeField: " + relDataTypeField.getType());
+        throw new IllegalStateException("Unexpected RelDataTypeField: " + relDataTypeField.getType() + " for column: "
+            + relDataTypeField.getName());
     }
   }
 }

@@ -18,13 +18,16 @@
  */
 
 import React from 'react';
-import { Button, Dialog, DialogActions, DialogTitle, makeStyles, withStyles } from '@material-ui/core';
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, makeStyles, withStyles } from '@material-ui/core';
 import { red } from '@material-ui/core/colors';
 
 const useStyles = makeStyles((theme) => ({
   root: {
     '& .MuiDialog-container > .MuiPaper-root':{
       minWidth: '600px'
+    },
+    "& .MuiDialogContent-root": {
+      padding: 8
     }
   },
   dialogTitle: {
@@ -86,7 +89,9 @@ export default function CustomDialog({
       disableEscapeKeyDown={disableEscapeKeyDown}
     >
       <DialogTitle className={classes.dialogTitle}>{title}</DialogTitle>
-      {children}
+      <DialogContent>
+        {children}
+      </DialogContent>
       <DialogActions>
         {showCancelBtn &&
         <CancelButton onClick={handleClose} variant="outlined">

@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
@@ -94,17 +95,19 @@ public class TransferableBlockUtilsTest {
 
   private void validateNonSplittableBlock(BaseDataBlock nonSplittableBlock)
       throws Exception {
-    List<TransferableBlock> transferableBlocks =
+    Iterator<TransferableBlock> transferableBlocks =
         TransferableBlockUtils.splitBlock(new TransferableBlock(nonSplittableBlock), DataBlock.Type.METADATA,
             4 * 1024 * 1024);
-    Assert.assertEquals(transferableBlocks.size(), 1);
-    Assert.assertEquals(transferableBlocks.get(0).getDataBlock(), nonSplittableBlock);
+    Assert.assertTrue(transferableBlocks.hasNext());
+    Assert.assertEquals(transferableBlocks.next().getDataBlock(), nonSplittableBlock);
+    Assert.assertFalse(transferableBlocks.hasNext());
   }
 
-  private void validateBlocks(List<TransferableBlock> blocks, List<Object[]> rows, DataSchema dataSchema)
+  private void validateBlocks(Iterator<TransferableBlock> blocks, List<Object[]> rows, DataSchema dataSchema)
       throws Exception {
     int rowId = 0;
-    for (TransferableBlock block : blocks) {
+    while (blocks.hasNext()) {
+      TransferableBlock block = blocks.next();
       for (Object[] row : block.getContainer()) {
         for (int colId = 0; colId < dataSchema.getColumnNames().length; colId++) {
           if (row[colId] == null && rows.get(rowId)[colId] == null) {

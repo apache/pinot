@@ -66,3 +66,11 @@ baseApi.interceptors.response.use(handleResponse, handleError);
 export const transformApi = axios.create({baseURL: '/', transformResponse: [data => data]});
 transformApi.interceptors.request.use(handleConfig, handleError);
 transformApi.interceptors.response.use(handleResponse, handleError);
+
+// baseApi axios instance does not throw an error when API fails hence the control will never go to catch block
+// changing the handleError method of baseApi will cause current UI to break (as UI might have not handle error properly)
+// creating a new axios instance baseApiWithErrors which can be used when adding new API's
+// NOTE: It is an add-on utility and can be used in case you want to handle/show UI when API fails.
+export const baseApiWithErrors = axios.create({ baseURL: '/' });
+baseApiWithErrors.interceptors.request.use(handleConfig);
+baseApiWithErrors.interceptors.response.use(handleResponse);

@@ -45,7 +45,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.matches;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -108,8 +107,7 @@ public class MockInstanceDataManagerFactory {
       tableDataManagers.put(e.getKey(), tableDataManager);
     }
     for (Map.Entry<String, TableDataManager> e : tableDataManagers.entrySet()) {
-      when(instanceDataManager.getTableDataManager(matches(String.format("%s.*", e.getKey())))).thenReturn(
-          e.getValue());
+      when(instanceDataManager.getTableDataManager(e.getKey())).thenAnswer(inv -> e.getValue());
     }
     return instanceDataManager;
   }

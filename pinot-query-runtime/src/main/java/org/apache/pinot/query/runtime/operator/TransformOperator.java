@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -33,24 +34,35 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 
 /**
  * This basic {@code TransformOperator} implement basic transformations.
+ *
+ * This operator performs three kinds of transform
+ * - InputRef transform, which reads from certain input column based on column index
+ * - Literal transform, which outputs literal value
+ * - Function transform, which runs a function on function operands. Function operands and be any of 3 the transform.
+ * Note: Function transform only runs functions from v1 engine scalar function factory, which only does argument count
+ * and canonicalized function name matching (lower case).
  */
 public class TransformOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "TRANSFORM";
   private final Operator<TransferableBlock> _upstreamOperator;
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
+  // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public TransformOperator(Operator<TransferableBlock> upstreamOperator, DataSchema dataSchema,
+  public TransformOperator(Operator<TransferableBlock> upstreamOperator, DataSchema resultSchema,
       List<RexExpression> transforms, DataSchema upstreamDataSchema) {
+    Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
+    Preconditions.checkState(resultSchema.size() == transforms.size(),
+        "result schema size:" + resultSchema.size() + " doesn't match transform operand size:" + transforms.size());
     _upstreamOperator = upstreamOperator;
     _resultColumnSize = transforms.size();
     _transformOperandsList = new ArrayList<>(_resultColumnSize);
     for (RexExpression rexExpression : transforms) {
       _transformOperandsList.add(TransformOperand.toTransformOperand(rexExpression, upstreamDataSchema));
     }
-    _resultSchema = dataSchema;
+    _resultSchema = resultSchema;
   }
 
   @Override

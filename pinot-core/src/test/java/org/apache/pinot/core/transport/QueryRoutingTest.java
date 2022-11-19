@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.Futures;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
@@ -33,7 +34,9 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -60,10 +63,18 @@ public class QueryRoutingTest {
       Collections.singletonMap(SERVER_INSTANCE, Collections.emptyList());
 
   private QueryRouter _queryRouter;
+  private ServerRoutingStatsManager _serverRoutingStatsManager;
+  int _requestCount;
 
   @BeforeClass
   public void setUp() {
-    _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class), mock(ServerRoutingStatsManager.class));
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    PinotConfiguration cfg = new PinotConfiguration(properties);
+    _serverRoutingStatsManager = new ServerRoutingStatsManager(cfg);
+    _serverRoutingStatsManager.init();
+    _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class), _serverRoutingStatsManager);
+    _requestCount = 0;
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes) {
@@ -88,6 +99,7 @@ public class QueryRoutingTest {
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
+    String serverId = SERVER_INSTANCE.getInstanceId();
 
     // Start the server
     QueryServer queryServer = getQueryServer(0, responseBytes);
@@ -95,13 +107,17 @@ public class QueryRoutingTest {
 
     // OFFLINE only
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 600_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
     ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
     assertNotNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseSize(), responseBytes.length);
+    // 2 requests - query submit and query response.
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
 
     // REALTIME only
     asyncQueryResponse =
@@ -112,6 +128,9 @@ public class QueryRoutingTest {
     serverResponse = response.get(REALTIME_SERVER_ROUTING_INSTANCE);
     assertNotNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseSize(), responseBytes.length);
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
 
     // Hybrid
     asyncQueryResponse =
@@ -127,6 +146,9 @@ public class QueryRoutingTest {
     serverResponse = response.get(REALTIME_SERVER_ROUTING_INSTANCE);
     assertNotNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseSize(), responseBytes.length);
+    _requestCount += 4;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
 
     // Shut down the server
     queryServer.shutDown();
@@ -136,6 +158,7 @@ public class QueryRoutingTest {
   public void testInvalidResponse()
       throws Exception {
     long requestId = 123;
+    String serverId = SERVER_INSTANCE.getInstanceId();
 
     // Start the server
     QueryServer queryServer = getQueryServer(0, new byte[0]);
@@ -154,6 +177,9 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
     // Query should time out
     assertTrue(System.currentTimeMillis() - startTimeMs >= 1000);
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
 
     // Shut down the server
     queryServer.shutDown();
@@ -166,6 +192,7 @@ public class QueryRoutingTest {
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
+    String serverId = SERVER_INSTANCE.getInstanceId();
 
     // Start the server
     QueryServer queryServer = getQueryServer(0, responseBytes);
@@ -184,6 +211,9 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
     // Query should time out
     assertTrue(System.currentTimeMillis() - startTimeMs >= 1000);
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
 
     // Shut down the server
     queryServer.shutDown();
@@ -199,6 +229,7 @@ public class QueryRoutingTest {
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
+    String serverId = SERVER_INSTANCE.getInstanceId();
 
     // Start the server
     QueryServer queryServer = getQueryServer(500, responseBytes);
@@ -221,6 +252,10 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
     // Query should early terminate
     assertTrue(System.currentTimeMillis() - startTimeMs < timeoutMs);
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+
 
     // Submit query after server is down
     startTimeMs = System.currentTimeMillis();
@@ -237,6 +272,15 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
     // Query should early terminate
     assertTrue(System.currentTimeMillis() - startTimeMs < timeoutMs);
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+  }
+
+  private void waitForStatsUpdate(long taskCount) {
+    TestUtils.waitForCondition(aVoid -> {
+      return (_serverRoutingStatsManager.getCompletedTaskCount() == taskCount);
+    }, 5L, 5000, "Failed to record stats for AdaptiveServerSelectorTest");
   }
 
   @AfterClass

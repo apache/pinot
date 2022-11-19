@@ -1,0 +1,117 @@
+{
+  "smallint": {
+    "psql": "8.1.1",
+    "ignored": true,
+    "comment": "not supported"
+  },
+  "integers": {
+    "comment": "we don't support BIGINT notation",
+    "tables": {
+      "ints": {
+        "schema": [
+          {"name": "int32", "type": "INT"},
+          {"name": "int64", "type": "LONG"}
+        ],
+        "inputs": [
+          [0, 0],
+          [123, 321],
+          [-2147483648, -9223372036854775808],
+          [2147483647, 9223372036854775807]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "8.1.1",
+        "description": "test selecting integer values",
+        "sql": "SELECT * FROM {ints}"
+      },
+      {
+        "psql": "8.1.1",
+        "ignored": true,
+        "comment": "we don't properly support overflow behavior because we return doubles",
+        "description": "overflow behavior",
+        "sql": "SELECT int32 + 1, int32 - 1, int64 + 1, int64 -1 FROM {ints}",
+        "expectedException": "*out of range*"
+      }
+    ]
+  },
+  "numeric": {
+    "comment": "ANSI SQL calls this type NUMERIC(precision, scale) but we call it BIG_DECIMAL",
+    "tables": {
+      "numeric": {
+        "schema": [
+          {"name": "big", "type": "BIG_DECIMAL"}
+        ],
+        "inputs": [
+          ["92233720368547758071"],
+          ["92233720368547758071.0000000001"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "8.1.2",
+        "TODO": "for some reason, when we select * with this test the timestamp column gets returned as well...",
+        "description": "test support for numeric types of arbitrary precision and scale with values larger than long can support",
+        "sql": "SELECT big FROM {numeric}"
+      }
+    ]
+  },
+  "nan_infinity": {
+    "ignored": true,
+    "comment": "we don't support NaN or Infinity",
+    "tables": {
+      "numeric": {
+        "schema": [
+          {"name": "big", "type": "BIG_DECIMAL"},
+          {"name": "float", "type": "FLOAT"},
+          {"name": "double", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          ["NaN", "NaN", "NaN"],
+          ["Infinity", "Infinity", "Infinity"],
+          ["-Infinity", "-Infinity", "-Infinity"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "8.1.2",
+        "TODO": "for some reason, when we select * with this test the timestamp column gets returned as well...",
+        "sql": "SELECT big, floatv, doublev FROM {numeric}",
+        "outputs": [
+          ["NaN"],
+          ["Infinity"],
+          ["-Infinity"]
+        ]
+      }
+    ]
+  },
+  "floating_point": {
+    "tables": {
+      "floats": {
+        "schema": [
+          {"name": "floatv", "type": "FLOAT"},
+          {"name": "doublev", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          [0, 0],
+          [123.456, 123.456],
+          [1E-37, 1E-307],
+          [1E+37, 1E+307]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test floating point precision",
+        "sql": "SELECT * FROM {floats}"
+      },
+      {
+        "description": "test floating point overflow",
+        "sql": "SELECT floatv + 1, doublev + 1 FROM {floats}"
+      }
+    ]
+  }
+}

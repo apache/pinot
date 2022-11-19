@@ -1,0 +1,42 @@
+{
+  "select_expression_test": {
+    "tables": {
+      "tbl1": {
+        "schema":[
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "strCol", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, 8, 3.0, 5.176518e16, "lyons"],
+          [2, 9, 4.0, 4.608155e11, "onan"],
+          [3, 14, 5.0, 1.249261e11, "rudvalis"],
+          [4, 21, 6.0, 8.677557e19, "janko"],
+          [1, 41, 2.0, 4.15478e33, "baby"],
+          [2, 46, 1.0, 8.08017e53, "monster"]
+        ]
+      },
+      "tbl2": {
+        "schema":[
+          {"name": "intCol", "type": "INT"},
+          {"name": "strCol", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "foo"],
+          [2, "bar"]
+        ]
+      }
+    },
+    "queries": [
+      { "sql": "SELECT intCol, longCol, doubleCol, strCol FROM {tbl1}"},
+      { "sql": "SELECT {tbl1}.intCol, {tbl2}.strCol FROM {tbl1}, {tbl2} WHERE {tbl1}.intCol = {tbl2}.intCol"},
+      { "sql": "SELECT {tbl1}.*, {tbl2}.strCol FROM {tbl1}, {tbl2} WHERE {tbl1}.intCol = {tbl2}.intCol"},
+      { "sql": "SELECT intCol as \"value\", doubleCol + floatCol AS \"sum\" FROM {tbl1}"},
+      { "sql": "SELECT intCol as \"from\" FROM {tbl1}"},
+      { "sql": "SELECT intCol as key, SUM(doubleCol + floatCol) AS aggSum FROM {tbl1} GROUP BY intCol"},
+      { "sql": "SELECT a.intCol as key, SUM(a.doubleCol + b.intCol) AS aggSum FROM {tbl1} AS a JOIN {tbl2} AS b ON a.intCol = b.intCol GROUP BY a.intCol"}
+    ]
+  }
+}

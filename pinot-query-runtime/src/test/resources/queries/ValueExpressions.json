@@ -1,0 +1,102 @@
+{
+  "subscript": {
+    "psql": "4.2.3",
+    "ignored": true,
+    "comment": "query runner test doesn't yet support multivalue columns",
+    "tables": {
+      "tbl": {
+        "schema":[{"name": "data", "type": "INT[]"}],
+        "inputs": [[[1]]]
+      }
+    },
+    "queries": [{
+      "description": "test array subscripting",
+      "sql": "SELECT data[0] FROM {tbl}"
+    }]
+  },
+  "scalar_function_call": {
+    "psql": "4.2.6",
+    "tables": {
+      "tbl": {
+        "schema":[{"name": "data", "type": "STRING"}],
+        "inputs": [[" foo "]]
+      }
+    },
+    "queries": [{
+      "description": "test basic function call syntax works",
+      "sql": "SELECT trim(data) FROM {tbl}"
+    }]
+  },
+  "custom_collation": {
+    "psql": "4.2.10",
+    "ignored": true,
+    "comment": "COLLATE is not supported",
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [{
+      "psql": "4.1.2.7",
+      "description": "test non-standard collation specification",
+      "sql": "SELECT data > 'bar' COLLATE \"C\" FROM {tbl}"
+    }]
+  },
+  "scalar_subqueries": {
+    "psql": "4.2.11",
+    "ignored": true,
+    "comment": "can't compile the logical plan",
+    "tables": {
+      "cities": {
+        "schema": [
+          {"name": "name", "type": "STRING"},
+          {"name": "population", "type": "INT"},
+          {"name": "state", "type": "STRING"}],
+        "inputs": [
+          ["san francisco", 800000, "CA"],
+          ["san jose", 1000000, "CA"],
+          ["new york", 8500000, "NY"]
+        ]
+      },
+      "states": {
+        "schema": [{"name": "name", "type": "STRING"}],
+        "inputs": [["CA"], ["NY"]]
+      }
+    },
+    "queries": [{
+        "description": "test support for scalar subqueries",
+        "sql": "SELECT name, (SELECT max(population) FROM {cities} WHERE {cities}.state = {states}.name) FROM {states}"
+      }]
+  },
+  "array_constructors": {
+    "psql": "4.2.12",
+    "ignored": true,
+    "comment": "cannot parse",
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [{
+      "description": "test inline array constructing",
+      "sql": "SELECT data, ARRAY[1,2,3+4] FROM {tbl}"
+    }]
+  },
+  "calling_functions": {
+    "psql": "4.3",
+    "ignored": true,
+    "comment": "named calling notation not supported",
+    "tables": {
+      "tbl": {
+        "schema": [{"name": "data", "type": "STRING"}],
+        "inputs": [["1"]]
+      }
+    },
+    "queries": [{
+      "description": "test calling functions via named/mixed notation",
+      "sql": "SELECT data, trim(data), trim(input => data) FROM {tbl}"
+    }]
+  }
+}
