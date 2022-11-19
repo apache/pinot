@@ -601,6 +601,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       streamMessageCount++;
     }
     updateCurrentDocumentCountMetrics();
+    updateConsumerLagMetrics();
+
     if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
       _hasMessagesFetched = true;
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
@@ -615,6 +617,35 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
     return prematureExit;
+  }
+
+  private void updateConsumerLagMetrics() {
+    Map<String, PartitionLagState> lagStateMap = getPartitionToLagState(getConsumerPartitionState());
+    for (Map.Entry<String, PartitionLagState> entry: lagStateMap.entrySet()) {
+      String partitionId = entry.getKey();
+      PartitionLagState lagState = entry.getValue();
+      if (!PartitionLagState.NOT_CALCULATED.equals(lagState.getRecordsLag())) {
+        try {
+          _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, Integer.parseInt(partitionId),
+              ServerGauge.LLC_RECORDS_LAG, Long.parseLong(entry.getValue().getRecordsLag()));
+        } catch (NumberFormatException nfe) {
+          // do not do anything
+          _segmentLogger.debug("Failed to parse the records lag {} returned from the consumer for partition {}",
+              lagState.getRecordsLag(), partitionId);
+        }
+      }
+
+      if (!PartitionLagState.NOT_CALCULATED.equals(lagState.getAvailabilityLagMs())) {
+        try {
+          _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, Integer.parseInt(partitionId),
+              ServerGauge.LLC_AVAILABILITY_LAG_MS, Long.parseLong(entry.getValue().getAvailabilityLagMs()));
+        } catch (NumberFormatException nfe) {
+          // do not do anything
+          _segmentLogger.debug("Failed to parse the availability lag {} returned from the consumer for partition {}",
+              lagState.getRecordsLag(), partitionId);
+        }
+      }
+    }
   }
 
   public class PartitionConsumer implements Runnable {
@@ -1071,6 +1102,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    */
   private void cleanupMetrics() {
     _serverMetrics.removeTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING);
+    _serverMetrics.removePartitionGauge(_tableNameWithType, _partitionGroupId, ServerGauge.LLC_RECORDS_LAG);
+    _serverMetrics.removePartitionGauge(_tableNameWithType, _partitionGroupId, ServerGauge.LLC_AVAILABILITY_LAG_MS);
   }
 
   protected void hold() {

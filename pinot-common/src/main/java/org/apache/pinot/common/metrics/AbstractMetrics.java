@@ -501,6 +501,14 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
             }));
   }
 
+  public void removePartitionGauge(final String tableName, final int partitionId, final G gauge) {
+    final String fullGaugeName;
+    String gaugeName = gauge.getGaugeName();
+    fullGaugeName = gaugeName + "." + getTableName(tableName) + "." + partitionId;
+
+    removeGauge(fullGaugeName);
+  }
+
   /**
    * Adds or updates a gauge whose values are retrieved from the given supplier function.
    * The supplier function can be updated by calling this method again.

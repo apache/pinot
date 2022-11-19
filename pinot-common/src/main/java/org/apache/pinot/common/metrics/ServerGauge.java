@@ -45,7 +45,10 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   // Dedup metrics
   DEDUP_PRIMARY_KEYS_COUNT("dedupPrimaryKeysCount", false),
   CONSUMPTION_QUOTA_UTILIZATION("ratio", false),
-  JVM_HEAP_USED_BYTES("bytes", true);
+  JVM_HEAP_USED_BYTES("bytes", true),
+  // Consumer lag metrics
+  LLC_RECORDS_LAG("recordCount", false),
+  LLC_AVAILABILITY_LAG_MS("availabilityLagMs", false);
 
   private final String _gaugeName;
   private final String _unit;
