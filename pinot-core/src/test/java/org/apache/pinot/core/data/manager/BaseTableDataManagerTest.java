@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -624,12 +625,9 @@ public class BaseTableDataManagerTest {
 
   // case 2: if the attempt to download from deep storage exceeds, invoke downloadFromPeers.
   @Test
-  public void testDownloadAndDecryptCase2() throws Exception {
-    File tempInput = new File(TEMP_DIR, "tmp.txt");
-    FileUtils.write(tempInput, "this is from somewhere remote");
-
+  public void testDownloadAndDecryptPeerDownload() throws Exception {
+    String backupCopyURI = mockRemoteCopy().toString();
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
-    String backupCopyURI = "file://" + tempInput.getAbsolutePath();
     when(zkmd.getDownloadUrl()).thenReturn(backupCopyURI);
 
     TableDataManagerConfig config = createDefaultTableDataManagerConfig();
@@ -638,9 +636,9 @@ public class BaseTableDataManagerTest {
     File tempRootDir = tmgr.getTmpSegmentDataDir("test-download-decrypt-peer");
 
     // As the case 2 description says, we need to mock the static method fetchAndDecryptSegmentToLocal to
-    // throw the AttemptExceed exception; Due to the constrain that mockito static cannot do argument matching,
+    // throw the AttemptExceed exception; Due to the constraint that mockito static cannot do argument matching,
     // e.g., any(), we have to pass exact argument value when mocking fetchAndDecryptSegmentToLocal.
-    // However, the first argument File is internally created, which cannot be mocked.
+    // However, the second argument of File is internally created, which cannot be mocked.
     // Luckily, the File class's equal method only compares the path. Thus, we can create a file with identical path
     // and use it to mock the fetchAndDecryptSegmentToLocal
     File destFile = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
@@ -653,15 +651,10 @@ public class BaseTableDataManagerTest {
     verify(tmgr, times(1)).downloadFromPeersWithoutStreaming("seg01", zkmd, destFile);
   }
 
-  // happy case: down
+  // happy case: download from peers
   @Test
-  public void testdownloadFromPeersWithoutStreaming() throws Exception {
-    File tempInput = new File(TEMP_DIR, "tmp.txt");
-    FileUtils.write(tempInput, "this is from somewhere remote");
-
-    String backupCopyURI = "file://" + tempInput.getAbsolutePath();
-    URI uri = new URI(backupCopyURI);
-
+  public void testDownloadFromPeersWithoutStreaming() throws Exception {
+    URI uri = mockRemoteCopy();
     TableDataManagerConfig config = createDefaultTableDataManagerConfig();
     when(config.getTablePeerDownloadScheme()).thenReturn("http");
     HelixManager mockedHelix = mock(HelixManager.class);
@@ -804,5 +797,14 @@ public class BaseTableDataManagerTest {
         Collections.singletonList(new TierConfig(tierName, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "3d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null,
             Collections.singletonMap("dataDir", dataDir.getAbsolutePath())))).build();
+  }
+
+  private static URI mockRemoteCopy() throws IOException, URISyntaxException {
+    File tempInput = new File(TEMP_DIR, "tmp.txt");
+    FileUtils.write(tempInput, "this is from somewhere remote");
+
+    String backupCopyURI = "file://" + tempInput.getAbsolutePath();
+    URI uri = new URI(backupCopyURI);
+    return uri;
   }
 }
