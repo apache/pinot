@@ -55,10 +55,9 @@ import org.apache.pinot.spi.config.table.TableConfig;
  * 1. If a stage A depends on stage B, stageId(A) < stageId(B)
  * 2. Leaf stage can either be a MailboxReceiveNode or TableScanNode.
  */
-public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, PhysicalStageInfo> {
+public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, PhysicalStageInfo> {
   private TableCache _tableCache;
   private Map<Integer, StageMetadata> _stageMetadataMap;
-  private Map<Integer, Integer> _equivalentPkey;
   private boolean _canSkipShuffleForJoin;
 
   public static void optimizeShuffles(StageNode rootStageNode, Map<Integer, StageMetadata> stageMetadataMap,
@@ -73,50 +72,44 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
   private SmartShuffleRewriteVisitor(TableCache tableCache, Map<Integer, StageMetadata> stageMetadataMap) {
     _tableCache = tableCache;
     _stageMetadataMap = stageMetadataMap;
-    _equivalentPkey = new HashMap<>();
     _canSkipShuffleForJoin = false;
   }
 
   @Override
-  public Set<Integer> visitAggregate(AggregateNode node, PhysicalStageInfo context) {
-    Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
+  public DSU visitAggregate(AggregateNode node, PhysicalStageInfo context) {
+    DSU oldPartitionKeys = node.getInputs().get(0).visit(this, context);
+    Map<Integer, Integer> oldNameMap = new HashMap<>();
+    Map<Integer, Integer> newNameMap = new HashMap<>();
 
     // any input reference directly carries over in group set of aggregation
     // should still be a partition key
-    Set<Integer> partitionKeys = new HashSet<>();
+    DSU partitionKeys = new DSU();
     for (int i = 0; i < node.getGroupSet().size(); i++) {
       RexExpression rex = node.getGroupSet().get(i);
       if (rex instanceof RexExpression.InputRef) {
         if (oldPartitionKeys.contains(((RexExpression.InputRef) rex).getIndex())) {
+          oldNameMap.put(i, ((RexExpression.InputRef) rex).getIndex());
+          newNameMap.put(((RexExpression.InputRef) rex).getIndex(), i);
           partitionKeys.add(i);
         }
       }
     }
+    updateDSU(oldPartitionKeys, partitionKeys, oldNameMap, newNameMap);
 
     return partitionKeys;
   }
 
   @Override
-  public Set<Integer> visitFilter(FilterNode node, PhysicalStageInfo context) {
+  public DSU visitFilter(FilterNode node, PhysicalStageInfo context) {
     // filters don't change partition keys
     return node.getInputs().get(0).visit(this, context);
   }
 
   @Override
-  public Set<Integer> visitJoin(JoinNode node, PhysicalStageInfo context) {
+  public DSU visitJoin(JoinNode node, PhysicalStageInfo context) {
     List<MailboxReceiveNode> innerLeafNodes = context.getLeafNodes().get(node.getStageId()).stream()
         .map(x -> (MailboxReceiveNode) x).collect(Collectors.toList());
     Preconditions.checkState(innerLeafNodes.size() == 2);
-
-    // Currently, JOIN criteria is guaranteed to only have one FieldSelectionKeySelector
-    FieldSelectionKeySelector leftJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getLeftJoinKeySelector();
-    FieldSelectionKeySelector rightJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getRightJoinKeySelector();
-    for (int i = 0; i < leftJoinKey.getColumnIndices().size(); i++) {
-      int leftIdx = leftJoinKey.getColumnIndices().get(i);
-      int rightIdx = rightJoinKey.getColumnIndices().get(i);
-      _equivalentPkey.put(leftIdx, rightIdx);
-      _equivalentPkey.put(rightIdx, leftIdx);
-    }
 
     if (canServerAssignmentAllowShuffleSkip(node.getStageId(), innerLeafNodes.get(0).getSenderStageId(),
         innerLeafNodes.get(1).getSenderStageId())) {
@@ -129,86 +122,45 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
         }
       }
     }
+    // Currently, JOIN criteria is guaranteed to only have one FieldSelectionKeySelector
+    FieldSelectionKeySelector leftJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getLeftJoinKeySelector();
+    FieldSelectionKeySelector rightJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getRightJoinKeySelector();
 
-    // TODO: This is copy-pasted from ShuffleRewriteVisitor. Make it re-usable.
-    Set<Integer> leftPKs = node.getInputs().get(0).visit(this, context);
-    Set<Integer> rightPks = node.getInputs().get(1).visit(this, context);
+    DSU leftPKs = node.getInputs().get(0).visit(this, context);
+    DSU rightPks = node.getInputs().get(1).visit(this, context);
 
     int leftDataSchemaSize = node.getInputs().get(0).getDataSchema().size();
-    Set<Integer> partitionKeys = new HashSet<>();
+    DSU partitionKeys = new DSU();
     for (int i = 0; i < leftJoinKey.getColumnIndices().size(); i++) {
       int leftIdx = leftJoinKey.getColumnIndices().get(i);
       int rightIdx = rightJoinKey.getColumnIndices().get(i);
+      int cnt = 0;
       if (leftPKs.contains(leftIdx)) {
         partitionKeys.add(leftIdx);
+        cnt++;
       }
       if (rightPks.contains(rightIdx)) {
         // combined schema will have all the left fields before the right fields
         // so add the leftDataSchemaSize before adding the key
         partitionKeys.add(leftDataSchemaSize + rightIdx);
+        cnt++;
+      }
+      if (cnt == 2) {
+        partitionKeys.merge(leftIdx, leftDataSchemaSize + rightIdx);
       }
     }
-
-    return partitionKeys;
-  }
-
-  @Override
-  public Set<Integer> visitMailboxReceive(MailboxReceiveNode node, PhysicalStageInfo context) {
-    KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
-    Set<Integer> oldPartitionKeys = context.getPartitionKeys(node.getSenderStageId());
-    // If the current stage is not a join-stage, then we already know sender's distribution
-    if (!context.isJoinStage(node.getStageId())) {
-      if (selector == null) {
-        return new HashSet<>();
-      } else if (canSkipShuffle(oldPartitionKeys, selector)) {
-        node.setExchangeType(RelDistribution.Type.SINGLETON);
-        return oldPartitionKeys;
-      }
-      return new HashSet<>(((FieldSelectionKeySelector) selector).getColumnIndices());
-    }
-    // If the current stage is a join-stage then we haven't determined distribution for sender and we already know
-    // whether shuffle can be skipped.
-    if (_canSkipShuffleForJoin) {
-      node.setExchangeType(RelDistribution.Type.SINGLETON);
-      ((MailboxSendNode) node.getSender()).setExchangeType(RelDistribution.Type.SINGLETON);
-      return oldPartitionKeys;
-    } else if (selector == null) {
-      return new HashSet<>();
-    }
-    return new HashSet<>(((FieldSelectionKeySelector) selector).getColumnIndices());
-  }
-
-  @Override
-  public Set<Integer> visitMailboxSend(MailboxSendNode node, PhysicalStageInfo context) {
-    Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
-    KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
-
-    boolean canSkipShuffleBasic = canSkipShuffle(oldPartitionKeys, selector);
-    // If receiver is not a join-stage, then we can determine distribution type now.
-    if (!context.isJoinStage(node.getReceiverStageId())) {
-      if (canSkipShuffleBasic) {
-        node.setExchangeType(RelDistribution.Type.SINGLETON);
-        return oldPartitionKeys;
-      }
-      return new HashSet<>();
-    }
-    // If receiver is a join-stage, remember partition-keys of the child node of MailboxSendNode.
-    Set<Integer> mailboxSendPartitionKeys = canSkipShuffleBasic ? oldPartitionKeys : new HashSet<>();
-    context.setPartitionKeys(node.getStageId(), mailboxSendPartitionKeys);
-    return mailboxSendPartitionKeys;
-  }
-
-  @Override
-  public Set<Integer> visitProject(ProjectNode node, PhysicalStageInfo context) {
-    Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
-
-    // all inputs carry over if they're still in the projection result
-    Set<Integer> partitionKeys = new HashSet<>();
-    for (int i = 0; i < node.getProjects().size(); i++) {
-      RexExpression rex = node.getProjects().get(i);
-      if (rex instanceof RexExpression.InputRef) {
-        if (oldPartitionKeys.contains(((RexExpression.InputRef) rex).getIndex())) {
-          partitionKeys.add(i);
+    for (Integer newKey : partitionKeys.getAllMembers()) {
+      if (newKey >= leftDataSchemaSize) {
+        for (Integer members : rightPks.getMembers(newKey - leftDataSchemaSize)) {
+          if (partitionKeys.contains(members + leftDataSchemaSize)) {
+            partitionKeys.merge(newKey, members + leftDataSchemaSize);
+          }
+        }
+      } else {
+        for (Integer members : leftPKs.getMembers(newKey)) {
+          if (partitionKeys.contains(members)) {
+            partitionKeys.merge(newKey, members);
+          }
         }
       }
     }
@@ -217,13 +169,86 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
   }
 
   @Override
-  public Set<Integer> visitSort(SortNode node, PhysicalStageInfo context) {
+  public DSU visitMailboxReceive(MailboxReceiveNode node, PhysicalStageInfo context) {
+    KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
+    DSU oldPartitionKeys = context.getPartitionKeys(node.getSenderStageId());
+    // If the current stage is not a join-stage, then we already know sender's distribution
+    if (!context.isJoinStage(node.getStageId())) {
+      if (selector == null) {
+        return new DSU();
+      } else if (canSkipShuffle(oldPartitionKeys, selector)) {
+        node.setExchangeType(RelDistribution.Type.SINGLETON);
+        return oldPartitionKeys;
+      }
+      return DSU.of(((FieldSelectionKeySelector) selector).getColumnIndices());
+    }
+    // If the current stage is a join-stage then we haven't determined distribution for sender and we already know
+    // whether shuffle can be skipped.
+    if (_canSkipShuffleForJoin) {
+      node.setExchangeType(RelDistribution.Type.SINGLETON);
+      ((MailboxSendNode) node.getSender()).setExchangeType(RelDistribution.Type.SINGLETON);
+      return oldPartitionKeys;
+    } else if (selector == null) {
+      return new DSU();
+    }
+    return DSU.of(((FieldSelectionKeySelector) selector).getColumnIndices());
+  }
+
+  @Override
+  public DSU visitMailboxSend(MailboxSendNode node, PhysicalStageInfo context) {
+    DSU oldPartitionKeys = node.getInputs().get(0).visit(this, context);
+    KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
+
+    boolean canSkipShuffleBasic = canSkipShuffle(oldPartitionKeys, selector);
+    // If receiver is not a join-stage, then we can determine distribution type now.
+    if (!context.isJoinStage(node.getReceiverStageId())) {
+      DSU partitionKeys;
+      if (canSkipShuffleBasic) {
+        node.setExchangeType(RelDistribution.Type.SINGLETON);
+        partitionKeys = oldPartitionKeys;
+      } else {
+        partitionKeys = new DSU();
+      }
+      context.setPartitionKeys(node.getStageId(), partitionKeys);
+      return partitionKeys;
+    }
+    // If receiver is a join-stage, remember partition-keys of the child node of MailboxSendNode.
+    DSU mailboxSendPartitionKeys = canSkipShuffleBasic ? oldPartitionKeys : new DSU();
+    context.setPartitionKeys(node.getStageId(), mailboxSendPartitionKeys);
+    return mailboxSendPartitionKeys;
+  }
+
+  @Override
+  public DSU visitProject(ProjectNode node, PhysicalStageInfo context) {
+    DSU oldPartitionKeys = node.getInputs().get(0).visit(this, context);
+
+    // all inputs carry over if they're still in the projection result
+    DSU partitionKeys = new DSU();
+    Map<Integer, Integer> oldNameMap = new HashMap<>();
+    Map<Integer, Integer> newNameMap = new HashMap<>();
+    for (int i = 0; i < node.getProjects().size(); i++) {
+      RexExpression rex = node.getProjects().get(i);
+      if (rex instanceof RexExpression.InputRef) {
+        if (oldPartitionKeys.contains(((RexExpression.InputRef) rex).getIndex())) {
+          oldNameMap.put(i, ((RexExpression.InputRef) rex).getIndex());
+          newNameMap.put(((RexExpression.InputRef) rex).getIndex(), i);
+          partitionKeys.add(i);
+        }
+      }
+    }
+    updateDSU(oldPartitionKeys, partitionKeys, oldNameMap, newNameMap);
+
+    return partitionKeys;
+  }
+
+  @Override
+  public DSU visitSort(SortNode node, PhysicalStageInfo context) {
     // sort doesn't change the partition keys
     return node.getInputs().get(0).visit(this, context);
   }
 
   @Override
-  public Set<Integer> visitTableScan(TableScanNode node, PhysicalStageInfo context) {
+  public DSU visitTableScan(TableScanNode node, PhysicalStageInfo context) {
     TableConfig tableConfig =
         _tableCache.getTableConfig(node.getTableName());
     Preconditions.checkNotNull(tableConfig, "table config is null");
@@ -233,7 +258,7 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
           indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap();
       if (columnPartitionMap != null) {
         Set<String> partitionColumns = columnPartitionMap.keySet();
-        Set<Integer> newPartitionKeys = new HashSet<>();
+        DSU newPartitionKeys = new DSU();
         for (int i = 0; i < node.getTableScanColumns().size(); i++) {
           if (partitionColumns.contains(node.getTableScanColumns().get(i))) {
             newPartitionKeys.add(i);
@@ -242,12 +267,12 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
         return newPartitionKeys;
       }
     }
-    return new HashSet<>();
+    return new DSU();
   }
 
   @Override
-  public Set<Integer> visitValue(ValueNode node, PhysicalStageInfo context) {
-    return new HashSet<>();
+  public DSU visitValue(ValueNode node, PhysicalStageInfo context) {
+    return new DSU();
   }
 
   private boolean canServerAssignmentAllowShuffleSkip(int currentStageId, int leftStageId, int rightStageId) {
@@ -261,7 +286,7 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
 
   private boolean canSkipShuffleForJoin(MailboxReceiveNode mailboxReceiveNode, MailboxSendNode mailboxSendNode,
       PhysicalStageInfo context) {
-    Set<Integer> oldPartitionKeys = context.getPartitionKeys(mailboxSendNode.getStageId());
+    DSU oldPartitionKeys = context.getPartitionKeys(mailboxSendNode.getStageId());
     KeySelector<Object[], Object[]> selector = mailboxSendNode.getPartitionKeySelector();
     if (!canSkipShuffle(oldPartitionKeys, selector)) {
       return false;
@@ -271,18 +296,47 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>
     return canSkipShuffle(oldPartitionKeys, selector);
   }
 
-  private boolean canSkipShuffle(Set<Integer> partitionKeys, KeySelector<Object[], Object[]> keySelector) {
-    if (!partitionKeys.isEmpty() && keySelector != null) {
-      Set<Integer> targetSet = new HashSet<>(((FieldSelectionKeySelector) keySelector).getColumnIndices());
-      boolean canSkip = true;
-      for (Integer senderPkey : partitionKeys) {
-        if (targetSet.contains(senderPkey)
-            || (_equivalentPkey.containsKey(senderPkey) && targetSet.contains(_equivalentPkey.get(senderPkey)))) {
-        } else {
-          canSkip = false;
+  private void updateDSU(DSU oldPartitionKeys, DSU newPartitionKeys) {
+    for (Integer takenKey : newPartitionKeys.getAllMembers()) {
+      for (Integer otherMember : oldPartitionKeys.getMembers(takenKey)) {
+        if (newPartitionKeys.contains(otherMember)) {
+          newPartitionKeys.merge(takenKey, otherMember);
         }
       }
-      return canSkip;
+    }
+  }
+
+  private void updateDSU(DSU oldPartitionKeys, DSU newPartitionKeys, Map<Integer, Integer> oldNameMap,
+      Map<Integer, Integer> newNameMap) {
+    for (Integer retainedKey : newPartitionKeys.getAllMembers()) {
+      int oldName = oldNameMap.get(retainedKey);
+      for (Integer otherMember : oldPartitionKeys.getMembers(oldName)) {
+        int newOtherMemberName = newNameMap.getOrDefault(otherMember, -1);
+        if (newOtherMemberName != -1) {
+          newPartitionKeys.merge(retainedKey, newOtherMemberName);
+        }
+      }
+    }
+  }
+
+  private boolean canSkipShuffle(DSU partitionKeys, KeySelector<Object[], Object[]> keySelector) {
+    if (!partitionKeys.isEmpty() && keySelector != null) {
+      Set<Integer> targetSet = new HashSet<>(((FieldSelectionKeySelector) keySelector).getColumnIndices());
+      for (Integer senderPkey : partitionKeys.getAllMembers()) {
+        if (!targetSet.contains(senderPkey)) {
+          boolean containsEquivalentKey = false;
+          for (Integer equivalentKey : partitionKeys.getMembers(senderPkey)) {
+            if (targetSet.contains(equivalentKey)) {
+              containsEquivalentKey = true;
+              break;
+            }
+          }
+          if (!containsEquivalentKey) {
+            return false;
+          }
+        }
+      }
+      return true;
     }
     return false;
   }

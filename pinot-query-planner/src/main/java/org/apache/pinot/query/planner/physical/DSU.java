@@ -18,19 +18,87 @@
  */
 package org.apache.pinot.query.planner.physical;
 
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 
 public class DSU {
+
+  public static DSU of(int a) {
+    DSU dsu = new DSU();
+    dsu.add(a);
+    return dsu;
+  }
+
+  public static DSU of(Collection<Integer> members) {
+    DSU dsu = new DSU();
+    for (Integer member: members) {
+      dsu.add(member);
+    }
+    return dsu;
+  }
+
+  private final Map<Integer, Integer> _rank;
+  private final Map<Integer, Integer> _parent;
+
+  public DSU() {
+    _rank = new HashMap<>();
+    _parent = new HashMap<>();
+  }
+
+  public boolean contains(int a) {
+    return _rank.containsKey(a);
+  }
+
+  public void add(int a) {
+    if (!_rank.containsKey(a)) {
+      _rank.put(a, 1);
+      _parent.put(a, a);
+    }
+  }
+
+  public int findRoot(int a) {
+    if (_parent.get(a) == a) {
+      return a;
+    }
+    int newParent = findRoot(_parent.get(a));
+    _parent.put(a, newParent);
+    return newParent;
+  }
+
   public void merge(int a, int b) {
+    int aRoot = findRoot(a);
+    int bRoot = findRoot(b);
+    if (aRoot == bRoot) {
+      return;
+    }
+    if (_rank.get(aRoot) >= _rank.get(bRoot)) {
+      _rank.put(aRoot, _rank.get(aRoot) + _rank.get(bRoot));
+      _parent.put(bRoot, aRoot);
+    } else {
+      _rank.put(bRoot, _rank.get(bRoot) + _rank.get(aRoot));
+      _parent.put(aRoot, bRoot);
+    }
   }
 
   public boolean connected(int a, int b) {
-    return true;
+    return findRoot(a) == findRoot(b);
+  }
+
+  public List<Integer> getAllMembers() {
+    return new ArrayList<>(_parent.keySet());
   }
 
   public Set<Integer> getMembers(int a) {
-    return new HashSet<>();
+    return _parent.keySet().stream().filter(member -> connected(member, a)).collect(Collectors.toSet());
+  }
+
+  public boolean isEmpty() {
+    return _rank.isEmpty();
   }
 }

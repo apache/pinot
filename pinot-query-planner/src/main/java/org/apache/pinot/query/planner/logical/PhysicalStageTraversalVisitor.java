@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.pinot.query.planner.physical.DSU;
 import org.apache.pinot.query.planner.stage.DefaultPostOrderTraversalVisitor;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -65,7 +66,7 @@ public class PhysicalStageTraversalVisitor
     private final Map<Integer, StageNode> _rootStageNode;
     private final Map<Integer, List<StageNode>> _leafNodes;
     private final Set<Integer> _joinStages;
-    private final Map<Integer, Set<Integer>> _senderInputPartitionKeys;
+    private final Map<Integer, DSU> _senderInputPartitionKeys;
 
     public PhysicalStageInfo() {
       _rootStageNode = new HashMap<>();
@@ -102,11 +103,11 @@ public class PhysicalStageTraversalVisitor
       _leafNodes.computeIfAbsent(stageId, (x) -> new ArrayList<>()).add(stageNode);
     }
 
-    public void setPartitionKeys(Integer stageId, Set<Integer> partitionKeys) {
+    public void setPartitionKeys(Integer stageId, DSU partitionKeys) {
       _senderInputPartitionKeys.put(stageId, partitionKeys);
     }
 
-    public Set<Integer> getPartitionKeys(Integer stageId) {
+    public DSU getPartitionKeys(Integer stageId) {
       return _senderInputPartitionKeys.get(stageId);
     }
   }
