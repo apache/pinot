@@ -44,7 +44,7 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
     Map.Entry<Integer, GrpcMailboxService> receiver = _mailboxServices.lastEntry();
     StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
         "happypath", "localhost", sender.getKey(), "localhost", receiver.getKey());
-    SendingMailbox<TransferableBlock> sendingMailbox = sender.getValue().getSendingMailbox(mailboxId);
+    SendingMailbox<TransferableBlock> sendingMailbox = sender.getValue().createSendingMailbox(mailboxId);
     ReceivingMailbox<TransferableBlock> receivingMailbox = receiver.getValue().getReceivingMailbox(mailboxId);
 
     // create mock object
@@ -78,7 +78,7 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
     Map.Entry<Integer, GrpcMailboxService> receiver = _mailboxServices.lastEntry();
     StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
         "exception", "localhost", sender.getKey(), "localhost", receiver.getKey());
-    GrpcSendingMailbox sendingMailbox = (GrpcSendingMailbox) sender.getValue().getSendingMailbox(mailboxId);
+    GrpcSendingMailbox sendingMailbox = (GrpcSendingMailbox) sender.getValue().createSendingMailbox(mailboxId);
     GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) receiver.getValue().getReceivingMailbox(mailboxId);
 
     // create mock object

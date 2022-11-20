@@ -41,7 +41,7 @@ public class InMemoryMailboxServiceTest {
         "happyPathJob", "localhost", 0, "localhost", 0);
     InMemoryReceivingMailbox receivingMailbox = (InMemoryReceivingMailbox) mailboxService.getReceivingMailbox(
         mailboxId);
-    InMemorySendingMailbox sendingMailbox = (InMemorySendingMailbox) mailboxService.getSendingMailbox(mailboxId);
+    InMemorySendingMailbox sendingMailbox = (InMemorySendingMailbox) mailboxService.createSendingMailbox(mailboxId);
 
     // Sends are non-blocking as long as channel capacity is not breached
     for (int i = 0; i < InMemoryMailboxService.DEFAULT_CHANNEL_CAPACITY; i++) {
@@ -86,7 +86,7 @@ public class InMemoryMailboxServiceTest {
 
     // Test getSendingMailbox
     try {
-      mailboxService.getSendingMailbox(mailboxId);
+      mailboxService.createSendingMailbox(mailboxId);
       Assert.fail("Method call above should have failed");
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("non-local transport"));

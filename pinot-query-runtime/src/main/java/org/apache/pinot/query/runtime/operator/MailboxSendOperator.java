@@ -31,13 +31,13 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,12 +54,13 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
           RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED);
 
   private final Operator<TransferableBlock> _dataTableBlockBaseOperator;
-  private final BlockExchange _exchange;
+
+  private PlanRequestContext _context;
 
   @VisibleForTesting
   interface BlockExchangeFactory {
-    BlockExchange build(MailboxService<TransferableBlock> mailboxService, List<MailboxIdentifier> destinations,
-        RelDistribution.Type exchange, KeySelector<Object[], Object[]> selector, BlockSplitter splitter);
+    BlockExchange build(PlanRequestContext context, List<MailboxIdentifier> destinations, RelDistribution.Type exchange,
+        KeySelector<Object[], Object[]> selector, BlockSplitter splitter);
   }
 
   @VisibleForTesting
@@ -67,28 +68,30 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     MailboxIdentifier generate(ServerInstance server);
   }
 
-  public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
-      Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
-      long jobId, int stageId) {
-    this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
-        server -> toMailboxId(server, jobId, stageId, hostName, port), BlockExchange::getExchange);
+  public MailboxSendOperator(PlanRequestContext context, Operator<TransferableBlock> dataTableBlockBaseOperator,
+      List<ServerInstance> receivingStageInstances, RelDistribution.Type exchangeType,
+      KeySelector<Object[], Object[]> keySelector, int stageId) {
+    this(context, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
+        server -> toMailboxId(server, context.getRequestId(), stageId, context.getHostName(), context.getPort()),
+        BlockExchange::getExchange);
   }
 
   @VisibleForTesting
-  MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
-      Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
-      MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory) {
-    _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
+  MailboxSendOperator(PlanRequestContext context, Operator<TransferableBlock> dataTableBlockBaseOperator,
+      List<ServerInstance> receivingStageInstances, RelDistribution.Type exchangeType,
+      KeySelector<Object[], Object[]> keySelector, MailboxIdGenerator mailboxIdGenerator,
+      BlockExchangeFactory blockExchangeFactory) {
+    Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
+        String.format("Exchange type '%s' is not supported yet", exchangeType));
 
+    _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
     List<MailboxIdentifier> receivingMailboxes;
     if (exchangeType == RelDistribution.Type.SINGLETON) {
       // TODO: this logic should be moved into SingletonExchange
       ServerInstance singletonInstance = null;
       for (ServerInstance serverInstance : receivingStageInstances) {
-        if (serverInstance.getHostname().equals(mailboxService.getHostname())
-            && serverInstance.getQueryMailboxPort() == mailboxService.getMailboxPort()) {
+        if (serverInstance.getHostname().equals(context.getMailboxService().getHostname())
+            && serverInstance.getQueryMailboxPort() == context.getMailboxService().getMailboxPort()) {
           Preconditions.checkState(singletonInstance == null, "multiple instance found for singleton exchange type!");
           singletonInstance = serverInstance;
         }
@@ -96,17 +99,13 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
       Preconditions.checkNotNull(singletonInstance, "Unable to find receiving instance for singleton exchange");
       receivingMailboxes = Collections.singletonList(mailboxIdGenerator.generate(singletonInstance));
     } else {
-      receivingMailboxes = receivingStageInstances
-          .stream()
-          .map(mailboxIdGenerator::generate)
-          .collect(Collectors.toList());
+      receivingMailboxes =
+          receivingStageInstances.stream().map(mailboxIdGenerator::generate).collect(Collectors.toList());
     }
-
     BlockSplitter splitter = TransferableBlockUtils::splitBlock;
-    _exchange = blockExchangeFactory.build(mailboxService, receivingMailboxes, exchangeType, keySelector, splitter);
-
-    Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
-        String.format("Exchange type '%s' is not supported yet", exchangeType));
+    context.registerExchange(
+        blockExchangeFactory.build(context, receivingMailboxes, exchangeType, keySelector, splitter));
+    _context = context;
   }
 
   @Override
@@ -135,8 +134,9 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
     if (!TransferableBlockUtils.isNoOpBlock(transferableBlock)) {
       try {
-        _exchange.send(transferableBlock);
+        _context.getExchange().send(transferableBlock);
       } catch (Exception e) {
+        // TODO: handle this exception.
         LOGGER.error("Exception while sending block to mailbox.", e);
       }
     }
@@ -144,8 +144,8 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     return transferableBlock;
   }
 
-  private static StringMailboxIdentifier toMailboxId(
-      ServerInstance serverInstance, long jobId, int stageId, String serverHostName, int serverPort) {
+  private static StringMailboxIdentifier toMailboxId(ServerInstance serverInstance, long jobId, int stageId,
+      String serverHostName, int serverPort) {
     return new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHostName, serverPort,
         serverInstance.getHostname(), serverInstance.getQueryMailboxPort());
   }

@@ -27,6 +27,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -49,6 +50,9 @@ public class OpChainSchedulerServiceTest {
   @Mock
   private OpChainScheduler _scheduler;
 
+  @Mock
+  private PlanRequestContext _context;
+
   @BeforeClass
   public void beforeClass() {
     _mocks = MockitoAnnotations.openMocks(this);
@@ -70,7 +74,7 @@ public class OpChainSchedulerServiceTest {
   }
 
   private OpChain getChain(Operator<TransferableBlock> operator) {
-    return new OpChain(operator);
+    return new OpChain(operator, _context);
   }
 
   @Test
@@ -90,7 +94,7 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.register(new OpChain(_operatorA));
+    scheduler.register(new OpChain(_operatorA, _context));
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
@@ -113,7 +117,7 @@ public class OpChainSchedulerServiceTest {
     });
 
     // When:
-    scheduler.register(new OpChain(_operatorA));
+    scheduler.register(new OpChain(_operatorA, _context));
     scheduler.startAsync().awaitRunning();
 
     // Then:
@@ -140,7 +144,7 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.register(new OpChain(_operatorA));
+    scheduler.register(new OpChain(_operatorA, _context));
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
@@ -181,8 +185,8 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.register(new OpChain(_operatorA));
-    scheduler.register(new OpChain(_operatorB));
+    scheduler.register(new OpChain(_operatorA, _context));
+    scheduler.register(new OpChain(_operatorB, _context));
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");

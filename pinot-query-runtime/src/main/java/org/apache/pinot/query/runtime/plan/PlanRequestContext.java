@@ -18,36 +18,54 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 
 
 public class PlanRequestContext {
   protected final MailboxService<TransferableBlock> _mailboxService;
   protected final long _requestId;
-  protected final int _stageId;
   protected final String _hostName;
   protected final int _port;
   protected final Map<Integer, StageMetadata> _metadataMap;
+  // TODO: Add exchange map if multiple exchanges are needed.
+  BlockExchange _exchange;
 
-  public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      String hostName, int port, Map<Integer, StageMetadata> metadataMap) {
+  private final HashMap<MailboxIdentifier, SendingMailbox<TransferableBlock>> _sendingMailboxMap = new HashMap<>();
+
+  public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, String hostName, int port,
+      Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _requestId = requestId;
-    _stageId = stageId;
     _hostName = hostName;
     _port = port;
     _metadataMap = metadataMap;
   }
 
-  public long getRequestId() {
-    return _requestId;
+  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
+    return _sendingMailboxMap.computeIfAbsent(mailboxId, (mid) -> _mailboxService.createSendingMailbox(mid));
   }
 
-  public int getStageId() {
-    return _stageId;
+  public void close() {
+    // TODO: clean up grpc resource.
+  }
+
+  public void registerExchange(BlockExchange exchange) {
+    _exchange = exchange;
+  }
+
+  public BlockExchange getExchange() {
+    return _exchange;
+  }
+
+  public long getRequestId() {
+    return _requestId;
   }
 
   public String getHostName() {

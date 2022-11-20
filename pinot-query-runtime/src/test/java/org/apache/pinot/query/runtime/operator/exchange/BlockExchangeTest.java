@@ -60,8 +60,8 @@ public class BlockExchangeTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_mailboxService.getSendingMailbox(MAILBOX_1)).thenReturn(_mailbox1);
-    Mockito.when(_mailboxService.getSendingMailbox(MAILBOX_2)).thenReturn(_mailbox2);
+    Mockito.when(_mailboxService.createSendingMailbox(MAILBOX_1)).thenReturn(_mailbox1);
+    Mockito.when(_mailboxService.createSendingMailbox(MAILBOX_2)).thenReturn(_mailbox2);
   }
 
   @AfterMethod

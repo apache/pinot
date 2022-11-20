@@ -40,10 +40,10 @@ public class ServerPlanRequestContext extends PlanRequestContext {
   protected PinotQuery _pinotQuery;
   protected InstanceRequest _instanceRequest;
 
-  public ServerPlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
+  public ServerPlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId,
       String hostName, int port, Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery, TableType tableType,
       TimeBoundaryInfo timeBoundaryInfo) {
-    super(mailboxService, requestId, stageId, hostName, port, metadataMap);
+    super(mailboxService, requestId, hostName, port, metadataMap);
     _pinotQuery = pinotQuery;
     _tableType = tableType;
     _timeBoundaryInfo = timeBoundaryInfo;

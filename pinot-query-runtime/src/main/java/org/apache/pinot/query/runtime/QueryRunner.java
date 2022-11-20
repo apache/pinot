@@ -79,8 +79,8 @@ public class QueryRunner {
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
-  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
-      HelixManager helixManager, ServerMetrics serverMetrics) {
+  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, HelixManager helixManager,
+      ServerMetrics serverMetrics) {
     String instanceName = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME);
     _hostname = instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE) ? instanceName.substring(
         CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceName;
@@ -108,13 +108,13 @@ public class QueryRunner {
 
   public void processQuery(DistributedStagePlan distributedStagePlan, OpChainSchedulerService scheduler,
       Map<String, String> requestMetadataMap) {
+    long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
     if (isLeafStage(distributedStagePlan)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
       // server executor.
-      List<ServerPlanRequestContext> serverQueryRequests = constructServerQueryRequests(distributedStagePlan,
-          requestMetadataMap, _helixPropertyStore, _mailboxService);
-
+      List<ServerPlanRequestContext> serverQueryRequests =
+          constructServerQueryRequests(distributedStagePlan, requestMetadataMap, _helixPropertyStore, _mailboxService);
       // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
       List<InstanceResponseBlock> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
       for (ServerPlanRequestContext requestContext : serverQueryRequests) {
@@ -122,24 +122,24 @@ public class QueryRunner {
             new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
         serverQueryResults.add(processServerQuery(request, scheduler.getWorkerPool()));
       }
-
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
-      MailboxSendOperator mailboxSendOperator =
-          new MailboxSendOperator(_mailboxService,
-              new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema()),
-              receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
-              sendNode.getPartitionKeySelector(), _hostname, _port, serverQueryRequests.get(0).getRequestId(),
-              sendNode.getStageId());
+      // TODO: Replace with a better context abstraction.
+      PlanRequestContext context =
+          new PlanRequestContext(_mailboxService, requestId, _hostname, _port, distributedStagePlan.getMetadataMap());
+      MailboxSendOperator mailboxSendOperator = new MailboxSendOperator(context,
+          new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema()),
+          receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(), sendNode.getPartitionKeySelector(),
+          sendNode.getStageId());
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
+      context.close();
     } else {
-      long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
       StageNode stageRoot = distributedStagePlan.getStageRoot();
-      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot, new PlanRequestContext(
-          _mailboxService, requestId, stageRoot.getStageId(), _hostname, _port, distributedStagePlan.getMetadataMap()));
+      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
+          new PlanRequestContext(_mailboxService, requestId, _hostname, _port, distributedStagePlan.getMetadataMap()));
       scheduler.register(rootOperator);
     }
   }
@@ -151,8 +151,8 @@ public class QueryRunner {
     Preconditions.checkState(stageMetadata.getScannedTables().size() == 1,
         "Server request for V2 engine should only have 1 scan table per request.");
     String rawTableName = stageMetadata.getScannedTables().get(0);
-    Map<String, List<String>> tableToSegmentListMap = stageMetadata.getServerInstanceToSegmentsMap()
-        .get(distributedStagePlan.getServerInstance());
+    Map<String, List<String>> tableToSegmentListMap =
+        stageMetadata.getServerInstanceToSegmentsMap().get(distributedStagePlan.getServerInstance());
     List<ServerPlanRequestContext> requests = new ArrayList<>();
     for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
       String tableType = tableEntry.getKey();
@@ -164,15 +164,17 @@ public class QueryRunner {
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
         Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
-        requests.add(ServerRequestPlanVisitor.build(mailboxService, distributedStagePlan, requestMetadataMap,
-            tableConfig, schema, stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, tableEntry.getValue()));
+        requests.add(
+            ServerRequestPlanVisitor.build(mailboxService, distributedStagePlan, requestMetadataMap, tableConfig,
+                schema, stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, tableEntry.getValue()));
       } else if (TableType.REALTIME.name().equals(tableType)) {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
         Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
-        requests.add(ServerRequestPlanVisitor.build(mailboxService, distributedStagePlan, requestMetadataMap,
-            tableConfig, schema, stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, tableEntry.getValue()));
+        requests.add(
+            ServerRequestPlanVisitor.build(mailboxService, distributedStagePlan, requestMetadataMap, tableConfig,
+                schema, stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, tableEntry.getValue()));
       } else {
         throw new IllegalArgumentException("Unsupported table type key: " + tableType);
       }

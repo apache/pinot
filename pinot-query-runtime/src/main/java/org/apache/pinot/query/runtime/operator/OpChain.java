@@ -23,6 +23,7 @@ import java.util.function.Supplier;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 
 
 /**
@@ -35,9 +36,12 @@ public class OpChain {
   // TODO: build timers that are partial-execution aware
   private final Supplier<ThreadResourceUsageProvider> _timer;
 
-  public OpChain(Operator<TransferableBlock> root) {
-    _root = root;
+  // TODO: refactor this into OpChainContext
+  private PlanRequestContext _context;
 
+  public OpChain(Operator<TransferableBlock> root, PlanRequestContext context) {
+    _root = root;
+    _context = context;
     // use memoized supplier so that the timing doesn't start until the
     // first time we get the timer
     _timer = Suppliers.memoize(ThreadResourceUsageProvider::new)::get;
@@ -49,5 +53,10 @@ public class OpChain {
 
   public ThreadResourceUsageProvider getAndStartTimer() {
     return _timer.get();
+  }
+
+  // TODO: Make this auto closable.
+  public void close() {
+    // Clean up resources. for example, clean up grpc channel.
   }
 }

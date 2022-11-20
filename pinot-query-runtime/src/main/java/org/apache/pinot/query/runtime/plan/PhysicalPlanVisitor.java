@@ -62,7 +62,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
 
   public static OpChain build(StageNode node, PlanRequestContext context) {
     Operator<TransferableBlock> root = node.visit(INSTANCE, context);
-    return new OpChain(root);
+    return new OpChain(root, context);
   }
 
   @Override
@@ -77,9 +77,8 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
   public Operator<TransferableBlock> visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
     Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
     StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
-    return new MailboxSendOperator(context.getMailboxService(), nextOperator,
-        receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
-        context.getHostName(), context.getPort(), context.getRequestId(), node.getStageId());
+    return new MailboxSendOperator(context, nextOperator, receivingStageMetadata.getServerInstances(),
+        node.getExchangeType(), node.getPartitionKeySelector(), node.getStageId());
   }
 
   @Override

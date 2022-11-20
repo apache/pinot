@@ -23,11 +23,11 @@ import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 
 
 /**
@@ -39,22 +39,22 @@ public abstract class BlockExchange {
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
 
-  private final MailboxService<TransferableBlock> _mailbox;
+  private final PlanRequestContext _context;
   private final List<MailboxIdentifier> _destinations;
   private final BlockSplitter _splitter;
 
-  public static BlockExchange getExchange(MailboxService<TransferableBlock> mailboxService,
+  public static BlockExchange getExchange(PlanRequestContext context,
       List<MailboxIdentifier> destinations, RelDistribution.Type exchangeType,
       KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
     switch (exchangeType) {
       case SINGLETON:
-        return new SingletonExchange(mailboxService, destinations, splitter);
+        return new SingletonExchange(context, destinations, splitter);
       case HASH_DISTRIBUTED:
-        return new HashExchange(mailboxService, destinations, selector, splitter);
+        return new HashExchange(context, destinations, selector, splitter);
       case RANDOM_DISTRIBUTED:
-        return new RandomExchange(mailboxService, destinations, splitter);
+        return new RandomExchange(context, destinations, splitter);
       case BROADCAST_DISTRIBUTED:
-        return new BroadcastExchange(mailboxService, destinations, splitter);
+        return new BroadcastExchange(context, destinations, splitter);
       case ROUND_ROBIN_DISTRIBUTED:
       case RANGE_DISTRIBUTED:
       case ANY:
@@ -63,9 +63,9 @@ public abstract class BlockExchange {
     }
   }
 
-  protected BlockExchange(MailboxService<TransferableBlock> mailbox, List<MailboxIdentifier> destinations,
+  protected BlockExchange(PlanRequestContext context, List<MailboxIdentifier> destinations,
       BlockSplitter splitter) {
-    _mailbox = mailbox;
+    _context = context;
     _destinations = destinations;
     _splitter = splitter;
   }
@@ -84,7 +84,7 @@ public abstract class BlockExchange {
   }
 
   private void sendBlock(MailboxIdentifier mailboxId, TransferableBlock block) {
-    SendingMailbox<TransferableBlock> sendingMailbox = _mailbox.getSendingMailbox(mailboxId);
+    SendingMailbox<TransferableBlock> sendingMailbox = _context.getSendingMailbox(mailboxId);
 
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);

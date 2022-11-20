@@ -100,7 +100,10 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                 LOGGER.info("Execution time: " + timer.getThreadTimeNs());
               }
             } catch (Exception e) {
+              // TODO: pass this error through context.
               LOGGER.error("Failed to execute query!", e);
+            } finally {
+              operatorChain.close();
             }
           }
         });

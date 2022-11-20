@@ -48,10 +48,9 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   private final String _hostname;
   private final int _mailboxPort;
 
+  // TODO: Clean up receiving mailbox.
   // maintaining a list of registered mailboxes.
   private final ConcurrentHashMap<String, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap =
-      new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap =
       new ConcurrentHashMap<>();
 
   public GrpcMailboxService(String hostname, int mailboxPort, PinotConfiguration extraConfig) {
@@ -84,8 +83,9 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * Register a mailbox, mailbox needs to be registered before use.
    * @param mailboxId the id of the mailbox.
    */
-  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
-    return _sendingMailboxMap.computeIfAbsent(mailboxId.toString(), (mId) -> new GrpcSendingMailbox(mId, this));
+  @Override
+  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId) {
+   return new GrpcSendingMailbox(mailboxId.toString(), this);
   }
 
   /**

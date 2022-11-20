@@ -90,7 +90,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     PinotQuery pinotQuery = new PinotQuery();
     pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
     pinotQuery.setExplain(false);
-    ServerPlanRequestContext context = new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(),
+    ServerPlanRequestContext context = new ServerPlanRequestContext(mailboxService, requestId,
         stagePlan.getServerInstance().getHostname(), stagePlan.getServerInstance().getPort(),
         stagePlan.getMetadataMap(), pinotQuery, tableType, timeBoundaryInfo);
 

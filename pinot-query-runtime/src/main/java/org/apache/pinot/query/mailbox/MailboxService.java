@@ -66,5 +66,5 @@ public interface MailboxService<T> {
    * @param mailboxId mailbox identifier.
    * @return a sending mailbox.
    */
-  SendingMailbox<T> getSendingMailbox(MailboxIdentifier mailboxId);
+  SendingMailbox<T> createSendingMailbox(MailboxIdentifier mailboxId);
 }
