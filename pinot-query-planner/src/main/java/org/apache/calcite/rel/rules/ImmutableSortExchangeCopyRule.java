@@ -18,23 +18,21 @@
  */
 package org.apache.calcite.rel.rules;
 
-import com.google.common.base.MoreObjects;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import javax.annotation.CheckReturnValue;
-import javax.annotation.Nullable;
-import javax.annotation.ParametersAreNonnullByDefault;
-import javax.annotation.concurrent.Immutable;
-import javax.annotation.concurrent.NotThreadSafe;
-import org.apache.calcite.plan.RelRule;
-import org.apache.calcite.tools.RelBuilderFactory;
-
 // NOTE: this file was generated using Calcite's code generator, but instead of pulling in all
 // the dependencies for codegen we just manually generate it and check it in. If active development
 // on this needs to happen, re-generate it using Calcite's generator.
 
 // CHECKSTYLE:OFF
+
+import com.google.common.base.MoreObjects;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import javax.annotation.Nullable;
+import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.calcite.plan.RelRule;
+import org.apache.calcite.tools.RelBuilderFactory;
+
 
 /**
  * {@code ImmutableSortExchangeCopyRule} contains immutable implementation classes generated from
