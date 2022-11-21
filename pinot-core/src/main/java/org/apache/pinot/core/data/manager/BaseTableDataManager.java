@@ -134,7 +134,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (tableMetaDataDir != null) {
       _tableMetaDataDir = new File(tableMetaDataDir);
       if (!_tableMetaDataDir.exists()) {
-        Preconditions.checkState(_tableMetaDataDir.mkdirs(), "Unable to create metadata directory at %s. " + "Please check for available space and write-permissions for this directory.", _tableMetaDataDir);
+        Preconditions.checkState(_tableMetaDataDir.mkdirs(), "Unable to create metadata directory at %s. "
+            + "Please check for available space and write-permissions for this directory.", _tableMetaDataDir);
       }
     } else {
       _tableMetaDataDir = _indexDir;
