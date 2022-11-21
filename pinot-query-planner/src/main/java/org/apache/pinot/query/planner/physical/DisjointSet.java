@@ -27,53 +27,46 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 
-public class DSU {
+public class DisjointSet<T> {
 
-  public static DSU of(int a) {
-    DSU dsu = new DSU();
-    dsu.add(a);
-    return dsu;
-  }
+  private final Map<T, Integer> _rank;
+  private final Map<T, T> _parent;
 
-  public static DSU of(Collection<Integer> members) {
-    DSU dsu = new DSU();
-    for (Integer member: members) {
-      dsu.add(member);
-    }
-    return dsu;
-  }
-
-  private final Map<Integer, Integer> _rank;
-  private final Map<Integer, Integer> _parent;
-
-  public DSU() {
+  public DisjointSet() {
     _rank = new HashMap<>();
     _parent = new HashMap<>();
   }
 
-  public boolean contains(int a) {
+  public DisjointSet(Collection<T> members) {
+    this();
+    for (T member: members) {
+      add(member);
+    }
+  }
+
+  public boolean contains(T a) {
     return _rank.containsKey(a);
   }
 
-  public void add(int a) {
+  public void add(T a) {
     if (!_rank.containsKey(a)) {
       _rank.put(a, 1);
       _parent.put(a, a);
     }
   }
 
-  public int findRoot(int a) {
+  public T findRoot(T a) {
     if (_parent.get(a) == a) {
       return a;
     }
-    int newParent = findRoot(_parent.get(a));
+    T newParent = findRoot(_parent.get(a));
     _parent.put(a, newParent);
     return newParent;
   }
 
-  public void merge(int a, int b) {
-    int aRoot = findRoot(a);
-    int bRoot = findRoot(b);
+  public void merge(T a, T b) {
+    T aRoot = findRoot(a);
+    T bRoot = findRoot(b);
     if (aRoot == bRoot) {
       return;
     }
@@ -86,15 +79,15 @@ public class DSU {
     }
   }
 
-  public boolean connected(int a, int b) {
-    return findRoot(a) == findRoot(b);
+  public boolean connected(T a, T b) {
+    return findRoot(a).equals(findRoot(b));
   }
 
-  public List<Integer> getAllMembers() {
+  public List<T> getAllMembers() {
     return new ArrayList<>(_parent.keySet());
   }
 
-  public Set<Integer> getMembers(int a) {
+  public Set<T> getMembers(T a) {
     return _parent.keySet().stream().filter(member -> connected(member, a)).collect(Collectors.toSet());
   }
 

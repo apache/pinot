@@ -23,9 +23,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -55,9 +57,9 @@ import org.apache.pinot.spi.config.table.TableConfig;
  * 1. If a stage A depends on stage B, stageId(A) < stageId(B)
  * 2. Leaf stage can either be a MailboxReceiveNode or TableScanNode.
  */
-public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, PhysicalStageInfo> {
-  private TableCache _tableCache;
-  private Map<Integer, StageMetadata> _stageMetadataMap;
+public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DisjointSet<Integer>, PhysicalStageInfo> {
+  private final TableCache _tableCache;
+  private final Map<Integer, StageMetadata> _stageMetadataMap;
   private boolean _canSkipShuffleForJoin;
 
   public static void optimizeShuffles(StageNode rootStageNode, Map<Integer, StageMetadata> stageMetadataMap,
@@ -76,14 +78,14 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
   }
 
   @Override
-  public DSU visitAggregate(AggregateNode node, PhysicalStageInfo context) {
-    DSU oldPartitionKeys = node.getInputs().get(0).visit(this, context);
+  public DisjointSet<Integer> visitAggregate(AggregateNode node, PhysicalStageInfo context) {
+    DisjointSet<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
     Map<Integer, Integer> oldNameMap = new HashMap<>();
     Map<Integer, Integer> newNameMap = new HashMap<>();
 
     // any input reference directly carries over in group set of aggregation
     // should still be a partition key
-    DSU partitionKeys = new DSU();
+    DisjointSet<Integer> partitionKeys = new DisjointSet<>();
     for (int i = 0; i < node.getGroupSet().size(); i++) {
       RexExpression rex = node.getGroupSet().get(i);
       if (rex instanceof RexExpression.InputRef) {
@@ -100,25 +102,28 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
   }
 
   @Override
-  public DSU visitFilter(FilterNode node, PhysicalStageInfo context) {
+  public DisjointSet<Integer> visitFilter(FilterNode node, PhysicalStageInfo context) {
     // filters don't change partition keys
     return node.getInputs().get(0).visit(this, context);
   }
 
   @Override
-  public DSU visitJoin(JoinNode node, PhysicalStageInfo context) {
+  public DisjointSet<Integer> visitJoin(JoinNode node, PhysicalStageInfo context) {
     List<MailboxReceiveNode> innerLeafNodes = context.getLeafNodes().get(node.getStageId()).stream()
         .map(x -> (MailboxReceiveNode) x).collect(Collectors.toList());
     Preconditions.checkState(innerLeafNodes.size() == 2);
 
-    if (canServerAssignmentAllowShuffleSkip(node.getStageId(), innerLeafNodes.get(0).getSenderStageId(),
-        innerLeafNodes.get(1).getSenderStageId())) {
-      if (canSkipShuffleForJoin(innerLeafNodes.get(0), (MailboxSendNode) innerLeafNodes.get(0).getSender(), context)) {
-        if (canSkipShuffleForJoin(innerLeafNodes.get(1),
-            (MailboxSendNode) innerLeafNodes.get(1).getSender(), context)) {
-          _stageMetadataMap.get(node.getStageId()).setServerInstances(
-              _stageMetadataMap.get(innerLeafNodes.get(0).getSenderStageId()).getServerInstances());
-          _canSkipShuffleForJoin = true;
+    if (canJoinBeColocated(node)) {
+      if (canServerAssignmentAllowShuffleSkip(node.getStageId(), innerLeafNodes.get(0).getSenderStageId(),
+          innerLeafNodes.get(1).getSenderStageId())) {
+        if (canSkipShuffleForJoin(innerLeafNodes.get(0),
+            (MailboxSendNode) innerLeafNodes.get(0).getSender(), context)) {
+          if (canSkipShuffleForJoin(innerLeafNodes.get(1),
+              (MailboxSendNode) innerLeafNodes.get(1).getSender(), context)) {
+            _stageMetadataMap.get(node.getStageId()).setServerInstances(
+                _stageMetadataMap.get(innerLeafNodes.get(0).getSenderStageId()).getServerInstances());
+            _canSkipShuffleForJoin = true;
+          }
         }
       }
     }
@@ -126,11 +131,11 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
     FieldSelectionKeySelector leftJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getLeftJoinKeySelector();
     FieldSelectionKeySelector rightJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getRightJoinKeySelector();
 
-    DSU leftPKs = node.getInputs().get(0).visit(this, context);
-    DSU rightPks = node.getInputs().get(1).visit(this, context);
+    DisjointSet<Integer> leftPKs = node.getInputs().get(0).visit(this, context);
+    DisjointSet<Integer> rightPks = node.getInputs().get(1).visit(this, context);
 
     int leftDataSchemaSize = node.getInputs().get(0).getDataSchema().size();
-    DSU partitionKeys = new DSU();
+    DisjointSet<Integer> partitionKeys = new DisjointSet<>();
     for (int i = 0; i < leftJoinKey.getColumnIndices().size(); i++) {
       int leftIdx = leftJoinKey.getColumnIndices().get(i);
       int rightIdx = rightJoinKey.getColumnIndices().get(i);
@@ -169,18 +174,18 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
   }
 
   @Override
-  public DSU visitMailboxReceive(MailboxReceiveNode node, PhysicalStageInfo context) {
+  public DisjointSet visitMailboxReceive(MailboxReceiveNode node, PhysicalStageInfo context) {
     KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
-    DSU oldPartitionKeys = context.getPartitionKeys(node.getSenderStageId());
+    DisjointSet<Integer> oldPartitionKeys = context.getPartitionKeys(node.getSenderStageId());
     // If the current stage is not a join-stage, then we already know sender's distribution
     if (!context.isJoinStage(node.getStageId())) {
       if (selector == null) {
-        return new DSU();
+        return new DisjointSet<>();
       } else if (canSkipShuffle(oldPartitionKeys, selector)) {
         node.setExchangeType(RelDistribution.Type.SINGLETON);
         return oldPartitionKeys;
       }
-      return DSU.of(((FieldSelectionKeySelector) selector).getColumnIndices());
+      return new DisjointSet<>(((FieldSelectionKeySelector) selector).getColumnIndices());
     }
     // If the current stage is a join-stage then we haven't determined distribution for sender and we already know
     // whether shuffle can be skipped.
@@ -189,41 +194,41 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
       ((MailboxSendNode) node.getSender()).setExchangeType(RelDistribution.Type.SINGLETON);
       return oldPartitionKeys;
     } else if (selector == null) {
-      return new DSU();
+      return new DisjointSet<>();
     }
-    return DSU.of(((FieldSelectionKeySelector) selector).getColumnIndices());
+    return new DisjointSet<>(((FieldSelectionKeySelector) selector).getColumnIndices());
   }
 
   @Override
-  public DSU visitMailboxSend(MailboxSendNode node, PhysicalStageInfo context) {
-    DSU oldPartitionKeys = node.getInputs().get(0).visit(this, context);
+  public DisjointSet<Integer> visitMailboxSend(MailboxSendNode node, PhysicalStageInfo context) {
+    DisjointSet<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
     KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
 
     boolean canSkipShuffleBasic = canSkipShuffle(oldPartitionKeys, selector);
     // If receiver is not a join-stage, then we can determine distribution type now.
     if (!context.isJoinStage(node.getReceiverStageId())) {
-      DSU partitionKeys;
+      DisjointSet<Integer> partitionKeys;
       if (canSkipShuffleBasic) {
         node.setExchangeType(RelDistribution.Type.SINGLETON);
         partitionKeys = oldPartitionKeys;
       } else {
-        partitionKeys = new DSU();
+        partitionKeys = new DisjointSet<>();
       }
       context.setPartitionKeys(node.getStageId(), partitionKeys);
       return partitionKeys;
     }
     // If receiver is a join-stage, remember partition-keys of the child node of MailboxSendNode.
-    DSU mailboxSendPartitionKeys = canSkipShuffleBasic ? oldPartitionKeys : new DSU();
+    DisjointSet<Integer> mailboxSendPartitionKeys = canSkipShuffleBasic ? oldPartitionKeys : new DisjointSet<>();
     context.setPartitionKeys(node.getStageId(), mailboxSendPartitionKeys);
     return mailboxSendPartitionKeys;
   }
 
   @Override
-  public DSU visitProject(ProjectNode node, PhysicalStageInfo context) {
-    DSU oldPartitionKeys = node.getInputs().get(0).visit(this, context);
+  public DisjointSet<Integer> visitProject(ProjectNode node, PhysicalStageInfo context) {
+    DisjointSet<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
 
     // all inputs carry over if they're still in the projection result
-    DSU partitionKeys = new DSU();
+    DisjointSet<Integer> partitionKeys = new DisjointSet<>();
     Map<Integer, Integer> oldNameMap = new HashMap<>();
     Map<Integer, Integer> newNameMap = new HashMap<>();
     for (int i = 0; i < node.getProjects().size(); i++) {
@@ -242,13 +247,13 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
   }
 
   @Override
-  public DSU visitSort(SortNode node, PhysicalStageInfo context) {
+  public DisjointSet<Integer> visitSort(SortNode node, PhysicalStageInfo context) {
     // sort doesn't change the partition keys
     return node.getInputs().get(0).visit(this, context);
   }
 
   @Override
-  public DSU visitTableScan(TableScanNode node, PhysicalStageInfo context) {
+  public DisjointSet<Integer> visitTableScan(TableScanNode node, PhysicalStageInfo context) {
     TableConfig tableConfig =
         _tableCache.getTableConfig(node.getTableName());
     Preconditions.checkNotNull(tableConfig, "table config is null");
@@ -258,7 +263,7 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
           indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap();
       if (columnPartitionMap != null) {
         Set<String> partitionColumns = columnPartitionMap.keySet();
-        DSU newPartitionKeys = new DSU();
+        DisjointSet<Integer> newPartitionKeys = new DisjointSet<>();
         for (int i = 0; i < node.getTableScanColumns().size(); i++) {
           if (partitionColumns.contains(node.getTableScanColumns().get(i))) {
             newPartitionKeys.add(i);
@@ -267,12 +272,12 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
         return newPartitionKeys;
       }
     }
-    return new DSU();
+    return new DisjointSet<>();
   }
 
   @Override
-  public DSU visitValue(ValueNode node, PhysicalStageInfo context) {
-    return new DSU();
+  public DisjointSet<Integer> visitValue(ValueNode node, PhysicalStageInfo context) {
+    return new DisjointSet<>();
   }
 
   private boolean canServerAssignmentAllowShuffleSkip(int currentStageId, int leftStageId, int rightStageId) {
@@ -286,7 +291,7 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
 
   private boolean canSkipShuffleForJoin(MailboxReceiveNode mailboxReceiveNode, MailboxSendNode mailboxSendNode,
       PhysicalStageInfo context) {
-    DSU oldPartitionKeys = context.getPartitionKeys(mailboxSendNode.getStageId());
+    DisjointSet<Integer> oldPartitionKeys = context.getPartitionKeys(mailboxSendNode.getStageId());
     KeySelector<Object[], Object[]> selector = mailboxSendNode.getPartitionKeySelector();
     if (!canSkipShuffle(oldPartitionKeys, selector)) {
       return false;
@@ -296,17 +301,8 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
     return canSkipShuffle(oldPartitionKeys, selector);
   }
 
-  private void updateDSU(DSU oldPartitionKeys, DSU newPartitionKeys) {
-    for (Integer takenKey : newPartitionKeys.getAllMembers()) {
-      for (Integer otherMember : oldPartitionKeys.getMembers(takenKey)) {
-        if (newPartitionKeys.contains(otherMember)) {
-          newPartitionKeys.merge(takenKey, otherMember);
-        }
-      }
-    }
-  }
-
-  private void updateDSU(DSU oldPartitionKeys, DSU newPartitionKeys, Map<Integer, Integer> oldNameMap,
+  private void updateDSU(DisjointSet<Integer> oldPartitionKeys, DisjointSet<Integer> newPartitionKeys,
+      Map<Integer, Integer> oldNameMap,
       Map<Integer, Integer> newNameMap) {
     for (Integer retainedKey : newPartitionKeys.getAllMembers()) {
       int oldName = oldNameMap.get(retainedKey);
@@ -319,7 +315,12 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
     }
   }
 
-  private boolean canSkipShuffle(DSU partitionKeys, KeySelector<Object[], Object[]> keySelector) {
+  // Equality joins can be colocated.
+  private boolean canJoinBeColocated(JoinNode joinNode) {
+    return joinNode.getJoinClauses().size() == 1 && joinNode.getJoinClauses().get(0).getKind().equals(SqlKind.EQUALS);
+  }
+
+  private boolean canSkipShuffle(DisjointSet<Integer> partitionKeys, KeySelector<Object[], Object[]> keySelector) {
     if (!partitionKeys.isEmpty() && keySelector != null) {
       Set<Integer> targetSet = new HashSet<>(((FieldSelectionKeySelector) keySelector).getColumnIndices());
       for (Integer senderPkey : partitionKeys.getAllMembers()) {
@@ -339,5 +340,35 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DSU, Physica
       return true;
     }
     return false;
+  }
+
+  static class PartitionKey {
+    private int _index;
+    private int _numPartitions;
+    private String _hashAlgorithm;
+
+    public PartitionKey(int index, int numPartitions) {
+      _index = index;
+      _numPartitions = numPartitions;
+      _hashAlgorithm = "GREAT_ALGO"; // TODO: fix this.
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      PartitionKey that = (PartitionKey) o;
+      return _index == that._index && _numPartitions == that._numPartitions && _hashAlgorithm
+          .equals(that._hashAlgorithm);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_index, _numPartitions, _hashAlgorithm);
+    }
   }
 }
