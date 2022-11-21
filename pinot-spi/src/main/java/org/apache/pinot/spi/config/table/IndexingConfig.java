@@ -63,8 +63,9 @@ public class IndexingConfig extends BaseJsonConfig {
    */
   private boolean _optimizeDictionary;
 
-  // Present only for backward compatibility. Please use `optimizeDictionary` for new tables.
-  @Deprecated
+  /**
+   * Same as `optimizeDictionary` but only for metric columns.
+   */
   private boolean _optimizeDictionaryForMetrics;
 
   private double _noDictionarySizeRatioThreshold;
