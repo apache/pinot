@@ -24,48 +24,45 @@
     },
     "queries": [
       {
-        "sql":"SELECT b, c FROM test_having GROUP BY b, c HAVING count(*) = 1 ORDER BY b, c;",
-        "ignored": true
+        "sql":"SELECT b, c FROM {test_having} GROUP BY b, c HAVING count(*) = 1 ORDER BY b, c;"
       },
       {
-        "sql":"SELECT b, c FROM test_having GROUP BY b, c HAVING b = 3 ORDER BY b, c;",
-        "ignored": true
+        "sql":"SELECT b, c FROM {test_having} GROUP BY b, c HAVING b = 3 ORDER BY b, c;"
       },
       {
-        "sql":"SELECT lower(c), count(c) FROM test_having GROUP BY lower(c) HAVING count(*) > 2 OR min(a) = max(a) ORDER BY lower(c);",
-        "ignored": true
+        "sql":"SELECT lower(c), count(c) FROM {test_having} GROUP BY lower(c) HAVING count(*) > 2 OR min(a) = max(a) ORDER BY lower(c);"
       },
       {
-        "sql":"SELECT c, max(a) FROM test_having GROUP BY c HAVING count(*) > 2 OR min(a) = max(a) ORDER BY c;",
-        "ignored": true
+        "sql":"SELECT c, max(a) FROM {test_having} GROUP BY c HAVING count(*) > 2 OR min(a) = max(a) ORDER BY c;"
       },
       {
-        "sql":"SELECT min(a), max(a) FROM test_having HAVING min(a) = max(a);",
-        "ignored": true
+        "sql":"SELECT min(a), max(a) FROM {test_having} HAVING min(a) = max(a);"
       },
       {
-        "sql":"SELECT min(a), max(a) FROM test_having HAVING min(a) < max(a);",
-        "ignored": true
+        "sql":"SELECT min(a), max(a) FROM {test_having} HAVING min(a) < max(a);"
       },
       {
-        "sql":"SELECT a FROM test_having HAVING min(a) < max(a);",
-        "ignored": true
+        "ignored": true,
+        "comment": "Plan failed. Expression 'a' is not being grouped.",
+        "sql":"SELECT a FROM {test_having} HAVING min(a) < max(a);"
       },
       {
-        "sql":"SELECT 1 AS one FROM test_having HAVING a > 1;",
-        "ignored": true
+        "ignored": true,
+        "comment": "Plan failed. Expression 'a' is not being grouped.",
+        "sql":"SELECT 1 AS one FROM {test_having} HAVING a > 1;"
       },
       {
-        "sql":"SELECT 1 AS one FROM test_having HAVING 1 > 2;",
-        "ignored": true
+        "sql":"SELECT 1 AS one FROM {test_having} HAVING 1 > 2;"
       },
       {
-        "sql":"SELECT 1 AS one FROM test_having HAVING 1 < 2;",
-        "ignored": true
+        "ignored": true,
+        "comment": "Runtime failure: java.lang.ArithmeticException: / by zero",
+        "sql":"SELECT 1 AS one FROM {test_having} HAVING 1 < 2;"
       },
       {
-        "sql":"SELECT 1 AS one FROM test_having WHERE 1/a = 1 HAVING 1 < 2;",
-        "ignored": true
+        "ignored": true,
+        "comment": "Runtime failure: java.lang.ArithmeticException: / by zero",
+        "sql":"SELECT 1 AS one FROM {test_having} WHERE 1/a = 1 HAVING 1 < 2;"
       }
     ]
   }
