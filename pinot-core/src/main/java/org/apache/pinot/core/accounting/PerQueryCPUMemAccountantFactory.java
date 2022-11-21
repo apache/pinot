@@ -470,13 +470,13 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           _config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME,
               CommonConstants.Accounting.DEFAULT_SLEEP_TIME);
 
-      // alarming sleep time factor, should be > 1 to sample more frequent at alarming level
-      private final int _alarmingSleepTimeFactor =
+      // alarming sleep time denominator, should be > 1 to sample more frequent at alarming level
+      private final int _alarmingSleepTimeDenominator =
           _config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_DENOMINATOR,
               CommonConstants.Accounting.DEFAULT_SLEEP_TIME_DENOMINATOR);
 
       // alarming sleep time
-      private final int _alarmingSleepTime = _normalSleepTime / _alarmingSleepTimeFactor;
+      private final int _alarmingSleepTime = _normalSleepTime / _alarmingSleepTimeDenominator;
 
       // the framework would not commit to kill any query if this is disabled
       private final boolean _oomKillQueryEnabled =
@@ -493,6 +493,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       public void run() {
         LOGGER.info("Starting accountant task for PerQueryCPUMemAccountant.");
         LOGGER.info("Xmx is {}", _maxHeapSize);
+        LOGGER.info("_alarmingLevel of on heap memory is {}", _alarmingLevel);
+        LOGGER.info("_criticalLevel of on heap memory is {}", _criticalLevel);
         while (true) {
           LOGGER.debug("Running timed task for PerQueryCPUMemAccountant.");
           _triggeringLevel = TriggeringLevel.Normal;
