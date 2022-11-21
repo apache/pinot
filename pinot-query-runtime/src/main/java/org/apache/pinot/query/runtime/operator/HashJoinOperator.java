@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.clearspring.analytics.util.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -48,9 +51,10 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
  * We currently support left join, inner join and semi join.
  * The output is in the format of [left_row, right_row]
  */
+// TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 public class HashJoinOperator extends BaseOperator<TransferableBlock> {
-  private static final String EXPLAIN_NAME = "BROADCAST_JOIN";
-
+  private static final String EXPLAIN_NAME = "HASH_JOIN";
+  private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES = ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT);
   private final HashMap<Key, List<Object[]>> _broadcastHashTable;
   private final Operator<TransferableBlock> _leftTableOperator;
   private final Operator<TransferableBlock> _rightTableOperator;
@@ -63,13 +67,14 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
-  // TODO: Fix inequi join bug. (https://github.com/apache/pinot/issues/9728)
-  // TODO: Double check semi join logic.
   public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
       DataSchema outputSchema, JoinNode.JoinKeys joinKeys, List<RexExpression> joinClauses, JoinRelType joinType) {
-    // TODO: Handle the case where _leftKeySelector and _rightKeySelector could be null.
+    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(joinType),
+        "Join type: " + joinType + " is not supported!");
     _leftKeySelector = joinKeys.getLeftJoinKeySelector();
     _rightKeySelector = joinKeys.getRightJoinKeySelector();
+    Preconditions.checkState(_leftKeySelector != null, "LeftKeySelector for join cannot be null");
+    Preconditions.checkState(_rightKeySelector != null, "RightKeySelector for join cannot be null");
     _leftTableOperator = leftTableOperator;
     _rightTableOperator = rightTableOperator;
     _resultSchema = outputSchema;
@@ -98,19 +103,17 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (!_isHashTableBuilt) {
-      // Build JOIN hash table
-      buildBroadcastHashTable();
-    }
-
-    if (_upstreamErrorBlock != null) {
-      return _upstreamErrorBlock;
-    } else if (!_isHashTableBuilt) {
-      return TransferableBlockUtils.getNoOpTransferableBlock();
-    }
-
-    // JOIN each left block with the right block.
     try {
+      if (!_isHashTableBuilt) {
+        // Build JOIN hash table
+        buildBroadcastHashTable();
+      }
+      if (_upstreamErrorBlock != null) {
+        return _upstreamErrorBlock;
+      } else if (!_isHashTableBuilt) {
+        return TransferableBlockUtils.getNoOpTransferableBlock();
+      }
+      // JOIN each left block with the right block.
       return buildJoinedDataBlock(_leftTableOperator.nextBlock());
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
@@ -145,30 +148,30 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     if (leftBlock.isErrorBlock()) {
       _upstreamErrorBlock = leftBlock;
       return _upstreamErrorBlock;
-    } else if (TransferableBlockUtils.isEndOfStream(leftBlock) || TransferableBlockUtils.isNoOpBlock(leftBlock)) {
+    } else if (TransferableBlockUtils.isNoOpBlock(leftBlock) || TransferableBlockUtils.isEndOfStream(leftBlock)) {
       return leftBlock;
     }
-
     List<Object[]> rows = new ArrayList<>();
-    List<Object[]> container = leftBlock.getContainer();
+    List<Object[]> container = leftBlock.isEndOfStreamBlock() ? new ArrayList<>() : leftBlock.getContainer();
     for (Object[] leftRow : container) {
-      List<Object[]> hashCollection = _broadcastHashTable.getOrDefault(
-          new Key(_leftKeySelector.getKey(leftRow)), Collections.emptyList());
+      // NOTE: Empty key selector will always give same hash code.
+      List<Object[]> hashCollection =
+          _broadcastHashTable.getOrDefault(new Key(_leftKeySelector.getKey(leftRow)), Collections.emptyList());
       // If it is a left join and right table is empty, we return left rows.
       if (hashCollection.isEmpty() && _joinType == JoinRelType.LEFT) {
         rows.add(joinRow(leftRow, null));
       } else {
         // If it is other type of join.
         for (Object[] rightRow : hashCollection) {
+          // TODO: Optimize this to avoid unnecessary object copy.
           Object[] resultRow = joinRow(leftRow, rightRow);
-          if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
-            evaluator -> evaluator.apply(resultRow))) {
+          if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream()
+              .allMatch(evaluator -> evaluator.apply(resultRow))) {
             rows.add(resultRow);
           }
         }
       }
     }
-
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
   }
 
@@ -178,7 +181,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     for (Object obj : leftRow) {
       resultRow[idx++] = obj;
     }
-    if (_joinType != JoinRelType.SEMI && rightRow != null) {
+    if (rightRow != null) {
       for (Object obj : rightRow) {
         resultRow[idx++] = obj;
       }

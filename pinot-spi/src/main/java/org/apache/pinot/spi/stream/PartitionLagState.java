@@ -24,7 +24,7 @@ package org.apache.pinot.spi.stream;
  * record offset, ingestion time etc.
  */
 public class PartitionLagState {
-  protected final static String NOT_CALCULATED = "NOT_CALCULATED";
+  public final static String NOT_CALCULATED = "NOT_CALCULATED";
 
   /**
    * Defines how far behind the current record's offset / pointer is from upstream latest record

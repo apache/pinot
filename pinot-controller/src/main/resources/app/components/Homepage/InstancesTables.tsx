@@ -17,21 +17,28 @@
  * under the License.
  */
 
-import React, {  } from 'react';
-import map from 'lodash/map';
+import React from 'react';
 import get from 'lodash/get';
+import has from 'lodash/has';
 import InstanceTable from './InstanceTable';
 
-const Instances = ({instances, clusterName}) => {
+const Instances = ({ instances, clusterName }) => {
   const order = ['Controller', 'Broker', 'Server', 'Minion'];
   return (
     <>
-      {
-        map(order, (key) => {
+      {order
+        .filter((key) => has(instances, key))
+        .map((key) => {
           const value = get(instances, key, []);
-          return <InstanceTable key={key} name={`${key}s`} instances={value} clusterName={clusterName} />;
-        })
-      }
+          return (
+            <InstanceTable
+              key={key}
+              name={`${key}s`}
+              instances={value}
+              clusterName={clusterName}
+            />
+          );
+        })}
     </>
   );
 };

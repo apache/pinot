@@ -53,7 +53,11 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
     _tableName = tableConfig.getTableName();
     SegmentsValidationAndRetentionConfig validationAndRetentionConfig = tableConfig.getValidationConfig();
     Preconditions.checkState(validationAndRetentionConfig != null, "Validation Config is null");
-    _replication = validationAndRetentionConfig.getReplicationNumber();
+    // Number of replicas per partition of low-level consumers check is for the real time tables only
+    // TODO: Cleanup required once we fetch the replication number from table config depending on table type
+    _replication = tableConfig.getTableType() == TableType.REALTIME
+        ? validationAndRetentionConfig.getReplicasPerPartitionNumber()
+        : validationAndRetentionConfig.getReplicationNumber();
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
         validationAndRetentionConfig.getReplicaGroupStrategyConfig();
     _partitionColumn = replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;

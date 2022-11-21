@@ -227,6 +227,8 @@ public class ConsumingSegmentInfoReader {
     }
   }
 
+  // TODO: Invert response to be a map of partition to a vector of [currentOffset, recordsLag, latestUpstreamOffset,
+  //  availabilityLagMs]
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class PartitionOffsetInfo {
     @JsonProperty("currentOffsetsMap")
