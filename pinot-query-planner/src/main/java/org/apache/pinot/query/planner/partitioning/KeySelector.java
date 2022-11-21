@@ -37,4 +37,9 @@ public interface KeySelector<IN, OUT> {
   OUT getKey(IN input);
 
   int computeHash(IN input);
+
+  /**
+   * @return the hash-algorithms used
+   */
+  String hashAlgorithm();
 }

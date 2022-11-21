@@ -73,4 +73,9 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]
     }
     return Math.abs(hashCodeBuilder.toHashCode());
   }
+
+  @Override
+  public String hashAlgorithm() {
+    return "absHashCode";
+  }
 }

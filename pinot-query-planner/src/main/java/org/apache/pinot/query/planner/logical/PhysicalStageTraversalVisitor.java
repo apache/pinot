@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.query.planner.physical.DisjointSet;
+import org.apache.pinot.query.planner.physical.SmartShuffleRewriteVisitor;
 import org.apache.pinot.query.planner.stage.DefaultPostOrderTraversalVisitor;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -66,7 +67,7 @@ public class PhysicalStageTraversalVisitor
     private final Map<Integer, StageNode> _rootStageNode;
     private final Map<Integer, List<StageNode>> _leafNodes;
     private final Set<Integer> _joinStages;
-    private final Map<Integer, DisjointSet<Integer>> _senderInputPartitionKeys;
+    private final Map<Integer, DisjointSet<SmartShuffleRewriteVisitor.PartitionKey>> _senderInputPartitionKeys;
 
     public PhysicalStageInfo() {
       _rootStageNode = new HashMap<>();
@@ -103,11 +104,11 @@ public class PhysicalStageTraversalVisitor
       _leafNodes.computeIfAbsent(stageId, (x) -> new ArrayList<>()).add(stageNode);
     }
 
-    public void setPartitionKeys(Integer stageId, DisjointSet<Integer> partitionKeys) {
+    public void setPartitionKeys(Integer stageId, DisjointSet<SmartShuffleRewriteVisitor.PartitionKey> partitionKeys) {
       _senderInputPartitionKeys.put(stageId, partitionKeys);
     }
 
-    public DisjointSet<Integer> getPartitionKeys(Integer stageId) {
+    public DisjointSet<SmartShuffleRewriteVisitor.PartitionKey> getPartitionKeys(Integer stageId) {
       return _senderInputPartitionKeys.get(stageId);
     }
   }

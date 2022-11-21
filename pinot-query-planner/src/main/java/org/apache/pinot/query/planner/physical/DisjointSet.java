@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
@@ -48,6 +49,10 @@ public class DisjointSet<T> {
     return _rank.containsKey(a);
   }
 
+  public List<T> getMatchingElements(Function<T, Boolean> matcher) {
+    return _rank.keySet().stream().filter(matcher::apply).collect(Collectors.toList());
+  }
+
   public void add(T a) {
     if (!_rank.containsKey(a)) {
       _rank.put(a, 1);
@@ -62,6 +67,10 @@ public class DisjointSet<T> {
     T newParent = findRoot(_parent.get(a));
     _parent.put(a, newParent);
     return newParent;
+  }
+
+  public int size() {
+    return _rank.size();
   }
 
   public void merge(T a, T b) {
