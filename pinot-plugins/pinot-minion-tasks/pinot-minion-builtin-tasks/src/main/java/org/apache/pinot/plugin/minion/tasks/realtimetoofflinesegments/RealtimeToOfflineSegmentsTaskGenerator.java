@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import com.google.common.base.Preconditions;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,7 +30,6 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
-import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
@@ -39,6 +37,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtil
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -209,8 +208,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         continue;
       }
 
-      Map<String, String> configs = getPushTaskConfig(realtimeTableName, taskConfigs,
-          StringUtils.join(downloadURLs, MinionConstants.URL_SEPARATOR));
+      Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(realtimeTableName, taskConfigs,
+          _clusterInfoAccessor);
       configs.put(MinionConstants.TABLE_NAME_KEY, realtimeTableName);
       configs.put(MinionConstants.SEGMENT_NAME_KEY, StringUtils.join(segmentNames, ","));
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, StringUtils.join(downloadURLs, MinionConstants.URL_SEPARATOR));
@@ -326,38 +325,5 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, -1);
     }
     return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
-  }
-
-  private Map<String, String> getPushTaskConfig(String tableName,
-      Map<String, String> batchConfigMap, String downloadUrls) {
-    try {
-      String[] downloadURLList = downloadUrls.split(MinionConstants.URL_SEPARATOR);
-      if (downloadURLList.length > 0) {
-        String downloadUrl = downloadURLList[0];
-        URI downloadURI = URI.create(downloadUrl);
-        URI outputDirURI = null;
-        if (!downloadURI.getScheme().contentEquals("http")) {
-          String outputDir = downloadUrl.substring(0, downloadUrl.lastIndexOf("/"));
-          outputDirURI = SegmentGenerationUtils.getDirectoryURI(outputDir);
-        } else {
-          outputDirURI = SegmentGenerationUtils.getDirectoryURI(_clusterInfoAccessor.getDataDir() + "/" + tableName);
-        }
-        String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
-
-        Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
-        singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDirURI.toString());
-        if (pushMode == null) {
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
-        } else {
-          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
-        }
-        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _clusterInfoAccessor.getVipUrl());
-        return singleFileGenerationTaskConfig;
-      }
-      return batchConfigMap;
-    } catch (Exception e) {
-      LOGGER.warn("Error occurred while generating push task config", e);
-      return batchConfigMap;
-    }
   }
 }

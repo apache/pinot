@@ -19,7 +19,9 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import java.net.URI;
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -30,6 +32,9 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 public class MinionTaskUtils {
+  private static final BatchConfigProperties.SegmentPushType DEFAULT_SEGMENT_PUSH_TYPE =
+      BatchConfigProperties.SegmentPushType.TAR;
+
   private MinionTaskUtils() {
   }
 
@@ -65,6 +70,34 @@ public class MinionTaskUtils {
       return pinotFS;
     }
     return PinotFSFactory.create(fileURIScheme);
+  }
+
+  public static Map<String, String> getPushTaskConfig(String tableName, Map<String, String> taskConfigs,
+      ClusterInfoAccessor clusterInfoAccessor) {
+    try {
+      URI outputDirURI = URI.create(clusterInfoAccessor.getDataDir() + "/" + tableName);
+      String outputDirURIScheme = outputDirURI.getScheme();
+      String pushMode = IngestionConfigUtils.getPushMode(taskConfigs);
+
+      Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
+      if (!isLocalOutputDir(outputDirURIScheme)) {
+        singleFileGenerationTaskConfig.put(
+            BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDirURI.toString());
+      }
+      if (isLocalOutputDir(outputDirURIScheme) || (pushMode == null)) {
+        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
+      } else {
+        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
+      }
+      singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, clusterInfoAccessor.getVipUrl());
+      return singleFileGenerationTaskConfig;
+    } catch (Exception e) {
+      return taskConfigs;
+    }
+  }
+
+  public static boolean isLocalOutputDir(String outputDirURIScheme) {
+    return outputDirURIScheme == null || outputDirURIScheme.startsWith("file");
   }
 
   public static PinotFS getLocalPinotFs() {
