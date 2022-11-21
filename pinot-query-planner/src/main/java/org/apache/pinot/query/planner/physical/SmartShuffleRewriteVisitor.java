@@ -53,7 +53,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**
- * Underlying assumptions:
+ * Some trivial implementation assumptions (very easy to remove):
  * 1. If a stage A depends on stage B, stageId(A) < stageId(B)
  * 2. Leaf stage can either be a MailboxReceiveNode or TableScanNode.
  */
@@ -63,6 +63,19 @@ public class SmartShuffleRewriteVisitor
   private final Map<Integer, StageMetadata> _stageMetadataMap;
   private boolean _canSkipShuffleForJoin;
 
+  /**
+   * A shuffle optimizer that can avoid shuffles by taking into account all of the following:
+   * 1. Servers assigned to the stages. The optimizer may also choose to change the server assignment if skipping
+   *    shuffles is possible.
+   * 2. The hash-algorithm and physical number of partitions of the data in sender/receiver nodes
+   *    So for instance if we do a join on two tables where the left table is partitioned using Murmur but the
+   *    right table is partitioned using hashCode, then this optimizer can detect this case and keep the shuffle.
+   * 3. Equivalent partitioning introduced by doing a join. e.g. if we do a join on two tables on a user_uuid column,
+   *    then the join-stage will have two partitioning keys: leftTable.userUUID and rightTable.userUUID. If the parent
+   *    of the join stage is another join with the userUUID column of the leftTable, then we should be able to skip
+   *    shuffle again. However to do that we need to detect that two keys are equivalent, and for that we use a
+   *    DisjointSet.
+   */
   public static void optimizeShuffles(StageNode rootStageNode, Map<Integer, StageMetadata> stageMetadataMap,
       TableCache tableCache) {
     PhysicalStageInfo info = PhysicalStageTraversalVisitor.go(rootStageNode);
@@ -117,15 +130,23 @@ public class SmartShuffleRewriteVisitor
         .map(x -> (MailboxReceiveNode) x).collect(Collectors.toList());
     Preconditions.checkState(innerLeafNodes.size() == 2);
 
+    // Multiple checks need to be made to ensure that shuffle can be skipped for a join.
+    // Step-1: Join can be skipped only for equality joins.
     boolean canColocate = canJoinBeColocated(node);
+    // Step-2: Only if the servers assigned to both left and right nodes are equal and the servers assigned to the join
+    //         stage are a superset of those servers, can we skip shuffles.
     canColocate &= canServerAssignmentAllowShuffleSkip(node.getStageId(), innerLeafNodes.get(0).getSenderStageId(),
         innerLeafNodes.get(1).getSenderStageId());
+    // Step-3: For both left/right MailboxReceiveNode/MailboxSendNode pairs, check whether the key partitioning can
+    //         allow shuffle skip.
     canColocate &= canSkipShuffleForJoin(innerLeafNodes.get(0),
         (MailboxSendNode) innerLeafNodes.get(0).getSender(), context);
     canColocate &= canSkipShuffleForJoin(innerLeafNodes.get(1),
         (MailboxSendNode) innerLeafNodes.get(1).getSender(), context);
+    // Step-4: Finally, ensure that the number of partitions and the hash algorithm is same for pkeys of both children.
     canColocate &= checkPartitionScheme(innerLeafNodes.get(0), innerLeafNodes.get(1), context);
     if (canColocate) {
+      // If shuffle can be skipped, reassign servers.
       _stageMetadataMap.get(node.getStageId()).setServerInstances(
           _stageMetadataMap.get(innerLeafNodes.get(0).getSenderStageId()).getServerInstances());
       _canSkipShuffleForJoin = true;
