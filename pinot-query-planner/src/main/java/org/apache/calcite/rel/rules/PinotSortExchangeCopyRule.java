@@ -41,7 +41,7 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
 
   public static final PinotSortExchangeCopyRule SORT_EXCHANGE_COPY =
       PinotSortExchangeCopyRule.Config.DEFAULT.toRule();
-  public static final TypeFactory TYPE_FACTORY = new TypeFactory(new TypeSystem());
+  private static final TypeFactory TYPE_FACTORY = new TypeFactory(new TypeSystem());
 
   /**
    * Creates a PinotSortExchangeCopyRule.

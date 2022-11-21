@@ -42,8 +42,6 @@ import org.apache.calcite.tools.RelBuilderFactory;
  * @see ImmutableSortExchangeCopyRule.Config
  */
 @SuppressWarnings({"all"})
-@ParametersAreNonnullByDefault
-@javax.annotation.processing.Generated("org.immutables.processor.ProxyProcessor")
 final class ImmutableSortExchangeCopyRule {
   private ImmutableSortExchangeCopyRule() {
   }
@@ -56,11 +54,9 @@ final class ImmutableSortExchangeCopyRule {
    * Use the static factory method to get the default singleton instance:
    * {@code ImmutableSortExchangeCopyRule.Config.of()}.
    */
-  @Immutable
-  @CheckReturnValue
   static final class Config implements PinotSortExchangeCopyRule.Config {
     private final RelBuilderFactory relBuilderFactory;
-    private final @Nullable java.lang.@org.checkerframework.checker.nullness.qual.Nullable String description;
+    private final @Nullable String description;
     private final RelRule.OperandTransform operandSupplier;
 
     private Config() {
@@ -84,7 +80,7 @@ final class ImmutableSortExchangeCopyRule {
     }
 
     private Config(RelBuilderFactory relBuilderFactory,
-        @Nullable java.lang.@org.checkerframework.checker.nullness.qual.Nullable String description,
+        @Nullable String description,
         RelRule.OperandTransform operandSupplier) {
       this.relBuilderFactory = relBuilderFactory;
       this.description = description;
@@ -172,7 +168,7 @@ final class ImmutableSortExchangeCopyRule {
      * @return The value of the {@code description} attribute
      */
     @Override
-    public @Nullable java.lang.@org.checkerframework.checker.nullness.qual.Nullable String description() {
+    public @Nullable String description() {
       return description;
     }
 
@@ -208,7 +204,7 @@ final class ImmutableSortExchangeCopyRule {
      * @return A modified copy of the {@code this} object
      */
     public final ImmutableSortExchangeCopyRule.Config withDescription(
-        @Nullable java.lang.@org.checkerframework.checker.nullness.qual.Nullable String value) {
+        @Nullable String value) {
       if (Objects.equals(this.description, value)) {
         return this;
       }
@@ -328,7 +324,7 @@ final class ImmutableSortExchangeCopyRule {
     @NotThreadSafe
     public static final class Builder {
       private @Nullable RelBuilderFactory relBuilderFactory;
-      private @Nullable java.lang.@org.checkerframework.checker.nullness.qual.Nullable String description;
+      private @Nullable String description;
       private @Nullable RelRule.OperandTransform operandSupplier;
 
       private Builder() {
@@ -363,7 +359,7 @@ final class ImmutableSortExchangeCopyRule {
           withRelBuilderFactory(instance.relBuilderFactory());
           withOperandSupplier(instance.operandSupplier());
           @Nullable
-          java.lang.@org.checkerframework.checker.nullness.qual.Nullable String descriptionValue =
+          String descriptionValue =
               instance.description();
           if (descriptionValue != null) {
             withDescription(descriptionValue);
@@ -390,7 +386,7 @@ final class ImmutableSortExchangeCopyRule {
        * @return {@code this} builder for use in a chained invocation
        */
       public final Builder withDescription(
-          @Nullable java.lang.@org.checkerframework.checker.nullness.qual.Nullable String description) {
+          @Nullable String description) {
         this.description = description;
         return this;
       }
