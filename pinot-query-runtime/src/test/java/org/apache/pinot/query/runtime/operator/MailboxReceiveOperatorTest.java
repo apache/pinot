@@ -71,7 +71,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void testReceiveTimeout()
+  public void shouldTimeoutOnExtraLongSleep()
       throws InterruptedException {
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(_mailboxService, new ArrayList<>(), RelDistribution.Type.SINGLETON, "test", 123, 456,
@@ -85,7 +85,7 @@ public class MailboxReceiveOperatorTest {
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*multiple instance "
       + "found.*")
-  public void testReceiveSingletonMultiMatchMailboxServer() {
+  public void shouldThrowReceiveSingletonFromMultiMatchMailboxServer() {
 
     Mockito.when(_mailboxService.getHostname()).thenReturn("singleton");
     Mockito.when(_mailboxService.getMailboxPort()).thenReturn(123);
@@ -101,7 +101,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RANGE_DISTRIBUTED.*")
-  public void testRangeDistributionNotSupported() {
+  public void shouldThrowRangeDistributionNotSupported() {
     Mockito.when(_mailboxService.getHostname()).thenReturn("singleton");
     Mockito.when(_mailboxService.getMailboxPort()).thenReturn(123);
 
@@ -116,7 +116,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void testReceiveSingletonNoMatchMailboxServer() {
+  public void shouldReceiveSingletonNoMatchMailboxServer() {
     String serverHost = "singleton";
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(serverHost);
@@ -143,7 +143,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void testReceiveSingletonCloseMailbox() {
+  public void shouldReceiveSingletonCloseMailbox() {
     String serverHost = "singleton";
     int server1Port = 123;
     Mockito.when(_server1.getHostname()).thenReturn(serverHost);
@@ -173,7 +173,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void testReceiveSingletonNullMailbox()
+  public void shouldReceiveSingletonNullMailbox()
       throws Exception {
     String serverHost = "singleton";
     int server1Port = 123;
@@ -206,7 +206,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void testReceiveSingletonMailbox()
+  public void shouldReceiveSingletonMailbox()
       throws Exception {
     String serverHost = "singleton";
     int server1Port = 123;
@@ -242,7 +242,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void testReceiveSingletonErrorMailbox()
+  public void shouldReceiveSingletonErrorMailbox()
       throws Exception {
     String serverHost = "singleton";
     int server1Port = 123;
@@ -277,7 +277,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void testReceiveMailboxFromTwoServersOneClose()
+  public void shouldReceiveMailboxFromTwoServersOneClose()
       throws Exception {
     String server1Host = "hash1";
     int server1Port = 123;
@@ -315,7 +315,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void testReceiveMailboxFromTwoServersOneNull()
+  public void shouldReceiveMailboxFromTwoServersOneNull()
       throws Exception {
     String server1Host = "hash1";
     int server1Port = 123;
@@ -354,7 +354,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void testReceiveMailboxFromTwoServers()
+  public void shouldReceiveMailboxFromTwoServers()
       throws Exception {
     String server1Host = "hash1";
     int server1Port = 123;
@@ -409,7 +409,7 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
-  public void testReceiveMailboxFromTwoServersOneError()
+  public void shouldGetReceptionReceiveErrorMailbox()
       throws Exception {
     String server1Host = "hash1";
     int server1Port = 123;
@@ -451,7 +451,7 @@ public class MailboxReceiveOperatorTest {
 
   // TODO: Exception should be passed as an errorBlock.
   @Test
-  public void testReceiveMailboxFromTwoServersOneException()
+  public void shouldThrowReceiveWhenOneServerReceiveThrowException()
       throws Exception {
     String server1Host = "hash1";
     int server1Port = 123;
