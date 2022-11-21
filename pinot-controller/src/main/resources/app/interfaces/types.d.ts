@@ -85,6 +85,8 @@ declare module 'Models' {
     tables: Array<string>;
   };
 
+  export type QuerySchemas = Array<string>;
+
   export type TableSchema = {
     dimensionFieldSpecs: Array<schema>;
     metricFieldSpecs?: Array<schema>;
