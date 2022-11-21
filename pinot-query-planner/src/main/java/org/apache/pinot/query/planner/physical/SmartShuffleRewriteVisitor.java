@@ -27,7 +27,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -174,7 +173,7 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DisjointSet<
   }
 
   @Override
-  public DisjointSet visitMailboxReceive(MailboxReceiveNode node, PhysicalStageInfo context) {
+  public DisjointSet<Integer> visitMailboxReceive(MailboxReceiveNode node, PhysicalStageInfo context) {
     KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
     DisjointSet<Integer> oldPartitionKeys = context.getPartitionKeys(node.getSenderStageId());
     // If the current stage is not a join-stage, then we already know sender's distribution
@@ -187,8 +186,7 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DisjointSet<
       }
       return new DisjointSet<>(((FieldSelectionKeySelector) selector).getColumnIndices());
     }
-    // If the current stage is a join-stage then we haven't determined distribution for sender and we already know
-    // whether shuffle can be skipped.
+    // If the current stage is a join-stage then we already know whether shuffle can be skipped.
     if (_canSkipShuffleForJoin) {
       node.setExchangeType(RelDistribution.Type.SINGLETON);
       ((MailboxSendNode) node.getSender()).setExchangeType(RelDistribution.Type.SINGLETON);
@@ -315,9 +313,9 @@ public class SmartShuffleRewriteVisitor implements StageNodeVisitor<DisjointSet<
     }
   }
 
-  // Equality joins can be colocated.
+  // TODO: Only equality joins can be colocated. We don't have join clause right now.
   private boolean canJoinBeColocated(JoinNode joinNode) {
-    return joinNode.getJoinClauses().size() == 1 && joinNode.getJoinClauses().get(0).getKind().equals(SqlKind.EQUALS);
+    return true;
   }
 
   private boolean canSkipShuffle(DisjointSet<Integer> partitionKeys, KeySelector<Object[], Object[]> keySelector) {
