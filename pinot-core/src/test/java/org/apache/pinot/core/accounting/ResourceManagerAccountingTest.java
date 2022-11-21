@@ -109,7 +109,6 @@ public class ResourceManagerAccountingTest {
     HashMap<String, Object> configs = new HashMap<>();
     ServerMetrics.register(Mockito.mock(ServerMetrics.class));
     configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_VERBOSE, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
         "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, false);
@@ -173,7 +172,6 @@ public class ResourceManagerAccountingTest {
     HashMap<String, Object> configs = new HashMap<>();
     ServerMetrics.register(Mockito.mock(ServerMetrics.class));
     configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_VERBOSE, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
         "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
@@ -282,7 +280,6 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
     configs.put(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.9f);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_VERBOSE, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
         "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);

@@ -148,8 +148,6 @@ public class OfflineClusterQueryKillingTest extends BaseClusterIntegrationTestSe
     serverConf.setProperty(ServerConf.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.60f);
     serverConf.setProperty(
-        ServerConf.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_ENABLE_VERBOSE, true);
-    serverConf.setProperty(
         ServerConf.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
         "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
     serverConf.setProperty(ServerConf.PINOT_QUERY_SCHEDULER_PREFIX + "."

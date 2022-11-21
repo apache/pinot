@@ -465,20 +465,23 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
               * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO,
               CommonConstants.Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO));
 
-      // sleep sometime after one kill for the jvm to reclaim memory
-      private final int _sleepTimeAfterKill =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_KILL_SLEEP_TIME_AFTER_GC_MS,
-              CommonConstants.Accounting.DEFAULT_CONFIG_OF_KILL_SLEEP_TIME_AFTER_GC_MS);
+      // normal sleep time
+      private final int _normalSleepTime =
+          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME,
+              CommonConstants.Accounting.DEFAULT_SLEEP_TIME);
+
+      // alarming sleep time factor, should be > 1 to sample more frequent at alarming level
+      private final int _alarmingSleepTimeFactor =
+          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_DENOMINATOR,
+              CommonConstants.Accounting.DEFAULT_SLEEP_TIME_DENOMINATOR);
+
+      // alarming sleep time
+      private final int _alarmingSleepTime = _normalSleepTime / _alarmingSleepTimeFactor;
 
       // the framework would not commit to kill any query if this is disabled
       private final boolean _oomKillQueryEnabled =
           _config.getProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY,
               CommonConstants.Accounting.DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY);
-
-      // verbose mode for debugging
-      private final boolean _isVerboseMode =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_VERBOSE,
-              CommonConstants.Accounting.DEFAULT_ENABLE_VERBOSE);
 
       private long _usedBytes;
       private int _sleepTime;
@@ -493,7 +496,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         while (true) {
           LOGGER.debug("Running timed task for PerQueryCPUMemAccountant.");
           _triggeringLevel = TriggeringLevel.Normal;
-          _sleepTime = CommonConstants.Accounting.DEFAULT_SLEEP_TIME;
+          _sleepTime = _normalSleepTime;
           _aggregatedUsagePerActiveQuery = null;
           try {
             // Get the metrics used for triggering the kill
@@ -511,8 +514,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           } catch (Exception e) {
             LOGGER.error("Caught exception while executing stats aggregation and query kill", e);
           } finally {
-            if (_isVerboseMode && _aggregatedUsagePerActiveQuery != null) {
-              LOGGER.info(_aggregatedUsagePerActiveQuery.toString());
+            if (_aggregatedUsagePerActiveQuery != null) {
+              LOGGER.debug(_aggregatedUsagePerActiveQuery.toString());
             }
             // Publish server heap usage metrics
             ServerMetrics.get().setValueOfGlobalGauge(ServerGauge.JVM_HEAP_USED_BYTES, _usedBytes);
@@ -526,9 +529,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       private void collectTriggerMetrics() {
         _usedBytes = MEMORY_MX_BEAN.getHeapMemoryUsage().getUsed();
-        if (_isVerboseMode) {
-          LOGGER.info("Heap used bytes {}", _usedBytes);
-        }
+        LOGGER.debug("Heap used bytes {}", _usedBytes);
       }
 
       /**
@@ -558,8 +559,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         if (_usedBytes > _criticalLevel) {
           _triggeringLevel = TriggeringLevel.HeapMemoryCritical;
         } else if (_usedBytes > _alarmingLevel) {
-          _triggeringLevel = _isVerboseMode ? TriggeringLevel.HeapMemoryAlarmingVerbose : _triggeringLevel;
-          _sleepTime /= 4;
+          _triggeringLevel = LOGGER.isDebugEnabled() ? TriggeringLevel.HeapMemoryAlarmingVerbose : _triggeringLevel;
+          _sleepTime = _alarmingSleepTime;
         }
       }
 
@@ -604,7 +605,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           }
           ServerMetrics.get().addMeteredGlobalValue(ServerMeter.QUERIES_PREEMPTED, killedCount);
           try {
-            Thread.sleep(_sleepTimeAfterKill);
+            Thread.sleep(_normalSleepTime);
           } catch (InterruptedException ignored) {
           }
           // In this extreme case we directly trigger system.gc
@@ -623,7 +624,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           System.gc();
           _numQueriesKilledConsecutively = 0;
           try {
-            Thread.sleep(CommonConstants.Accounting.DEFAULT_SLEEP_TIME);
+            Thread.sleep(_normalSleepTime);
           } catch (InterruptedException ignored) {
           }
           _usedBytes = MEMORY_MX_BEAN.getHeapMemoryUsage().getUsed();
@@ -638,7 +639,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         }
         // Critical heap memory usage while no queries running
         if (_aggregatedUsagePerActiveQuery.isEmpty()) {
-          LOGGER.warn("Heap used bytes {} exceeds critical level, but no active queries", _usedBytes);
+          LOGGER.debug("Heap used bytes {} exceeds critical level, but no active queries", _usedBytes);
           return;
         }
         AggregatedStats maxUsageTuple;
@@ -669,10 +670,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
               maxUsageTuple._allocatedBytes, maxUsageTuple._queryId, _oomKillQueryEnabled);
         }
         LOGGER.warn("Query aggregation results {}", _aggregatedUsagePerActiveQuery.toString());
-        try {
-          Thread.sleep(_sleepTimeAfterKill);
-        } catch (InterruptedException ignored) {
-        }
       }
 
       private void interruptRunnerThread(Thread thread) {

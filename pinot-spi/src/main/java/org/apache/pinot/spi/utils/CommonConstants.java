@@ -719,16 +719,14 @@ public class CommonConstants {
     public static final String CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.alarming.usage.ratio";
     public static final float DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO = 0.75f;
 
-    public static final String CONFIG_OF_KILL_SLEEP_TIME_AFTER_GC_MS = "accounting.oom.panic.sleep.after.gc.ms";
-    public static final int DEFAULT_CONFIG_OF_KILL_SLEEP_TIME_AFTER_GC_MS = 100;
-
-    public static final String CONFIG_OF_ENABLE_VERBOSE = "accounting.enable.verbose.mode";
-    public static final boolean DEFAULT_ENABLE_VERBOSE = false;
-
     public static final String CONFIG_OF_HEAP_USAGE_PUBLISH_PERIOD = "accounting.heap.usage.publish.period";
     public static final int DEFAULT_HEAP_USAGE_PUBLISH_PERIOD = 5000;
 
-    public static final int DEFAULT_SLEEP_TIME = 32;
+    public static final String CONFIG_OF_SLEEP_TIME = "accounting.sleep.ms";
+    public static final int DEFAULT_SLEEP_TIME = 30;
+
+    public static final String CONFIG_OF_SLEEP_TIME_DENOMINATOR = "accounting.sleep.time.denominator";
+    public static final int DEFAULT_SLEEP_TIME_DENOMINATOR = 3;
 
     public static final String CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO
         = "accounting.min.memory.footprint.to.kill.ratio";
