@@ -57,7 +57,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   // TODO: Unify SUPPORTED_EXCHANGE_TYPES with MailboxSendOperator.
   private static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
       ImmutableSet.of(RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED,
-          RelDistribution.Type.SINGLETON);
+          RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED);
 
   private final MailboxService<TransferableBlock> _mailboxService;
   private final RelDistribution.Type _exchangeType;
