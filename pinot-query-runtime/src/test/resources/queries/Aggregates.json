@@ -70,7 +70,6 @@
       {
         "ignored": true,
         "psql": "4.2.7",
-        "ignored": true,
         "comments": "result error:average doesn't work because we round up but h2 round down for integer",
         "description": "average int",
         "sql": "SELECT avg(int_col) FROM {tbl}"
@@ -134,37 +133,36 @@
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
-        "description": "nested",
-        "comments": "this should throw an error",
-        "sql": "SELECT min(max(int_col)) FROM {tbl}"
+        "description": "nested aggregation",
+        "sql": "SELECT min(max(int_col)) FROM {tbl}",
+        "comments": ".*Aggregate expressions cannot be nested.",
+        "expectedException": ".*Error composing query plan for.*"
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
-        "description": "nested",
-        "comments": "this should throw an error",
-        "sql": "SELECT (SELECT max(min({int_col})) FROM {tbl}) from {tbl};"
+        "description": "nested aggregation",
+        "sql": "SELECT (SELECT max(min(int_col)) FROM {tbl}) from {tbl};",
+        "expectedException": ".*Error composing query plan for.*"
       },
       {
         "psql": "4.2.7",
         "ignored": true,
         "comments": "parsing error:ORDER BY unexpected",
-        "description": "filter",
+        "description": "aggregate double column followed with order by",
         "sql": "SELECT min(double_col ORDER BY int_col) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
         "ignored": true,
         "comments": "NumberFormatException: For input string: \"a\"",
-        "description": "filter",
+        "description": "aggregate string column",
         "sql": "SELECT min(string_col) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
         "ignored": true,
         "comments": "class java.lang.Double cannot be cast to class java.lang.Boolean",
-        "description": "filter",
+        "description": "aggregate boolean column",
         "sql": "SELECT min(bool_col) FROM {tbl}"
       }
     ]
@@ -251,30 +249,30 @@
     "queries": [
       {
         "psql": "4.2.7",
-        "description": "filter",
+        "description": "aggregate int column and filter by int column",
         "sql": "SELECT min(int_col) FROM {tbl} WHERE int_col < 100"
       },
       {
         "psql": "4.2.7",
         "ignored": true,
-        "description": "filter",
+        "description": "aggregate int column and filter by int column",
         "comments": "rounding error",
         "sql": "SELECT sum(1 /int_col) FROM {tbl} WHERE int_col > 0"
       },
       {
         "psql": "4.2.7",
-        "description": "filter",
+        "description": "aggregate double column and filter by double column",
         "comments": "rounding error",
         "sql": "SELECT sum(1 /double_col) FROM {tbl} WHERE double_col < 1"
       },
       {
         "psql": "4.2.7",
-        "description": "filter",
+        "description": "aggregate double column and filter by string column",
         "sql": "SELECT sum(double_col) FROM {tbl} WHERE string_col > 'a'"
       },
       {
         "psql": "4.2.7",
-        "description": "filter",
+        "description": "aggregate boolean column and filter by string column",
         "ignored": true,
         "comments": "Cannot apply 'SUM' to arguments of type 'SUM(<BOOLEAN>)",
         "sql": "SELECT sum(bool_col) FROM {tbl} WHERE string_col > 'a'"
@@ -283,13 +281,13 @@
         "psql": "4.2.7",
         "comments": "parse error:Encountered HAVING",
         "ignored": true,
-        "description": "aggregate having",
+        "description": "aggregate query with having clause",
         "sql": "select string_col, count(int_col) from {tbl} a group by string_col order by string_col having exists(select 1 from {tbl} b where count(int_col) = b.int_col);"
       },
       {
         "psql": "4.2.7",
         "comments": "parse error:Encountered HAVING",
-        "description": "aggregate having",
+        "description": "aggregate query with having clause",
         "ignored": true,
         "sql": "select string_col, count(int_col) from {tbl} a group by string_col order by string_col having (select count(*) from {tbl} b where count(int_col) = b.int_col) > 0;"
       }
