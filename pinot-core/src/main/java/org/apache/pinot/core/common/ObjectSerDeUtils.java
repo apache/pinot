@@ -51,7 +51,6 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -476,31 +475,22 @@ public class ObjectSerDeUtils {
 
     @Override
     public HyperLogLog deserialize(byte[] bytes) {
-      return deserialize(ByteBuffer.wrap(bytes)
-              .order(ByteOrder.BIG_ENDIAN)
-              .asIntBuffer());
+      return deserialize(ByteBuffer.wrap(bytes));
     }
 
     @Override
     public HyperLogLog deserialize(ByteBuffer byteBuffer) {
-      byte[] bytes = new byte[byteBuffer.remaining()];
-      byteBuffer.get(bytes);
-      return deserialize(bytes);
+      // NOTE: The passed in byte buffer is always BIG ENDIAN
+      return deserialize(byteBuffer.asIntBuffer());
     }
 
-    private HyperLogLog deserialize(IntBuffer intBuf) {
+    private HyperLogLog deserialize(IntBuffer intBuffer) {
       try {
-        // The first 2 integers are constant headers for the HLL. We only need the first byte, the log2m.
-        // We skip the second integer, array size, as we instead rely on comparing the buffer size to the
-        // remaining integers size.
-        int log2m = intBuf.get(0);
-        intBuf.position(2);
-
-        if (intBuf.remaining() != RegisterSet.getSizeForCount(1 << log2m)) {
-          throw new RuntimeException("Caught exception while deserializing HyperLogLog");
-        }
-        int[] bits = new int[intBuf.remaining()];
-        intBuf.get(bits);
+        // The first 2 integers are constant headers for the HLL: log2m and size in bytes
+        int log2m = intBuffer.get();
+        int numBits = intBuffer.get() >>> 2;
+        int[] bits = new int[numBits];
+        intBuffer.get(bits);
         return new HyperLogLog(log2m, new RegisterSet(1 << log2m, bits));
       } catch (RuntimeException e) {
         throw new RuntimeException("Caught exception while deserializing HyperLogLog", e);

@@ -43,10 +43,10 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 public class ObjectSerDeUtilsTest {
@@ -140,8 +140,7 @@ public class ObjectSerDeUtilsTest {
       ValueLongPair<Integer> expected = new IntLongPair(RANDOM.nextInt(), RANDOM.nextLong());
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
-      ValueLongPair<Integer> actual = ObjectSerDeUtils.deserialize(bytes,
-          ObjectSerDeUtils.ObjectType.IntLongPair);
+      ValueLongPair<Integer> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.IntLongPair);
 
       assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
       assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
@@ -154,8 +153,7 @@ public class ObjectSerDeUtilsTest {
       ValueLongPair<Long> expected = new LongLongPair(RANDOM.nextLong(), RANDOM.nextLong());
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
-      ValueLongPair<Long> actual = ObjectSerDeUtils.deserialize(bytes,
-          ObjectSerDeUtils.ObjectType.LongLongPair);
+      ValueLongPair<Long> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.LongLongPair);
 
       assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
       assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
@@ -181,8 +179,7 @@ public class ObjectSerDeUtilsTest {
       ValueLongPair<Double> expected = new DoubleLongPair(RANDOM.nextDouble(), RANDOM.nextLong());
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
-      ValueLongPair<Double> actual = ObjectSerDeUtils.deserialize(bytes,
-          ObjectSerDeUtils.ObjectType.DoubleLongPair);
+      ValueLongPair<Double> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.DoubleLongPair);
 
       assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
       assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
@@ -196,8 +193,7 @@ public class ObjectSerDeUtilsTest {
 
       String temp = new String(expected.getValue().getBytes());
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
-      ValueLongPair<String> actual = ObjectSerDeUtils.deserialize(bytes,
-          ObjectSerDeUtils.ObjectType.StringLongPair);
+      ValueLongPair<String> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.StringLongPair);
 
       assertEquals(actual.getValue(), expected.getValue(), ERROR_MESSAGE);
       assertEquals(actual.getTime(), expected.getTime(), ERROR_MESSAGE);
@@ -217,16 +213,14 @@ public class ObjectSerDeUtilsTest {
   }
 
   @Test
-  public void testHyperLogLogDeserializeThrowsForSizeMismatch() throws Exception {
-    // We serialize a HLL w/ log2m of 12 and then trim 1024 bytes from the end of it and try to
-    // deserialize it. An exception should occur for this log2m, 2732 bytes are expected after the headers,
-    // but instead it will only find 1078.
+  public void testHyperLogLogDeserializeThrowsForSizeMismatch()
+      throws Exception {
+    // We serialize a HLL w/ log2m of 12 and then trim 1024 bytes from the end of it and try to deserialize it. An
+    // exception should occur because 2732 bytes are expected after the headers, but instead it will only find 1708.
     byte[] bytes = (new HyperLogLog(12)).getBytes();
     byte[] trimmed = Arrays.copyOfRange(bytes, 0, bytes.length - 1024);
-    Assert.assertThrows(RuntimeException.class, () -> ObjectSerDeUtils.deserialize(
-            trimmed,
-            ObjectSerDeUtils.ObjectType.HyperLogLog
-    ));
+    assertThrows(RuntimeException.class,
+        () -> ObjectSerDeUtils.deserialize(trimmed, ObjectSerDeUtils.ObjectType.HyperLogLog));
   }
 
   @Test
