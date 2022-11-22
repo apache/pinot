@@ -2,6 +2,8 @@ import {TableSortFunction} from "Models";
 import app_state from "../app_state";
 
 
+// table sorting requires a 1/-1 result. This helper function helps calculate this
+// from any two results.
 const valuesToResultNumber = (aRes: any, bRes: any, order: boolean): number => {
     const result = order ? aRes > bRes : aRes < bRes;
     return result ? 1 : -1;
@@ -10,8 +12,7 @@ const valuesToResultNumber = (aRes: any, bRes: any, order: boolean): number => {
 export const sortNumberOfSegments: TableSortFunction = (a: any, b: any, column: string, index: number, order: boolean) => {
     const aSegmentInt = parseInt(a[column+app_state.columnNameSeparator+index]);
     const bSegmentInt = parseInt(b[column+app_state.columnNameSeparator+index]);
-    const result = order ? (aSegmentInt > bSegmentInt) : (aSegmentInt < bSegmentInt);
-    return result ? 1 : -1;
+    return valuesToResultNumber(aSegmentInt, bSegmentInt, order);
 }
 
 export const sortBytes: TableSortFunction = (a: any, b: any, column: string, index: number, order: boolean) => {

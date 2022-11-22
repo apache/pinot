@@ -74,6 +74,10 @@ type Props = {
   tooltipData?: string[]
 };
 
+// These sort functions are applied to any columns with these names. Otherwise, we just
+// sort on the raw data. Ideally users of this class would pass in custom sort functions
+// for their columns, but this pattern already existed, so we're at least making the
+// improvement to pull this out to a common variable.
 let staticSortFunctions: Map<string, TableSortFunction> = new Map()
 staticSortFunctions.set("Number of Segments", sortNumberOfSegments);
 staticSortFunctions.set("Estimated Size", sortBytes);
