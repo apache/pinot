@@ -483,6 +483,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           _config.getProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY,
               CommonConstants.Accounting.DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY);
 
+      // if we want to publish the heap usage
+      private final boolean _publishHeapUsageMetric =
+          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_PUBLISHING_JVM_USAGE,
+              CommonConstants.Accounting.DEFAULT_PUBLISHING_JVM_USAGE);
+
       private long _usedBytes;
       private int _sleepTime;
       private int _numQueriesKilledConsecutively = 0;
@@ -520,7 +525,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
               LOGGER.debug(_aggregatedUsagePerActiveQuery.toString());
             }
             // Publish server heap usage metrics
-            ServerMetrics.get().setValueOfGlobalGauge(ServerGauge.JVM_HEAP_USED_BYTES, _usedBytes);
+            if (_publishHeapUsageMetric) {
+              ServerMetrics.get().setValueOfGlobalGauge(ServerGauge.JVM_HEAP_USED_BYTES, _usedBytes);
+            }
             // Clean inactive query stats
             cleanInactive();
             // Sleep for sometime

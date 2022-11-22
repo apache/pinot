@@ -710,6 +710,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_OOM_PROTECTION_KILLING_QUERY = "accounting.oom.enable.killing.query";
     public static final boolean DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY = false;
 
+    public static final String CONFIG_OF_PUBLISHING_JVM_USAGE = "accounting.publishing.jvm.heap.usage";
+    public static final boolean DEFAULT_PUBLISHING_JVM_USAGE = false;
+
     public static final String CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.panic.heap.usage.ratio";
     public static final float DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
 
