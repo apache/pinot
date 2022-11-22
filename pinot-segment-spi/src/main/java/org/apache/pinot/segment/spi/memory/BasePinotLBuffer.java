@@ -130,10 +130,11 @@ public abstract class BasePinotLBuffer extends PinotDataBuffer {
 
   @Override
   public PinotDataBuffer view(long start, long end, ByteOrder byteOrder) {
+    PinotNativeOrderLBuffer view = new PinotNativeOrderLBuffer(_buffer.view(start, end), false, false);
     if (byteOrder == NATIVE_ORDER) {
-      return new PinotNativeOrderLBuffer(_buffer.view(start, end), false, false);
+      return view;
     } else {
-      return new PinotNonNativeOrderLBuffer(_buffer.view(start, end), false, false);
+      return new NonNativePinotDataBuffer(view);
     }
   }
 

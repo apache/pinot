@@ -76,6 +76,11 @@
       <groupId>org.xerial.larray</groupId>
       <artifactId>larray-mmap</artifactId>
     </dependency>
+    <dependency>
+      <groupId>net.openhft</groupId>
+      <artifactId>chronicle-bytes</artifactId>
+      <version>2.23.31</version>
+    </dependency>
 
     <!-- test -->
     <dependency>

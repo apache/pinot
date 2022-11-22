@@ -31,6 +31,9 @@ import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import net.openhft.chronicle.core.Jvm;
+import org.apache.pinot.segment.spi.memory.chronicle.ChroniclePinotBufferFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,6 +102,52 @@ public abstract class PinotDataBuffer implements Closeable {
   private static final AtomicLong ALLOCATION_FAILURE_COUNT = new AtomicLong();
   private static final Map<PinotDataBuffer, BufferContext> BUFFER_CONTEXT_MAP = new WeakHashMap<>();
 
+  private static final String OFFHEAP_BUFFER_FACTORY_CONFIG = "pinot.offheap.buffer.factory";
+  private static final String OFFHEAP_BUFFER_PRIORITIZE_BYTE_BUFFER_CONFIG = "pinot.offheap.prioritize.bytebuffer";
+
+  private static volatile PinotBufferFactory _factory = createDefaultFactory();
+
+  public static void useFactory(PinotBufferFactory factory) {
+    _factory = factory;
+  }
+
+  private static PinotBufferFactory createDefaultFactory() {
+    String factoryClassName;
+    // TODO: If chronicle is going to be in their own package, use another way to get the runtime version
+    if (Jvm.majorVersion() > 11) {
+      factoryClassName = ChroniclePinotBufferFactory.class.getCanonicalName();
+    } else {
+      factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
+    }
+    return createFactory(factoryClassName, true);
+  }
+
+  private static PinotBufferFactory createFactory(String factoryClassName, boolean prioritizeByteBuffer) {
+    try {
+      LOGGER.info("Instantiating Pinot buffer factory class {}", factoryClassName);
+      PinotBufferFactory factory = (PinotBufferFactory) Class.forName(factoryClassName).getConstructor().newInstance();
+
+      if (prioritizeByteBuffer) {
+        factory = new SmallWithFallbackPinotBufferFactory(new ByteBufferPinotBufferFactory(), factory);
+      }
+
+      return factory;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static void loadFactory(PinotConfiguration configuration) {
+    boolean prioritizeByteBuffer = configuration.getProperty(OFFHEAP_BUFFER_PRIORITIZE_BYTE_BUFFER_CONFIG, true);
+    String factoryClassName = configuration.getProperty(OFFHEAP_BUFFER_FACTORY_CONFIG);
+    if (factoryClassName != null) {
+      _factory = createFactory(factoryClassName, prioritizeByteBuffer);
+    } else {
+      LOGGER.info("No custom Pinot buffer factory class found in configuration. Using default factory");
+      _factory = createDefaultFactory();
+    }
+  }
+
   /**
    * Allocates a buffer using direct memory.
    * <p>NOTE: The contents of the allocated buffer are not defined.
@@ -111,19 +160,10 @@ public abstract class PinotDataBuffer implements Closeable {
   public static PinotDataBuffer allocateDirect(long size, ByteOrder byteOrder, @Nullable String description) {
     PinotDataBuffer buffer;
     try {
-      if (size <= Integer.MAX_VALUE) {
-        buffer = PinotByteBuffer.allocateDirect((int) size, byteOrder);
-      } else {
-        if (byteOrder == NATIVE_ORDER) {
-          buffer = PinotNativeOrderLBuffer.allocateDirect(size);
-        } else {
-          buffer = PinotNonNativeOrderLBuffer.allocateDirect(size);
-        }
-      }
+      buffer = _factory.allocateDirect(size, byteOrder);
     } catch (Exception e) {
-      LOGGER
-          .error("Caught exception while allocating direct buffer of size: {} with description: {}", size, description,
-              e);
+      LOGGER.error("Caught exception while allocating direct buffer of size: {} with description: {}", size,
+          description, e);
       LOGGER.error("Buffer stats: {}", getBufferStats());
       ALLOCATION_FAILURE_COUNT.getAndIncrement();
       throw e;
@@ -144,15 +184,7 @@ public abstract class PinotDataBuffer implements Closeable {
       throws IOException {
     PinotDataBuffer buffer;
     try {
-      if (size <= Integer.MAX_VALUE) {
-        buffer = PinotByteBuffer.loadFile(file, offset, (int) size, byteOrder);
-      } else {
-        if (byteOrder == NATIVE_ORDER) {
-          buffer = PinotNativeOrderLBuffer.loadFile(file, offset, size);
-        } else {
-          buffer = PinotNonNativeOrderLBuffer.loadFile(file, offset, size);
-        }
-      }
+      buffer = _factory.readFile(file, offset, size, byteOrder);
     } catch (Exception e) {
       LOGGER.error("Caught exception while loading file: {} from offset: {} of size: {} with description: {}",
           file.getAbsolutePath(), offset, size, description, e);
@@ -187,15 +219,7 @@ public abstract class PinotDataBuffer implements Closeable {
       throws IOException {
     PinotDataBuffer buffer;
     try {
-      if (size <= Integer.MAX_VALUE) {
-        buffer = PinotByteBuffer.mapFile(file, readOnly, offset, (int) size, byteOrder);
-      } else {
-        if (byteOrder == NATIVE_ORDER) {
-          buffer = PinotNativeOrderLBuffer.mapFile(file, readOnly, offset, size);
-        } else {
-          buffer = PinotNonNativeOrderLBuffer.mapFile(file, readOnly, offset, size);
-        }
-      }
+      buffer = _factory.mapFile(file, readOnly, offset, size, byteOrder);
     } catch (Exception e) {
       LOGGER.error("Caught exception while mapping file: {} from offset: {} of size: {} with description: {}",
           file.getAbsolutePath(), offset, size, description, e);
@@ -286,70 +310,115 @@ public abstract class PinotDataBuffer implements Closeable {
     }
   }
 
-  public abstract byte getByte(int offset);
+  public byte getByte(int offset) {
+    return getByte((long) offset);
+  }
 
   public abstract byte getByte(long offset);
 
-  public abstract void putByte(int offset, byte value);
+  public void putByte(int offset, byte value) {
+    putByte((long) offset, value);
+  }
 
   public abstract void putByte(long offset, byte value);
 
-  public abstract char getChar(int offset);
+  public char getChar(int offset) {
+    return getChar((long) offset);
+  }
 
   public abstract char getChar(long offset);
 
-  public abstract void putChar(int offset, char value);
+  public void putChar(int offset, char value) {
+    putChar((long) offset, value);
+  }
 
   public abstract void putChar(long offset, char value);
 
-  public abstract short getShort(int offset);
+  public short getShort(int offset) {
+    return getShort((long) offset);
+  }
 
   public abstract short getShort(long offset);
 
-  public abstract void putShort(int offset, short value);
+  public void putShort(int offset, short value) {
+    putShort((long) offset, value);
+  }
 
   public abstract void putShort(long offset, short value);
 
-  public abstract int getInt(int offset);
+  public int getInt(int offset) {
+    return getInt((long) offset);
+  }
 
   public abstract int getInt(long offset);
 
-  public abstract void putInt(int offset, int value);
+  public void putInt(int offset, int value) {
+    putInt((long) offset, value);
+  }
 
   public abstract void putInt(long offset, int value);
 
-  public abstract long getLong(int offset);
+  public long getLong(int offset) {
+    return getLong((long) offset);
+  }
 
   public abstract long getLong(long offset);
 
-  public abstract void putLong(int offset, long value);
+  public void putLong(int offset, long value) {
+    putLong((long) offset, value);
+  }
 
   public abstract void putLong(long offset, long value);
 
-  public abstract float getFloat(int offset);
+  public float getFloat(int offset) {
+    return getFloat((long) offset);
+  }
 
   public abstract float getFloat(long offset);
 
-  public abstract void putFloat(int offset, float value);
+  public void putFloat(int offset, float value) {
+    putFloat((long) offset, value);
+  }
 
   public abstract void putFloat(long offset, float value);
 
-  public abstract double getDouble(int offset);
+  public double getDouble(int offset) {
+    return getDouble((long) offset);
+  }
 
   public abstract double getDouble(long offset);
 
-  public abstract void putDouble(int offset, double value);
+  public void putDouble(int offset, double value) {
+    putDouble((long) offset, value);
+  }
 
   public abstract void putDouble(long offset, double value);
 
+  /**
+   * Given an array of bytes, copies the content of this object into the array of bytes.
+   * The first byte to be copied is the one that could be read with {@code this.getByte(offset)}
+   */
   public abstract void copyTo(long offset, byte[] buffer, int destOffset, int size);
 
+  /**
+   * Given an array of bytes, copies the content of this object into the array of bytes.
+   * The first byte to be copied is the one that could be read with {@code this.getByte(offset)}
+   */
   public void copyTo(long offset, byte[] buffer) {
     copyTo(offset, buffer, 0, buffer.length);
   }
 
+  /**
+   * Note: It is the responsibility of the caller to make sure arguments are checked before the methods are called.
+   * While some rudimentary checks are performed on the input, the checks are best effort and when performance is an
+   * overriding priority, as when methods of this class are optimized by the runtime compiler, some or all checks
+   * (if any) may be elided. Hence, the caller must not rely on the checks and corresponding exceptions!
+   */
   public abstract void copyTo(long offset, PinotDataBuffer buffer, long destOffset, long size);
 
+  /**
+   * Given an array of bytes, writes the content in the specified position.
+   */
   public abstract void readFrom(long offset, byte[] buffer, int srcOffset, int size);
 
   public void readFrom(long offset, byte[] buffer) {
@@ -379,8 +448,49 @@ public abstract class PinotDataBuffer implements Closeable {
     return view(start, end, order());
   }
 
+  /**
+   * Returns an ByteBuffer with the same content of this buffer.
+   *
+   * This receiver object and the returned ByteBuffer share the same memory address, but the receiver conserves the
+   * ownership. This means that:
+   * <ol>
+   *   <li>The returned ByteBuffer should not be released (aka freed in C). For example, its cleaner should not be
+   *   called. <b>Violations of this rule may produce segmentation faults</b></li>
+   *   <li>The returned ByteBuffer should not be used once the receiver is released.
+   *   <b>Violations of this rule may produce segmentation faults</b></li>
+   *   <li>A write made by either the receiver or the returned ByteBuffer will be seen by the other.</li>
+   * </ol>
+   *
+   * Depending on the implementation, this may be a view (and therefore changes on any buffer will be seen by the other)
+   * or a copy (in which case the cost will be higher, but each copy will have their own lifecycle).
+   *
+   * @param byteOrder The byte order of the returned ByteBuffer. No special treatment is done if the order of the
+   *                  receiver buffer is different from the order requested. In other words: if this buffer was written
+   *                  in big endian and the direct buffer is requested in little endian, the integers read from each
+   *                  buffer will be different.
+   */
   public abstract ByteBuffer toDirectByteBuffer(long offset, int size, ByteOrder byteOrder);
 
+  /**
+   * Returns an ByteBuffer with the same content of this buffer.
+   *
+   * This receiver object and the returned ByteBuffer share the same memory address, but the receiver conserves the
+   * ownership. This means that:
+   * <ol>
+   *   <li>The returned ByteBuffer should not be released (aka freed in C). For example, its cleaner should not be
+   *   called. <b>Violations of this rule may produce segmentation faults</b></li>
+   *   <li>The returned ByteBuffer should not be used once the receiver is released.
+   *   <b>Violations of this rule may produce segmentation faults</b></li>
+   *   <li>A write made by either the receiver or the returned ByteBuffer will be seen by the other.</li>
+   * </ol>
+   *
+   * Depending on the implementation, this may be a view (and therefore changes on any buffer will be seen by the other)
+   * or a copy (in which case the cost will be higher, but each copy will have their own lifecycle).
+   *
+   */
+  // TODO: Most calls to this method are just used to then read the content of the buffer.
+  //  This is unnecessary an generates 2-5 unnecessary objects. We should benchmark whether there is some advantage on
+  //  transforming this buffer into a IntBuffer/LongBuffer/etc when reading sequentially
   public ByteBuffer toDirectByteBuffer(long offset, int size) {
     return toDirectByteBuffer(offset, size, order());
   }
@@ -389,4 +499,8 @@ public abstract class PinotDataBuffer implements Closeable {
 
   public abstract void release()
       throws IOException;
+
+  public boolean isCloseable() {
+    return _closeable;
+  }
 }
