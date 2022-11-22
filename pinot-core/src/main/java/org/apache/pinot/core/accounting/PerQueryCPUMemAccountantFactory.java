@@ -572,7 +572,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       private void triggeredActions() {
         switch (_triggeringLevel) {
           case HeapMemoryCritical:
-            LOGGER.warn("Heap used bytes {} exceeds critical level", _usedBytes);
+            LOGGER.debug("Heap used bytes {} exceeds critical level", _usedBytes);
             killMostExpensiveQuery();
             break;
           case HeapMemoryAlarmingVerbose:
@@ -655,7 +655,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                         + "exceeding the quota", maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes())));
             interruptRunnerThread(maxUsageTuple.getThread());
           }
-          LOGGER.warn("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
+          LOGGER.error("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
           LOGGER.error("Query {} got picked because using {} bytes of memory, actual kill committed {}",
               maxUsageTuple._queryId, maxUsageTuple._allocatedBytes, shouldKill);
         } else {
@@ -667,11 +667,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                         + "%d ns of CPU time", maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes())));
             interruptRunnerThread(maxUsageTuple.getThread());
           }
-          LOGGER.warn("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
+          LOGGER.error("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
           LOGGER.error("Query {} got picked because using {} ns of cpu time, actual kill committed {}",
               maxUsageTuple._allocatedBytes, maxUsageTuple._queryId, _oomKillQueryEnabled);
         }
-        LOGGER.warn("Query aggregation results {}", _aggregatedUsagePerActiveQuery.toString());
+        LOGGER.error("Query aggregation results {} for the previous kill.", _aggregatedUsagePerActiveQuery.toString());
       }
 
       private void interruptRunnerThread(Thread thread) {
