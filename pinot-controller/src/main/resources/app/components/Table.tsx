@@ -35,7 +35,7 @@ import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
 import { TablePagination, Tooltip } from '@material-ui/core';
-import { TableData } from 'Models';
+import {TableData, TableSortFunction} from 'Models';
 import IconButton from '@material-ui/core/IconButton';
 import FirstPageIcon from '@material-ui/icons/FirstPage';
 import KeyboardArrowLeft from '@material-ui/icons/KeyboardArrowLeft';
@@ -47,6 +47,7 @@ import { Link } from 'react-router-dom';
 import Chip from '@material-ui/core/Chip';
 import { get, has, orderBy } from 'lodash';
 import app_state from '../app_state';
+import { sortBytes, sortNumberOfSegments } from '../utils/SortFunctions'
 import Utils from '../utils/Utils';
 import TableToolbar from './TableToolbar';
 import SimpleAccordion from './SimpleAccordion';
@@ -72,6 +73,11 @@ type Props = {
   },
   tooltipData?: string[]
 };
+
+let staticSortFunctions: Map<string, TableSortFunction> = new Map()
+staticSortFunctions.set("Number of Segments", sortNumberOfSegments);
+staticSortFunctions.set("Estimated Size", sortBytes);
+staticSortFunctions.set("Reported Size", sortBytes);
 
 const StyledTableRow = withStyles((theme) =>
   createStyles({
@@ -464,13 +470,8 @@ export default function CustomizedTables({
                     className={classes.head}
                     key={index}
                     onClick={() => {
-                      if(column === 'Number of Segments'){
-                        const data = finalData.sort((a,b)=>{
-                          const aSegmentInt = parseInt(a[column+app_state.columnNameSeparator+index]);
-                          const bSegmentInt = parseInt(b[column+app_state.columnNameSeparator+index]);
-                          const result = order ? (aSegmentInt > bSegmentInt) : (aSegmentInt < bSegmentInt);
-                          return result ? 1 : -1;
-                        });
+                      if (staticSortFunctions.has(column)) {
+                        finalData.sort((a, b) => staticSortFunctions.get(column)(a, b, column, index, order));
                         setFinalData(finalData);
                       } else {
                         setFinalData(orderBy(finalData, column+app_state.columnNameSeparator+index, order ? 'asc' : 'desc'));
