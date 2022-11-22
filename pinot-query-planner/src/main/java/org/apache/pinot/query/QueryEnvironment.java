@@ -124,11 +124,11 @@ public class QueryEnvironment {
    * @param sqlNodeAndOptions parsed SQL query.
    * @return a dispatchable query plan
    */
-  public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
+  public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      return toDispatchablePlan(relRoot, plannerContext);
+      return toDispatchablePlan(relRoot, plannerContext, requestId);
     } catch (Exception e) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, e);
     }
@@ -137,9 +137,9 @@ public class QueryEnvironment {
   /**
    * Explain a SQL query.
    *
-   * Similar to {@link QueryEnvironment#planQuery(String, SqlNodeAndOptions)}, this API runs the query compilation.
-   * But it doesn't run the distributed {@link QueryPlan} generation, instead it only returns the explained logical
-   * plan.
+   * Similar to {@link QueryEnvironment#planQuery(String, SqlNodeAndOptions, long)}, this API runs the query
+   * compilation. But it doesn't run the distributed {@link QueryPlan} generation, instead it only returns the
+   * explained logical plan.
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
@@ -161,7 +161,7 @@ public class QueryEnvironment {
 
   @VisibleForTesting
   public QueryPlan planQuery(String sqlQuery) {
-    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
+    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0);
   }
 
   @VisibleForTesting
@@ -215,9 +215,9 @@ public class QueryEnvironment {
     }
   }
 
-  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext) {
+  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
     // 5. construct a dispatchable query plan.
-    StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager);
+    StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager, requestId);
     return queryStagePlanner.makePlan(relRoot);
   }
 

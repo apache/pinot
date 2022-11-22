@@ -199,7 +199,7 @@ public class BaseBrokerRequestHandlerTest {
     RoutingTable rt = mock(RoutingTable.class);
     when(rt.getServerInstanceToSegmentsMap()).thenReturn(Collections
         .singletonMap(new ServerInstance(new InstanceConfig("server01_9000")), Collections.singletonList("segment01")));
-    when(routingManager.getRoutingTable(any())).thenReturn(rt);
+    when(routingManager.getRoutingTable(any(), 0)).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);
     CountDownLatch latch = new CountDownLatch(1);

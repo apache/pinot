@@ -81,7 +81,7 @@ import org.slf4j.LoggerFactory;
  *   <li>{@link #removeRouting(String)}: Removes the routing for a table</li>
  *   <li>{@link #refreshSegment(String, String)}: Refreshes the metadata for a segment</li>
  *   <li>{@link #routingExists(String)}: Returns whether the routing exists for a table</li>
- *   <li>{@link #getRoutingTable(BrokerRequest)}: Returns the routing table for a query</li>
+ *   <li>{@link #getRoutingTable(BrokerRequest, long)}: Returns the routing table for a query</li>
  *   <li>{@link #getTimeBoundaryInfo(String)}: Returns the time boundary info for a table</li>
  *   <li>{@link #getQueryTimeoutMs(String)}: Returns the table-level query timeout in milliseconds for a table</li>
  * </ul>
@@ -437,7 +437,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     AdaptiveServerSelector adaptiveServerSelector =
         AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
     InstanceSelector instanceSelector =
-        InstanceSelectorFactory.getInstanceSelector(tableConfig, _brokerMetrics, adaptiveServerSelector);
+        InstanceSelectorFactory.getInstanceSelector(tableConfig, _brokerMetrics, _propertyStore,
+            adaptiveServerSelector);
     instanceSelector.init(_routableServers, idealState, externalView, preSelectedOnlineSegments);
 
     // Add time boundary manager if both offline and real-time part exist for a hybrid table
@@ -567,13 +568,13 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
    */
   @Nullable
   @Override
-  public RoutingTable getRoutingTable(BrokerRequest brokerRequest) {
+  public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
     String tableNameWithType = brokerRequest.getQuerySource().getTableName();
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     if (routingEntry == null) {
       return null;
     }
-    InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest);
+    InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest, requestId);
     Map<String, String> segmentToInstanceMap = selectionResult.getSegmentToInstanceMap();
     Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, String> entry : segmentToInstanceMap.entrySet()) {
@@ -717,7 +718,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
     }
 
-    InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest) {
+    InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest, long requestId) {
       Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
       int numTotalSelectedSegments = selectedSegments.size();
       if (!selectedSegments.isEmpty()) {
@@ -728,7 +729,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       int numPrunedSegments = numTotalSelectedSegments - selectedSegments.size();
       if (!selectedSegments.isEmpty()) {
         InstanceSelector.SelectionResult selectionResult = _instanceSelector.select(brokerRequest,
-            new ArrayList<>(selectedSegments));
+            new ArrayList<>(selectedSegments), requestId);
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {

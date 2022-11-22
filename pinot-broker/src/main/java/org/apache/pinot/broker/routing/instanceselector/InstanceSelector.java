@@ -56,7 +56,7 @@ public interface InstanceSelector {
    * to selected server instance hosting the segment and a set of unavailable segments (no enabled instance or all
    * enabled instances are in ERROR state).
    */
-  SelectionResult select(BrokerRequest brokerRequest, List<String> segments);
+  SelectionResult select(BrokerRequest brokerRequest, List<String> segments, long requestId);
 
   class SelectionResult {
     private final Map<String, String> _segmentToInstanceMap;

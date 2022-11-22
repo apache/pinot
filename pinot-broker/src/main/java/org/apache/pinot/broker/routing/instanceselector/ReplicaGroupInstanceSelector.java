@@ -64,7 +64,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   }
 
   @Override
-  Map<String, String> select(List<String> segments, int requestId,
+  Map<String, String> select(List<String> segments, long requestId,
       Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
 
@@ -91,7 +91,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     return segmentToSelectedInstanceMap;
   }
 
-  private void selectServersUsingRoundRobin(List<String> segments, int requestId,
+  private void selectServersUsingRoundRobin(List<String> segments, long requestId,
       Map<String, String> segmentToSelectedInstanceMap, Map<String, List<String>> segmentToEnabledInstancesMap,
       Map<String, String> queryOptions) {
     int replicaOffset = 0;
@@ -108,7 +108,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
       // Round robin selection.
       int numEnabledInstances = enabledInstances.size();
-      int instanceIdx = (requestId + replicaOffset) % numEnabledInstances;
+      int instanceIdx = (int) (requestId + replicaOffset) % numEnabledInstances;
       String selectedInstance = enabledInstances.get(instanceIdx);
 
       if (numReplicaGroupsToQuery > numEnabledInstances) {
@@ -119,7 +119,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     }
   }
 
-  private void selectServersUsingAdaptiverServerSelector(List<String> segments, int requestId,
+  private void selectServersUsingAdaptiverServerSelector(List<String> segments, long requestId,
       Map<String, String> segmentToSelectedInstanceMap, Map<String, List<String>> segmentToEnabledInstancesMap,
       Map<String, String> queryOptions, List<String> serverRankList) {
     for (String segment : segments) {
@@ -132,7 +132,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
       // Round Robin.
       int numEnabledInstances = enabledInstances.size();
-      int instanceIdx = requestId % numEnabledInstances;
+      int instanceIdx = (int) requestId % numEnabledInstances;
       String selectedInstance = enabledInstances.get(instanceIdx);
 
       // Adaptive Server Selection
