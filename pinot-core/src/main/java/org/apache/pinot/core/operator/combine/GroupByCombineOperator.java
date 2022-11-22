@@ -47,7 +47,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.utils.LoopUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -189,7 +189,7 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
               }
               _indexedTable.upsert(new Key(keys), new Record(values));
               mergedKeys++;
-              checkMergePhaseInterruption(mergedKeys);
+              LoopUtils.checkMergePhaseInterruption(mergedKeys);
             }
           }
         } else {
@@ -197,7 +197,7 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
             //TODO: change upsert api so that it accepts intermediateRecord directly
             _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
             mergedKeys++;
-            checkMergePhaseInterruption(mergedKeys);
+            LoopUtils.checkMergePhaseInterruption(mergedKeys);
           }
         }
       } finally {
@@ -205,13 +205,6 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-    }
-  }
-
-  // Check for thread interruption, every time after merging 10_000 keys
-  private void checkMergePhaseInterruption(int mergedKeys) {
-    if (mergedKeys % MAX_GROUP_BY_KEYS_MERGED_PER_INTERRUPTION_CHECK == 0 && Thread.interrupted()) {
-      throw new EarlyTerminationException();
     }
   }
 
