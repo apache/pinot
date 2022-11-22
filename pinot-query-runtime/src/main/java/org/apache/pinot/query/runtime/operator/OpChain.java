@@ -37,7 +37,7 @@ public class OpChain {
   private final Supplier<ThreadResourceUsageProvider> _timer;
 
   // TODO: refactor this into OpChainContext
-  private PlanRequestContext _context;
+  public PlanRequestContext _context;
 
   public OpChain(Operator<TransferableBlock> root, PlanRequestContext context) {
     _root = root;
@@ -56,7 +56,12 @@ public class OpChain {
   }
 
   // TODO: Make this auto closable.
-  public void close() {
+  public void close()  {
+    try {
+      _context.close();
+    } catch (Exception e){
+      System.out.println("shut down exception");
+    }
     // Clean up resources. for example, clean up grpc channel.
   }
 }

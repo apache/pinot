@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.stub.StreamObserver;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.proto.Mailbox;
@@ -40,6 +41,8 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   private static final long DEFAULT_MAILBOX_POLL_TIMEOUT_MS = 1000L;
   private final AtomicInteger _bufferSize = new AtomicInteger(5);
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
+
+  public CountDownLatch finishLatch = new CountDownLatch(1);
 
   private StreamObserver<Mailbox.MailboxContent> _mailboxContentStreamObserver;
 
@@ -73,6 +76,7 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
 
   @Override
   public void onError(Throwable e) {
+    finishLatch.countDown();
     _isCompleted.set(true);
     shutdown();
     throw new RuntimeException(e);
@@ -83,6 +87,7 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
 
   @Override
   public void onCompleted() {
+    finishLatch.countDown();
     _isCompleted.set(true);
     shutdown();
   }

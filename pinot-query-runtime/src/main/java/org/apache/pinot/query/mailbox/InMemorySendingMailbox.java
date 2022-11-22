@@ -53,4 +53,9 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   @Override
   public void complete() {
   }
+
+  @Override
+  public void waitForComplete(){
+
+  }
 }

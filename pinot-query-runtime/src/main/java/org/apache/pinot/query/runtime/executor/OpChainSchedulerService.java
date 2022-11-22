@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.slf4j.Logger;
@@ -83,7 +84,6 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
           public void runJob() {
             try {
               ThreadResourceUsageProvider timer = operatorChain.getAndStartTimer();
-
               // so long as there's work to be done, keep getting the next block
               // when the operator chain returns a NOOP block, then yield the execution
               // of this to another worker
@@ -101,6 +101,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                 operatorChain.close();
               }
             } catch (Exception e) {
+              operatorChain._context.getExchange().send(TransferableBlockUtils.getErrorTransferableBlock(e));
               // TODO: pass this error through context.
               LOGGER.error("Failed to execute query!", e);
               operatorChain.close();

@@ -136,8 +136,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
       try {
         _context.getExchange().send(transferableBlock);
       } catch (Exception e) {
-        // TODO: handle this exception.
-        LOGGER.error("Exception while sending block to mailbox.", e);
+        transferableBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
       }
     }
 

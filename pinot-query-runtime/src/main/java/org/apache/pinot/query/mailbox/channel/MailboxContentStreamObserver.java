@@ -130,7 +130,9 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   @Override
   public void onCompleted() {
-    _isCompleted.set(true);
-    _responseObserver.onCompleted();
+    if(!_isCompleted.get()){
+      _isCompleted.set(true);
+      _responseObserver.onCompleted();
+    }
   }
 }

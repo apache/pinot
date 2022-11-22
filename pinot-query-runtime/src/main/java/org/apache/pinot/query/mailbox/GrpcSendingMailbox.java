@@ -21,6 +21,8 @@ package org.apache.pinot.query.mailbox;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -96,6 +98,14 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
       return builder.build();
     } catch (IOException e) {
       throw new RuntimeException("Error converting to mailbox content", e);
+    }
+  }
+
+  @Override
+  public void waitForComplete()
+      throws InterruptedException {
+    if (!_statusStreamObserver.finishLatch.await(1, TimeUnit.MINUTES)) {
+      System.out.println("cannot finish sending mailbox.");
     }
   }
 }

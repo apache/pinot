@@ -36,25 +36,29 @@ public class PlanRequestContext {
   protected final Map<Integer, StageMetadata> _metadataMap;
   // TODO: Add exchange map if multiple exchanges are needed.
   BlockExchange _exchange;
+  public int _stageId;
 
-  private final HashMap<MailboxIdentifier, SendingMailbox<TransferableBlock>> _sendingMailboxMap = new HashMap<>();
+  private final HashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap = new HashMap<>();
 
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, String hostName, int port,
-      Map<Integer, StageMetadata> metadataMap) {
+      Map<Integer, StageMetadata> metadataMap, int stageId) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _hostName = hostName;
     _port = port;
     _metadataMap = metadataMap;
+    _stageId = stageId;
   }
 
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
-    System.out.println("sendingMailboxId:" + mailboxId);
-    return _sendingMailboxMap.computeIfAbsent(mailboxId, (mid) -> _mailboxService.createSendingMailbox(mid));
+    return _sendingMailboxMap.computeIfAbsent(mailboxId.toString(), (mid) -> _mailboxService.createSendingMailbox(mailboxId));
   }
 
-  public void close() {
-    // TODO: clean up grpc resource.
+  public void close()
+      throws InterruptedException {
+    for(SendingMailbox<TransferableBlock> sendingMailbox: _sendingMailboxMap.values()){
+      sendingMailbox.waitForComplete();
+    }
   }
 
   public void registerExchange(BlockExchange exchange) {
