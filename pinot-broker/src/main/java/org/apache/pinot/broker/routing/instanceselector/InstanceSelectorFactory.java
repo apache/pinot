@@ -39,8 +39,9 @@ public class InstanceSelectorFactory {
   public static final String LEGACY_REPLICA_GROUP_OFFLINE_ROUTING = "PartitionAwareOffline";
   public static final String LEGACY_REPLICA_GROUP_REALTIME_ROUTING = "PartitionAwareRealtime";
 
-  public static InstanceSelector getInstanceSelector(TableConfig tableConfig, BrokerMetrics brokerMetrics,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, @Nullable AdaptiveServerSelector adaptiveServerSelector) {
+  public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector) {
     String tableNameWithType = tableConfig.getTableName();
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null) {
@@ -59,8 +60,8 @@ public class InstanceSelectorFactory {
       }
       if (RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE.equalsIgnoreCase(
           routingConfig.getInstanceSelectorType())) {
-        LOGGER.info("Using MultiStageReplicaGroupInstanceSelector for table: {}", tableNameWithType);
-        return new MultiStageReplicaGroupSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector,
+        LOGGER.info("Using {} for table: {}", routingConfig.getInstanceSelectorType(), tableNameWithType);
+        return new MultiStageStrictReplicaGroupSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector,
             propertyStore);
       }
     }

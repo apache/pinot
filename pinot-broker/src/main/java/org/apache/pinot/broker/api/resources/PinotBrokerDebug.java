@@ -30,6 +30,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -58,6 +59,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 // TODO: Add APIs to return the RoutingTable (with unavailable segments)
 public class PinotBrokerDebug {
+
+  private static final int MAX_REQUEST_ID = 1_000_000_000;
+  // Request ID is passed to the RoutingManager to rotate the selected replica-group.
+  private final AtomicLong _requestIdGenerator = new AtomicLong();
 
   @Inject
   private BrokerRoutingManager _routingManager;
@@ -133,7 +138,9 @@ public class PinotBrokerDebug {
   })
   public Map<ServerInstance, List<String>> getRoutingTableForQuery(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query) {
-    RoutingTable routingTable = _routingManager.getRoutingTable(CalciteSqlCompiler.compileToBrokerRequest(query), 0);
+    int requestId = (int) (_requestIdGenerator.getAndIncrement() % MAX_REQUEST_ID);
+    RoutingTable routingTable = _routingManager.getRoutingTable(CalciteSqlCompiler.compileToBrokerRequest(query),
+        requestId);
     if (routingTable != null) {
       return routingTable.getServerInstanceToSegmentsMap();
     } else {

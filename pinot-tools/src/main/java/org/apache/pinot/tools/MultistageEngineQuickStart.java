@@ -44,11 +44,6 @@ public class MultistageEngineQuickStart extends Quickstart {
   }
 
   @Override
-  protected int getNumQuickstartRunnerServers() {
-    return 4;
-  }
-
-  @Override
   public void runSampleQueries(QuickstartRunner runner)
       throws Exception {
 

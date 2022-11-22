@@ -48,6 +48,9 @@ import org.slf4j.LoggerFactory;
 abstract class BaseInstanceSelector implements InstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
 
+  // To prevent int overflow, reset the request id once it reaches this value
+  private static final long MAX_REQUEST_ID = 1_000_000_000;
+
   private final String _tableNameWithType;
   private final BrokerMetrics _brokerMetrics;
   protected final AdaptiveServerSelector _adaptiveServerSelector;
@@ -267,7 +270,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         && brokerRequest.getPinotQuery().getQueryOptions() != null)
         ? brokerRequest.getPinotQuery().getQueryOptions()
         : Collections.emptyMap();
-    Map<String, String> segmentToInstanceMap = select(segments, requestId, _segmentToEnabledInstancesMap,
+    int requestIdInt = (int) (requestId % MAX_REQUEST_ID);
+    Map<String, String> segmentToInstanceMap = select(segments, requestIdInt, _segmentToEnabledInstancesMap,
         queryOptions);
     Set<String> unavailableSegments = _unavailableSegments;
     if (unavailableSegments.isEmpty()) {
@@ -289,6 +293,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * <p>NOTE: {@code segmentToEnabledInstancesMap} might contain {@code null} values (segment with no enabled
    * ONLINE/CONSUMING instances). If enabled instances are not {@code null}, they are sorted in alphabetical order.
    */
-  abstract Map<String, String> select(List<String> segments, long requestId,
+  abstract Map<String, String> select(List<String> segments, int requestId,
       Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions);
 }
