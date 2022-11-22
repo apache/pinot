@@ -18,23 +18,29 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 public class LookupRecordLocation {
-  private final IndexSegment _indexSegment;
+  private final PinotSegmentRecordReader _pinotSegmentRecordReader;
   private final int _docId;
 
-  public LookupRecordLocation(IndexSegment indexSegment, int docId) {
-    _indexSegment = indexSegment;
+  public LookupRecordLocation(PinotSegmentRecordReader pinotSegmentRecordReader, int docId) {
+    _pinotSegmentRecordReader = pinotSegmentRecordReader;
     _docId = docId;
   }
 
-  public IndexSegment getIndexSegment() {
-    return _indexSegment;
+  public PinotSegmentRecordReader getPinotSegmentRecordReader() {
+    return _pinotSegmentRecordReader;
   }
 
   public int getDocId() {
     return _docId;
+  }
+
+  public GenericRow getRecord(GenericRow reuse) {
+    _pinotSegmentRecordReader.getRecord(_docId, reuse);
+    return reuse;
   }
 }

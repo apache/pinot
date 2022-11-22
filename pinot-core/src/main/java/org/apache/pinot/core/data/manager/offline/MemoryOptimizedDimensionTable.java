@@ -29,9 +29,10 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 class MemoryOptimizedDimensionTable implements DimensionTable {
 
-  private Map<PrimaryKey, LookupRecordLocation> _lookupTable;
+  private final Map<PrimaryKey, LookupRecordLocation> _lookupTable;
   private final Schema _tableSchema;
   private final List<String> _primaryKeyColumns;
+  private final GenericRow _reuse = new GenericRow();
 
   MemoryOptimizedDimensionTable(Schema tableSchema, List<String> primaryKeyColumns) {
     this(tableSchema, primaryKeyColumns, new HashMap<>());
@@ -55,7 +56,7 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
     if (lookupRecordLocation == null) {
       return null;
     }
-    return lookupRecordLocation.getIndexSegment().getRecord(lookupRecordLocation.getDocId(), new GenericRow());
+    return lookupRecordLocation.getRecord(_reuse);
   }
 
   @Override

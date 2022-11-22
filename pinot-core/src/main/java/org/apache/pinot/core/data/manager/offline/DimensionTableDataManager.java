@@ -96,7 +96,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     if (tableConfig != null) {
       DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
       if (dimensionTableConfig != null) {
-        _disablePreload = dimensionTableConfig.isOptimizeMemory();
+        _disablePreload = dimensionTableConfig.isDisablePreload();
       }
     }
 
@@ -206,7 +206,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
             for (int i = 0; i < numTotalDocs; i++) {
               GenericRow row = new GenericRow();
               recordReader.getRecord(i, row);
-              lookupTable.put(row.getPrimaryKey(primaryKeyColumns), new LookupRecordLocation(indexSegment, i));
+              lookupTable.put(row.getPrimaryKey(primaryKeyColumns), new LookupRecordLocation(recordReader, i));
             }
           } catch (Exception e) {
             throw new RuntimeException(

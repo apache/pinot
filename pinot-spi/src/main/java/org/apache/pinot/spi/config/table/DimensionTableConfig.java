@@ -24,14 +24,14 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class DimensionTableConfig extends BaseJsonConfig {
-  private final boolean _optimizeMemory;
+  private final boolean _disablePreload;
 
   @JsonCreator
-  public DimensionTableConfig(@JsonProperty(value = "optimizeMemory", required = true) boolean optimizeMemory) {
-    _optimizeMemory = optimizeMemory;
+  public DimensionTableConfig(@JsonProperty(value = "disablePreload", required = true) boolean disablePreload) {
+    _disablePreload = disablePreload;
   }
 
-  public boolean isOptimizeMemory() {
-    return _optimizeMemory;
+  public boolean isDisablePreload() {
+    return _disablePreload;
   }
 }
