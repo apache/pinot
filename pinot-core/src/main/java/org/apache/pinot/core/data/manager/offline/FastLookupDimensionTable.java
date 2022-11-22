@@ -27,7 +27,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-class FastLookupDimensionTable implements DimensionTable<GenericRow> {
+class FastLookupDimensionTable implements DimensionTable {
 
   private Map<PrimaryKey, GenericRow> _lookupTable;
   private final Schema _tableSchema;
@@ -52,12 +52,6 @@ class FastLookupDimensionTable implements DimensionTable<GenericRow> {
   @Override
   public GenericRow get(PrimaryKey pk) {
     return _lookupTable.get(pk);
-  }
-
-  @Override
-  public boolean put(PrimaryKey pk, GenericRow value) {
-    _lookupTable.put(pk, value);
-    return true;
   }
 
   @Override

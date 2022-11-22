@@ -24,13 +24,11 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-public interface DimensionTable<T> {
+public interface DimensionTable {
 
   List<String> getPrimaryKeyColumns();
 
   GenericRow get(PrimaryKey pk);
-
-  boolean put(PrimaryKey pk, T value);
 
   boolean isEmpty();
 

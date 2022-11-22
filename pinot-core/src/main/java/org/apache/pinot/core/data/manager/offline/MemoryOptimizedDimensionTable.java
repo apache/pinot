@@ -27,7 +27,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-class MemoryOptimizedDimensionTable implements DimensionTable<LookupRecordLocation> {
+class MemoryOptimizedDimensionTable implements DimensionTable {
 
   private Map<PrimaryKey, LookupRecordLocation> _lookupTable;
   private final Schema _tableSchema;
@@ -56,12 +56,6 @@ class MemoryOptimizedDimensionTable implements DimensionTable<LookupRecordLocati
       return null;
     }
     return lookupRecordLocation.getIndexSegment().getRecord(lookupRecordLocation.getDocId(), new GenericRow());
-  }
-
-  @Override
-  public boolean put(PrimaryKey pk, LookupRecordLocation value) {
-    _lookupTable.put(pk, value);
-    return true;
   }
 
   @Override

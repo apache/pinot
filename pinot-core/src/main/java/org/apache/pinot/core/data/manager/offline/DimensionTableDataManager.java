@@ -80,7 +80,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       AtomicReferenceFieldUpdater.newUpdater(DimensionTableDataManager.class, DimensionTable.class, "_dimensionTable");
 
   private volatile DimensionTable _dimensionTable;
-  private boolean _isMemoryOptimized = true;
+  private boolean _disablePreload = false;
 
   @Override
   protected void doInit() {
@@ -96,11 +96,11 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     if (tableConfig != null) {
       DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
       if (dimensionTableConfig != null) {
-        _isMemoryOptimized = dimensionTableConfig.isOptimizeMemory();
+        _disablePreload = dimensionTableConfig.isOptimizeMemory();
       }
     }
 
-    if (_isMemoryOptimized) {
+    if (_disablePreload) {
       _dimensionTable = new MemoryOptimizedDimensionTable(schema, primaryKeyColumns);
     } else {
       _dimensionTable = new FastLookupDimensionTable(schema, primaryKeyColumns);
@@ -142,7 +142,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     DimensionTable replacement;
     do {
       snapshot = _dimensionTable;
-      if (_isMemoryOptimized) {
+      if (_disablePreload) {
         replacement = createMemOptimisedDimensionTable();
       } else {
         replacement = createDimensionTable();
