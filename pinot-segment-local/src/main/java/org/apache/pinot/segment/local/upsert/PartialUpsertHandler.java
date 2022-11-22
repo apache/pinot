@@ -33,9 +33,12 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class PartialUpsertHandler {
   // _column2Mergers maintains the mapping of merge strategies per columns.
   private final Map<String, PartialUpsertMerger> _column2Mergers = new HashMap<>();
+  private final UpsertConfig.Strategy _defaultPartialUpsertStrategy;
 
   public PartialUpsertHandler(Schema schema, Map<String, UpsertConfig.Strategy> partialUpsertStrategies,
       UpsertConfig.Strategy defaultPartialUpsertStrategy, String comparisonColumn) {
+    _defaultPartialUpsertStrategy = defaultPartialUpsertStrategy;
+
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
     }
@@ -44,7 +47,7 @@ public class PartialUpsertHandler {
     for (String columnName : schema.getPhysicalColumnNames()) {
       if (!schema.getPrimaryKeyColumns().contains(columnName) && !_column2Mergers.containsKey(columnName)
           && !comparisonColumn.equals(columnName)) {
-        _column2Mergers.put(columnName, PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy));
+        _column2Mergers.put(columnName, PartialUpsertMergerFactory.getMerger(_defaultPartialUpsertStrategy));
       }
     }
   }
@@ -65,15 +68,16 @@ public class PartialUpsertHandler {
    * @return a new row after merge
    */
   public GenericRow merge(GenericRow previousRecord, GenericRow newRecord) {
-    for (Map.Entry<String, PartialUpsertMerger> entry : _column2Mergers.entrySet()) {
-      String column = entry.getKey();
+    for (String column : previousRecord.getFieldToValueMap().keySet()) {
       if (!previousRecord.isNullValue(column)) {
         if (newRecord.isNullValue(column)) {
           newRecord.putValue(column, previousRecord.getValue(column));
           newRecord.removeNullValueField(column);
         } else {
+          PartialUpsertMerger merger = _column2Mergers.getOrDefault(column,
+              PartialUpsertMergerFactory.getMerger(_defaultPartialUpsertStrategy));
           newRecord.putValue(column,
-              entry.getValue().merge(previousRecord.getValue(column), newRecord.getValue(column)));
+              merger.merge(previousRecord.getValue(column), newRecord.getValue(column)));
         }
       }
     }
