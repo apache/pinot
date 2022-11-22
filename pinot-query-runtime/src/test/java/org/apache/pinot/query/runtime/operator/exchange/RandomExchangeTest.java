@@ -25,6 +25,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -41,7 +42,7 @@ public class RandomExchangeTest {
   @Mock
   TransferableBlock _block;
   @Mock
-  MailboxService<TransferableBlock> _mailboxService;
+  PlanRequestContext _context;
 
   @BeforeMethod
   public void setUp() {
@@ -61,7 +62,7 @@ public class RandomExchangeTest {
 
     // When:
     Iterator<BlockExchange.RoutedBlock> route =
-        new RandomExchange(_mailboxService, destinations, size -> 1, TransferableBlockUtils::splitBlock)
+        new RandomExchange(_context, destinations, size -> 1, TransferableBlockUtils::splitBlock)
             .route(destinations, _block);
 
     // Then:

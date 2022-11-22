@@ -109,6 +109,9 @@ public class QueryRunner {
   public void processQuery(DistributedStagePlan distributedStagePlan, OpChainSchedulerService scheduler,
       Map<String, String> requestMetadataMap) {
     long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
+    System.out.println("context request ID:" + requestId);
+    PlanRequestContext context =
+        new PlanRequestContext(_mailboxService, requestId, _hostname, _port, distributedStagePlan.getMetadataMap());
     if (isLeafStage(distributedStagePlan)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
@@ -125,8 +128,7 @@ public class QueryRunner {
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       // TODO: Replace with a better context abstraction.
-      PlanRequestContext context =
-          new PlanRequestContext(_mailboxService, requestId, _hostname, _port, distributedStagePlan.getMetadataMap());
+      System.out.println("leaf request id:" + serverQueryRequests.get(0).getRequestId());
       MailboxSendOperator mailboxSendOperator = new MailboxSendOperator(context,
           new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema()),
           receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(), sendNode.getPartitionKeySelector(),
@@ -135,13 +137,13 @@ public class QueryRunner {
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
-      context.close();
     } else {
+      System.out.println("other request id:" + requestId);
       StageNode stageRoot = distributedStagePlan.getStageRoot();
-      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
-          new PlanRequestContext(_mailboxService, requestId, _hostname, _port, distributedStagePlan.getMetadataMap()));
+      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot, context);
       scheduler.register(rootOperator);
     }
+    context.close();
   }
 
   private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,

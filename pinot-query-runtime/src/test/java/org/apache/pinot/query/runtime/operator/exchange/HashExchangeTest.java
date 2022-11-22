@@ -27,6 +27,7 @@ import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -46,7 +47,7 @@ public class HashExchangeTest {
   @Mock
   TransferableBlock _block;
   @Mock
-  MailboxService<TransferableBlock> _mailboxService;
+  PlanRequestContext _context;
 
   @BeforeMethod
   public void setUp() {
@@ -72,7 +73,7 @@ public class HashExchangeTest {
 
     // When:
     Iterator<BlockExchange.RoutedBlock> route =
-        new HashExchange(_mailboxService, destinations, selector, TransferableBlockUtils::splitBlock)
+        new HashExchange(_context, destinations, selector, TransferableBlockUtils::splitBlock)
             .route(destinations, _block);
 
     // Then:
