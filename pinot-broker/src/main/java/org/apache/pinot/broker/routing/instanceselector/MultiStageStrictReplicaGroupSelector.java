@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -56,8 +57,8 @@ public class MultiStageStrictReplicaGroupSelector extends BaseInstanceSelector {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private InstancePartitions _instancePartitions;
 
-  public MultiStageStrictReplicaGroupSelector(String tableNameWithType, BrokerMetrics brokerMetrics, @Nullable
-      AdaptiveServerSelector adaptiveServerSelector, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public MultiStageStrictReplicaGroupSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector) {
     super(tableNameWithType, brokerMetrics, adaptiveServerSelector);
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
@@ -129,7 +130,8 @@ public class MultiStageStrictReplicaGroupSelector extends BaseInstanceSelector {
     return result;
   }
 
-  private InstancePartitions getInstancePartitions() {
+  @VisibleForTesting
+  protected InstancePartitions getInstancePartitions() {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(_tableNameWithType);
     Preconditions.checkNotNull(tableType);
     InstancePartitions instancePartitions = null;

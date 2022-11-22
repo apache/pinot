@@ -61,8 +61,8 @@ public class InstanceSelectorFactory {
       if (RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE.equalsIgnoreCase(
           routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using {} for table: {}", routingConfig.getInstanceSelectorType(), tableNameWithType);
-        return new MultiStageStrictReplicaGroupSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector,
-            propertyStore);
+        return new MultiStageStrictReplicaGroupSelector(tableNameWithType, propertyStore, brokerMetrics,
+            adaptiveServerSelector);
       }
     }
     return new BalancedInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector);

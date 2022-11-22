@@ -107,7 +107,7 @@ public class PinotBrokerDebug {
     if (tableType != TableType.REALTIME) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       RoutingTable routingTable = _routingManager.getRoutingTable(
-          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + offlineTableName), 0);
+          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + offlineTableName), getRequestId());
       if (routingTable != null) {
         result.put(offlineTableName, routingTable.getServerInstanceToSegmentsMap());
       }
@@ -115,7 +115,7 @@ public class PinotBrokerDebug {
     if (tableType != TableType.OFFLINE) {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       RoutingTable routingTable = _routingManager.getRoutingTable(
-          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + realtimeTableName), 0);
+          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + realtimeTableName), getRequestId());
       if (routingTable != null) {
         result.put(realtimeTableName, routingTable.getServerInstanceToSegmentsMap());
       }
@@ -138,9 +138,8 @@ public class PinotBrokerDebug {
   })
   public Map<ServerInstance, List<String>> getRoutingTableForQuery(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query) {
-    int requestId = (int) (_requestIdGenerator.getAndIncrement() % MAX_REQUEST_ID);
     RoutingTable routingTable = _routingManager.getRoutingTable(CalciteSqlCompiler.compileToBrokerRequest(query),
-        requestId);
+        getRequestId());
     if (routingTable != null) {
       return routingTable.getServerInstanceToSegmentsMap();
     } else {
@@ -163,5 +162,9 @@ public class PinotBrokerDebug {
   })
   public String getServerRoutingStats() {
     return _serverRoutingStatsManager.getServerRoutingStatsStr();
+  }
+
+  private int getRequestId() {
+    return (int) (_requestIdGenerator.getAndIncrement() % MAX_REQUEST_ID);
   }
 }
