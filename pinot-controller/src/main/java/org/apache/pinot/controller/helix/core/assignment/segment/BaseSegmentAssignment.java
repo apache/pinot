@@ -75,7 +75,7 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
     _helixManager = helixManager;
     _tableNameWithType = tableConfig.getTableName();
     _tableConfig = tableConfig;
-    _replication = getReplication(tableConfig);
+    _replication = tableConfig.getReplicationNumber();
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
         tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
     _partitionColumn = replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
@@ -88,11 +88,6 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
           _partitionColumn, _tableNameWithType);
     }
   }
-
-  /**
-   * Returns the replication of the table.
-   */
-  protected abstract int getReplication(TableConfig tableConfig);
 
   /**
    * Rebalances tiers and returns a pair of tier assignments and non-tier assignment.

@@ -813,7 +813,7 @@ public class PinotTableRestletResource {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     SegmentsValidationAndRetentionConfig segmentsConfig =
         tableConfig != null ? tableConfig.getValidationConfig() : null;
-    int numReplica = segmentsConfig == null ? 1 : Integer.parseInt(segmentsConfig.getReplication());
+    int numReplica = segmentsConfig == null ? 1 : tableConfig.getReplicationNumber();
 
     String segmentsMetadata;
     try {

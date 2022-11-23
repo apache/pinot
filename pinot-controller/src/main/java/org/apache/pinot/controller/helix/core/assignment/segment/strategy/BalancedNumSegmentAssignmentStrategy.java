@@ -26,7 +26,6 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,11 +50,7 @@ public class BalancedNumSegmentAssignmentStrategy implements SegmentAssignmentSt
     _tableNameWithType = tableConfig.getTableName();
     SegmentsValidationAndRetentionConfig validationAndRetentionConfig = tableConfig.getValidationConfig();
     Preconditions.checkState(validationAndRetentionConfig != null, "Validation Config is null");
-    // Number of replicas per partition of low-level consumers check is for the real time tables only
-    // TODO: Cleanup required once we fetch the replication number from table config depending on table type
-    _replication = tableConfig.getTableType() == TableType.REALTIME
-        ? validationAndRetentionConfig.getReplicasPerPartitionNumber()
-        : validationAndRetentionConfig.getReplicationNumber();
+    _replication = tableConfig.getReplicationNumber();
     LOGGER.info("Initialized BalancedNumSegmentAssignmentStrategy for table: " + "{} with replication: {}",
         _tableNameWithType, _replication);
   }

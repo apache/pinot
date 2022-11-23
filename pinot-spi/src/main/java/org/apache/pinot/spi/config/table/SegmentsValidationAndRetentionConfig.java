@@ -124,6 +124,9 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _segmentPushType = segmentPushType;
   }
 
+  /**
+   * @deprecated Use {@link TableConfig#getReplicationNumber()}
+   */
   public String getReplication() {
     return _replication;
   }
@@ -142,6 +145,9 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _schemaName = schemaName;
   }
 
+  /**
+   * @deprecated Use {@link TableConfig#getReplicationNumber()}
+   */
   public String getReplicasPerPartition() {
     return _replicasPerPartition;
   }
@@ -166,11 +172,17 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _completionConfig = completionConfig;
   }
 
+  /**
+   * @deprecated Use {@link TableConfig#getReplicationNumber()}
+   */
   @JsonIgnore
   public int getReplicationNumber() {
     return Integer.parseInt(_replication);
   }
 
+  /**
+   * @deprecated Use {@link TableConfig#getReplicationNumber()}
+   */
   @JsonIgnore
   public int getReplicasPerPartitionNumber() {
     return Integer.parseInt(_replicasPerPartition);

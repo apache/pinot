@@ -31,6 +31,8 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -353,5 +355,32 @@ public class TableConfig extends BaseJsonConfig {
 
   public void setSegmentAssignmentConfigMap(Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap) {
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
+  }
+
+  @JsonIgnore
+  public int getReplicationNumber() {
+    Preconditions.checkNotNull(_validationConfig, "Validation config should not be null.");
+    int replication = 0;
+    if (_tableType == TableType.REALTIME) {
+      StreamConfig streamConfig = new StreamConfig(_tableName, IngestionConfigUtils.getStreamConfigMap(this));
+      if (streamConfig.hasHighLevelConsumerType()) {
+        // In case of HLC, we read from "replication"
+        replication = Integer.parseInt(_validationConfig.getReplication());
+      } else {
+        // To keep the backward compatibility, we read from "replicasPerPartition" in case of LLC
+        String replicasPerPartitionStr = _validationConfig.getReplicasPerPartition();
+        try {
+          replication = Integer.parseInt(replicasPerPartitionStr);
+        } catch (NumberFormatException e) {
+          // If numReplicasPerPartition is not being used or specified, read the value from replication
+          String replicationStr = _validationConfig.getReplication();
+          replication = Integer.parseInt(replicationStr);
+        }
+      }
+    } else {
+      // In case of OFFLINE tables, we read from "replication"
+      replication = Integer.parseInt(_validationConfig.getReplication());
+    }
+    return replication;
   }
 }
