@@ -60,7 +60,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 // TODO: Add APIs to return the RoutingTable (with unavailable segments)
 public class PinotBrokerDebug {
 
-  private static final int MAX_REQUEST_ID = 1_000_000_000;
   // Request ID is passed to the RoutingManager to rotate the selected replica-group.
   private final AtomicLong _requestIdGenerator = new AtomicLong();
 
@@ -164,7 +163,7 @@ public class PinotBrokerDebug {
     return _serverRoutingStatsManager.getServerRoutingStatsStr();
   }
 
-  private int getRequestId() {
-    return (int) (_requestIdGenerator.getAndIncrement() % MAX_REQUEST_ID);
+  private long getRequestId() {
+    return _requestIdGenerator.getAndIncrement();
   }
 }

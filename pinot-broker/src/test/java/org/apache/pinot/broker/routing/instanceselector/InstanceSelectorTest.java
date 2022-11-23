@@ -850,6 +850,7 @@ public class InstanceSelectorTest {
   @Test
   public void testMultiStageStrictReplicaGroupSelector() {
     String offlineTableName = "testTable_OFFLINE";
+    // Create instance-partitions with two replica-groups and 1 partition. Each replica-group has 2 instances.
     List<String> replicaGroup0 = ImmutableList.of("instance-0", "instance-1");
     List<String> replicaGroup1 = ImmutableList.of("instance-2", "instance-3");
     Map<String, List<String>> partitionToInstances = ImmutableMap.of(
@@ -880,17 +881,20 @@ public class InstanceSelectorTest {
     Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
     Set<String> onlineSegments = new HashSet<>();
 
+    // Mark all instances as enabled
     for (int i = 0; i < 4; i++) {
       enabledInstances.add(String.format("instance-%d", i));
     }
 
     List<String> segments = getSegments();
 
+    // Create two idealState and externalView maps. One is used for segments with replica-group=0 and the other for rg=1
     Map<String, String> idealStateInstanceStateMap0 = new TreeMap<>();
     Map<String, String> externalViewInstanceStateMap0 = new TreeMap<>();
     Map<String, String> idealStateInstanceStateMap1 = new TreeMap<>();
     Map<String, String> externalViewInstanceStateMap1 = new TreeMap<>();
 
+    // instance-0 and instance-2 mirror each other in the two replica-groups. Same for instance-1 and instance-3.
     for (int i = 0; i < 4; i++) {
       String instance = enabledInstances.get(i);
       if (i % 2 == 0) {
@@ -902,8 +906,8 @@ public class InstanceSelectorTest {
       }
     }
 
-    // add all segments to both idealStateSegmentAssignment and externalViewSegmentAssignment maps and also to online
-    // segments
+    // Even numbered segments get assigned to [instance-0, instance-2], and odd numbered segments get assigned to
+    // [instance-1,instance-3].
     for (int segmentNum = 0; segmentNum < segments.size(); segmentNum++) {
       String segment = segments.get(segmentNum);
       if (segmentNum % 2 == 0) {
@@ -918,7 +922,8 @@ public class InstanceSelectorTest {
 
     multiStageSelector.init(new HashSet<>(enabledInstances), idealState, externalView, onlineSegments);
 
-    // Using requestId=0 should select replica-group 0
+    // Using requestId=0 should select replica-group 0. Even segments get assigned to instance-0 and odd segments get
+    // assigned to instance-1.
     Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     for (int segmentNum = 0; segmentNum < segments.size(); segmentNum++) {
       expectedReplicaGroupInstanceSelectorResult.put(segments.get(segmentNum), replicaGroup0.get(segmentNum % 2));
