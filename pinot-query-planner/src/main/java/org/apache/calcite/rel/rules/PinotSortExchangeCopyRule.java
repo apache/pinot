@@ -32,7 +32,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.pinot.query.planner.logical.IntExprRexVisitor;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 
@@ -62,7 +62,9 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
         sort.getCollation(),
         sort.offset,
         sort.fetch)) {
-      // Don't rewrite anything if the input is already sorted
+      // Don't rewrite anything if the input is already sorted AND the
+      // input node would already return fewer than sort.offset + sort.fetch
+      // rows (e.g. there is already an inner limit applied)
       return;
     }
 
@@ -72,11 +74,6 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
         "Expected collation on exchange and sort to be the same"
     );
 
-    // for now, we push down the sort with the offset + limit as the
-    // fetch because we don't have proper flow control and this is the
-    // only way to prevent the V1 engine from returning all the matching
-    // rows - ideally, we just push down null for the fetch and let the
-    // flow control handle it
     final RexNode fetch;
     if (sort.fetch == null) {
       fetch = null;
@@ -84,7 +81,7 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
       fetch = sort.fetch;
     } else {
       RexBuilder rexBuilder = new RexBuilder(TYPE_FACTORY);
-      int total = IntExprRexVisitor.INSTANCE.visit(sort.fetch) + IntExprRexVisitor.INSTANCE.visit(sort.offset);
+      int total = RexExpressionUtils.getValueAsInt(sort.fetch) + RexExpressionUtils.getValueAsInt(sort.offset);
       fetch = rexBuilder.makeLiteral(total, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER));
     }
 

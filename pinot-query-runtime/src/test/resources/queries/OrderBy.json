@@ -21,11 +21,12 @@
       {"sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
       {"sql": "SELECT * FROM {basic} ORDER BY col0 LIMIT 2 OFFSET 1"},
       {"sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT 2 OFFSET 0"},
       {"sql": "SELECT * FROM {basic} ORDER BY col2, col1 LIMIT 2 OFFSET 1"},
       {"sql": "SELECT * FROM {basic} ORDER BY col1, col2 LIMIT 2 OFFSET 1"},
       {"sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 2"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 10"},
-      {"sql": "SELECT * FROM {basic} ORDER BY col1 OFFSET 10"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 100"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1 OFFSET 100"},
       {"sql": "SELECT * FROM {basic} ORDER BY col1"},
       {"sql": "SELECT * FROM {basic} ORDER BY col1 DESC"},
       {"sql": "SELECT * FROM {basic} ORDER BY col1 DESC LIMIT 2 OFFSET 1"},
@@ -38,7 +39,17 @@
       {"sql": "SELECT col1 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
       {"sql": "SELECT col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
       {"sql": "SELECT col1, col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
-      {"sql": "SELECT col1, col0, col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"}
+      {"sql": "SELECT col1, col0, col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
+      {
+        "ignored": true,
+        "comment": "we don't support ALL statement",
+        "sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT ALL"
+      },
+      {
+        "ignored": true,
+        "comment": "we don't support LIMIT NULL",
+        "sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT NULL"
+      }
     ]
   },
   "order_by_agg": {
