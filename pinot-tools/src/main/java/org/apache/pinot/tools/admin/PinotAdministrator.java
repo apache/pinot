@@ -24,7 +24,6 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AddSchemaCommand;
-import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.AddTenantCommand;
 import org.apache.pinot.tools.admin.command.AnonymizeDataCommand;
 import org.apache.pinot.tools.admin.command.AvroSchemaToPinotSchema;

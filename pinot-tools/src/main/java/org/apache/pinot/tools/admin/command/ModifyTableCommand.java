@@ -43,13 +43,17 @@ import picocli.CommandLine;
  * Class to implement CreateResource command.
  *
  */
-@CommandLine.Command(name = "AddTable")
-public class AddTableCommand extends AbstractBaseAdminCommand implements Command {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
+@CommandLine.Command(name = "ModifyTable")
+public class ModifyTableCommand extends AbstractBaseAdminCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ModifyTableCommand.class);
 
   @CommandLine.Option(names = {"-tableConfigFile", "-tableConf", "-tableConfig", "-filePath"}, description = "Path to"
       + " table config file.")
   private String _tableConfigFile;
+
+  @CommandLine.Option(names = {"-tableName"}, description = "Name of the table for which config needs to"
+      + " be updated or deleted")
+  private String _tableName;
 
   @CommandLine.Option(names = {
       "-offlineTableConfigFile", "-offlineTableConf", "-offlineTableConfig", "-offlineFilePath"
@@ -74,6 +78,10 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
+
+  @CommandLine.Option(names = {"-opType"}, required = false,
+      description = "Operation to be performed on table (ADD, DELETE or UPDATE).")
+  private TableOp _tableOp = TableOp.ADD;
 
   @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
   private boolean _exec;
@@ -127,57 +135,57 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   public void cleanup() {
   }
 
-  public AddTableCommand setTableConfigFile(String tableConfigFile) {
+  public ModifyTableCommand setTableConfigFile(String tableConfigFile) {
     _tableConfigFile = tableConfigFile;
     return this;
   }
 
-  public AddTableCommand setOfflineTableConfigFile(String offlineTableConfigFile) {
+  public ModifyTableCommand setOfflineTableConfigFile(String offlineTableConfigFile) {
     _offlineTableConfigFile = offlineTableConfigFile;
     return this;
   }
 
-  public AddTableCommand setRealtimeTableConfigFile(String realtimeTableConfigFile) {
+  public ModifyTableCommand setRealtimeTableConfigFile(String realtimeTableConfigFile) {
     _realtimeTableConfigFile = realtimeTableConfigFile;
     return this;
   }
 
-  public AddTableCommand setSchemaFile(String schemaFile) {
+  public ModifyTableCommand setSchemaFile(String schemaFile) {
     _schemaFile = schemaFile;
     return this;
   }
 
-  public AddTableCommand setControllerHost(String controllerHost) {
+  public ModifyTableCommand setControllerHost(String controllerHost) {
     _controllerHost = controllerHost;
     return this;
   }
 
-  public AddTableCommand setControllerPort(String controllerPort) {
+  public ModifyTableCommand setControllerPort(String controllerPort) {
     _controllerPort = controllerPort;
     return this;
   }
 
-  public AddTableCommand setControllerProtocol(String controllerProtocol) {
+  public ModifyTableCommand setControllerProtocol(String controllerProtocol) {
     _controllerProtocol = controllerProtocol;
     return this;
   }
 
-  public AddTableCommand setUser(String user) {
+  public ModifyTableCommand setUser(String user) {
     _user = user;
     return this;
   }
 
-  public AddTableCommand setPassword(String password) {
+  public ModifyTableCommand setPassword(String password) {
     _password = password;
     return this;
   }
 
-  public AddTableCommand setExecute(boolean exec) {
+  public ModifyTableCommand setExecute(boolean exec) {
     _exec = exec;
     return this;
   }
 
-  public AddTableCommand setAuthProvider(AuthProvider authProvider) {
+  public ModifyTableCommand setAuthProvider(AuthProvider authProvider) {
     _authProvider = authProvider;
     return this;
   }
@@ -189,6 +197,24 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
         makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
     LOGGER.info(res);
     return res.contains("successfully added");
+  }
+
+  public boolean sendTableUpdateRequest(JsonNode node, String tableName)
+      throws IOException {
+    String res = AbstractBaseAdminCommand.sendRequest("PUT",
+        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsUpdate(tableName), node.toString(),
+        makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
+    LOGGER.info(res);
+    return res.contains("TableConfigs updated");
+  }
+
+  public boolean sendTableDeleteRequest(String tableName)
+      throws IOException {
+    String res = AbstractBaseAdminCommand.sendRequest("DELETE",
+        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsDelete(tableName), null,
+        makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
+    LOGGER.info(res);
+    return res.contains("Deleted TableConfigs");
   }
 
   @Override
@@ -206,6 +232,14 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     _controllerAddress = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
 
     LOGGER.info("Executing command: " + toString());
+
+    if (_tableOp != TableOp.ADD) {
+      Preconditions.checkNotNull(_tableName, "-tableName must be specified for updates and deletes");
+    }
+
+    if (_tableOp == TableOp.DELETE) {
+      return sendTableDeleteRequest(_tableName);
+    }
 
     String rawTableName = null;
     TableConfig offlineTableConfig = null;
@@ -239,7 +273,11 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
         "Failed reading schema " + _schemaFile);
     TableConfigs tableConfigs = new TableConfigs(rawTableName, schema, offlineTableConfig, realtimeTableConfig);
 
-    return sendTableCreationRequest(JsonUtils.objectToJsonNode(tableConfigs));
+    if (_tableOp == TableOp.UPDATE) {
+      return sendTableUpdateRequest(tableConfigs.toJsonNode(), _tableName);
+    } else {
+      return sendTableCreationRequest(tableConfigs.toJsonNode());
+    }
   }
 
   private static <T> T attempt(Callable<T> callable, String errorMessage) {
@@ -249,5 +287,9 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       LOGGER.error(errorMessage, t);
       throw new IllegalStateException(t);
     }
+  }
+
+  enum TableOp {
+    ADD, DELETE, UPDATE;
   }
 }
