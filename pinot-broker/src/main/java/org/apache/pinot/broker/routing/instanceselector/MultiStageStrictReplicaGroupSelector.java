@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * Pinot broker to determine the replica-group picked for each table involved in the query, as opposed to using a
  * member variable. There may be scenarios where an instance in the chosen replica-group is down. In that case, this
  * strategy will try to pick another replica-group. For realtime tables, this strategy uses only CONSUMING partitions.
- * TODO: Evaluate whether we need to provide support for COMPLETE partitions here.
+ * This is feature is in <strong>Beta</strong>.
  */
 public class MultiStageStrictReplicaGroupSelector extends BaseInstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageStrictReplicaGroupSelector.class);
@@ -132,6 +132,7 @@ public class MultiStageStrictReplicaGroupSelector extends BaseInstanceSelector {
 
   @VisibleForTesting
   protected InstancePartitions getInstancePartitions() {
+    // TODO: Evaluate whether we need to provide support for COMPLETE partitions.
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(_tableNameWithType);
     Preconditions.checkNotNull(tableType);
     InstancePartitions instancePartitions = null;
