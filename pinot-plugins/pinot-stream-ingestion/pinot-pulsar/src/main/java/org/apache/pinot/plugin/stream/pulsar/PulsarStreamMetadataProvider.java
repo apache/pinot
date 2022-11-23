@@ -31,6 +31,11 @@ import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.PulsarAdminBuilder;
+import org.apache.pulsar.client.admin.PulsarAdminException;
+import org.apache.pulsar.client.api.Authentication;
+import org.apache.pulsar.client.api.AuthenticationFactory;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
@@ -47,8 +52,8 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     implements StreamMetadataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarStreamMetadataProvider.class);
 
-  private final StreamConfig _streamConfig;
   private final int _partition;
+  private final PulsarAdmin _pulsarAdminClient;
 
   public PulsarStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     this(clientId, streamConfig, 0);
@@ -56,16 +61,28 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
 
   public PulsarStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
-    _streamConfig = streamConfig;
     _partition = partition;
+    try {
+        PulsarAdminBuilder builder = PulsarAdmin.builder().serviceHttpUrl(_config.getBootstrapServers());
+        if (_config.getTlsTrustCertsFilePath() != null) {
+          builder.tlsTrustCertsFilePath(_config.getTlsTrustCertsFilePath());
+        }
+        if (_config.getAuthenticationToken() != null) {
+          Authentication authentication = AuthenticationFactory.token(_config.getAuthenticationToken());
+          builder.authentication(authentication);
+        }
+      _pulsarAdminClient = builder.build();
+    } catch (PulsarClientException e) {
+      throw new RuntimeException("Failed to create Pulsar Admin Client", e);
+    }
   }
 
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
     try {
-      return _pulsarClient.getPartitionsForTopic(_streamConfig.getTopicName()).get().size();
+      return _pulsarClient.getPartitionsForTopic(_config.getPulsarTopicName()).get().size();
     } catch (Exception e) {
-      throw new RuntimeException("Cannot fetch partitions for topic: " + _streamConfig.getTopicName(), e);
+      throw new RuntimeException("Cannot fetch partitions for topic: " + _config.getPulsarTopicName(), e);
     }
   }
 
@@ -123,6 +140,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     }
 
     PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, clientId);
+    String subscription = ConsumerName.generateRandomName();
     Consumer consumer = null;
     try {
       List<String> partitionedTopicNameList = _pulsarClient.getPartitionsForTopic(_topic).get();
@@ -134,7 +152,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
 
           consumer = _pulsarClient.newConsumer().topic(partitionedTopicNameList.get(p))
               .subscriptionInitialPosition(pulsarConfig.getInitialSubscriberPosition())
-              .subscriptionName(ConsumerName.generateRandomName()).subscribe();
+              .subscriptionName(subscription).subscribe();
 
           Message message = consumer.receive(timeoutMillis, TimeUnit.MILLISECONDS);
           if (message != null) {
@@ -156,9 +174,19 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
       LOGGER.warn("Error encountered while calculating pulsar partition group metadata: " + e.getMessage(), e);
     } finally {
       closeConsumer(consumer);
+      deleteSubscription(_topic, subscription);
     }
 
     return newPartitionGroupMetadataList;
+  }
+
+  private void deleteSubscription(String topicName, String subscription) {
+    try {
+      _pulsarAdminClient.topics().deleteSubscription(topicName, subscription);
+    } catch (PulsarAdminException e) {
+      // best-effort - log in case of exception
+      LOGGER.warn("Failed to delete subscription {} for topic {}.", subscription, topicName);
+    }
   }
 
   private void closeConsumer(Consumer consumer) {
