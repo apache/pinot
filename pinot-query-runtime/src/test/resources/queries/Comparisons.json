@@ -390,6 +390,7 @@
     "queries": [
       { "sql": "SELECT val BETWEEN small AND big FROM {tbl}" },
       { "sql": "SELECT val BETWEEN big AND small FROM {tbl}" },
+      { "sql": "SELECT val BETWEEN 2 AND 3 FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN small AND big FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN big AND small FROM {tbl}" },
       {
@@ -443,6 +444,7 @@
     },
     "queries": [
       { "sql": "SELECT val BETWEEN small AND big FROM {tbl}" },
+      { "sql": "SELECT val BETWEEN 0.0 AND 3.0 FROM {tbl}" },
       { "sql": "SELECT val BETWEEN big AND small FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN small AND big FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN big AND small FROM {tbl}" }
@@ -467,7 +469,8 @@
       { "sql": "SELECT val BETWEEN small AND big FROM {tbl}" },
       { "sql": "SELECT val BETWEEN big AND small FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN small AND big FROM {tbl}" },
-      { "sql": "SELECT val NOT BETWEEN big AND small FROM {tbl}" }
+      { "sql": "SELECT val NOT BETWEEN big AND small FROM {tbl}" },
+      { "sql": "SELECT val BETWEEN 0.0 AND 3.0 FROM {tbl}" }
     ]
   },
   "between_numerics": {
@@ -490,7 +493,8 @@
       { "sql": "SELECT val BETWEEN small AND big FROM {tbl}" },
       { "sql": "SELECT val BETWEEN big AND small FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN small AND big FROM {tbl}" },
-      { "sql": "SELECT val NOT BETWEEN big AND small FROM {tbl}" }
+      { "sql": "SELECT val NOT BETWEEN big AND small FROM {tbl}" },
+      { "sql": "SELECT val BETWEEN 0.0 AND 3.0 FROM {tbl}" }
     ]
   },
   "between_different_types": {
@@ -510,7 +514,30 @@
     "queries": [
       { "sql": "SELECT a BETWEEN b AND c FROM {tbl}" },
       { "sql": "SELECT b BETWEEN c AND a FROM {tbl}" },
-      { "sql": "SELECT c BETWEEN a AND b FROM {tbl}" }
+      { "sql": "SELECT c BETWEEN a AND b FROM {tbl}" },
+      { "sql": "SELECT c BETWEEN 1 AND 3.0 FROM {tbl}" }
+    ]
+  },
+  "between_strings": {
+    "psql": "9.2",
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "a", "type": "STRING"},
+          {"name": "b", "type": "STRING"},
+          {"name": "c", "type": "STRING"}
+        ],
+        "inputs": [
+          ["aa", "bb", "cc"], ["ee", "ff", "cc"], ["b", "d", "cc"]
+        ]
+      }
+    },
+    "queries": [
+      { "sql": "SELECT a BETWEEN b AND c FROM {tbl}" },
+      { "sql": "SELECT b BETWEEN c AND a FROM {tbl}" },
+      { "sql": "SELECT c BETWEEN a AND b FROM {tbl}" },
+      { "sql": "SELECT a BETWEEN 'a' AND 'c' FROM {tbl}" },
+      { "sql" : "SELECT 'c' BETWEEN 'a' AND 'b' FROM {tbl}"}
     ]
   }
 }
