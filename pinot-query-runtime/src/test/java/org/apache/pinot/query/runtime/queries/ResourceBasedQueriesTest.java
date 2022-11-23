@@ -66,8 +66,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       "SelectExpressions.json",
       "ValueExpressions.json",
       "NumericTypes.json",
-      "Comparisons.json",
-      "NumericFuncs.json"
+      "Comparisons.json"
   );
 
   @BeforeClass
