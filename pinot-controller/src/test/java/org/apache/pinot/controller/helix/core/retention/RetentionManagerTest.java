@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.retention;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
@@ -34,6 +35,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -152,8 +154,10 @@ public class RetentionManagerTest {
   }
 
   private TableConfig createRealtimeTableConfig1(int replicaCount) {
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     return new TableConfigBuilder(TableType.REALTIME).setTableName(TEST_TABLE_NAME).setLLC(true)
-        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setNumReplicas(replicaCount).build();
+        .setStreamConfigs(streamConfigs).setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+        .setNumReplicas(replicaCount).build();
   }
 
   private void setupPinotHelixResourceManager(TableConfig tableConfig, final List<String> removedSegments,
@@ -233,7 +237,7 @@ public class RetentionManagerTest {
 
   private PinotHelixResourceManager setupSegmentMetadata(TableConfig tableConfig, final long now, final int nSegments,
       List<String> segmentsToBeDeleted) {
-    final int replicaCount = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
+    final int replicaCount = tableConfig.getReplication();
 
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
 

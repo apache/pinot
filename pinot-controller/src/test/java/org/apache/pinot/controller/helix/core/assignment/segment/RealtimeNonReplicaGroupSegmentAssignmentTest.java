@@ -30,6 +30,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -79,9 +80,10 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
           System.currentTimeMillis()).getSegmentName());
     }
 
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setLLC(true).build();
+            .setLLC(true).setStreamConfigs(streamConfigs).build();
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig);
 
     _instancePartitionsMap = new TreeMap<>();
@@ -113,9 +115,10 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
 
   @Test
   public void testReplicationForSegmentAssignment() {
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setLLC(true).build();
+            .setLLC(true).setStreamConfigs(streamConfigs).build();
     // Update the replication by changing the NUM_REPLICAS_PER_PARTITION
     tableConfig.getValidationConfig().setReplicasPerPartition(NUM_REPLICAS_PER_PARTITION);
     SegmentAssignment segmentAssignment =

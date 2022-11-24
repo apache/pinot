@@ -53,7 +53,7 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
     // Get the number of replicas in the tableconfig.
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     final TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
-    final int newNumReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
+    final int newNumReplicas = offlineTableConfig.getReplication();
 
     // Now get the idealstate, and get the number of replicas in it.
     IdealState currentIdealState = _helixAdmin.getResourceIdealState(_clusterName, offlineTableName);

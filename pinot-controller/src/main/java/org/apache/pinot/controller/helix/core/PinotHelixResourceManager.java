@@ -136,7 +136,6 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
-import org.apache.pinot.segment.local.utils.ReplicationUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -1474,7 +1473,6 @@ public class PinotHelixResourceManager {
     }
 
     validateTableTenantConfig(tableConfig);
-    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     TableType tableType = tableConfig.getTableType();
 
     switch (tableType) {
@@ -1482,7 +1480,7 @@ public class PinotHelixResourceManager {
         // now lets build an ideal state
         LOGGER.info("building empty ideal state for table : " + tableNameWithType);
         final IdealState offlineIdealState = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableNameWithType,
-            Integer.parseInt(segmentsConfig.getReplication()), _enableBatchMessageMode);
+            tableConfig.getReplication(), _enableBatchMessageMode);
         LOGGER.info("adding table via the admin");
 
         try {
@@ -1795,7 +1793,7 @@ public class PinotHelixResourceManager {
 
         // Update IdealState replication
         IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-        String replicationConfigured = segmentsConfig.getReplication();
+        String replicationConfigured = Integer.toString(tableConfig.getReplication());
         if (!idealState.getReplicas().equals(replicationConfigured)) {
           HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {
             assert is != null;
@@ -3742,12 +3740,7 @@ public class PinotHelixResourceManager {
       Set<String> serverInstances = getAllInstancesForServerTenant(tenantConfig.getServer());
       return serverInstances.size();
     }
-
-    if (ReplicationUtils.useReplicasPerPartition(tableConfig)) {
-      return Integer.parseInt(tableConfig.getValidationConfig().getReplicasPerPartition());
-    }
-
-    return tableConfig.getValidationConfig().getReplicationNumber();
+    return tableConfig.getReplication();
   }
 
   /**
