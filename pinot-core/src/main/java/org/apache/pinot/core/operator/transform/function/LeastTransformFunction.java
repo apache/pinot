@@ -32,7 +32,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
-    if (_intValuesSV == null || _intValuesSV.length < numDocs) {
+    if (_intValuesSV == null) {
       _intValuesSV = new int[numDocs];
     }
     int[] values = _arguments.get(0).transformToIntValuesSV(projectionBlock);
@@ -49,7 +49,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
-    if (_longValuesSV == null || _longValuesSV.length < numDocs) {
+    if (_longValuesSV == null) {
       _longValuesSV = new long[numDocs];
     }
     long[] values = _arguments.get(0).transformToLongValuesSV(projectionBlock);
@@ -66,7 +66,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
-    if (_floatValuesSV == null || _floatValuesSV.length < numDocs) {
+    if (_floatValuesSV == null) {
       _floatValuesSV = new float[numDocs];
     }
     float[] values = _arguments.get(0).transformToFloatValuesSV(projectionBlock);
@@ -83,7 +83,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
-    if (_doubleValuesSV == null || _doubleValuesSV.length < numDocs) {
+    if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[numDocs];
     }
     double[] values = _arguments.get(0).transformToDoubleValuesSV(projectionBlock);
@@ -100,7 +100,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < numDocs) {
+    if (_bigDecimalValuesSV == null) {
       _bigDecimalValuesSV = new BigDecimal[numDocs];
     }
     BigDecimal[] values = _arguments.get(0).transformToBigDecimalValuesSV(projectionBlock);
@@ -117,7 +117,7 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
-    if (_stringValuesSV == null || _stringValuesSV.length < numDocs) {
+    if (_stringValuesSV == null) {
       _stringValuesSV = new String[numDocs];
     }
     String[] values = _arguments.get(0).transformToStringValuesSV(projectionBlock);

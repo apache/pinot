@@ -64,19 +64,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
   private static final String GROOVY_TEMPLATE_WITHOUT_ARGS = "Groovy({%s})";
   private static final String GROOVY_ARG_DELIMITER = ",";
 
-  private int[] _intResultSV;
-  private long[] _longResultSV;
-  private double[] _doubleResultSV;
-  private float[] _floatResultSV;
-  private BigDecimal[] _bigDecimalResultSV;
-  private String[] _stringResultSV;
-  private int[][] _intResultMV;
-  private long[][] _longResultMV;
-  private double[][] _doubleResultMV;
-  private float[][] _floatResultMV;
-  private String[][] _stringResultMV;
   private TransformResultMetadata _resultMetadata;
-
   private GroovyFunctionEvaluator _groovyFunctionEvaluator;
   private int _numGroovyArgs;
   private TransformFunction[] _groovyArguments;
@@ -145,16 +133,16 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       // construct arguments string for GroovyFunctionEvaluator
       String argumentsStr = IntStream.range(0, _numGroovyArgs).mapToObj(i -> ARGUMENT_PREFIX + i)
           .collect(Collectors.joining(GROOVY_ARG_DELIMITER));
-      _groovyFunctionEvaluator = new GroovyFunctionEvaluator(String
-          .format(GROOVY_TEMPLATE_WITH_ARGS, ((LiteralTransformFunction) groovyTransformFunction).getLiteral(),
+      _groovyFunctionEvaluator = new GroovyFunctionEvaluator(
+          String.format(GROOVY_TEMPLATE_WITH_ARGS, ((LiteralTransformFunction) groovyTransformFunction).getLiteral(),
               argumentsStr));
 
       _transformToValuesFunctions = new BiFunction[_numGroovyArgs];
       _fetchElementFunctions = new BiFunction[_numGroovyArgs];
       initFunctions();
     } else {
-      _groovyFunctionEvaluator = new GroovyFunctionEvaluator(String
-          .format(GROOVY_TEMPLATE_WITHOUT_ARGS, ((LiteralTransformFunction) groovyTransformFunction).getLiteral()));
+      _groovyFunctionEvaluator = new GroovyFunctionEvaluator(String.format(GROOVY_TEMPLATE_WITHOUT_ARGS,
+          ((LiteralTransformFunction) groovyTransformFunction).getLiteral()));
     }
     _sourceArrays = new Object[_numGroovyArgs];
     _bindingValues = new Object[_numGroovyArgs];
@@ -233,155 +221,62 @@ public class GroovyTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_intResultSV == null) {
-      _intResultSV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+    if (_intValuesSV == null) {
+      _intValuesSV = new int[length];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
       _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
     }
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
         _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
       }
-      _intResultSV[i] = (int) _groovyFunctionEvaluator.evaluate(_bindingValues);
+      _intValuesSV[i] = (int) _groovyFunctionEvaluator.evaluate(_bindingValues);
     }
-    return _intResultSV;
-  }
-
-  @Override
-  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    if (_intResultMV == null) {
-      _intResultMV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-    }
-    for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
-    }
-    int length = projectionBlock.getNumDocs();
-    for (int i = 0; i < length; i++) {
-      for (int j = 0; j < _numGroovyArgs; j++) {
-        _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
-      }
-      Object result = _groovyFunctionEvaluator.evaluate(_bindingValues);
-      if (result instanceof List) {
-        _intResultMV[i] = new IntArrayList((List<Integer>) result).toIntArray();
-      } else if (result instanceof int[]) {
-        _intResultMV[i] = (int[]) result;
-      } else {
-        throw new IllegalStateException("Unexpected result type '" + result.getClass() + "' for GROOVY function");
-      }
-    }
-    return _intResultMV;
-  }
-
-  @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_doubleResultSV == null) {
-      _doubleResultSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-    for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
-    }
-    int length = projectionBlock.getNumDocs();
-    for (int i = 0; i < length; i++) {
-      for (int j = 0; j < _numGroovyArgs; j++) {
-        _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
-      }
-      _doubleResultSV[i] = (double) _groovyFunctionEvaluator.evaluate(_bindingValues);
-    }
-    return _doubleResultSV;
-  }
-
-  @Override
-  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    if (_doubleResultMV == null) {
-      _doubleResultMV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-    }
-    for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
-    }
-    int length = projectionBlock.getNumDocs();
-    for (int i = 0; i < length; i++) {
-      for (int j = 0; j < _numGroovyArgs; j++) {
-        _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
-      }
-      Object result = _groovyFunctionEvaluator.evaluate(_bindingValues);
-      if (result instanceof List) {
-        _doubleResultMV[i] = new DoubleArrayList((List<Double>) result).toDoubleArray();
-      } else if (result instanceof double[]) {
-        _doubleResultMV[i] = (double[]) result;
-      } else {
-        throw new IllegalStateException("Unexpected result type '" + result.getClass() + "' for GROOVY function");
-      }
-    }
-    return _doubleResultMV;
+    return _intValuesSV;
   }
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_longResultSV == null) {
-      _longResultSV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+    if (_longValuesSV == null) {
+      _longValuesSV = new long[length];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
       _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
     }
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
         _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
       }
-      _longResultSV[i] = (long) _groovyFunctionEvaluator.evaluate(_bindingValues);
+      _longValuesSV[i] = (long) _groovyFunctionEvaluator.evaluate(_bindingValues);
     }
-    return _longResultSV;
-  }
-
-  @Override
-  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    if (_longResultMV == null) {
-      _longResultMV = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-    }
-    for (int i = 0; i < _numGroovyArgs; i++) {
-      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
-    }
-    int length = projectionBlock.getNumDocs();
-    for (int i = 0; i < length; i++) {
-      for (int j = 0; j < _numGroovyArgs; j++) {
-        _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
-      }
-      Object result = _groovyFunctionEvaluator.evaluate(_bindingValues);
-      if (result instanceof List) {
-        _longResultMV[i] = new LongArrayList((List<Long>) result).toLongArray();
-      } else if (result instanceof long[]) {
-        _longResultMV[i] = (long[]) result;
-      } else {
-        throw new IllegalStateException("Unexpected result type '" + result.getClass() + "' for GROOVY function");
-      }
-    }
-    return _longResultMV;
+    return _longValuesSV;
   }
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    if (_floatResultSV == null) {
-      _floatResultSV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+    if (_floatValuesSV == null) {
+      _floatValuesSV = new float[length];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
       _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
     }
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
         _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
       }
-      _floatResultSV[i] = (float) _groovyFunctionEvaluator.evaluate(_bindingValues);
+      _floatValuesSV[i] = (float) _groovyFunctionEvaluator.evaluate(_bindingValues);
     }
-    return _floatResultSV;
+    return _floatValuesSV;
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    if (_floatResultMV == null) {
-      _floatResultMV = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    if (_doubleValuesSV == null) {
+      _doubleValuesSV = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
       _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
@@ -391,58 +286,151 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       for (int j = 0; j < _numGroovyArgs; j++) {
         _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
       }
-      Object result = _groovyFunctionEvaluator.evaluate(_bindingValues);
-      if (result instanceof List) {
-        _floatResultMV[i] = new FloatArrayList((List<Float>) result).toFloatArray();
-      } else if (result instanceof float[]) {
-        _floatResultMV[i] = (float[]) result;
-      } else {
-        throw new IllegalStateException("Unexpected result type '" + result.getClass() + "' for GROOVY function");
-      }
+      _doubleValuesSV[i] = (double) _groovyFunctionEvaluator.evaluate(_bindingValues);
     }
-    return _floatResultMV;
+    return _doubleValuesSV;
   }
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    if (_bigDecimalResultSV == null) {
-      _bigDecimalResultSV = new BigDecimal[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalValuesSV == null) {
+      _bigDecimalValuesSV = new BigDecimal[length];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
       _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
     }
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
         _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
       }
-      _bigDecimalResultSV[i] = (BigDecimal) _groovyFunctionEvaluator.evaluate(_bindingValues);
+      _bigDecimalValuesSV[i] = (BigDecimal) _groovyFunctionEvaluator.evaluate(_bindingValues);
     }
-    return _bigDecimalResultSV;
+    return _bigDecimalValuesSV;
   }
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    if (_stringResultSV == null) {
-      _stringResultSV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    int length = projectionBlock.getNumDocs();
+    if (_stringValuesSV == null) {
+      _stringValuesSV = new String[length];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
       _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
     }
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numGroovyArgs; j++) {
         _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
       }
-      _stringResultSV[i] = (String) _groovyFunctionEvaluator.evaluate(_bindingValues);
+      _stringValuesSV[i] = (String) _groovyFunctionEvaluator.evaluate(_bindingValues);
     }
-    return _stringResultSV;
+    return _stringValuesSV;
+  }
+
+  @Override
+  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    if (_intValuesMV == null) {
+      _intValuesMV = new int[length][];
+    }
+    for (int i = 0; i < _numGroovyArgs; i++) {
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+    }
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numGroovyArgs; j++) {
+        _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
+      }
+      Object result = _groovyFunctionEvaluator.evaluate(_bindingValues);
+      if (result instanceof List) {
+        _intValuesMV[i] = new IntArrayList((List<Integer>) result).toIntArray();
+      } else if (result instanceof int[]) {
+        _intValuesMV[i] = (int[]) result;
+      } else {
+        throw new IllegalStateException("Unexpected result type '" + result.getClass() + "' for GROOVY function");
+      }
+    }
+    return _intValuesMV;
+  }
+
+  @Override
+  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    if (_longValuesMV == null) {
+      _longValuesMV = new long[length][];
+    }
+    for (int i = 0; i < _numGroovyArgs; i++) {
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+    }
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numGroovyArgs; j++) {
+        _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
+      }
+      Object result = _groovyFunctionEvaluator.evaluate(_bindingValues);
+      if (result instanceof List) {
+        _longValuesMV[i] = new LongArrayList((List<Long>) result).toLongArray();
+      } else if (result instanceof long[]) {
+        _longValuesMV[i] = (long[]) result;
+      } else {
+        throw new IllegalStateException("Unexpected result type '" + result.getClass() + "' for GROOVY function");
+      }
+    }
+    return _longValuesMV;
+  }
+
+  @Override
+  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    if (_floatValuesMV == null) {
+      _floatValuesMV = new float[length][];
+    }
+    for (int i = 0; i < _numGroovyArgs; i++) {
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+    }
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numGroovyArgs; j++) {
+        _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
+      }
+      Object result = _groovyFunctionEvaluator.evaluate(_bindingValues);
+      if (result instanceof List) {
+        _floatValuesMV[i] = new FloatArrayList((List<Float>) result).toFloatArray();
+      } else if (result instanceof float[]) {
+        _floatValuesMV[i] = (float[]) result;
+      } else {
+        throw new IllegalStateException("Unexpected result type '" + result.getClass() + "' for GROOVY function");
+      }
+    }
+    return _floatValuesMV;
+  }
+
+  @Override
+  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    if (_doubleValuesMV == null) {
+      _doubleValuesMV = new double[length][];
+    }
+    for (int i = 0; i < _numGroovyArgs; i++) {
+      _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
+    }
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < _numGroovyArgs; j++) {
+        _bindingValues[j] = _fetchElementFunctions[j].apply(_sourceArrays[j], i);
+      }
+      Object result = _groovyFunctionEvaluator.evaluate(_bindingValues);
+      if (result instanceof List) {
+        _doubleValuesMV[i] = new DoubleArrayList((List<Double>) result).toDoubleArray();
+      } else if (result instanceof double[]) {
+        _doubleValuesMV[i] = (double[]) result;
+      } else {
+        throw new IllegalStateException("Unexpected result type '" + result.getClass() + "' for GROOVY function");
+      }
+    }
+    return _doubleValuesMV;
   }
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    if (_stringResultMV == null) {
-      _stringResultMV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    if (_stringValuesMV == null) {
+      _stringValuesMV = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
     }
     for (int i = 0; i < _numGroovyArgs; i++) {
       _sourceArrays[i] = _transformToValuesFunctions[i].apply(_groovyArguments[i], projectionBlock);
@@ -454,13 +442,13 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       }
       Object result = _groovyFunctionEvaluator.evaluate(_bindingValues);
       if (result instanceof List) {
-        _stringResultMV[i] = ((List<String>) result).toArray(new String[0]);
+        _stringValuesMV[i] = ((List<String>) result).toArray(new String[0]);
       } else if (result instanceof String[]) {
-        _stringResultMV[i] = (String[]) result;
+        _stringValuesMV[i] = (String[]) result;
       } else {
         throw new IllegalStateException("Unexpected result type '" + result.getClass() + "' for GROOVY function");
       }
     }
-    return _stringResultMV;
+    return _stringValuesMV;
   }
 }

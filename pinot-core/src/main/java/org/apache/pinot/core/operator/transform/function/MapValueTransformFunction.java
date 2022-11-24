@@ -97,11 +97,9 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
-    if (_dictIds == null || _dictIds.length < length) {
+    if (_dictIds == null) {
       _dictIds = new int[length];
     }
-
     int[][] keyDictIdsMV = _keyColumnFunction.transformToDictIdsMV(projectionBlock);
     int[][] valueDictIdsMV = _valueColumnFunction.transformToDictIdsMV(projectionBlock);
     for (int i = 0; i < length; i++) {

@@ -50,7 +50,6 @@ public class ExtractTransformFunction extends BaseTransformFunction {
     }
 
     _field = Field.valueOf(((LiteralTransformFunction) arguments.get(0)).getLiteral());
-
     _mainTransformFunction = arguments.get(1);
   }
 
@@ -62,22 +61,17 @@ public class ExtractTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
-
-    if (_intValuesSV == null || _intValuesSV.length < numDocs) {
+    if (_intValuesSV == null) {
       _intValuesSV = new int[numDocs];
     }
-
     long[] timestamps = _mainTransformFunction.transformToLongValuesSV(projectionBlock);
-
     convert(timestamps, numDocs, _intValuesSV);
-
     return _intValuesSV;
   }
 
   private void convert(long[] timestamps, int numDocs, int[] output) {
     for (int i = 0; i < numDocs; i++) {
       DateTimeField accessor;
-
       switch (_field) {
         case YEAR:
           accessor = _chronology.year();
