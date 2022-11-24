@@ -92,12 +92,12 @@ public class PinotTableIdealStateBuilder {
     List<String> realtimeInstances = HelixHelper.getInstancesWithTag(helixManager,
         TagNameUtils.extractConsumingServerTag(realtimeTableConfig.getTenantConfig()));
     IdealState idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, 1, enableBatchMessageMode);
-    if (realtimeInstances.size() % realtimeTableConfig.getReplicationNumber() != 0) {
+    if (realtimeInstances.size() % realtimeTableConfig.getReplication() != 0) {
       throw new RuntimeException(
           "Number of instance in current tenant should be an integer multiples of the number of replications");
     }
     setupInstanceConfigForHighLevelConsumer(realtimeTableName, realtimeInstances.size(),
-        realtimeTableConfig.getReplicationNumber(), IngestionConfigUtils.getStreamConfigMap(realtimeTableConfig),
+        realtimeTableConfig.getReplication(), IngestionConfigUtils.getStreamConfigMap(realtimeTableConfig),
         zkHelixPropertyStore, realtimeInstances);
     return idealState;
   }
@@ -108,7 +108,7 @@ public class PinotTableIdealStateBuilder {
     // Validate replicasPerPartition here.
     final int nReplicas;
     try {
-      nReplicas = realtimeTableConfig.getReplicationNumber();
+      nReplicas = realtimeTableConfig.getReplication();
     } catch (NumberFormatException e) {
       throw new InvalidTableConfigException("Invalid value for replicasPerPartition, expected a number.", e);
     }

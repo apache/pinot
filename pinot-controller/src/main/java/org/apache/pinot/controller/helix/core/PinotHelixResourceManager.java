@@ -1480,7 +1480,7 @@ public class PinotHelixResourceManager {
         // now lets build an ideal state
         LOGGER.info("building empty ideal state for table : " + tableNameWithType);
         final IdealState offlineIdealState = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableNameWithType,
-            tableConfig.getReplicationNumber(), _enableBatchMessageMode);
+            tableConfig.getReplication(), _enableBatchMessageMode);
         LOGGER.info("adding table via the admin");
 
         try {
@@ -1793,7 +1793,7 @@ public class PinotHelixResourceManager {
 
         // Update IdealState replication
         IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-        String replicationConfigured = Integer.toString(tableConfig.getReplicationNumber());
+        String replicationConfigured = Integer.toString(tableConfig.getReplication());
         if (!idealState.getReplicas().equals(replicationConfigured)) {
           HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {
             assert is != null;
@@ -3740,7 +3740,7 @@ public class PinotHelixResourceManager {
       Set<String> serverInstances = getAllInstancesForServerTenant(tenantConfig.getServer());
       return serverInstances.size();
     }
-    return tableConfig.getReplicationNumber();
+    return tableConfig.getReplication();
   }
 
   /**

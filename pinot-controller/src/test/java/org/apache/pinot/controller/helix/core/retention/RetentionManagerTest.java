@@ -237,7 +237,7 @@ public class RetentionManagerTest {
 
   private PinotHelixResourceManager setupSegmentMetadata(TableConfig tableConfig, final long now, final int nSegments,
       List<String> segmentsToBeDeleted) {
-    final int replicaCount = tableConfig.getReplicationNumber();
+    final int replicaCount = tableConfig.getReplication();
 
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
 

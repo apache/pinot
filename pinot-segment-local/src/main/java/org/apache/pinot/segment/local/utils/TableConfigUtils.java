@@ -995,7 +995,7 @@ public final class TableConfigUtils {
     if (verifyReplication) {
       int requestReplication;
       try {
-        requestReplication = tableConfig.getReplicationNumber();
+        requestReplication = tableConfig.getReplication();
         if (requestReplication < defaultTableMinReplicas) {
           LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
               defaultTableMinReplicas, requestReplication);
@@ -1009,7 +1009,7 @@ public final class TableConfigUtils {
     if (verifyReplicasPerPartition) {
       int replicasPerPartition;
       try {
-        replicasPerPartition = tableConfig.getReplicationNumber();
+        replicasPerPartition = tableConfig.getReplication();
         if (replicasPerPartition < defaultTableMinReplicas) {
           LOGGER.info(
               "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",

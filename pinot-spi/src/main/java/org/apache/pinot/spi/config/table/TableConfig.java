@@ -358,8 +358,7 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @JsonIgnore
-  public int getReplicationNumber() {
-    Preconditions.checkNotNull(_validationConfig, "Validation config should not be null.");
+  public int getReplication() {
     int replication = 0;
     if (_tableType == TableType.REALTIME) {
       StreamConfig streamConfig = new StreamConfig(_tableName, IngestionConfigUtils.getStreamConfigMap(this));

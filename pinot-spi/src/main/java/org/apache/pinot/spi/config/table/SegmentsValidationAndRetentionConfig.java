@@ -125,7 +125,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use {@link TableConfig#getReplicationNumber()}
+   * Try to Use {@link TableConfig#getReplication()}
    */
   public String getReplication() {
     return _replication;
@@ -146,7 +146,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use {@link TableConfig#getReplicationNumber()}
+   * Try to Use {@link TableConfig#getReplication()}
    */
   public String getReplicasPerPartition() {
     return _replicasPerPartition;
@@ -173,7 +173,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use {@link TableConfig#getReplicationNumber()}
+   * Try to Use {@link TableConfig#getReplication()}
    */
   @JsonIgnore
   public int getReplicationNumber() {
@@ -181,7 +181,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Use {@link TableConfig#getReplicationNumber()}
+   * Try to Use {@link TableConfig#getReplication()}
    */
   @JsonIgnore
   public int getReplicasPerPartitionNumber() {

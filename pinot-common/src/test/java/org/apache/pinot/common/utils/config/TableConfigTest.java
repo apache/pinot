@@ -68,36 +68,36 @@ public class TableConfigTest {
   public void testGetReplication() {
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_OFFLINE_TABLE_NAME).setNumReplicas(2).build();
-    assertEquals(2, offlineTableConfig.getReplicationNumber());
+    assertEquals(2, offlineTableConfig.getReplication());
 
     offlineTableConfig.getValidationConfig().setReplication("4");
-    assertEquals(4, offlineTableConfig.getReplicationNumber());
+    assertEquals(4, offlineTableConfig.getReplication());
 
     offlineTableConfig.getValidationConfig().setReplicasPerPartition("3");
-    assertEquals(4, offlineTableConfig.getReplicationNumber());
+    assertEquals(4, offlineTableConfig.getReplication());
 
     TableConfig realtimeHLCTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TEST_REALTIME_HLC_TABLE_NAME)
             .setStreamConfigs(getStreamConfigMap("highlevel")).setNumReplicas(2).build();
-    assertEquals(2, realtimeHLCTableConfig.getReplicationNumber());
+    assertEquals(2, realtimeHLCTableConfig.getReplication());
 
     realtimeHLCTableConfig.getValidationConfig().setReplication("4");
-    assertEquals(4, realtimeHLCTableConfig.getReplicationNumber());
+    assertEquals(4, realtimeHLCTableConfig.getReplication());
 
     realtimeHLCTableConfig.getValidationConfig().setReplicasPerPartition("3");
-    assertEquals(4, realtimeHLCTableConfig.getReplicationNumber());
+    assertEquals(4, realtimeHLCTableConfig.getReplication());
 
     TableConfig realtimeLLCTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TEST_REALTIME_LLC_TABLE_NAME)
             .setStreamConfigs(getStreamConfigMap("lowlevel")).setLLC(true).setNumReplicas(2).build();
 
-    assertEquals(2, realtimeLLCTableConfig.getReplicationNumber());
+    assertEquals(2, realtimeLLCTableConfig.getReplication());
 
     realtimeLLCTableConfig.getValidationConfig().setReplication("4");
-    assertEquals(2, realtimeLLCTableConfig.getReplicationNumber());
+    assertEquals(2, realtimeLLCTableConfig.getReplication());
 
     realtimeLLCTableConfig.getValidationConfig().setReplicasPerPartition("3");
-    assertEquals(3, realtimeLLCTableConfig.getReplicationNumber());
+    assertEquals(3, realtimeLLCTableConfig.getReplication());
   }
 
   private Map<String, String> getStreamConfigMap(String consumerType) {
