@@ -245,7 +245,17 @@ public class FileUploadDownloadClient implements AutoCloseable {
 
   public static URI getDeleteTableURI(String protocol, String host, int port, String tableName, String type, String retention)
       throws URISyntaxException {
-    return getURI(protocol, host, port, SCHEMA_PATH + "/" + tableName, TYPE_DELIMITER + type + RETENTION_PARAMETER + retention);
+    StringBuilder sb = new StringBuilder();
+    if (StringUtils.isNotBlank(type)) {
+      sb.append(TYPE_DELIMITER);
+      sb.append(type);
+    }
+    if (StringUtils.isNotBlank(retention)) {
+      sb.append(RETENTION_PARAMETER);
+      sb.append(retention);
+    }
+    String query = sb.length() == 0 ? null : sb.toString();
+    return getURI(protocol, host, port, SCHEMA_PATH + "/" + tableName, query);
   }
 
   public static URI getUploadSchemaURI(URI controllerURI)
