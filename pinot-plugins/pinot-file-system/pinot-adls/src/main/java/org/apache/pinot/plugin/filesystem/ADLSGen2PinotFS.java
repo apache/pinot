@@ -24,6 +24,7 @@ import com.azure.core.http.rest.PagedIterable;
 import com.azure.core.util.Context;
 import com.azure.identity.ClientSecretCredential;
 import com.azure.identity.ClientSecretCredentialBuilder;
+import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.storage.common.StorageSharedKeyCredential;
 import com.azure.storage.common.Utility;
 import com.azure.storage.file.datalake.DataLakeDirectoryClient;
@@ -73,7 +74,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(ADLSGen2PinotFS.class);
 
   private enum AuthenticationType {
-    ACCESS_KEY, AZURE_AD, AZURE_AD_WITH_PROXY, NONE
+    ACCESS_KEY, AZURE_AD, AZURE_AD_WITH_PROXY, ANONYMOUS_ACCESS
   }
 
   private static final String AUTHENTICATION_TYPE = "authenticationType";
@@ -84,6 +85,8 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   private static final String CLIENT_ID = "clientId";
   private static final String CLIENT_SECRET = "clientSecret";
   private static final String TENANT_ID = "tenantId";
+  private static final String MANAGED_IDENTITY_CLIENT_ID = "managedIdentityClientId";
+  private static final String AUTHORITY_HOST = "authorityHost";
   private static final String PROXY_HOST = "proxyHost";
   private static final String PROXY_PORT = "proxyPort";
   private static final String PROXY_USERNAME = "proxyUsername";
@@ -131,6 +134,8 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     String clientId = config.getProperty(CLIENT_ID);
     String clientSecret = config.getProperty(CLIENT_SECRET);
     String tenantId = config.getProperty(TENANT_ID);
+    String managedIdentityClientId = config.getProperty(MANAGED_IDENTITY_CLIENT_ID);
+    String authorityHost = config.getProperty(AUTHORITY_HOST);
     String proxyHost = config.getProperty(PROXY_HOST);
     String proxyUsername = config.getProperty(PROXY_USERNAME);
     String proxyPassword = config.getProperty(PROXY_PASSWORD);
@@ -184,13 +189,28 @@ public class ADLSGen2PinotFS extends BasePinotFS {
         dataLakeServiceClientBuilder.credential(clientSecretCredentialBuilder.build());
         break;
       }
-      case NONE: {
+      case ANONYMOUS_ACCESS: {
         LOGGER.info("Authenticating using anonymous access");
         break;
       }
-      default:
-        throw new IllegalArgumentException(
-            "Expecting valid authType. One of (ACCESS_KEY, AZURE_AD, AZURE_AD_WITH_PROXY, NONE)");
+      default: {
+        LOGGER.info("Authenticating using Azure default credential");
+        DefaultAzureCredentialBuilder defaultAzureCredentialBuilder = new DefaultAzureCredentialBuilder();
+        if (tenantId != null) {
+          LOGGER.info("Set tenant ID to {}", tenantId);
+          defaultAzureCredentialBuilder.tenantId(tenantId);
+        }
+        if (managedIdentityClientId != null) {
+          LOGGER.info("Set managed identity client ID to {}", managedIdentityClientId);
+          defaultAzureCredentialBuilder.managedIdentityClientId(managedIdentityClientId);
+        }
+        if (authorityHost != null) {
+          LOGGER.info("Set authority host to {}", authorityHost);
+          defaultAzureCredentialBuilder.authorityHost(authorityHost);
+        }
+        dataLakeServiceClientBuilder.credential(defaultAzureCredentialBuilder.build());
+        break;
+      }
     }
 
     DataLakeServiceClient serviceClient = dataLakeServiceClientBuilder.buildClient();
