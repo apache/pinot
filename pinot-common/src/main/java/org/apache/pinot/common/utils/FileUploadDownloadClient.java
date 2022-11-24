@@ -119,6 +119,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String FORCE_REVERT_PARAMETER = "&forceRevert=";
   private static final String FORCE_CLEANUP_PARAMETER = "&forceCleanup=";
 
+  private static final String RETENTION_PARAMETER = "&retention=";
+
   private static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(HTTP, HTTPS);
 
   private final HttpClient _httpClient;
@@ -234,6 +236,16 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public static URI getUploadSchemaURI(String protocol, String host, int port)
       throws URISyntaxException {
     return getURI(protocol, host, port, SCHEMA_PATH);
+  }
+
+  public static URI getDeleteSchemaURI(String protocol, String host, int port, String schemaName)
+      throws URISyntaxException {
+    return getURI(protocol, host, port, SCHEMA_PATH + "/" + schemaName);
+  }
+
+  public static URI getDeleteTableURI(String protocol, String host, int port, String tableName, String type, String retention)
+      throws URISyntaxException {
+    return getURI(protocol, host, port, SCHEMA_PATH + "/" + tableName, TYPE_DELIMITER + type + RETENTION_PARAMETER + retention);
   }
 
   public static URI getUploadSchemaURI(URI controllerURI)
