@@ -60,8 +60,8 @@ public class DeleteSchemaCommand extends AbstractBaseAdminCommand implements Com
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
+      + "this message.")
   private boolean _help = false;
 
   private AuthProvider _authProvider;
@@ -83,9 +83,10 @@ public class DeleteSchemaCommand extends AbstractBaseAdminCommand implements Com
 
   @Override
   public String toString() {
-    String retString = ("DeleteSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -schemaName " + _schemaName + " -user " + _user + " -password "
-        + "[hidden]");
+    String retString =
+        ("DeleteSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
+            + " -controllerPort " + _controllerPort + " -schemaName " + _schemaName + " -user " + _user + " -password "
+            + "[hidden]");
 
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -146,10 +147,10 @@ public class DeleteSchemaCommand extends AbstractBaseAdminCommand implements Com
 
     LOGGER.info("Executing command: " + toString());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient.getHttpClient().sendDeleteRequest(FileUploadDownloadClient
-              .getDeleteSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort),
-          _schemaName), Collections.emptyMap(), makeAuthProvider(_authProvider, _authTokenUrl, _authToken,
-              _user, _password));
+      fileUploadDownloadClient.getHttpClient().sendDeleteRequest(
+          FileUploadDownloadClient.getDeleteSchemaURI(_controllerProtocol, _controllerHost,
+              Integer.parseInt(_controllerPort), _schemaName), Collections.emptyMap(),
+          makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
     } catch (Exception e) {
       LOGGER.error("Got Exception while deleting Pinot Schema: " + _schemaName, e);
       return false;

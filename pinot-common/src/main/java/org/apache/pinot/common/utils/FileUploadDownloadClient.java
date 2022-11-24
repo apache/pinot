@@ -243,7 +243,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return getURI(protocol, host, port, SCHEMA_PATH + "/" + schemaName);
   }
 
-  public static URI getDeleteTableURI(String protocol, String host, int port, String tableName, String type, String retention)
+  public static URI getDeleteTableURI(String protocol, String host, int port, String tableName, String type,
+      String retention)
       throws URISyntaxException {
     StringBuilder sb = new StringBuilder();
     if (StringUtils.isNotBlank(type)) {
@@ -781,7 +782,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
    */
   public Map<String, List<String>> getSegments(URI controllerUri, String rawTableName, @Nullable TableType tableType,
-      boolean excludeReplacedSegments) throws Exception {
+      boolean excludeReplacedSegments)
+      throws Exception {
     List<String> tableTypes;
     if (tableType == null) {
       tableTypes = Arrays.asList(TableType.OFFLINE.toString(), TableType.REALTIME.toString());
@@ -793,8 +795,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
     Map<String, List<String>> tableTypeToSegments = new HashMap<>();
     for (String tableTypeToFilter : tableTypes) {
       tableTypeToSegments.put(tableTypeToFilter, new ArrayList<>());
-      String uri = controllerRequestURLBuilder.forSegmentListAPI(rawTableName,
-          tableTypeToFilter, excludeReplacedSegments);
+      String uri =
+          controllerRequestURLBuilder.forSegmentListAPI(rawTableName, tableTypeToFilter, excludeReplacedSegments);
       RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
       HttpClient.setTimeout(requestBuilder, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
       RetryPolicies.exponentialBackoffRetryPolicy(5, 10_000L, 2.0).attempt(() -> {
