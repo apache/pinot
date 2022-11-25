@@ -114,9 +114,12 @@ public abstract class PinotDataBuffer implements Closeable {
   private static PinotBufferFactory createDefaultFactory() {
     String factoryClassName;
     // TODO: If chronicle is going to be in their own package, use another way to get the runtime version
-    if (Jvm.majorVersion() > 11) {
+    int jvmVersion = Jvm.majorVersion();
+    if (jvmVersion > 11) {
+      LOGGER.info("Using Chronicle Bytes as buffer on JVM version {}", jvmVersion);
       factoryClassName = ChroniclePinotBufferFactory.class.getCanonicalName();
     } else {
+      LOGGER.info("Using LArray as buffer on JVM version {}", jvmVersion);
       factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
     }
     return createFactory(factoryClassName, true);
@@ -502,5 +505,18 @@ public abstract class PinotDataBuffer implements Closeable {
 
   public boolean isCloseable() {
     return _closeable;
+  }
+
+  protected void checkLimits(long capacity, long offset, long size) {
+    if (offset < 0) {
+      throw new IllegalArgumentException("Offset " + offset + " cannot be negative");
+    }
+    if (size < 0) {
+      throw new IllegalArgumentException("Size " + size + " cannot be negative");
+    }
+    if (offset + size > capacity) {
+      throw new IllegalArgumentException("Size (" + size + ") + offset (" + offset + ") exceeds the capacity of "
+          + capacity);
+    }
   }
 }

@@ -18,35 +18,77 @@
  */
 package org.apache.pinot.segment.spi.memory;
 
+import com.google.common.collect.Lists;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
 
 
 public class ByteBufferUtil {
 
-  private static final Constructor<? extends ByteBuffer> _dbbCC = findDirectByteBufferConstructor();
+  private static final ByteBufferCreator _creator;
+  private static final List<CreatorSupplier> _SUPPLIERS = Lists.newArrayList(
+      () -> {
+        Constructor<? extends ByteBuffer> dbbCC =
+            (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
+                .getDeclaredConstructor(Long.TYPE, Integer.TYPE, Object.class);
+        return (addr, size, att) -> {
+          dbbCC.setAccessible(true);
+          try {
+            return dbbCC.newInstance(Long.valueOf(addr), Integer.valueOf(size), att);
+          } catch (Exception e) {
+            throw new IllegalStateException("Failed to create DirectByteBuffer", e);
+          }
+        };
+      },
+      () -> {
+        Constructor<? extends ByteBuffer> dbbCC =
+            (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
+                .getDeclaredConstructor(Long.TYPE, Integer.TYPE);
+        return (addr, size, att) -> {
+          dbbCC.setAccessible(true);
+          try {
+            return dbbCC.newInstance(Long.valueOf(addr), Integer.valueOf(size));
+          } catch (Exception e) {
+            throw new IllegalStateException("Failed to create DirectByteBuffer", e);
+          }
+        };
+      }
+  );
 
   private ByteBufferUtil() {
   }
 
-  public static ByteBuffer newDirectByteBuffer(long addr, int size, Object att) {
-    _dbbCC.setAccessible(true);
-    try {
-      return _dbbCC.newInstance(Long.valueOf(addr), Integer.valueOf(size), att);
-    } catch (Exception e) {
-      throw new IllegalStateException("Failed to create DirectByteBuffer", e);
+  static {
+    ByteBufferCreator creator = null;
+    Exception firstException = null;
+    for (CreatorSupplier supplier : _SUPPLIERS) {
+      try {
+        creator = supplier.createCreator();
+      } catch (ClassNotFoundException | NoSuchMethodException e) {
+        if (firstException == null) {
+          firstException = e;
+        }
+      }
     }
+    if (creator == null) {
+      throw new IllegalStateException("Cannot find a way to instantiate DirectByteBuffer. "
+          + "Please verify you are using a supported JVM", firstException);
+    }
+    _creator = creator;
   }
 
-  @SuppressWarnings("unchecked")
-  private static Constructor<? extends ByteBuffer> findDirectByteBufferConstructor() {
-    try {
-      return (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
-          .getDeclaredConstructor(Long.TYPE, Integer.TYPE, Object.class);
-    } catch (ClassNotFoundException e) {
-      throw new IllegalStateException("Failed to find java.nio.DirectByteBuffer", e);
-    } catch (NoSuchMethodException e) {
-      throw new IllegalStateException("Failed to find constructor f java.nio.DirectByteBuffer", e);
-    }
+  public static ByteBuffer newDirectByteBuffer(long addr, int size, Object att) {
+    return _creator.newDirectByteBuffer(addr, size, att);
+  }
+
+  private interface CreatorSupplier {
+    ByteBufferCreator createCreator() throws ClassNotFoundException, NoSuchMethodException;
+  }
+
+  private interface ByteBufferCreator {
+    ByteBuffer newDirectByteBuffer(long addr, int size, Object att);
   }
 }

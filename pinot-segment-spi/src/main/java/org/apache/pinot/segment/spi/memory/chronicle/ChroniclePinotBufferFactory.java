@@ -21,7 +21,7 @@ package org.apache.pinot.segment.spi.memory.chronicle;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import net.openhft.chronicle.bytes.BytesStore;
+import net.openhft.chronicle.bytes.Bytes;
 import net.openhft.chronicle.bytes.MappedBytes;
 import org.apache.pinot.segment.spi.memory.OnlyNativePinotBufferFactory;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -30,19 +30,19 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 public class ChroniclePinotBufferFactory extends OnlyNativePinotBufferFactory {
   @Override
   protected PinotDataBuffer allocateDirect(long size) {
-    BytesStore<?, ?> store;
+    Bytes<?> store;
     if (size < Integer.MAX_VALUE) {
-      store = BytesStore.wrap(ByteBuffer.allocateDirect((int) size));
+      store = Bytes.wrapForWrite(ByteBuffer.allocateDirect((int) size));
     } else {
-      store = BytesStore.nativeStore(size);
+      store = Bytes.allocateDirect(size);
     }
-    return new ChronicleDataBuffer(store, true, false);
+    return new ChronicleDataBuffer(store, true, false, 0, size);
   }
 
   @Override
   protected PinotDataBuffer mapFile(File file, boolean readOnly, long offset, long size)
       throws IOException {
-    MappedBytes mappedBytes = MappedBytes.singleMappedBytes(file, size, readOnly);
-    return new ChronicleDataBuffer(mappedBytes, true, true);
+    MappedBytes mappedBytes = MappedBytes.singleMappedBytes(file, offset + size, readOnly);
+    return new ChronicleDataBuffer(mappedBytes, true, true, offset, size + offset);
   }
 }

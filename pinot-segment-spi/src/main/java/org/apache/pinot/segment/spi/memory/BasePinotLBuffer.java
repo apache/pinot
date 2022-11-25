@@ -140,7 +140,7 @@ public abstract class BasePinotLBuffer extends PinotDataBuffer {
 
   @Override
   public ByteBuffer toDirectByteBuffer(long offset, int size, ByteOrder byteOrder) {
-    return _buffer.toDirectByteBuffer(offset, size).order(byteOrder);
+    return ByteBufferUtil.newDirectByteBuffer(offset, size, this).order(byteOrder);
   }
 
   @Override

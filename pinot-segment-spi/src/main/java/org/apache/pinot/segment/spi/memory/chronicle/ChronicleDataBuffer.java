@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.memory.chronicle;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -26,7 +27,7 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import net.openhft.chronicle.bytes.Bytes;
 import net.openhft.chronicle.bytes.BytesStore;
-import net.openhft.chronicle.bytes.MappedBytesStore;
+import net.openhft.chronicle.bytes.MappedBytes;
 import org.apache.pinot.segment.spi.memory.ByteBufferUtil;
 import org.apache.pinot.segment.spi.memory.NonNativePinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -34,13 +35,29 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 public class ChronicleDataBuffer extends PinotDataBuffer {
 
-  private final BytesStore<?, ?> _store;
+  private final Bytes<?> _store;
   private final boolean _flushable;
+  private boolean _closed = false;
+  private final long _viewStart;
+  private final long _viewEnd;
 
-  public ChronicleDataBuffer(BytesStore<?, ?> store, boolean closeable, boolean flushable) {
+  public ChronicleDataBuffer(Bytes<?> store, boolean closeable, boolean flushable, long start, long end) {
     super(closeable);
+    Preconditions.checkArgument(start >= 0, "Invalid start " + start + ". It must be > 0");
+    Preconditions.checkArgument(start <= end, "Invalid start " + start + " and end " + end
+        + ". Start cannot be greater than end");
+    Preconditions.checkArgument(end + store.start() <= store.capacity(), "Invalid end " + end
+        + ". It cannot be greater than capacity (" + (store.capacity() - store.start()) + ")");
     _store = store;
     _flushable = flushable;
+    _viewStart = start + store.start();
+    _viewEnd = end + store.start();
+
+    _store.writePosition(_store.capacity());
+  }
+
+  public ChronicleDataBuffer(ChronicleDataBuffer other, long start, long end) {
+    this(other._store, false, other._flushable, start, end);
   }
 
   @Override
@@ -60,57 +77,57 @@ public class ChronicleDataBuffer extends PinotDataBuffer {
 
   @Override
   public void putChar(long offset, char value) {
-    _store.writeUnsignedShort(offset, value);
+    _store.writeUnsignedShort(offset + _viewStart, value);
   }
 
   @Override
   public short getShort(long offset) {
-    return _store.readShort(offset);
+    return _store.readShort(offset + _viewStart);
   }
 
   @Override
   public void putShort(long offset, short value) {
-    _store.writeShort(offset, value);
+    _store.writeShort(offset + _viewStart, value);
   }
 
   @Override
   public int getInt(long offset) {
-    return _store.readInt(offset);
+    return _store.readInt(offset + _viewStart);
   }
 
   @Override
   public void putInt(long offset, int value) {
-    _store.writeInt(offset, value);
+    _store.writeInt(offset + _viewStart, value);
   }
 
   @Override
   public long getLong(long offset) {
-    return _store.readLong(offset);
+    return _store.readLong(offset + _viewStart);
   }
 
   @Override
   public void putLong(long offset, long value) {
-    _store.writeLong(offset, value);
+    _store.writeLong(offset + _viewStart, value);
   }
 
   @Override
   public float getFloat(long offset) {
-    return _store.readFloat(offset);
+    return _store.readFloat(offset + _viewStart);
   }
 
   @Override
   public void putFloat(long offset, float value) {
-    _store.writeFloat(offset, value);
+    _store.writeFloat(offset + _viewStart, value);
   }
 
   @Override
   public double getDouble(long offset) {
-    return _store.readDouble(offset);
+    return _store.readDouble(offset + _viewStart);
   }
 
   @Override
   public void putDouble(long offset, double value) {
-    _store.writeDouble(offset, value);
+    _store.writeDouble(offset + _viewStart, value);
   }
 
   @Override
@@ -118,61 +135,78 @@ public class ChronicleDataBuffer extends PinotDataBuffer {
     Bytes<byte[]> dest = Bytes.wrapForWrite(buffer);
     dest.writePosition(destOffset);
     dest.writeLimit(destOffset + size);
+    _store.readPosition(offset + _viewStart);
     _store.copyTo(dest);
   }
 
   @Override
   public void copyTo(long offset, PinotDataBuffer buffer, long destOffset, long size) {
     long actualSize = Math.min(size, buffer.size() - destOffset);
-    actualSize = Math.min(actualSize, _store.length() - offset);
+    actualSize = Math.min(actualSize, _store.capacity() - offset + _viewStart);
 
     if (buffer instanceof ChronicleDataBuffer) {
       ChronicleDataBuffer other = (ChronicleDataBuffer) buffer;
-      BytesStore<?, ?> dest = other._store.subBytes(destOffset, size);
-      _store.copyTo(dest);
-    } else {
-      long read = 0;
-      byte[] arr = new byte[4096];
-      while (read < actualSize) {
-        long offsetOnStore = offset + read;
-        int bytesToRead = Math.min((int) (actualSize - read), 4096);
-        long inc = _store.read(offsetOnStore, arr, 0, bytesToRead);
-        assert inc == bytesToRead;
-        buffer.readFrom(offsetOnStore, arr, 0, bytesToRead);
-        read += inc;
+      if (_store == other._store) {
+        _store.move(offset + _viewStart, destOffset + other._viewStart, size);
+      } else {
+        _store.readPosition(offset + _viewStart);
+        other._store.writePosition(destOffset + other._viewStart);
+        _store.copyTo(other._store);
       }
+    } else {
+      long copied = 0;
+      while (copied < actualSize) {
+        int subSize = Math.min((int) (actualSize - copied), Integer.MAX_VALUE);
+        _store.readPosition(offset + _viewStart + copied);
+        _store.readLimit(offset + _viewStart + copied + subSize);
+        BytesStore<?, ?> into = BytesStore.wrap(buffer.toDirectByteBuffer(destOffset, subSize));
+        copied += _store.copyTo(into);
+      }
+      _store.readLimit(_store.capacity());
     }
   }
 
   @Override
   public void readFrom(long offset, byte[] buffer, int srcOffset, int size) {
-    _store.write(offset, buffer, srcOffset, size);
+    _store.write(offset + _viewStart, buffer, srcOffset, size);
   }
 
   @Override
   public void readFrom(long offset, ByteBuffer buffer) {
-    _store.write(offset, buffer, buffer.position(), buffer.remaining());
+    ByteBuffer nativeBuf;
+    if (buffer.order() == ByteOrder.nativeOrder()) {
+      nativeBuf = buffer;
+    } else {
+      nativeBuf = buffer.duplicate().order(ByteOrder.nativeOrder());
+    }
+    _store.write(offset + _viewStart, nativeBuf, nativeBuf.position(), nativeBuf.remaining());
   }
 
   @Override
   public void readFrom(long offset, File file, long srcOffset, long size)
       throws IOException {
+    checkLimits(_viewEnd - _viewStart, offset, size);
     try (FileInputStream fos = new FileInputStream(file); FileChannel channel = fos.getChannel()) {
-      channel.position(offset);
+      if (srcOffset + size > file.length()) {
+        throw new IllegalArgumentException("Final position cannot be larger than the file length");
+      }
+      channel.position(srcOffset);
 
       int len;
       byte[] buffer = new byte[4096];
-      long offsetOnStore = offset;
-      while ((len = fos.read(buffer)) > 0) {
+      long offsetOnStore = offset + _viewStart;
+      long pendingBytes = size - srcOffset;
+      while (pendingBytes >= 0 && (len = fos.read(buffer, 0, Math.min((int) pendingBytes, 4096))) > 0) {
         _store.write(offsetOnStore, buffer, 0, len);
         offsetOnStore += len;
+        pendingBytes -= len;
       }
     }
   }
 
   @Override
   public long size() {
-    return _store.capacity();
+    return _viewEnd - _viewStart;
   }
 
   @Override
@@ -182,7 +216,11 @@ public class ChronicleDataBuffer extends PinotDataBuffer {
 
   @Override
   public PinotDataBuffer view(long start, long end, ByteOrder byteOrder) {
-    ChronicleDataBuffer buffer = new ChronicleDataBuffer(_store.subBytes(start, end - start), false, false);
+    Preconditions.checkArgument(start >= 0, "Start cannot be negative");
+    Preconditions.checkArgument(start < _viewEnd - _viewStart,
+        "Start cannot be larger than this buffer capacity");
+    Preconditions.checkArgument(end <= _viewEnd, "End cannot be higher than this buffer capacity");
+    ChronicleDataBuffer buffer = new ChronicleDataBuffer(this, start + _viewStart, end + _viewEnd);
 
     return byteOrder == ByteOrder.nativeOrder() ? buffer : new NonNativePinotDataBuffer(buffer);
   }
@@ -198,20 +236,24 @@ public class ChronicleDataBuffer extends PinotDataBuffer {
           .slice()
           .order(byteOrder);
     }
-    return ByteBufferUtil.newDirectByteBuffer(_store.addressForRead(size), size, _store)
+    return ByteBufferUtil.newDirectByteBuffer(_store.addressForRead(size) + offset + _viewStart, size, _store)
         .order(byteOrder);
   }
 
   @Override
   public void flush() {
-    if (_flushable && _store instanceof MappedBytesStore) {
-      ((MappedBytesStore) _store).syncUpTo(_store.capacity());
+    if (_flushable && _store instanceof MappedBytes) {
+      _store.writePosition(_store.capacity());
+      ((MappedBytes) _store).sync();
     }
   }
 
   @Override
-  public void release()
+  public synchronized void release()
       throws IOException {
-    _store.releaseLast();
+    if (!_closed) {
+      _closed = true;
+      _store.releaseLast();
+    }
   }
 }
