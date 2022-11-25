@@ -20,16 +20,21 @@ package org.apache.pinot.tools.admin.command;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.FileInputStream;
 import java.net.URI;
 import java.util.Collections;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.Header;
+import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,9 +75,9 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-segmentDir"}, required = true, description = "Path to segment directory.")
   private String _segmentDir = null;
 
-  // TODO: make this as a required field once we deprecate the table name from segment metadata
-  @CommandLine.Option(names = {"-tableName"}, required = false, description = "Table name to upload.")
-  private String _tableName = null;
+  @CommandLine.Option(names = {"-tableNameWithType"}, required = true,
+      description = "Table name with type to upload. e.g. myTable_REALTIME")
+  private String _tableNameWithType = null;
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
       description = "Print this message.")
@@ -140,6 +145,11 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
+  public UploadSegmentCommand setTableNameWithType(String tableNameWithType) {
+    _tableNameWithType = tableNameWithType;
+    return this;
+  }
+
   @Override
   public boolean execute()
       throws Exception {
@@ -157,6 +167,11 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
     File[] segmentFiles = segmentDir.listFiles();
     Preconditions.checkNotNull(segmentFiles);
 
+    String rawTableName = TableNameBuilder.extractRawTableName(_tableNameWithType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(_tableNameWithType);
+
+    Preconditions.checkNotNull(tableType, "Table type missing from table name: " + _tableNameWithType);
+
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       URI uploadSegmentHttpURI = FileUploadDownloadClient
           .getUploadSegmentURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
@@ -173,10 +188,13 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
         }
 
         LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
-        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
-            makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)),
-            Collections.singletonList(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
-                _tableName)), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+        List<Header> headerList = makeAuthHeaders(_authProvider);
+        List<NameValuePair> params = Collections.singletonList(
+            new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, _tableNameWithType));
+
+        FileInputStream fileInputStream = new FileInputStream(segmentTarFile);
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
+            fileInputStream, headerList, params, rawTableName, tableType);
       }
     } finally {
       // Delete the temporary working directory.
