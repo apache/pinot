@@ -113,7 +113,7 @@ public class ModifyTableCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public String getName() {
-    return "AddTable";
+    return "ModifyTable";
   }
 
   @Override
@@ -124,7 +124,7 @@ public class ModifyTableCommand extends AbstractBaseAdminCommand implements Comm
   @Override
   public String toString() {
     String retString =
-        ("AddTable -tableConfigFile " + _tableConfigFile + " -offlineTableConfigFile " + _offlineTableConfigFile
+        ("ModifyTable -tableConfigFile " + _tableConfigFile + " -offlineTableConfigFile " + _offlineTableConfigFile
             + " -realtimeTableConfigFile" + _realtimeTableConfigFile + " -schemaFile " + _schemaFile
             + " -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
             + " -controllerPort " + _controllerPort + " -user " + _user + " -password " + "[hidden]");
