@@ -145,12 +145,12 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       if (_disablePreload) {
         replacement = createMemOptimisedDimensionTable();
       } else {
-        replacement = createDimensionTable();
+        replacement = createFastLookupDimensionTable();
       }
     } while (!UPDATER.compareAndSet(this, snapshot, replacement));
   }
 
-  private DimensionTable createDimensionTable() {
+  private DimensionTable createFastLookupDimensionTable() {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkState(schema != null, "Failed to find schema for dimension table: %s", _tableNameWithType);
 
@@ -178,7 +178,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
           }
         }
       }
-        return new FastLookupDimensionTable(schema, primaryKeyColumns, lookupTable);
+      return new FastLookupDimensionTable(schema, primaryKeyColumns, lookupTable);
     } finally {
       for (SegmentDataManager segmentManager : segmentManagers) {
         releaseSegment(segmentManager);
