@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import java.io.Closeable;
 import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-public interface DimensionTable {
+public interface DimensionTable extends Closeable {
 
   List<String> getPrimaryKeyColumns();
 

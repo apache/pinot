@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,5 +63,11 @@ class FastLookupDimensionTable implements DimensionTable {
   @Override
   public FieldSpec getFieldSpecFor(String columnName) {
     return _tableSchema.getFieldSpecFor(columnName);
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+
   }
 }

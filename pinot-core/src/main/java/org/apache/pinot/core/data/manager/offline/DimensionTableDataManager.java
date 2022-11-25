@@ -134,6 +134,28 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
   }
 
+  @Override
+  protected void doShutdown() {
+    closeDimensionTable(_dimensionTable);
+  }
+
+  private void closeDimensionTable(DimensionTable dimensionTable) {
+    if (dimensionTable != null) {
+      try {
+        dimensionTable.close();
+        if (_disablePreload) {
+          //TODO: this might not work because the segments might be reused in new memory optimized table instance
+          List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
+          for (SegmentDataManager segmentDataManager: segmentDataManagers) {
+            releaseSegment(segmentDataManager);
+          }
+        }
+      } catch (Exception e) {
+        _logger.warn("Cannot close segment data manager for dimension table: {}", _tableNameWithType, e);
+      }
+    }
+  }
+
   /**
    * `loadLookupTable()` reads contents of the DimensionTable into _lookupTable HashMap for fast lookup.
    */
@@ -148,6 +170,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         replacement = createFastLookupDimensionTable();
       }
     } while (!UPDATER.compareAndSet(this, snapshot, replacement));
+
+    closeDimensionTable(snapshot);
   }
 
   private DimensionTable createFastLookupDimensionTable() {
@@ -196,30 +220,25 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
     Map<PrimaryKey, LookupRecordLocation> lookupTable = new HashMap<>();
     List<SegmentDataManager> segmentManagers = acquireAllSegments();
-    try {
-      for (SegmentDataManager segmentManager : segmentManagers) {
-        IndexSegment indexSegment = segmentManager.getSegment();
-        int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
-        if (numTotalDocs > 0) {
-          try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-            recordReader.init(indexSegment);
-            for (int i = 0; i < numTotalDocs; i++) {
-              GenericRow row = new GenericRow();
-              recordReader.getRecord(i, row);
-              lookupTable.put(row.getPrimaryKey(primaryKeyColumns), new LookupRecordLocation(recordReader, i));
-            }
-          } catch (Exception e) {
-            throw new RuntimeException(
-                "Caught exception while reading records from segment: " + indexSegment.getSegmentName());
+    for (SegmentDataManager segmentManager : segmentManagers) {
+      IndexSegment indexSegment = segmentManager.getSegment();
+      int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
+      if (numTotalDocs > 0) {
+        try {
+          PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
+          recordReader.init(indexSegment);
+          for (int i = 0; i < numTotalDocs; i++) {
+            GenericRow row = new GenericRow();
+            recordReader.getRecord(i, row);
+            lookupTable.put(row.getPrimaryKey(primaryKeyColumns), new LookupRecordLocation(recordReader, i));
           }
+        } catch (Exception e) {
+          throw new RuntimeException(
+              "Caught exception while reading records from segment: " + indexSegment.getSegmentName());
         }
       }
-      return new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable);
-    } finally {
-      for (SegmentDataManager segmentManager : segmentManagers) {
-        releaseSegment(segmentManager);
-      }
     }
+    return new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable);
   }
 
   public boolean isPopulated() {

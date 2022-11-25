@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,5 +68,17 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
   @Override
   public FieldSpec getFieldSpecFor(String columnName) {
     return _tableSchema.getFieldSpecFor(columnName);
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    for(LookupRecordLocation lookupRecordLocation: _lookupTable.values()) {
+      try {
+        lookupRecordLocation.getPinotSegmentRecordReader().close();
+      } catch (Exception e) {
+        //TODO: log warning
+      }
+    }
   }
 }
