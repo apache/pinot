@@ -74,7 +74,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(ADLSGen2PinotFS.class);
 
   private enum AuthenticationType {
-    ACCESS_KEY, AZURE_AD, AZURE_AD_WITH_PROXY, ANONYMOUS_ACCESS
+    ACCESS_KEY, AZURE_AD, AZURE_AD_WITH_PROXY, ANONYMOUS_ACCESS, DEFAULT
   }
 
   private static final String AUTHENTICATION_TYPE = "authenticationType";
@@ -189,11 +189,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
         dataLakeServiceClientBuilder.credential(clientSecretCredentialBuilder.build());
         break;
       }
-      case ANONYMOUS_ACCESS: {
-        LOGGER.info("Authenticating using anonymous access");
-        break;
-      }
-      default: {
+      case DEFAULT: {
         LOGGER.info("Authenticating using Azure default credential");
         DefaultAzureCredentialBuilder defaultAzureCredentialBuilder = new DefaultAzureCredentialBuilder();
         if (tenantId != null) {
@@ -210,6 +206,14 @@ public class ADLSGen2PinotFS extends BasePinotFS {
         }
         dataLakeServiceClientBuilder.credential(defaultAzureCredentialBuilder.build());
         break;
+      }
+      case ANONYMOUS_ACCESS: {
+        LOGGER.info("Authenticating using anonymous access");
+        break;
+      }
+      default: {
+        // Should never reach here
+        throw new IllegalStateException("Unexpected authType: " + authType);
       }
     }
 
