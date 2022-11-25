@@ -131,6 +131,11 @@ controller:
       hosts: [ ]
     v1:
       enabled: false
+      ingressClassName: ""
+      annotations: {}
+      tls: []
+      path: /
+      hosts: []
 
   resources:
     requests:
@@ -226,6 +231,11 @@ broker:
       hosts: []
     v1:
       enabled: false
+      ingressClassName: ""
+      annotations: {}
+      tls: []
+      path: /
+      hosts: []
 
   resources:
     requests:
