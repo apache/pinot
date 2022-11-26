@@ -68,6 +68,5 @@ class FastLookupDimensionTable implements DimensionTable {
   @Override
   public void close()
       throws IOException {
-
   }
 }

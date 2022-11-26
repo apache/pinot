@@ -136,22 +136,21 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   @Override
   protected void doShutdown() {
-    closeDimensionTable(_dimensionTable);
+    closeDimensionTable(_dimensionTable, true);
   }
 
-  private void closeDimensionTable(DimensionTable dimensionTable) {
+  private void closeDimensionTable(DimensionTable dimensionTable, boolean releaseSegments) {
     if (dimensionTable != null) {
       try {
         dimensionTable.close();
-        if (_disablePreload) {
-          //TODO: this might not work because the segments might be reused in new memory optimized table instance
+        if (releaseSegments) {
           List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
           for (SegmentDataManager segmentDataManager: segmentDataManagers) {
             releaseSegment(segmentDataManager);
           }
         }
       } catch (Exception e) {
-        _logger.warn("Cannot close segment data manager for dimension table: {}", _tableNameWithType, e);
+        _logger.warn("Cannot close dimension table: {}", _tableNameWithType, e);
       }
     }
   }
@@ -171,7 +170,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       }
     } while (!UPDATER.compareAndSet(this, snapshot, replacement));
 
-    closeDimensionTable(snapshot);
+    closeDimensionTable(snapshot, !_disablePreload);
   }
 
   private DimensionTable createFastLookupDimensionTable() {

@@ -22,13 +22,17 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 class MemoryOptimizedDimensionTable implements DimensionTable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
 
   private final Map<PrimaryKey, LookupRecordLocation> _lookupTable;
   private final Schema _tableSchema;
@@ -73,11 +77,11 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
   @Override
   public void close()
       throws IOException {
-    for(LookupRecordLocation lookupRecordLocation: _lookupTable.values()) {
+    for (LookupRecordLocation lookupRecordLocation: _lookupTable.values()) {
       try {
         lookupRecordLocation.getPinotSegmentRecordReader().close();
       } catch (Exception e) {
-        //TODO: log warning
+        LOGGER.warn("Cannot close segment record reader", e);
       }
     }
   }
