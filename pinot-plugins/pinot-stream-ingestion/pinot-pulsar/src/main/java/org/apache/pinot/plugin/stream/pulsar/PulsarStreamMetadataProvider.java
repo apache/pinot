@@ -100,12 +100,13 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
     Consumer consumer = null;
+    String subscription = "Pinot_" + UUID.randomUUID();
     try {
       MessageId offset = null;
       consumer =
           _pulsarClient.newConsumer().topic(_topic)
               .subscriptionInitialPosition(PulsarUtils.offsetCriteriaToSubscription(offsetCriteria))
-              .subscriptionName("Pinot_" + UUID.randomUUID()).subscribe();
+              .subscriptionName(subscription).subscribe();
 
       if (offsetCriteria.isLargest()) {
         offset = consumer.getLastMessageId();
@@ -121,6 +122,7 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
       return null;
     } finally {
       closeConsumer(consumer);
+      deleteSubscription(_topic, subscription);
     }
   }
 
@@ -203,5 +205,6 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   public void close()
       throws IOException {
     super.close();
+    _pulsarAdminClient.close();
   }
 }
