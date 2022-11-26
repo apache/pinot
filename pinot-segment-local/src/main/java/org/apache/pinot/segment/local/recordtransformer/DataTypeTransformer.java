@@ -93,12 +93,6 @@ public class DataTypeTransformer implements RecordTransformer {
           source = PinotDataType.getSingleValueType(value.getClass());
         }
 
-        if (source == PinotDataType.BYTES && dest == PinotDataType.STRING && value instanceof byte[]) {
-          // this case is required for backward-compatability of the bugfix https://github.com/apache/pinot/pull/9642
-          value = Arrays.toString((byte[]) value);
-          source = PinotDataType.STRING;
-        }
-
         // Skipping conversion when srcType!=destType is speculative, and can be unsafe when
         // the array for MV column contains values of mixing types. Mixing types can lead
         // to ClassCastException during conversion, often aborting data ingestion jobs.

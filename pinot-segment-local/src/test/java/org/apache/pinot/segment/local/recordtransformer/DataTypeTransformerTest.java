@@ -18,21 +18,13 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertEqualsNoOrder;
 import static org.testng.Assert.assertNull;
@@ -208,24 +200,5 @@ public class DataTypeTransformerTest {
       // Expected
     }
     assertEqualsNoOrder((Object[]) DataTypeTransformer.standardize(COLUMN, values, false), expectedValues);
-  }
-
-  @Test
-  public void testTransformFromByteArrays() {
-    TableConfig tableConfig = mock(TableConfig.class);
-    Schema schema = mock(Schema.class);
-    String bytesColumn = "bytesColumn";
-    String stringColumn = "stringColumn";
-    when(schema.getAllFieldSpecs()).thenReturn(ImmutableList.of(
-        new DimensionFieldSpec(bytesColumn, FieldSpec.DataType.BYTES, true),
-        new DimensionFieldSpec(stringColumn, FieldSpec.DataType.STRING, true)
-    ));
-    DataTypeTransformer transformer = new DataTypeTransformer(tableConfig, schema);
-    GenericRow genericRow = new GenericRow();
-    genericRow.putValue(bytesColumn, new byte[] {0x00, 0x01, 0x02, 0x0F});
-    genericRow.putValue(stringColumn, new byte[] {0x00, 0x01, 0x02, 0x0F});
-    GenericRow transformedRow = transformer.transform(genericRow);
-    assertEquals(transformedRow.getValue(bytesColumn), new byte[] {0x00, 0x01, 0x02, 0x0F});
-    assertEquals(transformedRow.getValue(stringColumn), "[0, 1, 2, 15]");
   }
 }
