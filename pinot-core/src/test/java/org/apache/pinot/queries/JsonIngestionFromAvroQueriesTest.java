@@ -56,7 +56,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ReadMode;
-import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -209,7 +208,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         record.put(JSON_COLUMN_1, inputRecord.getValue(JSON_COLUMN_1));
         record.put(JSON_COLUMN_2, inputRecord.getValue(JSON_COLUMN_2));
         record.put(JSON_COLUMN_3, inputRecord.getValue(JSON_COLUMN_3));
-        record.put(JSON_COLUMN_4,  inputRecord.getValue(JSON_COLUMN_4));
+        record.put(JSON_COLUMN_4, inputRecord.getValue(JSON_COLUMN_4));
         fileWriter.append(record);
       }
     }
