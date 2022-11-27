@@ -37,6 +37,8 @@ public class KinesisConfig {
   public static final String SECRET_KEY = "secretKey";
   public static final String MAX_RECORDS_TO_FETCH = "maxRecordsToFetch";
   public static final String ENDPOINT = "endpoint";
+  public static final String RPS_LIMIT = "requests_per_second_limit";
+
 
   // IAM role configs
   /**
@@ -64,6 +66,7 @@ public class KinesisConfig {
   public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
   public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";
   public static final String DEFAULT_ASYNC_SESSION_UPDATED_ENABLED = "true";
+  public static final String DEFAULT_RPS_LIMIT = "5";
 
   private final String _streamTopicName;
   private final String _awsRegion;
@@ -80,6 +83,7 @@ public class KinesisConfig {
   private String _externalId;
   private int _sessionDurationSeconds;
   private boolean _asyncSessionUpdateEnabled;
+  private int _rpsLimit;
 
   public KinesisConfig(StreamConfig streamConfig) {
     Map<String, String> props = streamConfig.getStreamConfigsMap();
@@ -88,6 +92,7 @@ public class KinesisConfig {
     Preconditions.checkNotNull(_awsRegion, "Must provide 'region' in stream config for table: %s",
         streamConfig.getTableNameWithType());
     _numMaxRecordsToFetch = Integer.parseInt(props.getOrDefault(MAX_RECORDS_TO_FETCH, DEFAULT_MAX_RECORDS));
+    _rpsLimit = Integer.parseInt(props.getOrDefault(RPS_LIMIT, DEFAULT_RPS_LIMIT));
     _shardIteratorType =
         ShardIteratorType.fromValue(props.getOrDefault(SHARD_ITERATOR_TYPE, DEFAULT_SHARD_ITERATOR_TYPE));
     _accessKey = props.get(ACCESS_KEY);
@@ -122,6 +127,10 @@ public class KinesisConfig {
 
   public int getNumMaxRecordsToFetch() {
     return _numMaxRecordsToFetch;
+  }
+
+  public int getRpsLimit() {
+    return _rpsLimit;
   }
 
   public ShardIteratorType getShardIteratorType() {
