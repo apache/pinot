@@ -21,11 +21,11 @@ package org.apache.pinot.query.runtime.executor;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.common.util.concurrent.Monitor;
 import java.util.concurrent.ExecutorService;
-import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +82,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
           @Override
           public void runJob() {
             try {
-              ThreadTimer timer = operatorChain.getAndStartTimer();
+              ThreadResourceUsageProvider timer = operatorChain.getAndStartTimer();
 
               // so long as there's work to be done, keep getting the next block
               // when the operator chain returns a NOOP block, then yield the execution

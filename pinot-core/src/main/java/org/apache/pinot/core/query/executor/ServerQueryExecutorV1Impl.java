@@ -271,7 +271,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         // return the error table to broker sooner than here. But in case of race condition, we construct the error
         // table here too.
         instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR,
-            "Query cancelled on: " + _instanceDataManager.getInstanceId()));
+            "Query cancelled on: " + _instanceDataManager.getInstanceId() + e));
       } else {
         LOGGER.error("Exception processing requestId {}", requestId, e);
         instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));

@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.perf;
 
-import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadMXBean;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Level;
@@ -38,12 +37,24 @@ import org.openjdk.jmh.runner.options.TimeValue;
 
 
 @State(Scope.Benchmark)
-public class BenchmarkThreadMXBeanThreadCPUTime {
+/**
+ * Hotspot:
+ * Benchmark                                             Mode  Cnt   Score    Error  Units
+ * BenchmarkThreadMXBean.benchThreadMXBeanMem            avgt    5  ≈ 10⁻⁴           ms/op
+ * BenchmarkThreadMXBean.benchThreadMXBeanThreadCPUTime  avgt    5   0.001 ±  0.001  ms/op
+ *
+ * OpenJ9 does not even support getThreadAllocatedBytes, so it is always returning 0
+ * meanwhile JMH doesn't support OpenJ9, so the benchmark is not accurate
+ * Benchmark                                             Mode  Cnt  Score    Error  Units
+ * BenchmarkThreadMXBean.benchThreadMXBeanMem            avgt    5  0.001 ±  0.001  ms/op
+ * BenchmarkThreadMXBean.benchThreadMXBeanThreadCPUTime  avgt    5  0.003 ±  0.001  ms/op
+ */
+public class BenchmarkThreadResourceUsageProvider {
 
   public static void main(String[] args)
       throws RunnerException {
     Options opt =
-        new OptionsBuilder().include(BenchmarkThreadMXBeanThreadCPUTime.class.getSimpleName())
+        new OptionsBuilder().include(BenchmarkThreadResourceUsageProvider.class.getSimpleName())
             .warmupTime(TimeValue.seconds(5))
             .warmupIterations(3).measurementTime(TimeValue.seconds(10)).measurementIterations(5).forks(1).build();
 
@@ -54,18 +65,34 @@ public class BenchmarkThreadMXBeanThreadCPUTime {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void benchThreadMXBeanThreadCPUTime(MyState myState, Blackhole bh) {
-    for (int i = 0; i < 1000; i++) {
-      bh.consume(myState._threadMXBean.getCurrentThreadCpuTime());
-    }
+    bh.consume(myState._threadResourceUsageProvider.getThreadTimeNs());
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public void benchThreadMXBeanMem(MyState myState, Blackhole bh) {
+    bh.consume(myState._threadResourceUsageProvider.getThreadAllocatedBytes());
   }
 
   @State(Scope.Benchmark)
   public static class MyState {
-    public ThreadMXBean _threadMXBean;
+    ThreadResourceUsageProvider _threadResourceUsageProvider;
+    long[] _allocation;
 
     @Setup(Level.Iteration)
     public void doSetup() {
-      _threadMXBean = ManagementFactory.getThreadMXBean();
+      _threadResourceUsageProvider = new ThreadResourceUsageProvider();
+    }
+
+    @Setup(Level.Invocation)
+    public void allocateMemory() {
+      _allocation = new long[1000];
+    }
+
+    static {
+      ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+      ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     }
   }
 }

@@ -43,6 +43,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,6 +144,9 @@ public abstract class QueryScheduler {
    */
   @Nullable
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
+
+    Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
+
     _latestQueryTime.accumulate(System.currentTimeMillis());
     InstanceResponseBlock instanceResponse;
     try {
@@ -155,136 +159,143 @@ public abstract class QueryScheduler {
       instanceResponse = new InstanceResponseBlock();
       instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
-    long requestId = queryRequest.getRequestId();
-    Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
-    responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
 
-    byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
+    try {
+      long requestId = queryRequest.getRequestId();
+      Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
+      responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
 
-    // Log the statistics
-    String tableNameWithType = queryRequest.getTableNameWithType();
-    long numDocsScanned =
-        Long.parseLong(responseMetadata.getOrDefault(MetadataKey.NUM_DOCS_SCANNED.getName(), INVALID_NUM_SCANNED));
-    long numEntriesScannedInFilter = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), INVALID_NUM_SCANNED));
-    long numEntriesScannedPostFilter = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), INVALID_NUM_SCANNED));
-    long numSegmentsProcessed = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
-    long numSegmentsMatched = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
-    long numSegmentsPrunedInvalid = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(), INVALID_SEGMENTS_COUNT));
-    long numSegmentsPrunedByLimit = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(), INVALID_SEGMENTS_COUNT));
-    long numSegmentsPrunedByValue = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(), INVALID_SEGMENTS_COUNT));
-    long numSegmentsConsuming = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), INVALID_SEGMENTS_COUNT));
-    long numConsumingSegmentsProcessed = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
-    long numConsumingSegmentsMatched = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
-    long minConsumingFreshnessMs = Long.parseLong(
-        responseMetadata.getOrDefault(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), INVALID_FRESHNESS_MS));
-    int numResizes =
-        Integer.parseInt(responseMetadata.getOrDefault(MetadataKey.NUM_RESIZES.getName(), INVALID_NUM_RESIZES));
-    long resizeTimeMs =
-        Long.parseLong(responseMetadata.getOrDefault(MetadataKey.RESIZE_TIME_MS.getName(), INVALID_RESIZE_TIME_MS));
-    long threadCpuTimeNs = Long.parseLong(responseMetadata.getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"));
-    long systemActivitiesCpuTimeNs =
-        Long.parseLong(responseMetadata.getOrDefault(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(), "0"));
-    long responseSerializationCpuTimeNs =
-        Long.parseLong(responseMetadata.getOrDefault(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0"));
-    long totalCpuTimeNs = threadCpuTimeNs + systemActivitiesCpuTimeNs + responseSerializationCpuTimeNs;
+      byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
 
-    if (numDocsScanned > 0) {
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
-    }
-    if (numEntriesScannedInFilter > 0) {
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER,
-          numEntriesScannedInFilter);
-    }
-    if (numEntriesScannedPostFilter > 0) {
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER,
-          numEntriesScannedPostFilter);
-    }
-    if (numResizes > 0) {
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_RESIZES, numResizes);
-    }
-    if (resizeTimeMs > 0) {
-      _serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
-    }
-    if (threadCpuTimeNs > 0) {
-      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs,
-          TimeUnit.NANOSECONDS);
-    }
-    if (systemActivitiesCpuTimeNs > 0) {
-      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.SYSTEM_ACTIVITIES_CPU_TIME_NS,
-          systemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
-    }
-    if (responseSerializationCpuTimeNs > 0) {
-      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.RESPONSE_SER_CPU_TIME_NS,
-          responseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
-    }
-    if (totalCpuTimeNs > 0) {
-      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.TOTAL_CPU_TIME_NS, totalCpuTimeNs,
-          TimeUnit.NANOSECONDS);
-    }
+      // Log the statistics
+      String tableNameWithType = queryRequest.getTableNameWithType();
+      long numDocsScanned =
+          Long.parseLong(responseMetadata.getOrDefault(MetadataKey.NUM_DOCS_SCANNED.getName(), INVALID_NUM_SCANNED));
+      long numEntriesScannedInFilter = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), INVALID_NUM_SCANNED));
+      long numEntriesScannedPostFilter = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), INVALID_NUM_SCANNED));
+      long numSegmentsProcessed = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
+      long numSegmentsMatched = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
+      long numSegmentsPrunedInvalid = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(), INVALID_SEGMENTS_COUNT));
+      long numSegmentsPrunedByLimit = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(), INVALID_SEGMENTS_COUNT));
+      long numSegmentsPrunedByValue = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(), INVALID_SEGMENTS_COUNT));
+      long numSegmentsConsuming = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), INVALID_SEGMENTS_COUNT));
+      long numConsumingSegmentsProcessed = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(),
+              INVALID_SEGMENTS_COUNT));
+      long numConsumingSegmentsMatched = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
+      long minConsumingFreshnessMs = Long.parseLong(
+          responseMetadata.getOrDefault(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), INVALID_FRESHNESS_MS));
+      int numResizes =
+          Integer.parseInt(responseMetadata.getOrDefault(MetadataKey.NUM_RESIZES.getName(), INVALID_NUM_RESIZES));
+      long resizeTimeMs =
+          Long.parseLong(responseMetadata.getOrDefault(MetadataKey.RESIZE_TIME_MS.getName(), INVALID_RESIZE_TIME_MS));
+      long threadCpuTimeNs =
+          Long.parseLong(responseMetadata.getOrDefault(MetadataKey.THREAD_CPU_TIME_NS.getName(), "0"));
+      long systemActivitiesCpuTimeNs =
+          Long.parseLong(responseMetadata.getOrDefault(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(), "0"));
+      long responseSerializationCpuTimeNs =
+          Long.parseLong(responseMetadata.getOrDefault(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0"));
+      long totalCpuTimeNs = threadCpuTimeNs + systemActivitiesCpuTimeNs + responseSerializationCpuTimeNs;
 
-    TimerContext timerContext = queryRequest.getTimerContext();
-    int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
-    long schedulerWaitMs = timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT);
-
-    // Please keep the format as name=value comma-separated with no spaces
-    // Please add new entries at the end
-    if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned, numSegmentsPrunedInvalid)) {
-      LOGGER.info("Processed requestId={},table={},"
-              + "segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/"
-              + "invalid/limit/value)={}/{}/{}/{}/{}/{}/{}/{}/{},"
-              + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},"
-              + "broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
-              + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}", requestId, tableNameWithType,
-          numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
-          numConsumingSegmentsProcessed, numConsumingSegmentsMatched, numSegmentsPrunedInvalid,
-          numSegmentsPrunedByLimit, numSegmentsPrunedByValue, schedulerWaitMs,
-          timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
-          timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
-          timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
-          timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
-          queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name(),
-          totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs);
-
-      // Limit the dropping log message at most once per second.
-      if (_numDroppedLogRateLimiter.tryAcquire()) {
-        // NOTE: the reported number may not be accurate since we will be missing some increments happened between
-        // get() and set().
-        int numDroppedLog = _numDroppedLogCounter.get();
-        if (numDroppedLog > 0) {
-          LOGGER.info("{} logs were dropped. (log max rate per second: {})", numDroppedLog,
-              _queryLogRateLimiter.getRate());
-          _numDroppedLogCounter.set(0);
-        }
+      if (numDocsScanned > 0) {
+        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
       }
-    } else {
-      _numDroppedLogCounter.incrementAndGet();
-    }
+      if (numEntriesScannedInFilter > 0) {
+        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER,
+            numEntriesScannedInFilter);
+      }
+      if (numEntriesScannedPostFilter > 0) {
+        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER,
+            numEntriesScannedPostFilter);
+      }
+      if (numResizes > 0) {
+        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_RESIZES, numResizes);
+      }
+      if (resizeTimeMs > 0) {
+        _serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.RESIZE_TIME_MS, resizeTimeMs);
+      }
+      if (threadCpuTimeNs > 0) {
+        _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs,
+            TimeUnit.NANOSECONDS);
+      }
+      if (systemActivitiesCpuTimeNs > 0) {
+        _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.SYSTEM_ACTIVITIES_CPU_TIME_NS,
+            systemActivitiesCpuTimeNs, TimeUnit.NANOSECONDS);
+      }
+      if (responseSerializationCpuTimeNs > 0) {
+        _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.RESPONSE_SER_CPU_TIME_NS,
+            responseSerializationCpuTimeNs, TimeUnit.NANOSECONDS);
+      }
+      if (totalCpuTimeNs > 0) {
+        _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.TOTAL_CPU_TIME_NS, totalCpuTimeNs,
+            TimeUnit.NANOSECONDS);
+      }
 
-    if (minConsumingFreshnessMs > -1) {
-      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.FRESHNESS_LAG_MS,
-          (System.currentTimeMillis() - minConsumingFreshnessMs), TimeUnit.MILLISECONDS);
-    }
-    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
-    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);
-    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_MATCHED, numSegmentsMatched);
-    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PRUNED_INVALID,
-        numSegmentsPrunedInvalid);
-    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PRUNED_BY_LIMIT,
-        numSegmentsPrunedByLimit);
-    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PRUNED_BY_VALUE,
-        numSegmentsPrunedByValue);
+      TimerContext timerContext = queryRequest.getTimerContext();
+      int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
+      long schedulerWaitMs = timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT);
 
-    return responseBytes;
+      // Please keep the format as name=value comma-separated with no spaces
+      // Please add new entries at the end
+      if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned, numSegmentsPrunedInvalid)) {
+        LOGGER.info("Processed requestId={},table={},"
+                + "segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/"
+                + "invalid/limit/value)={}/{}/{}/{}/{}/{}/{}/{}/{},"
+                + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},"
+                + "minConsumingFreshnessMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
+                + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}", requestId, tableNameWithType,
+            numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
+            numConsumingSegmentsProcessed, numConsumingSegmentsMatched, numSegmentsPrunedInvalid,
+            numSegmentsPrunedByLimit, numSegmentsPrunedByValue, schedulerWaitMs,
+            timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
+            timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
+            timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
+            timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
+            queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name(),
+            totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs);
+
+        // Limit the dropping log message at most once per second.
+        if (_numDroppedLogRateLimiter.tryAcquire()) {
+          // NOTE: the reported number may not be accurate since we will be missing some increments happened between
+          // get() and set().
+          int numDroppedLog = _numDroppedLogCounter.get();
+          if (numDroppedLog > 0) {
+            LOGGER.info("{} logs were dropped. (log max rate per second: {})", numDroppedLog,
+                _queryLogRateLimiter.getRate());
+            _numDroppedLogCounter.set(0);
+          }
+        }
+      } else {
+        _numDroppedLogCounter.incrementAndGet();
+      }
+
+      if (minConsumingFreshnessMs > -1) {
+        _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.FRESHNESS_LAG_MS,
+            (System.currentTimeMillis() - minConsumingFreshnessMs), TimeUnit.MILLISECONDS);
+      }
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_MATCHED, numSegmentsMatched);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PRUNED_INVALID,
+          numSegmentsPrunedInvalid);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PRUNED_BY_LIMIT,
+          numSegmentsPrunedByLimit);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PRUNED_BY_VALUE,
+          numSegmentsPrunedByValue);
+
+      return responseBytes;
+    } finally {
+      Tracing.ThreadAccountantOps.clear();
+    }
   }
 
   /**
@@ -337,8 +348,8 @@ public abstract class QueryScheduler {
   }
 
   /**
-   * Error response future in case of internal error where query response is not available. This can happen if the query
-   * can not be executed.
+   * Error response future in case of internal error where query response is not available. This can happen if the
+   * query can not be executed.
    */
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
       ProcessingException error) {

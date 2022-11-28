@@ -66,8 +66,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       "SelectExpressions.json",
       "ValueExpressions.json",
       "NumericTypes.json",
+      "TableExpressions.json",
+      "CharacterTypes.json",
+      "BinaryTypes.json",
+      "TimeTypes.json",
+      "BooleanLogic.json",
       "Comparisons.json",
-      "ValueExpressions.json",
       "Aggregates.json"
   );
 
@@ -170,7 +174,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       try {
         compareRowEquals(rows, queryH2(sql));
       } catch (Exception e) {
-        Assert.fail(e.getMessage());
+        Assert.fail(e.getMessage(), e);
       }
     });
   }
@@ -197,7 +201,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       } else {
         Pattern pattern = Pattern.compile(except);
         Assert.assertTrue(pattern.matcher(e.getMessage()).matches(),
-            String.format("Caught exception %s, but it did not match the expected pattern %s.",
+            String.format("Caught exception '%s', but it did not match the expected pattern '%s'.",
                 e.getMessage(), except));
       }
     }

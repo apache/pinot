@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
@@ -60,11 +61,14 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
       return null;
     }
 
+
     // Initialize filter block document Id set
     if (_filterBlockDocIdSet == null) {
       _filterBlockDocIdSet = _filterOperator.nextBlock().getBlockDocIdSet();
       _blockDocIdIterator = _filterBlockDocIdSet.iterator();
     }
+
+    Tracing.ThreadAccountantOps.sample();
 
     int pos = 0;
     int[] docIds = THREAD_LOCAL_DOC_IDS.get();

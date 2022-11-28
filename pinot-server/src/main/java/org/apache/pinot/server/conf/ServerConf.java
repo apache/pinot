@@ -45,7 +45,7 @@ public class ServerConf {
   private static final String PINOT_SERVER_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
   private static final String PINOT_SERVER_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
 
-  private static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
+  public static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
 
   private PinotConfiguration _serverConf;
 

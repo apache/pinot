@@ -459,8 +459,8 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     List<Object[]> beforeResultRows2 = resultTable.getRows();
 
     // TEST3
-    query = "SELECT column1, max(column1), sum(column10) from testTable WHERE column7 = 2147483647 GROUP BY "
-        + "column1 ORDER BY column1";
+    query = "SET \"timeoutMs\" = 30000; SELECT column1, max(column1), sum(column10) "
+        + "from testTable WHERE column7 = 2147483647 GROUP BY column1 ORDER BY column1";
     brokerResponseNative = getBrokerResponse(query);
     assertTrue(brokerResponseNative.getProcessingExceptions() == null
         || brokerResponseNative.getProcessingExceptions().size() == 0);

@@ -25,6 +25,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -53,6 +54,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
@@ -511,6 +513,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       throws Exception {
     File tarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     String uri = zkMetadata.getDownloadUrl();
+    boolean downloadSuccess = false;
     try {
       if (_segmentDownloadSemaphore != null) {
         long startTime = System.currentTimeMillis();
@@ -523,16 +526,51 @@ public abstract class BaseTableDataManager implements TableDataManager {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(uri, tarFile, zkMetadata.getCrypterName());
       LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
           _tableNameWithType, uri, tarFile, tarFile.length());
+      downloadSuccess = true;
       return tarFile;
     } catch (AttemptsExceededException e) {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,
           _tableNameWithType, uri, tarFile);
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1L);
-      throw e;
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, 1L);
+      if (_tableDataManagerConfig.getTablePeerDownloadScheme() == null) {
+        throw e;
+      }
+      downloadFromPeersWithoutStreaming(segmentName, zkMetadata, tarFile);
+      downloadSuccess = true;
+      return tarFile;
     } finally {
+      if (!downloadSuccess) {
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1L);
+      }
       if (_segmentDownloadSemaphore != null) {
         _segmentDownloadSemaphore.release();
       }
+    }
+  }
+
+  // not thread safe. Caller should invoke it with safe concurrency control.
+  protected void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata,
+      File destTarFile) throws Exception {
+    Preconditions.checkArgument(_tableDataManagerConfig.getTablePeerDownloadScheme() != null,
+            "Download peers require non null peer download scheme");
+    List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName,
+        _tableDataManagerConfig.getTablePeerDownloadScheme(), _helixManager, _tableNameWithType);
+    if (peerSegmentURIs.isEmpty()) {
+      String msg = String.format("segment %s doesn't have any peers", segmentName);
+      LOGGER.warn(msg);
+      // HelixStateTransitionHandler would catch the runtime exception and mark the segment state as Error
+      throw new RuntimeException(msg);
+    }
+    try {
+      // Next download the segment from a randomly chosen server using configured scheme.
+      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(peerSegmentURIs, destTarFile, zkMetadata.getCrypterName());
+      LOGGER.info("Fetched segment {} from peers: {} to: {} of size: {}", segmentName, peerSegmentURIs, destTarFile,
+              destTarFile.length());
+    } catch (AttemptsExceededException e) {
+      LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from peers {} to: {}", segmentName,
+              _tableNameWithType, peerSegmentURIs, destTarFile);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1L);
+      throw e;
     }
   }
 

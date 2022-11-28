@@ -21,7 +21,7 @@
 
 image:
   repository: apachepinot/pinot
-  tag: latest # release-0.10.0
+  tag: latest # release-0.11.0
   pullPolicy: Always # Use IfNotPresent when you pinged a version of image tag
 
 cluster:
@@ -131,6 +131,11 @@ controller:
       hosts: [ ]
     v1:
       enabled: false
+      ingressClassName: ""
+      annotations: {}
+      tls: []
+      path: /
+      hosts: []
 
   resources:
     requests:
@@ -226,6 +231,11 @@ broker:
       hosts: []
     v1:
       enabled: false
+      ingressClassName: ""
+      annotations: {}
+      tls: []
+      path: /
+      hosts: []
 
   resources:
     requests:
