@@ -275,8 +275,9 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         //    For each bucket find all segments overlapping with the target bucket, skip the bucket if all overlapping
         //    segments are merged. Schedule k (numParallelBuckets) buckets at most, and stops at the first bucket that
         //    contains spilled over data.
-        //    One may wonder how segments with records spanning different bucket are handled. The short answer is that
-        //    they will be cut into 
+        //    One may wonder how a segment with records spanning different buckets is handled. The short answer is that
+        //    it will be cut into multiple segments, each for a separate bucket. This is achieved by setting bucket time
+        //    period as PARTITION_BUCKET_TIME_PERIOD when generating PinotTaskConfigs
         // 2. There's no bucket with unmerged segments, skip scheduling
         for (SegmentZKMetadata preSelectedSegment : preSelectedSegments) {
           long startTimeMs = preSelectedSegment.getStartTimeMs();
