@@ -144,6 +144,7 @@ public class SelectionOperatorService {
         _dataSchema,
         rows,
         _selectionColumns,
-        ResultTable::new);
+        ResultTable::new,
+        true);
   }
 }

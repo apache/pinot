@@ -154,7 +154,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
     CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
         numServerThreads);
-    return processFinalBlock(mergedBlock);
+    return mergedBlock;
   }
 
   /**
@@ -267,10 +267,6 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
    */
   protected T convertToMergeableBlock(T resultsBlock) {
     return resultsBlock;
-  }
-
-  protected BaseResultsBlock processFinalBlock(BaseResultsBlock finalBlock) {
-    return finalBlock;
   }
 
   @Override

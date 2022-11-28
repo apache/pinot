@@ -341,21 +341,4 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       _maxValue = dataSourceMetadata.getMaxValue();
     }
   }
-
-  @Override
-  protected BaseResultsBlock processFinalBlock(BaseResultsBlock finalBlock) {
-    DataSchema dataSchema = finalBlock.getDataSchema(_queryContext);
-    Collection<Object[]> rows = finalBlock.getRows(_queryContext);
-
-    // null check covers error conditions
-    if (!_queryContext.isServerReturnFinalResult() || dataSchema == null || rows == null) {
-      return finalBlock;
-    }
-
-    return SelectionOperatorUtils.arrangeColumnsToMatchProjection(dataSchema,
-        rows.iterator(),
-        SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema),
-        SelectionResultsBlock::new
-    );
-  }
 }

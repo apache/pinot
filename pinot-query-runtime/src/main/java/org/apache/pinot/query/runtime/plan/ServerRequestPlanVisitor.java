@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.plan;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -52,7 +51,6 @@ import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter;
@@ -92,9 +90,6 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     PinotQuery pinotQuery = new PinotQuery();
     pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
     pinotQuery.setExplain(false);
-    pinotQuery.setQueryOptions(ImmutableMap.of(
-        CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT,
-        "true"));
     ServerPlanRequestContext context = new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(),
         stagePlan.getServerInstance().getHostname(), stagePlan.getServerInstance().getPort(),
         stagePlan.getMetadataMap(), pinotQuery, tableType, timeBoundaryInfo);

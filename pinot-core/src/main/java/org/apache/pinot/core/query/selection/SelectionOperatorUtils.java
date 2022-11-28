@@ -651,7 +651,7 @@ public class SelectionOperatorUtils {
   }
 
   public static <T> T arrangeColumnsToMatchProjection(DataSchema dataSchema, Iterator<Object[]> rows,
-      List<String> selections, BiFunction<DataSchema, List<Object[]>, T> factory) {
+      List<String> selections, BiFunction<DataSchema, List<Object[]>, T> factory, boolean shouldConvertAndFormat) {
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selections, dataSchema);
     int numColumns = columnIndices.length;
 
@@ -676,7 +676,7 @@ public class SelectionOperatorUtils {
       for (int i = 0; i < numColumns; i++) {
         Object value = row[columnIndices[i]];
         if (value != null) {
-          extractedRow[i] = resultColumnDataTypes[i].convertAndFormat(value);
+          extractedRow[i] = shouldConvertAndFormat ? resultColumnDataTypes[i].convertAndFormat(value) : value;
         }
       }
       // note: the iterator returns elements in reverse order so that we can respect
