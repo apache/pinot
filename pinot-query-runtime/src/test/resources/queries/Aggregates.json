@@ -127,6 +127,19 @@
         "psql": "9.21.0",
         "description": "aggregate boolean column no group by",
         "sql": "SELECT bool_and(bool_col), bool_or(bool_col) FROM {tbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "issue with converting data types:  Unexpected RelDataTypeField: ANY for column: EXPR$0",
+        "psql": "9.21.0",
+        "description": "aggregate boolean column no group by with inner function",
+        "sql": "SELECT bool_and(startsWith(string_col, 'a')), bool_or(startsWith(string_col, 'a')) FROM {tbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "issue with converting data types:  Unexpected RelDataTypeField: ANY for column: EXPR$0",
+        "description": "sum with inner function",
+        "sql": "SELECT sum(pow(int_col, 2)) FROM {tbl}"
       }
     ]
   },
