@@ -30,10 +30,10 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -376,14 +376,14 @@ public class DataTableImplV4 implements DataTable {
   @Override
   public byte[] toBytes()
       throws IOException {
-    ThreadTimer threadTimer = new ThreadTimer();
+    ThreadResourceUsageProvider threadTimer = new ThreadResourceUsageProvider();
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     writeLeadingSections(dataOutputStream);
 
     // Add table serialization time metadata if thread timer is enabled.
-    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
+    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
       long responseSerializationCpuTimeNs = threadTimer.getThreadTimeNs();
       getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(responseSerializationCpuTimeNs));
     }

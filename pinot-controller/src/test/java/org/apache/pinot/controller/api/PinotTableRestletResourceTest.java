@@ -229,7 +229,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     sendPostRequest(_createTableUrl, tableJSONConfigString);
     // table creation should succeed
     TableConfig tableConfig = getTableConfig(tableName, "OFFLINE");
-    assertEquals(tableConfig.getValidationConfig().getReplicationNumber(),
+    assertEquals(tableConfig.getReplication(),
         Math.max(tableReplication, DEFAULT_MIN_NUM_REPLICAS));
 
     DEFAULT_INSTANCE.addDummySchema(tableName);
@@ -237,8 +237,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         _realtimeBuilder.setTableName(tableName).setNumReplicas(tableReplication).build().toJsonString();
     sendPostRequest(_createTableUrl, tableJSONConfigString);
     tableConfig = getTableConfig(tableName, "REALTIME");
-    assertEquals(tableConfig.getValidationConfig().getReplicationNumber(),
-        Math.max(tableReplication, DEFAULT_MIN_NUM_REPLICAS));
+    assertEquals(tableConfig.getReplication(), Math.max(tableReplication, DEFAULT_MIN_NUM_REPLICAS));
 
     DEFAULT_INSTANCE.getHelixResourceManager().deleteOfflineTable(tableName);
     DEFAULT_INSTANCE.getHelixResourceManager().deleteRealtimeTable(tableName);
