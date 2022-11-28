@@ -662,7 +662,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
    * Reset the delay metrics for the given table name and merge level.
    *
    * @param tableNameWithType table name with type
-   * @param mergeLevel merge levelM
+   * @param mergeLevel merge level
    */
   private void resetDelayMetrics(String tableNameWithType, String mergeLevel) {
     ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
