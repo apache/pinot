@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -97,16 +98,18 @@ public class SegmentAssignmentStrategyFactoryTest {
   }
 
   @Test
-  public void testBalancedNumSegmentAssignmentStrategyforRealtimeTables() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).build();
-
+  public void testBalancedNumSegmentAssignmentStrategyForRealtimeTables() {
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setLLC(true)
+        .setStreamConfigs(streamConfigs).build();
     InstancePartitions instancePartitions = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
     instancePartitions.setInstances(0, 0, INSTANCES);
 
-    SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
-        .getSegmentAssignmentStrategy(null, tableConfig, InstancePartitionsType.COMPLETED.toString(),
-            instancePartitions);
+    SegmentAssignmentStrategy segmentAssignmentStrategy =
+        SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(null, tableConfig,
+            InstancePartitionsType.COMPLETED.toString(), instancePartitions);
     Assert.assertNotNull(segmentAssignmentStrategy);
+
     Assert.assertTrue(segmentAssignmentStrategy instanceof BalancedNumSegmentAssignmentStrategy);
   }
 

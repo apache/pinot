@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.RegisterSet;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
@@ -50,6 +51,7 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -473,21 +475,25 @@ public class ObjectSerDeUtils {
 
     @Override
     public HyperLogLog deserialize(byte[] bytes) {
-      try {
-        return HyperLogLog.Builder.build(bytes);
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
-      }
+      return deserialize(ByteBuffer.wrap(bytes));
     }
 
     @Override
     public HyperLogLog deserialize(ByteBuffer byteBuffer) {
-      byte[] bytes = new byte[byteBuffer.remaining()];
-      byteBuffer.get(bytes);
+      // NOTE: The passed in byte buffer is always BIG ENDIAN
+      return deserialize(byteBuffer.asIntBuffer());
+    }
+
+    private HyperLogLog deserialize(IntBuffer intBuffer) {
       try {
-        return HyperLogLog.Builder.build(bytes);
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
+        // The first 2 integers are constant headers for the HLL: log2m and size in bytes
+        int log2m = intBuffer.get();
+        int numBits = intBuffer.get() >>> 2;
+        int[] bits = new int[numBits];
+        intBuffer.get(bits);
+        return new HyperLogLog(log2m, new RegisterSet(1 << log2m, bits));
+      } catch (RuntimeException e) {
+        throw new RuntimeException("Caught exception while deserializing HyperLogLog", e);
       }
     }
   };

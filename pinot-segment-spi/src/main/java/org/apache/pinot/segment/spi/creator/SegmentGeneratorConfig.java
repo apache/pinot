@@ -120,6 +120,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _rowTimeValueCheck = false;
   private boolean _segmentTimeValueCheck = true;
   private boolean _failOnEmptySegment = false;
+  private boolean _optimizeDictionary = false;
   private boolean _optimizeDictionaryForMetrics = false;
   private double _noDictionarySizeRatioThreshold = DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
 
@@ -233,6 +234,8 @@ public class SegmentGeneratorConfig implements Serializable {
 
       _fstTypeForFSTIndex = indexingConfig.getFSTIndexType();
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+
+      _optimizeDictionary = indexingConfig.isOptimizeDictionary();
       _optimizeDictionaryForMetrics = indexingConfig.isOptimizeDictionaryForMetrics();
       _noDictionarySizeRatioThreshold = indexingConfig.getNoDictionarySizeRatioThreshold();
     }
@@ -827,6 +830,14 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public void setSegmentTimeValueCheck(boolean segmentTimeValueCheck) {
     _segmentTimeValueCheck = segmentTimeValueCheck;
+  }
+
+  public boolean isOptimizeDictionary() {
+    return _optimizeDictionary;
+  }
+
+  public void setOptimizeDictionary(boolean optimizeDictionary) {
+    _optimizeDictionary = optimizeDictionary;
   }
 
   public boolean isOptimizeDictionaryForMetrics() {

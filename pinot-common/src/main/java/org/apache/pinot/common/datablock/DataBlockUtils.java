@@ -42,6 +42,7 @@ public final class DataBlockUtils {
     if (e instanceof ProcessingException) {
       return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), errorMessage));
     } else {
+      // TODO: Pass in meaningful error code.
       return getErrorDataBlock(Collections.singletonMap(QueryException.UNKNOWN_ERROR_CODE, errorMessage));
     }
   }

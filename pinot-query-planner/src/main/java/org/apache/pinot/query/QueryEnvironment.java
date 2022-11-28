@@ -38,6 +38,7 @@ import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
@@ -129,6 +130,9 @@ public class QueryEnvironment {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       return toDispatchablePlan(relRoot, plannerContext);
+    } catch (CalciteContextException e) {
+      throw new RuntimeException("Error composing query plan for '" + sqlQuery
+          + "': " + e.getMessage() + "'", e);
     } catch (Exception e) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, e);
     }

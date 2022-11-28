@@ -1339,7 +1339,7 @@ public class PinotLLCRealtimeSegmentManager {
   private int getNumReplicas(TableConfig tableConfig, InstancePartitions instancePartitions) {
     if (instancePartitions.getNumReplicaGroups() == 1) {
       // Non-replica-group based
-      return tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+      return tableConfig.getReplication();
     } else {
       // Replica-group based
       return instancePartitions.getNumReplicaGroups();

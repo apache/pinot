@@ -22,7 +22,6 @@ import io.grpc.ManagedChannelBuilder
 import org.apache.pinot.common.datatable.{DataTable, DataTableFactory}
 import org.apache.pinot.common.proto.PinotQueryServerGrpc
 import org.apache.pinot.common.proto.Server.ServerRequest
-import org.apache.pinot.connector.spark.exceptions.PinotException
 import org.apache.pinot.connector.spark.utils.Logging
 import org.apache.pinot.spi.config.table.TableType
 
@@ -60,17 +59,16 @@ private[pinot] class PinotGrpcServerDataFetcher(pinotSplit: PinotSplit)
     logInfo(s"Pinot server total response time in millis: ${System.nanoTime() - requestStartTime}")
 
     try {
-      val dataTables = (for {
+      val dataTables = for {
         serverResponse <- serverResponse.asScala.toList
         if serverResponse.getMetadataMap.get("responseType") == "data"
-      } yield DataTableFactory.getDataTable(serverResponse.getPayload.toByteArray))
-        .filter(_.getNumberOfRows > 0)
+      } yield DataTableFactory.getDataTable(serverResponse.getPayload.toByteArray)
 
-      if (dataTables.isEmpty) {
-        throw PinotException(s"Empty response from ${pinotSplit.serverAndSegments.serverHost}:${pinotSplit.serverAndSegments.serverGrpcPort}")
-      }
-
-      dataTables
+      dataTables.filter(_.getNumberOfRows > 0)
+    } catch {
+      case e: io.grpc.StatusRuntimeException =>
+        logError(s"Caught exception when reading data from ${pinotSplit.serverAndSegments.serverHost}:${pinotSplit.serverAndSegments.serverGrpcPort}: ${e}")
+        throw e
     } finally {
       channel.shutdown()
       logInfo("Pinot server connection closed")

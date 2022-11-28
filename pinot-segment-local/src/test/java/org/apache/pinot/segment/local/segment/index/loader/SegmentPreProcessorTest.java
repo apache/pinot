@@ -163,7 +163,7 @@ public class SegmentPreProcessorTest {
     ingestionConfig.setSegmentTimeValueCheck(false);
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch")
-            .setIngestionConfig(ingestionConfig).build();
+            .setIngestionConfig(ingestionConfig).setNullHandlingEnabled(true).build();
     _indexLoadingConfig = getDefaultIndexLoadingConfig();
 
     // We specify two columns without inverted index ('column1', 'column13'), one non-existing column ('noSuchColumn')
@@ -219,6 +219,8 @@ public class SegmentPreProcessorTest {
     indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_RAW);
     indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW_MV);
     indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW);
+
+    indexLoadingConfig.setTableConfig(_tableConfig);
     return indexLoadingConfig;
   }
 
@@ -1097,6 +1099,13 @@ public class SegmentPreProcessorTest {
       assertTrue(reader.hasIndexFor(NEW_INT_SV_DIMENSION_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX));
       assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, ColumnIndexType.DICTIONARY));
       assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX));
+
+      assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
+      assertTrue(reader.hasIndexFor(NEW_LONG_METRIC_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
+      assertTrue(reader.hasIndexFor(NEW_FLOAT_METRIC_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
+      assertTrue(reader.hasIndexFor(NEW_DOUBLE_METRIC_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
+      assertTrue(reader.hasIndexFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
+      assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
     }
 
     // Use the second schema and update default value again.

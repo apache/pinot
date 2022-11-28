@@ -18,18 +18,21 @@
  */
 package org.apache.pinot.common.utils.fetcher;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import org.apache.pinot.common.auth.AuthConfig;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +46,7 @@ public class SegmentFetcherFactory {
   private static final String AUTH_KEY = CommonConstants.KEY_OF_AUTH;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
+  private static final Random RANDOM = new Random();
 
   private final Map<String, SegmentFetcher> _segmentFetcherMap = new HashMap<>();
   private final SegmentFetcher _httpSegmentFetcher = new HttpSegmentFetcher();
@@ -182,8 +186,31 @@ public class SegmentFetcherFactory {
     getInstance().fetchAndDecryptSegmentToLocalInternal(uri, dest, crypterName);
   }
 
+  // uris have equal weight to be selected for segment download
+  public static void fetchAndDecryptSegmentToLocal(List<URI> uris, File dest, String crypterName)
+          throws Exception {
+    getInstance().fetchAndDecryptSegmentToLocalInternal(uris, dest, crypterName);
+  }
+
   private void fetchAndDecryptSegmentToLocalInternal(String uri, File dest, String crypterName)
       throws Exception {
+    if (crypterName == null) {
+      fetchSegmentToLocal(uri, dest);
+    } else {
+      // download
+      File tempDownloadedFile = new File(dest.getPath() + ENCODED_SUFFIX);
+      fetchSegmentToLocal(uri, tempDownloadedFile);
+
+      // decrypt
+      PinotCrypter crypter = PinotCrypterFactory.create(crypterName);
+      crypter.decrypt(tempDownloadedFile, dest);
+    }
+  }
+
+  private void fetchAndDecryptSegmentToLocalInternal(@NonNull List<URI> uris, File dest, String crypterName)
+          throws Exception {
+    Preconditions.checkArgument(!uris.isEmpty(), "empty uris passed into the fetchAndDecryptSegmentToLocalInternal");
+    URI uri = uris.get(RANDOM.nextInt(uris.size()));
     if (crypterName == null) {
       fetchSegmentToLocal(uri, dest);
     } else {

@@ -29,6 +29,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -51,6 +52,7 @@ import org.apache.pinot.query.service.QueryDispatcher;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.testng.Assert;
 
@@ -142,6 +144,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         } else {
           return ((BigDecimal) l).compareTo(new BigDecimal((String) r));
         }
+      } else if (l instanceof ByteArray) {
+        return ((ByteArray) l).compareTo(new ByteArray((byte[]) r));
+      } else if (l instanceof Timestamp) {
+        return ((Timestamp) l).compareTo((Timestamp) r);
       } else {
         throw new RuntimeException("non supported type " + l.getClass());
       }
@@ -268,8 +274,17 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         case DOUBLE:
           fieldType = "double";
           break;
+        case BOOLEAN:
+          fieldType = "BOOLEAN";
+          break;
         case BIG_DECIMAL:
           fieldType = "NUMERIC";
+          break;
+        case BYTES:
+          fieldType = "BYTEA";
+          break;
+        case TIMESTAMP:
+          fieldType = "TIMESTAMP";
           break;
         default:
           throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);

@@ -20,9 +20,9 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Suppliers;
 import java.util.function.Supplier;
-import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 
 
 /**
@@ -33,21 +33,21 @@ public class OpChain {
 
   private final Operator<TransferableBlock> _root;
   // TODO: build timers that are partial-execution aware
-  private final Supplier<ThreadTimer> _timer;
+  private final Supplier<ThreadResourceUsageProvider> _timer;
 
   public OpChain(Operator<TransferableBlock> root) {
     _root = root;
 
     // use memoized supplier so that the timing doesn't start until the
     // first time we get the timer
-    _timer = Suppliers.memoize(ThreadTimer::new)::get;
+    _timer = Suppliers.memoize(ThreadResourceUsageProvider::new)::get;
   }
 
   public Operator<TransferableBlock> getRoot() {
     return _root;
   }
 
-  public ThreadTimer getAndStartTimer() {
+  public ThreadResourceUsageProvider getAndStartTimer() {
     return _timer.get();
   }
 }

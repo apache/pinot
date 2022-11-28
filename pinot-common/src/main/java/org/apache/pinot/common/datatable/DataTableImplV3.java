@@ -27,9 +27,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -187,15 +187,15 @@ public class DataTableImplV3 extends BaseDataTable {
   @Override
   public byte[] toBytes()
       throws IOException {
-    ThreadTimer threadTimer = new ThreadTimer();
+    ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     writeLeadingSections(dataOutputStream);
 
     // Add table serialization time metadata if thread timer is enabled.
-    if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
-      long responseSerializationCpuTimeNs = threadTimer.getThreadTimeNs();
+    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
+      long responseSerializationCpuTimeNs = threadResourceUsageProvider.getThreadTimeNs();
       getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(responseSerializationCpuTimeNs));
     }
 

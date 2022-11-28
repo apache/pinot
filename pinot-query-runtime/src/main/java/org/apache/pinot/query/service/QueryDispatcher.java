@@ -45,16 +45,12 @@ import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.roaringbitmap.RoaringBitmap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * {@code QueryDispatcher} dispatch a query to different workers.
  */
 public class QueryDispatcher {
-  private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
-
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
 
   public QueryDispatcher() {
@@ -68,8 +64,8 @@ public class QueryDispatcher {
     // run reduce stage and return result.
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
-        queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-        requestId, reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
+        queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
+        reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
         mailboxService.getMailboxPort());
     List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutNano);
     return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
@@ -91,9 +87,8 @@ public class QueryDispatcher {
           int servicePort = serverInstance.getQueryServicePort();
           int mailboxPort = serverInstance.getQueryMailboxPort();
           DispatchClient client = getOrCreateDispatchClient(host, servicePort);
-          Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder()
-              .setStagePlan(QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId,
-                  serverInstance)))
+          Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
+                  QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
               .putMetadata("REQUEST_ID", String.valueOf(requestId))
               .putMetadata("SERVER_INSTANCE_HOST", serverInstance.getHostname())
               .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(mailboxPort)).build());
@@ -132,8 +127,8 @@ public class QueryDispatcher {
       if (TransferableBlockUtils.isEndOfStream(transferableBlock) && transferableBlock.isErrorBlock()) {
         // TODO: we only received bubble up error from the execution stage tree.
         // TODO: query dispatch should also send cancel signal to the rest of the execution stage tree.
-          throw new RuntimeException("Received error query execution result block: "
-              + transferableBlock.getDataBlock().getExceptions());
+        throw new RuntimeException(
+            "Received error query execution result block: " + transferableBlock.getDataBlock().getExceptions());
       }
       if (transferableBlock.isNoOpBlock()) {
         continue;
@@ -154,7 +149,6 @@ public class QueryDispatcher {
     for (DataBlock dataBlock : queryResult) {
       int numColumns = resultSchema.getColumnNames().length;
       int numRows = dataBlock.getNumberOfRows();
-      DataSchema.ColumnDataType[] resultColumnDataTypes = resultSchema.getColumnDataTypes();
       List<Object[]> rows = new ArrayList<>(dataBlock.getNumberOfRows());
       if (numRows > 0) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
@@ -199,8 +193,8 @@ public class QueryDispatcher {
       List<ServerInstance> sendingInstances, long jobId, int stageId, DataSchema dataSchema, String hostname,
       int port) {
     MailboxReceiveOperator mailboxReceiveOperator =
-        new MailboxReceiveOperator(mailboxService, dataSchema, sendingInstances,
-            RelDistribution.Type.RANDOM_DISTRIBUTED, null, hostname, port, jobId, stageId);
+        new MailboxReceiveOperator(mailboxService, sendingInstances,
+            RelDistribution.Type.RANDOM_DISTRIBUTED, hostname, port, jobId, stageId, null);
     return mailboxReceiveOperator;
   }
 

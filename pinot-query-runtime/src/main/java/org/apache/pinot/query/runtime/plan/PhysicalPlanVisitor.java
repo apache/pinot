@@ -68,9 +68,9 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
   @Override
   public Operator<TransferableBlock> visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
     List<ServerInstance> sendingInstances = context.getMetadataMap().get(node.getSenderStageId()).getServerInstances();
-    return new MailboxReceiveOperator(context.getMailboxService(), node.getDataSchema(), sendingInstances,
-        node.getExchangeType(), node.getPartitionKeySelector(), context.getHostName(), context.getPort(),
-        context.getRequestId(), node.getSenderStageId());
+    return new MailboxReceiveOperator(context.getMailboxService(), sendingInstances,
+        node.getExchangeType(), context.getHostName(), context.getPort(),
+        context.getRequestId(), node.getSenderStageId(), null);
   }
 
   @Override

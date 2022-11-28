@@ -28,6 +28,8 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +51,8 @@ public abstract class ResourceManager {
   public static final String QUERY_WORKER_CONFIG_KEY = "query_worker_threads";
   public static final int DEFAULT_QUERY_RUNNER_THREADS;
   public static final int DEFAULT_QUERY_WORKER_THREADS;
+
+
 
   static {
     int numCores = Runtime.getRuntime().availableProcessors();
@@ -80,14 +84,18 @@ public abstract class ResourceManager {
     LOGGER.info("Initializing with {} query runner threads and {} worker threads", _numQueryRunnerThreads,
         _numQueryWorkerThreads);
     // pqr -> pinot query runner (to give short names)
-    ThreadFactory queryRunnerFactory = new TracedThreadFactory(QUERY_RUNNER_THREAD_PRIORITY, false, "pqr-%d");
+    ThreadFactory queryRunnerFactory = new TracedThreadFactory(QUERY_RUNNER_THREAD_PRIORITY, false,
+        CommonConstants.ExecutorService.PINOT_QUERY_RUNNER_NAME_FORMAT);
     _queryRunners =
         MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(_numQueryRunnerThreads, queryRunnerFactory));
 
     // pqw -> pinot query workers
-    ThreadFactory queryWorkersFactory = new TracedThreadFactory(Thread.NORM_PRIORITY, false, "pqw-%d");
+    ThreadFactory queryWorkersFactory = new TracedThreadFactory(Thread.NORM_PRIORITY, false,
+        CommonConstants.ExecutorService.PINOT_QUERY_WORKER_NAME_FORMAT);
     _queryWorkers =
         MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory));
+
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(_numQueryRunnerThreads, _numQueryWorkerThreads, config);
   }
 
   public void stop() {

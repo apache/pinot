@@ -20,7 +20,8 @@
 import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
   IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
-  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig, SegmentDebugDetails
+  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig,
+  SegmentDebugDetails, QuerySchemas
 } from 'Models';
 
 const headers = {
@@ -45,7 +46,7 @@ export const getTenantTableDetails = (tableName: string): Promise<AxiosResponse<
 export const putTable = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.put(`/tables/${name}`, params, { headers });
 
-export const getSchemaList = (): Promise<AxiosResponse<OperationResponse>> =>
+export const getSchemaList = (): Promise<AxiosResponse<QuerySchemas>> =>
   baseApi.get(`/schemas`);
 
 export const getSchema = (name: string): Promise<AxiosResponse<OperationResponse>> =>

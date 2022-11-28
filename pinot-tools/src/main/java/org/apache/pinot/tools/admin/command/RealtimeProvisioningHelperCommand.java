@@ -221,7 +221,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     StringBuilder note = new StringBuilder();
     note.append("\nNote:\n");
-    int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+    int numReplicas = tableConfig.getReplication();
     int tableRetentionHours = (int) TimeUnit.valueOf(tableConfig.getValidationConfig().getRetentionTimeUnit())
         .toHours(Long.parseLong(tableConfig.getValidationConfig().getRetentionTimeValue()));
     if (_retentionHours > 0) {

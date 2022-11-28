@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
@@ -111,7 +110,7 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock())
-        .thenReturn(block(inSchema, new Object[]{1, 1}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}))
         .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
@@ -135,7 +134,7 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock())
-        .thenReturn(block(inSchema, new Object[]{2, 1}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
@@ -163,7 +162,7 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock())
-        .thenReturn(block(inSchema, new Object[]{2, 3}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 3}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
@@ -192,8 +191,8 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock())
-        .thenReturn(block(inSchema, new Object[]{1, 1}, new Object[]{1, 1}))
-        .thenReturn(block(inSchema, new Object[]{1, 1}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}, new Object[]{1, 1}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     AggregateOperator.Merger merger = Mockito.mock(AggregateOperator.Merger.class);
@@ -260,7 +259,7 @@ public class AggregateOperatorTest {
     Mockito.when(_input.nextBlock())
         // TODO: it is necessary to produce two values here, the operator only throws on second
         // (see the comment in Aggregate operator)
-        .thenReturn(block(inSchema, new Object[]{2, "foo"}, new Object[]{2, "foo"}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}, new Object[]{2, "foo"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
@@ -273,10 +272,6 @@ public class AggregateOperatorTest {
     Assert.assertTrue(block.isErrorBlock(), "expected ERROR block from invalid computation");
     Assert.assertTrue(block.getDataBlock().getExceptions().get(1000).contains("String cannot be cast to class"),
         "expected it to fail with class cast exception");
-  }
-
-  private static TransferableBlock block(DataSchema schema, Object[]... rows) {
-    return new TransferableBlock(Arrays.asList(rows), schema, DataBlock.Type.ROW);
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {

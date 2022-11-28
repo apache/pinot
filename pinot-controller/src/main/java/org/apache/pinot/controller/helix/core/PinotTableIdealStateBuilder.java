@@ -92,31 +92,25 @@ public class PinotTableIdealStateBuilder {
     List<String> realtimeInstances = HelixHelper.getInstancesWithTag(helixManager,
         TagNameUtils.extractConsumingServerTag(realtimeTableConfig.getTenantConfig()));
     IdealState idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, 1, enableBatchMessageMode);
-    if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
+    if (realtimeInstances.size() % realtimeTableConfig.getReplication() != 0) {
       throw new RuntimeException(
           "Number of instance in current tenant should be an integer multiples of the number of replications");
     }
     setupInstanceConfigForHighLevelConsumer(realtimeTableName, realtimeInstances.size(),
-        Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()),
-        IngestionConfigUtils.getStreamConfigMap(realtimeTableConfig), zkHelixPropertyStore, realtimeInstances);
+        realtimeTableConfig.getReplication(), IngestionConfigUtils.getStreamConfigMap(realtimeTableConfig),
+        zkHelixPropertyStore, realtimeInstances);
     return idealState;
   }
 
   public static void buildLowLevelRealtimeIdealStateFor(PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager,
       String realtimeTableName, TableConfig realtimeTableConfig, IdealState idealState,
       boolean enableBatchMessageMode) {
-
     // Validate replicasPerPartition here.
-    final String replicasPerPartitionStr = realtimeTableConfig.getValidationConfig().getReplicasPerPartition();
-    if (replicasPerPartitionStr == null || replicasPerPartitionStr.isEmpty()) {
-      throw new RuntimeException("Null or empty value for replicasPerPartition, expected a number");
-    }
     final int nReplicas;
     try {
-      nReplicas = Integer.valueOf(replicasPerPartitionStr);
+      nReplicas = realtimeTableConfig.getReplication();
     } catch (NumberFormatException e) {
-      throw new InvalidTableConfigException(
-          "Invalid value for replicasPerPartition, expected a number: " + replicasPerPartitionStr, e);
+      throw new InvalidTableConfigException("Invalid value for replicasPerPartition, expected a number.", e);
     }
     if (idealState == null) {
       idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, nReplicas, enableBatchMessageMode);

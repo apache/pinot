@@ -28,8 +28,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -38,6 +38,8 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
@@ -88,17 +90,22 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     // behavior (even JVM crash) when processing queries against it.
     Phaser phaser = new Phaser(1);
     Tracing.activeRecording().setNumTasks(_numTasks);
+    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     for (int i = 0; i < _numTasks; i++) {
+      int taskId = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          ThreadTimer executionThreadTimer = new ThreadTimer();
+          ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+
+          Tracing.ThreadAccountantOps.setupWorker(taskId, threadResourceUsageProvider, parentContext);
 
           // Register the task to the phaser
           // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
           //       the query execution has finished, and the main thread has deregistered itself and returned the
           //       result. Directly return as no execution result will be taken.
           if (phaser.register() < 0) {
+            Tracing.ThreadAccountantOps.clear();
             return;
           }
           try {
@@ -119,9 +126,10 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           } finally {
             onFinish();
             phaser.arriveAndDeregister();
+            Tracing.ThreadAccountantOps.clear();
           }
 
-          _totalWorkerThreadCpuTimeNs.getAndAdd(executionThreadTimer.getThreadTimeNs());
+          _totalWorkerThreadCpuTimeNs.getAndAdd(threadResourceUsageProvider.getThreadTimeNs());
         }
       });
     }
@@ -129,8 +137,11 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     BaseResultsBlock mergedBlock;
     try {
       mergedBlock = mergeResults();
-    } catch (InterruptedException e) {
-      throw new QueryCancelledException("Cancelled while merging results blocks", e);
+    } catch (InterruptedException | EarlyTerminationException e) {
+      Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
+      throw new QueryCancelledException(
+          "Cancelled while merging results blocks"
+              + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg), e);
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
       mergedBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
