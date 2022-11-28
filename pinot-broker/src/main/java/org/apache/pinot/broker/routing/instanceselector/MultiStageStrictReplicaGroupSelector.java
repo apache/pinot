@@ -87,12 +87,12 @@ public class MultiStageStrictReplicaGroupSelector extends BaseInstanceSelector {
   Map<String, String> select(List<String> segments, int requestId,
       Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
-    InstancePartitions localInstancePartitions = _instancePartitions.createCopy();
-    int replicaGroupSelected = requestId % localInstancePartitions.getNumReplicaGroups();
-    for (int iteration = 0; iteration < localInstancePartitions.getNumReplicaGroups(); iteration++) {
-      int replicaGroup = (replicaGroupSelected + iteration) % localInstancePartitions.getNumReplicaGroups();
+    InstancePartitions instancePartitions = _instancePartitions;
+    int replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
+    for (int iteration = 0; iteration < instancePartitions.getNumReplicaGroups(); iteration++) {
+      int replicaGroup = (replicaGroupSelected + iteration) % instancePartitions.getNumReplicaGroups();
       try {
-        return tryAssigning(segmentToEnabledInstancesMap, localInstancePartitions, replicaGroup);
+        return tryAssigning(segmentToEnabledInstancesMap, instancePartitions, replicaGroup);
       } catch (Exception e) {
         LOGGER.warn("Unable to select replica-group {} for table: {}", replicaGroup, _tableNameWithType, e);
       }

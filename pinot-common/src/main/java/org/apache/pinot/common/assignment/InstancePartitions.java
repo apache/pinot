@@ -134,10 +134,6 @@ public class InstancePartitions {
     return new InstancePartitions(newName, getPartitionToInstancesMap());
   }
 
-  public InstancePartitions createCopy() {
-    return withName(_instancePartitionsName);
-  }
-
   public String toJsonString() {
     try {
       return JsonUtils.objectToString(this);
