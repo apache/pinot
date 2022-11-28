@@ -1,0 +1,72 @@
+{
+  "ts_without_tz": {
+    "tables": {
+      "ts": {
+        "schema": [
+          {"name": "data", "type": "TIMESTAMP"}
+        ],
+        "inputs": [
+          ["1999-01-08 04:05:06"],
+          ["1999-01-08 22:05:46"],
+          ["1999-01-08 04:05:06.001"],
+          ["5760-01-01 04:05:06"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "8.5.1.3",
+        "description": "should support timestamps with various values",
+        "sql": "SELECT * FROM {ts}"
+      }
+    ]
+  },
+  "timestamps_in_bc": {
+    "ignored": true,
+    "comment": "we don't support parsing postgres' max timestamp or BC timestamps",
+    "tables": {
+      "ts": {
+        "schema": [
+          {"name": "data", "type": "TIMESTAMP"}
+        ],
+        "inputs": [
+          ["275760-01-01 04:05:06"],
+          ["4713-12-31 00:00:00 BC"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "should support timestamps with various values",
+        "sql": "SELECT * FROM {ts}"
+      }
+    ]
+  },
+  "special_values": {
+    "ignored": true,
+    "comment": "we don't support the special values for timestamps",
+    "tables": {
+      "ts": {
+        "schema": [
+          {"name": "data", "type": "TIMESTAMP"}
+        ],
+        "inputs": [
+          ["epoch"],
+          ["infinity"],
+          ["-infinity"],
+          ["now"],
+          ["today"],
+          ["tomorrow"],
+          ["yesterday"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "8.5.1.4",
+        "description": "should support timestamps with various values",
+        "sql": "SELECT * FROM {ts}"
+      }
+    ]
+  }
+}
