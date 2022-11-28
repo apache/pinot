@@ -19,6 +19,12 @@
     },
     "queries": [
       { "sql": "SELECT intCol, CASE WHEN boolCol = true THEN 'Yes' ELSE 'No' END AS boolVal, strCol FROM {tbl1}"},
+      {
+        "ignored": true,
+        "comment": "should return NULL, but returns '' (empty string) when case is not matched",
+        "sql": "SELECT intCol, CASE WHEN boolCol = true THEN 'Yes' END AS boolVal, strCol FROM {tbl1}"
+      },
+      { "sql": "SELECT intCol FROM {tbl1} WHERE CASE WHEN strCol = 'one' THEN true ELSE boolCol END"},
       { "sql": "SELECT intCol, CASE WHEN strCol = 'one' THEN 'The first one' WHEN strCol = 'two' THEN 'The second one' WHEN strCol = 'three' THEN 'The third one' WHEN strCol = 'four' THEN 'The fourth one' ELSE 'Unknown' END AS stringVal FROM {tbl1}"},
       { "sql": "SELECT intCol, CASE WHEN intCol % 2 = 0 THEN intCol ELSE intCol * 2 END AS intVal, strCol FROM {tbl1}"},
       { "sql": "SELECT intCol, CASE WHEN floatCol > 4.0 THEN floatCol ELSE floatCol / 2.0 END AS floatVal, strCol FROM {tbl1}"},
