@@ -304,7 +304,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testStringSplitPartTransformFunction() {
-    int index = 2;
+    int index = 1;
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("split_part(%s, 'ab', %d)", STRING_ALPHANUM_SV_COLUMN, index));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
@@ -314,7 +314,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     for (int i = 0; i < NUM_ROWS; i++) {
       String[] splitString = StringUtils.splitByWholeSeparator(_stringAlphaNumericSVValues[i], "ab");
       if (splitString.length > index) {
-        expectedValues[i] = splitString[i];
+        expectedValues[i] = splitString[index];
       } else {
         expectedValues[i] = "null";
       }
