@@ -46,7 +46,6 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
  */
 public class NotOperatorTransformFunction extends BaseTransformFunction {
   private TransformFunction _argument;
-  private int[] _results;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
@@ -71,14 +70,14 @@ public class NotOperatorTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
-    if (_results == null) {
-      _results = new int[numDocs];
+    if (_intValuesSV == null) {
+      _intValuesSV = new int[numDocs];
     }
     int[] intValues = _argument.transformToIntValuesSV(projectionBlock);
     for (int i = 0; i < numDocs; i++) {
-      _results[i] = getLogicalNegate(intValues[i]);
+      _intValuesSV[i] = getLogicalNegate(intValues[i]);
     }
-    return _results;
+    return _intValuesSV;
   }
 
   private static int getLogicalNegate(int val) {

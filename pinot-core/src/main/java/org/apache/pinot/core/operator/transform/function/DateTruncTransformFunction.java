@@ -86,7 +86,6 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
   private static final String UTC_TZ = TimeZoneKey.UTC_KEY.getId();
   private TransformFunction _mainTransformFunction;
   private TransformResultMetadata _resultMetadata;
-  private long[] _longOutputTimes;
   private DateTimeField _field;
   private TimeUnit _inputTimeUnit;
   private TimeUnit _outputTimeUnit;
@@ -130,16 +129,15 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
-    if (_longOutputTimes == null) {
-      _longOutputTimes = new long[length];
+    if (_longValuesSV == null) {
+      _longValuesSV = new long[length];
     }
-
     long[] input = _mainTransformFunction.transformToLongValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _longOutputTimes[i] = _outputTimeUnit
-          .convert(_field.roundFloor(TimeUnit.MILLISECONDS.convert(input[i], _inputTimeUnit)), TimeUnit.MILLISECONDS);
+      _longValuesSV[i] =
+          _outputTimeUnit.convert(_field.roundFloor(TimeUnit.MILLISECONDS.convert(input[i], _inputTimeUnit)),
+              TimeUnit.MILLISECONDS);
     }
-    return _longOutputTimes;
+    return _longValuesSV;
   }
 }
