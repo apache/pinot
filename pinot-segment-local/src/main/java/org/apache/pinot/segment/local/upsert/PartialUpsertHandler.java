@@ -34,26 +34,18 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class PartialUpsertHandler {
   // _column2Mergers maintains the mapping of merge strategies per columns.
   private final Map<String, PartialUpsertMerger> _column2Mergers = new HashMap<>();
-  private final UpsertConfig.Strategy _defaultPartialUpsertStrategy;
+  private final PartialUpsertMerger _defaultPartialUpsertMerger;
   private final String _comparisonColumn;
   private final List<String> _primaryKeyColumns;
 
   public PartialUpsertHandler(Schema schema, Map<String, UpsertConfig.Strategy> partialUpsertStrategies,
       UpsertConfig.Strategy defaultPartialUpsertStrategy, String comparisonColumn) {
-    _defaultPartialUpsertStrategy = defaultPartialUpsertStrategy;
+    _defaultPartialUpsertMerger = PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy);
     _comparisonColumn = comparisonColumn;
     _primaryKeyColumns = schema.getPrimaryKeyColumns();
 
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
-    }
-    // For all physical columns (including date time columns) except for primary key columns and comparison column.
-    // If no comparison column is configured, use main time column as the comparison time.
-    for (String columnName : schema.getPhysicalColumnNames()) {
-      if (!_primaryKeyColumns.contains(columnName) && !_column2Mergers.containsKey(columnName)
-          && !_comparisonColumn.equals(columnName)) {
-        _column2Mergers.put(columnName, PartialUpsertMergerFactory.getMerger(_defaultPartialUpsertStrategy));
-      }
     }
   }
 
@@ -80,8 +72,7 @@ public class PartialUpsertHandler {
             newRecord.putValue(column, previousRecord.getValue(column));
             newRecord.removeNullValueField(column);
           } else {
-            PartialUpsertMerger merger = _column2Mergers.getOrDefault(column,
-                PartialUpsertMergerFactory.getMerger(_defaultPartialUpsertStrategy));
+            PartialUpsertMerger merger = _column2Mergers.getOrDefault(column, _defaultPartialUpsertMerger);
             newRecord.putValue(column,
                 merger.merge(previousRecord.getValue(column), newRecord.getValue(column)));
           }
