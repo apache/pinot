@@ -119,7 +119,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String FORCE_REVERT_PARAMETER = "&forceRevert=";
   private static final String FORCE_CLEANUP_PARAMETER = "&forceCleanup=";
 
-  private static final String RETENTION_PARAMETER = "&retention=";
+  private static final String RETENTION_PARAMETER = "retention=";
 
   private static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(HTTP, HTTPS);
 
@@ -252,11 +252,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
       sb.append(type);
     }
     if (StringUtils.isNotBlank(retention)) {
+      if (sb.length() > 0) {
+        sb.append("&");
+      }
       sb.append(RETENTION_PARAMETER);
       sb.append(retention);
     }
     String query = sb.length() == 0 ? null : sb.toString();
-    return getURI(protocol, host, port, SCHEMA_PATH + "/" + tableName, query);
+    return getURI(protocol, host, port, TABLES_PATH + "/" + tableName, query);
   }
 
   public static URI getUploadSchemaURI(URI controllerURI)
