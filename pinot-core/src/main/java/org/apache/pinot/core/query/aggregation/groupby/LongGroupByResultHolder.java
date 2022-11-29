@@ -16,31 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 
 
-/**
- * Result Holder implemented using ObjectArray.
- */
-public class ObjectGroupByResultHolder implements GroupByResultHolder {
+public class LongGroupByResultHolder implements GroupByResultHolder {
+
   private final int _maxCapacity;
+  private final long _defaultValue;
 
   private int _resultHolderCapacity;
-  private Object[] _resultArray;
+  private long[] _resultArray;
 
   /**
    * Constructor for the class.
    *
    * @param initialCapacity Initial capacity of the result holder
    * @param maxCapacity Maximum capacity of the result holder
+   * @param defaultValue Default value of un-initialized results
    */
-  public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity) {
+  public LongGroupByResultHolder(int initialCapacity, int maxCapacity, long defaultValue) {
     _maxCapacity = maxCapacity;
+    _defaultValue = defaultValue;
 
     _resultHolderCapacity = initialCapacity;
-    _resultArray = new Object[initialCapacity];
+    _resultArray = new long[initialCapacity];
+    if (defaultValue != 0.0) {
+      Arrays.fill(_resultArray, defaultValue);
+    }
   }
 
   @Override
@@ -54,9 +60,13 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
       // Cap the growth to maximum possible number of group keys
       _resultHolderCapacity = Math.min(_resultHolderCapacity, _maxCapacity);
 
-      Object[] current = _resultArray;
-      _resultArray = new Object[_resultHolderCapacity];
+      long[] current = _resultArray;
+      _resultArray = new long[_resultHolderCapacity];
       System.arraycopy(current, 0, _resultArray, 0, copyLength);
+
+      if (_defaultValue != 0.0) {
+        Arrays.fill(_resultArray, copyLength, _resultHolderCapacity, _defaultValue);
+      }
     }
   }
 
@@ -67,24 +77,21 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
 
   @Override
   public long getLongResult(int groupKey) {
+    if (groupKey == GroupKeyGenerator.INVALID_ID) {
+      return _defaultValue;
+    } else {
+      return _resultArray[groupKey];
+    }
+  }
+
+  @Override
+  public <T> T getResult(int groupKey) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public <T> T getResult(int groupKey) {
-    if (groupKey == GroupKeyGenerator.INVALID_ID) {
-      return null;
-    } else {
-      return (T) _resultArray[groupKey];
-    }
-  }
-
-  @Override
   public void setValueForKey(int groupKey, double newValue) {
-    if (groupKey != GroupKeyGenerator.INVALID_ID) {
-      _resultArray[groupKey] = newValue;
-    }
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -94,11 +101,9 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public void setValueForKey(int groupKey, Object newValue) {
-    if (groupKey != GroupKeyGenerator.INVALID_ID) {
-      _resultArray[groupKey] = newValue;
-    }
+    throw new UnsupportedOperationException();
   }
+
 }

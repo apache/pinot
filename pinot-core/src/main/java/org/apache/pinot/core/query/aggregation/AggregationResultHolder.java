@@ -31,6 +31,12 @@ public interface AggregationResultHolder {
   void setValue(double value);
 
   /**
+   * Set the 'primitive long' aggregation result.
+   * @param value
+   */
+  void setValue(long value);
+
+  /**
    * Set the aggregation result value.
    * @param value
    */
@@ -41,6 +47,12 @@ public interface AggregationResultHolder {
    * @return
    */
   double getDoubleResult();
+
+  /**
+   * Returns the 'primitive long' aggregation result.
+   * @return
+   */
+  long getLongResult();
 
   /**
    * Returns the result of aggregation.

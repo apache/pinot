@@ -42,6 +42,11 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
     _value = value;
   }
 
+  @Override
+  public void setValue(long value) {
+    throw new RuntimeException("Method 'setValue' (with long value) not supported for class " + getClass().getName());
+  }
+
   /**
    * {@inheritDoc}
    * Value for this class is 'primitive double', so this method is not implemented.
@@ -59,6 +64,15 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
   @Override
   public double getDoubleResult() {
     return _value;
+  }
+
+  /**
+   * {@inheritDoc}
+   * @return
+   */
+  @Override
+  public long getLongResult() {
+    throw new RuntimeException("Method 'getLongResult' not supported for class " + getClass().getName());
   }
 
   /**

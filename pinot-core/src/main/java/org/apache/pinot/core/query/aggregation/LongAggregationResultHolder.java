@@ -16,63 +16,45 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.core.query.aggregation;
 
-/**
- * AggregationResultHolder interface implementation for result type 'object'.
- */
-public class ObjectAggregationResultHolder implements AggregationResultHolder {
-  Object _value;
+public class LongAggregationResultHolder implements AggregationResultHolder {
 
-  /**
-   * {@inheritDoc}
-   * @param value
-   */
+  long _value;
+
+  public LongAggregationResultHolder(long defaultValue) {
+    _value = defaultValue;
+  }
+
   @Override
   public void setValue(double value) {
-    _value = value;
+    throw new RuntimeException("Method 'setValue' (with double value) not supported for class " + getClass().getName());
   }
-
-  /**
-   * {@inheritDoc}
-   * @param value
-   */
-  @Override
-  public void setValue(Object value) {
-    _value = value;
-  }
-
 
   @Override
   public void setValue(long value) {
     _value = value;
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
+  @Override
+  public void setValue(Object value) {
+    throw new RuntimeException("Method 'setValue' (with object value) not supported for class " + getClass().getName());
+  }
+
   @Override
   public double getDoubleResult() {
     throw new RuntimeException("Method 'getDoubleResult' not supported for class " + getClass().getName());
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
   @Override
   public long getLongResult() {
-    throw new RuntimeException("Method 'getLongResult' not supported for class " + getClass().getName());
+    return _value;
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
   @Override
-  @SuppressWarnings("unchecked")
   public <T> T getResult() {
-    return (T) _value;
+    throw new RuntimeException("Method 'getResult' not supported for class " + getClass().getName());
   }
+
 }
