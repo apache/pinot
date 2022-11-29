@@ -1,0 +1,69 @@
+{
+  "select_expression_test": {
+    "tables": {
+      "test_having": {
+        "schema":[
+          {"name": "a", "type": "INT"},
+          {"name": "b", "type": "INT"},
+          {"name": "c", "type": "STRING"},
+          {"name": "d", "type": "STRING"}
+        ],
+        "inputs": [
+          [0, 1, "XXXX", "A"],
+          [1, 2, "AAAA", "b"],
+          [2, 2, "AAAA", "c"],
+          [3, 3, "BBBB", "D"],
+          [4, 3, "BBBB", "e"],
+          [5, 3, "bbbb", "F"],
+          [6, 4, "cccc", "g"],
+          [7, 4, "cccc", "h"],
+          [8, 4, "CCCC", "I"],
+          [9, 4, "CCCC", "j"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql":"SELECT b, c FROM {test_having} GROUP BY b, c HAVING count(*) = 1 ORDER BY b, c;"
+      },
+      {
+        "sql":"SELECT b, c FROM {test_having} GROUP BY b, c HAVING b = 3 ORDER BY b, c;"
+      },
+      {
+        "sql":"SELECT lower(c), count(c) FROM {test_having} GROUP BY lower(c) HAVING count(*) > 2 OR min(a) = max(a) ORDER BY lower(c);"
+      },
+      {
+        "sql":"SELECT c, max(a) FROM {test_having} GROUP BY c HAVING count(*) > 2 OR min(a) = max(a) ORDER BY c;"
+      },
+      {
+        "sql":"SELECT min(a), max(a) FROM {test_having} HAVING min(a) = max(a);"
+      },
+      {
+        "sql":"SELECT min(a), max(a) FROM {test_having} HAVING min(a) < max(a);"
+      },
+      {
+        "comment": "Plan failed. Expression 'a' is not being grouped.",
+        "sql":"SELECT a FROM {test_having} HAVING min(a) < max(a);",
+        "expectedException": ".*Error composing query plan.*"
+      },
+      {
+        "comment": "Plan failed. Expression 'a' is not being grouped.",
+        "sql":"SELECT 1 AS one FROM {test_having} HAVING a > 1;",
+        "expectedException": ".*Error composing query plan.*"
+      },
+      {
+        "sql":"SELECT 1 AS one FROM {test_having} HAVING 1 > 2;"
+      },
+      {
+        "ignored": true,
+        "comment": "Runtime failure: java.lang.ArithmeticException: / by zero",
+        "sql":"SELECT 1 AS one FROM {test_having} HAVING 1 < 2;"
+      },
+      {
+        "ignored": true,
+        "comment": "Runtime failure: java.lang.ArithmeticException: / by zero",
+        "sql":"SELECT 1 AS one FROM {test_having} WHERE 1/a = 1 HAVING 1 < 2;"
+      }
+    ]
+  }
+}
