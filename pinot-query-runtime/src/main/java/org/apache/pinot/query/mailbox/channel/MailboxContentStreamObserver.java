@@ -22,11 +22,12 @@ import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.GrpcReceivingMailbox;
+import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
@@ -43,46 +44,42 @@ import org.slf4j.LoggerFactory;
 public class MailboxContentStreamObserver implements StreamObserver<Mailbox.MailboxContent> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentStreamObserver.class);
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
-  private static final long DEFAULT_MAILBOX_POLL_TIMEOUT = 1000L;
   private final GrpcMailboxService _mailboxService;
   private final StreamObserver<Mailbox.MailboxStatus> _responseObserver;
+  private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final boolean _isEnabledFeedback;
 
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
-  private String _mailboxId;
-  private ArrayBlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
+  private final ArrayBlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
+  private StringMailboxIdentifier _mailboxId;
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
-      StreamObserver<Mailbox.MailboxStatus> responseObserver) {
-    this(mailboxService, responseObserver, false);
+      StreamObserver<Mailbox.MailboxStatus> responseObserver, Consumer<MailboxIdentifier> gotMailCallback) {
+    this(mailboxService, responseObserver, false, gotMailCallback);
   }
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
-      StreamObserver<Mailbox.MailboxStatus> responseObserver, boolean isEnabledFeedback) {
+      StreamObserver<Mailbox.MailboxStatus> responseObserver, boolean isEnabledFeedback,
+      Consumer<MailboxIdentifier> gotMailCallback) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
+    _gotMailCallback = gotMailCallback;
     _receivingBuffer = new ArrayBlockingQueue<>(DEFAULT_MAILBOX_QUEUE_CAPACITY);
     _isEnabledFeedback = isEnabledFeedback;
   }
 
   /**
-   * This method may return null. It can happen if there's a large enough gap between the time the receiver received
-   * the last block and the StreamObserver was detected as complete. In that case, the MailboxReceiveOperator would
-   * try to call this method again but since there's no new content to be received, we'll exit the loop. Returning
-   * null here means that MailboxReceiveOperator won't consider this as an error.
+   * This method will return {@code null} if there has not been any data since the
+   * last poll. Callers should be careful not to call this in a tight loop, and
+   * instead use the {@code gotMailCallback} passed into this observer's constructor
+   * to indicate when to call this method.
    */
   public Mailbox.MailboxContent poll() {
-    while (!isCompleted()) {
-      try {
-        Mailbox.MailboxContent content = _receivingBuffer.poll(DEFAULT_MAILBOX_POLL_TIMEOUT, TimeUnit.MILLISECONDS);
-        if (content != null) {
-          return content;
-        }
-      } catch (InterruptedException e) {
-        LOGGER.error("Interrupt occurred while waiting for mailbox content", e);
-      }
+    if (isCompleted()) {
+      return null;
     }
-    return null;
+
+    return _receivingBuffer.poll();
   }
 
   public boolean isCompleted() {
@@ -91,13 +88,16 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   @Override
   public void onNext(Mailbox.MailboxContent mailboxContent) {
-    _mailboxId = mailboxContent.getMailboxId();
-    GrpcReceivingMailbox receivingMailbox =
-        (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(new StringMailboxIdentifier(_mailboxId));
+    _mailboxId = new StringMailboxIdentifier(mailboxContent.getMailboxId());
+
+    GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
     receivingMailbox.init(this);
+
     if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {
       // when the receiving end receives a message put it in the mailbox queue.
       _receivingBuffer.offer(mailboxContent);
+      _gotMailCallback.accept(_mailboxId);
+
       if (_isEnabledFeedback) {
         // TODO: this has race conditions with onCompleted() because sender blindly closes connection channels once
         // it has finished sending all the data packets.
@@ -122,6 +122,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
           .setPayload(ByteString.copyFrom(
               TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(e)).getDataBlock().toBytes()))
           .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build());
+      _gotMailCallback.accept(_mailboxId);
       throw new RuntimeException(e);
     } catch (IOException ioe) {
       throw new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);

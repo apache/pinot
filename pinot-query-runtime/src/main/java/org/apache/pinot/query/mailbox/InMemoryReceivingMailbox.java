@@ -19,38 +19,40 @@
 package org.apache.pinot.query.mailbox;
 
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
-  private final String _mailboxId;
+  private final String _stringMailboxId;
   private final BlockingQueue<TransferableBlock> _queue;
+  private final MailboxIdentifier _mailboxId;
   private volatile boolean _closed;
 
   public InMemoryReceivingMailbox(String mailboxId, BlockingQueue<TransferableBlock> queue) {
-    _mailboxId = mailboxId;
+    _stringMailboxId = mailboxId;
+    _mailboxId = new StringMailboxIdentifier(_stringMailboxId);
     _queue = queue;
     _closed = false;
   }
 
   @Override
   public String getMailboxId() {
-    return _mailboxId;
+    return _stringMailboxId;
   }
 
   @Override
   public TransferableBlock receive()
       throws Exception {
-    TransferableBlock block = _queue.poll(
-        InMemoryMailboxService.DEFAULT_CHANNEL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-    // If the poll timed out, we return a null since MailboxReceiveOperator can continue to check other mailboxes
+    TransferableBlock block = _queue.poll();
+
     if (block == null) {
       return null;
     }
+
     if (block.isEndOfStreamBlock()) {
       _closed = true;
     }
+
     return block;
   }
 

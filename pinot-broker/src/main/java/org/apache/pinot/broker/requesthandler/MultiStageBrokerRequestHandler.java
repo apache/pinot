@@ -94,7 +94,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager(_reducerHostname, _reducerPort, routingManager));
     _queryDispatcher = new QueryDispatcher();
-    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config);
+
+    // it is OK to ignore the onDataAvailable callback because the broker top-level operators
+    // always run in-line (they don't have any scheduler)
+    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config, ignored -> { });
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();

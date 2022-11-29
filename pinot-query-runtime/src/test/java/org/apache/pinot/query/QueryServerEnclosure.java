@@ -132,6 +132,6 @@ public class QueryServerEnclosure {
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
-    _queryRunner.processQuery(distributedStagePlan, _scheduler, requestMetadataMap);
+    _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
   }
 }

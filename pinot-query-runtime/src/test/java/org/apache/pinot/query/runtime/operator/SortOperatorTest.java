@@ -124,7 +124,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -148,7 +147,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -172,7 +170,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -196,7 +193,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -220,7 +216,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -244,7 +239,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -267,7 +261,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -290,7 +283,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -313,8 +305,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -338,7 +328,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -363,7 +352,6 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -390,9 +378,7 @@ public class SortOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume, create NOOP
-    op.nextBlock(); // consume and do nothing
-    op.nextBlock(); // consume, create NOOP
+    op.nextBlock(); // consume up until NOOP, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 

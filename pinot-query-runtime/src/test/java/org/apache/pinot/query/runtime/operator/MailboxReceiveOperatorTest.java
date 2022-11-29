@@ -221,6 +221,38 @@ public class MailboxReceiveOperatorTest {
   }
 
   @Test
+  public void shouldReceiveEosDirectlyFromSender()
+      throws Exception {
+    String serverHost = "singleton";
+    int server1Port = 123;
+    Mockito.when(_server1.getHostname()).thenReturn(serverHost);
+    Mockito.when(_server1.getQueryMailboxPort()).thenReturn(server1Port);
+
+    int server2port = 456;
+    Mockito.when(_server2.getHostname()).thenReturn(serverHost);
+    Mockito.when(_server2.getQueryMailboxPort()).thenReturn(server2port);
+
+    int mailboxPort = server2port;
+    Mockito.when(_mailboxService.getHostname()).thenReturn(serverHost);
+    Mockito.when(_mailboxService.getMailboxPort()).thenReturn(mailboxPort);
+
+    int jobId = 456;
+    int stageId = 0;
+    int toPort = 8888;
+    String toHost = "toHost";
+
+    StringMailboxIdentifier expectedMailboxId =
+        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
+    Mockito.when(_mailbox.isClosed()).thenReturn(false);
+    Mockito.when(_mailbox.receive()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+        RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
+    // Receive EosBloc.
+    Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+  }
+
+  @Test
   public void shouldReceiveSingletonMailbox()
       throws Exception {
     String serverHost = "singleton";

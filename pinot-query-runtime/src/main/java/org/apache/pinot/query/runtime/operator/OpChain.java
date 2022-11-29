@@ -19,8 +19,12 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Suppliers;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 
@@ -34,9 +38,11 @@ public class OpChain {
   private final Operator<TransferableBlock> _root;
   // TODO: build timers that are partial-execution aware
   private final Supplier<ThreadResourceUsageProvider> _timer;
+  private final Set<MailboxIdentifier> _receivingMailbox;
 
-  public OpChain(Operator<TransferableBlock> root) {
+  public OpChain(Operator<TransferableBlock> root, List<MailboxIdentifier> receivingMailboxes) {
     _root = root;
+    _receivingMailbox = new HashSet<>(receivingMailboxes);
 
     // use memoized supplier so that the timing doesn't start until the
     // first time we get the timer
@@ -49,5 +55,9 @@ public class OpChain {
 
   public ThreadResourceUsageProvider getAndStartTimer() {
     return _timer.get();
+  }
+
+  public Set<MailboxIdentifier> getReceivingMailbox() {
+    return _receivingMailbox;
   }
 }

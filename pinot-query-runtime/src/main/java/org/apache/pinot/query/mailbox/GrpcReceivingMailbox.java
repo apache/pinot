@@ -28,6 +28,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
+import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxContentStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -123,6 +124,11 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
         return new TransferableBlock(dataBlock);
       }
     }
+
+    if (mailboxContent.getMetadataOrDefault(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "false").equals("true")) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    }
+
     return null;
   }
 }

@@ -111,6 +111,10 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     _serverIdx = 0;
   }
 
+  public List<MailboxIdentifier> getSendingMailbox() {
+    return _sendingMailbox;
+  }
+
   @Override
   public List<Operator> getChildOperators() {
     // WorkerExecutor doesn't use getChildOperators, returns null here.
@@ -134,6 +138,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
 
     int startingIdx = _serverIdx;
     int openMailboxCount = 0;
+    int eosMailboxCount = 0;
 
     // For all non-singleton distribution, we poll from every instance to check mailbox content.
     // TODO: Fix wasted CPU cycles on waiting for servers that are not supposed to give content.
@@ -145,8 +150,8 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
         ReceivingMailbox<TransferableBlock> mailbox = _mailboxService.getReceivingMailbox(mailboxId);
         if (!mailbox.isClosed()) {
           openMailboxCount++;
-          // this is blocking for 100ms and may return null
           TransferableBlock block = mailbox.receive();
+
           // Get null block when pulling times out from mailbox.
           if (block != null) {
             if (block.isErrorBlock()) {
@@ -156,6 +161,8 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
             }
             if (!block.isEndOfStreamBlock()) {
               return block;
+            } else {
+              eosMailboxCount++;
             }
           }
         }
@@ -165,11 +172,13 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
       }
     }
 
-    // if we opened at least one mailbox, but still got to this point, then that means
-    // all the mailboxes we opened returned null but were not yet closed - early terminate
-    // with a noop block. Otherwise, we have exhausted all data from all mailboxes and can
-    // return EOS
-    return openMailboxCount > 0 ? TransferableBlockUtils.getNoOpTransferableBlock()
+    // there are two conditions in which we should return EOS: (1) there were
+    // no mailboxes to open (this shouldn't happen because the second condition
+    // should be hit first, but is defensive) (2) every mailbox that was opened
+    // returned an EOS block. in every other scenario, there are mailboxes that
+    // are not yet exhausted and we should wait for more data to be available
+    return openMailboxCount > 0 && openMailboxCount > eosMailboxCount
+        ? TransferableBlockUtils.getNoOpTransferableBlock()
         : TransferableBlockUtils.getEndOfStreamTransferableBlock();
   }
 }

@@ -126,18 +126,24 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     TransferableBlock transferableBlock;
     try {
       transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+      while (!transferableBlock.isNoOpBlock()) {
+        _exchange.send(transferableBlock);
+
+        if (transferableBlock.isEndOfStreamBlock()) {
+          return transferableBlock;
+        }
+
+        transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+      }
     } catch (final Exception e) {
       // ideally, MailboxSendOperator doesn't ever throw an exception because
       // it will just get swallowed, in this scenario at least we can forward
       // any upstream exceptions as an error  block
       transferableBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
-    }
-
-    if (!TransferableBlockUtils.isNoOpBlock(transferableBlock)) {
       try {
         _exchange.send(transferableBlock);
-      } catch (Exception e) {
-        LOGGER.error("Exception while sending block to mailbox.", e);
+      } catch (Exception e2) {
+        LOGGER.error("Exception while sending block to mailbox.", e2);
       }
     }
 

@@ -122,26 +122,28 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
   private void consumeInputBlocks() {
     if (!_isSortedBlockConstructed) {
       TransferableBlock block = _upstreamOperator.nextBlock();
-      // setting upstream error block
-      if (block.isErrorBlock()) {
-        _upstreamErrorBlock = block;
-        return;
-      } else if (TransferableBlockUtils.isEndOfStream(block)) {
-        _readyToConstruct = true;
-        return;
-      } else if (TransferableBlockUtils.isNoOpBlock(block)) {
-        return;
-      }
-
-      DataBlock dataBlock = block.getDataBlock();
-      int numRows = dataBlock.getNumberOfRows();
-      if (numRows > 0) {
-        RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
-              dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
-          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+      while (!block.isNoOpBlock()) {
+        // setting upstream error block
+        if (block.isErrorBlock()) {
+          _upstreamErrorBlock = block;
+          return;
+        } else if (TransferableBlockUtils.isEndOfStream(block)) {
+          _readyToConstruct = true;
+          return;
         }
+
+        DataBlock dataBlock = block.getDataBlock();
+        int numRows = dataBlock.getNumberOfRows();
+        if (numRows > 0) {
+          RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
+                dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
+            SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+          }
+        }
+
+        block = _upstreamOperator.nextBlock();
       }
     }
   }
