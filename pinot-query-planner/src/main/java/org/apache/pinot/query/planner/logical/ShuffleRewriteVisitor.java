@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
@@ -68,11 +70,7 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
   public Set<Integer> visitAggregate(AggregateNode node, Void context) {
     Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
     List<RexExpression> groupSet = node.getGroupSet();
-    // when they all match old partition keys, then partition carry occurs.
-    if (rexExpressionListContainsAllPartitionKey(groupSet, oldPartitionKeys)) {
-      return oldPartitionKeys;
-    }
-    return new HashSet<>();
+    return deriveNewPartitionKeysFromRexExpressions(groupSet, oldPartitionKeys);
   }
 
   @Override
@@ -147,11 +145,7 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
   @Override
   public Set<Integer> visitProject(ProjectNode node, Void context) {
     Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
-    if (rexExpressionListContainsAllPartitionKey(node.getProjects(), oldPartitionKeys)) {
-      return oldPartitionKeys;
-    } else {
-      return new HashSet<>();
-    }
+    return deriveNewPartitionKeysFromRexExpressions(node.getProjects(), oldPartitionKeys);
   }
 
   @Override
@@ -179,15 +173,26 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
     return false;
   }
 
-  private static boolean rexExpressionListContainsAllPartitionKey(List<RexExpression> rexExpressionList,
+  private static Set<Integer> deriveNewPartitionKeysFromRexExpressions(List<RexExpression> rexExpressionList,
       Set<Integer> oldPartitionKeys) {
-    Set<Integer> partitionKeys = new HashSet<>();
+    Map<Integer, Integer> partitionKeyMap = new HashMap<>();
     for (int i = 0; i < rexExpressionList.size(); i++) {
       RexExpression rex = rexExpressionList.get(i);
       if (rex instanceof RexExpression.InputRef) {
-        partitionKeys.add(i);
+        // put the old-index to new-index mapping
+        // TODO: it doesn't handle duplicate references. e.g. if the same old partition key is referred twice. it will
+        // only keep the second one. (see JOIN handling on left/right as another example)
+        partitionKeyMap.put(((RexExpression.InputRef) rex).getIndex(), i);
       }
     }
-    return partitionKeys.containsAll(oldPartitionKeys);
+    if (partitionKeyMap.keySet().containsAll(oldPartitionKeys)) {
+      Set<Integer> newPartitionKeys = new HashSet<>();
+      for (int oldKey : oldPartitionKeys) {
+        newPartitionKeys.add(partitionKeyMap.get(oldKey));
+      }
+      return newPartitionKeys;
+    } else {
+      return new HashSet<>();
+    }
   }
 }
