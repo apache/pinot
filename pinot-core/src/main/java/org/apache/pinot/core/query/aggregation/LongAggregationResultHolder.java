@@ -56,5 +56,4 @@ public class LongAggregationResultHolder implements AggregationResultHolder {
   public <T> T getResult() {
     throw new RuntimeException("Method 'getResult' not supported for class " + getClass().getName());
   }
-
 }
