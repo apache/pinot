@@ -50,7 +50,7 @@ public interface RoutingManager {
    * @param brokerRequest the broker request constructed from a query.
    * @return the route table.
    */
-  RoutingTable getRoutingTable(BrokerRequest brokerRequest);
+  RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
 
   /**
    * Validate routing exist for a table
