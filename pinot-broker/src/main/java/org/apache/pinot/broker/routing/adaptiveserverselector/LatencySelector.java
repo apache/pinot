@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
@@ -69,6 +71,32 @@ public class LatencySelector implements AdaptiveServerSelector {
   @Override
   public List<Pair<String, Double>> fetchAllServerRankingsWithScores() {
     List<Pair<String, Double>> pairList = _serverRoutingStatsManager.fetchEMALatencyForAllServers();
+
+    // Let's shuffle the list before sorting. This helps with randomly choosing different servers if there is a tie.
+    Collections.shuffle(pairList);
+    Collections.sort(pairList, (o1, o2) -> {
+      int val = Double.compare(o1.getRight(), o2.getRight());
+      return val;
+    });
+
+    return pairList;
+  }
+
+  @Override
+  public List<Pair<String, Double>> fetchServerRankingsWithScores(List<String> serverCandidates) {
+    List<Pair<String, Double>> pairList = new ArrayList<>();
+    if (serverCandidates.size() == 0) {
+      return pairList;
+    }
+
+    for (String server : serverCandidates) {
+      Double score = _serverRoutingStatsManager.fetchEMALatencyForServer(server);
+      if (score == null) {
+        score = -1.0;
+      }
+
+      pairList.add(new ImmutablePair<>(server, score));
+    }
 
     // Let's shuffle the list before sorting. This helps with randomly choosing different servers if there is a tie.
     Collections.shuffle(pairList);
