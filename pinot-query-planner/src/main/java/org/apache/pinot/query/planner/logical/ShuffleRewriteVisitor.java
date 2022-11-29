@@ -55,7 +55,7 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
    * @param root the root node of the tree to rewrite
    */
   public static void optimizeShuffles(StageNode root) {
-     root.visit(new ShuffleRewriteVisitor(), null);
+    root.visit(new ShuffleRewriteVisitor(), null);
   }
 
   /**
@@ -68,9 +68,8 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
   public Set<Integer> visitAggregate(AggregateNode node, Void context) {
     Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
     List<RexExpression> groupSet = node.getGroupSet();
-    // only (1) all group sets are input refs, and (2) they all match old partition keys; then partition carry occurs.
-    if (groupSet.size() == oldPartitionKeys.size()
-        && rexExpressionListContainsAllPartitionKey(groupSet, oldPartitionKeys)) {
+    // when they all match old partition keys, then partition carry occurs.
+    if (rexExpressionListContainsAllPartitionKey(groupSet, oldPartitionKeys)) {
       return oldPartitionKeys;
     }
     return new HashSet<>();
@@ -99,11 +98,15 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
       if (leftPKs.contains(leftIdx)) {
         partitionKeys.add(leftIdx);
       }
+      // TODO: enable right key carrying. currently we only support left key carrying b/c of the partition key list
+      // doesn't understand equivalent partition key column or group partition key columns, yet.
+      /*
       if (rightPks.contains(rightIdx)) {
         // combined schema will have all the left fields before the right fields
         // so add the leftDataSchemaSize before adding the key
         partitionKeys.add(leftDataSchemaSize + rightIdx);
       }
+      */
     }
 
     return partitionKeys;
