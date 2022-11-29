@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.selection;
 
 import java.util.Collection;
-import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.datatable.DataTable;
@@ -128,23 +128,26 @@ public class SelectionOperatorService {
    * <p>Should be called after method "reduceWithOrdering()".
    */
   public ResultTable renderResultTableWithOrdering() {
-    Iterator<Object[]> rows = new Iterator<Object[]>() {
-      @Override
-      public boolean hasNext() {
-        return _rows.size() > _offset;
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
+    int numColumns = columnIndices.length;
+    DataSchema resultDataSchema = SelectionOperatorUtils.getSchemaForProjection(_dataSchema, columnIndices);
+
+    // Extract the result rows
+    LinkedList<Object[]> rowsInSelectionResults = new LinkedList<>();
+    while (_rows.size() > _offset) {
+      Object[] row = _rows.poll();
+      assert row != null;
+      Object[] extractedRow = new Object[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        Object value = row[columnIndices[i]];
+        if (value != null) {
+          extractedRow[i] = resultDataSchema.getColumnDataType(i).convertAndFormat(value);
+        }
       }
 
-      @Override
-      public Object[] next() {
-        return _rows.poll();
-      }
-    };
+      rowsInSelectionResults.addFirst(extractedRow);
+    }
 
-    return SelectionOperatorUtils.arrangeColumnsToMatchProjection(
-        _dataSchema,
-        rows,
-        _selectionColumns,
-        ResultTable::new,
-        true);
+    return new ResultTable(resultDataSchema, rowsInSelectionResults);
   }
 }

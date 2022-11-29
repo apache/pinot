@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,6 +31,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
@@ -187,21 +189,40 @@ public class QueryRunner {
       ExecutorService executorService) {
     try {
       InstanceResponseBlock result = _serverExecutor.execute(serverQueryRequest, executorService);
+
       if (result.getRows() != null && serverQueryRequest.getQueryContext().getOrderByExpressions() != null) {
         // we only re-arrange columns to match the projection in the case of order by - this is to ensure
         // that V1 results match what the expected projection schema in the calcite logical operator; if
         // we realize that there are other situations where we need to post-process v1 results to adhere to
         // the expected results we should factor this out and also apply the canonicalization of the data
         // types during this post-process step (also see LeafStageTransferableBlockOperator#canonicalizeRow)
-        SelectionResultsBlock selectionBlock =
-            SelectionOperatorUtils.arrangeColumnsToMatchProjection(
-                result.getDataSchema(),
-                result.getRows().iterator(),
-                SelectionOperatorUtils.getSelectionColumns(
-                    serverQueryRequest.getQueryContext(), result.getDataSchema()),
-                SelectionResultsBlock::new,
-                false);
-        return new InstanceResponseBlock(selectionBlock, serverQueryRequest.getQueryContext());
+        DataSchema dataSchema = result.getDataSchema();
+        List<String> selectionColumns =
+            SelectionOperatorUtils.getSelectionColumns(serverQueryRequest.getQueryContext(), dataSchema);
+
+        int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, dataSchema);
+        int numColumns = columnIndices.length;
+
+        DataSchema resultDataSchema = SelectionOperatorUtils.getSchemaForProjection(dataSchema, columnIndices);
+
+        // Extract the result rows
+        LinkedList<Object[]> rowsInSelectionResults = new LinkedList<>();
+        for (Object[] row : result.getRows()) {
+          assert row != null;
+          Object[] extractedRow = new Object[numColumns];
+          for (int i = 0; i < numColumns; i++) {
+            Object value = row[columnIndices[i]];
+            if (value != null) {
+              extractedRow[i] = value;
+            }
+          }
+
+          rowsInSelectionResults.addFirst(extractedRow);
+        }
+
+        return new InstanceResponseBlock(
+            new SelectionResultsBlock(resultDataSchema, rowsInSelectionResults),
+            serverQueryRequest.getQueryContext());
       } else {
         return result;
       }
