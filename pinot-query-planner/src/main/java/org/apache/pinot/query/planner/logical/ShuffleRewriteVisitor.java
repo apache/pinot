@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.logical;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
@@ -54,7 +55,7 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
    * @param root the root node of the tree to rewrite
    */
   public static void optimizeShuffles(StageNode root) {
-    root.visit(new ShuffleRewriteVisitor(), null);
+     root.visit(new ShuffleRewriteVisitor(), null);
   }
 
   /**
@@ -66,20 +67,13 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
   @Override
   public Set<Integer> visitAggregate(AggregateNode node, Void context) {
     Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
-
-    // any input reference directly carries over in group set of aggregation
-    // should still be a partition key
-    Set<Integer> partitionKeys = new HashSet<>();
-    for (int i = 0; i < node.getGroupSet().size(); i++) {
-      RexExpression rex = node.getGroupSet().get(i);
-      if (rex instanceof RexExpression.InputRef) {
-        if (oldPartitionKeys.contains(((RexExpression.InputRef) rex).getIndex())) {
-          partitionKeys.add(i);
-        }
-      }
+    List<RexExpression> groupSet = node.getGroupSet();
+    // only (1) all group sets are input refs, and (2) they all match old partition keys; then partition carry occurs.
+    if (groupSet.size() == oldPartitionKeys.size()
+        && rexExpressionListContainsAllPartitionKey(groupSet, oldPartitionKeys)) {
+      return oldPartitionKeys;
     }
-
-    return partitionKeys;
+    return new HashSet<>();
   }
 
   @Override
@@ -150,19 +144,11 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
   @Override
   public Set<Integer> visitProject(ProjectNode node, Void context) {
     Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
-
-    // all inputs carry over if they're still in the projection result
-    Set<Integer> partitionKeys = new HashSet<>();
-    for (int i = 0; i < node.getProjects().size(); i++) {
-      RexExpression rex = node.getProjects().get(i);
-      if (rex instanceof RexExpression.InputRef) {
-        if (oldPartitionKeys.contains(((RexExpression.InputRef) rex).getIndex())) {
-          partitionKeys.add(i);
-        }
-      }
+    if (rexExpressionListContainsAllPartitionKey(node.getProjects(), oldPartitionKeys)) {
+      return oldPartitionKeys;
+    } else {
+      return new HashSet<>();
     }
-
-    return partitionKeys;
   }
 
   @Override
@@ -188,5 +174,17 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
       return targetSet.containsAll(partitionKeys);
     }
     return false;
+  }
+
+  private static boolean rexExpressionListContainsAllPartitionKey(List<RexExpression> rexExpressionList,
+      Set<Integer> oldPartitionKeys) {
+    Set<Integer> partitionKeys = new HashSet<>();
+    for (int i = 0; i < rexExpressionList.size(); i++) {
+      RexExpression rex = rexExpressionList.get(i);
+      if (rex instanceof RexExpression.InputRef) {
+        partitionKeys.add(i);
+      }
+    }
+    return partitionKeys.containsAll(oldPartitionKeys);
   }
 }
