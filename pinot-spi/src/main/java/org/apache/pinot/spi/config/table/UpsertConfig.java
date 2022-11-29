@@ -36,7 +36,7 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public enum Strategy {
     // Todo: add CUSTOM strategies
-    APPEND, IGNORE, INCREMENT, OVERWRITE, UNION
+    APPEND, IGNORE, INCREMENT, MAX, MIN, OVERWRITE, UNION
   }
 
   @JsonPropertyDescription("Upsert mode.")

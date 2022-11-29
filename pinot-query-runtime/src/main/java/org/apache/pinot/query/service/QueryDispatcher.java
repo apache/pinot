@@ -193,8 +193,8 @@ public class QueryDispatcher {
       List<ServerInstance> sendingInstances, long jobId, int stageId, DataSchema dataSchema, String hostname,
       int port) {
     MailboxReceiveOperator mailboxReceiveOperator =
-        new MailboxReceiveOperator(mailboxService, dataSchema, sendingInstances,
-            RelDistribution.Type.RANDOM_DISTRIBUTED, null, hostname, port, jobId, stageId);
+        new MailboxReceiveOperator(mailboxService, sendingInstances,
+            RelDistribution.Type.RANDOM_DISTRIBUTED, hostname, port, jobId, stageId, null);
     return mailboxReceiveOperator;
   }
 

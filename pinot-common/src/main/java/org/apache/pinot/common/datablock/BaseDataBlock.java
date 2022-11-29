@@ -29,10 +29,10 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTableImplV3;
 import org.apache.pinot.common.datatable.DataTableUtils;
-import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -419,7 +419,7 @@ public abstract class BaseDataBlock implements DataBlock {
   @Override
   public byte[] toBytes()
       throws IOException {
-    ThreadTimer threadTimer = new ThreadTimer();
+    ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);

@@ -1,0 +1,245 @@
+{
+  "basic_join_queries": {
+    "tables": {
+      "tbl1" : {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "name", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "a"],
+          [2, "b"],
+          [3, "c"]
+        ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "value", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "xxx"],
+          [3, "yyy"],
+          [5, "zzz"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "7.2.1.1",
+        "description": "Basic From table",
+        "sql": "SELECT * FROM {tbl1}"
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "Basic From table with Alias",
+        "sql": "SELECT a.num, a.name FROM {tbl1} AS a"
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "INNER JOIN",
+        "sql": "SELECT * FROM {tbl1} INNER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "LEFT OUTER JOIN",
+        "sql": "SELECT * FROM {tbl1} LEFT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "LEFT OUTER JOIN with non-join related clause",
+        "sql": "SELECT * FROM {tbl1} LEFT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num AND {tbl2}.value = 'xxx'"
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "CROSS JOIN",
+        "sql": "SELECT * FROM {tbl1} CROSS JOIN {tbl2}"
+      },
+      {
+        "psql": "7.2.1.1",
+        "ignored": true,
+        "description": "RIGHT OUTER JOIN",
+        "sql": "SELECT * FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.col1 = {tbl2}.col1"
+      },
+      {
+        "psql": "7.2.1.1",
+        "ignored": true,
+        "description": "FULL OUTER JOIN",
+        "sql": "SELECT * FROM {tbl1} FULL OUTER JOIN {tbl2} ON {tbl1}.col1 = {tbl2}.col1"
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "NATURAL JOIN",
+        "sql": "SELECT * FROM {tbl1} NATURAL JOIN {tbl2}"
+      },
+      {
+        "psql": "7.2.1.2",
+        "description": "JOIN with table alias",
+        "sql": "SELECT * FROM {tbl1} a LEFT JOIN {tbl2} b ON a.num = b.num"
+      },
+      {
+        "psql": "7.2.1.2",
+        "description": "self JOIN with table alias",
+        "sql": "SELECT * FROM {tbl1} AS a INNER JOIN {tbl1} AS b ON a.num = b.num"
+      },
+      {
+        "psql": "7.2.1.2",
+        "description": "table alias on one side only using star",
+        "sql": "SELECT a.* FROM {tbl1} AS a JOIN {tbl2} AS b ON a.num = b.num"
+      },
+      {
+        "psql": "7.2.1.3",
+        "description": "sub-query to semi-join syntax with star results, using IN clause",
+        "sql": "SELECT * FROM {tbl1} WHERE num IN (SELECT num FROM {tbl2})"
+      },
+      {
+        "psql": "7.2.1.3",
+        "description": "sub-query to semi-join syntax with star results, using single value predicate clause",
+        "sql": "SELECT * FROM {tbl1} WHERE num < (SELECT SUM(num) FROM {tbl2})"
+      },
+      {
+        "psql": "7.2.1.3",
+        "description": "sub-query used as one side of the join condition",
+        "sql": "SELECT * FROM (SELECT num AS id, name FROM {tbl1} WHERE name != 'c') AS a JOIN {tbl2} AS b ON a.id = b.num"
+      }
+    ]
+  },
+  "extended_join_features": {
+    "tables": {
+      "tbl1" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "strCol2", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", "alice", 1],
+          ["bar", "bob", 2]
+        ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "strCol2", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "doubleCol1", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          ["bar", "charlie", 2, 2.0],
+          ["foo", "bob", 3, 3.1416],
+          ["alice", "alice", 4, 2.7183]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "join without condition",
+        "sql": "SELECT * FROM {tbl1}, {tbl2}"
+      },
+      {
+        "description": "join with functional results",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON MOD({tbl1}.intCol1, 2) = MOD({tbl2}.intCol1, 3)"
+      },
+      {
+        "description": "join with multiple columns and mixed types",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 AND {tbl1}.intCol1 = {tbl2}.intCol1 AND {tbl1}.intCol1 = {tbl2}.doubleCol1"
+      },
+      {
+        "description": "join with mixed equality and inequality conditions",
+        "sql": "SELECT * FROM {tbl1}, {tbl2} WHERE {tbl2}.doubleCol1 > {tbl1}.intCol1 AND (({tbl1}.strCol1 <> 'foo' AND {tbl2}.intCol1 <> 2) OR ({tbl1}.strCol1 <> 'bar' AND {tbl2}.doubleCol1 > 3))"
+      },
+      {
+        "description": "join with multiple join keys, with star results",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 AND {tbl1}.intCol1 = {tbl2}.intCol1"
+      },
+      {
+        "description": "join with multiple join keys, reused references on one side, with star results",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 AND {tbl2}.strCol1 = {tbl1}.strCol2"
+      },
+      {
+        "description": "join with where clause",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 WHERE {tbl2}.doubleCol1 > 2 AND {tbl1}.intCol1 > 1"
+      },
+      {
+        "description": "join with where clause conditions on both table to be pulled up",
+        "sql": "SELECT * FROM {tbl1}, {tbl2} WHERE {tbl2}.doubleCol1 > 2 AND {tbl1}.strCol1 = {tbl2}.strCol1 AND {tbl1}.intCol1 > 1"
+      },
+      {
+        "description": "join with where clause conditions on both table that involves or clause should translate to inequality join",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 WHERE {tbl1}.strCol2 = 'alice' OR ({tbl1}.intCol1 > 1 AND {tbl2}.doubleCol1 > 2)"
+      },
+      {
+        "description": "join with mixed equality and inequality conditions",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 AND {tbl1}.intCol1 > {tbl2}.doubleCol1"
+      }
+    ]
+  },
+  "multiple_table_joins": {
+    "tables": {
+      "tbl1" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "strCol2", "type": "STRING"}
+        ],
+        "inputs": [
+          ["foo", 1, "foo"],
+          ["bar", 2, "alice"]
+        ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "strCol2", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "doubleCol1", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          ["foo", "bob", 3, 3.1416],
+          ["alice", "alice", 4, 2.7183]
+        ]
+      },
+      "tbl3" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "strCol2", "type": "STRING"}
+        ],
+        "inputs": [
+          ["foo", 1, "foo"],
+          ["bar", 2, "foo"]
+        ]
+      },
+      "tbl_empty" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "strCol2", "type": "STRING"}
+        ],
+        "inputs": [ ]
+      }
+    },
+    "queries": [
+      {
+        "description": "join 3 tables, mixed join conditions",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.intCol1 > {tbl2}.doubleCol1 JOIN {tbl3} ON {tbl1}.strCol1 = {tbl3}.strCol2"
+      },
+      {
+        "description": "join with an empty right table",
+        "sql": "SELECT * FROM {tbl1} JOIN {tbl_empty} ON {tbl1}.intCol1 = {tbl_empty}.intCol1"
+      },
+      {
+        "description": "join with an empty right table using LEFT OUTER",
+        "sql": "SELECT * FROM {tbl1} LEFT JOIN {tbl_empty} ON {tbl1}.intCol1 = {tbl_empty}.intCol1"
+      },
+      {
+        "description": "join with an empty left table",
+        "sql": "SELECT * FROM {tbl_empty} JOIN {tbl1} ON {tbl1}.intCol1 = {tbl_empty}.intCol1"
+      },
+      {
+        "description": "join with an empty left table using LEFT OUTER",
+        "sql": "SELECT * FROM {tbl_empty} LEFT JOIN {tbl1} ON {tbl1}.intCol1 = {tbl_empty}.intCol1"
+      }
+    ]
+  }
+},

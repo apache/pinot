@@ -1,0 +1,42 @@
+{
+  "bytea": {
+    "tables": {
+      "bytea": {
+        "schema": [
+          {"name": "data", "type": "BYTES"}
+        ],
+        "inputs": [
+          ["DEADBEEF"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "8.4.1",
+        "description": "should select binary data",
+        "sql": "SELECT * FROM {bytea}"
+      },
+      {
+        "psql": "8.4.1",
+        "ignored": true,
+        "comments": [
+          "looks like we don't support constants, this is treated as a normal string",
+          "we also require using calcite syntax for byte strings to parse, which is x'deadbeef' instead",
+          "of postgres syntax which is '\\xdeadbeaf'"
+        ],
+        "description": "bytea hex constants",
+        "sql": "SELECT x'DEADBEEF', data from {bytea}"
+      },
+      {
+        "psql": "8.4.2",
+        "ignored": true,
+        "comments": [
+          "in order to specify bytea constants using escape syntax, we need type casting",
+          "which we don't support. also, calcite doesn't support the escape syntax for bytes"
+        ],
+        "description": "bytea escape constants",
+        "sql": "SELECT CAST('\\046' AS BINARY), data from {bytea}"
+      }
+    ]
+  }
+}

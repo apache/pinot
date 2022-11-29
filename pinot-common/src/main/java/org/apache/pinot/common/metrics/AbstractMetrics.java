@@ -412,6 +412,25 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Gets the value of a table partition gauge.
+   *
+   * @param tableName The table name
+   * @param partitionId The partition name
+   * @param gauge The gauge to use
+   */
+  public long getValueOfPartitionGauge(final String tableName, final int partitionId, final G gauge) {
+    final String fullGaugeName;
+    String gaugeName = gauge.getGaugeName();
+    fullGaugeName = gaugeName + "." + getTableName(tableName) + "." + partitionId;
+
+    if (!_gaugeValues.containsKey(fullGaugeName)) {
+      return -1;
+    } else {
+      return _gaugeValues.get(fullGaugeName).get();
+    }
+  }
+
+  /**
    * Initializes all global meters (such as exceptions count) to zero.
    */
   public void initializeGlobalMeters() {

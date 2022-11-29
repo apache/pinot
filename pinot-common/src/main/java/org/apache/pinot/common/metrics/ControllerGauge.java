@@ -117,8 +117,13 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   SEGMENT_DOWNLOADS_IN_PROGRESS("segmentDownloadsInProgress", true),
 
   // Number of in progress segment uploads
-  SEGMENT_UPLOADS_IN_PROGRESS("segmentUploadsInProgress", true);
+  SEGMENT_UPLOADS_IN_PROGRESS("segmentUploadsInProgress", true),
 
+  // Records lag at a partition level
+  MAX_RECORDS_LAG("maxRecordsLag", false),
+
+  // Consumption availability lag in ms at a partition level
+  MAX_RECORD_AVAILABILITY_LAG_MS("maxRecordAvailabilityLagMs", false);
 
   private final String _gaugeName;
   private final String _unit;

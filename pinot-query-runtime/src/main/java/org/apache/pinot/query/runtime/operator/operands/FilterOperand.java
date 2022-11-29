@@ -230,14 +230,41 @@ public abstract class FilterOperand extends TransformOperand {
           "Expected 2 function ops for Predicate but got:" + functionOperands.size());
       _lhs = TransformOperand.toTransformOperand(functionOperands.get(0), dataSchema);
       _rhs = TransformOperand.toTransformOperand(functionOperands.get(1), dataSchema);
-      if (_lhs._resultType != null && _lhs._resultType != DataSchema.ColumnDataType.OBJECT) {
-        _resultType = _lhs._resultType;
-      } else if (_rhs._resultType != null && _rhs._resultType != DataSchema.ColumnDataType.OBJECT) {
-        _resultType = _rhs._resultType;
+      _resultType = resolveResultType(_lhs._resultType, _rhs._resultType);
+    }
+
+    /**
+     * Resolve data type, since we don't have a exhausted list of filter function signatures. we rely on type casting.
+     *
+     * <ul>
+     *   <li>if both RHS and LHS has null data type, exception occurs.</li>
+     *   <li>if either side is null or OBJECT, we best-effort cast data into the other side's data type.</li>
+     *   <li>if either side supertype of the other, we use the super type.</li>
+     *   <li>if we can't resolve a common data type, exception occurs.</li>
+     * </ul>
+     *
+     * @param lhsType left-hand-side type
+     * @param rhsType right-hand-side type
+     * @return best common conversion data type.
+     * @see DataSchema.ColumnDataType#isSuperTypeOf(DataSchema.ColumnDataType)
+     */
+    private static DataSchema.ColumnDataType resolveResultType(DataSchema.ColumnDataType lhsType,
+        DataSchema.ColumnDataType rhsType) {
+      // TODO: Correctly throw exception instead of returning null.
+      // Currently exception thrown during constructor is not piped back to query dispatcher, thus in order to
+      // avoid silent failure, we deliberately set to null here, make the exception thrown during data processing.
+      if (lhsType == null && rhsType == null) {
+        return null;
+      } else if (lhsType == null || lhsType == DataSchema.ColumnDataType.OBJECT) {
+        return rhsType;
+      } else if (rhsType == null || rhsType == DataSchema.ColumnDataType.OBJECT) {
+        return lhsType;
+      } else if (lhsType.isSuperTypeOf(rhsType)) {
+        return lhsType;
+      } else if (rhsType.isSuperTypeOf(rhsType)) {
+        return rhsType;
       } else {
-        // TODO: we should correctly throw exception here. Currently exception thrown during constructor is not
-        // piped back to query dispatcher, thus we set it to null and deliberately make the processing throw exception.
-        _resultType = null;
+        return null;
       }
     }
   }

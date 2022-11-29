@@ -37,8 +37,6 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   private BigDecimal[] _bigDecimalLiterals;
   private TransformFunction _firstTransformFunction;
   private TransformFunction _secondTransformFunction;
-  private double[] _doubleDifferences;
-  private BigDecimal[] _bigDecimalDifferences;
 
   @Override
   public String getName() {
@@ -99,63 +97,60 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
-    if (_doubleDifferences == null || _doubleDifferences.length < length) {
-      _doubleDifferences = new double[length];
+    if (_doubleValuesSV == null) {
+      _doubleValuesSV = new double[length];
     }
-
     if (_resultDataType == DataType.BIG_DECIMAL) {
       BigDecimal[] values = transformToBigDecimalValuesSV(projectionBlock);
-      ArrayCopyUtils.copy(values, _doubleDifferences, length);
+      ArrayCopyUtils.copy(values, _doubleValuesSV, length);
     } else {
       if (_firstTransformFunction == null) {
-        Arrays.fill(_doubleDifferences, 0, length, _doubleLiterals[0]);
+        Arrays.fill(_doubleValuesSV, 0, length, _doubleLiterals[0]);
       } else {
         double[] values = _firstTransformFunction.transformToDoubleValuesSV(projectionBlock);
-        System.arraycopy(values, 0, _doubleDifferences, 0, length);
+        System.arraycopy(values, 0, _doubleValuesSV, 0, length);
       }
       if (_secondTransformFunction == null) {
         for (int i = 0; i < length; i++) {
-          _doubleDifferences[i] -= _doubleLiterals[1];
+          _doubleValuesSV[i] -= _doubleLiterals[1];
         }
       } else {
         double[] values = _secondTransformFunction.transformToDoubleValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
-          _doubleDifferences[i] -= values[i];
+          _doubleValuesSV[i] -= values[i];
         }
       }
     }
-    return _doubleDifferences;
+    return _doubleValuesSV;
   }
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    if (_bigDecimalDifferences == null || _bigDecimalDifferences.length < length) {
-      _bigDecimalDifferences = new BigDecimal[length];
+    if (_bigDecimalValuesSV == null) {
+      _bigDecimalValuesSV = new BigDecimal[length];
     }
-
     if (_resultDataType == DataType.DOUBLE) {
       double[] values = transformToDoubleValuesSV(projectionBlock);
-      ArrayCopyUtils.copy(values, _bigDecimalDifferences, length);
+      ArrayCopyUtils.copy(values, _bigDecimalValuesSV, length);
     } else {
       if (_firstTransformFunction == null) {
-        Arrays.fill(_bigDecimalDifferences, 0, length, _bigDecimalLiterals[0]);
+        Arrays.fill(_bigDecimalValuesSV, 0, length, _bigDecimalLiterals[0]);
       } else {
         BigDecimal[] values = _firstTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
-        System.arraycopy(values, 0, _bigDecimalDifferences, 0, length);
+        System.arraycopy(values, 0, _bigDecimalValuesSV, 0, length);
       }
       if (_secondTransformFunction == null) {
         for (int i = 0; i < length; i++) {
-          _bigDecimalDifferences[i] = _bigDecimalDifferences[i].subtract(_bigDecimalLiterals[1]);
+          _bigDecimalValuesSV[i] = _bigDecimalValuesSV[i].subtract(_bigDecimalLiterals[1]);
         }
       } else {
         BigDecimal[] values = _secondTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
-          _bigDecimalDifferences[i] = _bigDecimalDifferences[i].subtract(values[i]);
+          _bigDecimalValuesSV[i] = _bigDecimalValuesSV[i].subtract(values[i]);
         }
       }
     }
-    return _bigDecimalDifferences;
+    return _bigDecimalValuesSV;
   }
 }

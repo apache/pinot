@@ -27,17 +27,17 @@ public class ObjectFunctions {
   private ObjectFunctions() {
   }
 
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, names = {"isNull", "is_null"})
   public static boolean isNull(@Nullable Object obj) {
     return obj == null;
   }
 
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, names = {"isNotNull", "is_not_null"})
   public static boolean isNotNull(@Nullable Object obj) {
     return !isNull(obj);
   }
 
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, names = {"isDistinctFrom", "is_distinct_from"})
   public static boolean isDistinctFrom(@Nullable Object obj1, @Nullable Object obj2) {
     if (obj1 == null && obj2 == null) {
       return false;
@@ -48,7 +48,7 @@ public class ObjectFunctions {
     return !obj1.equals(obj2);
   }
 
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, names = {"isNotDistinctFrom", "is_not_distinct_from"})
   public static boolean isNotDistinctFrom(@Nullable Object obj1, @Nullable Object obj2) {
     return !isDistinctFrom(obj1, obj2);
   }

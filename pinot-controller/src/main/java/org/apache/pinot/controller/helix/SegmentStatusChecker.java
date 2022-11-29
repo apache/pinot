@@ -143,12 +143,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, 0);
       return;
     }
-    int replication;
-    if (tableConfig.getTableType() == TableType.REALTIME) {
-      replication = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-    } else {
-      replication = tableConfig.getValidationConfig().getReplicationNumber();
-    }
+    int replication = tableConfig.getReplication();
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, replication);
   }
 

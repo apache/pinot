@@ -375,25 +375,45 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return false;
     }
 
-    // Do not create dictionary if index size with dictionary is going to be larger than index size without dictionary
-    // This is done to reduce the cost of dictionary for high cardinality columns
-    // Off by default and needs optimizeDictionaryEnabled to be set to true
-    if (config.isOptimizeDictionaryForMetrics() && spec.getFieldType() == FieldType.METRIC && spec.isSingleValueField()
-        && spec.getDataType().isFixedWidth()) {
-      long dictionarySize = info.getDistinctValueCount() * spec.getDataType().size();
-      long forwardIndexSize =
-          ((long) info.getTotalNumberOfEntries() * PinotDataBitSet.getNumBitsPerValue(info.getDistinctValueCount() - 1)
-              + Byte.SIZE - 1) / Byte.SIZE;
+    if (config.isOptimizeDictionary()) {
 
-      double indexWithDictSize = dictionarySize + forwardIndexSize;
-      double indexWithoutDictSize = info.getTotalNumberOfEntries() * spec.getDataType().size();
-
-      double indexSizeRatio = indexWithoutDictSize / indexWithDictSize;
-      if (indexSizeRatio <= config.getNoDictionarySizeRatioThreshold()) {
+      // Do not create dictionaries for json or text index columns as they are high-cardinality values almost always
+      if ((config.getJsonIndexConfigs().containsKey(column)
+          || config.getTextIndexCreationColumns().contains(column))) {
         return false;
+      }
+
+      // Do not create dictionary if index size with dictionary is going to be larger than index size without dictionary
+      // This is done to reduce the cost of dictionary for high cardinality columns
+      // Off by default and needs optimizeDictionary to be set to true
+      if (spec.isSingleValueField() && spec.getDataType().isFixedWidth()) {
+        return shouldCreateDictionaryWithinThreshold(info, config, spec);
       }
     }
 
+    if (config.isOptimizeDictionaryForMetrics() && !config.isOptimizeDictionary()) {
+      if (spec.isSingleValueField() && spec.getDataType().isFixedWidth() && spec.getFieldType() == FieldType.METRIC) {
+        return shouldCreateDictionaryWithinThreshold(info, config, spec);
+      }
+    }
+
+    return info.isCreateDictionary();
+  }
+
+  private boolean shouldCreateDictionaryWithinThreshold(ColumnIndexCreationInfo info,
+      SegmentGeneratorConfig config, FieldSpec spec) {
+    long dictionarySize = info.getDistinctValueCount() * spec.getDataType().size();
+    long forwardIndexSize =
+        ((long) info.getTotalNumberOfEntries()
+            * PinotDataBitSet.getNumBitsPerValue(info.getDistinctValueCount() - 1) + Byte.SIZE - 1) / Byte.SIZE;
+
+    double indexWithDictSize = dictionarySize + forwardIndexSize;
+    double indexWithoutDictSize = info.getTotalNumberOfEntries() * spec.getDataType().size();
+
+    double indexSizeRatio = indexWithoutDictSize / indexWithDictSize;
+    if (indexSizeRatio <= config.getNoDictionarySizeRatioThreshold()) {
+      return false;
+    }
     return info.isCreateDictionary();
   }
 

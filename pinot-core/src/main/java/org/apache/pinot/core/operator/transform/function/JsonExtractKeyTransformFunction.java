@@ -86,11 +86,9 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
-    if (_stringValuesMV == null || _stringValuesSV.length < length) {
+    if (_stringValuesMV == null) {
       _stringValuesMV = new String[length][];
     }
-
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
       List<String> values = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);

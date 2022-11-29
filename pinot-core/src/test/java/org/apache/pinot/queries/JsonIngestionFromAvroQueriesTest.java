@@ -21,6 +21,7 @@ package org.apache.pinot.queries;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -30,12 +31,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.function.scalar.StringFunctions;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
@@ -75,12 +79,14 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   private static final String JSON_COLUMN_1 = "jsonColumn1"; // for testing RECORD, ARRAY, MAP, UNION
   private static final String JSON_COLUMN_2 = "jsonColumn2"; // for testing ENUM
   private static final String JSON_COLUMN_3 = "jsonColumn3"; // for testing FIXED
+  private static final String JSON_COLUMN_4 = "jsonColumn4"; // for testing BYTES
   private static final String STRING_COLUMN = "stringColumn";
   private static final org.apache.pinot.spi.data.Schema SCHEMA =
       new org.apache.pinot.spi.data.Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
           .addSingleValueDimension(JSON_COLUMN_1, FieldSpec.DataType.JSON)
           .addSingleValueDimension(JSON_COLUMN_2, FieldSpec.DataType.JSON)
           .addSingleValueDimension(JSON_COLUMN_3, FieldSpec.DataType.JSON)
+          .addSingleValueDimension(JSON_COLUMN_4, FieldSpec.DataType.JSON)
           .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING).build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
@@ -105,13 +111,14 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
   /** @return {@link GenericRow} representing a row in Pinot table. */
   private static GenericRow createTableRecord(int intValue, String stringValue, Object jsonValue,
-      GenericData.EnumSymbol enumValue, GenericData.Fixed fixedValue) {
+      GenericData.EnumSymbol enumValue, GenericData.Fixed fixedValue, byte[] bytesValue) {
     GenericRow record = new GenericRow();
     record.putValue(INT_COLUMN, intValue);
     record.putValue(STRING_COLUMN, stringValue);
     record.putValue(JSON_COLUMN_1, jsonValue);
     record.putValue(JSON_COLUMN_2, enumValue);
     record.putValue(JSON_COLUMN_3, fixedValue);
+    record.putValue(JSON_COLUMN_4, ByteBuffer.wrap(bytesValue));
     return record;
   }
 
@@ -158,37 +165,39 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         new Field(JSON_COLUMN_1,
             createUnion(createArray(create(Type.STRING)), createMap(create(Type.STRING)), createRecordSchema(),
                 create(Type.STRING), create(Type.NULL))), new Field(JSON_COLUMN_2, enumSchema),
-        new Field(JSON_COLUMN_3, fixedSchema));
+        new Field(JSON_COLUMN_3, fixedSchema),
+        new Field(JSON_COLUMN_4, create(Type.BYTES)));
     avroSchema.setFields(fields);
     List<GenericRow> inputRecords = new ArrayList<>();
     // Insert ARRAY
     inputRecords.add(
         createTableRecord(1, "daffy duck", Arrays.asList("this", "is", "a", "test"), createEnumField(enumSchema, "UP"),
-            createFixedField(fixedSchema, 1)));
+            createFixedField(fixedSchema, 1), new byte[] {0, 0, 0, 1}));
 
     // Insert MAP
     inputRecords.add(
         createTableRecord(2, "mickey mouse", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
-            createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 2)));
+            createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 2), new byte[] {0, 0, 0, 2}));
     inputRecords.add(
         createTableRecord(3, "donald duck", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
-            createEnumField(enumSchema, "UP"), createFixedField(fixedSchema, 3)));
+            createEnumField(enumSchema, "UP"), createFixedField(fixedSchema, 3), new byte[] {0, 0, 0, 3}));
     inputRecords.add(
         createTableRecord(4, "scrooge mcduck", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
-            createEnumField(enumSchema, "LEFT"), createFixedField(fixedSchema, 4)));
+            createEnumField(enumSchema, "LEFT"), createFixedField(fixedSchema, 4), new byte[] {0, 0, 0, 4}));
 
     // insert RECORD
     inputRecords.add(createTableRecord(5, "minney mouse", createRecordField("id", 1, "name", "minney"),
-        createEnumField(enumSchema, "RIGHT"), createFixedField(fixedSchema, 5)));
+        createEnumField(enumSchema, "RIGHT"), createFixedField(fixedSchema, 5), new byte[] {0, 0, 0, 5}));
 
     // Insert simple Java String (gets converted into JSON value)
     inputRecords.add(
-        createTableRecord(6, "pluto", "test", createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 6)));
+        createTableRecord(6, "pluto", "test", createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 6),
+            new byte[] {0, 0, 0, 6}));
 
     // Insert JSON string (gets converted into JSON document)
     inputRecords.add(
         createTableRecord(7, "scooby doo", "{\"name\":\"scooby\",\"id\":7}", createEnumField(enumSchema, "UP"),
-            createFixedField(fixedSchema, 7)));
+            createFixedField(fixedSchema, 7), new byte[] {0, 0, 0, 7}));
 
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, AVRO_DATA_FILE);
@@ -199,6 +208,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         record.put(JSON_COLUMN_1, inputRecord.getValue(JSON_COLUMN_1));
         record.put(JSON_COLUMN_2, inputRecord.getValue(JSON_COLUMN_2));
         record.put(JSON_COLUMN_3, inputRecord.getValue(JSON_COLUMN_3));
+        record.put(JSON_COLUMN_4, inputRecord.getValue(JSON_COLUMN_4));
         fileWriter.append(record);
       }
     }
@@ -212,6 +222,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     set.add(JSON_COLUMN_1);
     set.add(JSON_COLUMN_2);
     set.add(JSON_COLUMN_3);
+    set.add(JSON_COLUMN_4);
     AvroRecordReader avroRecordReader = new AvroRecordReader();
     avroRecordReader.init(AVRO_DATA_FILE, set, null);
     return avroRecordReader;
@@ -316,19 +327,28 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   /** Verify that ingestion from avro FIXED type field (jsonColumn3) to Pinot JSON column worked fine. */
   @Test
   public void testSimpleSelectOnFixedJsonColumn() {
-    Operator<SelectionResultsBlock> operator = getOperator("select jsonColumn3 FROM testTable");
+    testByteArray("select jsonColumn3 FROM testTable");
+  }
+
+  /** Verify that ingestion from avro BYTES type field (jsonColumn4) to Pinot JSON column worked fine. */
+  @Test
+  public void testSimpleSelectOnBytesJsonColumn() {
+    testByteArray("select jsonColumn4 FROM testTable");
+  }
+
+  private void testByteArray(String query) {
+    Operator<SelectionResultsBlock> operator = getOperator(query);
     SelectionResultsBlock block = operator.nextBlock();
     Collection<Object[]> rows = block.getRows();
     Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
 
-    List<String> expecteds =
-        Arrays.asList("[[0,0,0,1]]", "[[0,0,0,2]]", "[[0,0,0,3]]", "[[0,0,0,4]]", "[[0,0,0,5]]", "[[0,0,0,6]]",
-            "[[0,0,0,7]]");
-    int index = 0;
+    List<String> expecteds = IntStream.range(1, 8)
+        .mapToObj(i -> new byte[] {0, 0, 0, (byte) i})
+        .map(byteArray -> "[\"" + StringFunctions.toBase64(byteArray) + "\"]")
+        .collect(Collectors.toList());
 
-    Iterator<Object[]> iterator = rows.iterator();
-    while (iterator.hasNext()) {
-      Object[] row = iterator.next();
+    int index = 0;
+    for (Object[] row : rows) {
       Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }

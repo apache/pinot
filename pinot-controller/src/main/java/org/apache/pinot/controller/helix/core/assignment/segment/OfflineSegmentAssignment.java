@@ -30,7 +30,6 @@ import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.AllServersSegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 
@@ -39,11 +38,6 @@ import org.apache.pinot.spi.utils.RebalanceConfigConstants;
  * Segment assignment for offline table.
  */
 public class OfflineSegmentAssignment extends BaseSegmentAssignment {
-
-  @Override
-  protected int getReplication(TableConfig tableConfig) {
-    return tableConfig.getValidationConfig().getReplicationNumber();
-  }
 
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,

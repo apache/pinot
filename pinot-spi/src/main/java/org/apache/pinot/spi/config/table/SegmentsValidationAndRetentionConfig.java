@@ -124,6 +124,9 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _segmentPushType = segmentPushType;
   }
 
+  /**
+   * Try to Use {@link TableConfig#getReplication()}
+   */
   public String getReplication() {
     return _replication;
   }
@@ -142,6 +145,9 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _schemaName = schemaName;
   }
 
+  /**
+   * Try to Use {@link TableConfig#getReplication()}
+   */
   public String getReplicasPerPartition() {
     return _replicasPerPartition;
   }
@@ -166,11 +172,17 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _completionConfig = completionConfig;
   }
 
+  /**
+   * Try to Use {@link TableConfig#getReplication()}
+   */
   @JsonIgnore
   public int getReplicationNumber() {
     return Integer.parseInt(_replication);
   }
 
+  /**
+   * Try to Use {@link TableConfig#getReplication()}
+   */
   @JsonIgnore
   public int getReplicasPerPartitionNumber() {
     return Integer.parseInt(_replicasPerPartition);
