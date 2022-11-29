@@ -869,8 +869,8 @@ public class InstanceSelectorTest {
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
 
-    MultiStageStrictReplicaGroupSelector multiStageSelector =
-        new MultiStageStrictReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null);
+    MultiStageReplicaGroupSelector multiStageSelector =
+        new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null);
     multiStageSelector = spy(multiStageSelector);
     doReturn(instancePartitions).when(multiStageSelector).getInstancePartitions();
 

@@ -50,14 +50,14 @@ import org.slf4j.LoggerFactory;
  * strategy will try to pick another replica-group. For realtime tables, this strategy uses only CONSUMING partitions.
  * This is feature is in <strong>Beta</strong>.
  */
-public class MultiStageStrictReplicaGroupSelector extends BaseInstanceSelector {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageStrictReplicaGroupSelector.class);
+public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageReplicaGroupSelector.class);
 
   private final String _tableNameWithType;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private InstancePartitions _instancePartitions;
 
-  public MultiStageStrictReplicaGroupSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public MultiStageReplicaGroupSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector) {
     super(tableNameWithType, brokerMetrics, adaptiveServerSelector);
     _tableNameWithType = tableNameWithType;
