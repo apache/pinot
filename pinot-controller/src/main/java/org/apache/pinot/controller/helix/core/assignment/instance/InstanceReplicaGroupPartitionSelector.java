@@ -230,7 +230,6 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
               instancesInPartition.add(replicaGroupIdToInstancesMap[replicaGroupId][instanceIdInReplicaGroup]);
               instanceIdInReplicaGroup = (instanceIdInReplicaGroup + 1) % numInstancesPerReplicaGroup;
             }
-            instancesInPartition.sort(null);
             LOGGER.info("Selecting instances: {} for replica-group: {}, partition: {} for table: {}",
                 instancesInPartition, replicaGroupId, partitionId, _tableNameWithType);
             instancePartitions.setInstances(partitionId, replicaGroupId, instancesInPartition);
@@ -271,7 +270,6 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
           instancesToSelect.add(instanceConfigs.get(i).getInstanceName());
         }
       }
-      instancesToSelect.sort(null);
       LOGGER.info("Selecting instances: {} for table: {}", instancesToSelect, _tableNameWithType);
       // Set the instances as partition 0 replica 0
       instancePartitions.setInstances(0, 0, instancesToSelect);
