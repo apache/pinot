@@ -18,19 +18,145 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SchemaUtils;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.core.data.manager.TableDataManagerTestUtils;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
 public class RealtimeTableDataManagerTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "RealtimeTableDataManagerTest");
+  private static final String TABLE_NAME = "table01";
+  private static final String TABLE_NAME_WITH_TYPE = "table01_REALTIME";
+  private static final File TABLE_DATA_DIR = new File(TEMP_DIR, TABLE_NAME_WITH_TYPE);
+  private static final String STRING_COLUMN = "col1";
+  private static final String[] STRING_VALUES = {"A", "D", "E", "B", "C"};
+  private static final String LONG_COLUMN = "col2";
+  private static final long[] LONG_VALUES = {10000L, 20000L, 50000L, 40000L, 30000L};
+
+  @BeforeMethod
+  public void setUp()
+      throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
+    TableDataManagerTestUtils.initSegmentFetcher();
+  }
+
+  @AfterMethod
+  public void tearDown()
+      throws Exception {
+    FileUtils.deleteDirectory(TEMP_DIR);
+  }
+
+  @Test
+  public void testAddSegmentUseBackupCopy()
+      throws Exception {
+    RealtimeTableDataManager tmgr = new RealtimeTableDataManager(null);
+    TableDataManagerConfig tableDataManagerConfig = createTableDataManagerConfig();
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    TableConfig tableConfig = setupTableConfig(propertyStore);
+    Schema schema = setupSchema(propertyStore);
+    tmgr.init(tableDataManagerConfig, "server01", propertyStore,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null,
+        new TableDataManagerParams(0, false, -1));
+
+    // Create a dummy local segment.
+    String segName = "seg01";
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segName);
+    segmentZKMetadata.setStatus(Status.DONE);
+    File localSegDir = createSegment(tableConfig, schema, segName);
+    long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v3);
+    segmentZKMetadata.setCrc(segCrc);
+    when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE_NAME_WITH_TYPE, segName), null,
+        AccessOption.PERSISTENT)).thenReturn(segmentZKMetadata.toZNRecord());
+
+    // Move the segment to the backup location.
+    File backup = new File(TABLE_DATA_DIR, segName + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
+    localSegDir.renameTo(backup);
+    assertEquals(localSegDir, new File(TABLE_DATA_DIR, segName));
+    assertFalse(localSegDir.exists());
+    IndexLoadingConfig indexLoadingConfig =
+        TableDataManagerTestUtils.createIndexLoadingConfig("default", tableConfig, schema);
+    tmgr.addSegment(segName, tableConfig, indexLoadingConfig);
+    // Segment data is put back the default location, and backup location is deleted.
+    assertTrue(localSegDir.exists());
+    assertFalse(backup.exists());
+    SegmentMetadataImpl llmd = new SegmentMetadataImpl(new File(TABLE_DATA_DIR, segName));
+    assertEquals(llmd.getTotalDocs(), 5);
+  }
+
+  @Test
+  public void testAddSegmentNoBackupCopy()
+      throws Exception {
+    RealtimeTableDataManager tmgr = new RealtimeTableDataManager(null);
+    TableDataManagerConfig tableDataManagerConfig = createTableDataManagerConfig();
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    TableConfig tableConfig = setupTableConfig(propertyStore);
+    Schema schema = setupSchema(propertyStore);
+    tmgr.init(tableDataManagerConfig, "server01", propertyStore,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null,
+        new TableDataManagerParams(0, false, -1));
+
+    // Create a raw segment and put it in deep store backed by local fs.
+    String segName = "seg01";
+    SegmentZKMetadata segmentZKMetadata =
+        TableDataManagerTestUtils.makeRawSegment(segName, createSegment(tableConfig, schema, segName),
+            new File(TEMP_DIR, segName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION), true);
+    segmentZKMetadata.setStatus(Status.DONE);
+    when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE_NAME_WITH_TYPE, segName), null,
+        AccessOption.PERSISTENT)).thenReturn(segmentZKMetadata.toZNRecord());
+
+    // Local segment dir doesn't exist, thus downloading from deep store.
+    File localSegDir = new File(TABLE_DATA_DIR, segName);
+    assertFalse(localSegDir.exists());
+    IndexLoadingConfig indexLoadingConfig =
+        TableDataManagerTestUtils.createIndexLoadingConfig("default", tableConfig, schema);
+    tmgr.addSegment(segName, tableConfig, indexLoadingConfig);
+    // Segment data is put on default location.
+    assertTrue(localSegDir.exists());
+    SegmentMetadataImpl llmd = new SegmentMetadataImpl(new File(TABLE_DATA_DIR, segName));
+    assertEquals(llmd.getTotalDocs(), 5);
+  }
+
   @Test
   public void testAllowDownload() {
     RealtimeTableDataManager mgr = new RealtimeTableDataManager(null);
@@ -52,5 +178,51 @@ public class RealtimeTableDataManagerTest {
 
     when(zkmd.getDownloadUrl()).thenReturn("remote");
     assertTrue(mgr.allowDownload(llc.getSegmentName(), zkmd));
+  }
+
+  private static File createSegment(TableConfig tableConfig, Schema schema, String segName)
+      throws Exception {
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(TABLE_DATA_DIR.getAbsolutePath());
+    config.setSegmentName(segName);
+    config.setSegmentVersion(SegmentVersion.v3);
+    List<GenericRow> rows = new ArrayList<>(3);
+    for (int i = 0; i < STRING_VALUES.length; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue(STRING_COLUMN, STRING_VALUES[i]);
+      row.putValue(LONG_COLUMN, LONG_VALUES[i]);
+      rows.add(row);
+    }
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+    return new File(TABLE_DATA_DIR, segName);
+  }
+
+  private static TableDataManagerConfig createTableDataManagerConfig() {
+    TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
+    when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME_WITH_TYPE);
+    when(tableDataManagerConfig.getDataDir()).thenReturn(TABLE_DATA_DIR.getAbsolutePath());
+    return tableDataManagerConfig;
+  }
+
+  private static TableConfig setupTableConfig(ZkHelixPropertyStore propertyStore)
+      throws Exception {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setSchemaName(TABLE_NAME).build();
+    ZNRecord tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
+    when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(TABLE_NAME_WITH_TYPE), null,
+        AccessOption.PERSISTENT)).thenReturn(tableConfigZNRecord);
+    return tableConfig;
+  }
+
+  private static Schema setupSchema(ZkHelixPropertyStore propertyStore) {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
+        .addMetric(LONG_COLUMN, FieldSpec.DataType.LONG).build();
+    ZNRecord schemaZNRecord = SchemaUtils.toZNRecord(schema);
+    when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSchema(TABLE_NAME), null,
+        AccessOption.PERSISTENT)).thenReturn(schemaZNRecord);
+    return schema;
   }
 }

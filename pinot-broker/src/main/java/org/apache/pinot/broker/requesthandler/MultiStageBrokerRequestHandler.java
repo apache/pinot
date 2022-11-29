@@ -144,7 +144,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
-          queryPlan = _queryEnvironment.planQuery(query, sqlNodeAndOptions);
+          queryPlan = _queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
           break;
       }
     } catch (Exception e) {

@@ -61,6 +61,7 @@ import org.apache.pinot.core.operator.transform.function.TrigonometricTransformF
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AtanTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CosTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CoshTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CotTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.DegreesTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.RadiansTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.SinTransformFunction;
@@ -211,6 +212,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.SIN, SinTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.COS, CosTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.TAN, TanTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.COT, CotTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ASIN, AsinTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ACOS, AcosTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ATAN, AtanTransformFunction.class);

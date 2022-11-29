@@ -105,6 +105,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
   private static final int DEFAULT_NUM_PARALLEL_BUCKETS = 1;
   private static final String REFRESH = "REFRESH";
+  private static final String DELIMITER_IN_SEGMENT_NAME = "_";
 
   // This is the metric that keeps track of the task delay in the number of time buckets. For example, if we see this
   // number to be 7 and merge task is configured with "bucketTimePeriod = 1d", this means that we have 7 days of
@@ -114,8 +115,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
 
   // tableNameWithType -> mergeLevel -> watermarkMs
   private final Map<String, Map<String, Long>> _mergeRollupWatermarks = new HashMap<>();
-  // tableNameWithType -> maxValidBucketEndTime
-  private final Map<String, Long> _tableMaxValidBucketEndTimeMs = new HashMap<>();
+  // tableNameWithType -> lowestLevelMaxValidBucketEndTime
+  private final Map<String, Long> _tableLowestLevelMaxValidBucketEndTimeMs = new HashMap<>();
 
   @Override
   public String getTaskType() {
@@ -243,16 +244,20 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             getWatermarkMs(preSelectedSegments.get(0).getStartTimeMs(), bucketMs, mergeLevel, mergeRollupTaskMetadata);
         long bucketStartMs = watermarkMs;
         long bucketEndMs = bucketStartMs + bucketMs;
+        if (lowerMergeLevel == null) {
+          long lowestLevelMaxValidBucketEndTimeMs = Long.MIN_VALUE;
+          for (SegmentZKMetadata preSelectedSegment : preSelectedSegments) {
+            // Compute lowestLevelMaxValidBucketEndTimeMs among segments that are ready for merge
+            long currentValidBucketEndTimeMs =
+                getValidBucketEndTimeMsForSegment(preSelectedSegment, bucketMs, bufferMs);
+            lowestLevelMaxValidBucketEndTimeMs =
+                Math.max(lowestLevelMaxValidBucketEndTimeMs, currentValidBucketEndTimeMs);
+          }
+          _tableLowestLevelMaxValidBucketEndTimeMs.put(offlineTableName, lowestLevelMaxValidBucketEndTimeMs);
+        }
         // Create delay metrics even if there's no task scheduled, this helps the case that the controller is restarted
         // but the metrics are not available until the controller schedules a valid task
-        long maxValidBucketEndTimeMs = Long.MIN_VALUE;
-        for (SegmentZKMetadata preSelectedSegment : preSelectedSegments) {
-          // Compute maxValidBucketEndTimeMs among segments that are ready for merge
-          long currentValidBucketEndTimeMs = getValidBucketEndTimeMsForSegment(preSelectedSegment, bucketMs, bufferMs);
-          maxValidBucketEndTimeMs = Math.max(maxValidBucketEndTimeMs, currentValidBucketEndTimeMs);
-        }
-        createOrUpdateDelayMetrics(offlineTableName, mergeLevel, null, watermarkMs, maxValidBucketEndTimeMs,
-            bufferMs, bucketMs);
+        createOrUpdateDelayMetrics(offlineTableName, mergeLevel, null, watermarkMs, bufferMs, bucketMs);
         if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata)) {
           LOGGER.info("Bucket with start: {} and end: {} (table : {}, mergeLevel : {}) cannot be merged yet",
               bucketStartMs, bucketEndMs, offlineTableName, mergeLevel);
@@ -270,6 +275,9 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         //    For each bucket find all segments overlapping with the target bucket, skip the bucket if all overlapping
         //    segments are merged. Schedule k (numParallelBuckets) buckets at most, and stops at the first bucket that
         //    contains spilled over data.
+        //    One may wonder how a segment with records spanning different buckets is handled. The short answer is that
+        //    it will be cut into multiple segments, each for a separate bucket. This is achieved by setting bucket time
+        //    period as PARTITION_BUCKET_TIME_PERIOD when generating PinotTaskConfigs
         // 2. There's no bucket with unmerged segments, skip scheduling
         for (SegmentZKMetadata preSelectedSegment : preSelectedSegments) {
           long startTimeMs = preSelectedSegment.getStartTimeMs();
@@ -337,8 +345,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             watermarkMs, newWatermarkMs);
 
         // Update the delay metrics
-        createOrUpdateDelayMetrics(offlineTableName, mergeLevel, lowerMergeLevel, newWatermarkMs,
-            maxValidBucketEndTimeMs, bufferMs, bucketMs);
+        createOrUpdateDelayMetrics(offlineTableName, mergeLevel, lowerMergeLevel, newWatermarkMs, bufferMs, bucketMs);
 
         // Create task configs
         int maxNumRecordsPerTask =
@@ -349,7 +356,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           for (List<SegmentZKMetadata> selectedSegmentsPerBucket : selectedSegmentsForAllBuckets) {
             pinotTaskConfigsForTable.addAll(
                 createPinotTaskConfigs(selectedSegmentsPerBucket, offlineTableName, maxNumRecordsPerTask, mergeLevel,
-                    mergeConfigs, taskConfigs));
+                    null, mergeConfigs, taskConfigs));
           }
         } else {
           // For partitioned table, schedule separate tasks for each partitionId (partitionId is constructed from
@@ -383,16 +390,18 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
               }
             }
 
-            for (List<SegmentZKMetadata> partitionedSegments : partitionToSegments.values()) {
+            for (Map.Entry<List<Integer>, List<SegmentZKMetadata>> entry : partitionToSegments.entrySet()) {
+              List<Integer> partition = entry.getKey();
+              List<SegmentZKMetadata> partitionedSegments = entry.getValue();
               pinotTaskConfigsForTable.addAll(
                   createPinotTaskConfigs(partitionedSegments, offlineTableName, maxNumRecordsPerTask, mergeLevel,
-                      mergeConfigs, taskConfigs));
+                      partition, mergeConfigs, taskConfigs));
             }
 
             if (!outlierSegments.isEmpty()) {
               pinotTaskConfigsForTable.addAll(
                   createPinotTaskConfigs(outlierSegments, offlineTableName, maxNumRecordsPerTask, mergeLevel,
-                      mergeConfigs, taskConfigs));
+                      null, mergeConfigs, taskConfigs));
             }
           }
         }
@@ -456,7 +465,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     // the rounded segment end time of [10/1 00:00, 10/1 23:59] is 10/2 00:00. The rounded segment end time of
     // [10/1 00:00, 10/2 00:00] is 10/3 00:00
     long validBucketEndTimeMs = (segmentZKMetadata.getEndTimeMs() / bucketMs + 1) * bucketMs;
-    validBucketEndTimeMs = Math.min(validBucketEndTimeMs, (currentTimeMs - bucketMs) / bucketMs * bucketMs);
+    validBucketEndTimeMs = Math.min(validBucketEndTimeMs, (currentTimeMs - bufferMs) / bucketMs * bucketMs);
     return validBucketEndTimeMs;
   }
 
@@ -516,8 +525,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
    * Create pinot task configs with selected segments and configs
    */
   private List<PinotTaskConfig> createPinotTaskConfigs(List<SegmentZKMetadata> selectedSegments,
-      String offlineTableName, int maxNumRecordsPerTask, String mergeLevel, Map<String, String> mergeConfigs,
-      Map<String, String> taskConfigs) {
+      String offlineTableName, int maxNumRecordsPerTask, String mergeLevel, List<Integer> partition,
+      Map<String, String> mergeConfigs, Map<String, String> taskConfigs) {
     int numRecordsPerTask = 0;
     List<List<String>> segmentNamesList = new ArrayList<>();
     List<List<String>> downloadURLsList = new ArrayList<>();
@@ -539,6 +548,15 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     }
 
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+
+    StringBuilder partitionSuffixBuilder = new StringBuilder();
+    if (partition != null && !partition.isEmpty()) {
+      for (int columnPartition : partition) {
+        partitionSuffixBuilder.append(DELIMITER_IN_SEGMENT_NAME).append(columnPartition);
+      }
+    }
+    String partitionSuffix = partitionSuffixBuilder.toString();
+
     for (int i = 0; i < segmentNamesList.size(); i++) {
       Map<String, String> configs = new HashMap<>();
       configs.put(MinionConstants.TABLE_NAME_KEY, offlineTableName);
@@ -562,9 +580,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       configs.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
           mergeConfigs.get(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY));
 
+      // Segment name conflict happens when the current method "createPinotTaskConfigs" is invoked more than once within
+      // the same epoch millisecond, which may happen when there are multiple partitions.
+      // To prevent such name conflict, we include a partitionSeqSuffix to the segment name.
       configs.put(MergeRollupTask.SEGMENT_NAME_PREFIX_KEY,
-          MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + "_" + System.currentTimeMillis() + "_" + i + "_"
-              + TableNameBuilder.extractRawTableName(offlineTableName));
+          MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + DELIMITER_IN_SEGMENT_NAME
+              + System.currentTimeMillis() + partitionSuffix + DELIMITER_IN_SEGMENT_NAME + i
+              + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(offlineTableName));
       pinotTaskConfigs.add(new PinotTaskConfig(MergeRollupTask.TASK_TYPE, configs));
     }
 
@@ -587,12 +609,11 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
    * @param mergeLevel merge level
    * @param lowerMergeLevel lower merge level
    * @param watermarkMs current watermark value
-   * @param maxValidBucketEndTimeMs max valid bucket end time of all the segments for the table
    * @param bufferTimeMs buffer time
    * @param bucketTimeMs bucket time
    */
   private void createOrUpdateDelayMetrics(String tableNameWithType, String mergeLevel, String lowerMergeLevel,
-      long watermarkMs, long maxValidBucketEndTimeMs, long bufferTimeMs, long bucketTimeMs) {
+      long watermarkMs, long bufferTimeMs, long bucketTimeMs) {
     ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
     if (controllerMetrics == null) {
       return;
@@ -601,19 +622,19 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     // Update gauge value that indicates the delay in terms of the number of time buckets.
     Map<String, Long> watermarkForTable =
         _mergeRollupWatermarks.computeIfAbsent(tableNameWithType, k -> new ConcurrentHashMap<>());
-    _tableMaxValidBucketEndTimeMs.put(tableNameWithType, maxValidBucketEndTimeMs);
     watermarkForTable.compute(mergeLevel, (k, v) -> {
       if (v == null) {
         LOGGER.info(
             "Creating the gauge metric for tracking the merge/roll-up task delay for table: {} and mergeLevel: {}."
                 + "(watermarkMs={}, bufferTimeMs={}, bucketTimeMs={}, taskDelayInNumTimeBuckets={})", tableNameWithType,
-            mergeLevel, watermarkMs, bucketTimeMs, bucketTimeMs,
+            mergeLevel, watermarkMs, bufferTimeMs, bucketTimeMs,
             getMergeRollupTaskDelayInNumTimeBuckets(watermarkMs, lowerMergeLevel == null
-                    ? _tableMaxValidBucketEndTimeMs.get(tableNameWithType) : watermarkForTable.get(lowerMergeLevel),
+                    ? _tableLowestLevelMaxValidBucketEndTimeMs.get(tableNameWithType)
+                    : watermarkForTable.get(lowerMergeLevel),
                 bufferTimeMs, bucketTimeMs));
         controllerMetrics.addCallbackGaugeIfNeeded(getMetricNameForTaskDelay(tableNameWithType, mergeLevel),
             (() -> getMergeRollupTaskDelayInNumTimeBuckets(watermarkForTable.getOrDefault(k, -1L),
-                lowerMergeLevel == null ? _tableMaxValidBucketEndTimeMs.get(tableNameWithType)
+                lowerMergeLevel == null ? _tableLowestLevelMaxValidBucketEndTimeMs.get(tableNameWithType)
                     : watermarkForTable.get(lowerMergeLevel), bufferTimeMs, bucketTimeMs)));
       }
       return watermarkMs;

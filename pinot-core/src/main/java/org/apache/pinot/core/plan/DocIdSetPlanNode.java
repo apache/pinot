@@ -26,7 +26,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class DocIdSetPlanNode implements PlanNode {
-  public static final int MAX_DOC_PER_CALL = 10000;
+  public static final int MAX_DOC_PER_CALL = 10_000;
 
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;

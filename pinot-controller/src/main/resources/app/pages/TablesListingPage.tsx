@@ -28,6 +28,7 @@ import SimpleAccordion from '../components/SimpleAccordion';
 import AddSchemaOp from '../components/Homepage/Operations/AddSchemaOp';
 import AddOfflineTableOp from '../components/Homepage/Operations/AddOfflineTableOp';
 import AddRealtimeTableOp from '../components/Homepage/Operations/AddRealtimeTableOp';
+import Skeleton from '@material-ui/lab/Skeleton';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -72,31 +73,33 @@ const TablesListingPage = () => {
     false
   );
 
-  const loading = 'Loading...';
+  const loading = { customRenderer: <Skeleton animation={'wave'} /> };
 
   const fetchData = async () => {
+    const schemaResponse = await PinotMethodUtils.getQuerySchemaList();
+    const schemaList = [];
+    const schemaData = [];
+    schemaResponse.records.map((record) => {
+      schemaList.push(...record);
+    });
+    schemaList.map((schema) => {
+      schemaData.push([schema].concat([...Array(PinotMethodUtils.allSchemaDetailsColumnHeader.length - 1)].map((e) => loading)));
+    });
     const tablesResponse = await PinotMethodUtils.getQueryTablesList({
       bothType: true,
     });
     const tablesList = [];
     const tableData = [];
-    const tableColumnHeaders = [
-      'Table Name',
-      'Reported Size',
-      'Estimated Size',
-      'Number of Segments',
-      'Status',
-    ];
     tablesResponse.records.map((record) => {
       tablesList.push(...record);
     });
     tablesList.map((table) => {
-      tableData.push([table, loading, loading, loading, loading]);
+      tableData.push([table].concat([...Array(PinotMethodUtils.allTableDetailsColumnHeader.length - 1)].map((e) => loading)));
     });
     // Set the table data to "Loading..." at first as tableSize can take minutes to fetch
     // for larger tables.
     setTableData({
-      columns: tableColumnHeaders,
+      columns: PinotMethodUtils.allTableDetailsColumnHeader,
       records: tableData,
       isLoading: false,
     });
@@ -104,14 +107,14 @@ const TablesListingPage = () => {
     // Set just the column headers so these do not have to load with the data
     setSchemaDetails({
       columns: PinotMethodUtils.allSchemaDetailsColumnHeader,
-      records: [],
-      isLoading: true,
+      records: schemaData,
+      isLoading: false,
     });
 
     // these implicitly set isLoading=false by leaving it undefined
     const tableDetails = await PinotMethodUtils.getAllTableDetails(tablesList);
     setTableData(tableDetails);
-    const schemaDetailsData = await PinotMethodUtils.getAllSchemaDetails();
+    const schemaDetailsData = await PinotMethodUtils.getAllSchemaDetails(schemaList);
     setSchemaDetails(schemaDetailsData);
   };
 
@@ -119,9 +122,7 @@ const TablesListingPage = () => {
     fetchData();
   }, []);
 
-  return tableData.isLoading && schemaDetails.isLoading ? (
-    <AppLoader />
-  ) : (
+  return (
     <Grid item xs className={classes.gridContainer}>
       <div className={classes.operationDiv}>
         <SimpleAccordion headerTitle="Operations" showSearchBox={false}>

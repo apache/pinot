@@ -144,7 +144,7 @@ public class MockRoutingManagerFactory {
     }
 
     @Override
-    public RoutingTable getRoutingTable(BrokerRequest brokerRequest) {
+    public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
       String tableName = brokerRequest.getPinotQuery().getDataSource().getTableName();
       return _routingTableMap.getOrDefault(tableName,
           _routingTableMap.get(TableNameBuilder.extractRawTableName(tableName)));

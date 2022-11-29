@@ -44,6 +44,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.LoopUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -198,8 +199,11 @@ public class SelectionOperatorUtils {
   public static void mergeWithoutOrdering(Collection<Object[]> mergedRows, Collection<Object[]> rowsToMerge,
       int selectionSize) {
     Iterator<Object[]> iterator = rowsToMerge.iterator();
+    int numMergedRows = 0;
     while (mergedRows.size() < selectionSize && iterator.hasNext()) {
+      LoopUtils.checkMergePhaseInterruption(numMergedRows);
       mergedRows.add(iterator.next());
+      numMergedRows++;
     }
   }
 
@@ -213,8 +217,11 @@ public class SelectionOperatorUtils {
    */
   public static void mergeWithOrdering(PriorityQueue<Object[]> mergedRows, Collection<Object[]> rowsToMerge,
       int maxNumRows) {
+    int numMergedRows = 0;
     for (Object[] row : rowsToMerge) {
+      LoopUtils.checkMergePhaseInterruption(numMergedRows);
       addToPriorityQueue(row, mergedRows, maxNumRows);
+      numMergedRows++;
     }
   }
 
@@ -453,6 +460,7 @@ public class SelectionOperatorUtils {
           nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
         }
         for (int rowId = 0; rowId < numRows; rowId++) {
+          LoopUtils.checkMergePhaseInterruption(rowId);
           if (rows.size() < limit) {
             rows.add(extractRowFromDataTableWithNullHandling(dataTable, rowId, nullBitmaps));
           } else {
@@ -461,6 +469,7 @@ public class SelectionOperatorUtils {
         }
       } else {
         for (int rowId = 0; rowId < numRows; rowId++) {
+          LoopUtils.checkMergePhaseInterruption(rowId);
           if (rows.size() < limit) {
             rows.add(extractRowFromDataTable(dataTable, rowId));
           } else {

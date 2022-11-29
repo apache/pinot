@@ -22,15 +22,20 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * The config used for TableDataManager.
  */
 public class TableDataManagerConfig {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableDataManagerConfig.class);
+
   private static final String TABLE_DATA_MANAGER_TYPE = "dataManagerType";
   private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
   private static final String TABLE_DATA_MANAGER_CONSUMER_DIRECTORY = "consumerDirectory";
@@ -39,6 +44,7 @@ public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_AUTH = "auth";
   private static final String TABLE_DELETED_SEGMENTS_CACHE_SIZE = "deletedSegmentsCacheSize";
   private static final String TABLE_DELETED_SEGMENTS_CACHE_TTL_MINUTES = "deletedSegmentsCacheTTL";
+  private static final String TABLE_PEER_DOWNLOAD_SCHEME = "peerDownloadScheme";
 
   private final Configuration _tableDataManagerConfig;
 
@@ -82,6 +88,10 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getInt(TABLE_DELETED_SEGMENTS_CACHE_TTL_MINUTES);
   }
 
+  public String getTablePeerDownloadScheme() {
+    return _tableDataManagerConfig.getString(TABLE_PEER_DOWNLOAD_SCHEME);
+  }
+
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
       InstanceDataManagerConfig instanceDataManagerConfig, String tableNameWithType) {
     Configuration defaultConfig = new PropertiesConfiguration();
@@ -96,6 +106,11 @@ public class TableDataManagerConfig {
         instanceDataManagerConfig.getDeletedSegmentsCacheSize());
     defaultConfig.addProperty(TABLE_DELETED_SEGMENTS_CACHE_TTL_MINUTES,
         instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes());
+    // allow null
+    String segmentPeerDownloadScheme = instanceDataManagerConfig.getSegmentPeerDownloadScheme();
+    LOGGER.info("instance level segment peer download scheme = {}", segmentPeerDownloadScheme);
+    defaultConfig.addProperty(TABLE_PEER_DOWNLOAD_SCHEME, segmentPeerDownloadScheme);
+
 
     // copy auth-related configs
     instanceDataManagerConfig.getConfig().subset(TABLE_DATA_MANAGER_AUTH).toMap()
@@ -108,6 +123,11 @@ public class TableDataManagerConfig {
     // Override table level configs
 
     _tableDataManagerConfig.addProperty(TABLE_IS_DIMENSION, tableConfig.isDimTable());
+    SegmentsValidationAndRetentionConfig segmentConfig = tableConfig.getValidationConfig();
+    if (segmentConfig != null && segmentConfig.getPeerSegmentDownloadScheme() != null) {
+      _tableDataManagerConfig.setProperty(TABLE_PEER_DOWNLOAD_SCHEME, segmentConfig.getPeerSegmentDownloadScheme());
+    }
+    LOGGER.info("final segment peer download scheme = {}", getTablePeerDownloadScheme());
 
     // If we wish to override some table level configs using table config, override them here
     // Note: the configs in TableDataManagerConfig is immutable once the table is created, which mean it will not pick

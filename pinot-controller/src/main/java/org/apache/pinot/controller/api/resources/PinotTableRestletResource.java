@@ -99,7 +99,6 @@ import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableStatus;
@@ -833,9 +832,7 @@ public class PinotTableRestletResource {
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-    SegmentsValidationAndRetentionConfig segmentsConfig =
-        tableConfig != null ? tableConfig.getValidationConfig() : null;
-    int numReplica = segmentsConfig == null ? 1 : Integer.parseInt(segmentsConfig.getReplication());
+    int numReplica = tableConfig == null ? 1 : tableConfig.getReplication();
 
     String segmentsMetadata;
     try {

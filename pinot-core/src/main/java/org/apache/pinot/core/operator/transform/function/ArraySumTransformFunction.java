@@ -36,7 +36,6 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public class ArraySumTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "arraySum";
 
-  private double[] _results;
   private TransformFunction _argument;
 
   @Override
@@ -71,19 +70,17 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
-    if (_results == null || _results.length < length) {
-      _results = new double[length];
+    if (_doubleValuesSV == null) {
+      _doubleValuesSV = new double[length];
     }
-
     double[][] doubleValuesMV = _argument.transformToDoubleValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
       double sumRes = 0;
       for (double value : doubleValuesMV[i]) {
         sumRes += value;
       }
-      _results[i] = sumRes;
+      _doubleValuesSV[i] = sumRes;
     }
-    return _results;
+    return _doubleValuesSV;
   }
 }

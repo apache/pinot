@@ -20,29 +20,17 @@ package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
-import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.datablock.MetadataBlock;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
-import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -50,11 +38,16 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
+import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.query.runtime.plan.ServerRequestPlanVisitor;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.service.QueryConfig;
@@ -76,7 +69,6 @@ public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
   // This is a temporary before merging the 2 type of executor.
   private ServerQueryExecutorV1Impl _serverExecutor;
-  private WorkerQueryExecutor _workerExecutor;
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
   private MailboxService<TransferableBlock> _mailboxService;
@@ -98,8 +90,6 @@ public class QueryRunner {
       _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config, instanceDataManager, serverMetrics);
-      _workerExecutor = new WorkerQueryExecutor();
-      _workerExecutor.init(config, serverMetrics, _mailboxService, _hostname, _port);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -109,16 +99,14 @@ public class QueryRunner {
     _helixPropertyStore = _helixManager.getHelixPropertyStore();
     _mailboxService.start();
     _serverExecutor.start();
-    _workerExecutor.start();
   }
 
   public void shutDown() {
-    _workerExecutor.shutDown();
     _serverExecutor.shutDown();
     _mailboxService.shutdown();
   }
 
-  public void processQuery(DistributedStagePlan distributedStagePlan, ExecutorService executorService,
+  public void processQuery(DistributedStagePlan distributedStagePlan, OpChainSchedulerService scheduler,
       Map<String, String> requestMetadataMap) {
     if (isLeafStage(distributedStagePlan)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
@@ -132,23 +120,27 @@ public class QueryRunner {
       for (ServerPlanRequestContext requestContext : serverQueryRequests) {
         ServerQueryRequest request = new ServerQueryRequest(requestContext.getInstanceRequest(),
             new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
-        serverQueryResults.add(processServerQuery(request, executorService));
+        serverQueryResults.add(processServerQuery(request, scheduler.getWorkerPool()));
       }
 
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
-          new MailboxSendOperator(_mailboxService, sendNode.getDataSchema(),
+          new MailboxSendOperator(_mailboxService,
               new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema()),
               receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
               sendNode.getPartitionKeySelector(), _hostname, _port, serverQueryRequests.get(0).getRequestId(),
-              sendNode.getStageId(), true);
+              sendNode.getStageId());
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
     } else {
-      _workerExecutor.processQuery(distributedStagePlan, requestMetadataMap, executorService);
+      long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
+      StageNode stageRoot = distributedStagePlan.getStageRoot();
+      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot, new PlanRequestContext(
+          _mailboxService, requestId, stageRoot.getStageId(), _hostname, _port, distributedStagePlan.getMetadataMap()));
+      scheduler.register(rootOperator);
     }
   }
 
@@ -196,83 +188,6 @@ public class QueryRunner {
       InstanceResponseBlock errorResponse = new InstanceResponseBlock();
       errorResponse.getExceptions().put(QueryException.QUERY_EXECUTION_ERROR_CODE, e.getMessage());
       return errorResponse;
-    }
-  }
-
-  /**
-   * Leaf-stage transfer block opreator is used to wrap around the leaf stage process results. They are passed to the
-   * Pinot server to execute query thus only one {@link DataTable} were returned. However, to conform with the
-   * intermediate stage operators. an additional {@link MetadataBlock} needs to be transfer after the data block.
-   *
-   * <p>In order to achieve this:
-   * <ul>
-   *   <li>The leaf-stage result is split into data payload block and metadata payload block.</li>
-   *   <li>In case the leaf-stage result contains error or only metadata, we skip the data payload block.</li>
-   * </ul>
-   */
-  private static class LeafStageTransferableBlockOperator extends BaseOperator<TransferableBlock> {
-    private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
-
-    private final InstanceResponseBlock _errorBlock;
-    private final List<InstanceResponseBlock> _baseResultBlock;
-    private int _currentIndex;
-
-    private LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema) {
-      _baseResultBlock = baseResultBlock;
-      _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
-      _currentIndex = 0;
-    }
-
-    @Override
-    public List<Operator> getChildOperators() {
-      return null;
-    }
-
-    @Nullable
-    @Override
-    public String toExplainString() {
-      return EXPLAIN_NAME;
-    }
-
-    @Override
-    protected TransferableBlock getNextBlock() {
-      if (_currentIndex < 0) {
-        throw new RuntimeException("Leaf transfer terminated. next block should no longer be called.");
-      }
-      if (_errorBlock != null) {
-        _currentIndex = -1;
-        return new TransferableBlock(DataBlockUtils.getErrorDataBlock(_errorBlock.getExceptions()));
-      } else {
-        if (_currentIndex < _baseResultBlock.size()) {
-          InstanceResponseBlock responseBlock = _baseResultBlock.get(_currentIndex++);
-          BaseResultsBlock resultsBlock = responseBlock.getResultsBlock();
-          if (resultsBlock != null) {
-            return new TransferableBlock(toList(resultsBlock.getRows(responseBlock.getQueryContext())),
-                responseBlock.getDataSchema(), DataBlock.Type.ROW);
-          } else {
-            return new TransferableBlock(Collections.emptyList(), responseBlock.getDataSchema(),
-                DataBlock.Type.ROW);
-          }
-        } else {
-          _currentIndex = -1;
-          return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
-        }
-      }
-    }
-  }
-
-  private static List<Object[]> toList(Collection<Object[]> collections) {
-    if (collections instanceof List) {
-      return (List<Object[]>) collections;
-    } else if (collections instanceof PriorityQueue) {
-      PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) collections;
-      List<Object[]> sortedList = new ArrayList<>(priorityQueue.size());
-      while (!priorityQueue.isEmpty()) {
-        sortedList.add(priorityQueue.poll());
-      }
-      return sortedList;
-    } else {
-      throw new UnsupportedOperationException("Unsupported collection type: " + collections.getClass());
     }
   }
 

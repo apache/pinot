@@ -32,7 +32,6 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
@@ -217,6 +216,14 @@ public class ControllerConf extends PinotConfiguration {
     private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
     private static final int DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
     private static final int DEFAULT_SEGMENT_TIER_ASSIGNER_FREQUENCY_IN_SECONDS = -1; // Disabled
+
+    // Realtime Consumer Monitor
+    private static final String RT_CONSUMER_MONITOR_FREQUENCY_PERIOD =
+        "controller.realtimeConsumerMonitor.frequencyPeriod";
+    private static final String RT_CONSUMER_MONITOR_INITIAL_DELAY_IN_SECONDS =
+        "controller.realtimeConsumerMonitor.initialDelayInSeconds";
+
+    private static final int DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS = -1; // Disabled by default
   }
 
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
@@ -296,8 +303,7 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(PINOT_FS_FACTORY_CLASS_LOCAL, DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL);
 
     if (pinotFSFactoryClasses != null) {
-      pinotFSFactoryClasses.getKeys()
-          .forEachRemaining(key -> setProperty((String) key, pinotFSFactoryClasses.getProperty((String) key)));
+      pinotFSFactoryClasses.getKeys().forEachRemaining(key -> setProperty(key, pinotFSFactoryClasses.getProperty(key)));
     }
   }
 
@@ -429,21 +435,11 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public String getZkStr() {
-    Object zkAddressObj = containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER) ? getProperty(
+    String zkAddress = containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER) ? getProperty(
         CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER) : getProperty(ZK_STR);
-
-    // The set method converted comma separated string into ArrayList, so need to convert back to String here.
-    if (zkAddressObj instanceof List) {
-      List<String> zkAddressList = (List<String>) zkAddressObj;
-      String[] zkAddress = zkAddressList.toArray(new String[0]);
-      return StringUtil.join(",", zkAddress);
-    } else if (zkAddressObj instanceof String) {
-      return (String) zkAddressObj;
-    } else {
-      throw new RuntimeException(
-          "Unexpected data type for zkAddress PropertiesConfiguration, expecting String but got " + zkAddressObj
-              .getClass().getName());
-    }
+    Preconditions.checkState(zkAddress != null,
+        "ZK address is not configured. Please configure it using the config: 'pinot.zk.server'");
+    return zkAddress;
   }
 
   @Override
@@ -515,8 +511,8 @@ public class ControllerConf extends PinotConfiguration {
    * @return the supplied config in seconds
    */
   public int getOfflineSegmentIntervalCheckerFrequencyInSeconds() {
-    return Optional
-        .ofNullable(getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD))
+    return Optional.ofNullable(
+            getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> getProperty(
             ControllerPeriodicTasksConf.DEPRECATED_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
             ControllerPeriodicTasksConf.DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS));
@@ -586,6 +582,17 @@ public class ControllerConf extends PinotConfiguration {
   public void setStatusCheckerFrequencyInSeconds(int statusCheckerFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.DEPRECATED_STATUS_CHECKER_FREQUENCY_IN_SECONDS,
         Integer.toString(statusCheckerFrequencyInSeconds));
+  }
+
+  public int getRealtimeConsumerMonitorRunFrequency() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.RT_CONSUMER_MONITOR_FREQUENCY_PERIOD))
+        .map(period -> (int) convertPeriodToSeconds(period)).orElse(
+            ControllerPeriodicTasksConf.DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS);
+  }
+
+  public long getRealtimeConsumerMonitorInitialDelayInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.RT_CONSUMER_MONITOR_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
   public int getTaskMetricsEmitterFrequencyInSeconds() {
@@ -762,7 +769,6 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
   }
 
-
   public void setAccessControlFactoryClass(String accessControlFactoryClass) {
     setProperty(ACCESS_CONTROL_FACTORY_CLASS, accessControlFactoryClass);
   }
@@ -863,7 +869,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public ControllerMode getControllerMode() {
-    return ControllerMode.valueOf(getProperty(CONTROLLER_MODE, DEFAULT_CONTROLLER_MODE.toString()).toUpperCase());
+    return ControllerMode.valueOf(getProperty(CONTROLLER_MODE, DEFAULT_CONTROLLER_MODE).toUpperCase());
   }
 
   public void setLeadControllerResourceRebalanceStrategy(String rebalanceStrategy) {
@@ -892,8 +898,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public List<String> getTableConfigTunerPackages() {
-    return Arrays
-        .asList(getProperty(TABLE_CONFIG_TUNER_PACKAGES, DEFAULT_TABLE_CONFIG_TUNER_PACKAGES).split("\\s*,\\s*"));
+    return Arrays.asList(
+        getProperty(TABLE_CONFIG_TUNER_PACKAGES, DEFAULT_TABLE_CONFIG_TUNER_PACKAGES).split("\\s*,\\s*"));
   }
 
   public String getControllerResourcePackages() {

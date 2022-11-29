@@ -365,17 +365,20 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractKeyTransformFunction.FUNCTION_NAME);
-    String[][] keysResults = transformFunction.transformToStringValuesMV(_projectionBlock);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      List<String> keys = Arrays.asList(keysResults[i]);
-      Assert.assertTrue(keys.contains(String.format("$['%s']", INT_SV_COLUMN)));
-      Assert.assertTrue(keys.contains(String.format("$['%s']", LONG_SV_COLUMN)));
-      Assert.assertTrue(keys.contains(String.format("$['%s']", FLOAT_SV_COLUMN)));
-      Assert.assertTrue(keys.contains(String.format("$['%s']", DOUBLE_SV_COLUMN)));
-      Assert.assertTrue(keys.contains(String.format("$['%s']", BIG_DECIMAL_SV_COLUMN)));
-      Assert.assertTrue(keys.contains(String.format("$['%s']", STRING_SV_COLUMN)));
-      Assert.assertTrue(keys.contains(String.format("$['%s']", INT_MV_COLUMN)));
-      Assert.assertTrue(keys.contains(String.format("$['%s']", TIME_COLUMN)));
+    // Transform the same block multiple times should give the same result
+    for (int i = 0; i < 10; i++) {
+      String[][] keysResults = transformFunction.transformToStringValuesMV(_projectionBlock);
+      for (int j = 0; j < NUM_ROWS; j++) {
+        List<String> keys = Arrays.asList(keysResults[j]);
+        Assert.assertTrue(keys.contains(String.format("$['%s']", INT_SV_COLUMN)));
+        Assert.assertTrue(keys.contains(String.format("$['%s']", LONG_SV_COLUMN)));
+        Assert.assertTrue(keys.contains(String.format("$['%s']", FLOAT_SV_COLUMN)));
+        Assert.assertTrue(keys.contains(String.format("$['%s']", DOUBLE_SV_COLUMN)));
+        Assert.assertTrue(keys.contains(String.format("$['%s']", BIG_DECIMAL_SV_COLUMN)));
+        Assert.assertTrue(keys.contains(String.format("$['%s']", STRING_SV_COLUMN)));
+        Assert.assertTrue(keys.contains(String.format("$['%s']", INT_MV_COLUMN)));
+        Assert.assertTrue(keys.contains(String.format("$['%s']", TIME_COLUMN)));
+      }
     }
   }
 

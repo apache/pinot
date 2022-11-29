@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -85,6 +86,33 @@ public class DataSchemaTest {
     dataSchema = DataSchema.upgradeToCover(dataSchema, compatibleDataSchema);
     DataSchema upgradedDataSchema = new DataSchema(COLUMN_NAMES, UPGRADED_COLUMN_DATA_TYPES);
     Assert.assertEquals(dataSchema, upgradedDataSchema);
+  }
+
+  @Test
+  public void testSuperTypeCheckers() {
+    List<DataSchema.ColumnDataType> numberTypeToTest = Arrays.asList(INT, LONG, FLOAT, DOUBLE);
+
+    for (DataSchema.ColumnDataType testType : DataSchema.ColumnDataType.values()) {
+      for (DataSchema.ColumnDataType candidateType : DataSchema.ColumnDataType.values()) {
+        if (testType == candidateType) {
+          // all type should be sub-type of themselves.
+          Assert.assertTrue(testType.isSuperTypeOf(candidateType));
+        } else if (!numberTypeToTest.contains(testType)) {
+          // other than number type, nothing should be sub-type of another type.
+          Assert.assertFalse(testType.isSuperTypeOf(candidateType));
+        }
+      }
+    }
+
+    // number super type relationship should be in exactly the order in the list above.
+    for (int idx = 0; idx < numberTypeToTest.size(); idx++) {
+      for (int subTypeIdx = 0; subTypeIdx <= idx; subTypeIdx++) {
+        Assert.assertTrue(numberTypeToTest.get(idx).isSuperTypeOf(numberTypeToTest.get(subTypeIdx)));
+      }
+      for (int subTypeIdx = idx + 1; subTypeIdx < numberTypeToTest.size(); subTypeIdx++) {
+        Assert.assertFalse(numberTypeToTest.get(idx).isSuperTypeOf(numberTypeToTest.get(subTypeIdx)));
+      }
+    }
   }
 
   @Test

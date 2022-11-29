@@ -81,7 +81,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private int[] getIntTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    int[] results = new int[length];
+    if (_intValuesSV == null) {
+      _intValuesSV = new int[length];
+    }
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
     int[][] data = new int[width][length];
@@ -98,14 +100,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
           data[j] = _transformFunctions[j].transformToIntValuesSV(projectionBlock);
         }
         hasNonNullValue = true;
-        results[i] = data[j][i];
+        _intValuesSV[i] = data[j][i];
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = NULL_INT;
+        _intValuesSV[i] = NULL_INT;
       }
     }
-    return results;
+    return _intValuesSV;
   }
 
   /**
@@ -114,7 +116,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private long[] getLongTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    long[] results = new long[length];
+    if (_longValuesSV == null) {
+      _longValuesSV = new long[length];
+    }
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
     long[][] data = new long[width][length];
@@ -131,14 +135,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
           data[j] = _transformFunctions[j].transformToLongValuesSV(projectionBlock);
         }
         hasNonNullValue = true;
-        results[i] = data[j][i];
+        _longValuesSV[i] = data[j][i];
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = NULL_LONG;
+        _longValuesSV[i] = NULL_LONG;
       }
     }
-    return results;
+    return _longValuesSV;
   }
 
   /**
@@ -147,7 +151,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private float[] getFloatTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    float[] results = new float[length];
+    if (_floatValuesSV == null) {
+      _floatValuesSV = new float[length];
+    }
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
     float[][] data = new float[width][length];
@@ -164,14 +170,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
           data[j] = _transformFunctions[j].transformToFloatValuesSV(projectionBlock);
         }
         hasNonNullValue = true;
-        results[i] = data[j][i];
+        _floatValuesSV[i] = data[j][i];
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = NULL_FLOAT;
+        _floatValuesSV[i] = NULL_FLOAT;
       }
     }
-    return results;
+    return _floatValuesSV;
   }
 
   /**
@@ -180,7 +186,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private double[] getDoubleTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    double[] results = new double[length];
+    if (_doubleValuesSV == null) {
+      _doubleValuesSV = new double[length];
+    }
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
     double[][] data = new double[width][length];
@@ -197,14 +205,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
           data[j] = _transformFunctions[j].transformToDoubleValuesSV(projectionBlock);
         }
         hasNonNullValue = true;
-        results[i] = data[j][i];
+        _doubleValuesSV[i] = data[j][i];
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = NULL_DOUBLE;
+        _doubleValuesSV[i] = NULL_DOUBLE;
       }
     }
-    return results;
+    return _doubleValuesSV;
   }
 
   /**
@@ -213,7 +221,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private BigDecimal[] getBigDecimalTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    BigDecimal[] results = new BigDecimal[length];
+    if (_bigDecimalValuesSV == null) {
+      _bigDecimalValuesSV = new BigDecimal[length];
+    }
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
     BigDecimal[][] data = new BigDecimal[width][length];
@@ -230,14 +240,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
           data[j] = _transformFunctions[j].transformToBigDecimalValuesSV(projectionBlock);
         }
         hasNonNullValue = true;
-        results[i] = data[j][i];
+        _bigDecimalValuesSV[i] = data[j][i];
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = NULL_BIG_DECIMAL;
+        _bigDecimalValuesSV[i] = NULL_BIG_DECIMAL;
       }
     }
-    return results;
+    return _bigDecimalValuesSV;
   }
 
   /**
@@ -246,7 +256,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
    */
   private String[] getStringTransformResults(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    String[] results = new String[length];
+    if (_stringValuesSV == null) {
+      _stringValuesSV = new String[length];
+    }
     int width = _transformFunctions.length;
     RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
     String[][] data = new String[width][length];
@@ -263,14 +275,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
           data[j] = _transformFunctions[j].transformToStringValuesSV(projectionBlock);
         }
         hasNonNullValue = true;
-        results[i] = data[j][i];
+        _stringValuesSV[i] = data[j][i];
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = NULL_STRING;
+        _stringValuesSV[i] = NULL_STRING;
       }
     }
-    return results;
+    return _stringValuesSV;
   }
 
   @Override
@@ -371,9 +383,5 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       return super.transformToStringValuesSV(projectionBlock);
     }
     return getStringTransformResults(projectionBlock);
-  }
-
-  public static void main(String[] args) {
-    System.out.println(BigDecimal.valueOf(Long.MIN_VALUE));
   }
 }

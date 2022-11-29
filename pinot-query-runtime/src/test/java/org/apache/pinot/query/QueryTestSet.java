@@ -213,6 +213,7 @@ public class QueryTestSet {
         new Object[]{"SELECT COALESCE(SUM(col3), 0) FROM a WHERE col1 = 'foo' AND col1 = 'bar'"},
         new Object[]{"SELECT SUM(CAST(col3 AS INTEGER)) FROM a HAVING MIN(col3) BETWEEN 1 AND 0"},
         new Object[]{"SELECT col1, COUNT(col3) FROM a GROUP BY col1 HAVING SUM(col3) > 40 AND SUM(col3) < 30"},
+        new Object[]{"SELECT col1, COUNT(col3) FROM b GROUP BY col1 HAVING SUM(col3) >= 42.5"},
 
         // Test SQL functions
         // TODO split these SQL functions into separate test files to share between planner and runtime

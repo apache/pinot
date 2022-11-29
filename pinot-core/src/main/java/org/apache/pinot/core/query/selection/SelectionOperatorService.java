@@ -27,6 +27,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.utils.LoopUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -105,6 +106,7 @@ public class SelectionOperatorService {
           nullBitmaps[colId] = dataTable.getNullRowIds(colId);
         }
         for (int rowId = 0; rowId < numRows; rowId++) {
+          LoopUtils.checkMergePhaseInterruption(rowId);
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
           for (int colId = 0; colId < nullBitmaps.length; colId++) {
             if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
@@ -115,6 +117,7 @@ public class SelectionOperatorService {
         }
       } else {
         for (int rowId = 0; rowId < numRows; rowId++) {
+          LoopUtils.checkMergePhaseInterruption(rowId);
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
           SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
         }

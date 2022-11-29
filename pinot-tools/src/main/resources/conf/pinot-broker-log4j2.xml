@@ -31,6 +31,11 @@
         <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
       </PatternLayout>
     </RandomAccessFile>
+    <RandomAccessFile name="brokerHelixLog" fileName="pinotBrokerHelix.log" immediateFlush="false">
+      <PatternLayout>
+        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
+      </PatternLayout>
+    </RandomAccessFile>
     <RandomAccessFile name="querylog" fileName="querylog.log" immediateFlush="false">
       <PatternLayout>
         <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
@@ -44,6 +49,10 @@
       <!-- Direct most logs to the log file -->
       <AppenderRef ref="brokerLog"/>
     </Root>
+    <!-- Output helix logs to a dedicated file-->
+    <Logger name="org.apache.helix" level="info" additivity="false">
+      <AppenderRef ref="brokerHelixLog"/>
+    </Logger>
     <!-- Output query logs to a dedicated file-->
     <Logger name="org.apache.pinot.broker.querylog.QueryLogger" level="debug" additivity="false">
       <AppenderRef ref="querylog"/>

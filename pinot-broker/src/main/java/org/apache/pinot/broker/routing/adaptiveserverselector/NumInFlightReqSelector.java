@@ -85,4 +85,30 @@ public class NumInFlightReqSelector implements AdaptiveServerSelector {
 
     return pairList;
   }
+
+  @Override
+  public List<Pair<String, Double>> fetchServerRankingsWithScores(List<String> serverCandidates) {
+    List<Pair<String, Double>> pairList = new ArrayList<>();
+    if (serverCandidates.size() == 0) {
+      return pairList;
+    }
+
+    for (String server : serverCandidates) {
+      Integer score = _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(server);
+      if (score == null) {
+        score = -1;
+      }
+
+      pairList.add(new ImmutablePair<>(server, (double) score));
+    }
+
+    // Let's shuffle the list before sorting. This helps with randomly choosing different servers if there is a tie.
+    Collections.shuffle(pairList);
+    Collections.sort(pairList, (o1, o2) -> {
+      int val = Double.compare(o1.getRight(), o2.getRight());
+      return val;
+    });
+
+    return pairList;
+  }
 }

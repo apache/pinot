@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -36,12 +35,14 @@ import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
 
@@ -53,30 +54,32 @@ import org.apache.pinot.query.runtime.operator.TransformOperator;
  *
  * <p>This class should be used statically via {@link #build(StageNode, PlanRequestContext)}
  *
- * @see org.apache.pinot.query.runtime.QueryRunner#processQuery(DistributedStagePlan, ExecutorService, Map)
+ * @see org.apache.pinot.query.runtime.QueryRunner#processQuery(DistributedStagePlan, OpChainSchedulerService, Map)
  */
 public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<TransferableBlock>, PlanRequestContext> {
+
   private static final PhysicalPlanVisitor INSTANCE = new PhysicalPlanVisitor();
 
-  public static Operator<TransferableBlock> build(StageNode node, PlanRequestContext context) {
-    return node.visit(INSTANCE, context);
+  public static OpChain build(StageNode node, PlanRequestContext context) {
+    Operator<TransferableBlock> root = node.visit(INSTANCE, context);
+    return new OpChain(root);
   }
 
   @Override
   public Operator<TransferableBlock> visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
     List<ServerInstance> sendingInstances = context.getMetadataMap().get(node.getSenderStageId()).getServerInstances();
-    return new MailboxReceiveOperator(context.getMailboxService(), node.getDataSchema(), sendingInstances,
-        node.getExchangeType(), node.getPartitionKeySelector(), context.getHostName(), context.getPort(),
-        context.getRequestId(), node.getSenderStageId());
+    return new MailboxReceiveOperator(context.getMailboxService(), sendingInstances,
+        node.getExchangeType(), context.getHostName(), context.getPort(),
+        context.getRequestId(), node.getSenderStageId(), null);
   }
 
   @Override
   public Operator<TransferableBlock> visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
     Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
     StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
-    return new MailboxSendOperator(context.getMailboxService(), node.getDataSchema(), nextOperator,
+    return new MailboxSendOperator(context.getMailboxService(), nextOperator,
         receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
-        context.getHostName(), context.getPort(), context.getRequestId(), node.getStageId(), false);
+        context.getHostName(), context.getPort(), context.getRequestId(), node.getStageId());
   }
 
   @Override

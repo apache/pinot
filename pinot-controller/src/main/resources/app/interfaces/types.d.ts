@@ -85,6 +85,8 @@ declare module 'Models' {
     tables: Array<string>;
   };
 
+  export type QuerySchemas = Array<string>;
+
   export type TableSchema = {
     dimensionFieldSpecs: Array<schema>;
     metricFieldSpecs?: Array<schema>;
@@ -204,6 +206,21 @@ declare module 'Models' {
     TaskTimeoutMs: string,
     TaskExpireTimeMs: string,
     MinionWorkerGroupTag: string
+  }
+
+  export interface SegmentDebugDetails {
+    segmentName: string;
+    serverState: {
+      [key: string]: {
+        idealState: SEGMENT_STATUS,
+        externalView: SEGMENT_STATUS,
+        errorInfo?: {
+          timeStamp: string,
+          errorMessage: string,
+          stackTrace: string
+        }
+      }
+    }
   }
 
   export const enum SEGMENT_STATUS {

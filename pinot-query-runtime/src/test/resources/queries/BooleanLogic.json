@@ -1,0 +1,130 @@
+{
+  "boolean_type": {
+    "tables": {
+      "bools": {
+        "schema": [{"name": "b", "type": "BOOLEAN"}],
+        "inputs": [[true], [false]]
+      }
+    },
+    "queries": [
+      {
+        "description": "should support booleans",
+        "sql": "select b FROM {bools}"
+      },
+      {
+        "description": "should support booleans",
+        "sql": "select true, false FROM {bools}"
+      },
+      {
+        "description": "should support booleans",
+        "sql": "select b FROM {bools} WHERE b"
+      },
+      {
+        "description": "should support booleans",
+        "sql": "select b FROM {bools} WHERE b = false"
+      },
+      {
+        "description": "should support boolean literals",
+        "sql": "select b = true, b = false FROM {bools}"
+      },
+      {
+        "description": "should support boolean inequality ",
+        "sql": "select b != true, b <> false FROM {bools}"
+      }
+    ]
+  },
+  "boolean_implicit_casting": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "b", "type": "BOOLEAN"},
+          {"name": "i", "type": "INT"},
+          {"name": "d", "type": "DOUBLE"},
+          {"name": "s", "type": "STRING"},
+          {"name": "n", "type": "BIG_DECIMAL"},
+          {"name": "t", "type": "TIMESTAMP"},
+          {"name": "by", "type": "BYTES"}
+        ],
+        "inputs": [
+          [true, 1, 1.2, "foo", "1.234", "2022-01-02 03:45:00", "DEADBEEF"],
+          [true, 0, 0.0, "", "0.0", "2022-01-02 03:45:00", "00"],
+          [false, 1, 1.2, "foo", "1.234", "2022-01-02 03:45:00", "DEADBEEF"],
+          [false, 0, 0.0, "", "0.0", "2022-01-02 03:45:00", "00"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "note": "to be postgres compatible, this should throw an exception - but various other systems (like H2 and MySQL) support this",
+        "description": "check implicit cast between boolean and int",
+        "sql": "select b = i FROM {tbl}"
+      },
+      {
+        "description": "check implicit cast between boolean and double",
+        "sql": "select b = d FROM {tbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "H2 doesn't support this, and behavior is somewhat unclear",
+        "description": "check implicit cast between boolean and string",
+        "sql": "select b = s FROM {tbl}"
+      },
+      {
+        "description": "check implicit cast between boolean and numeric",
+        "sql": "select b = n FROM {tbl}"
+      },
+      {
+        "description": "implicit cast should fail between boolean and timestamp",
+        "sql": "select b = t FROM {tbl}",
+        "expectedException": ".*Cannot apply '=' to arguments.*"
+      },
+      {
+        "description": "implicit should fail between boolean and bytes",
+        "sql": "select b = by FROM {tbl}",
+        "expectedException": ".*Cannot apply '=' to arguments.*"
+      }
+    ]
+  },
+  "boolean_logic": {
+    "tables": {
+      "bools": {
+        "schema": [
+          {"name": "b1", "type": "BOOLEAN"},
+          {"name": "b2", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [true, true],
+          [true, false],
+          [false, false],
+          [false, true]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "should support AND",
+        "sql": "select b1 AND b2 FROM {bools}"
+      },
+      {
+        "description": "should support OR",
+        "sql": "select b1 OR b2 FROM {bools}"
+      },
+      {
+        "description": "should support NOT",
+        "sql": "select NOT b1, NOT b2 FROM {bools}"
+      },
+      {
+        "description": "should support NOT with order of precedence",
+        "sql": "select NOT b1 AND b2, NOT b1 OR b2 FROM {bools}"
+      },
+      {
+        "description": "should support cascade",
+        "sql": "select (b1 AND b2) = true FROM {bools}"
+      },
+      {
+        "description": "should support combine",
+        "sql": "select (b1 AND b2) OR (b1 AND b1) FROM {bools}"
+      }
+    ]
+  }
+}

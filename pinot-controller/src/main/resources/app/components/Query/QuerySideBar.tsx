@@ -100,7 +100,7 @@ const Sidebar = ({ tableList, fetchSQLData, tableSchema, selectedTable, queryLoa
               data={tableList}
               cellClickCallback={fetchSQLData}
               isCellClickable
-              showSearchBox={false}
+              showSearchBox={true}
             />
 
             {!queryLoader && tableSchema.records.length ? (
@@ -108,7 +108,7 @@ const Sidebar = ({ tableList, fetchSQLData, tableSchema, selectedTable, queryLoa
                 title={`${selectedTable} schema`}
                 data={tableSchema}
                 highlightBackground
-                showSearchBox={false}
+                showSearchBox={true}
               />
             ) : null}
           </Grid>

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -135,6 +136,9 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
   protected Object convertSingleValue(Object value) {
     if (value instanceof Instant) {
       return Timestamp.from((Instant) value);
+    }
+    if (value instanceof GenericFixed) {
+      return ((GenericFixed) value).bytes();
     }
     // LocalDate, LocalTime and UUID are returned as the ::toString version of the logical type
     return super.convertSingleValue(value);

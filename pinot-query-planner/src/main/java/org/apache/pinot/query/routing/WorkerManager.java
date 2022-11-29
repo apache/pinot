@@ -58,12 +58,12 @@ public class WorkerManager {
     _routingManager = routingManager;
   }
 
-  public void assignWorkerToStage(int stageId, StageMetadata stageMetadata) {
+  public void assignWorkerToStage(int stageId, StageMetadata stageMetadata, long requestId) {
     List<String> scannedTables = stageMetadata.getScannedTables();
     if (scannedTables.size() == 1) {
       // table scan stage, need to attach server as well as segment info for each physical table type.
       String logicalTableName = scannedTables.get(0);
-      Map<String, RoutingTable> routingTableMap = getRoutingTable(logicalTableName);
+      Map<String, RoutingTable> routingTableMap = getRoutingTable(logicalTableName, requestId);
       if (routingTableMap.size() == 0) {
         throw new IllegalArgumentException("Unable to find routing entries for table: " + logicalTableName);
       }
@@ -124,22 +124,22 @@ public class WorkerManager {
    * @param logicalTableName it can either be a hybrid table name or a physical table name with table type.
    * @return keyed-map from table type(s) to routing table(s).
    */
-  private Map<String, RoutingTable> getRoutingTable(String logicalTableName) {
+  private Map<String, RoutingTable> getRoutingTable(String logicalTableName, long requestId) {
     String rawTableName = TableNameBuilder.extractRawTableName(logicalTableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(logicalTableName);
     Map<String, RoutingTable> routingTableMap = new HashMap<>();
     RoutingTable routingTable;
     if (tableType == null) {
-      routingTable = getRoutingTable(rawTableName, TableType.OFFLINE);
+      routingTable = getRoutingTable(rawTableName, TableType.OFFLINE, requestId);
       if (routingTable != null) {
         routingTableMap.put(TableType.OFFLINE.name(), routingTable);
       }
-      routingTable = getRoutingTable(rawTableName, TableType.REALTIME);
+      routingTable = getRoutingTable(rawTableName, TableType.REALTIME, requestId);
       if (routingTable != null) {
         routingTableMap.put(TableType.REALTIME.name(), routingTable);
       }
     } else {
-      routingTable = getRoutingTable(logicalTableName, tableType);
+      routingTable = getRoutingTable(logicalTableName, tableType, requestId);
       if (routingTable != null) {
         routingTableMap.put(tableType.name(), routingTable);
       }
@@ -147,10 +147,10 @@ public class WorkerManager {
     return routingTableMap;
   }
 
-  private RoutingTable getRoutingTable(String tableName, TableType tableType) {
+  private RoutingTable getRoutingTable(String tableName, TableType tableType, long requestId) {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(
         TableNameBuilder.extractRawTableName(tableName));
     return _routingManager.getRoutingTable(
-        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + tableNameWithType));
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + tableNameWithType), requestId);
   }
 }

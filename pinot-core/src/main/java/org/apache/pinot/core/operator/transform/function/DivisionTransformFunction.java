@@ -38,8 +38,6 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   private BigDecimal[] _bigDecimalLiterals;
   private TransformFunction _firstTransformFunction;
   private TransformFunction _secondTransformFunction;
-  private double[] _doubleQuotients;
-  private BigDecimal[] _bigDecimalQuotients;
 
   @Override
   public String getName() {
@@ -100,65 +98,62 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
-    if (_doubleQuotients == null || _doubleQuotients.length < length) {
-      _doubleQuotients = new double[length];
+    if (_doubleValuesSV == null) {
+      _doubleValuesSV = new double[length];
     }
-
     if (_resultDataType == DataType.BIG_DECIMAL) {
       BigDecimal[] values = transformToBigDecimalValuesSV(projectionBlock);
-      ArrayCopyUtils.copy(values, _doubleQuotients, length);
+      ArrayCopyUtils.copy(values, _doubleValuesSV, length);
     } else {
       if (_firstTransformFunction == null) {
-        Arrays.fill(_doubleQuotients, 0, length, _doubleLiterals[0]);
+        Arrays.fill(_doubleValuesSV, 0, length, _doubleLiterals[0]);
       } else {
         double[] values = _firstTransformFunction.transformToDoubleValuesSV(projectionBlock);
-        System.arraycopy(values, 0, _doubleQuotients, 0, length);
+        System.arraycopy(values, 0, _doubleValuesSV, 0, length);
       }
       if (_secondTransformFunction == null) {
         for (int i = 0; i < length; i++) {
-          _doubleQuotients[i] /= _doubleLiterals[1];
+          _doubleValuesSV[i] /= _doubleLiterals[1];
         }
       } else {
         double[] values = _secondTransformFunction.transformToDoubleValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
-          _doubleQuotients[i] /= values[i];
+          _doubleValuesSV[i] /= values[i];
         }
       }
     }
-    return _doubleQuotients;
+    return _doubleValuesSV;
   }
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    if (_bigDecimalQuotients == null || _bigDecimalQuotients.length < length) {
-      _bigDecimalQuotients = new BigDecimal[length];
+    if (_bigDecimalValuesSV == null) {
+      _bigDecimalValuesSV = new BigDecimal[length];
     }
-
     if (_resultDataType == DataType.DOUBLE) {
       double[] values = transformToDoubleValuesSV(projectionBlock);
-      ArrayCopyUtils.copy(values, _bigDecimalQuotients, length);
+      ArrayCopyUtils.copy(values, _bigDecimalValuesSV, length);
     } else {
       if (_firstTransformFunction == null) {
-        Arrays.fill(_bigDecimalQuotients, 0, length, _bigDecimalLiterals[0]);
+        Arrays.fill(_bigDecimalValuesSV, 0, length, _bigDecimalLiterals[0]);
       } else {
         BigDecimal[] values = _firstTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
-        System.arraycopy(values, 0, _bigDecimalQuotients, 0, length);
+        System.arraycopy(values, 0, _bigDecimalValuesSV, 0, length);
       }
       if (_secondTransformFunction == null) {
         for (int i = 0; i < length; i++) {
           // todo: expose roundingMode/mathContext as parameter in DivisionTransformFunction.
-          _bigDecimalQuotients[i] = _bigDecimalQuotients[i].divide(_bigDecimalLiterals[1], RoundingMode.HALF_EVEN);
+          _bigDecimalValuesSV[i] = _bigDecimalValuesSV[i].divide(_bigDecimalLiterals[1], RoundingMode.HALF_EVEN);
         }
       } else {
         BigDecimal[] values = _secondTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
           // todo: expose roundingMode/mathContext as parameter in DivisionTransformFunction.
-          _bigDecimalQuotients[i] = _bigDecimalQuotients[i].divide(values[i], RoundingMode.HALF_EVEN);
+          _bigDecimalValuesSV[i] = _bigDecimalValuesSV[i].divide(values[i], RoundingMode.HALF_EVEN);
         }
       }
     }
-    return _bigDecimalQuotients;
+    return _bigDecimalValuesSV;
   }
 }

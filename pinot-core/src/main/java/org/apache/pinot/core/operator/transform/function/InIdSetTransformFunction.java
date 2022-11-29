@@ -43,7 +43,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class InIdSetTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   private IdSet _idSet;
-  private int[] _results;
 
   @Override
   public String getName() {
@@ -75,52 +74,50 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
-    if (_results == null || _results.length < length) {
-      _results = new int[length];
+    if (_intValuesSV == null) {
+      _intValuesSV = new int[length];
     }
-
     DataType storedType = _transformFunction.getResultMetadata().getDataType().getStoredType();
     switch (storedType) {
       case INT:
         int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
-          _results[i] = _idSet.contains(intValues[i]) ? 1 : 0;
+          _intValuesSV[i] = _idSet.contains(intValues[i]) ? 1 : 0;
         }
         break;
       case LONG:
         long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
-          _results[i] = _idSet.contains(longValues[i]) ? 1 : 0;
+          _intValuesSV[i] = _idSet.contains(longValues[i]) ? 1 : 0;
         }
         break;
       case FLOAT:
         float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
-          _results[i] = _idSet.contains(floatValues[i]) ? 1 : 0;
+          _intValuesSV[i] = _idSet.contains(floatValues[i]) ? 1 : 0;
         }
         break;
       case DOUBLE:
         double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
-          _results[i] = _idSet.contains(doubleValues[i]) ? 1 : 0;
+          _intValuesSV[i] = _idSet.contains(doubleValues[i]) ? 1 : 0;
         }
         break;
       case STRING:
         String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
-          _results[i] = _idSet.contains(stringValues[i]) ? 1 : 0;
+          _intValuesSV[i] = _idSet.contains(stringValues[i]) ? 1 : 0;
         }
         break;
       case BYTES:
         byte[][] bytesValues = _transformFunction.transformToBytesValuesSV(projectionBlock);
         for (int i = 0; i < length; i++) {
-          _results[i] = _idSet.contains(bytesValues[i]) ? 1 : 0;
+          _intValuesSV[i] = _idSet.contains(bytesValues[i]) ? 1 : 0;
         }
         break;
       default:
         throw new IllegalStateException();
     }
-    return _results;
+    return _intValuesSV;
   }
 }

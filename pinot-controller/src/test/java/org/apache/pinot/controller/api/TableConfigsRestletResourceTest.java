@@ -306,9 +306,9 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
     tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
-    Assert.assertEquals(tableConfigsResponse.getOffline().getValidationConfig().getReplicationNumber(),
+    Assert.assertEquals(tableConfigsResponse.getOffline().getReplication(),
         DEFAULT_MIN_NUM_REPLICAS);
-    Assert.assertEquals(tableConfigsResponse.getRealtime().getValidationConfig().getReplicasPerPartitionNumber(),
+    Assert.assertEquals(tableConfigsResponse.getRealtime().getReplication(),
         DEFAULT_MIN_NUM_REPLICAS);
     sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
 

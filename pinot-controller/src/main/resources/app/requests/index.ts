@@ -20,7 +20,8 @@
 import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
   IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
-  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig
+  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig,
+  SegmentDebugDetails, QuerySchemas
 } from 'Models';
 
 const headers = {
@@ -28,7 +29,7 @@ const headers = {
   'Accept': 'text/plain, */*; q=0.01'
 };
 
-import { baseApi, transformApi } from '../utils/axios-config';
+import { baseApi, baseApiWithErrors, transformApi } from '../utils/axios-config';
 
 export const getTenants = (): Promise<AxiosResponse<Tenants>> =>
   baseApi.get('/tenants');
@@ -45,14 +46,21 @@ export const getTenantTableDetails = (tableName: string): Promise<AxiosResponse<
 export const putTable = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.put(`/tables/${name}`, params, { headers });
 
-export const getSchemaList = (): Promise<AxiosResponse<OperationResponse>> =>
+export const getSchemaList = (): Promise<AxiosResponse<QuerySchemas>> =>
   baseApi.get(`/schemas`);
 
 export const getSchema = (name: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/schemas/${name}`);
 
-export const putSchema = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.put(`/schemas/${name}`, params, { headers });
+export const putSchema = (name: string, params: string, reload?: boolean): Promise<AxiosResponse<OperationResponse>> => {
+  let queryParams = {};
+  
+  if(reload) {
+    queryParams["reload"] = reload;
+  }
+
+  return baseApi.put(`/schemas/${name}`, params, { headers, params: queryParams });
+}
 
 export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<IdealState>> =>
   baseApi.get(`/segments/${tableName}/${segmentName}/metadata?columns=*`);
@@ -236,6 +244,11 @@ export const authenticateUser = (authToken): Promise<AxiosResponse<OperationResp
 
 export const getSegmentDebugInfo = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`debug/tables/${tableName}?type=${tableType}&verbosity=10`);
+
+export const getSegmentLevelDebugDetails = async (tableName: string, segmentName: string): Promise<SegmentDebugDetails> => {
+  const response = await baseApiWithErrors.get(`debug/segments/${tableName}/${segmentName}`);
+  return response.data;
+}
 
 export const requestTable = (): Promise<AxiosResponse<TableList>> =>
     baseApi.get(`/tables`);
