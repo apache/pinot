@@ -143,6 +143,14 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     return transferableBlock;
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+    _dataTableBlockBaseOperator.close();
+    // close send stream.
+    _context.getExchange().close();
+  }
+
   private static StringMailboxIdentifier toMailboxId(ServerInstance serverInstance, long jobId, int stageId,
       String serverHostName, int serverPort) {
     return new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHostName, serverPort,

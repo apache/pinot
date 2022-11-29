@@ -54,14 +54,4 @@ public class OpChain {
   public ThreadResourceUsageProvider getAndStartTimer() {
     return _timer.get();
   }
-
-  // TODO: Make this auto closable.
-  public void close()  {
-    try {
-      _context.close();
-    } catch (Exception e){
-      System.out.println("shut down exception");
-    }
-    // Clean up resources. for example, clean up grpc channel.
-  }
 }

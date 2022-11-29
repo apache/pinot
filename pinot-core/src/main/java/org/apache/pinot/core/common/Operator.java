@@ -48,6 +48,9 @@ public interface Operator<T extends Block> {
   @Nullable
   String toExplainString();
 
+  void close()
+      throws InterruptedException;
+
   /**
    * Returns the index segment associated with the operator.
    */

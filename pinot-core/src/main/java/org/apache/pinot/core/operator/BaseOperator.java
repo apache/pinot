@@ -46,4 +46,7 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   // Make it protected because we should always call nextBlock()
   protected abstract T getNextBlock();
+
+  public abstract void close()
+      throws InterruptedException;
 }

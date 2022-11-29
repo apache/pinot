@@ -83,12 +83,23 @@ public abstract class BlockExchange {
     }
   }
 
+  public void close()
+      throws InterruptedException {
+    for(MailboxIdentifier dest: _destinations){
+      SendingMailbox<TransferableBlock> sendingMailbox = _context.getSendingMailbox(dest);
+      sendingMailbox.complete();
+    }
+    for(MailboxIdentifier dest: _destinations){
+      SendingMailbox<TransferableBlock> sendingMailbox = _context.getSendingMailbox(dest);
+      sendingMailbox.waitForComplete();
+    }
+  }
+
   private void sendBlock(MailboxIdentifier mailboxId, TransferableBlock block) {
     SendingMailbox<TransferableBlock> sendingMailbox = _context.getSendingMailbox(mailboxId);
 
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);
-      sendingMailbox.complete();
       return;
     }
 

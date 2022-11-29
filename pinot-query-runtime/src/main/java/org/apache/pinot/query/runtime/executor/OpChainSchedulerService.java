@@ -77,11 +77,11 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
         if (!isRunning()) {
           return;
         }
-
         OpChain operatorChain = _scheduler.next();
         _workerPool.submit(new TraceRunnable() {
           @Override
-          public void runJob() {
+          public void runJob()
+              throws InterruptedException {
             try {
               ThreadResourceUsageProvider timer = operatorChain.getAndStartTimer();
               // so long as there's work to be done, keep getting the next block
@@ -97,14 +97,12 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                 // not complete, needs to re-register for scheduling
                 register(operatorChain);
               } else {
-                LOGGER.info("Execution time: " + timer.getThreadTimeNs());
-                operatorChain.close();
+                operatorChain.getRoot().close();
               }
             } catch (Exception e) {
               operatorChain._context.getExchange().send(TransferableBlockUtils.getErrorTransferableBlock(e));
               // TODO: pass this error through context.
-              LOGGER.error("Failed to execute query!", e);
-              operatorChain.close();
+              operatorChain.getRoot().close();
             }
           }
         });

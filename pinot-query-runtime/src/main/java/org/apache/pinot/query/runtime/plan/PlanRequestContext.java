@@ -54,13 +54,6 @@ public class PlanRequestContext {
     return _sendingMailboxMap.computeIfAbsent(mailboxId.toString(), (mid) -> _mailboxService.createSendingMailbox(mailboxId));
   }
 
-  public void close()
-      throws InterruptedException {
-    for(SendingMailbox<TransferableBlock> sendingMailbox: _sendingMailboxMap.values()){
-      sendingMailbox.waitForComplete();
-    }
-  }
-
   public void registerExchange(BlockExchange exchange) {
     _exchange = exchange;
   }

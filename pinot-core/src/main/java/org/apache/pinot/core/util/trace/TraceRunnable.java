@@ -45,5 +45,6 @@ public abstract class TraceRunnable implements Runnable {
     }
   }
 
-  public abstract void runJob();
+  public abstract void runJob()
+      throws InterruptedException;
 }
