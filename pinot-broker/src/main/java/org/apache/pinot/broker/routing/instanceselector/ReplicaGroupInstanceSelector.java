@@ -20,8 +20,10 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
@@ -68,14 +70,15 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
 
-
     if (_adaptiveServerSelector != null) {
       // Adaptive Server Selection is enabled.
       List<String> serverRankList = new ArrayList<>();
+      List<String> candidateServers = fetchCandidateServersForQuery(segments, segmentToEnabledInstancesMap);
 
       // Fetch serverRankList before looping through all the segments. This is important to make sure that we pick
       // the least amount of instances for a query by referring to a single snapshot of the rankings.
-      List<Pair<String, Double>> serverRankListWithScores = _adaptiveServerSelector.fetchAllServerRankingsWithScores();
+      List<Pair<String, Double>> serverRankListWithScores =
+          _adaptiveServerSelector.fetchServerRankingsWithScores(candidateServers);
       for (Pair<String, Double> entry : serverRankListWithScores) {
         serverRankList.add(entry.getLeft());
       }
@@ -155,5 +158,21 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
       segmentToSelectedInstanceMap.put(segment, selectedInstance);
     }
+  }
+
+  private List<String> fetchCandidateServersForQuery(List<String> segments,
+      Map<String, List<String>> segmentToEnabledInstancesMap) {
+    List<String> serversList = new ArrayList<>();
+
+    Set<String> tempServerSet = new HashSet<>();
+    for (String segment : segments) {
+      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
+      if (enabledInstances != null) {
+        tempServerSet.addAll(enabledInstances);
+      }
+    }
+
+    serversList.addAll(tempServerSet);
+    return serversList;
   }
 }
