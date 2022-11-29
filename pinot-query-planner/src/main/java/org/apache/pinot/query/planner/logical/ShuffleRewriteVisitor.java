@@ -150,8 +150,9 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
 
   @Override
   public Set<Integer> visitSort(SortNode node, Void context) {
-    // sort doesn't change the partition keys
-    return node.getInputs().get(0).visit(this, context);
+    // with sort shuffling reorder could change, so we can't directly return the old partition keys.
+    // TODO: fix me.
+    return new HashSet<>();
   }
 
   @Override
