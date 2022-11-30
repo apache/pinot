@@ -20,8 +20,10 @@ package org.apache.pinot.query.runtime.queries;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,25 +59,6 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern TABLE_NAME_REPLACE_PATTERN = Pattern.compile("\\{([\\w\\d]+)\\}");
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
-  // TODO: refactor and load test dynamically using the reousrce utils in pinot-tools
-  private static final List<String> QUERY_TEST_RESOURCE_FILES = ImmutableList.of(
-      "BasicQuery.json",
-      "FromExpressions.json",
-      "SpecialSyntax.json",
-      "LexicalStructure.json",
-      "SelectExpressions.json",
-      "ValueExpressions.json",
-      "NumericTypes.json",
-      "SelectHaving.json",
-      "TableExpressions.json",
-      "CharacterTypes.json",
-      "BinaryTypes.json",
-      "TimeTypes.json",
-      "BooleanLogic.json",
-      "Comparisons.json",
-      "Aggregates.json",
-      "Case.json"
-  );
 
   @BeforeClass
   public void setUp()
@@ -278,10 +261,21 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static Map<String, QueryTestCase> getTestCases()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = new HashMap<>();
-    for (String testCaseName : QUERY_TEST_RESOURCE_FILES) {
+    ClassLoader classLoader = ResourceBasedQueriesTest.class.getClassLoader();
+    // Get all test files.
+    List<String> testFilenames = new ArrayList<>();
+    try (InputStream in = classLoader.getResourceAsStream(QUERY_TEST_RESOURCE_FOLDER);
+        BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
+      String resource;
+      while ((resource = br.readLine()) != null) {
+        testFilenames.add(resource);
+      }
+    }
+    // Load each test file.
+    for (String testCaseName : testFilenames) {
       String testCaseFile = QUERY_TEST_RESOURCE_FOLDER + File.separator + testCaseName;
-      // TODO: support JAR test as well, right now it has to be run in a checked-out repo
-      URL testFileUrl = ResourceBasedQueriesTest.class.getClassLoader().getResource(testCaseFile);
+      URL testFileUrl = classLoader.getResource(testCaseFile);
+      // This test only supports local resource loading (e.g. must be a file), not support JAR test loading.
       if (testFileUrl != null && new File(testFileUrl.getFile()).exists()) {
         Map<String, QueryTestCase> testCases = MAPPER.readValue(new File(testFileUrl.getFile()),
             new TypeReference<Map<String, QueryTestCase>>() { });
