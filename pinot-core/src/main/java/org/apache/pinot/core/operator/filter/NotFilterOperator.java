@@ -55,6 +55,12 @@ public class NotFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
+  @Override
   public boolean canOptimizeCount() {
     return _filterOperator.canOptimizeCount();
   }

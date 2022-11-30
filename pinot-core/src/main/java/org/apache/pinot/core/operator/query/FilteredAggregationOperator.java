@@ -93,6 +93,12 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
   }
 
   @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return _aggFunctionsWithTransformOperator.stream().map(Pair::getRight).collect(Collectors.toList());
   }

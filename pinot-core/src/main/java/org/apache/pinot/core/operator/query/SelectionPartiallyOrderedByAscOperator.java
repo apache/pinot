@@ -79,4 +79,10 @@ public class SelectionPartiallyOrderedByAscOperator extends LinearSelectionOrder
   protected String getExplainName() {
     return EXPLAIN_NAME;
   }
+
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 }

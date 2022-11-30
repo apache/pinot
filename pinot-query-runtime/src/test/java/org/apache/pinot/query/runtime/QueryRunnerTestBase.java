@@ -48,6 +48,7 @@ import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.query.service.QueryDispatcher;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -78,7 +79,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
-        mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
+        PlanRequestContext context = new PlanRequestContext(_mailboxService,  Long.parseLong(requestMetadataMap.get("REQUEST_ID")),
+            "localhost", _reducerGrpcPort, queryPlan.getStageMetadataMap(), reduceNode.getSenderStageId());
+        mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(context,
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
             Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(),
             reduceNode.getDataSchema(), "localhost", _reducerGrpcPort);

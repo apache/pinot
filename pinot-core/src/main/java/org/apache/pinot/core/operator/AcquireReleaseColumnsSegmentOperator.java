@@ -63,6 +63,12 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
     return _childOperator.nextBlock();
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   /**
    * Acquires the indexSegment using the provided fetchContext
    */

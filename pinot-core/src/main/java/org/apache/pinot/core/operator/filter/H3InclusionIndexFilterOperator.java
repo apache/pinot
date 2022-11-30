@@ -121,6 +121,12 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   /**
    * Returns the filter block based on the given the partial match doc ids.
    */

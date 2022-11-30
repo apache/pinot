@@ -130,6 +130,12 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
   }
 
   @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_transformOperator);
   }

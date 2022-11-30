@@ -70,6 +70,12 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator<SelectionR
   }
 
   @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
+  @Override
   protected boolean isQuerySatisfied(SelectionResultsBlock resultsBlock) {
     return resultsBlock.getRows().size() == _numRowsToKeep;
   }

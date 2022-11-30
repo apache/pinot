@@ -274,6 +274,12 @@ public class CombineSlowOperatorsTest {
     }
 
     @Override
+    public void close()
+        throws InterruptedException {
+
+    }
+
+    @Override
     public String toExplainString() {
       return EXPLAIN_NAME;
     }

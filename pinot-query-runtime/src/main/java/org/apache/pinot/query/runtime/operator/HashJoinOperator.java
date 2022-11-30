@@ -120,6 +120,13 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+    _leftTableOperator.close();
+    _rightTableOperator.close();
+  }
+
   private void buildBroadcastHashTable() {
     TransferableBlock rightBlock = _rightTableOperator.nextBlock();
     if (rightBlock.isErrorBlock()) {

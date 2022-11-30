@@ -107,6 +107,12 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   private BaseResultsBlock getCombinedResults() {
     try {
       prefetchAll();

@@ -63,4 +63,10 @@ public class CombinedFilterOperator extends BaseFilterOperator {
     FilterBlockDocIdSet subFilterDocIdSet = _subFilterOperator.nextBlock().getBlockDocIdSet();
     return new FilterBlock(new AndDocIdSet(Arrays.asList(mainFilterDocIdSet, subFilterDocIdSet), _queryOptions));
   }
+
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 }

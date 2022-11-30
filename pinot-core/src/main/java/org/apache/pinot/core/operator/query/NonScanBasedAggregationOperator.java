@@ -131,6 +131,12 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     return new AggregationResultsBlock(_aggregationFunctions, aggregationResults);
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   private static Double getMinValue(DataSource dataSource) {
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {

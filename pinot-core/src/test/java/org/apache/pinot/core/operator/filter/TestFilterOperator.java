@@ -75,6 +75,12 @@ public class TestFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
+  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }

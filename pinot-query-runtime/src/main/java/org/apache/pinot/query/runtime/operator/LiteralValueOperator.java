@@ -65,6 +65,12 @@ public class LiteralValueOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   private TransferableBlock constructBlock(List<List<RexExpression>> rexLiteralRows) {
     List<Object[]> blockContent = new ArrayList<>();
     for (List<RexExpression> rexLiteralRow : rexLiteralRows) {

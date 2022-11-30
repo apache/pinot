@@ -63,6 +63,14 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
   }
 
   @Override
+  public ReceivingMailbox<TransferableBlock> createReceivingMailbox(MailboxIdentifier mailboxId) {
+    if (mailboxId.isLocal()) {
+      return _inMemoryMailboxService.createReceivingMailbox(mailboxId);
+    }
+    return _grpcMailboxService.createReceivingMailbox(mailboxId);
+  }
+
+  @Override
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     if (mailboxId.isLocal()) {
       return _inMemoryMailboxService.getReceivingMailbox(mailboxId);

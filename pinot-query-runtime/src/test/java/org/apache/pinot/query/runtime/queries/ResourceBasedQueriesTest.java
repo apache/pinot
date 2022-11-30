@@ -59,28 +59,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
   // TODO: refactor and load test dynamically using the reousrce utils in pinot-tools
   private static final List<String> QUERY_TEST_RESOURCE_FILES = ImmutableList.of(
-      "BasicQuery.json",
-      "FromExpressions.json",
-      "SpecialSyntax.json",
-      "LexicalStructure.json",
-      "SelectExpressions.json",
-      "ValueExpressions.json",
-      "NumericTypes.json",
-      "SelectHaving.json",
-      "TableExpressions.json",
-      "CharacterTypes.json",
-      "BinaryTypes.json",
-      "TimeTypes.json",
-      "BooleanLogic.json",
-      "Comparisons.json",
-      "Aggregates.json",
-      "BasicQuery.json",
-      "SpecialSyntax.json",
-      "LexicalStructure.json",
-      "SelectExpressions.json",
-      "ValueExpressions.json",
-      "NumericTypes.json",
-      "Comparisons.json"
+      "BasicQuery.json"
   );
 
   @BeforeClass

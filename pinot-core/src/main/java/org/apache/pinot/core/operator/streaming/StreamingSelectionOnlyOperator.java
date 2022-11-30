@@ -99,6 +99,12 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
   }
 
   @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
+  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }

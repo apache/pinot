@@ -74,6 +74,12 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   }
 
   @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_transformOperator);
   }

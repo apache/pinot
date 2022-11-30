@@ -186,6 +186,12 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   /**
    * Returns the H3 ids that is ALWAYS fully covered by the circle with the given distance as the radius and a point
    * within the _h3Id hexagon as the center.

@@ -130,6 +130,12 @@ public class CombineErrorOperatorsTest {
     }
 
     @Override
+    public void close()
+        throws InterruptedException {
+
+    }
+
+    @Override
     public List<Operator> getChildOperators() {
       return Collections.emptyList();
     }
@@ -151,6 +157,12 @@ public class CombineErrorOperatorsTest {
     @Override
     protected Block getNextBlock() {
       throw new Error("Error");
+    }
+
+    @Override
+    public void close()
+        throws InterruptedException {
+
     }
 
     @Override
@@ -177,6 +189,12 @@ public class CombineErrorOperatorsTest {
       return new SelectionResultsBlock(
           new DataSchema(new String[]{"myColumn"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}),
           new ArrayList<>());
+    }
+
+    @Override
+    public void close()
+        throws InterruptedException {
+
     }
 
     @Override

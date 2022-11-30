@@ -43,6 +43,11 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
     return new FilterBlock(new MatchAllDocIdSet(_numDocs));
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 
   @Override
   public List<Operator> getChildOperators() {

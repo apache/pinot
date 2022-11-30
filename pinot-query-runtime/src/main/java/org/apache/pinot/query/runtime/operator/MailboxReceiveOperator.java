@@ -31,11 +31,11 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,12 +59,16 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
       ImmutableSet.of(RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED,
           RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED);
 
-  private final MailboxService<TransferableBlock> _mailboxService;
+  private PlanRequestContext _context;
   private final RelDistribution.Type _exchangeType;
   private final List<MailboxIdentifier> _sendingMailbox;
   private final long _deadlineInNanoSeconds;
   private int _serverIdx;
   private TransferableBlock _upstreamErrorBlock;
+
+  private long _jobId;
+
+  private long _stageId;
 
   private static MailboxIdentifier toMailboxId(ServerInstance fromInstance, long jobId, long stageId,
       String receiveHostName, int receivePort) {
@@ -73,12 +77,14 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   }
 
   // TODO: Move deadlineInNanoSeconds to OperatorContext.
-  public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService,
+  public MailboxReceiveOperator(PlanRequestContext context,
       List<ServerInstance> sendingStageInstances, RelDistribution.Type exchangeType, String receiveHostName,
       int receivePort, long jobId, int stageId, Long deadlineInNanoSeconds) {
-    _mailboxService = mailboxService;
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
         "Exchange/Distribution type: " + exchangeType + " is not supported!");
+    _context = context;
+    _jobId = jobId;
+    _stageId = stageId;
     if (deadlineInNanoSeconds == null) {
       _deadlineInNanoSeconds = System.nanoTime() + QueryConfig.DEFAULT_TIMEOUT_NANO;
     } else {
@@ -86,11 +92,13 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     }
 
     _exchangeType = exchangeType;
+    System.out.println("MailboxReceiveOperator: jobId" + _jobId + "stageID" + stageId);
+
     if (_exchangeType == RelDistribution.Type.SINGLETON) {
       ServerInstance singletonInstance = null;
       for (ServerInstance serverInstance : sendingStageInstances) {
-        if (serverInstance.getHostname().equals(_mailboxService.getHostname())
-            && serverInstance.getQueryMailboxPort() == _mailboxService.getMailboxPort()) {
+        if (serverInstance.getHostname().equals(_context.getMailboxService().getHostname())
+            && serverInstance.getQueryMailboxPort() == _context.getMailboxService().getMailboxPort()) {
           Preconditions.checkState(singletonInstance == null, "multiple instance found for singleton exchange type!");
           singletonInstance = serverInstance;
         }
@@ -100,6 +108,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
         // TODO: fix WorkerManager assignment, this should not happen if we properly assign workers.
         // see: https://github.com/apache/pinot/issues/9611
         _sendingMailbox = Collections.emptyList();
+        System.out.println("empty sending mailbox");
       } else {
         _sendingMailbox =
             Collections.singletonList(toMailboxId(singletonInstance, jobId, stageId, receiveHostName, receivePort));
@@ -109,6 +118,9 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
       for (ServerInstance instance : sendingStageInstances) {
         _sendingMailbox.add(toMailboxId(instance, jobId, stageId, receiveHostName, receivePort));
       }
+    }
+    for(MailboxIdentifier id: _sendingMailbox){
+      System.out.println("sendingMaiblox:" + id);
     }
     _upstreamErrorBlock = null;
     _serverIdx = 0;
@@ -145,7 +157,8 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
       _serverIdx = (startingIdx + i) % _sendingMailbox.size();
       MailboxIdentifier mailboxId = _sendingMailbox.get(_serverIdx);
       try {
-        ReceivingMailbox<TransferableBlock> mailbox = _mailboxService.getReceivingMailbox(mailboxId);
+        ReceivingMailbox<TransferableBlock> mailbox = _context.createReceivingMailbox(mailboxId);
+        System.out.println("mailbox:" + mailbox + "mailboxId:" + mailboxId);
         if (!mailbox.isClosed()) {
           openMailboxCount++;
           // this is blocking for 100ms and may return null
@@ -174,5 +187,11 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     // return EOS
     return openMailboxCount > 0 ? TransferableBlockUtils.getNoOpTransferableBlock()
         : TransferableBlockUtils.getEndOfStreamTransferableBlock();
+  }
+
+  @Override
+  public void close()
+      throws InterruptedException {
+
   }
 }

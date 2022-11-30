@@ -99,6 +99,12 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   /**
    * This util is used to canonicalize row generated from V1 engine, which is stored using
    * {@link DataSchema#getStoredColumnDataTypes()} format. However, the transferable block ser/de stores data in the

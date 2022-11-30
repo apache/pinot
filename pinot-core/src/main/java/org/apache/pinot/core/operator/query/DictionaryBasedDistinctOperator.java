@@ -74,6 +74,12 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     return new DistinctResultsBlock(_distinctAggregationFunction, buildResult());
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   /**
    * Build the final result for this operation
    */

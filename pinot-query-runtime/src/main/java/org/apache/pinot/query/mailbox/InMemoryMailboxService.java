@@ -64,6 +64,10 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
     return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._sendingMailbox;
   }
 
+  public ReceivingMailbox<TransferableBlock> createReceivingMailbox(MailboxIdentifier mailboxId){
+    return getReceivingMailbox(mailboxId);
+  }
+
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();

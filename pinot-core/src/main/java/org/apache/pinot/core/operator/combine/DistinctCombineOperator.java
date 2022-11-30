@@ -71,4 +71,10 @@ public class DistinctCombineOperator extends BaseCombineOperator<DistinctResults
 
     mergedDistinctTable.mergeTable(distinctTableToMerge);
   }
+
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 }

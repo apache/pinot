@@ -267,4 +267,10 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
   @Override
   protected void mergeResultsBlocks(GroupByResultsBlock mergedBlock, GroupByResultsBlock blockToMerge) {
   }
+
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 }

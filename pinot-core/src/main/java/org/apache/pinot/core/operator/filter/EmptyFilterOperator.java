@@ -61,6 +61,11 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
     return EmptyFilterBlock.getInstance();
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 
   @Override
   public String toExplainString() {

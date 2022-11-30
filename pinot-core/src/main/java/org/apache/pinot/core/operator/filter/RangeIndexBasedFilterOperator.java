@@ -68,6 +68,12 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     return evaluateLegacyRangeFilter();
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   private FilterBlock evaluateLegacyRangeFilter() {
     ImmutableRoaringBitmap matches = _rangeEvaluator.getMatchingDocIds();
     // if the implementation cannot match the entire query exactly, it will

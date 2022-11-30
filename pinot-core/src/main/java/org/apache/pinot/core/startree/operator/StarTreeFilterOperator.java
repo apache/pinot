@@ -128,6 +128,12 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
+  @Override
   public boolean isResultEmpty() {
     return _resultEmpty;
   }

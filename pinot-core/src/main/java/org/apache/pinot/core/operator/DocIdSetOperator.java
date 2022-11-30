@@ -86,6 +86,11 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 
   @Override
   public String toExplainString() {

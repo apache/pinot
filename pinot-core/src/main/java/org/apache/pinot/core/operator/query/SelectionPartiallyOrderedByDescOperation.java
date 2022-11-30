@@ -102,4 +102,10 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
   protected String getExplainName() {
     return EXPLAIN_NAME;
   }
+
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 }

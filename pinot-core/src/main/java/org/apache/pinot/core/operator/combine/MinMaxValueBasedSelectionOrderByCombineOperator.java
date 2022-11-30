@@ -329,6 +329,12 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     return resultsBlock.convertToPriorityQueueBased();
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   private static class MinMaxValueContext {
     final Operator<BaseResultsBlock> _operator;
     final Comparable _minValue;

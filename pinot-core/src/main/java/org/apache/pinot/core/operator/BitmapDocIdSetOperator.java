@@ -71,6 +71,11 @@ public class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 
   @Override
   public String toExplainString() {

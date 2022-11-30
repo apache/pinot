@@ -38,6 +38,8 @@ public abstract class TraceRunnable implements Runnable {
     }
     try {
       runJob();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     } finally {
       if (_parentTraceEntry != null) {
         TraceContext.unregisterThreadFromRequest();

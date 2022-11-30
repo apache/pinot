@@ -116,6 +116,11 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 
   @Override
   public String toExplainString() {

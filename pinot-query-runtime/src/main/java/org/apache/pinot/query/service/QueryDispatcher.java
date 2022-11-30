@@ -43,6 +43,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -61,9 +62,11 @@ public class QueryDispatcher {
       throws Exception {
     // submit all the distributed stages.
     int reduceStageId = submit(requestId, queryPlan);
+    PlanRequestContext context = new PlanRequestContext(mailboxService, requestId, mailboxService.getHostname(), mailboxService.getMailboxPort(),
+        queryPlan.getStageMetadataMap(),reduceStageId);
     // run reduce stage and return result.
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
-    MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
+    MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(context,
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
         reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
         mailboxService.getMailboxPort());
@@ -189,11 +192,11 @@ public class QueryDispatcher {
   }
 
   @VisibleForTesting
-  public static MailboxReceiveOperator createReduceStageOperator(MailboxService<TransferableBlock> mailboxService,
+  public static MailboxReceiveOperator createReduceStageOperator(PlanRequestContext context,
       List<ServerInstance> sendingInstances, long jobId, int stageId, DataSchema dataSchema, String hostname,
       int port) {
     MailboxReceiveOperator mailboxReceiveOperator =
-        new MailboxReceiveOperator(mailboxService, sendingInstances,
+        new MailboxReceiveOperator(context, sendingInstances,
             RelDistribution.Type.RANDOM_DISTRIBUTED, hostname, port, jobId, stageId, null);
     return mailboxReceiveOperator;
   }

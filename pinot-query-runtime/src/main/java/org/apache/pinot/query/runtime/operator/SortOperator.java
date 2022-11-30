@@ -95,6 +95,12 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+    _upstreamOperator.close();
+  }
+
   private TransferableBlock produceSortedBlock() {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;

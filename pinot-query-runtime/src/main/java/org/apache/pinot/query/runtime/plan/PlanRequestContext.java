@@ -20,8 +20,10 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -38,7 +40,9 @@ public class PlanRequestContext {
   BlockExchange _exchange;
   public int _stageId;
 
-  private final HashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap = new HashMap<>();
+  private final ConcurrentHashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap = new ConcurrentHashMap<>();
+
+  private final ConcurrentHashMap<String, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap = new ConcurrentHashMap<>();
 
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, String hostName, int port,
       Map<Integer, StageMetadata> metadataMap, int stageId) {
@@ -52,6 +56,14 @@ public class PlanRequestContext {
 
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
     return _sendingMailboxMap.computeIfAbsent(mailboxId.toString(), (mid) -> _mailboxService.createSendingMailbox(mailboxId));
+  }
+
+  public ReceivingMailbox<TransferableBlock> createReceivingMailbox(MailboxIdentifier mailboxId) {
+    return _receivingMailboxMap.computeIfAbsent(mailboxId.toString(), (mid) -> _mailboxService.createReceivingMailbox(mailboxId));
+
+  }
+  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
+    return  _mailboxService.getReceivingMailbox(mailboxId);
   }
 
   public void registerExchange(BlockExchange exchange) {

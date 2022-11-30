@@ -138,4 +138,10 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
   @Override
   protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
   }
+
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 }

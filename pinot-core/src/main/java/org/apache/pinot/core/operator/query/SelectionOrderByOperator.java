@@ -129,6 +129,12 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
   /**
    * Helper method to compute the result when all the output expressions are ordered.
    */

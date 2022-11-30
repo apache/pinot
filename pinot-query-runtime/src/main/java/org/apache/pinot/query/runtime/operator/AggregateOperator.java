@@ -141,6 +141,12 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+    _inputOperator.close();
+  }
+
   private TransferableBlock produceAggregatedBlock() {
     List<Object[]> rows = new ArrayList<>(_groupByKeyHolder.size());
     for (Map.Entry<Key, Object[]> e : _groupByKeyHolder.entrySet()) {

@@ -59,6 +59,11 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 
   @Override
   public List<Operator> getChildOperators() {

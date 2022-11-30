@@ -78,6 +78,12 @@ public class FilterOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
+  @Override
+  public void close()
+      throws InterruptedException {
+    _upstreamOperator.close();
+  }
+
   private TransferableBlock transform(TransferableBlock block)
       throws Exception {
     if (_upstreamErrorBlock != null) {

@@ -136,7 +136,7 @@ public class QueryRunner {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
       try {
-        context.close();
+        mailboxSendOperator.close();
       } catch (Exception e){
         System.out.println("got exception.");
       }

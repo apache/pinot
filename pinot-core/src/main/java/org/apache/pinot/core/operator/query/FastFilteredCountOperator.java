@@ -69,6 +69,12 @@ public class FastFilteredCountOperator extends BaseOperator<AggregationResultsBl
   }
 
   @Override
+  public void close()
+      throws InterruptedException {
+
+  }
+
+  @Override
   public ExecutionStatistics getExecutionStatistics() {
     // fabricate the number of docs scanned to keep compatibility tests happy for now, but this should be set to zero
     return new ExecutionStatistics(_docsCounted, 0, 0, _segmentMetadata.getTotalDocs());

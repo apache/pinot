@@ -31,6 +31,7 @@ import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -73,8 +74,10 @@ public class MailboxReceiveOperatorTest {
   @Test
   public void shouldTimeoutOnExtraLongSleep()
       throws InterruptedException {
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
     MailboxReceiveOperator receiveOp =
-        new MailboxReceiveOperator(_mailboxService, new ArrayList<>(), RelDistribution.Type.SINGLETON, "test", 123, 456,
+        new MailboxReceiveOperator(context, new ArrayList<>(), RelDistribution.Type.SINGLETON, "test", 123, 456,
             789, 1L);
     Thread.sleep(1000);
     TransferableBlock mailbox = receiveOp.nextBlock();
@@ -95,8 +98,9 @@ public class MailboxReceiveOperatorTest {
 
     Mockito.when(_server2.getHostname()).thenReturn("singleton");
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(123);
-
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.SINGLETON, "test", 123, 456, 789, null);
   }
 
@@ -110,8 +114,9 @@ public class MailboxReceiveOperatorTest {
 
     Mockito.when(_server2.getHostname()).thenReturn("singleton");
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(123);
-
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.RANGE_DISTRIBUTED, "test", 123, 456, 789, null);
   }
 
@@ -134,8 +139,9 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
 
     // Receive end of stream block directly when there is no match.
@@ -166,7 +172,9 @@ public class MailboxReceiveOperatorTest {
         new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(true);
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
     // Receive end of stream block directly when mailbox is close.
     Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
@@ -199,7 +207,9 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     // Receive null mailbox during timeout.
     Mockito.when(_mailbox.receive()).thenReturn(null);
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
     // Receive NoOpBlock.
     Assert.assertTrue(receiveOp.nextBlock().isNoOpBlock());
@@ -233,7 +243,9 @@ public class MailboxReceiveOperatorTest {
     Object[] expRow = new Object[]{1, 1};
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
     Mockito.when(_mailbox.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     List<Object[]> resultRows = receivedBlock.getContainer();
@@ -268,7 +280,9 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Exception e = new Exception("errorBlock");
     Mockito.when(_mailbox.receive()).thenReturn(TransferableBlockUtils.getErrorTransferableBlock(e));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.SINGLETON, toHost, toPort, jobId, stageId, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     Assert.assertTrue(receivedBlock.isErrorBlock());
@@ -306,7 +320,9 @@ public class MailboxReceiveOperatorTest {
     Object[] expRow = new Object[]{1, 1};
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     List<Object[]> resultRows = receivedBlock.getContainer();
@@ -345,7 +361,9 @@ public class MailboxReceiveOperatorTest {
     Object[] expRow = new Object[]{1, 1};
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     List<Object[]> resultRows = receivedBlock.getContainer();
@@ -388,7 +406,9 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
     // Receive first block from first server.
     TransferableBlock receivedBlock = receiveOp.nextBlock();
@@ -440,7 +460,9 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
     // Receive error block from first server.
     TransferableBlock receivedBlock = receiveOp.nextBlock();
@@ -481,7 +503,9 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
-    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
+    PlanRequestContext context = new PlanRequestContext(_mailboxService,  456,
+        "test", 123, null, 789);
+    MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     List<Object[]> resultRows = receivedBlock.getContainer();

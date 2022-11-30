@@ -55,4 +55,10 @@ public class AggregationCombineOperator extends BaseCombineOperator<AggregationR
       mergedResults.set(i, aggregationFunctions[i].merge(mergedResults.get(i), resultsToMerge.get(i)));
     }
   }
+
+  @Override
+  public void close()
+      throws InterruptedException {
+
+  }
 }

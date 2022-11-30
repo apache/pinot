@@ -292,6 +292,12 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     }
 
     @Override
+    public void close()
+        throws InterruptedException {
+
+    }
+
+    @Override
     public String toExplainString() {
       return EXPLAIN_NAME;
     }
