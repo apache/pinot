@@ -136,10 +136,11 @@ public class QueryRunner {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
     } else {
-      long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
+      long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
+      long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
       StageNode stageRoot = distributedStagePlan.getStageRoot();
-      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot, new PlanRequestContext(
-          _mailboxService, requestId, stageRoot.getStageId(), _hostname, _port, distributedStagePlan.getMetadataMap()));
+      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot, new PlanRequestContext(_mailboxService, requestId,
+          stageRoot.getStageId(), timeoutMs, _hostname, _port, distributedStagePlan.getMetadataMap()));
       scheduler.register(rootOperator);
     }
   }

@@ -41,6 +41,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -63,9 +64,9 @@ import org.slf4j.LoggerFactory;
 
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
-  private static final long DEFAULT_TIMEOUT_NANO = 10_000_000_000L;
   private final String _reducerHostname;
   private final int _reducerPort;
+  private final long _defaultBrokerTimeoutMs;
 
   private final MailboxService<TransferableBlock> _mailboxService;
   private final QueryEnvironment _queryEnvironment;
@@ -87,6 +88,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
     _reducerHostname = reducerHostname;
     _reducerPort = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
+    _defaultBrokerTimeoutMs = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
+        CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager(_reducerHostname, _reducerPort, routingManager));
@@ -132,10 +135,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     long compilationStartTimeNs;
+    long queryTimeoutMs;
     QueryPlan queryPlan;
     try {
       // Parse the request
       sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
+      Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
+      queryTimeoutMs = timeoutMsFromQueryOption == null ? _defaultBrokerTimeoutMs : timeoutMsFromQueryOption;
       // Compile the request
       compilationStartTimeNs = System.nanoTime();
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
@@ -156,7 +162,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     ResultTable queryResults;
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, DEFAULT_TIMEOUT_NANO);
+      queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs);
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));

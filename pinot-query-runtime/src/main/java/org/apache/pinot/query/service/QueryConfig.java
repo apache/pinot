@@ -22,19 +22,42 @@ package org.apache.pinot.query.service;
  * Configuration for setting up query runtime.
  */
 public class QueryConfig {
-  public static final long DEFAULT_TIMEOUT_NANO = 10_000_000_000L;
-
+  /**
+   * Configuration for mailbox data block size
+   */
   public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
   public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
 
+  public static final String KEY_OF_MAILBOX_TIMEOUT_MS = "pinot.query.runner.mailbox.timeout.ms";
+  public static final long DEFAULT_MAILBOX_TIMEOUT_MS = 10_000L;
+
+  /**
+   * Configuration for server port, port that opens and accepts
+   * {@link org.apache.pinot.query.runtime.plan.DistributedStagePlan} and start executing query stages.
+   */
   public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";
   public static final int DEFAULT_QUERY_SERVER_PORT = 0;
 
+  /**
+   * Configuration for mailbox hostname and port, this hostname and port opens streaming channel to receive
+   * {@link org.apache.pinot.common.datablock.DataBlock}.
+   */
   public static final String KEY_OF_QUERY_RUNNER_HOSTNAME = "pinot.query.runner.hostname";
   public static final String DEFAULT_QUERY_RUNNER_HOSTNAME = "localhost";
-  // query runner port is the mailbox port.
   public static final String KEY_OF_QUERY_RUNNER_PORT = "pinot.query.runner.port";
   public static final int DEFAULT_QUERY_RUNNER_PORT = 0;
+
+  /**
+   * Configuration keys for {@link org.apache.pinot.common.proto.Worker.QueryRequest} extra metadata.
+   */
+  public static final String KEY_OF_BROKER_REQUEST_ID = "pinot.query.runner.broker.request.id";
+  public static final String KEY_OF_BROKER_REQUEST_TIMEOUT_MS = "pinot.query.runner.broker.request.timeout.ms";
+
+  /**
+   * Configuration keys for {@link org.apache.pinot.common.proto.Worker.QueryResponse} extra metadata.
+   */
+  public static final String KEY_OF_SERVER_RESPONSE_STATUS_ERROR = "ERROR";
+  public static final String KEY_OF_SERVER_RESPONSE_STATUS_OK = "OK";
 
   private QueryConfig() {
     // do not instantiate.
