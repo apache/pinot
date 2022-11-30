@@ -61,7 +61,7 @@ import static org.testng.Assert.assertTrue;
 public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
   private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
-      "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
+      "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = -9999";
   private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS = Collections.singletonList("DivActualElapsedTime");
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
@@ -252,6 +252,9 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
         long numConsumingSegmentsQueried = queryResponse1.get("numConsumingSegmentsQueried").asLong();
         long minConsumingFreshnessTimeMs = queryResponse1.get("minConsumingFreshnessTimeMs").asLong();
         long numEntriesScannedInFilter = queryResponse1.get("numEntriesScannedInFilter").asLong();
+        System.out.println(String.format(
+            "numConsumingSegmentsQueried: %d, minConsumingFreshnessTimeMs: %d, numEntriesScannedInFilter: %d",
+            numConsumingSegmentsQueried, minConsumingFreshnessTimeMs, numEntriesScannedInFilter));
         return numConsumingSegmentsQueried == 2 && minConsumingFreshnessTimeMs > _startTime
             && minConsumingFreshnessTimeMs < System.currentTimeMillis() && numEntriesScannedInFilter == 0;
       } catch (Exception e) {
