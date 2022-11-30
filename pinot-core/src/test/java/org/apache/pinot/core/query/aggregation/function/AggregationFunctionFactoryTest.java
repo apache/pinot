@@ -449,15 +449,15 @@ public class AggregationFunctionFactoryTest {
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof BooleanAndAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.BOOLAND);
-    assertEquals(aggregationFunction.getColumnName(), "bool_and_column");
-    assertEquals(aggregationFunction.getResultColumnName(), "bool_and(column)");
+    assertEquals(aggregationFunction.getColumnName(), "boolAnd_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "booland(column)");
 
     function = getFunction("bool_or");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof BooleanOrAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.BOOLOR);
-    assertEquals(aggregationFunction.getColumnName(), "bool_or_column");
-    assertEquals(aggregationFunction.getResultColumnName(), "bool_or(column)");
+    assertEquals(aggregationFunction.getColumnName(), "boolOr_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "boolor(column)");
   }
 
   private FunctionContext getFunction(String functionName) {
