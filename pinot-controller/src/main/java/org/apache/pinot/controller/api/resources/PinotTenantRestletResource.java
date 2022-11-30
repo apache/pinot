@@ -283,7 +283,7 @@ public class PinotTenantRestletResource {
       return new SuccessResponse("Dropped tenant " + tenantName + " successfully.").toString();
     }
 
-    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(stateStr) ? true : false;
+    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(stateStr);
     for (String instance : allInstances) {
       if (enable) {
         instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
@@ -438,7 +438,7 @@ public class PinotTenantRestletResource {
       }
     }
 
-    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(state) ? true : false;
+    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(state);
     ObjectNode instanceResult = JsonUtils.newObjectNode();
     String instance = null;
     try {
