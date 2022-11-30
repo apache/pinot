@@ -81,6 +81,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   private volatile DimensionTable _dimensionTable;
   private boolean _disablePreload = false;
+  private List<SegmentDataManager> _segmentDataManagers;
 
   @Override
   protected void doInit() {
@@ -101,9 +102,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
 
     if (_disablePreload) {
-      _dimensionTable = new MemoryOptimizedDimensionTable(schema, primaryKeyColumns);
+      _dimensionTable = new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, new HashMap<>());
     } else {
-      _dimensionTable = new FastLookupDimensionTable(schema, primaryKeyColumns);
+      _dimensionTable = new FastLookupDimensionTable(schema, primaryKeyColumns, new HashMap<>());
     }
   }
 
@@ -136,16 +137,15 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   @Override
   protected void doShutdown() {
-    closeDimensionTable(_dimensionTable, true);
+    closeDimensionTable(_dimensionTable, _disablePreload);
   }
 
   private void closeDimensionTable(DimensionTable dimensionTable, boolean releaseSegments) {
     if (dimensionTable != null) {
       try {
         dimensionTable.close();
-        if (releaseSegments) {
-          List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-          for (SegmentDataManager segmentDataManager: segmentDataManagers) {
+        if (releaseSegments && _segmentDataManagers != null) {
+          for (SegmentDataManager segmentDataManager: _segmentDataManagers) {
             releaseSegment(segmentDataManager);
           }
         }
@@ -182,9 +182,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
     Map<PrimaryKey, GenericRow> lookupTable = new HashMap<>();
-    List<SegmentDataManager> segmentManagers = acquireAllSegments();
+    List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
     try {
-      for (SegmentDataManager segmentManager : segmentManagers) {
+      for (SegmentDataManager segmentManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentManager.getSegment();
         int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
         if (numTotalDocs > 0) {
@@ -203,7 +203,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       }
       return new FastLookupDimensionTable(schema, primaryKeyColumns, lookupTable);
     } finally {
-      for (SegmentDataManager segmentManager : segmentManagers) {
+      for (SegmentDataManager segmentManager : segmentDataManagers) {
         releaseSegment(segmentManager);
       }
     }
@@ -218,8 +218,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
     Map<PrimaryKey, LookupRecordLocation> lookupTable = new HashMap<>();
-    List<SegmentDataManager> segmentManagers = acquireAllSegments();
-    for (SegmentDataManager segmentManager : segmentManagers) {
+    _segmentDataManagers = acquireAllSegments();
+    for (SegmentDataManager segmentManager : _segmentDataManagers) {
       IndexSegment indexSegment = segmentManager.getSegment();
       int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
       if (numTotalDocs > 0) {

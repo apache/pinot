@@ -19,7 +19,6 @@
 package org.apache.pinot.core.data.manager.offline;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
@@ -38,10 +37,6 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
   private final Schema _tableSchema;
   private final List<String> _primaryKeyColumns;
   private final GenericRow _reuse = new GenericRow();
-
-  MemoryOptimizedDimensionTable(Schema tableSchema, List<String> primaryKeyColumns) {
-    this(tableSchema, primaryKeyColumns, new HashMap<>());
-  }
 
   MemoryOptimizedDimensionTable(Schema tableSchema, List<String> primaryKeyColumns,
       Map<PrimaryKey, LookupRecordLocation> lookupTable) {

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.data.manager.offline;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -33,10 +32,6 @@ class FastLookupDimensionTable implements DimensionTable {
   private Map<PrimaryKey, GenericRow> _lookupTable;
   private final Schema _tableSchema;
   private final List<String> _primaryKeyColumns;
-
-  FastLookupDimensionTable(Schema tableSchema, List<String> primaryKeyColumns) {
-    this(tableSchema, primaryKeyColumns, new HashMap<>());
-  }
 
   FastLookupDimensionTable(Schema tableSchema, List<String> primaryKeyColumns,
       Map<PrimaryKey, GenericRow> lookupTable) {
