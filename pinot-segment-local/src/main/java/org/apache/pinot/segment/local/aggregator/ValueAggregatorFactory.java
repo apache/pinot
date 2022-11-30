@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-
-import java.util.List;
 
 
 /**
