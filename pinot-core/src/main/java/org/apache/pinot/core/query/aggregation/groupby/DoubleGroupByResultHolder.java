@@ -81,7 +81,7 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
-  public long getLongResult(int groupKey) {
+  public int getIntResult(int groupKey) {
     throw new UnsupportedOperationException();
   }
 
@@ -98,7 +98,7 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
-  public void setValueForKey(int groupKey, long value) {
+  public void setValueForKey(int groupKey, int value) {
     throw new UnsupportedOperationException();
   }
 

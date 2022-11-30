@@ -22,18 +22,20 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.LongAggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.IntAggregateResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.LongGroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.IntGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
+// TODO: change this to implement BaseSingleInputAggregationFunction<Boolean, Boolean> when we get proper
+// handling of booleans in serialization - today this would fail because ColumnDataType#convert assumes
+// that the boolean is encoded as its stored type (an integer)
 public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggregationFunction<Integer, Integer> {
 
   private final BooleanMerge _merger;
@@ -42,42 +44,42 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
   protected enum BooleanMerge {
     AND {
       @Override
-      long merge(long left, int right) {
-        return left * right;
+      int merge(int left, int right) {
+        return left & right;
       }
 
       @Override
-      boolean isTerminal(long agg) {
+      boolean isTerminal(int agg) {
         return agg == 0;
       }
 
       @Override
-      long getDefaultValue() {
+      int getDefaultValue() {
         return 1;
       }
     },
     OR {
       @Override
-      long merge(long left, int right) {
-        return left + right;
+      int merge(int left, int right) {
+        return left | right;
       }
 
       @Override
-      boolean isTerminal(long agg) {
+      boolean isTerminal(int agg) {
         return agg > 0;
       }
 
       @Override
-      long getDefaultValue() {
+      int getDefaultValue() {
         return 0;
       }
     };
 
-    abstract long merge(long left, int right);
+    abstract int merge(int left, int right);
 
-    abstract boolean isTerminal(long agg);
+    abstract boolean isTerminal(int agg);
 
-    abstract long getDefaultValue();
+    abstract int getDefaultValue();
   }
 
   protected BaseBooleanAggregateFunction(ExpressionContext expression, boolean nullHandlingEnabled,
@@ -91,14 +93,14 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
   public AggregationResultHolder createAggregationResultHolder() {
     return _nullHandlingEnabled
         ? new ObjectAggregationResultHolder()
-        : new LongAggregationResultHolder(_merger.getDefaultValue());
+        : new IntAggregateResultHolder(_merger.getDefaultValue());
   }
 
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return _nullHandlingEnabled
         ? new ObjectGroupByResultHolder(initialCapacity, maxCapacity)
-        : new LongGroupByResultHolder(initialCapacity, maxCapacity, _merger.getDefaultValue());
+        : new IntGroupByResultHolder(initialCapacity, maxCapacity, _merger.getDefaultValue());
   }
 
   @Override
@@ -106,14 +108,14 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType().getStoredType() != FieldSpec.DataType.INT) {
+    if (blockValSet.getValueType() != FieldSpec.DataType.BOOLEAN) {
       throw new IllegalArgumentException(
-          String.format("Unsupported data type %s for BOOL_AND", blockValSet.getValueType()));
+          String.format("Unsupported data type %s for %s", getType().getName(), blockValSet.getValueType()));
     }
 
     int[] bools = blockValSet.getIntValuesSV();
     if (_nullHandlingEnabled) {
-      long agg = getLong(aggregationResultHolder.getResult());
+      int agg = getInt(aggregationResultHolder.getResult());
 
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap == null) {
@@ -122,23 +124,30 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
         return;
       }
 
+      // early terminate on a per-block level to allow the
+      // loop below to be more tightly optimized (avoid a branch)
+      if (_merger.isTerminal(agg)) {
+        return;
+      }
+
       for (int i = 0; i < length; i++) {
         if (!nullBitmap.contains(i)) {
           agg = _merger.merge(agg, bools[i]);
           aggregationResultHolder.setValue((Object) agg);
-          if (_merger.isTerminal(agg)) {
-            return;
-          }
         }
       }
     } else {
-      long agg = aggregationResultHolder.getLongResult();
+      int agg = aggregationResultHolder.getIntResult();
+
+      // early terminate on a per-block level to allow the
+      // loop below to be more tightly optimized (avoid a branch)
+      if (_merger.isTerminal(agg)) {
+        return;
+      }
+
       for (int i = 0; i < length; i++) {
         agg = _merger.merge(agg, bools[i]);
         aggregationResultHolder.setValue(agg);
-        if (_merger.isTerminal(agg)) {
-          return;
-        }
       }
     }
   }
@@ -148,9 +157,9 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType().getStoredType() != FieldSpec.DataType.INT) {
+    if (blockValSet.getValueType() != FieldSpec.DataType.BOOLEAN) {
       throw new IllegalArgumentException(
-          String.format("Unsupported data type %s for BOOL_AND", blockValSet.getValueType()));
+          String.format("Unsupported data type %s for %s", getType().getName(), blockValSet.getValueType()));
     }
 
     int[] bools = blockValSet.getIntValuesSV();
@@ -165,14 +174,14 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
       for (int i = 0; i < length; i++) {
         if (!nullBitmap.contains(i)) {
           int groupByKey = groupKeyArray[i];
-          long agg = getLong(groupByResultHolder.getResult(groupByKey));
+          int agg = getInt(groupByResultHolder.getResult(groupByKey));
           groupByResultHolder.setValueForKey(groupByKey, (Object) _merger.merge(agg, bools[i]));
         }
       }
     } else {
       for (int i = 0; i < length; i++) {
         int groupByKey = groupKeyArray[i];
-        long agg = groupByResultHolder.getLongResult(groupByKey);
+        int agg = groupByResultHolder.getIntResult(groupByKey);
         groupByResultHolder.setValueForKey(groupByKey, _merger.merge(agg, bools[i]));
       }
     }
@@ -185,7 +194,7 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
 
     for (int i = 0; i < length; i++) {
       for (int groupKey : groupKeysArray[i]) {
-        long agg = groupByResultHolder.getLongResult(groupKey);
+        int agg = groupByResultHolder.getIntResult(groupKey);
         groupByResultHolder.setValueForKey(groupKey, _merger.merge(agg, valueArray[i]));
       }
     }
@@ -194,20 +203,18 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
   @Override
   public Integer extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     if (_nullHandlingEnabled) {
-      Long agg = aggregationResultHolder.getResult();
-      return agg == null ? null : toInt(agg);
+      return aggregationResultHolder.getResult();
     } else {
-      return toInt(aggregationResultHolder.getLongResult());
+      return aggregationResultHolder.getIntResult();
     }
   }
 
   @Override
   public Integer extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     if (_nullHandlingEnabled) {
-      Long agg = groupByResultHolder.getResult(groupKey);
-      return agg == null ? null : toInt(agg);
+      return groupByResultHolder.getResult(groupKey);
     } else {
-      return toInt(groupByResultHolder.getLongResult(groupKey));
+      return groupByResultHolder.getIntResult(groupKey);
     }
   }
 
@@ -221,7 +228,7 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
       }
     }
 
-    return toInt(_merger.merge(intermediateResult1, intermediateResult2));
+    return _merger.merge(intermediateResult1, intermediateResult2);
   }
 
   @Override
@@ -239,11 +246,7 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
     return intermediateResult;
   }
 
-  private static int toInt(long val) {
-    return PinotDataType.BOOLEAN.toInt(val != 0);
-  }
-
-  private long getLong(Long val) {
+  private int getInt(Integer val) {
     return val == null ? _merger.getDefaultValue() : val;
   }
 }

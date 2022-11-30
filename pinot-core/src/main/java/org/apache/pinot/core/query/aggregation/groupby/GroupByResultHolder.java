@@ -37,7 +37,7 @@ public interface GroupByResultHolder {
    * @param groupKey
    * @param value
    */
-  void setValueForKey(int groupKey, long value);
+  void setValueForKey(int groupKey, int value);
 
   /**
    * Store the given value (of type ResultType) for the given groupKey.
@@ -66,7 +66,7 @@ public interface GroupByResultHolder {
    * @param groupKey
    * @return
    */
-  long getLongResult(int groupKey);
+  int getIntResult(int groupKey);
 
   /**
    * Returns the result (ResultType) for the given group key.

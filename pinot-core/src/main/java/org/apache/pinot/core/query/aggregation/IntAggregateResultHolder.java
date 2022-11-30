@@ -19,11 +19,11 @@
 
 package org.apache.pinot.core.query.aggregation;
 
-public class LongAggregationResultHolder implements AggregationResultHolder {
+public class IntAggregateResultHolder implements AggregationResultHolder {
 
-  long _value;
+  int _value;
 
-  public LongAggregationResultHolder(long defaultValue) {
+  public IntAggregateResultHolder(int defaultValue) {
     _value = defaultValue;
   }
 
@@ -33,7 +33,7 @@ public class LongAggregationResultHolder implements AggregationResultHolder {
   }
 
   @Override
-  public void setValue(long value) {
+  public void setValue(int value) {
     _value = value;
   }
 
@@ -48,7 +48,7 @@ public class LongAggregationResultHolder implements AggregationResultHolder {
   }
 
   @Override
-  public long getLongResult() {
+  public int getIntResult() {
     return _value;
   }
 

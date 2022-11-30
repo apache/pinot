@@ -44,7 +44,7 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
 
 
   @Override
-  public void setValue(long value) {
+  public void setValue(int value) {
     _value = value;
   }
 
@@ -59,10 +59,11 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
 
   /**
    * {@inheritDoc}
+   *
    * @return
    */
   @Override
-  public long getLongResult() {
+  public int getIntResult() {
     throw new RuntimeException("Method 'getLongResult' not supported for class " + getClass().getName());
   }
 

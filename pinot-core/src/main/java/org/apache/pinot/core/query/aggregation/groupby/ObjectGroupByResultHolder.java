@@ -66,7 +66,7 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
-  public long getLongResult(int groupKey) {
+  public int getIntResult(int groupKey) {
     throw new UnsupportedOperationException();
   }
 
@@ -88,7 +88,7 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
-  public void setValueForKey(int groupKey, long newValue) {
+  public void setValueForKey(int groupKey, int newValue) {
     if (groupKey != GroupKeyGenerator.INVALID_ID) {
       _resultArray[groupKey] = newValue;
     }

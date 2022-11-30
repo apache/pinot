@@ -43,7 +43,7 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
   }
 
   @Override
-  public void setValue(long value) {
+  public void setValue(int value) {
     throw new RuntimeException("Method 'setValue' (with long value) not supported for class " + getClass().getName());
   }
 
@@ -68,10 +68,11 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
 
   /**
    * {@inheritDoc}
+   *
    * @return
    */
   @Override
-  public long getLongResult() {
+  public int getIntResult() {
     throw new RuntimeException("Method 'getLongResult' not supported for class " + getClass().getName());
   }
 
