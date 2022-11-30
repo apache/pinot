@@ -327,17 +327,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             throw new RuntimeException(e);
           }
           break;
-        case URI:
-          try {
-            List<String> segmentUris = new ArrayList<>();
-            URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputSegmentDirURI, outputSegmentTarURI,
-                pushJobSpec.getSegmentUriPrefix(), pushJobSpec.getSegmentUriSuffix());
-            segmentUris.add(updatedURI.toString());
-            SegmentPushUtils.sendSegmentUris(spec, segmentUris, headers, parameters);
-          } catch (RetriableOperationException | AttemptsExceededException e) {
-            throw new RuntimeException(e);
-          }
-          break;
         case METADATA:
           try {
             Map<String, String> segmentUriToTarPathMap =
