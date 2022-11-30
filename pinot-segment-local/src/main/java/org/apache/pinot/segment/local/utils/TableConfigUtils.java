@@ -972,6 +972,9 @@ public final class TableConfigUtils {
   }
 
   /**
+   * TODO: After deprecating "replicasPerPartition", we can change this function's behavior to always overwrite
+   * config to "replication" only.
+   *
    * Ensure that the table config has the minimum number of replicas set as per cluster configs.
    * If is doesn't, set the required amount of replication in the table config
    */
@@ -992,7 +995,7 @@ public final class TableConfigUtils {
     if (verifyReplication) {
       int requestReplication;
       try {
-        requestReplication = segmentsConfig.getReplicationNumber();
+        requestReplication = tableConfig.getReplication();
         if (requestReplication < defaultTableMinReplicas) {
           LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
               defaultTableMinReplicas, requestReplication);
@@ -1004,12 +1007,9 @@ public final class TableConfigUtils {
     }
 
     if (verifyReplicasPerPartition) {
-      String replicasPerPartitionStr = segmentsConfig.getReplicasPerPartition();
-      if (replicasPerPartitionStr == null) {
-        throw new IllegalStateException("Field replicasPerPartition needs to be specified");
-      }
+      int replicasPerPartition;
       try {
-        int replicasPerPartition = Integer.parseInt(replicasPerPartitionStr);
+        replicasPerPartition = tableConfig.getReplication();
         if (replicasPerPartition < defaultTableMinReplicas) {
           LOGGER.info(
               "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
@@ -1017,7 +1017,7 @@ public final class TableConfigUtils {
           segmentsConfig.setReplicasPerPartition(String.valueOf(defaultTableMinReplicas));
         }
       } catch (NumberFormatException e) {
-        throw new IllegalStateException("Invalid value for replicasPerPartition: '" + replicasPerPartitionStr + "'", e);
+        throw new IllegalStateException("Invalid replicasPerPartition number", e);
       }
     }
   }

@@ -19,6 +19,8 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import javax.annotation.Nullable;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -37,7 +39,8 @@ public class InstanceSelectorFactory {
   public static final String LEGACY_REPLICA_GROUP_OFFLINE_ROUTING = "PartitionAwareOffline";
   public static final String LEGACY_REPLICA_GROUP_REALTIME_ROUTING = "PartitionAwareRealtime";
 
-  public static InstanceSelector getInstanceSelector(TableConfig tableConfig, BrokerMetrics brokerMetrics,
+  public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector) {
     String tableNameWithType = tableConfig.getTableName();
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
@@ -54,6 +57,12 @@ public class InstanceSelectorFactory {
           .equalsIgnoreCase(routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using StrictReplicaGroupInstanceSelector for table: {}", tableNameWithType);
         return new StrictReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector);
+      }
+      if (RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE.equalsIgnoreCase(
+          routingConfig.getInstanceSelectorType())) {
+        LOGGER.info("Using {} for table: {}", routingConfig.getInstanceSelectorType(), tableNameWithType);
+        return new MultiStageReplicaGroupSelector(tableNameWithType, propertyStore, brokerMetrics,
+            adaptiveServerSelector);
       }
     }
     return new BalancedInstanceSelector(tableNameWithType, brokerMetrics, adaptiveServerSelector);

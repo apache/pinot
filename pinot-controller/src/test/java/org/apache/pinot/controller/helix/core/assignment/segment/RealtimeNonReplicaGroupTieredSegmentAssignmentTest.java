@@ -33,6 +33,7 @@ import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -117,9 +118,11 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME, null, null),
         new TierConfig(TIER_C_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME, null, null));
+
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setTierConfigList(tierConfigList).setLLC(true).build();
+            .setTierConfigList(tierConfigList).setLLC(true).setStreamConfigs(streamConfigs).build();
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig);
 
     _instancePartitionsMap = new TreeMap<>();

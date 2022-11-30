@@ -31,7 +31,6 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
@@ -73,11 +72,6 @@ import org.apache.pinot.spi.utils.RebalanceConfigConstants;
  * </ul>
  */
 public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
-
-  @Override
-  protected int getReplication(TableConfig tableConfig) {
-    return tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-  }
 
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,

@@ -94,31 +94,31 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    _results = super.transformToIntValuesSV(projectionBlock);
+    _intValuesSV = super.transformToIntValuesSV(projectionBlock);
     RoaringBitmap leftNull = getNullBitMap(projectionBlock, _leftTransformFunction);
     RoaringBitmap rightNull = getNullBitMap(projectionBlock, _rightTransformFunction);
     // Both sides are not null.
     if (isEmpty(leftNull) && isEmpty(rightNull)) {
-      return _results;
+      return _intValuesSV;
     }
     // Left side is not null.
     if (isEmpty(leftNull)) {
       // Mark right null rows as distinct.
-      rightNull.forEach((IntConsumer) i -> _results[i] = _distinctResult);
-      return _results;
+      rightNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
+      return _intValuesSV;
     }
     // Right side is not null.
     if (isEmpty(rightNull)) {
       // Mark left null rows as distinct.
-      leftNull.forEach((IntConsumer) i -> _results[i] = _distinctResult);
-      return _results;
+      leftNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
+      return _intValuesSV;
     }
     RoaringBitmap xorNull = RoaringBitmap.xor(leftNull, rightNull);
     // For rows that with one null and one not null, mark them as distinct
-    xorNull.forEach((IntConsumer) i -> _results[i] = _distinctResult);
+    xorNull.forEach((IntConsumer) i -> _intValuesSV[i] = _distinctResult);
     RoaringBitmap andNull = RoaringBitmap.and(leftNull, rightNull);
     // For rows that are both null, mark them as not distinct.
-    andNull.forEach((IntConsumer) i -> _results[i] = _notDistinctResult);
-    return _results;
+    andNull.forEach((IntConsumer) i -> _intValuesSV[i] = _notDistinctResult);
+    return _intValuesSV;
   }
 }

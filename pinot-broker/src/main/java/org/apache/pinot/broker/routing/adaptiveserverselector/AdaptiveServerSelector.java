@@ -45,4 +45,14 @@ public interface AdaptiveServerSelector {
    * @return List of servers along with their values ranked from best to worst.
    */
   List<Pair<String, Double>> fetchAllServerRankingsWithScores();
+
+  /**
+   * Same as above but fetches ranking only for the list of serverCandidates provided in the parameter. If a server
+   * doesn't have an entry, it's ranked better than other serverCandidates and a value of -1.0 is returned. With the
+   * above "fetchAllServerRankingsWithScores" API, ranking for all the servers are fetched. This can become
+   * problematic if a broker is routing to multiple  server tenants but a query needs to touch only a single server
+   * tenant. This API helps fetch ranking only for a subset of servers.
+   * @return List of servers along with their values ranked from best to worst.
+   */
+  List<Pair<String, Double>> fetchServerRankingsWithScores(List<String> serverCandidates);
 }

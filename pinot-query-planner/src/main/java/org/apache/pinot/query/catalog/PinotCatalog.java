@@ -63,7 +63,14 @@ public class PinotCatalog implements Schema {
   @Override
   public Table getTable(String name) {
     String tableName = TableNameBuilder.extractRawTableName(name);
-    return new PinotTable(_tableCache.getSchema(tableName));
+    org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
+    if (schema == null) {
+      throw new IllegalArgumentException("Could not find schema for table: '" + tableName
+          + "'. This is likely indicative of some kind of corruption and should not happen! "
+          + "If you are running this via the a test environment, check to make sure you're "
+          + "specifying the correct tables.");
+    }
+    return new PinotTable(schema);
   }
 
   /**

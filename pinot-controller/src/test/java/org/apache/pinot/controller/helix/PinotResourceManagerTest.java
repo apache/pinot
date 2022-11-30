@@ -79,15 +79,16 @@ public class PinotResourceManagerTest {
     Schema dummySchema = TEST_INSTANCE.createDummySchema(invalidRealtimeTable);
     TEST_INSTANCE.addSchema(dummySchema);
 
-    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     // Missing replicasPerPartition
     TableConfig invalidRealtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setStreamConfigs(streamConfigs).setTableName(invalidRealtimeTable)
+        new TableConfigBuilder(TableType.REALTIME).setTableName(invalidRealtimeTable)
             .setSchemaName(dummySchema.getSchemaName()).build();
+
     try {
       TEST_INSTANCE.getHelixResourceManager().addTable(invalidRealtimeTableConfig);
       Assert.fail(
-          "Table creation should have thrown exception due to missing replicasPerPartition in validation config");
+          "Table creation should have thrown exception due to missing stream config and replicasPerPartition in "
+              + "validation config");
     } catch (Exception e) {
       // expected
     }

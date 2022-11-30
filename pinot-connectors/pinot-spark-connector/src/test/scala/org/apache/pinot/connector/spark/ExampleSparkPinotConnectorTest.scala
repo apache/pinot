@@ -42,6 +42,7 @@ object ExampleSparkPinotConnectorTest extends Logging {
     readHybridWithFilters()
     readHybridViaGrpc()
     readRealtimeViaGrpc()
+    readRealtimeWithFilterViaGrpc()
     readHybridWithFiltersViaGrpc()
     readRealtimeWithSelectionColumns()
     applyJustSomeFilters()
@@ -159,6 +160,21 @@ object ExampleSparkPinotConnectorTest extends Logging {
       .option("tableType", "realtime")
       .option("useGrpcServer", "true")
       .load()
+
+    data.show()
+  }
+
+  def readRealtimeWithFilterViaGrpc()(implicit spark: SparkSession): Unit = {
+    import spark.implicits._
+    log.info("## Reading `airlineStats_REALTIME` table... ##")
+    val data = spark.read
+      .format("pinot")
+      .option("table", "airlineStats")
+      .option("tableType", "realtime")
+      .option("useGrpcServer", "true")
+      .load()
+      .filter($"DestWac" === 5)
+      .select($"FlightNum", $"Origin", $"DestStateName")
 
     data.show()
   }

@@ -66,7 +66,7 @@ public class PartialUpsertHandlerTest {
 
     // newRecord is default null value, while previousRecord is not.
     // field1 should not be incremented since the newRecord is null.
-    // special case: field2 should be overrided by null value because we didn't enabled default partial upsert strategy.
+    // special case: field2 should be merged based on default partial upsert strategy.
     previousRecord.clear();
     incomingRecord.clear();
     previousRecord.putValue("field1", 1);
@@ -76,7 +76,8 @@ public class PartialUpsertHandlerTest {
     newRecord = handler.merge(previousRecord, incomingRecord);
     assertFalse(newRecord.isNullValue("field1"));
     assertEquals(newRecord.getValue("field1"), 1);
-    assertTrue(newRecord.isNullValue("field2"));
+    assertFalse(newRecord.isNullValue("field2"));
+    assertEquals(newRecord.getValue("field2"), 2);
 
     // neither of records is null.
     previousRecord.clear();

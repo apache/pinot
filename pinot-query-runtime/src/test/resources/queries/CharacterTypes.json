@@ -1,0 +1,43 @@
+{
+  "fixed_char": {
+    "ignored": true,
+    "comment": "we don't support fixed length string types",
+    "psql": "8.3"
+  },
+  "varchar": {
+    "tables": {
+      "varchar": {
+        "schema": [
+          {"name": "str", "type": "STRING"}
+        ],
+        "inputs": [
+          ["foo"],
+          ["value with spaces"],
+          ["Οὐχὶ (greek)"],
+          ["แสน (thai)"],
+          ["верстке (russian)"],
+          ["∀x∈ℝ (mathematics)"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "8.3",
+        "description": "test different UTF8 string values",
+        "sql": "SELECT * FROM {varchar}"
+      },
+      {
+        "psql": "8.3",
+        "description": "test inline constants",
+        "sql": "SELECT 'value with spaces' FROM {varchar}"
+      },
+      {
+        "ignored": true,
+        "comment": "calcite doesn't support parsing non ISO-8859-1 characters as constants",
+        "psql": "8.3",
+        "description": "test inline UTF8 constants",
+        "sql": "SELECT 'Οὐχὶ (greek)' FROM {varchar}"
+      }
+    ]
+  }
+}

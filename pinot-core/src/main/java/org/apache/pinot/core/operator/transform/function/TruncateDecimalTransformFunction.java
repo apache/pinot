@@ -83,11 +83,9 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
-    if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
+    if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[length];
     }
-
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(projectionBlock);
     if (_fixedScale) {
       for (int i = 0; i < length; i++) {
@@ -105,7 +103,6 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
         _doubleValuesSV[i] = Math.signum(leftValues[i]) * Math.floor(Math.abs(leftValues[i]));
       }
     }
-
     return _doubleValuesSV;
   }
 }

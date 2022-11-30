@@ -38,10 +38,9 @@ import org.apache.pinot.spi.data.Schema;
  * upgrading Calcite versions.
  */
 public class TypeFactory extends JavaTypeFactoryImpl {
-  private final RelDataTypeSystem _typeSystem;
 
   public TypeFactory(RelDataTypeSystem typeSystem) {
-    _typeSystem = typeSystem;
+    super(typeSystem);
   }
 
   public RelDataType createRelDataTypeFromSchema(Schema schema) {

@@ -1,0 +1,77 @@
+{
+  "case_when_test": {
+    "tables": {
+      "tbl1": {
+        "schema":[
+          {"name": "intCol", "type": "INT"},
+          {"name": "boolCol", "type": "BOOLEAN"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "strCol", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, true, 2.0, 3.0, "one"],
+          [2, false, 4.0, 6.0, "two"],
+          [3, true, 6.0, 9.0, "three"],
+          [4, false, 8.0, 12.0, "four"]
+        ]
+      }
+    },
+    "queries": [
+      { "sql": "SELECT intCol, CASE WHEN boolCol = true THEN 'Yes' ELSE 'No' END AS boolVal, strCol FROM {tbl1}"},
+      {
+        "ignored": true,
+        "comment": "should return NULL, but returns '' (empty string) when case is not matched",
+        "sql": "SELECT intCol, CASE WHEN boolCol = true THEN 'Yes' END AS boolVal, strCol FROM {tbl1}"
+      },
+      { "sql": "SELECT intCol FROM {tbl1} WHERE CASE WHEN strCol = 'one' THEN true ELSE boolCol END"},
+      { "sql": "SELECT intCol, CASE WHEN strCol = 'one' THEN 'The first one' WHEN strCol = 'two' THEN 'The second one' WHEN strCol = 'three' THEN 'The third one' WHEN strCol = 'four' THEN 'The fourth one' ELSE 'Unknown' END AS stringVal FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN intCol % 2 = 0 THEN intCol ELSE intCol * 2 END AS intVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN floatCol > 4.0 THEN floatCol ELSE floatCol / 2.0 END AS floatVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN doubleCol > 6.0 THEN doubleCol ELSE doubleCol / 2.0 END AS doubleVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN (SELECT SUM(floatCol) FROM {tbl1}) > 16.0 THEN 'Large sum' ELSE 'Small sum' END AS aggVal, strCol FROM {tbl1}"}
+    ]
+  },
+  "nested_case_when_test": {
+    "tables": {
+      "tbl1": {
+        "schema":[
+          {"name": "primary_key", "type": "INT"},
+          {"name": "description", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "Item one"],
+          [2, "Item two"],
+          [3, "Item three"],
+          [4, "Item four"]
+        ]
+      },
+      "tbl2": {
+        "schema":[
+          {"name": "primary_key", "type": "INT"},
+          {"name": "attribute", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "apple"],
+          [2, "chocolate"],
+          [3, "red"],
+          [4, "thirty"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT {tbl1}.primary_key, {tbl1}.description, CASE WHEN {tbl2}.attribute = 'red' THEN 'Color' ELSE 'Non-color' END AS attribute FROM {tbl1} JOIN {tbl2} ON {tbl1}.primary_key = {tbl2}.primary_key",
+        "description": "Joins the two tables and categorizes attributes from tbl2 as either 'Color' or 'Non-color'"
+      },
+      {
+        "sql": "SELECT {tbl1}.primary_key, CASE WHEN {tbl1}.description = 'Item one' THEN {tbl2}.attribute ELSE {tbl1}.description END AS description FROM {tbl1} JOIN {tbl2} ON {tbl1}.primary_key = {tbl2}.primary_key",
+        "description": "Joins the two tables and selects either the attribute from tbl2 or the description from tbl1, depending on the description from tbl1"
+      },
+      {
+        "sql": "SELECT {tbl1}.primary_key, SUM(CASE WHEN {tbl2}.attribute = 'chocolate' THEN 1 ELSE 0 END) as chocolate_count FROM {tbl1} JOIN {tbl2} ON {tbl1}.primary_key = {tbl2}.primary_key GROUP BY {tbl1}.primary_key",
+        "description": "Joins the two tables and aggregates the number of times 'chocolate' appears as an attribute in tbl2"
+      }
+    ]
+  }
+}

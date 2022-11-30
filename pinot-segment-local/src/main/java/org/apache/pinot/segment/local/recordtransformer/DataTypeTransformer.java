@@ -92,6 +92,7 @@ public class DataTypeTransformer implements RecordTransformer {
           // Single-value column
           source = PinotDataType.getSingleValueType(value.getClass());
         }
+
         // Skipping conversion when srcType!=destType is speculative, and can be unsafe when
         // the array for MV column contains values of mixing types. Mixing types can lead
         // to ClassCastException during conversion, often aborting data ingestion jobs.
