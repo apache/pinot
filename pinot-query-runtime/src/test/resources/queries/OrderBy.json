@@ -1,0 +1,232 @@
+{
+  "basic_order_by": {
+    "tables": {
+      "basic": {
+        "schema": [
+          {"name": "col0", "type": "INT"},
+          {"name": "col1", "type": "INT"},
+          {"name": "col2", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, 2, "a"],
+          [2, 3, "b"],
+          [3, 1, "c"],
+          [4, 4, "d"],
+          [5, 5, "e"],
+          [6, 6, "f"]
+        ]
+      }
+    },
+    "queries": [
+      {"sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col0 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT 2 OFFSET 0"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col2, col1 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1, col2 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 2"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1 LIMIT 100"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1 OFFSET 100"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1 DESC"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1 DESC LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1 ASC"},
+      {"sql": "SELECT * FROM {basic} ORDER BY col1 ASC LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {basic} ORDER BY power(col1, 2)"},
+      {"sql": "SELECT * FROM {basic} WHERE col1 > 3 ORDER BY col1 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {basic} WHERE col0 > 3 ORDER BY col1 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {basic} WHERE col1 > 3 AND col1 < 5 ORDER BY col1 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT col1 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT col1, col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT col1, col0, col2 FROM {basic} ORDER BY col1 LIMIT 2 OFFSET 1"},
+      {
+        "ignored": true,
+        "comment": "we don't support ALL statement",
+        "sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT ALL"
+      },
+      {
+        "ignored": true,
+        "comment": "we don't support LIMIT NULL",
+        "sql": "SELECT * FROM {basic} ORDER BY col2 LIMIT NULL"
+      }
+    ]
+  },
+  "order_by_agg": {
+    "tables": {
+      "agg": {
+        "schema": [
+          {"name": "val", "type": "INT"},
+          {"name": "g", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "a"],
+          [2, "a"],
+          [3, "b"],
+          [4, "b"],
+          [5, "c"]
+        ]
+      }
+    },
+    "queries": [
+      {"sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY sum"},
+      {"sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY sum LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g HAVING SUM(val) > 3 ORDER BY sum LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY g"},
+      {"sql": "SELECT g, SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY SUM(val)"},
+      {"sql": "SELECT SUM(val) AS sum FROM {agg} GROUP BY g ORDER BY g"}
+    ]
+  },
+  "order_by_join": {
+    "tables": {
+      "l": {
+        "schema": [
+          {"name": "key", "type": "STRING"},
+          {"name": "lval", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", 1],
+          ["foo", 3],
+          ["foo", 5],
+          ["bar", 2],
+          ["bar", 4],
+          ["bar", 6]
+        ]
+      },
+      "r": {
+        "schema": [
+          {"name": "key", "type": "STRING"},
+          {"name": "rval", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", 1],
+          ["foo", 3],
+          ["foo", 7],
+          ["bar", 2],
+          ["bar", 4],
+          ["bar", 8]
+        ]
+      }
+    },
+    "queries": [
+      {"sql": "SELECT * FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY lval, rval LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT lval FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY lval, rval LIMIT 2 OFFSET 1"},
+      {"sql": "SELECT * FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY {l}.key"},
+      {"sql": "SELECT * FROM {l} JOIN {r} ON {l}.key = {r}.key ORDER BY {r}.key"},
+      {"sql": "SELECT {l}.key, SUM(lval), SUM(rval) FROM {l} JOIN {r} ON {l}.key = {r}.key GROUP BY {l}.key ORDER BY {l}.key"}
+    ]
+  },
+  "order_by_subqueries": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "col0", "type": "INT"},
+          {"name": "col1", "type": "INT"},
+          {"name": "col2", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, 2, "a"],
+          [2, 3, "b"],
+          [3, 1, "c"],
+          [4, 4, "d"],
+          [5, 5, "e"],
+          [6, 6, "f"]
+        ]
+      }
+    },
+    "queries": [
+      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col0)"},
+      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2)"},
+      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2 OFFSET 1)"},
+      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2 OFFSET 1) ORDER BY col1 LIMIT 3"},
+      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2 OFFSET 1) ORDER BY col2 LIMIT 3 OFFSET 1"},
+      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 5 OFFSET 1) ORDER BY col1 LIMIT 3 OFFSET 1"},
+      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 5 OFFSET 1) ORDER BY col1 OFFSET 1"},
+      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1 LIMIT 2) LIMIT 1"},
+      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1) ORDER BY col0"},
+      {"sql": "SELECT * FROM (SELECT * FROM {tbl} ORDER BY col1) ORDER BY col0 LIMIT 1"}
+    ]
+  },
+  "order_by_float": {
+    "tables": {
+      "floats": {
+        "schema": [
+          {"name": "col0", "type": "FLOAT"},
+          {"name": "col1", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0.0, 2.2],
+          [3.3, -3.3],
+          [4.4, 1.1],
+          [-5.5, 4.4],
+          [6.6, 5.0],
+          [7.7, -6.6]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT col1 FROM {floats} ORDER BY col1 LIMIT 2 OFFSET 1",
+        "description": "Basic test for ordering by a float column with a limit and offset"
+      },
+      {
+        "sql": "SELECT col0 FROM {floats} ORDER BY col0 * 2 LIMIT 2 OFFSET 1",
+        "description": "Testing order by with an expression involving floats"
+      }
+    ]
+  },
+  "order_by_double": {
+    "tables": {
+      "doubles": {
+        "schema": [
+          {"name": "col0", "type": "DOUBLE"},
+          {"name": "col1", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          [0.0, 2.2],
+          [3.3, -3.3],
+          [4.4, 1.1],
+          [-5.5, 4.4],
+          [6.6, -5.0],
+          [7.7, 6.6]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT col1 FROM {doubles} ORDER BY col1 LIMIT 2 OFFSET 1",
+        "description": "Basic test for ordering by a double column with a limit and offset"
+      },
+      {
+        "sql": "SELECT col0 FROM {doubles} ORDER BY col0 * 2 LIMIT 2 OFFSET 1",
+        "description": "Testing order by with an expression involving doubles"
+      }
+    ]
+  },
+  "order_by_boolean": {
+    "ignored": true,
+    "comment": "fails when we try to canonicalizeRow with ClassCastException - value is already in memory as boolean but DataSchema expects it to be an int",
+    "tables": {
+      "bools": {
+        "schema": [
+          {"name": "col0", "type": "BOOLEAN"},
+          {"name": "col1", "type": "INT"}
+        ],
+        "inputs": [
+          [true, 2],
+          [false, 3],
+          [false, 1],
+          [true, 4],
+          [true, 5],
+          [false, 6]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT col1 FROM {bools} ORDER BY col0, col1 LIMIT 2 OFFSET 1",
+        "description": "Basic test for ordering by a boolean column with a limit and offset"
+      }
+    ]
+  }
+}
