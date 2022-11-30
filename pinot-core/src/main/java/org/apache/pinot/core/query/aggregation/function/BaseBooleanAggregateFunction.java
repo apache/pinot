@@ -123,7 +123,7 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
       }
 
       for (int i = 0; i < length; i++) {
-        if (nullBitmap.contains(i)) {
+        if (!nullBitmap.contains(i)) {
           agg = _merger.merge(agg, bools[i]);
           aggregationResultHolder.setValue((Object) agg);
           if (_merger.isTerminal(agg)) {
@@ -163,7 +163,7 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
       }
 
       for (int i = 0; i < length; i++) {
-        if (nullBitmap.contains(i)) {
+        if (!nullBitmap.contains(i)) {
           int groupByKey = groupKeyArray[i];
           long agg = getLong(groupByResultHolder.getResult(groupByKey));
           groupByResultHolder.setValueForKey(groupByKey, (Object) _merger.merge(agg, bools[i]));
