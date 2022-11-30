@@ -73,7 +73,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       "TimeTypes.json",
       "BooleanLogic.json",
       "Comparisons.json",
-      "Aggregates.json"
+      "Aggregates.json",
+      "Case.json"
   );
 
   @BeforeClass
