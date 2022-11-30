@@ -98,14 +98,20 @@
       },
       {
         "ignored": true,
-        "comment": "as not materialized is not supported",
+        "comment": "materialized is not supported",
         "description": "'with materializaed' or not flag",
         "sql": "WITH w AS NOT MATERIALIZED ( SELECT strCol, SUM(intCol) AS sumRes FROM {tbl1} GROUP BY strCol ) SELECT strCol, strCol2, sumRes FROM w JOIN {tbl2} ON w.strCol = {tbl2}.strCol1",
         "outputs": [
-          ["a", "foo", 4],
-          ["a", "bar", 4],
-          ["b", "alice", 2],
-          ["b", "bob", 2]
+          []
+        ]
+      },
+      {
+        "ignored": true,
+        "comment": "recursive is not supported",
+        "description": "'with recursive' or not flag",
+        "sql": "WITH RECURSIVE search_tree(id, data) AS ( SELECT {tbl1}.strCol, {tbl1}.intCol, {tbl1}.intCol FROM {tbl1} UNION ALL SELECT {tbl2}.strCol1, {tbl2}.intCol ) SELECT * FROM search_tree",
+        "outputs": [
+          []
         ]
       }
     ]
