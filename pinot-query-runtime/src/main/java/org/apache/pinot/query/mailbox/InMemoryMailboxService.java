@@ -84,6 +84,10 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
     return new ArrayBlockingQueue<>(DEFAULT_CHANNEL_CAPACITY);
   }
 
+  public void close(MailboxIdentifier mailboxId){
+    _mailboxStateMap.remove(mailboxId);
+  }
+
   static class InMemoryMailboxState {
     ReceivingMailbox<TransferableBlock> _receivingMailbox;
     SendingMailbox<TransferableBlock> _sendingMailbox;

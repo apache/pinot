@@ -63,4 +63,9 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
   public boolean isClosed() {
     return _closed && _queue.size() == 0;
   }
+
+  @Override
+  public void close() {
+
+  }
 }

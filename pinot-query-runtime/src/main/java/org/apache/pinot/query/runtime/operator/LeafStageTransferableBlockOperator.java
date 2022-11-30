@@ -102,7 +102,7 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
   @Override
   public void close()
       throws InterruptedException {
-
+    // TODO: cancel leaf stage request.
   }
 
   /**

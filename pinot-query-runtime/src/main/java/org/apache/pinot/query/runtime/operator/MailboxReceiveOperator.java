@@ -92,7 +92,6 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     }
 
     _exchangeType = exchangeType;
-    System.out.println("MailboxReceiveOperator: jobId" + _jobId + "stageID" + stageId);
 
     if (_exchangeType == RelDistribution.Type.SINGLETON) {
       ServerInstance singletonInstance = null;
@@ -108,7 +107,6 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
         // TODO: fix WorkerManager assignment, this should not happen if we properly assign workers.
         // see: https://github.com/apache/pinot/issues/9611
         _sendingMailbox = Collections.emptyList();
-        System.out.println("empty sending mailbox");
       } else {
         _sendingMailbox =
             Collections.singletonList(toMailboxId(singletonInstance, jobId, stageId, receiveHostName, receivePort));
@@ -118,9 +116,6 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
       for (ServerInstance instance : sendingStageInstances) {
         _sendingMailbox.add(toMailboxId(instance, jobId, stageId, receiveHostName, receivePort));
       }
-    }
-    for(MailboxIdentifier id: _sendingMailbox){
-      System.out.println("sendingMaiblox:" + id);
     }
     _upstreamErrorBlock = null;
     _serverIdx = 0;
@@ -157,8 +152,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
       _serverIdx = (startingIdx + i) % _sendingMailbox.size();
       MailboxIdentifier mailboxId = _sendingMailbox.get(_serverIdx);
       try {
-        ReceivingMailbox<TransferableBlock> mailbox = _context.createReceivingMailbox(mailboxId);
-        System.out.println("mailbox:" + mailbox + "mailboxId:" + mailboxId);
+        ReceivingMailbox<TransferableBlock> mailbox = _context.getMailboxService().getReceivingMailbox(mailboxId);
         if (!mailbox.isClosed()) {
           openMailboxCount++;
           // this is blocking for 100ms and may return null
@@ -192,6 +186,9 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   @Override
   public void close()
       throws InterruptedException {
-
+    for (int i = 0; i < _sendingMailbox.size(); i++) {
+      MailboxIdentifier mailboxId = _sendingMailbox.get(_serverIdx);
+      _context.getMailboxService().close(mailboxId);
+    }
   }
 }

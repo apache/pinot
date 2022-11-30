@@ -40,9 +40,7 @@ public class PlanRequestContext {
   BlockExchange _exchange;
   public int _stageId;
 
-  private final ConcurrentHashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap = new ConcurrentHashMap<>();
-
-  private final ConcurrentHashMap<String, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap = new ConcurrentHashMap<>();
+  private final HashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap = new HashMap<>();
 
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, String hostName, int port,
       Map<Integer, StageMetadata> metadataMap, int stageId) {
@@ -58,10 +56,6 @@ public class PlanRequestContext {
     return _sendingMailboxMap.computeIfAbsent(mailboxId.toString(), (mid) -> _mailboxService.createSendingMailbox(mailboxId));
   }
 
-  public ReceivingMailbox<TransferableBlock> createReceivingMailbox(MailboxIdentifier mailboxId) {
-    return _receivingMailboxMap.computeIfAbsent(mailboxId.toString(), (mid) -> _mailboxService.createReceivingMailbox(mailboxId));
-
-  }
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     return  _mailboxService.getReceivingMailbox(mailboxId);
   }
@@ -92,5 +86,9 @@ public class PlanRequestContext {
 
   public MailboxService<TransferableBlock> getMailboxService() {
     return _mailboxService;
+  }
+
+  public void close(MailboxIdentifier mailboxId){
+    _mailboxService.close(mailboxId);
   }
 }

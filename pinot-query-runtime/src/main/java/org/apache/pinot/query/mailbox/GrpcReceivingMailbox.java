@@ -88,6 +88,11 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
     return isInitialized() && _contentStreamObserver.isCompleted();
   }
 
+  @Override
+  public void close() {
+    _contentStreamObserver.onCompleted();
+  }
+
   // TODO: fix busy wait. This should be guarded by timeout.
   private boolean waitForInitialize()
       throws Exception {

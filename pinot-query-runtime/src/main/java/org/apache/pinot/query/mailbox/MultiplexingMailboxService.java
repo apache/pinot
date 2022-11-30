@@ -47,6 +47,15 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
   }
 
   @Override
+  public void close(MailboxIdentifier mailboxId) {
+    if(mailboxId.isLocal()){
+      _inMemoryMailboxService.close(mailboxId);
+      return;
+    }
+    _grpcMailboxService.close(mailboxId);
+  }
+
+  @Override
   public void shutdown() {
     _grpcMailboxService.shutdown();
     _inMemoryMailboxService.shutdown();
@@ -60,14 +69,6 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
   @Override
   public int getMailboxPort() {
     return _grpcMailboxService.getMailboxPort();
-  }
-
-  @Override
-  public ReceivingMailbox<TransferableBlock> createReceivingMailbox(MailboxIdentifier mailboxId) {
-    if (mailboxId.isLocal()) {
-      return _inMemoryMailboxService.createReceivingMailbox(mailboxId);
-    }
-    return _grpcMailboxService.createReceivingMailbox(mailboxId);
   }
 
   @Override

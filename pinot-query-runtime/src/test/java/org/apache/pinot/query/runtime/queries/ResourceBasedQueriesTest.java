@@ -59,7 +59,22 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
   // TODO: refactor and load test dynamically using the reousrce utils in pinot-tools
   private static final List<String> QUERY_TEST_RESOURCE_FILES = ImmutableList.of(
-      "BasicQuery.json"
+      "BasicQuery.json",
+      "FromExpressions.json",
+      "SpecialSyntax.json",
+      "LexicalStructure.json",
+      "SelectExpressions.json",
+      "ValueExpressions.json",
+      "NumericTypes.json",
+      "SelectHaving.json",
+      "TableExpressions.json",
+      "CharacterTypes.json",
+      "BinaryTypes.json",
+      "TimeTypes.json",
+      "BooleanLogic.json",
+      "Comparisons.json",
+      "Aggregates.json",
+      "Case.json"
   );
 
   @BeforeClass
@@ -172,7 +187,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     runQuery(sql, expect).ifPresent(rows -> compareRowEquals(rows, expectedRows));
   }
 
-  private Optional<List<Object[]>> runQuery(String sql, final String except) {
+  private Optional<List<Object[]>> runQuery(String sql, final String except)
+      throws InterruptedException {
     try {
       // query pinot
       List<Object[]> resultRows = queryRunner(sql);

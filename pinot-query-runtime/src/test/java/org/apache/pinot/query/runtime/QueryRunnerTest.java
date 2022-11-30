@@ -202,7 +202,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
     try {
       QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator);
-    } catch (RuntimeException rte) {
+    } catch (RuntimeException | InterruptedException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
       Assert.assertTrue(rte.getMessage().contains(exceptionMsg), "Exception should contain: " + exceptionMsg
           + "! but found: " + rte.getMessage());

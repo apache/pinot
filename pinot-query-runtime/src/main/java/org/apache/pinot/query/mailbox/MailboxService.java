@@ -30,6 +30,8 @@ public interface MailboxService<T> {
    */
   void start();
 
+  void close(MailboxIdentifier mailboxId);
+
   /**
    * Shutting down the mailbox service.s
    */
@@ -60,7 +62,6 @@ public interface MailboxService<T> {
    */
   ReceivingMailbox<T> getReceivingMailbox(MailboxIdentifier mailboxId);
 
-  ReceivingMailbox<T> createReceivingMailbox(MailboxIdentifier mailboxId);
   /**
    * Look up a sending mailbox by {@link MailboxIdentifier}.
    *
