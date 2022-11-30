@@ -447,14 +447,14 @@ public class AggregationFunctionFactoryTest {
 
     function = getFunction("bool_and");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
-    assertTrue(aggregationFunction instanceof BooleanAndAggregateFunction);
+    assertTrue(aggregationFunction instanceof BooleanAndAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.BOOLAND);
     assertEquals(aggregationFunction.getColumnName(), "bool_and_column");
     assertEquals(aggregationFunction.getResultColumnName(), "bool_and(column)");
 
     function = getFunction("bool_or");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
-    assertTrue(aggregationFunction instanceof BooleanOrAggregateFunction);
+    assertTrue(aggregationFunction instanceof BooleanOrAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.BOOLOR);
     assertEquals(aggregationFunction.getColumnName(), "bool_or_column");
     assertEquals(aggregationFunction.getResultColumnName(), "bool_or(column)");

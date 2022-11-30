@@ -64,7 +64,7 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
    */
   @Override
   public int getIntResult() {
-    throw new RuntimeException("Method 'getLongResult' not supported for class " + getClass().getName());
+    throw new RuntimeException("Method 'getIntResult' not supported for class " + getClass().getName());
   }
 
   /**

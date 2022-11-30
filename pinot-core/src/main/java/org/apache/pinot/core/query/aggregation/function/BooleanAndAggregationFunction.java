@@ -23,13 +23,13 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class BooleanAndAggregateFunction extends BaseBooleanAggregateFunction {
+public class BooleanAndAggregationFunction extends BaseBooleanAggregationFunction {
 
-  public BooleanAndAggregateFunction(ExpressionContext expression) {
+  public BooleanAndAggregationFunction(ExpressionContext expression) {
     this(expression, false);
   }
 
-  public BooleanAndAggregateFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+  public BooleanAndAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled, BooleanMerge.AND);
   }
 

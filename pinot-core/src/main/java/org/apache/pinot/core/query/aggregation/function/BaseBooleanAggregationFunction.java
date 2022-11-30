@@ -36,7 +36,7 @@ import org.roaringbitmap.RoaringBitmap;
 // TODO: change this to implement BaseSingleInputAggregationFunction<Boolean, Boolean> when we get proper
 // handling of booleans in serialization - today this would fail because ColumnDataType#convert assumes
 // that the boolean is encoded as its stored type (an integer)
-public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggregationFunction<Integer, Integer> {
+public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggregationFunction<Integer, Integer> {
 
   private final BooleanMerge _merger;
   private final boolean _nullHandlingEnabled;
@@ -82,7 +82,7 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
     abstract int getDefaultValue();
   }
 
-  protected BaseBooleanAggregateFunction(ExpressionContext expression, boolean nullHandlingEnabled,
+  protected BaseBooleanAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled,
       BooleanMerge merger) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
@@ -117,16 +117,16 @@ public abstract class BaseBooleanAggregateFunction extends BaseSingleInputAggreg
     if (_nullHandlingEnabled) {
       int agg = getInt(aggregationResultHolder.getResult());
 
+      // early terminate on a per-block level to allow the
+      // loop below to be more tightly optimized (avoid a branch)
+      if (_merger.isTerminal(agg)) {
+        return;
+      }
+
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap == null) {
         nullBitmap = new RoaringBitmap();
       } else if (nullBitmap.getCardinality() > length) {
-        return;
-      }
-
-      // early terminate on a per-block level to allow the
-      // loop below to be more tightly optimized (avoid a branch)
-      if (_merger.isTerminal(agg)) {
         return;
       }
 

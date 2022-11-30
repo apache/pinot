@@ -32,7 +32,7 @@ public interface GroupByResultHolder {
   void setValueForKey(int groupKey, double value);
 
   /**
-   * Stores the given value (of type long) for the given groupKey.
+   * Stores the given value (of type int) for the given groupKey.
    *
    * @param groupKey
    * @param value

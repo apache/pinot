@@ -82,8 +82,8 @@ public enum AggregationFunctionType {
   DISTINCT("distinct"),
 
   // boolean aggregate functions
-  BOOLAND("bool_and"),
-  BOOLOR("bool_or");
+  BOOLAND("boolAnd"),
+  BOOLOR("boolOr");
 
   private static final Set<String> NAMES = Arrays.stream(values()).flatMap(func -> Stream.of(func.name(),
       func.getName(), func.getName().toLowerCase())).collect(Collectors.toSet());

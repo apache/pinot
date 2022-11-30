@@ -274,9 +274,9 @@ public class AggregationFunctionFactory {
           case COVARSAMP:
             return new CovarianceAggregationFunction(arguments, true);
           case BOOLAND:
-            return new BooleanAndAggregateFunction(firstArgument, queryContext.isNullHandlingEnabled());
+            return new BooleanAndAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
           case BOOLOR:
-            return new BooleanOrAggregateFunction(firstArgument, queryContext.isNullHandlingEnabled());
+            return new BooleanOrAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
           default:
             throw new IllegalArgumentException();
         }
