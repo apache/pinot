@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.OperatorUtils;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 public abstract class FilterOperand extends TransformOperand {
@@ -59,6 +60,8 @@ public abstract class FilterOperand extends TransformOperand {
       case "OR":
         Preconditions.checkState(operandSize >= 2, "OR takes >=2 argument, passed in argument size:" + operandSize);
         return new Or(functionCall.getFunctionOperands(), dataSchema);
+      // negate boolean literal/inputRef is compiled as IS NOT TRUE function instead of NOT operator
+      case "ISNOTTRUE":
       case "NOT":
         Preconditions.checkState(operandSize == 1, "NOT takes one argument, passed in argument size:" + operandSize);
         return new Not(toFilterOperand(functionCall.getFunctionOperands().get(0), dataSchema));
@@ -146,7 +149,7 @@ public abstract class FilterOperand extends TransformOperand {
 
     @Override
     public Boolean apply(Object[] row) {
-      return (boolean) row[_inputRef.getIndex()];
+      return BooleanUtils.toBoolean(row[_inputRef.getIndex()]);
     }
   }
 
