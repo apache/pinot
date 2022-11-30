@@ -20,7 +20,9 @@ package org.apache.pinot.plugin.inputformat.orc;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.InputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +47,7 @@ import org.apache.orc.TypeDescription;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -77,7 +80,8 @@ public class ORCRecordReader implements RecordReader {
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     Configuration configuration = new Configuration();
-    Reader orcReader = OrcFile.createReader(new Path(dataFile.getAbsolutePath()),
+    File orcFile = unzipIfRequired(dataFile);
+    Reader orcReader = OrcFile.createReader(new Path(orcFile.getAbsolutePath()),
         OrcFile.readerOptions(configuration).filesystem(FileSystem.getLocal(configuration)));
     TypeDescription orcSchema = orcReader.getSchema();
     Preconditions
@@ -104,6 +108,19 @@ public class ORCRecordReader implements RecordReader {
     _rowBatch = orcSchema.createRowBatch();
     _hasNext = _orcRecordReader.nextBatch(_rowBatch);
     _nextRowId = 0;
+  }
+
+  private File unzipIfRequired(File dataFile) throws IOException {
+    if (dataFile.getName().endsWith(".gz")) {
+      try(final InputStream inputStream = RecordReaderUtils.getInputStream(dataFile)) {
+        String pathname = dataFile.getAbsolutePath().split(".gz")[0];
+        File targetFile = new File(pathname);
+        Files.copy(inputStream, targetFile.toPath());
+        return targetFile;
+      }
+    } else {
+      return dataFile;
+    }
   }
 
   /**
