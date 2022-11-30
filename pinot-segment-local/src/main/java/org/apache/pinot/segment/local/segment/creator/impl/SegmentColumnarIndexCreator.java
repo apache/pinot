@@ -433,13 +433,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       FieldSpec fieldSpec) {
     ChunkCompressionType compressionType = segmentCreationSpec.getRawIndexCompressionType().get(fieldSpec.getName());
     if (compressionType == null) {
-      if (fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
-        return ChunkCompressionType.PASS_THROUGH;
-      } else {
-        return ChunkCompressionType.LZ4;
-      }
+      compressionType = getDefaultCompressionType(fieldSpec.getFieldType());
+    }
+
+    return compressionType;
+  }
+
+  public static ChunkCompressionType getDefaultCompressionType(FieldType fieldType) {
+    if (fieldType == FieldSpec.FieldType.METRIC) {
+      return ChunkCompressionType.PASS_THROUGH;
     } else {
-      return compressionType;
+      return ChunkCompressionType.LZ4;
     }
   }
 

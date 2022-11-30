@@ -70,10 +70,10 @@ import static org.testng.Assert.assertTrue;
  *   <li>column2, METRIC, INT, 42242, F, F, F, F, F</li>
  *   <li>column3, DIMENSION, STRING, 5, F, F, F, F, F</li>
  *   <li>column5, DIMENSION, STRING, 9, F, F, F, F, F</li>
- *   <li>column6, DIMENSION, INT, 18499, F, F, T, F, F</li>
+ *   <li>column6, DIMENSION, INT, 18499, F, F, T, T, F</li>
  *   <li>column7, DIMENSION, INT, 359, F, F, T, F, F</li>
  *   <li>column8, DIMENSION, INT, 850, F, T, F, T, F</li>
- *   <li>column9, METRIC, INT, 146, F, T, F, T, F</li>
+ *   <li>column9, METRIC, INT, 146, F, T, F, T, T</li>
  *   <li>column10, METRIC, INT, 3960, F, F, F, F, T</li>
  *   <li>daysSinceEpoch, TIME, INT, 1, T, F, F, T, F</li>
  * </ul>
@@ -134,9 +134,11 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertNotNull(immutableSegment1.getForwardIndex("column3"));
     assertNull(immutableSegment1.getDictionary("column3"));
     assertNotNull(immutableSegment1.getForwardIndex("column6"));
-    assertNull(immutableSegment1.getDictionary("column6"));
+    assertNotNull(immutableSegment1.getDictionary("column6"));
     assertNotNull(immutableSegment1.getForwardIndex("column7"));
     assertNull(immutableSegment1.getDictionary("column7"));
+    assertNotNull(immutableSegment1.getForwardIndex("column9"));
+    assertNotNull(immutableSegment1.getDictionary("column9"));
     assertNotNull(immutableSegment1.getForwardIndex("column10"));
     assertNull(immutableSegment1.getDictionary("column10"));
 
@@ -147,10 +149,12 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertNull(immutableSegment2.getDictionary("column2"));
     assertNotNull(immutableSegment2.getForwardIndex("column3"));
     assertNull(immutableSegment2.getDictionary("column3"));
-    assertNotNull(immutableSegment2.getForwardIndex("column6"));
-    assertNull(immutableSegment2.getDictionary("column6"));
+    assertNotNull(immutableSegment1.getForwardIndex("column6"));
+    assertNotNull(immutableSegment1.getDictionary("column6"));
     assertNotNull(immutableSegment2.getForwardIndex("column7"));
     assertNull(immutableSegment2.getDictionary("column7"));
+    assertNotNull(immutableSegment1.getForwardIndex("column9"));
+    assertNotNull(immutableSegment1.getDictionary("column9"));
     assertNotNull(immutableSegment2.getForwardIndex("column10"));
     assertNull(immutableSegment2.getDictionary("column10"));
 
@@ -160,10 +164,10 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
 
   private void createSegment(String filePath, String segmentName)
       throws Exception {
-    _rangeIndexColumns = new ArrayList<>(Arrays.asList("column10"));
+    _rangeIndexColumns = new ArrayList<>(Arrays.asList("column10", "column9"));
 
     _noDictionaryColumns =
-        new ArrayList<>(Arrays.asList("column1", "column2", "column3", "column5", "column6", "column7", "column10"));
+        new ArrayList<>(Arrays.asList("column1", "column2", "column3", "column5", "column7", "column10"));
     List<FieldConfig> fieldConfigs = new ArrayList<>();
     for (String column : _noDictionaryColumns) {
       fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.RAW, Collections.emptyList(),
@@ -245,7 +249,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testSelectQueriesAfterReload()
+  public void testSelectQueries()
       throws Exception {
     String query =
         "SELECT column1, column2, column3, column6, column7, column10 FROM testTable WHERE column10 > 674022574 AND "
@@ -302,10 +306,11 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testSelectWithDistinctQueriesAfterReload()
+  public void testSelectWithDistinctQueries()
       throws Exception {
-    String query = "SELECT DISTINCT column1, column2, column3, column6, column7, column10 FROM testTable ORDER BY "
-        + "column1 LIMIT 10";
+    String query =
+        "SELECT DISTINCT column1, column2, column3, column6, column7, column9, column10 FROM testTable ORDER BY "
+            + "column1 LIMIT 10";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
     assertTrue(brokerResponseNative.getProcessingExceptions() == null
         || brokerResponseNative.getProcessingExceptions().size() == 0);
@@ -315,15 +320,16 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
     assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
-    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 2400000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 2800000L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
     assertNotNull(brokerResponseNative.getProcessingExceptions());
     assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
     DataSchema dataSchema = new DataSchema(new String[]{
-        "column1", "column2", "column3", "column6", "column7", "column10"
+        "column1", "column2", "column3", "column6", "column7", "column9", "column10"
     }, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+        DataSchema.ColumnDataType.INT
     });
     assertEquals(resultTable.getDataSchema(), dataSchema);
     List<Object[]> resultRows1 = resultTable.getRows();
@@ -339,15 +345,16 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
     assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
-    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 2400000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 2800000L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
     assertNotNull(brokerResponseNative.getProcessingExceptions());
     assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
     dataSchema = new DataSchema(new String[]{
-        "column1", "column2", "column3", "column6", "column7", "column10"
+        "column1", "column2", "column3", "column6", "column7", "column9", "column10"
     }, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+        DataSchema.ColumnDataType.INT
     });
     assertEquals(resultTable.getDataSchema(), dataSchema);
     List<Object[]> resultRows2 = resultTable.getRows();
@@ -356,10 +363,11 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testSelectWithGroupByOrderByQueriesWithReload()
+  public void testSelectWithGroupByOrderByQueries()
       throws Exception {
     String query =
-        "SELECT column1, column7 FROM testTable GROUP BY column1, column7 ORDER BY column1, column7 " + " LIMIT 10";
+        "SELECT column1, column7, column9 FROM testTable GROUP BY column1, column7, column9 ORDER BY column1, "
+            + "column7, column9 LIMIT 10";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
     ResultTable resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
@@ -367,16 +375,17 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponseNative.getNumDocsScanned(), 400000L);
     assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
-    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 800000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 1200000L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
     assertNotNull(brokerResponseNative.getProcessingExceptions());
     assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
-    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column7"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT}));
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column7", "column9"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.INT}));
     List<Object[]> resultRows1 = resultTable.getRows();
     int previousVal = -1;
     for (Object[] resultRow : resultRows1) {
-      assertEquals(resultRow.length, 2);
+      assertEquals(resultRow.length, 3);
       assertTrue((int) resultRow[0] >= previousVal);
       previousVal = (int) resultRow[0];
     }
@@ -390,16 +399,17 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponseNative.getNumDocsScanned(), 400000L);
     assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
-    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 800000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 1200000L);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
     assertNotNull(brokerResponseNative.getProcessingExceptions());
     assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
-    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column7"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT}));
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column7", "column9"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.INT}));
     List<Object[]> resultRows2 = resultTable.getRows();
     previousVal = -1;
     for (Object[] resultRow : resultRows2) {
-      assertEquals(resultRow.length, 2);
+      assertEquals(resultRow.length, 3);
       assertTrue((int) resultRow[0] >= previousVal);
       previousVal = (int) resultRow[0];
     }
@@ -408,11 +418,74 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testSelectWithAggregationQueriesWithReload()
+  public void testAllSelectAggregations()
       throws Exception {
-    // TEST 1.
-    String query = "SELECT MAX(ARRAYLENGTH(column7)) from testTable LIMIT 10";
+    String query =
+        "SELECT MAX(column1), MIN(column1), MAX(column2), MIN(column2), MAXMV(column6), MINMV(column6), MAXMV"
+            + "(column7), MINMV(column7), MAX(column9), MIN(column9), MAX(column10), MIN(column10) FROM testTable";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
+    assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 0);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{
+        "max(column1)", "min(column1)",
+        "max" + "(column2)", "min(column2)", "maxmv(column6)", "minmv(column6)",
+        "maxmv" + "(column7)", "minmv(column7)", "max(column9)", "min(column9)", "max(column10)", "min(column10)"
+    }, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
+    }));
+    List<Object[]> beforeResultRows = resultTable.getRows();
+
+
+    changePropertiesAndReloadSegment();
+
+
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
+    assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 0);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{
+        "max(column1)", "min(column1)",
+        "max" + "(column2)", "min(column2)", "maxmv(column6)", "minmv(column6)",
+        "maxmv" + "(column7)", "minmv(column7)", "max(column9)", "min(column9)", "max(column10)", "min(column10)"
+    }, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
+    }));
+    List<Object[]> afterResultRows = resultTable.getRows();
+
+    validateBeforeAfterQueryResults(beforeResultRows, afterResultRows);
+  }
+
+  @Test
+  public void testMaxArrayLengthAggregation()
+      throws Exception {
+    // TEST1 - Before Reload: Test for column7.
+    String query1 = "SELECT MAX(ARRAYLENGTH(column7)) from testTable LIMIT 10";
+    BrokerResponseNative brokerResponseNative = getBrokerResponse(query1);
     assertTrue(brokerResponseNative.getProcessingExceptions() == null
         || brokerResponseNative.getProcessingExceptions().size() == 0);
     ResultTable resultTable = brokerResponseNative.getResultTable();
@@ -429,11 +502,9 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE}));
     List<Object[]> beforeResultRows1 = resultTable.getRows();
 
-    // TEST2
-    query =
-        "SELECT MAX(column1), MIN(column1), MAX(column2), MIN(column2), MAXMV(column6), MINMV(column6), MAXMV"
-            + "(column7), MINMV(column7), MAX(column10), MIN(column10) FROM testTable";
-    brokerResponseNative = getBrokerResponse(query);
+    // TEST2 - Before Reload: Test for column6.
+    String query2 = "SELECT MAX(ARRAYLENGTH(column6)) from testTable LIMIT 10";
+    brokerResponseNative = getBrokerResponse(query2);
     assertTrue(brokerResponseNative.getProcessingExceptions() == null
         || brokerResponseNative.getProcessingExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
@@ -442,48 +513,18 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
     assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
-    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 0);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 400000);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
     assertNotNull(brokerResponseNative.getProcessingExceptions());
     assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
-    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{
-        "max(column1)", "min(column1)",
-        "max" + "(column2)", "min(column2)", "maxmv(column6)", "minmv(column6)",
-        "maxmv" + "(column7)", "minmv(column7)", "max(column10)", "min(column10)"
-    }, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
-        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
-        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
-        DataSchema.ColumnDataType.DOUBLE
-    }));
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"max(arraylength(column6))"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE}));
     List<Object[]> beforeResultRows2 = resultTable.getRows();
-
-    // TEST3
-    query = "SET \"timeoutMs\" = 30000; SELECT column1, max(column1), sum(column10) "
-        + "from testTable WHERE column7 = 2147483647 GROUP BY column1 ORDER BY column1";
-    brokerResponseNative = getBrokerResponse(query);
-    assertTrue(brokerResponseNative.getProcessingExceptions() == null
-        || brokerResponseNative.getProcessingExceptions().size() == 0);
-    resultTable = brokerResponseNative.getResultTable();
-    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
-    assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
-    assertEquals(brokerResponseNative.getNumDocsScanned(), 199_756L);
-    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
-    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
-    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 399_512L);
-    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 536360L);
-    assertNotNull(brokerResponseNative.getProcessingExceptions());
-    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
-    assertEquals(resultTable.getDataSchema(),
-        new DataSchema(new String[]{"column1", "max(column1)", "sum(column10)"}, new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
-        }));
-    List<Object[]> beforeResultRows3 = resultTable.getRows();
 
     changePropertiesAndReloadSegment();
 
-    query = "SELECT MAX(ARRAYLENGTH(column7)) from testTable LIMIT 10";
-    brokerResponseNative = getBrokerResponse(query);
+    // TEST1 - After Reload: Test for column7.
+    brokerResponseNative = getBrokerResponse(query1);
     assertTrue(brokerResponseNative.getProcessingExceptions() == null
         || brokerResponseNative.getProcessingExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
@@ -499,13 +540,10 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"max(arraylength(column7))"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE}));
     List<Object[]> afterResultRows1 = resultTable.getRows();
-
     validateBeforeAfterQueryResults(beforeResultRows1, afterResultRows1);
 
-    query =
-        "SELECT MAX(column1), MIN(column1), MAX(column2), MIN(column2), MAXMV(column6), MINMV(column6), MAXMV"
-            + "(column7), MINMV(column7), MAX(column10), MIN(column10) FROM testTable";
-    brokerResponseNative = getBrokerResponse(query);
+    // TEST2 - After Reload: Test for column6.
+    brokerResponseNative = getBrokerResponse(query2);
     assertTrue(brokerResponseNative.getProcessingExceptions() == null
         || brokerResponseNative.getProcessingExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
@@ -514,27 +552,68 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
     assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
-    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 0);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 400000);
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
     assertNotNull(brokerResponseNative.getProcessingExceptions());
     assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
-    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{
-        "max(column1)", "min(column1)",
-        "max" + "(column2)", "min(column2)", "maxmv(column6)", "minmv(column6)",
-        "maxmv" + "(column7)", "minmv(column7)", "max(column10)", "min(column10)"
-    }, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
-        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
-        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
-        DataSchema.ColumnDataType.DOUBLE
-    }));
+    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"max(arraylength(column6))"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE}));
     List<Object[]> afterResultRows2 = resultTable.getRows();
-
     validateBeforeAfterQueryResults(beforeResultRows2, afterResultRows2);
+  }
 
-    query = "SELECT column1, max(column1), sum(column10) from testTable WHERE column7 = 2147483647 GROUP BY "
+  @Test
+  public void testSelectWithAggregationQueries()
+      throws Exception {
+    // TEST1 - Before Reload: Test where column7 is in filter.
+    String query1 = "SET \"timeoutMs\" = 30000; SELECT column1, max(column1), sum(column10) from testTable WHERE "
+        + "column7 = 2147483647 GROUP BY column1 ORDER BY column1";
+    BrokerResponseNative brokerResponseNative = getBrokerResponse(query1);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+    assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 199_756L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 399_512L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 536360L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(),
+        new DataSchema(new String[]{"column1", "max(column1)", "sum(column10)"}, new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
+        }));
+    List<Object[]> beforeResultRows1 = resultTable.getRows();
+
+
+    // TEST2 - Before Reload: Test where column6 is in filter.
+    String query2 = "SELECT column1, max(column1), sum(column10) from testTable WHERE column6 = 1001 GROUP BY "
         + "column1 ORDER BY column1";
-    brokerResponseNative = getBrokerResponse(query);
+    brokerResponseNative = getBrokerResponse(query2);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
+    assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 8);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 16L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 426752L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(),
+        new DataSchema(new String[]{"column1", "max(column1)", "sum(column10)"}, new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
+        }));
+    List<Object[]> beforeResultRows2 = resultTable.getRows();
+
+    changePropertiesAndReloadSegment();
+
+    // TEST1 - After reload. Test where column7 is in filter.
+    brokerResponseNative = getBrokerResponse(query1);
     assertTrue(brokerResponseNative.getProcessingExceptions() == null
         || brokerResponseNative.getProcessingExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
@@ -551,26 +630,48 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
         new DataSchema(new String[]{"column1", "max(column1)", "sum(column10)"}, new DataSchema.ColumnDataType[]{
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
         }));
-    List<Object[]> afterResultRows3 = resultTable.getRows();
+    List<Object[]> afterResultRows1 = resultTable.getRows();
 
-    validateBeforeAfterQueryResults(beforeResultRows3, afterResultRows3);
+    validateBeforeAfterQueryResults(beforeResultRows1, afterResultRows1);
+
+    // TEST2 - After Reload: Test where column6 is in filter.
+    brokerResponseNative = getBrokerResponse(query2);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
+    assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 8);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 16L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 426752);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    assertEquals(resultTable.getDataSchema(),
+        new DataSchema(new String[]{"column1", "max(column1)", "sum(column10)"}, new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
+        }));
+    List<Object[]> afterResultRows2 = resultTable.getRows();
+
+    validateBeforeAfterQueryResults(beforeResultRows2, afterResultRows2);
   }
 
   @Test
   public void testRangeIndexAfterReload()
       throws Exception {
-    String query = "select count(*) from testTable where column10 > 674022574";
+    String query = "select count(*) from testTable where column10 > 674022574 and column9 < 674022574";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
     assertTrue(brokerResponseNative.getProcessingExceptions() == null
         || brokerResponseNative.getProcessingExceptions().size() == 0);
     ResultTable resultTable1 = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
-    assertEquals(brokerResponseNative.getNumDocsScanned(), 103280L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 40224L);
     assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 0L);
-    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 400000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 479412L);
     assertNotNull(brokerResponseNative.getProcessingExceptions());
 
     DataSchema dataSchema = new DataSchema(new String[]{
@@ -589,7 +690,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     resultTable1 = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
-    assertEquals(brokerResponseNative.getNumDocsScanned(), 103280L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 40224L);
     assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 0L);
@@ -623,7 +724,8 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
    * As a part of segmentReload, the ForwardIndexHandler will perform the following operations:
    *
    * column1 -> change compression.
-   * column6 -> change compression
+   * column6 -> disable dictionary
+   * column9 -> disable dictionary
    * column3 -> Enable dictionary.
    * column2 -> Enable dictionary. Add inverted index.
    * column7 -> Enable dictionary. Add inverted index.
@@ -634,8 +736,6 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     List<FieldConfig> newFieldConfigs = new ArrayList<>();
     newFieldConfigs.add(new FieldConfig("column1", FieldConfig.EncodingType.RAW, Collections.emptyList(),
         FieldConfig.CompressionCodec.ZSTANDARD, null));
-    newFieldConfigs.add(new FieldConfig("column6", FieldConfig.EncodingType.RAW, Collections.emptyList(),
-        FieldConfig.CompressionCodec.LZ4, null));
     _tableConfig.setFieldConfigList(newFieldConfigs);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
@@ -644,12 +744,15 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     invertedIndexEnabledColumns.add("column2");
     invertedIndexEnabledColumns.add("column7");
     indexLoadingConfig.setInvertedIndexColumns(invertedIndexEnabledColumns);
+    indexLoadingConfig.getInvertedIndexColumns().remove("column9");
     Set<String> noDictionaryColumns = new HashSet<>(_noDictionaryColumns);
     indexLoadingConfig.setNoDictionaryColumns(noDictionaryColumns);
     indexLoadingConfig.getNoDictionaryColumns().remove("column2");
     indexLoadingConfig.getNoDictionaryColumns().remove("column3");
     indexLoadingConfig.getNoDictionaryColumns().remove("column7");
     indexLoadingConfig.getNoDictionaryColumns().remove("column10");
+    indexLoadingConfig.getNoDictionaryColumns().add("column6");
+    indexLoadingConfig.getNoDictionaryColumns().add("column9");
     Set<String> rangeIndexColumns = new HashSet<>(_rangeIndexColumns);
     indexLoadingConfig.setRangeIndexColumns(rangeIndexColumns);
     indexLoadingConfig.setReadMode(ReadMode.heap);
@@ -673,6 +776,8 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertNull(immutableSegment1.getDictionary("column6"));
     assertNotNull(immutableSegment1.getForwardIndex("column7"));
     assertNotNull(immutableSegment1.getDictionary("column7"));
+    assertNotNull(immutableSegment1.getForwardIndex("column9"));
+    assertNull(immutableSegment1.getDictionary("column9"));
     assertNotNull(immutableSegment1.getForwardIndex("column10"));
     assertNotNull(immutableSegment1.getDictionary("column10"));
 
@@ -687,6 +792,8 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertNull(immutableSegment2.getDictionary("column6"));
     assertNotNull(immutableSegment2.getForwardIndex("column7"));
     assertNotNull(immutableSegment2.getDictionary("column7"));
+    assertNotNull(immutableSegment1.getForwardIndex("column9"));
+    assertNull(immutableSegment1.getDictionary("column9"));
     assertNotNull(immutableSegment2.getForwardIndex("column10"));
     assertNotNull(immutableSegment2.getDictionary("column10"));
   }
