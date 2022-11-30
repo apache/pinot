@@ -21,13 +21,7 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -142,7 +136,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     for (AggregationFunctionColumnPair functionColumnPair : functionColumnPairs) {
       _metrics[index] = functionColumnPair.toColumnName();
       _functionColumnPairs[index] = functionColumnPair;
-      _valueAggregators[index] = ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType());
+      _valueAggregators[index] = ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.EMPTY_LIST);
 
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {

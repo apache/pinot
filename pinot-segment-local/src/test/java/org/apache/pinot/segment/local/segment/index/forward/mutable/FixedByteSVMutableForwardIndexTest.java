@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.forward.mutable;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
@@ -41,13 +42,13 @@ public class FixedByteSVMutableForwardIndexTest {
 
   @AfterClass
   public void tearDown()
-      throws Exception {
+          throws Exception {
     _memoryManager.close();
   }
 
   @Test
   public void testDictId()
-      throws IOException {
+          throws IOException {
     Random r = new Random();
     final long seed = r.nextLong();
     r = new Random(seed);
@@ -63,7 +64,7 @@ public class FixedByteSVMutableForwardIndexTest {
   }
 
   private void testDictId(final Random random, final int rows, final int div)
-      throws IOException {
+          throws IOException {
     FixedByteSVMutableForwardIndex readerWriter;
     readerWriter = new FixedByteSVMutableForwardIndex(true, DataType.INT, rows / div, _memoryManager, "Int");
     int[] data = new int[rows];
@@ -114,8 +115,76 @@ public class FixedByteSVMutableForwardIndexTest {
   }
 
   @Test
+  public void testBytes() throws IOException {
+    int rows = 10;
+    Random r = new Random();
+    final long seed = r.nextLong();
+    r = new Random(seed);
+    for (int div = 1; div <= rows / 2; div++) {
+      testBytes(r, rows, div);
+    }
+  }
+
+  private void testBytes(final Random random, final int rows, final int div) throws IOException {
+    int HLL_log2m_12_size = 2740;
+    int log2m = 12;
+
+    FixedByteSVMutableForwardIndex readerWriter;
+    readerWriter = new FixedByteSVMutableForwardIndex(false, DataType.BYTES, HLL_log2m_12_size, rows / div, _memoryManager, "Long");
+    byte[][] data = new byte[rows][];
+
+    for (int i = 0; i < rows; i++) {
+      HyperLogLog hll = new HyperLogLog(log2m);
+      hll.offer(random.nextLong());
+      data[i] = hll.getBytes();
+      Assert.assertEquals(data[i].length, HLL_log2m_12_size);
+      readerWriter.setBytes(i, data[i]);
+      Assert.assertEquals(readerWriter.getBytes(i).length, data[i].length);
+      Assert.assertEquals(readerWriter.getBytes(i), data[i]);
+    }
+    for (int i = 0; i < rows; i++) {
+      Assert.assertEquals(readerWriter.getBytes(i), data[i]);
+    }
+
+    // Test mutability by overwriting randomly selected rows.
+    for (int i = 0; i < rows; i++) {
+      if (random.nextFloat() >= 0.5) {
+        HyperLogLog hll = new HyperLogLog(log2m);
+        hll.offer(random.nextLong());
+        data[i] = hll.getBytes();
+        readerWriter.setBytes(i, data[i]);
+      }
+    }
+    for (int i = 0; i < rows; i++) {
+      Assert.assertEquals(readerWriter.getBytes(i), data[i]);
+    }
+
+    // Write to a large enough row index to ensure multiple chunks are correctly allocated.
+    int start = rows * 4;
+    for (int i = 0; i < rows; i++) {
+      HyperLogLog hll = new HyperLogLog(log2m);
+      hll.offer(random.nextLong());
+      data[i] = hll.getBytes();
+      readerWriter.setBytes(start + i, data[i]);
+    }
+
+    for (int i = 0; i < rows; i++) {
+      Assert.assertEquals(readerWriter.getBytes(start + i), data[i]);
+    }
+
+    // Ensure that rows not written default to an empty byte array.
+    byte[] emptyBytes = new byte[HLL_log2m_12_size];
+    start = rows * 2;
+    for (int i = 0; i < 2 * rows; i++) {
+      byte[] bytes = readerWriter.getBytes(start + i);
+      Assert.assertEquals(bytes, emptyBytes);
+    }
+    readerWriter.close();
+  }
+
+  @Test
   public void testLong()
-      throws IOException {
+          throws IOException {
     int rows = 10;
     Random r = new Random();
     final long seed = r.nextLong();
@@ -126,7 +195,7 @@ public class FixedByteSVMutableForwardIndexTest {
   }
 
   private void testLong(final Random random, final int rows, final int div)
-      throws IOException {
+          throws IOException {
     FixedByteSVMutableForwardIndex readerWriter;
     readerWriter = new FixedByteSVMutableForwardIndex(false, DataType.LONG, rows / div, _memoryManager, "Long");
     long[] data = new long[rows];
