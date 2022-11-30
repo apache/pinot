@@ -42,13 +42,13 @@ public class FixedByteSVMutableForwardIndexTest {
 
   @AfterClass
   public void tearDown()
-          throws Exception {
+      throws Exception {
     _memoryManager.close();
   }
 
   @Test
   public void testDictId()
-          throws IOException {
+      throws IOException {
     Random r = new Random();
     final long seed = r.nextLong();
     r = new Random(seed);
@@ -64,7 +64,7 @@ public class FixedByteSVMutableForwardIndexTest {
   }
 
   private void testDictId(final Random random, final int rows, final int div)
-          throws IOException {
+      throws IOException {
     FixedByteSVMutableForwardIndex readerWriter;
     readerWriter = new FixedByteSVMutableForwardIndex(true, DataType.INT, rows / div, _memoryManager, "Int");
     int[] data = new int[rows];
@@ -115,7 +115,8 @@ public class FixedByteSVMutableForwardIndexTest {
   }
 
   @Test
-  public void testBytes() throws IOException {
+  public void testBytes()
+      throws IOException {
     int rows = 10;
     Random r = new Random();
     final long seed = r.nextLong();
@@ -125,19 +126,22 @@ public class FixedByteSVMutableForwardIndexTest {
     }
   }
 
-  private void testBytes(final Random random, final int rows, final int div) throws IOException {
-    int HLL_log2m_12_size = 2740;
+  private void testBytes(final Random random, final int rows, final int div)
+      throws IOException {
+    int hllLog2m12Size = 2740;
     int log2m = 12;
 
     FixedByteSVMutableForwardIndex readerWriter;
-    readerWriter = new FixedByteSVMutableForwardIndex(false, DataType.BYTES, HLL_log2m_12_size, rows / div, _memoryManager, "Long");
+    readerWriter =
+        new FixedByteSVMutableForwardIndex(false, DataType.BYTES, hllLog2m12Size, rows / div, _memoryManager,
+            "Long");
     byte[][] data = new byte[rows][];
 
     for (int i = 0; i < rows; i++) {
       HyperLogLog hll = new HyperLogLog(log2m);
       hll.offer(random.nextLong());
       data[i] = hll.getBytes();
-      Assert.assertEquals(data[i].length, HLL_log2m_12_size);
+      Assert.assertEquals(data[i].length, hllLog2m12Size);
       readerWriter.setBytes(i, data[i]);
       Assert.assertEquals(readerWriter.getBytes(i).length, data[i].length);
       Assert.assertEquals(readerWriter.getBytes(i), data[i]);
@@ -173,7 +177,7 @@ public class FixedByteSVMutableForwardIndexTest {
     }
 
     // Ensure that rows not written default to an empty byte array.
-    byte[] emptyBytes = new byte[HLL_log2m_12_size];
+    byte[] emptyBytes = new byte[hllLog2m12Size];
     start = rows * 2;
     for (int i = 0; i < 2 * rows; i++) {
       byte[] bytes = readerWriter.getBytes(start + i);
@@ -184,7 +188,7 @@ public class FixedByteSVMutableForwardIndexTest {
 
   @Test
   public void testLong()
-          throws IOException {
+      throws IOException {
     int rows = 10;
     Random r = new Random();
     final long seed = r.nextLong();
@@ -195,7 +199,7 @@ public class FixedByteSVMutableForwardIndexTest {
   }
 
   private void testLong(final Random random, final int rows, final int div)
-          throws IOException {
+      throws IOException {
     FixedByteSVMutableForwardIndex readerWriter;
     readerWriter = new FixedByteSVMutableForwardIndex(false, DataType.LONG, rows / div, _memoryManager, "Long");
     long[] data = new long[rows];

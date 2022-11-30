@@ -34,9 +34,10 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, HyperLogLog> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
   private int _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
-  private int _log2m_byte_size = 180;
+  private int _log2mByteSize = 180;
 
-  public DistinctCountHLLValueAggregator() {}
+  public DistinctCountHLLValueAggregator() {
+  }
 
   public DistinctCountHLLValueAggregator(List<ExpressionContext> arguments) {
     // length 1 means we use the default _log2m of 8
@@ -49,7 +50,7 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
 
     _log2m = Integer.parseInt(log2mLiteral);
     try {
-      _log2m_byte_size = (new HyperLogLog(_log2m)).getBytes().length;
+      _log2mByteSize = (new HyperLogLog(_log2m)).getBytes().length;
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -78,7 +79,7 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
     } else {
       initialValue = new HyperLogLog(_log2m);
       initialValue.offer(rawValue);
-      _maxByteSize = Math.max(_maxByteSize, _log2m_byte_size);
+      _maxByteSize = Math.max(_maxByteSize, _log2mByteSize);
     }
     return initialValue;
   }

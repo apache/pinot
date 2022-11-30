@@ -54,14 +54,14 @@ public class DefaultMutableIndexProvider implements MutableIndexProvider {
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
     if (!context.hasDictionary()) {
       if (isSingleValue) {
-        String allocationContext =
-            buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
-                V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-        // We consider BYTES with a specific maxLength as being also fixed width maxLength's purpose doubles as the fixed width
+        String allocationContext = buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
+            V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+        // We consider BYTES with a specific maxLength as being also fixed width maxLength's purpose doubles as the
+        // fixed width
         // when used on a BYTES field.
         if (storedType.isFixedWidth() || (storedType.getStoredType() == BYTES && maxLength > 0)) {
           return new FixedByteSVMutableForwardIndex(false, storedType, maxLength, context.getCapacity(),
-                  context.getMemoryManager(), allocationContext);
+              context.getMemoryManager(), allocationContext);
         } else {
           // RealtimeSegmentStatsHistory does not have the stats for no-dictionary columns from previous consuming
           // segments
@@ -69,35 +69,32 @@ public class DefaultMutableIndexProvider implements MutableIndexProvider {
           //       columns as well
           // TODO: Use the stats to get estimated average length
           // Use a smaller capacity as opposed to segment flush size
-          int initialCapacity = Math.min(context.getCapacity(),
-              NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
+          int initialCapacity =
+              Math.min(context.getCapacity(), NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
           return new VarByteSVMutableForwardIndex(storedType, context.getMemoryManager(), allocationContext,
               initialCapacity, NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);
         }
       } else {
         // TODO: Add support for variable width (bytes, string, big decimal) MV RAW column types
         assert storedType.isFixedWidth();
-        String allocationContext =
-            buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
-                V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
+        String allocationContext = buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
+            V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
         return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
-            context.getCapacity(), storedType.size(), context.getMemoryManager(), allocationContext, false,
-            storedType);
+            context.getCapacity(), storedType.size(), context.getMemoryManager(), allocationContext, false, storedType);
       }
     } else {
       if (isSingleValue) {
-        String allocationContext = buildAllocationContext(segmentName, column,
-            V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+        String allocationContext =
+            buildAllocationContext(segmentName, column, V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
         return new FixedByteSVMutableForwardIndex(true, INT, context.getCapacity(), context.getMemoryManager(),
             allocationContext);
       } else {
-        String allocationContext = buildAllocationContext(segmentName, column,
-            V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+        String allocationContext =
+            buildAllocationContext(segmentName, column, V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
         return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
-            context.getCapacity(), Integer.BYTES,
-            context.getMemoryManager(), allocationContext, true, INT);
+            context.getCapacity(), Integer.BYTES, context.getMemoryManager(), allocationContext, true, INT);
       }
     }
   }
@@ -130,8 +127,7 @@ public class DefaultMutableIndexProvider implements MutableIndexProvider {
     }
     // NOTE: preserve 10% buffer for cardinality to reduce the chance of re-sizing the dictionary
     int estimatedCardinality = (int) (context.getEstimatedCardinality() * 1.1);
-    String dictionaryAllocationContext =
-        buildAllocationContext(segmentName, column, V1Constants.Dict.FILE_EXTENSION);
+    String dictionaryAllocationContext = buildAllocationContext(segmentName, column, V1Constants.Dict.FILE_EXTENSION);
     return MutableDictionaryFactory.getMutableDictionary(storedType, context.isOffHeap(), context.getMemoryManager(),
         dictionaryColumnSize, Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
   }

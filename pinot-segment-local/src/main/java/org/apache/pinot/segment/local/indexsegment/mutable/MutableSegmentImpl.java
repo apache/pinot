@@ -349,8 +349,8 @@ public class MutableSegmentImpl implements MutableSegment {
           //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
           //  text indexes remain statically defined. Revisit this after this refactoring has been done.
           RealtimeLuceneTextIndex luceneTextIndex =
-              new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName,
-                  stopWordsInclude, stopWordsExclude);
+              new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName, stopWordsInclude,
+                  stopWordsExclude);
           if (_realtimeLuceneReaders == null) {
             _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
           }
@@ -1279,8 +1279,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
     for (String metricName : segmentConfig.getSchema().getMetricNames()) {
-      columnNameToAggregator.put(metricName,
-              Pair.of(metricName, ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.EMPTY_LIST)));
+      columnNameToAggregator.put(metricName, Pair.of(metricName,
+          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.EMPTY_LIST)));
     }
     return columnNameToAggregator;
   }
@@ -1300,12 +1300,14 @@ public class MutableSegmentImpl implements MutableSegment {
 
       switch (functionContext.getFunctionName().toLowerCase()) {
         case "distinctcounthll":
-          Preconditions.checkState(functionContext.getArguments().size() >= 1 && functionContext.getArguments().size() <= 2,
-                  "distinctcounthll function can have max two arguments: %s", config);
+          Preconditions.checkState(
+              functionContext.getArguments().size() >= 1 && functionContext.getArguments().size() <= 2,
+              "distinctcounthll function can have max two arguments: %s", config);
           break;
         default:
           Preconditions.checkState(functionContext.getArguments().size() == 1,
-                  "aggregation function can only have one argument: %s", config);
+              "aggregation function can only have one argument: %s", config);
+          break;
       }
 
       ExpressionContext argument = functionContext.getArguments().get(0);
@@ -1315,8 +1317,8 @@ public class MutableSegmentImpl implements MutableSegment {
       AggregationFunctionType functionType =
           AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
 
-      columnNameToAggregator.put(config.getColumnName(),
-              Pair.of(argument.getIdentifier(), ValueAggregatorFactory.getValueAggregator(functionType, functionContext.getArguments())));
+      columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(),
+          ValueAggregatorFactory.getValueAggregator(functionType, functionContext.getArguments())));
     }
 
     return columnNameToAggregator;

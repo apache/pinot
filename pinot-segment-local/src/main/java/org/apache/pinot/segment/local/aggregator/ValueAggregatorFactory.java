@@ -38,7 +38,8 @@ public class ValueAggregatorFactory {
    * @param aggregationType Aggregation type
    * @return Value aggregator
    */
-  public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType, List<ExpressionContext> arguments) {
+  public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType,
+      List<ExpressionContext> arguments) {
     switch (aggregationType) {
       case COUNT:
         return new CountValueAggregator();
