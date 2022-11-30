@@ -3,76 +3,28 @@
     "tables": {
       "tbl": {
         "schema": [
-          {
-            "name": "int_col",
-            "type": "INT"
-          },
-          {
-            "name": "double_col",
-            "type": "DOUBLE"
-          },
-          {
-            "name": "string_col",
-            "type": "STRING"
-          },
-          {
-            "name": "bool_col",
-            "type": "BOOLEAN"
-          }
+          { "name": "int_col", "type": "INT" },
+          { "name": "double_col", "type": "DOUBLE" },
+          { "name": "string_col", "type": "STRING" },
+          { "name": "bool_col", "type": "BOOLEAN" }
         ],
         "inputs": [
-          [
-            2,
-            300,
-            "a",
-            true
-          ],
-          [
-            2,
-            400,
-            "a",
-            false
-          ],
-          [
-            3,
-            100,
-            "b",
-            true
-          ],
-          [
-            100,
-            1,
-            "b",
-            false
-          ],
-          [
-            101,
-            1.01,
-            "c",
-            false
-          ],
-          [
-            150,
-            1.5,
-            "c",
-            false
-          ],
-          [
-            175,
-            1.75,
-            "c",
-            true
-          ]
+          [ 2, 300, "a", true ],
+          [ 2, 400, "a", false ],
+          [ 3, 100, "b", true ],
+          [ 100, 1, "b", false ],
+          [ 101, 1.01, "c", false ],
+          [ 150, 1.5, "c", false ],
+          [ 175, 1.75, "c", true ]
         ]
       }
     },
     "queries": [
       {
-        "ignored": true,
         "psql": "4.2.7",
-        "comments": "result error:average doesn't work because we round up but h2 round down for integer",
+        "comments": ":we round up but h2 round down for integer, to work around this we divide by 2",
         "description": "average int",
-        "sql": "SELECT avg(int_col) FROM {tbl}"
+        "sql": "SELECT avg(int_col) / 2 FROM {tbl}"
       },
       {
         "psql": "4.2.7",
@@ -171,78 +123,21 @@
     "tables": {
       "tbl": {
         "schema": [
-          {
-            "name": "int_col",
-            "type": "INT"
-          },
-          {
-            "name": "double_col",
-            "type": "DOUBLE"
-          },
-          {
-            "name": "string_col",
-            "type": "STRING"
-          },
-          {
-            "name": "bool_col",
-            "type": "BOOLEAN"
-          }
+          { "name": "int_col", "type": "INT" },
+          { "name": "double_col", "type": "DOUBLE" },
+          { "name": "string_col", "type": "STRING" },
+          { "name": "bool_col", "type": "BOOLEAN" }
         ],
         "inputs": [
-          [
-            2,
-            300,
-            "a",
-            false
-          ],
-          [
-            2,
-            400,
-            "a",
-            true
-          ],
-          [
-            3,
-            100,
-            "b",
-            true
-          ],
-          [
-            0.001,
-            1,
-            "b",
-            false
-          ],
-          [
-            101,
-            1.01,
-            "c",
-            false
-          ],
-          [
-            150,
-            1.5,
-            "c",
-            true
-          ],
-          [
-            175,
-            1.75,
-            "c",
-            true
-          ],
-          [
-            -10000,
-            1.75,
-            "c",
-            false
-          ],
-          [
-            -2,
-            0.5,
-            "c",
-            false
-          ]
+          [ 2, 300, "a", false ],
+          [ 2, 400, "a", true ],
+          [ 3, 100, "b", true ],
+          [ 0.001, 1, "b", false ],
+          [ 101, 1.01, "c", false ],
+          [ 150, 1.5, "c", true ],
+          [ 175, 1.75, "c", true ],
+          [ -10000, 1.75, "c", false ],
+          [ -2, 0.5, "c", false ]
         ]
       }
     },
@@ -254,10 +149,9 @@
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
         "description": "aggregate int column and filter by int column",
-        "comments": "rounding error",
-        "sql": "SELECT sum(1 /int_col) FROM {tbl} WHERE int_col > 0"
+        "comments": "divide result by 2 to avoid rounding error",
+        "sql": "SELECT sum(1 /int_col) / 2 FROM {tbl} WHERE int_col > 0"
       },
       {
         "psql": "4.2.7",
