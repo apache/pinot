@@ -33,6 +33,10 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -89,23 +93,119 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
       if (_currentIndex < _baseResultBlock.size()) {
         InstanceResponseBlock responseBlock = _baseResultBlock.get(_currentIndex++);
         if (responseBlock.getResultsBlock() != null) {
-          DataSchema dataSchema = responseBlock.getDataSchema();
-          boolean requiresCleanup = responseBlock.getResultsBlock() instanceof SelectionResultsBlock
-              && dataSchema != null && responseBlock.getRows() != null && !responseBlock.getRows().isEmpty();
-
-          // 1. canonicalize data schema
-          dataSchema = requiresCleanup ? cleanUpDataSchema(responseBlock, _desiredDataSchema) : dataSchema;
-          // 2. canonicalize data block
-          List<Object[]> rows = cleanUpDataBlock(responseBlock, dataSchema, requiresCleanup);
-          return new TransferableBlock(rows, dataSchema, DataBlock.Type.ROW);
+          return composeTransferableBlock(responseBlock, _desiredDataSchema);
         } else {
-          return new TransferableBlock(Collections.emptyList(), responseBlock.getDataSchema(), DataBlock.Type.ROW);
+          return new TransferableBlock(Collections.emptyList(), _desiredDataSchema, DataBlock.Type.ROW);
         }
       } else {
         _currentIndex = -1;
         return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
       }
     }
+  }
+
+  private static TransferableBlock composeTransferableBlock(InstanceResponseBlock responseBlock,
+      DataSchema desiredDataSchema) {
+    BaseResultsBlock resultsBlock = responseBlock.getResultsBlock();
+    if (resultsBlock instanceof SelectionResultsBlock) {
+      return composeSelectTransferableBlock(responseBlock, desiredDataSchema);
+    } else if (resultsBlock instanceof AggregationResultsBlock) {
+      return composeAggregationTransferableBlock(responseBlock, desiredDataSchema);
+    } else if (resultsBlock instanceof GroupByResultsBlock) {
+      return composeGroupByTransferableBlock(responseBlock, desiredDataSchema);
+    } else if (resultsBlock instanceof DistinctResultsBlock) {
+      return composeDistinctTransferableBlock(responseBlock, desiredDataSchema);
+    } else {
+      throw new IllegalArgumentException("Unsupported result block type: " + resultsBlock);
+    }
+  }
+
+  private static TransferableBlock composeDistinctTransferableBlock(InstanceResponseBlock responseBlock,
+      DataSchema desiredDataSchema) {
+    return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
+  }
+
+  private static TransferableBlock composeGroupByTransferableBlock(InstanceResponseBlock responseBlock,
+      DataSchema desiredDataSchema) {
+    return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
+  }
+
+  private static TransferableBlock composeAggregationTransferableBlock(InstanceResponseBlock responseBlock,
+      DataSchema desiredDataSchema) {
+    return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
+  }
+
+  /**
+   * we re-arrange columns to match the projection in the case of order by - this is to ensure
+   * that V1 results match what the expected projection schema in the calcite logical operator; if
+   * we realize that there are other situations where we need to post-process v1 results to adhere to
+   * the expected results we should factor this out and also apply the canonicalization of the data
+   * types during this post-process step (also see LeafStageTransferableBlockOperator#canonicalizeRow)
+   *
+   * @param responseBlock result block from leaf stage
+   * @param desiredDataSchema the desired schema for send operator
+   * @return conformed collection of rows.
+   */
+  @SuppressWarnings("ConstantConditions")
+  private static TransferableBlock composeSelectTransferableBlock(InstanceResponseBlock responseBlock,
+      DataSchema desiredDataSchema) {
+    DataSchema resultSchema = responseBlock.getDataSchema();
+    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(responseBlock.getQueryContext(),
+        resultSchema);
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
+    if (!inOrder(columnIndices)) {
+      // Extract the result rows
+      Collection<Object[]> resultRows = responseBlock.getRows();
+      List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
+      DataSchema adjustedResultSchema = SelectionOperatorUtils.getSchemaForProjection(resultSchema, columnIndices);
+      Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
+              adjustedResultSchema.getColumnDataTypes()),
+          "Incompatible result data schema: " + "Expecting: " + desiredDataSchema + " Actual: " + adjustedResultSchema);
+
+      if (responseBlock.getQueryContext().getOrderByExpressions() != null) {
+        // extract result row in ordered fashion
+        PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
+        while (!priorityQueue.isEmpty()) {
+          extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema, columnIndices));
+        }
+      } else {
+        // extract result row in non-ordered fashion
+        for (Object[] row : resultRows) {
+          extractedRows.add(canonicalizeRow(row, desiredDataSchema, columnIndices));
+        }
+      }
+      return new TransferableBlock(extractedRows, desiredDataSchema, DataBlock.Type.ROW);
+    } else {
+      return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
+    }
+  }
+
+  private static TransferableBlock composeDirectTransferableBlock(InstanceResponseBlock responseBlock,
+      DataSchema desiredDataSchema) {
+    Collection<Object[]> resultRows = responseBlock.getRows();
+    List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
+    if (resultRows instanceof List) {
+      for (Object[] orgRow : resultRows) {
+        extractedRows.add(canonicalizeRow(orgRow, desiredDataSchema));
+      }
+    } else if (resultRows instanceof PriorityQueue) {
+      PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
+      while (!priorityQueue.isEmpty()) {
+        extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema));
+      }
+    } else {
+      throw new UnsupportedOperationException("Unsupported collection type: " + resultRows.getClass());
+    }
+    return new TransferableBlock(extractedRows, desiredDataSchema, DataBlock.Type.ROW);
+  }
+
+  private static boolean inOrder(int[] columnIndices) {
+    for (int i = 0; i < columnIndices.length; i++) {
+      if (columnIndices[i] != i) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -120,100 +220,23 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
   private static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema) {
     Object[] resultRow = new Object[row.length];
     for (int colId = 0; colId < row.length; colId++) {
-      resultRow[colId] = dataSchema.getColumnDataType(colId).convert(row[colId]);
+      Object value = row[colId];
+      if (value != null) {
+        resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
+      }
     }
     return resultRow;
   }
 
-  /**
-   * we re-arrange columns to match the projection in the case of order by - this is to ensure
-   * that V1 results match what the expected projection schema in the calcite logical operator; if
-   * we realize that there are other situations where we need to post-process v1 results to adhere to
-   * the expected results we should factor this out and also apply the canonicalization of the data
-   * types during this post-process step (also see LeafStageTransferableBlockOperator#canonicalizeRow)
-   *
-   * @param serverResultsBlock result block from leaf stage
-   * @param dataSchema the desired schema for send operator
-   * @return conformed collection of rows.
-   */
-  @SuppressWarnings("ConstantConditions")
-  private static List<Object[]> cleanUpDataBlock(InstanceResponseBlock serverResultsBlock, DataSchema dataSchema,
-      boolean requiresCleanUp) {
-    // Extract the result rows
-    Collection<Object[]> resultRows = serverResultsBlock.getRows();
-    List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
-    if (requiresCleanUp) {
-      DataSchema resultSchema = serverResultsBlock.getDataSchema();
-      List<String> selectionColumns =
-          SelectionOperatorUtils.getSelectionColumns(serverResultsBlock.getQueryContext(), resultSchema);
-      int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
-      DataSchema adjustedDataSchema = SelectionOperatorUtils.getSchemaForProjection(resultSchema, columnIndices);
-      Preconditions.checkState(isDataSchemaColumnTypesCompatible(dataSchema.getColumnDataTypes(),
-              adjustedDataSchema.getColumnDataTypes()),
-          "Incompatible result data schema: " + "Expecting: " + dataSchema + " Actual: " + adjustedDataSchema);
-      int numColumns = columnIndices.length;
-
-      if (serverResultsBlock.getQueryContext().getOrderByExpressions() != null) {
-        // extract result row in ordered fashion
-        PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
-        while (!priorityQueue.isEmpty()) {
-          Object[] row = priorityQueue.poll();
-          assert row != null;
-          Object[] extractedRow = new Object[numColumns];
-          for (int colId = 0; colId < numColumns; colId++) {
-            Object value = row[columnIndices[colId]];
-            if (value != null) {
-              extractedRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
-            }
-          }
-          extractedRows.add(extractedRow);
-        }
-      } else {
-        // extract result row in non-ordered fashion
-        for (Object[] row : resultRows) {
-          assert row != null;
-          Object[] extractedRow = new Object[numColumns];
-          for (int colId = 0; colId < numColumns; colId++) {
-            Object value = row[columnIndices[colId]];
-            if (value != null) {
-              extractedRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
-            }
-          }
-          extractedRows.add(extractedRow);
-        }
-      }
-    } else {
-      if (resultRows instanceof List) {
-        for (Object[] orgRow : resultRows) {
-          extractedRows.add(canonicalizeRow(orgRow, dataSchema));
-        }
-      } else if (resultRows instanceof PriorityQueue) {
-        PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
-        while (!priorityQueue.isEmpty()) {
-          extractedRows.add(canonicalizeRow(priorityQueue.poll(), dataSchema));
-        }
-      } else {
-        throw new UnsupportedOperationException("Unsupported collection type: " + resultRows.getClass());
+  private static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema, int[] columnIndices) {
+    Object[] resultRow = new Object[columnIndices.length];
+    for (int colId = 0; colId < columnIndices.length; colId++) {
+      Object value = row[columnIndices[colId]];
+      if (value != null) {
+        resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
       }
     }
-    return extractedRows;
-  }
-
-  /**
-   * @see LeafStageTransferableBlockOperator#cleanUpDataBlock(InstanceResponseBlock, DataSchema, boolean)
-   */
-  @SuppressWarnings("ConstantConditions")
-  private static DataSchema cleanUpDataSchema(InstanceResponseBlock serverResultsBlock, DataSchema desiredDataSchema) {
-    DataSchema resultSchema = serverResultsBlock.getDataSchema();
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(serverResultsBlock.getQueryContext(), resultSchema);
-
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
-    DataSchema adjustedResultSchema = SelectionOperatorUtils.getSchemaForProjection(resultSchema, columnIndices);
-    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
-            adjustedResultSchema.getColumnDataTypes()),
-        "Incompatible result data schema: " + "Expecting: " + desiredDataSchema + " Actual: " + adjustedResultSchema);
-    return adjustedResultSchema;
+    return resultRow;
   }
 
   private static boolean isDataSchemaColumnTypesCompatible(DataSchema.ColumnDataType[] desiredTypes,
