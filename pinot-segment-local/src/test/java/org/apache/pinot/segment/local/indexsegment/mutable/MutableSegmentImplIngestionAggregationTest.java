@@ -197,7 +197,7 @@ public class MutableSegmentImplIngestionAggregationTest {
 
     ArrayList<ExpressionContext> arguments = new ArrayList<ExpressionContext>();
     arguments.add(ExpressionContext.forIdentifier("distinctcounthll"));
-    arguments.add(ExpressionContext.forIdentifier("12"));
+    arguments.add(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "12"));
 
     DistinctCountHLLValueAggregator valueAggregator = new DistinctCountHLLValueAggregator(arguments);
 

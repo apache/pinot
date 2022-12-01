@@ -23,7 +23,7 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.math.NumberUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -46,7 +46,8 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
     }
 
     String log2mLiteral = arguments.get(1).getLiteralString();
-    Preconditions.checkState(StringUtils.isNumeric(log2mLiteral), "log2m argument must be a numeric literal");
+    Preconditions.checkState(NumberUtils.isNumber(log2mLiteral), "log2m argument must be a number "
+        + "literal, but instead was " + log2mLiteral);
 
     _log2m = Integer.parseInt(log2mLiteral);
     try {
