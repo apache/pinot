@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.offline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +82,6 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   private volatile DimensionTable _dimensionTable;
   private boolean _disablePreload = false;
-  private List<SegmentDataManager> _segmentDataManagers;
 
   @Override
   protected void doInit() {
@@ -102,7 +102,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
 
     if (_disablePreload) {
-      _dimensionTable = new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, new HashMap<>());
+      _dimensionTable = new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, new HashMap<>(),
+          new ArrayList<>(), this);
     } else {
       _dimensionTable = new FastLookupDimensionTable(schema, primaryKeyColumns, new HashMap<>());
     }
@@ -137,22 +138,15 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   @Override
   protected void doShutdown() {
-    closeDimensionTable(_dimensionTable, _disablePreload);
+    closeDimensionTable(_dimensionTable);
   }
 
-  private void closeDimensionTable(DimensionTable dimensionTable, boolean releaseSegments) {
-    if (dimensionTable != null) {
+  private void closeDimensionTable(DimensionTable dimensionTable) {
       try {
         dimensionTable.close();
-        if (releaseSegments && _segmentDataManagers != null) {
-          for (SegmentDataManager segmentDataManager: _segmentDataManagers) {
-            releaseSegment(segmentDataManager);
-          }
-        }
       } catch (Exception e) {
         _logger.warn("Cannot close dimension table: {}", _tableNameWithType, e);
       }
-    }
   }
 
   /**
@@ -170,7 +164,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       }
     } while (!UPDATER.compareAndSet(this, snapshot, replacement));
 
-    closeDimensionTable(snapshot, !_disablePreload);
+    closeDimensionTable(snapshot);
   }
 
   private DimensionTable createFastLookupDimensionTable() {
@@ -218,8 +212,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
     Map<PrimaryKey, LookupRecordLocation> lookupTable = new HashMap<>();
-    _segmentDataManagers = acquireAllSegments();
-    for (SegmentDataManager segmentManager : _segmentDataManagers) {
+    List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
+    for (SegmentDataManager segmentManager : segmentDataManagers) {
       IndexSegment indexSegment = segmentManager.getSegment();
       int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
       if (numTotalDocs > 0) {
@@ -237,7 +231,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         }
       }
     }
-    return new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable);
+    return new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable,
+        segmentDataManagers, this);
   }
 
   public boolean isPopulated() {

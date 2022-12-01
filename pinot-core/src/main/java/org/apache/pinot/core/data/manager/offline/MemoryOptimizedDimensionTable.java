@@ -21,7 +21,8 @@ package org.apache.pinot.core.data.manager.offline;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.data.manager.BaseTableDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -31,18 +32,23 @@ import org.slf4j.LoggerFactory;
 
 
 class MemoryOptimizedDimensionTable implements DimensionTable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MemoryOptimizedDimensionTable.class);
 
   private final Map<PrimaryKey, LookupRecordLocation> _lookupTable;
   private final Schema _tableSchema;
   private final List<String> _primaryKeyColumns;
   private final GenericRow _reuse = new GenericRow();
+  private final List<SegmentDataManager> _segmentDataManagers;
+  private final TableDataManager _tableDataManager;
 
   MemoryOptimizedDimensionTable(Schema tableSchema, List<String> primaryKeyColumns,
-      Map<PrimaryKey, LookupRecordLocation> lookupTable) {
-    _lookupTable = lookupTable;
+      Map<PrimaryKey, LookupRecordLocation> lookupTable, List<SegmentDataManager> segmentDataManagers,
+      TableDataManager tableDataManager) {
     _tableSchema = tableSchema;
     _primaryKeyColumns = primaryKeyColumns;
+    _lookupTable = lookupTable;
+    _segmentDataManagers = segmentDataManagers;
+    _tableDataManager = tableDataManager;
   }
 
   @Override
@@ -78,6 +84,10 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
       } catch (Exception e) {
         LOGGER.warn("Cannot close segment record reader", e);
       }
+    }
+
+    for (SegmentDataManager segmentDataManager: _segmentDataManagers) {
+        _tableDataManager.releaseSegment(segmentDataManager);
     }
   }
 }
