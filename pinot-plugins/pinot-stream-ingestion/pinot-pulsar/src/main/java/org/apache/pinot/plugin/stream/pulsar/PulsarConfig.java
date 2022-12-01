@@ -38,14 +38,14 @@ public class PulsarConfig {
   public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
   public static final String ENABLE_KEY_VALUE_STITCH = "enableKeyValueStitch";
 
-  private String _pulsarTopicName;
-  private String _subscriberId;
-  private String _bootstrapServers;
-  private MessageId _initialMessageId;
-  private SubscriptionInitialPosition _subscriptionInitialPosition;
-  private String _authenticationToken;
-  private String _tlsTrustCertsFilePath;
-  private boolean _enableKeyValueStitch;
+  private final String _pulsarTopicName;
+  private final String _subscriberId;
+  private final String _bootstrapServers;
+  private final MessageId _initialMessageId;
+  private final SubscriptionInitialPosition _subscriptionInitialPosition;
+  private final String _authenticationToken;
+  private final String _tlsTrustCertsFilePath;
+  private final boolean _enableKeyValueStitch;
 
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
