@@ -538,10 +538,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * Replaces a committed LLC REALTIME segment.
    */
   public void replaceLLSegment(String segmentName, IndexLoadingConfig indexLoadingConfig) {
+    File indexDir = new File(_indexDir, segmentName);
+    // Use the latest table config and schema to load the segment
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to get table config for table: {}", _tableNameWithType);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
+    indexLoadingConfig.updateTableConfigAndSchema(tableConfig, schema);
     try {
-      File indexDir = new File(_indexDir, segmentName);
-      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-      addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+      addSegment(indexDir, indexLoadingConfig);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
