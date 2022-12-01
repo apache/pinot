@@ -135,10 +135,8 @@ public class QueryDispatcher {
       } else if (transferableBlock.isEndOfStreamBlock()) {
         return resultDataBlocks;
       }
-
       resultDataBlocks.add(transferableBlock.getDataBlock());
     }
-
     throw new RuntimeException("Timed out while receiving from mailbox: " + QueryException.EXECUTION_TIMEOUT_ERROR);
   }
 
