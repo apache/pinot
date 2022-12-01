@@ -1073,8 +1073,8 @@ const getURLWithoutAccessToken = (fallbackUrl = '/'): string => {
 
     if(!validateRedirectPath(url)) {
       // constructed redirect url is not a valid app route
-      // fallback to root path "/"
-      url = "/";
+      // redirect to fallBackUrl
+      url = fallbackUrl;
     }
   } else {
     url = fallbackUrl;
