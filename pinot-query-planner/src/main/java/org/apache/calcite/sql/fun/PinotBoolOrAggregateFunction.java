@@ -16,48 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation;
 
-/**
- * Interface for ResultHolder to hold the result of aggregation.
- *
- */
-public interface AggregationResultHolder {
+package org.apache.calcite.sql.fun;
 
-  /**
-   * Set the 'primitive double' aggregation result.
-   * @param value
-   */
-  void setValue(double value);
+import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.calcite.sql.SqlFunctionCategory;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.util.Optionality;
 
-  /**
-   * Set the 'primitive int' aggregation result.
-   * @param value
-   */
-  void setValue(int value);
 
-  /**
-   * Set the aggregation result value.
-   * @param value
-   */
-  void setValue(Object value);
+public class PinotBoolOrAggregateFunction extends SqlAggFunction {
 
-  /**
-   * Returns the 'primitive double' aggregation result.
-   * @return
-   */
-  double getDoubleResult();
-
-  /**
-   * Returns the 'primitive int' aggregation result.
-   *
-   * @return
-   */
-  int getIntResult();
-
-  /**
-   * Returns the result of aggregation.
-   * @return
-   */
-  <T> T getResult();
+  public PinotBoolOrAggregateFunction() {
+    super("BOOL_OR", null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN,
+        null, OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+        false, false, Optionality.FORBIDDEN);
+  }
 }

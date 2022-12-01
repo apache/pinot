@@ -16,71 +16,42 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.core.query.aggregation;
 
-/**
- * AggregationResultHolder interface implementation for result type 'primitive double'.
- *
- */
-public class DoubleAggregationResultHolder implements AggregationResultHolder {
-  double _value;
+public class IntAggregateResultHolder implements AggregationResultHolder {
 
-  /**
-   * Constructor for the class.
-   * @param defaultValue
-   */
-  public DoubleAggregationResultHolder(double defaultValue) {
+  int _value;
+
+  public IntAggregateResultHolder(int defaultValue) {
     _value = defaultValue;
   }
 
-  /**
-   * {@inheritDoc}
-   * @param value
-   */
   @Override
   public void setValue(double value) {
-    _value = value;
+    throw new RuntimeException("Method 'setValue' (with double value) not supported for class " + getClass().getName());
   }
 
   @Override
   public void setValue(int value) {
-    throw new RuntimeException("Method 'setValue' (with int value) not supported for class " + getClass().getName());
+    _value = value;
   }
 
-  /**
-   * {@inheritDoc}
-   * Value for this class is 'primitive double', so this method is not implemented.
-   * @param value
-   */
   @Override
   public void setValue(Object value) {
     throw new RuntimeException("Method 'setValue' (with object value) not supported for class " + getClass().getName());
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
   @Override
   public double getDoubleResult() {
+    throw new RuntimeException("Method 'getDoubleResult' not supported for class " + getClass().getName());
+  }
+
+  @Override
+  public int getIntResult() {
     return _value;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
-  @Override
-  public int getIntResult() {
-    throw new RuntimeException("Method 'getIntResult' not supported for class " + getClass().getName());
-  }
-
-  /**
-   * {@inheritDoc}
-   * Result for this class is 'primitive double', so this method is not implemented.
-   * @return
-   */
   @Override
   public <T> T getResult() {
     throw new RuntimeException("Method 'getResult' not supported for class " + getClass().getName());

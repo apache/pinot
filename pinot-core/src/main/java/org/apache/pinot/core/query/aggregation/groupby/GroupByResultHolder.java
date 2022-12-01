@@ -32,6 +32,14 @@ public interface GroupByResultHolder {
   void setValueForKey(int groupKey, double value);
 
   /**
+   * Stores the given value (of type int) for the given groupKey.
+   *
+   * @param groupKey
+   * @param value
+   */
+  void setValueForKey(int groupKey, int value);
+
+  /**
    * Store the given value (of type ResultType) for the given groupKey.
    * @param groupKey
    * @param value
@@ -48,6 +56,17 @@ public interface GroupByResultHolder {
    * @return
    */
   double getDoubleResult(int groupKey);
+
+  /**
+   * Returns the result (int) for the given group by key.
+   * If the group key does not exist in the result holder, returns
+   * the defaultValue it was initialized with (default value of the aggregation
+   * function it is holding the result for).
+   *
+   * @param groupKey
+   * @return
+   */
+  int getIntResult(int groupKey);
 
   /**
    * Returns the result (ResultType) for the given group key.

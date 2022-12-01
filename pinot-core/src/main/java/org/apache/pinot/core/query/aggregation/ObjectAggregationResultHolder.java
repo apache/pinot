@@ -42,6 +42,12 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
     _value = value;
   }
 
+
+  @Override
+  public void setValue(int value) {
+    _value = value;
+  }
+
   /**
    * {@inheritDoc}
    * @return
@@ -49,6 +55,16 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
   @Override
   public double getDoubleResult() {
     throw new RuntimeException("Method 'getDoubleResult' not supported for class " + getClass().getName());
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @return
+   */
+  @Override
+  public int getIntResult() {
+    throw new RuntimeException("Method 'getIntResult' not supported for class " + getClass().getName());
   }
 
   /**

@@ -16,48 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation;
 
-/**
- * Interface for ResultHolder to hold the result of aggregation.
- *
- */
-public interface AggregationResultHolder {
+package org.apache.pinot.core.query.aggregation.function;
 
-  /**
-   * Set the 'primitive double' aggregation result.
-   * @param value
-   */
-  void setValue(double value);
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 
-  /**
-   * Set the 'primitive int' aggregation result.
-   * @param value
-   */
-  void setValue(int value);
 
-  /**
-   * Set the aggregation result value.
-   * @param value
-   */
-  void setValue(Object value);
+public class BooleanAndAggregationFunction extends BaseBooleanAggregationFunction {
 
-  /**
-   * Returns the 'primitive double' aggregation result.
-   * @return
-   */
-  double getDoubleResult();
+  public BooleanAndAggregationFunction(ExpressionContext expression) {
+    this(expression, false);
+  }
 
-  /**
-   * Returns the 'primitive int' aggregation result.
-   *
-   * @return
-   */
-  int getIntResult();
+  public BooleanAndAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled, BooleanMerge.AND);
+  }
 
-  /**
-   * Returns the result of aggregation.
-   * @return
-   */
-  <T> T getResult();
+  @Override
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.BOOLAND;
+  }
 }
