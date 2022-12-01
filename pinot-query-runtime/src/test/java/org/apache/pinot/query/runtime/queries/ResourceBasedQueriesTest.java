@@ -270,6 +270,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
       String resource;
       while ((resource = br.readLine()) != null) {
+        if(!resource.contains("FromExpressions.json")){
+          continue;
+        }
+        System.out.println(resource);
         testFilenames.add(resource);
       }
     }
