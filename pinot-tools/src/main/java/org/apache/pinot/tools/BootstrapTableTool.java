@@ -45,7 +45,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.tools.admin.command.ModifyTableCommand;
+import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,7 +125,7 @@ public class BootstrapTableTool {
 
   private boolean createTable(File schemaFile, File tableConfigFile)
       throws Exception {
-    return new ModifyTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
+    return new AddTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
         .setTableConfigFile(tableConfigFile.getAbsolutePath()).setControllerProtocol(_controllerProtocol)
         .setControllerHost(_controllerHost).setControllerPort(String.valueOf(_controllerPort)).setExecute(true)
         .setAuthProvider(_authProvider).execute();
@@ -133,7 +133,7 @@ public class BootstrapTableTool {
 
   private boolean createTable(File schemaFile, File offlineTableConfigFile, File realtimeTableConfigFile)
       throws Exception {
-    return new ModifyTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
+    return new AddTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
         .setOfflineTableConfigFile(offlineTableConfigFile.getAbsolutePath())
         .setRealtimeTableConfigFile(realtimeTableConfigFile.getAbsolutePath())
         .setControllerProtocol(_controllerProtocol).setControllerHost(_controllerHost)
