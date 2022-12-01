@@ -27,8 +27,8 @@
     "queries": [
       {
         "psql": "7.2.1.1",
-        "description": "LEFT OUTER JOIN",
-        "sql": "SELECT * FROM {tbl1} LEFT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+        "description": "RIGHT OUTER JOIN",
+        "sql": "SELECT value FROM {tbl1} LEFT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
       }
     ]
   }
