@@ -23,6 +23,8 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
@@ -30,6 +32,8 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
  * Kinesis stream specific config
  */
 public class KinesisConfig {
+  private static final Logger LOGGER = LoggerFactory.getLogger(KinesisConfig.class);
+
   public static final String STREAM_TYPE = "kinesis";
   public static final String SHARD_ITERATOR_TYPE = "shardIteratorType";
   public static final String REGION = "region";
@@ -93,6 +97,13 @@ public class KinesisConfig {
         streamConfig.getTableNameWithType());
     _numMaxRecordsToFetch = Integer.parseInt(props.getOrDefault(MAX_RECORDS_TO_FETCH, DEFAULT_MAX_RECORDS));
     _rpsLimit = Integer.parseInt(props.getOrDefault(RPS_LIMIT, DEFAULT_RPS_LIMIT));
+
+    if (_rpsLimit <= 0) {
+      LOGGER.warn("Invalid 'requests_per_second_limit' value: {}."
+          + " Please provide value greater than 0. Using default: {}", _rpsLimit, DEFAULT_RPS_LIMIT);
+      _rpsLimit = Integer.parseInt(DEFAULT_RPS_LIMIT);
+    }
+
     _shardIteratorType =
         ShardIteratorType.fromValue(props.getOrDefault(SHARD_ITERATOR_TYPE, DEFAULT_SHARD_ITERATOR_TYPE));
     _accessKey = props.get(ACCESS_KEY);
