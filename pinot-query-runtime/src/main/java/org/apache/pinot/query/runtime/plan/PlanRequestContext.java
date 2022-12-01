@@ -28,15 +28,18 @@ public class PlanRequestContext {
   protected final MailboxService<TransferableBlock> _mailboxService;
   protected final long _requestId;
   protected final int _stageId;
+  private final long _timeoutMs;
   protected final String _hostName;
   protected final int _port;
   protected final Map<Integer, StageMetadata> _metadataMap;
 
+
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      String hostName, int port, Map<Integer, StageMetadata> metadataMap) {
+      long timeoutMs, String hostName, int port, Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
+    _timeoutMs = timeoutMs;
     _hostName = hostName;
     _port = port;
     _metadataMap = metadataMap;
@@ -48,6 +51,10 @@ public class PlanRequestContext {
 
   public int getStageId() {
     return _stageId;
+  }
+
+  public long getTimeoutMs() {
+    return _timeoutMs;
   }
 
   public String getHostName() {

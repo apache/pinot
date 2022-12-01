@@ -62,7 +62,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private final MailboxService<TransferableBlock> _mailboxService;
   private final RelDistribution.Type _exchangeType;
   private final List<MailboxIdentifier> _sendingMailbox;
-  private final long _deadlineInNanoSeconds;
+  private final long _deadlineTimestampNano;
   private int _serverIdx;
   private TransferableBlock _upstreamErrorBlock;
 
@@ -75,15 +75,12 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   // TODO: Move deadlineInNanoSeconds to OperatorContext.
   public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService,
       List<ServerInstance> sendingStageInstances, RelDistribution.Type exchangeType, String receiveHostName,
-      int receivePort, long jobId, int stageId, Long deadlineInNanoSeconds) {
+      int receivePort, long jobId, int stageId, Long timeoutMs) {
     _mailboxService = mailboxService;
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
         "Exchange/Distribution type: " + exchangeType + " is not supported!");
-    if (deadlineInNanoSeconds == null) {
-      _deadlineInNanoSeconds = System.nanoTime() + QueryConfig.DEFAULT_TIMEOUT_NANO;
-    } else {
-      _deadlineInNanoSeconds = deadlineInNanoSeconds;
-    }
+    long timeoutNano = (timeoutMs != null ? timeoutMs : QueryConfig.DEFAULT_MAILBOX_TIMEOUT_MS) * 1_000_000L;
+    _deadlineTimestampNano = timeoutNano + System.nanoTime();
 
     _exchangeType = exchangeType;
     if (_exchangeType == RelDistribution.Type.SINGLETON) {
@@ -130,7 +127,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   protected TransferableBlock getNextBlock() {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
-    } else if (System.nanoTime() >= _deadlineInNanoSeconds) {
+    } else if (System.nanoTime() >= _deadlineTimestampNano) {
       LOGGER.error("Timed out after polling mailboxes: {}", _sendingMailbox);
       return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
     }

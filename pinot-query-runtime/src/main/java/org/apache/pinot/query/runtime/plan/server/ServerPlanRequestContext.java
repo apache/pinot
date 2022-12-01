@@ -41,9 +41,9 @@ public class ServerPlanRequestContext extends PlanRequestContext {
   protected InstanceRequest _instanceRequest;
 
   public ServerPlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      String hostName, int port, Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery, TableType tableType,
-      TimeBoundaryInfo timeBoundaryInfo) {
-    super(mailboxService, requestId, stageId, hostName, port, metadataMap);
+      long timeoutMs, String hostName, int port, Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery,
+      TableType tableType, TimeBoundaryInfo timeBoundaryInfo) {
+    super(mailboxService, requestId, stageId, timeoutMs, hostName, port, metadataMap);
     _pinotQuery = pinotQuery;
     _tableType = tableType;
     _timeBoundaryInfo = timeBoundaryInfo;

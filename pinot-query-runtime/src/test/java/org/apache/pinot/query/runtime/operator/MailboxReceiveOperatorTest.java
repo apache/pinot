@@ -73,14 +73,29 @@ public class MailboxReceiveOperatorTest {
   @Test
   public void shouldTimeoutOnExtraLongSleep()
       throws InterruptedException {
+    // shorter timeoutMs should result in error.
     MailboxReceiveOperator receiveOp =
         new MailboxReceiveOperator(_mailboxService, new ArrayList<>(), RelDistribution.Type.SINGLETON, "test", 123, 456,
-            789, 1L);
-    Thread.sleep(1000);
+            789, 10L);
+    Thread.sleep(200L);
     TransferableBlock mailbox = receiveOp.nextBlock();
     Assert.assertTrue(mailbox.isErrorBlock());
     MetadataBlock errorBlock = (MetadataBlock) mailbox.getDataBlock();
     Assert.assertTrue(errorBlock.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
+
+    // longer timeout or default timeout (10s) doesn't result in error.
+    receiveOp =
+        new MailboxReceiveOperator(_mailboxService, new ArrayList<>(), RelDistribution.Type.SINGLETON, "test", 123, 456,
+            789, 2000L);
+    Thread.sleep(200L);
+    mailbox = receiveOp.nextBlock();
+    Assert.assertFalse(mailbox.isErrorBlock());
+    receiveOp =
+        new MailboxReceiveOperator(_mailboxService, new ArrayList<>(), RelDistribution.Type.SINGLETON, "test", 123, 456,
+            789, null);
+    Thread.sleep(200L);
+    mailbox = receiveOp.nextBlock();
+    Assert.assertFalse(mailbox.isErrorBlock());
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*multiple instance "

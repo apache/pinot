@@ -104,7 +104,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
     // return dispatch successful.
     // TODO: return meaningful value here.
-    responseObserver.onNext(Worker.QueryResponse.newBuilder().putMetadata("OK", "OK").build());
+    responseObserver.onNext(Worker.QueryResponse.newBuilder()
+        .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
     responseObserver.onCompleted();
 
     // start a new GRPC ctx has all the values as the current context, but won't be cancelled
