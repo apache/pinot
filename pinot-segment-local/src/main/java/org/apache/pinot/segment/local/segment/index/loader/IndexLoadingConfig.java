@@ -105,7 +105,7 @@ public class IndexLoadingConfig {
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig,
       @Nullable Schema schema) {
     extractFromInstanceConfig(instanceDataManagerConfig);
-    extractFromTableConfigAndSchema(tableConfig, schema);
+    updateTableConfigAndSchema(tableConfig, schema);
   }
 
   @VisibleForTesting
@@ -117,7 +117,7 @@ public class IndexLoadingConfig {
   public IndexLoadingConfig() {
   }
 
-  private void extractFromTableConfigAndSchema(TableConfig tableConfig, @Nullable Schema schema) {
+  public void updateTableConfigAndSchema(TableConfig tableConfig, @Nullable Schema schema) {
     if (schema != null) {
       TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     }
@@ -512,8 +512,8 @@ public class IndexLoadingConfig {
    */
   @VisibleForTesting
   public void setForwardIndexDisabledColumns(Set<String> forwardIndexDisabledColumns) {
-    _forwardIndexDisabledColumns = forwardIndexDisabledColumns == null ? Collections.emptySet()
-        : forwardIndexDisabledColumns;
+    _forwardIndexDisabledColumns =
+        forwardIndexDisabledColumns == null ? Collections.emptySet() : forwardIndexDisabledColumns;
   }
 
   public Set<String> getNoDictionaryColumns() {

@@ -81,7 +81,6 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -210,40 +209,38 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     // Gather stats for realtime consuming segments
+    // TODO: the freshness time should not be collected at query time because there is no guarantee that the consuming
+    //       segment is queried (consuming segment might be pruned, or the server only contains relocated committed
+    //       segments)
     int numConsumingSegmentsQueried = 0;
-    int numOnlineSegments = 0;
     long minIndexTimeMs = 0;
     long minIngestionTimeMs = 0;
     long maxEndTimeMs = 0;
     if (tableDataManager instanceof RealtimeTableDataManager) {
-      numConsumingSegmentsQueried = 0;
-      numOnlineSegments = 0;
       minIndexTimeMs = Long.MAX_VALUE;
       minIngestionTimeMs = Long.MAX_VALUE;
       maxEndTimeMs = Long.MIN_VALUE;
       for (IndexSegment indexSegment : indexSegments) {
+        SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
         if (indexSegment instanceof MutableSegment) {
           numConsumingSegmentsQueried += 1;
-          SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
           long indexTimeMs = segmentMetadata.getLastIndexedTimestamp();
-          if (indexTimeMs != Long.MIN_VALUE && indexTimeMs < minIndexTimeMs) {
-            minIndexTimeMs = indexTimeMs;
+          if (indexTimeMs > 0) {
+            minIndexTimeMs = Math.min(minIndexTimeMs, indexTimeMs);
           }
           long ingestionTimeMs = segmentMetadata.getLatestIngestionTimestamp();
-          if (ingestionTimeMs != Long.MIN_VALUE && ingestionTimeMs < minIngestionTimeMs) {
-            minIngestionTimeMs = ingestionTimeMs;
+          if (ingestionTimeMs > 0) {
+            minIngestionTimeMs = Math.min(minIngestionTimeMs, ingestionTimeMs);
           }
         } else if (indexSegment instanceof ImmutableSegment) {
-          SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
           long indexCreationTime = segmentMetadata.getIndexCreationTime();
-          numOnlineSegments++;
-          if (indexCreationTime != Long.MIN_VALUE) {
+          if (indexCreationTime > 0) {
             maxEndTimeMs = Math.max(maxEndTimeMs, indexCreationTime);
           } else {
             // NOTE: the endTime may be totally inaccurate based on the value added in the timeColumn
-            Interval timeInterval = segmentMetadata.getTimeInterval();
-            if (timeInterval != null) {
-              maxEndTimeMs = Math.max(maxEndTimeMs, timeInterval.getEndMillis());
+            long endTime = segmentMetadata.getEndTime();
+            if (endTime > 0) {
+              maxEndTimeMs = Math.max(maxEndTimeMs, endTime);
             }
           }
         }
@@ -314,22 +311,24 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     if (tableDataManager instanceof RealtimeTableDataManager) {
-      long minConsumingFreshnessTimeMs;
       if (numConsumingSegmentsQueried > 0) {
-        minConsumingFreshnessTimeMs = minIngestionTimeMs != Long.MAX_VALUE ? minIngestionTimeMs : minIndexTimeMs;
         instanceResponse.addMetadata(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(),
             Integer.toString(numConsumingSegmentsQueried));
+      }
+      long minConsumingFreshnessTimeMs = 0;
+      if (minIngestionTimeMs != Long.MAX_VALUE) {
+        minConsumingFreshnessTimeMs = minIndexTimeMs;
+      } else if (minIndexTimeMs != Long.MAX_VALUE) {
+        minConsumingFreshnessTimeMs = minIndexTimeMs;
+      } else if (maxEndTimeMs != Long.MIN_VALUE) {
+        minConsumingFreshnessTimeMs = maxEndTimeMs;
+      }
+      if (minConsumingFreshnessTimeMs > 0) {
         instanceResponse.addMetadata(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(),
             Long.toString(minConsumingFreshnessTimeMs));
-        LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
-            numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
-      } else if (numConsumingSegmentsQueried == 0 && maxEndTimeMs != Long.MIN_VALUE) {
-        minConsumingFreshnessTimeMs = maxEndTimeMs;
-        instanceResponse.addMetadata(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(),
-            Long.toString(maxEndTimeMs));
-        LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
-            numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
       }
+      LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
+          numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
