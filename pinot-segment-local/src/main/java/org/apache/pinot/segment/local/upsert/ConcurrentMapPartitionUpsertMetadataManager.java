@@ -65,7 +65,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   @Override
   protected long getNumPrimaryKeys() {
-    return _primaryKeyColumns.size();
+    return _primaryKeyToRecordLocationMap.size();
   }
 
   @Override

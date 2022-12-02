@@ -656,4 +656,19 @@ public class SelectionOperatorUtils {
       queue.offer(value);
     }
   }
+
+  public static DataSchema getSchemaForProjection(DataSchema dataSchema, int[] columnIndices) {
+    int numColumns = columnIndices.length;
+
+    String[] columnNames = dataSchema.getColumnNames();
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    String[] resultColumnNames = new String[numColumns];
+    ColumnDataType[] resultColumnDataTypes = new ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      int columnIndex = columnIndices[i];
+      resultColumnNames[i] = columnNames[columnIndex];
+      resultColumnDataTypes[i] = columnDataTypes[columnIndex];
+    }
+    return new DataSchema(resultColumnNames, resultColumnDataTypes);
+  }
 }

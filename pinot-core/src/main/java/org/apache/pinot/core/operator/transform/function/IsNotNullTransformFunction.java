@@ -31,8 +31,6 @@ import org.roaringbitmap.PeekableIntIterator;
 
 
 public class IsNotNullTransformFunction extends BaseTransformFunction {
-
-  private int[] _results;
   private PeekableIntIterator _nullValueVectorIterator;
 
   @Override
@@ -66,13 +64,11 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    if (_results == null || _results.length < length) {
-      _results = new int[length];
+    if (_intValuesSV == null) {
+      _intValuesSV = new int[length];
     }
-
+    Arrays.fill(_intValuesSV, 1);
     int[] docIds = projectionBlock.getDocIds();
-
-    Arrays.fill(_results, 1);
     if (_nullValueVectorIterator != null) {
       int currentDocIdIndex = 0;
       while (_nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {
@@ -80,7 +76,7 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
         if (_nullValueVectorIterator.hasNext()) {
           currentDocIdIndex = Arrays.binarySearch(docIds, currentDocIdIndex, length, _nullValueVectorIterator.next());
           if (currentDocIdIndex >= 0) {
-            _results[currentDocIdIndex] = 0;
+            _intValuesSV[currentDocIdIndex] = 0;
             currentDocIdIndex++;
           } else {
             currentDocIdIndex = -currentDocIdIndex - 1;
@@ -88,7 +84,6 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
         }
       }
     }
-
-    return _results;
+    return _intValuesSV;
   }
 }

@@ -23,7 +23,7 @@ import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.rel.logical.LogicalExchange;
+import org.apache.calcite.rel.core.Exchange;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -44,10 +44,12 @@ public class StagePlanner {
   private final PlannerContext _plannerContext;   // DO NOT REMOVE.
   private final WorkerManager _workerManager;
   private int _stageIdCounter;
+  private long _requestId;
 
-  public StagePlanner(PlannerContext plannerContext, WorkerManager workerManager) {
+  public StagePlanner(PlannerContext plannerContext, WorkerManager workerManager, long requestId) {
     _plannerContext = plannerContext;
     _workerManager = workerManager;
+    _requestId = requestId;
   }
 
   /**
@@ -79,7 +81,7 @@ public class StagePlanner {
 
     // assign workers to each stage.
     for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
-      _workerManager.assignWorkerToStage(e.getKey(), e.getValue());
+      _workerManager.assignWorkerToStage(e.getKey(), e.getValue(), _requestId);
     }
 
     return queryPlan;
@@ -90,7 +92,7 @@ public class StagePlanner {
   private StageNode walkRelPlan(RelNode node, int currentStageId) {
     if (isExchangeNode(node)) {
       StageNode nextStageRoot = walkRelPlan(node.getInput(0), getNewStageId());
-      RelDistribution distribution = ((LogicalExchange) node).getDistribution();
+      RelDistribution distribution = ((Exchange) node).getDistribution();
       return createSendReceivePair(nextStageRoot, distribution, currentStageId);
     } else {
       StageNode stageNode = RelToStageConverter.toStageNode(node, currentStageId);
@@ -123,7 +125,7 @@ public class StagePlanner {
   }
 
   private boolean isExchangeNode(RelNode node) {
-    return (node instanceof LogicalExchange);
+    return (node instanceof Exchange);
   }
 
   private int getNewStageId() {

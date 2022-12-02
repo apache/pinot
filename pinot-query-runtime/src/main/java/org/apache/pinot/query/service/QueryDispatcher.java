@@ -57,22 +57,22 @@ public class QueryDispatcher {
   }
 
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
-      MailboxService<TransferableBlock> mailboxService, long timeoutNano)
+      MailboxService<TransferableBlock> mailboxService, long timeoutMs)
       throws Exception {
     // submit all the distributed stages.
-    int reduceStageId = submit(requestId, queryPlan);
+    int reduceStageId = submit(requestId, queryPlan, timeoutMs);
     // run reduce stage and return result.
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
         reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
-        mailboxService.getMailboxPort());
-    List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutNano);
+        mailboxService.getMailboxPort(), timeoutMs);
+    List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs);
     return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
         queryPlan.getQueryStageMap().get(0).getDataSchema());
   }
 
-  public int submit(long requestId, QueryPlan queryPlan)
+  public int submit(long requestId, QueryPlan queryPlan, long timeoutMs)
       throws Exception {
     int reduceStageId = -1;
     for (Map.Entry<Integer, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
@@ -85,14 +85,12 @@ public class QueryDispatcher {
         for (ServerInstance serverInstance : serverInstances) {
           String host = serverInstance.getHostname();
           int servicePort = serverInstance.getQueryServicePort();
-          int mailboxPort = serverInstance.getQueryMailboxPort();
           DispatchClient client = getOrCreateDispatchClient(host, servicePort);
           Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
                   QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
-              .putMetadata("REQUEST_ID", String.valueOf(requestId))
-              .putMetadata("SERVER_INSTANCE_HOST", serverInstance.getHostname())
-              .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(mailboxPort)).build());
-          if (response.containsMetadata("ERROR")) {
+              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
+              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs)).build());
+          if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
             throw new RuntimeException(
                 String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", stageId,
                     serverInstance, response));
@@ -114,14 +112,10 @@ public class QueryDispatcher {
         queryPlan.getStageMetadataMap());
   }
 
-  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator) {
-    return reduceMailboxReceive(mailboxReceiveOperator, QueryConfig.DEFAULT_TIMEOUT_NANO);
-  }
-
-  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutNano) {
+  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs) {
     List<DataBlock> resultDataBlocks = new ArrayList<>();
     TransferableBlock transferableBlock;
-    long timeoutWatermark = System.nanoTime() + timeoutNano;
+    long timeoutWatermark = System.nanoTime() + timeoutMs * 1_000_000L;
     while (System.nanoTime() < timeoutWatermark) {
       transferableBlock = mailboxReceiveOperator.nextBlock();
       if (TransferableBlockUtils.isEndOfStream(transferableBlock) && transferableBlock.isErrorBlock()) {
@@ -191,10 +185,11 @@ public class QueryDispatcher {
   @VisibleForTesting
   public static MailboxReceiveOperator createReduceStageOperator(MailboxService<TransferableBlock> mailboxService,
       List<ServerInstance> sendingInstances, long jobId, int stageId, DataSchema dataSchema, String hostname,
-      int port) {
+      int port, long timeoutMs) {
+    // timeout is set for reduce stage
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(mailboxService, sendingInstances,
-            RelDistribution.Type.RANDOM_DISTRIBUTED, hostname, port, jobId, stageId, null);
+            RelDistribution.Type.RANDOM_DISTRIBUTED, hostname, port, jobId, stageId, timeoutMs);
     return mailboxReceiveOperator;
   }
 

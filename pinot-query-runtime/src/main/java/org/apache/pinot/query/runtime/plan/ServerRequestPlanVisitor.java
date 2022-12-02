@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.plan;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -48,9 +49,11 @@ import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
+import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter;
@@ -86,12 +89,13 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
       DistributedStagePlan stagePlan, Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema,
       TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList) {
     // Before-visit: construct the ServerPlanRequestContext baseline
-    long requestId = Long.parseLong(requestMetadataMap.get("REQUEST_ID"));
+    long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
+    long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     PinotQuery pinotQuery = new PinotQuery();
     pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
     pinotQuery.setExplain(false);
     ServerPlanRequestContext context = new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(),
-        stagePlan.getServerInstance().getHostname(), stagePlan.getServerInstance().getPort(),
+        timeoutMs, stagePlan.getServerInstance().getHostname(), stagePlan.getServerInstance().getPort(),
         stagePlan.getMetadataMap(), pinotQuery, tableType, timeBoundaryInfo);
 
     // visit the plan and create query physical plan.
@@ -107,7 +111,11 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     }
     QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
 
-    // 2. wrapped around in broker request
+    // 2. set pinot query options according to requestMetadataMap
+    pinotQuery.setQueryOptions(ImmutableMap.of(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
+        String.valueOf(timeoutMs)));
+
+    // 3. wrapped around in broker request
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setPinotQuery(pinotQuery);
     DataSource dataSource = pinotQuery.getDataSource();

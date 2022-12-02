@@ -25,7 +25,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -50,7 +49,6 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
   private Pattern _regexp;
   private int _group;
   private String _defaultValue;
-  private String[] _stringOutputRegexMatches;
   private TransformResultMetadata _resultMetadata;
 
   @Override
@@ -60,15 +58,13 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions.checkArgument(
-        arguments.size() >= 2 && arguments.size() <= 4,
+    Preconditions.checkArgument(arguments.size() >= 2 && arguments.size() <= 4,
         "REGEXP_EXTRACT takes between 2 to 4 arguments. See usage: "
             + "REGEXP_EXTRACT(`value`, `regexp`[, `group`[, `default_value`]]");
     _valueFunction = arguments.get(0);
 
     TransformFunction regexpFunction = arguments.get(1);
-    Preconditions.checkState(
-        regexpFunction instanceof LiteralTransformFunction,
+    Preconditions.checkState(regexpFunction instanceof LiteralTransformFunction,
         "`regexp` must be a literal regex expression.");
     _regexp = Pattern.compile(((LiteralTransformFunction) regexpFunction).getLiteral());
 
@@ -91,7 +87,6 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
       _defaultValue = "";
     }
     _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
-    _stringOutputRegexMatches = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
   }
 
   @Override
@@ -102,15 +97,18 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
+    if (_stringValuesSV == null) {
+      _stringValuesSV = new String[length];
+    }
     String[] valuesSV = _valueFunction.transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
       Matcher matcher = _regexp.matcher(valuesSV[i]);
       if (matcher.find() && matcher.groupCount() >= _group) {
-        _stringOutputRegexMatches[i] = matcher.group(_group);
+        _stringValuesSV[i] = matcher.group(_group);
       } else {
-        _stringOutputRegexMatches[i] = _defaultValue;
+        _stringValuesSV[i] = _defaultValue;
       }
     }
-    return _stringOutputRegexMatches;
+    return _stringValuesSV;
   }
 }

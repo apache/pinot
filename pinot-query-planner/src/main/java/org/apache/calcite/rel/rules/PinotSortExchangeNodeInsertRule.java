@@ -23,13 +23,21 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.core.Sort;
-import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalSort;
+import org.apache.calcite.rel.logical.LogicalSortExchange;
 import org.apache.calcite.tools.RelBuilderFactory;
 
 
 /**
- * Special rule for Pinot, this rule is fixed to always insert exchange after SORT node.
+ * Rewrite any sort into a relation that adds an exchange and pushes down the collation
+ * to the rest of the tree. This happens for two reasons:
+ * <ol>
+ *   <li>Sort needs to be a distributed operation, if there are multiple nodes that are
+ *   scanning data the sort ordering must be applied globally.</li>
+ *   <li>It is ideal to push down the sort ordering as far as possible. If upstream nodes
+ *   can send data in sorted order, then we can apply N-way merge sort and early terminate
+ *   once all nodes have sent data that is no longer in the top OFFSET+LIMIT.</li>
+ * </ol>
  */
 public class PinotSortExchangeNodeInsertRule extends RelOptRule {
   public static final PinotSortExchangeNodeInsertRule INSTANCE =
@@ -54,8 +62,10 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Sort sort = call.rel(0);
-    // TODO: this is a single value
-    LogicalExchange exchange = LogicalExchange.create(sort.getInput(), RelDistributions.hash(Collections.emptyList()));
+    LogicalSortExchange exchange = LogicalSortExchange.create(
+        sort.getInput(),
+        RelDistributions.hash(Collections.emptyList()),
+        sort.getCollation());
     call.transformTo(LogicalSort.create(exchange, sort.getCollation(), sort.offset, sort.fetch));
   }
 }

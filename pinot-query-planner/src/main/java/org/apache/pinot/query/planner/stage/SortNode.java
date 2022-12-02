@@ -70,7 +70,9 @@ public class SortNode extends AbstractStageNode {
 
   @Override
   public String explain() {
-    return "SORT" + (_fetch > 0 ? " (LIMIT " + _fetch + ")" : "");
+    return String.format("SORT%s%s",
+        (_fetch > 0) ? " LIMIT " + _fetch : "",
+        (_offset > 0) ? " OFFSET " + _offset : "");
   }
 
   @Override

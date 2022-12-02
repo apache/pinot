@@ -56,15 +56,10 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   private IntSet _dictIdSet;
   private int[][] _dictIds;
   private IntSet _intValueSet;
-  private int[][] _intValues;
   private LongSet _longValueSet;
-  private long[][] _longValues;
   private FloatSet _floatValueSet;
-  private float[][] _floatValues;
   private DoubleSet _doubleValueSet;
-  private double[][] _doubleValues;
   private Set<String> _stringValueSet;
-  private String[][] _stringValues;
 
   @Override
   public String getName() {
@@ -109,7 +104,6 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   @Override
   public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_dictIdSet == null) {
       _dictIdSet = new IntOpenHashSet();
       assert _dictionary != null;
@@ -119,7 +113,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
           _dictIdSet.add(dictId);
         }
       }
-      if (_dictIds == null || _dictIds.length < length) {
+      if (_dictIds == null) {
         _dictIds = new int[length][];
       }
     }
@@ -135,22 +129,21 @@ public class ValueInTransformFunction extends BaseTransformFunction {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesMV(projectionBlock);
     }
-
     int length = projectionBlock.getNumDocs();
     if (_intValueSet == null) {
       _intValueSet = new IntOpenHashSet();
       for (String inValue : _stringValueSet) {
         _intValueSet.add(Integer.parseInt(inValue));
       }
-      if (_intValues == null || _intValues.length < length) {
-        _intValues = new int[length][];
+      if (_intValuesMV == null) {
+        _intValuesMV = new int[length][];
       }
     }
     int[][] unFilteredIntValues = _mainTransformFunction.transformToIntValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _intValues[i] = filterInts(_intValueSet, unFilteredIntValues[i]);
+      _intValuesMV[i] = filterInts(_intValueSet, unFilteredIntValues[i]);
     }
-    return _intValues;
+    return _intValuesMV;
   }
 
   @Override
@@ -158,22 +151,21 @@ public class ValueInTransformFunction extends BaseTransformFunction {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesMV(projectionBlock);
     }
-
     int length = projectionBlock.getNumDocs();
     if (_longValueSet == null) {
       _longValueSet = new LongOpenHashSet();
       for (String inValue : _stringValueSet) {
         _longValueSet.add(Long.parseLong(inValue));
       }
-      if (_longValues == null || _longValues.length < length) {
-        _longValues = new long[length][];
+      if (_longValuesMV == null) {
+        _longValuesMV = new long[length][];
       }
     }
     long[][] unFilteredLongValues = _mainTransformFunction.transformToLongValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _longValues[i] = filterLongs(_longValueSet, unFilteredLongValues[i]);
+      _longValuesMV[i] = filterLongs(_longValueSet, unFilteredLongValues[i]);
     }
-    return _longValues;
+    return _longValuesMV;
   }
 
   @Override
@@ -181,22 +173,21 @@ public class ValueInTransformFunction extends BaseTransformFunction {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesMV(projectionBlock);
     }
-
     int length = projectionBlock.getNumDocs();
     if (_floatValueSet == null) {
       _floatValueSet = new FloatOpenHashSet();
       for (String inValue : _stringValueSet) {
         _floatValueSet.add(Float.parseFloat(inValue));
       }
-      if (_floatValues == null || _floatValues.length < length) {
-        _floatValues = new float[length][];
+      if (_floatValuesMV == null) {
+        _floatValuesMV = new float[length][];
       }
     }
     float[][] unFilteredFloatValues = _mainTransformFunction.transformToFloatValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _floatValues[i] = filterFloats(_floatValueSet, unFilteredFloatValues[i]);
+      _floatValuesMV[i] = filterFloats(_floatValueSet, unFilteredFloatValues[i]);
     }
-    return _floatValues;
+    return _floatValuesMV;
   }
 
   @Override
@@ -204,22 +195,21 @@ public class ValueInTransformFunction extends BaseTransformFunction {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(projectionBlock);
     }
-
     int length = projectionBlock.getNumDocs();
     if (_doubleValueSet == null) {
       _doubleValueSet = new DoubleOpenHashSet();
       for (String inValue : _stringValueSet) {
         _doubleValueSet.add(Double.parseDouble(inValue));
       }
-      if (_doubleValues == null || _doubleValues.length < length) {
-        _doubleValues = new double[length][];
+      if (_doubleValuesMV == null) {
+        _doubleValuesMV = new double[length][];
       }
     }
     double[][] unFilteredDoubleValues = _mainTransformFunction.transformToDoubleValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _doubleValues[i] = filterDoubles(_doubleValueSet, unFilteredDoubleValues[i]);
+      _doubleValuesMV[i] = filterDoubles(_doubleValueSet, unFilteredDoubleValues[i]);
     }
-    return _doubleValues;
+    return _doubleValuesMV;
   }
 
   @Override
@@ -227,16 +217,15 @@ public class ValueInTransformFunction extends BaseTransformFunction {
     if (_dictionary != null || _resultMetadata.getDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesMV(projectionBlock);
     }
-
     int length = projectionBlock.getNumDocs();
-    if (_stringValues == null || _stringValues.length < length) {
-      _stringValues = new String[length][];
+    if (_stringValuesMV == null) {
+      _stringValuesMV = new String[length][];
     }
     String[][] unFilteredStringValues = _mainTransformFunction.transformToStringValuesMV(projectionBlock);
     for (int i = 0; i < length; i++) {
-      _stringValues[i] = filterStrings(_stringValueSet, unFilteredStringValues[i]);
+      _stringValuesMV[i] = filterStrings(_stringValueSet, unFilteredStringValues[i]);
     }
-    return _stringValues;
+    return _stringValuesMV;
   }
 
   private static int[] filterInts(IntSet intSet, int[] source) {

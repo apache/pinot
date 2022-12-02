@@ -33,7 +33,6 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
 
   private TransformFunction _mainTransformFunction;
   private TimeUnitTransformer _timeUnitTransformer;
-  private long[] _outputTimes;
 
   @Override
   public String getName() {
@@ -68,13 +67,11 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
-    if (_outputTimes == null || _outputTimes.length < length) {
-      _outputTimes = new long[length];
+    if (_longValuesSV == null) {
+      _longValuesSV = new long[length];
     }
-
-    _timeUnitTransformer.transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _outputTimes,
+    _timeUnitTransformer.transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _longValuesSV,
         length);
-    return _outputTimes;
+    return _longValuesSV;
   }
 }
