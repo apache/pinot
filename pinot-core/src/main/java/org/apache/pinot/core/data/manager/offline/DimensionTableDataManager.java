@@ -20,7 +20,7 @@ package org.apache.pinot.core.data.manager.offline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,8 +102,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
 
     if (_disablePreload) {
-      _dimensionTable = new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, new HashMap<>(),
-          new ArrayList<>(), this);
+      _dimensionTable = new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, Collections.emptyMap(),
+          Collections.emptyList(), this);
     } else {
       _dimensionTable = new FastLookupDimensionTable(schema, primaryKeyColumns, new HashMap<>());
     }
@@ -142,11 +142,11 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   }
 
   private void closeDimensionTable(DimensionTable dimensionTable) {
-      try {
-        dimensionTable.close();
-      } catch (Exception e) {
-        _logger.warn("Cannot close dimension table: {}", _tableNameWithType, e);
-      }
+    try {
+      dimensionTable.close();
+    } catch (Exception e) {
+      _logger.warn("Cannot close dimension table: {}", _tableNameWithType, e);
+    }
   }
 
   /**

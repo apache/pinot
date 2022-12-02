@@ -78,7 +78,7 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
   @Override
   public void close()
       throws IOException {
-    for (LookupRecordLocation lookupRecordLocation: _lookupTable.values()) {
+    for (LookupRecordLocation lookupRecordLocation : _lookupTable.values()) {
       try {
         lookupRecordLocation.getPinotSegmentRecordReader().close();
       } catch (Exception e) {
@@ -86,8 +86,8 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
       }
     }
 
-    for (SegmentDataManager segmentDataManager: _segmentDataManagers) {
-        _tableDataManager.releaseSegment(segmentDataManager);
+    for (SegmentDataManager segmentDataManager : _segmentDataManagers) {
+      _tableDataManager.releaseSegment(segmentDataManager);
     }
   }
 }
