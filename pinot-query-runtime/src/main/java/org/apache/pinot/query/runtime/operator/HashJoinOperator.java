@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.clearspring.analytics.util.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -43,13 +42,18 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
 
 /**
  * This basic {@code BroadcastJoinOperator} implement a basic broadcast join algorithm.
+ * This algorithm assumes that the broadcast table has to fit in memory since we are not supporting any spilling.
  *
+ * For left join and inner join,
  * <p>It takes the right table as the broadcast side and materialize a hash table. Then for each of the left table row,
  * it looks up for the corresponding row(s) from the hash table and create a joint row.
  *
  * <p>For each of the data block received from the left table, it will generate a joint data block.
  *
- * We currently support left join, inner join and semi join.
+ * For right join,
+ * We broadcast the left table and probe the hash table using right table.
+ *
+ * We currently support left join, inner join and right join.
  * The output is in the format of [left_row, right_row]
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
@@ -62,6 +66,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private final Operator<TransferableBlock> _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
+  private final int _leftRowSize;
   private final int _resultRowSize;
   private final List<FilterOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
@@ -70,22 +75,26 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
   public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
-      DataSchema outputSchema, JoinNode.JoinKeys joinKeys, List<RexExpression> joinClauses, JoinRelType joinType) {
-    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(joinType),
-        "Join type: " + joinType + " is not supported!");
-    _leftKeySelector = joinKeys.getLeftJoinKeySelector();
-    _rightKeySelector = joinKeys.getRightJoinKeySelector();
+      DataSchema leftSchema, JoinNode node) {
+    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
+        "Join type: " + node.getJoinRelType() + " is not supported!");
+    _joinType = node.getJoinRelType();
+    _leftKeySelector = node.getJoinKeys().getLeftJoinKeySelector();
+    _rightKeySelector = node.getJoinKeys().getRightJoinKeySelector();
     Preconditions.checkState(_leftKeySelector != null, "LeftKeySelector for join cannot be null");
     Preconditions.checkState(_rightKeySelector != null, "RightKeySelector for join cannot be null");
+    _leftRowSize = leftSchema.size();
+    Preconditions.checkState(_leftRowSize > 0, "leftRowSize has to be greater than zero:" + _leftRowSize);
+    _resultSchema = node.getDataSchema();
+    _resultRowSize = _resultSchema.size();
+    Preconditions.checkState(_resultRowSize > _leftRowSize,
+        "Result row size" + _leftRowSize + " has to be greater than left row size:" + _leftRowSize);
     _leftTableOperator = leftTableOperator;
     _rightTableOperator = rightTableOperator;
-    _resultSchema = outputSchema;
-    _joinClauseEvaluators = new ArrayList<>(joinClauses.size());
-    for (RexExpression joinClause : joinClauses) {
+    _joinClauseEvaluators = new ArrayList<>(node.getJoinClauses().size());
+    for (RexExpression joinClause : node.getJoinClauses()) {
       _joinClauseEvaluators.add(FilterOperand.toFilterOperand(joinClause, _resultSchema));
     }
-    _joinType = joinType;
-    _resultRowSize = _resultSchema.size();
     _isHashTableBuilt = false;
     _broadcastHashTable = new HashMap<>();
     _upstreamErrorBlock = null;
@@ -122,7 +131,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
-  private Operator<TransferableBlock> getBroadcastOperator(){
+  private Operator<TransferableBlock> getBroadcastOperator() {
     switch (_joinType) {
       case LEFT:
         // Intentional fall through
@@ -130,12 +139,13 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         return _rightTableOperator;
       case RIGHT:
         return _leftTableOperator;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
     }
-    Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
-    return null;
   }
 
-  private KeySelector<Object[], Object[]>  getBroadcastKeySelector(){
+  private KeySelector<Object[], Object[]> getBroadcastKeySelector() {
     switch (_joinType) {
       case LEFT:
         // Intentional fall through
@@ -143,22 +153,24 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         return _rightKeySelector;
       case RIGHT:
         return _leftKeySelector;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
     }
-    Preconditions.checkState(false);
-    return null;
   }
 
-  private Operator<TransferableBlock> getProbeOperator(){
-    switch (_joinType){
+  private Operator<TransferableBlock> getProbeOperator() {
+    switch (_joinType) {
       case LEFT:
         // Intentional fall through
       case INNER:
         return _leftTableOperator;
       case RIGHT:
         return _rightTableOperator;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
     }
-    Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
-    return null;
   }
 
   private KeySelector<Object[], Object[]> getProbeKeySelector() {
@@ -169,9 +181,38 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         return _leftKeySelector;
       case RIGHT:
         return _rightKeySelector;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
     }
-    Preconditions.checkState(false);
-    return null;
+  }
+
+  private Object[] getLeftRow(Object[] probeRow, Object[] broadcastRow) {
+    switch (_joinType) {
+      case LEFT:
+        // Intentional fall through
+      case INNER:
+        return probeRow;
+      case RIGHT:
+        return broadcastRow;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
+    }
+  }
+
+  private Object[] getRightRow(Object[] probeRow, Object[] broadcastRow) {
+    switch (_joinType) {
+      case LEFT:
+        // Intentional fall through
+      case INNER:
+        return broadcastRow;
+      case RIGHT:
+        return probeRow;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
+    }
   }
 
   private void buildBroadcastHashTable() {
@@ -229,32 +270,6 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
   }
 
-  private Object[] getLeftRow(Object[] probeRow, Object[] broadcastRow) {
-    switch (_joinType) {
-      case LEFT:
-        // Intentional fall through
-      case INNER:
-        return probeRow;
-      case RIGHT:
-        return broadcastRow;
-    }
-    Preconditions.checkState(false);
-    return null;
-  }
-
-  private Object[] getRightRow(Object[] probeRow, Object[] broadcastRow) {
-    switch (_joinType) {
-      case LEFT:
-        // Intentional fall through
-      case INNER:
-        return broadcastRow;
-      case RIGHT:
-        return probeRow;
-    }
-    Preconditions.checkState(false);
-    return null;
-  }
-
   private Object[] joinRow(Object[] probeRow, @Nullable Object[] broadcastRow) {
     Object[] resultRow = new Object[_resultRowSize];
     int idx = 0;
@@ -263,6 +278,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         resultRow[idx++] = obj;
       }
     }
+    // This is needed since left row can be null and we need to advance the idx to the beginning of right row.
+    idx = _leftRowSize;
     if (getRightRow(probeRow, broadcastRow) != null) {
       for (Object obj : getRightRow(probeRow, broadcastRow)) {
         resultRow[idx++] = obj;
