@@ -89,8 +89,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator joinOnString = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.INNER);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
+    HashJoinOperator joinOnString = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = joinOnString.nextBlock();
     while (result.isNoOpBlock()) {
@@ -125,8 +126,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator joinOnInt = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, JoinRelType.INNER);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+    HashJoinOperator joinOnInt = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnInt.nextBlock();
     while (result.isNoOpBlock()) {
       result = joinOnInt.nextBlock();
@@ -158,8 +160,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator joinOnInt = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, JoinRelType.INNER);
+    JoinNode node = new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(new ArrayList<>(), new ArrayList<>()),
+        joinClauses);
+    HashJoinOperator joinOnInt = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnInt.nextBlock();
     while (result.isNoOpBlock()) {
       result = joinOnInt.nextBlock();
@@ -198,8 +201,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.LEFT);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.LEFT, getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -214,6 +218,9 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldPassLeftTableEOS() {
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
@@ -228,8 +235,10 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, JoinRelType.INNER);
+
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.LEFT, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -258,8 +267,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, JoinRelType.LEFT);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.LEFT, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -274,6 +284,9 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldPassRightTableEOS() {
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
@@ -288,8 +301,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, JoinRelType.INNER);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -325,9 +339,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, JoinRelType.INNER);
-
+    JoinNode node = new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(new ArrayList<>(), new ArrayList<>()),
+        joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
       result = join.nextBlock();
@@ -363,9 +377,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, JoinRelType.INNER);
-
+    JoinNode node = new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(new ArrayList<>(), new ArrayList<>()),
+        joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
       result = join.nextBlock();
@@ -377,9 +391,8 @@ public class HashJoinOperatorTest {
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RIGHT is not supported"
-      + ".*")
-  public void shouldThrowOnRightJoin() {
+  @Test
+  public void shouldHandleRightJoin() {
     DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
@@ -398,8 +411,20 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.RIGHT);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.RIGHT, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+    HashJoinOperator joinOnNum = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    TransferableBlock result = joinOnNum.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = joinOnNum.nextBlock();
+    }
+    List<Object[]> resultRows = result.getContainer();
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{2, "BB", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"},
+        new Object[]{null, null, 3, "BB"});
+    Assert.assertEquals(resultRows.size(), expectedRows.size());
+    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
+    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*SEMI is not "
@@ -423,8 +448,9 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.SEMI);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.SEMI, getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*FULL is not supported.*")
@@ -447,8 +473,9 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.FULL);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.FULL, getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*ANTI is not supported.*")
@@ -471,12 +498,16 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, JoinRelType.ANTI);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.ANTI, getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
   }
 
   @Test
   public void shouldPropagateRightTableError() {
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
@@ -492,8 +523,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, JoinRelType.INNER);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -506,6 +538,9 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldPropagateLeftTableError() {
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
@@ -521,8 +556,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, JoinRelType.INNER);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -535,6 +571,9 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleNoOpBlock() {
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
@@ -553,8 +592,9 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, resultSchema,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, JoinRelType.INNER);
+    JoinNode node =
+        new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock(); // first no-op consumes first right data block.
     Assert.assertTrue(result.isNoOpBlock());

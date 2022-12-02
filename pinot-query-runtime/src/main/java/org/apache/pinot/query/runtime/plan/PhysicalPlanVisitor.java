@@ -102,8 +102,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
     Operator<TransferableBlock> leftOperator = left.visit(this, context);
     Operator<TransferableBlock> rightOperator = right.visit(this, context);
 
-    return new HashJoinOperator(leftOperator, rightOperator, node.getDataSchema(), node.getJoinKeys(),
-        node.getJoinClauses(), node.getJoinRelType());
+    return new HashJoinOperator(leftOperator, rightOperator, left.getDataSchema(), node);
   }
 
   @Override
