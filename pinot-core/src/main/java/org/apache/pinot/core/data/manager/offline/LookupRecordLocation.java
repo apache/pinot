@@ -18,20 +18,29 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import java.io.Closeable;
-import java.util.List;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-public interface DimensionTable extends Closeable {
+public class LookupRecordLocation {
+  private final PinotSegmentRecordReader _pinotSegmentRecordReader;
+  private final int _docId;
 
-  List<String> getPrimaryKeyColumns();
+  public LookupRecordLocation(PinotSegmentRecordReader pinotSegmentRecordReader, int docId) {
+    _pinotSegmentRecordReader = pinotSegmentRecordReader;
+    _docId = docId;
+  }
 
-  GenericRow get(PrimaryKey pk);
+  public PinotSegmentRecordReader getPinotSegmentRecordReader() {
+    return _pinotSegmentRecordReader;
+  }
 
-  boolean isEmpty();
+  public int getDocId() {
+    return _docId;
+  }
 
-  FieldSpec getFieldSpecFor(String columnName);
+  public GenericRow getRecord(GenericRow reuse) {
+    _pinotSegmentRecordReader.getRecord(_docId, reuse);
+    return reuse;
+  }
 }

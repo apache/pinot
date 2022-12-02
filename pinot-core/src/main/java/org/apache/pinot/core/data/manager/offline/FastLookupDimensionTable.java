@@ -18,20 +18,50 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import java.io.Closeable;
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-public interface DimensionTable extends Closeable {
+class FastLookupDimensionTable implements DimensionTable {
 
-  List<String> getPrimaryKeyColumns();
+  private Map<PrimaryKey, GenericRow> _lookupTable;
+  private final Schema _tableSchema;
+  private final List<String> _primaryKeyColumns;
 
-  GenericRow get(PrimaryKey pk);
+  FastLookupDimensionTable(Schema tableSchema, List<String> primaryKeyColumns,
+      Map<PrimaryKey, GenericRow> lookupTable) {
+    _lookupTable = lookupTable;
+    _tableSchema = tableSchema;
+    _primaryKeyColumns = primaryKeyColumns;
+  }
 
-  boolean isEmpty();
+  @Override
+  public List<String> getPrimaryKeyColumns() {
+    return _primaryKeyColumns;
+  }
 
-  FieldSpec getFieldSpecFor(String columnName);
+  @Override
+  public GenericRow get(PrimaryKey pk) {
+    return _lookupTable.get(pk);
+  }
+
+  @Override
+  public boolean isEmpty() {
+    return _lookupTable.isEmpty();
+  }
+
+  @Override
+  public FieldSpec getFieldSpecFor(String columnName) {
+    return _tableSchema.getFieldSpecFor(columnName);
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+  }
 }

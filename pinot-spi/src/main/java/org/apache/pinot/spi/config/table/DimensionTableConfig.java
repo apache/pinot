@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager.offline;
+package org.apache.pinot.spi.config.table;
 
-import java.io.Closeable;
-import java.util.List;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public interface DimensionTable extends Closeable {
+public class DimensionTableConfig extends BaseJsonConfig {
+  private final boolean _disablePreload;
 
-  List<String> getPrimaryKeyColumns();
+  @JsonCreator
+  public DimensionTableConfig(@JsonProperty(value = "disablePreload", required = true) boolean disablePreload) {
+    _disablePreload = disablePreload;
+  }
 
-  GenericRow get(PrimaryKey pk);
-
-  boolean isEmpty();
-
-  FieldSpec getFieldSpecFor(String columnName);
+  public boolean isDisablePreload() {
+    return _disablePreload;
+  }
 }
