@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -136,8 +137,10 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
   /**
    * we only need to rearrange columns when distinct is not conforming with selection columns, specifically:
    * <ul>
-   *   <li> when distinct is not returning final result: it should never happen.</li>
-   *   <li> when distinct columns are not all being selected: it should never happen.</li>
+   *   <li> when distinct is not returning final result:
+   *       it should never happen as non-final result contains Object opaque columns v2 engine can't process. </li>
+   *   <li> when distinct columns are not all being selected:
+   *       it should never happen as leaf stage MUST return the entire list.</li>
    * </ul>
    * thus we only need to check for compatibility between response schema against query context schema.
    *
@@ -151,23 +154,48 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
         ((DistinctAggregationFunction) responseBlock.getQueryContext().getAggregationFunctions()[0]).getColumns());
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
     Preconditions.checkState(inOrder(columnIndices), "Incompatible distinct table schema for leaf stage."
-        + "Expected: " + desiredDataSchema + ". Actual: " + responseBlock.getDataSchema());
+        + "Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
+  /**
+   * Calcite generated {@link DataSchema} should conform with Pinot's group by result schema thus we only need to check
+   * for correctness similar to distinct case.
+   *
+   * @see LeafStageTransferableBlockOperator#composeDirectTransferableBlock(InstanceResponseBlock, DataSchema).
+   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
+   */
+  @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeGroupByTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
-    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
-        responseBlock.getDataSchema().getColumnDataTypes()), "Incompatible result data schema: "
-        + "Expecting: " + desiredDataSchema + " Actual: " + responseBlock.getDataSchema());
+    DataSchema resultSchema = responseBlock.getDataSchema();
+    // GROUP-BY column names conforms with selection expression
+    List<String> selectionColumns = responseBlock.getQueryContext().getSelectExpressions().stream()
+        .map(e -> e.toString()).collect(Collectors.toList());
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
+    Preconditions.checkState(inOrder(columnIndices), "Incompatible group by result schema for leaf stage."
+        + "Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
+
+  /**
+   * Calcite generated {@link DataSchema} should conform with Pinot's agg result schema thus we only need to check
+   * for correctness similar to distinct case.
+   *
+   * @see LeafStageTransferableBlockOperator#composeDirectTransferableBlock(InstanceResponseBlock, DataSchema).
+   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
+   */
+  @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeAggregationTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
-    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
-        responseBlock.getDataSchema().getColumnDataTypes()), "Incompatible result data schema: "
-        + "Expecting: " + desiredDataSchema + " Actual: " + responseBlock.getDataSchema());
+    DataSchema resultSchema = responseBlock.getDataSchema();
+    // AGG-ONLY column names are derived from AggFunction.getColumnName()
+    List<String> selectionColumns = Arrays.stream(responseBlock.getQueryContext().getAggregationFunctions()).map(
+        a -> a.getColumnName()).collect(Collectors.toList());
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
+    Preconditions.checkState(inOrder(columnIndices), "Incompatible aggregate result schema for leaf stage."
+        + "Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
