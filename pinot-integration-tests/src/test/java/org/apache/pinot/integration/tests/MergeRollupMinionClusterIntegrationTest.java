@@ -90,8 +90,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir,
-        _segmentDir1, _segmentDir2, _segmentDir3, _segmentDir4,
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir1, _segmentDir2, _segmentDir3, _segmentDir4,
         _tarDir1, _tarDir2, _tarDir3, _tarDir4);
 
     // Start the Pinot cluster

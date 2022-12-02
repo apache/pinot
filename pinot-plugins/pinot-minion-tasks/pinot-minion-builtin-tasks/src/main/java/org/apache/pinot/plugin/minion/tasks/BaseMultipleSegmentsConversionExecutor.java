@@ -24,6 +24,7 @@ import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -313,22 +314,19 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
     SegmentGenerationJobSpec spec = generatePushJobSpec(tableName, taskConfigs, pushJobSpec);
 
-    URI outputSegmentDirURI = null;
-    if (taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
-      outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    }
-    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
-      switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
-        case TAR:
-          try (PinotFS pinotFS = MinionTaskUtils.getLocalPinotFs()) {
-            SegmentPushUtils.pushSegments(
-                spec, pinotFS, Arrays.asList(outputSegmentTarURI.toString()), headers, parameters);
-          } catch (RetriableOperationException | AttemptsExceededException e) {
-            throw new RuntimeException(e);
-          }
-          break;
-        case METADATA:
-          try {
+    switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
+      case TAR:
+        try (PinotFS pinotFS = MinionTaskUtils.getLocalPinotFs()) {
+          SegmentPushUtils.pushSegments(
+              spec, pinotFS, Collections.singletonList(outputSegmentTarURI.toString()), headers, parameters);
+        } catch (RetriableOperationException | AttemptsExceededException e) {
+          throw new RuntimeException(e);
+        }
+        break;
+      case METADATA:
+        if (taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
+          URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
+          try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
             Map<String, String> segmentUriToTarPathMap =
                 SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
                     new String[]{outputSegmentTarURI.toString()});
@@ -336,10 +334,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
           }
-          break;
-        default:
-          throw new UnsupportedOperationException("Unrecognized push mode - " + pushMode);
-      }
+        } else {
+          throw new RuntimeException("Output dir URI missing for metadata push");
+        }
+        break;
+      default:
+        throw new UnsupportedOperationException("Unrecognized push mode - " + pushMode);
     }
   }
 
@@ -364,15 +364,13 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
   private URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile)
       throws Exception {
-    if (!taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
-      return localSegmentTarFile.toURI();
-    }
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
       URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
       if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
-          outputSegmentDirURI)) {
-        LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentDirURI));
+          outputSegmentTarURI)) {
+        throw new RuntimeException(String.format("Output file: %s already exists. "
+                + "Set 'overwriteOutput' to true to ignore this error", outputSegmentTarURI));
       } else {
         outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
       }

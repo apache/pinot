@@ -29,11 +29,12 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class MinionTaskUtils {
-  private static final BatchConfigProperties.SegmentPushType DEFAULT_SEGMENT_PUSH_TYPE =
-      BatchConfigProperties.SegmentPushType.TAR;
+  private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
   private MinionTaskUtils() {
   }
@@ -75,19 +76,30 @@ public class MinionTaskUtils {
   public static Map<String, String> getPushTaskConfig(String tableName, Map<String, String> taskConfigs,
       ClusterInfoAccessor clusterInfoAccessor) {
     try {
-      URI outputDirURI = URI.create(clusterInfoAccessor.getDataDir() + "/" + tableName);
-      String outputDirURIScheme = outputDirURI.getScheme();
       String pushMode = IngestionConfigUtils.getPushMode(taskConfigs);
 
       Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
-      if (!isLocalOutputDir(outputDirURIScheme)) {
-        singleFileGenerationTaskConfig.put(
-            BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDirURI.toString());
-      }
-      if (isLocalOutputDir(outputDirURIScheme) || (pushMode == null)) {
-        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
+      if (pushMode == null
+          || pushMode.toUpperCase().contentEquals(BatchConfigProperties.SegmentPushType.TAR.toString())) {
+        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+            BatchConfigProperties.SegmentPushType.TAR.toString());
       } else {
-        singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
+        URI outputDirURI = URI.create(clusterInfoAccessor.getDataDir() + "/" + tableName);
+        String outputDirURIScheme = outputDirURI.getScheme();
+
+        if (!isLocalOutputDir(outputDirURIScheme)) {
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI, outputDirURI.toString());
+          if (pushMode.toUpperCase().contentEquals(BatchConfigProperties.SegmentPushType.URI.toString())) {
+            LOGGER.warn("URI push type is not supported in this task. Switching to METADATA push");
+            pushMode = BatchConfigProperties.SegmentPushType.METADATA.toString();
+          }
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, pushMode);
+        } else {
+          LOGGER.warn("segment upload with METADATA push is not supported with local output dir: {}."
+              + " Switching to TAR push.", outputDirURI);
+          singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
+              BatchConfigProperties.SegmentPushType.TAR.toString());
+        }
       }
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, clusterInfoAccessor.getVipUrl());
       return singleFileGenerationTaskConfig;
