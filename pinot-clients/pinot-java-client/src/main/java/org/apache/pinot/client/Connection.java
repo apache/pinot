@@ -173,7 +173,7 @@ public class Connection {
    * @return A future containing the result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public Future<ResultSetGroup> executeAsync(String tableName, String query)
+  public Future<ResultSetGroup> executeAsync(@Nullable String tableName, String query)
       throws PinotClientException {
     tableName = tableName == null ? resolveTableName(query) : tableName;
     String brokerHostPort = _brokerSelector.selectBroker(tableName);
@@ -183,11 +183,12 @@ public class Connection {
     return new ResultSetGroupFuture(_transport.executeQueryAsync(brokerHostPort, query));
   }
 
+  @Nullable
   private static String resolveTableName(String query) {
     try {
       return CalciteSqlCompiler.compileToBrokerRequest(query).querySource.tableName;
     } catch (Exception e) {
-      LOGGER.error("Cannot parse table name from query: " + query, e);
+      LOGGER.error("Cannot parse table name from query: {}", query, e);
       return null;
     }
   }
