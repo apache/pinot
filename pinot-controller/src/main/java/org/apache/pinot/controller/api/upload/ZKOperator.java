@@ -297,8 +297,9 @@ public class ZKOperator {
     }
 
     // Lock if enableParallelPushProtection is true.
+    long segmentUploadStartTime = System.currentTimeMillis();
     if (enableParallelPushProtection) {
-      newSegmentZKMetadata.setSegmentUploadStartTime(System.currentTimeMillis());
+      newSegmentZKMetadata.setSegmentUploadStartTime(segmentUploadStartTime);
     }
 
     // Update zk metadata customer map
@@ -323,8 +324,7 @@ public class ZKOperator {
         // Cleanup the Zk entry and the segment from the permanent directory if it exists.
         LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, tableNameWithType,
             e);
-        _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
-        LOGGER.info("Deleted zk entry and segment {} for table {}.", segmentName, tableNameWithType);
+        deleteSegmentIfNeeded(tableNameWithType, segmentName, segmentUploadStartTime, enableParallelPushProtection);
         throw e;
       }
     }
@@ -332,11 +332,11 @@ public class ZKOperator {
     try {
       _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName());
     } catch (Exception e) {
-      // assignTableSegment removes the zk entry. Call deleteSegment to remove the segment from permanent location.
+      // assignTableSegment removes the zk entry.
+      // Call deleteSegment to remove the segment from permanent location if needed.
       LOGGER.error("Caught exception while calling assignTableSegment for adding segment: {} to table: {}", segmentName,
           tableNameWithType, e);
-      _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
-      LOGGER.info("Deleted zk entry and segment {} for table {}.", segmentName, tableNameWithType);
+      deleteSegmentIfNeeded(tableNameWithType, segmentName, segmentUploadStartTime, enableParallelPushProtection);
       throw e;
     }
 
@@ -344,11 +344,40 @@ public class ZKOperator {
       // Release lock. Expected version will be 0 as we hold a lock and no updates could take place meanwhile.
       newSegmentZKMetadata.setSegmentUploadStartTime(-1);
       if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, newSegmentZKMetadata, 0)) {
-        _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
-        LOGGER.info("Deleted zk entry and segment {} for table {}.", segmentName, tableNameWithType);
-        throw new RuntimeException(
-            String.format("Failed to update ZK metadata for segment: %s of table: %s", segmentFile, tableNameWithType));
+        // There is a race condition when it took too much time for the 1st segment upload to process (due to slow
+        // PinotFS access), which leads to the 2nd attempt of segment upload, and the 2nd segment upload succeeded.
+        // In this case, when the 1st upload comes back, it shouldn't blindly delete the segment when it failed to
+        // update the zk metadata. Instead, the 1st attempt should validate the upload start time one more time. If the
+        // start time doesn't match with the one persisted in zk metadata, segment deletion should be skipped.
+        String errorMsg =
+            String.format("Failed to update ZK metadata for segment: %s of table: %s", segmentFile, tableNameWithType);
+        LOGGER.error(errorMsg);
+        deleteSegmentIfNeeded(tableNameWithType, segmentName, segmentUploadStartTime, true);
+        throw new RuntimeException(errorMsg);
       }
+    }
+  }
+
+  /**
+   * Deletes the segment to be uploaded if either one of the criteria is qualified:
+   * 1) the uploadStartTime matches with the one persisted in ZK metadata.
+   * 2) enableParallelPushProtection is not enabled.
+   */
+  private void deleteSegmentIfNeeded(String tableNameWithType, String segmentName, long currentSegmentUploadStartTime,
+      boolean enableParallelPushProtection) {
+    ZNRecord existingSegmentMetadataZNRecord =
+        _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
+    if (existingSegmentMetadataZNRecord == null) {
+      return;
+    }
+    // Check if the upload start time is set by this thread itself, if yes delete the segment.
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(existingSegmentMetadataZNRecord);
+    long existingSegmentUploadStartTime = segmentZKMetadata.getSegmentUploadStartTime();
+    LOGGER.info("Parallel push protection is {} for segment: {}.",
+        (enableParallelPushProtection ? "enabled" : "disabled"), segmentName);
+    if (!enableParallelPushProtection || currentSegmentUploadStartTime == existingSegmentUploadStartTime) {
+      _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
+      LOGGER.info("Deleted zk entry and segment {} for table {}.", segmentName, tableNameWithType);
     }
   }
 
