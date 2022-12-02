@@ -1,0 +1,153 @@
+{
+  "string_functions": {
+    "tables": {
+      "stringTbl": {
+        "schema": [
+          { "name": "strCol", "type": "STRING" }
+        ],
+        "inputs": [
+          [ "HELLO" ],
+          [ "Hello" ],
+          [ "hello" ],
+          [ " hello " ],
+          [ "wiTH Mixed CaSe" ],
+          [ "" ],
+          [ " " ]
+        ]
+      }
+    },
+    "queries": [
+      { "sql": "SELECT lower(strCol) FROM {stringTbl}" },
+      { "sql": "SELECT upper(strCol) FROM {stringTbl}" },
+      { "sql": "SELECT length(strCol) FROM {stringTbl}" },
+      { "sql": "SELECT concat(strCol, strCol) FROM {stringTbl}" },
+      { "sql": "SELECT concat_ws(',', strCol, strCol) FROM {stringTbl} WHERE strCol <> ''" },
+      {
+        "ignored": true,
+        "comment": "standard SQL treats '' as null and ignores it, but pinot does not",
+        "sql": "SELECT concat_ws(',', strCol, strCol) FROM {stringTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "standard sql concat is vararg, while we treat the third input as a separator",
+        "sql": "SELECT concat(strCol, strCol, ',') FROM {stringTbl}"
+      },
+      { "sql": "SELECT trim(strCol) FROM {stringTbl}" },
+      { "sql": "SELECT lower(strCol), regexp_Replace(strCol, 'e.*o', 'le') FROM {stringTbl}" },
+      {
+        "ignored": true,
+        "comment": "split returns a MV array, we don't yet support that",
+        "sql": "SELECT split(strCol, ' ') FROM {stringTbl}"
+      }
+    ]
+  },
+  "string_functions_noh2": {
+    "tables": {
+      "stringTbl": {
+        "schema": [
+          {
+            "name": "strCol",
+            "type": "STRING"
+          }
+        ],
+        "inputs": [
+          [ "Hello" ],
+          [ "hello" ],
+          [ "hello world" ],
+          [ "world hello" ],
+          [ "wiTH Mixed CaSe" ],
+          [ "" ],
+          [ " " ]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT strpos(strCol, 'hello') FROM {stringTbl}",
+        "outputs": [
+          [-1],
+          [0],
+          [0],
+          [6],
+          [-1],
+          [-1],
+          [-1]
+        ]
+      },
+      {
+        "sql": "SELECT reverse(strCol) FROM {stringTbl}",
+        "outputs": [
+          ["olleH"],
+          ["olleh"],
+          ["dlrow olleh"],
+          ["olleh dlrow"],
+          ["eSaC dexiM HTiw"],
+          [""],
+          [" "]
+        ]
+      },
+      {
+        "sql": "SELECT starts_with(strCol, 'Hello') FROM {stringTbl}",
+        "outputs": [
+          [true],
+          [false],
+          [false],
+          [false],
+          [false],
+          [false],
+          [false]
+        ]
+      },
+      {
+        "sql": "SELECT ends_with(strCol, 'ello') FROM {stringTbl}",
+        "outputs": [
+          [true],
+          [true],
+          [false],
+          [true],
+          [false],
+          [false],
+          [false]
+        ]
+      },
+      {
+        "comment": "h2 only supports SUBSTR(input FROM x TO y) syntax, which we don't support",
+        "sql": "SELECT substr(strCol, 0) FROM {stringTbl}",
+        "outputs": [
+          [ "Hello" ],
+          [ "hello" ],
+          [ "hello world" ],
+          [ "world hello" ],
+          [ "wiTH Mixed CaSe" ],
+          [ "" ],
+          [ " " ]
+        ]
+      },
+      {
+        "comment": "h2 only supports SUBSTRING(input FROM x TO y) syntax, which we don't support",
+        "sql": "SELECT substring(strCol, 0) FROM {stringTbl}",
+        "outputs": [
+          [ "Hello" ],
+          [ "hello" ],
+          [ "hello world" ],
+          [ "world hello" ],
+          [ "wiTH Mixed CaSe" ],
+          [ "" ],
+          [ " " ]
+        ]
+      },
+      {
+        "sql": "SELECT substr(strCol, 3) FROM {stringTbl}",
+        "outputs": [
+          [ "lo" ],
+          [ "lo" ],
+          [ "lo world" ],
+          [ "ld hello" ],
+          [ "H Mixed CaSe" ],
+          [ "" ],
+          [ "" ]
+        ]
+      }
+    ]
+  }
+}

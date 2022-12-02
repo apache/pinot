@@ -82,7 +82,7 @@ public class StringFunctions {
    * @param beginIndex index from which substring should be created
    * @return substring from beginIndex to end of the parent string
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"substr", "substring"})
   public static String substr(String input, int beginIndex) {
     return StringUtils.substring(input, beginIndex);
   }
@@ -97,7 +97,7 @@ public class StringFunctions {
    * @param endIndex index at which substring should be terminated
    * @return substring from beginIndex to endIndex
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"substr", "substring"})
   public static String substr(String input, int beginIndex, int endIndex) {
     if (endIndex == -1) {
       return substr(input, beginIndex);
@@ -112,11 +112,34 @@ public class StringFunctions {
    * @param seperator
    * @return The two input strings joined by the seperator
    */
+  @ScalarFunction(names = "concat_ws")
+  public static String concatws(String seperator, String input1, String input2) {
+    return concat(input1, input2, seperator);
+  }
+
+  /**
+   * Join two input string with seperator in between
+   * @param input1
+   * @param input2
+   * @param seperator
+   * @return The two input strings joined by the seperator
+   */
   @ScalarFunction
   public static String concat(String input1, String input2, String seperator) {
     String result = input1;
     result = result + seperator + input2;
     return result;
+  }
+
+  /**
+   * Join two input string with no seperator in between
+   * @param input1
+   * @param input2
+   * @return The two input strings joined
+   */
+  @ScalarFunction
+  public static String concat(String input1, String input2) {
+    return concat(input1, input2, "");
   }
 
   /**
@@ -313,7 +336,7 @@ public class StringFunctions {
    * @param prefix substring to check if it is the prefix
    * @return true if string starts with prefix, false o.w.
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"startsWith", "starts_with"})
   public static boolean startsWith(String input, String prefix) {
     return StringUtils.startsWith(input, prefix);
   }
@@ -324,7 +347,7 @@ public class StringFunctions {
    * @param suffix substring to check if it is the prefix
    * @return true if string ends with prefix, false o.w.
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"endsWith", "ends_with"})
   public static boolean endsWith(String input, String suffix) {
     return StringUtils.endsWith(input, suffix);
   }
@@ -637,7 +660,7 @@ public class StringFunctions {
    *             i -> Case insensitive
    * @return replaced input string
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"regexpReplace", "regexp_replace"})
   public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
       int occurence, String flag) {
     Integer patternFlag;
@@ -691,7 +714,7 @@ public class StringFunctions {
    * @param replaceStr Regexp or string to replace if matchStr is found
    * @return replaced input string
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"regexpReplace", "regexp_replace"})
   public static String regexpReplace(String inputStr, String matchStr, String replaceStr) {
     return regexpReplace(inputStr, matchStr, replaceStr, 0, -1, "");
   }
@@ -706,7 +729,7 @@ public class StringFunctions {
    * @param matchStartPos Index of inputStr from where matching should start. Default is 0.
    * @return replaced input string
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"regexpReplace", "regexp_replace"})
   public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos) {
     return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, -1, "");
   }
@@ -722,7 +745,7 @@ public class StringFunctions {
    *                    at 0. Default is -1
    * @return replaced input string
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"regexpReplace", "regexp_replace"})
   public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
       int occurence) {
     return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, occurence, "");
