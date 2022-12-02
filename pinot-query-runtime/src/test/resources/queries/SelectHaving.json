@@ -55,8 +55,6 @@
         "sql":"SELECT 1 AS one FROM {test_having} HAVING 1 > 2;"
       },
       {
-        "ignored": true,
-        "comment": "Runtime failure: java.lang.ArithmeticException: / by zero",
         "sql":"SELECT 1 AS one FROM {test_having} HAVING 1 < 2;"
       },
       {

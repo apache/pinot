@@ -76,9 +76,13 @@ public final class TransferableBlockUtils {
   public static Iterator<TransferableBlock> splitBlock(TransferableBlock block, DataBlock.Type type, int maxBlockSize) {
     List<TransferableBlock> blockChunks = new ArrayList<>();
     if (type == DataBlock.Type.ROW) {
-      // Use estimated row size, this estimate is not accurate and is used to estimate numRowsPerChunk only.
-      int estimatedRowSizeInBytes = block.getDataSchema().getColumnNames().length * MEDIAN_COLUMN_SIZE_BYTES;
-      int numRowsPerChunk = maxBlockSize / estimatedRowSizeInBytes;
+      // Use 1 row per chunk when block.getDataSchema().size() is 0, we may want to fine tune it.
+      int numRowsPerChunk = 1;
+      if (block.getDataSchema().size() != 0) {
+        // Use estimated row size, this estimate is not accurate and is used to estimate numRowsPerChunk only.
+        int estimatedRowSizeInBytes = block.getDataSchema().size() * MEDIAN_COLUMN_SIZE_BYTES;
+        numRowsPerChunk = maxBlockSize / estimatedRowSizeInBytes;
+      }
       Preconditions.checkState(numRowsPerChunk > 0, "row size too large for query engine to handle, abort!");
 
       int totalNumRows = block.getNumRows();

@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.common.datablock.BaseDataBlock;
@@ -54,6 +55,20 @@ public class TransferableBlockUtilsTest {
     }
     return new DataSchema(columnNames.toArray(new String[0]),
         columnDataTypes.toArray(new DataSchema.ColumnDataType[0]));
+  }
+
+  @Test
+  public void testSplitEmptyBlock() {
+    DataSchema dataSchema = getDataSchema();
+    Iterator<TransferableBlock> transferableBlockIterator = TransferableBlockUtils.splitBlock(
+        new TransferableBlock(Collections.emptyList(), dataSchema, DataBlock.Type.ROW), DataBlock.Type.ROW,
+        dataSchema.size() * TEST_EST_BYTES_PER_COLUMN + 1);
+    Assert.assertFalse(transferableBlockIterator.hasNext());
+
+    dataSchema = new DataSchema(new String[0], new DataSchema.ColumnDataType[0]);
+    transferableBlockIterator = TransferableBlockUtils.splitBlock(
+        new TransferableBlock(Collections.emptyList(), dataSchema, DataBlock.Type.ROW), DataBlock.Type.ROW, 1);
+    Assert.assertFalse(transferableBlockIterator.hasNext());
   }
 
   @DataProvider
