@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.clearspring.analytics.util.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +39,7 @@ import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -104,6 +106,17 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
     }
   }
 
+  /**
+   * this is data transfer block compose method is here to ensure that V1 results match what the expected projection
+   * schema in the calcite logical operator.
+   * <p> it applies different clean up mechanism based on different type of {@link BaseResultsBlock} and the
+   *     {@link org.apache.pinot.core.query.request.context.QueryContext}.</p>
+   * <p> this also applies to the canonicalization of the data types during post post-process step.</p>
+   *
+   * @param responseBlock result block from leaf stage
+   * @param desiredDataSchema the desired schema for send operator
+   * @return the converted {@link TransferableBlock} that conform with the desiredDataSchema
+   */
   private static TransferableBlock composeTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
     BaseResultsBlock resultsBlock = responseBlock.getResultsBlock();
@@ -120,31 +133,49 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
     }
   }
 
+  /**
+   * we only need to rearrange columns when distinct is not conforming with selection columns, specifically:
+   * <ul>
+   *   <li> when distinct is not returning final result: it should never happen.</li>
+   *   <li> when distinct columns are not all being selected: it should never happen.</li>
+   * </ul>
+   * thus we only need to check for compatibility between response schema against query context schema.
+   *
+   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
+   */
+  @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeDistinctTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
+    DataSchema resultSchema = responseBlock.getDataSchema();
+    List<String> selectionColumns = Arrays.asList(
+        ((DistinctAggregationFunction) responseBlock.getQueryContext().getAggregationFunctions()[0]).getColumns());
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
+    Preconditions.checkState(inOrder(columnIndices), "Incompatible distinct table schema for leaf stage."
+        + "Expected: " + desiredDataSchema + ". Actual: " + responseBlock.getDataSchema());
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
   private static TransferableBlock composeGroupByTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
+    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
+        responseBlock.getDataSchema().getColumnDataTypes()), "Incompatible result data schema: "
+        + "Expecting: " + desiredDataSchema + " Actual: " + responseBlock.getDataSchema());
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
   private static TransferableBlock composeAggregationTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
+    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
+        responseBlock.getDataSchema().getColumnDataTypes()), "Incompatible result data schema: "
+        + "Expecting: " + desiredDataSchema + " Actual: " + responseBlock.getDataSchema());
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
   /**
-   * we re-arrange columns to match the projection in the case of order by - this is to ensure
-   * that V1 results match what the expected projection schema in the calcite logical operator; if
-   * we realize that there are other situations where we need to post-process v1 results to adhere to
-   * the expected results we should factor this out and also apply the canonicalization of the data
-   * types during this post-process step (also see LeafStageTransferableBlockOperator#canonicalizeRow)
+   * Only re-arrange columns to match the projection in the case of select / order-by, when the desiredDataSchema
+   * doesn't conform with the result block schema exactly.
    *
-   * @param responseBlock result block from leaf stage
-   * @param desiredDataSchema the desired schema for send operator
-   * @return conformed collection of rows.
+   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
    */
   @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeSelectTransferableBlock(InstanceResponseBlock responseBlock,
@@ -180,6 +211,12 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
     }
   }
 
+  /**
+   * Fallback mechanism for {@link TransferableBlock}, used when no special handling is necessary. This method only
+   * performs {@link DataSchema.ColumnDataType} canonicalization.
+   *
+   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
+   */
   private static TransferableBlock composeDirectTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
     Collection<Object[]> resultRows = responseBlock.getRows();
