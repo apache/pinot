@@ -70,6 +70,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -468,11 +469,21 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       BloomFilterCreator bloomFilterCreator = _bloomFilterCreatorMap.get(columnName);
       if (bloomFilterCreator != null) {
         if (fieldSpec.isSingleValueField()) {
-          bloomFilterCreator.add(columnValueToIndex.toString());
+          if (fieldSpec.getDataType() == DataType.BYTES) {
+            bloomFilterCreator.add(BytesUtils.toHexString((byte[]) columnValueToIndex));
+          } else {
+            bloomFilterCreator.add(columnValueToIndex.toString());
+          }
         } else {
           Object[] values = (Object[]) columnValueToIndex;
-          for (Object value : values) {
-            bloomFilterCreator.add(value.toString());
+          if (fieldSpec.getDataType() == DataType.BYTES) {
+            for (Object value : values) {
+              bloomFilterCreator.add(BytesUtils.toHexString((byte[]) value));
+            }
+          } else {
+            for (Object value : values) {
+              bloomFilterCreator.add(value.toString());
+            }
           }
         }
       }
