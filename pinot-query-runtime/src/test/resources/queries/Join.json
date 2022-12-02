@@ -1,0 +1,36 @@
+{
+  "basic_join_queries": {
+    "tables": {
+      "tbl1" : {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "name", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "a"],
+          [2, "b"],
+          [3, "c"]
+        ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "value", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "xxx"],
+          [3, "yyy"],
+          [5, "zzz"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "7.2.1.1",
+        "comments": "select all doesn't work because h2 output the rows in different order from Pinot and test framework doesn't consider the column order for rows and blindly assume they are in the same order",
+        "description": "RIGHT OUTER JOIN",
+        "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.value FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      }
+    ]
+  }
+}
