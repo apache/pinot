@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.MapDifference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -27,8 +26,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.tier.TierFactory;
@@ -320,71 +317,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
   }
 
-
-  @Test
-  public void testTableRebalanceStatus()
-      throws Exception {
-      int numServers = 3;
-      String server = "SERVER_INSTANCE_ID_PREFIX_TEST";
-      for (int i = 0; i < numServers; i++) {
-          addFakeServerInstanceToAutoJoinHelixCluster(server + i, true);
-      }
-
-      TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
-      TableConfig tableConfig =
-          new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
-
-      // Rebalance should fail without creating the table
-      RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
-
-      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
-
-      // Create the table
-      _helixResourceManager.addTable(tableConfig);
-
-
-      // Add the segments
-      int numSegments = 10;
-      for (int i = 0; i < numSegments; i++) {
-          _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-              SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
-      }
-
-      tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
-
-      ExternalView extView = _helixResourceManager.getTableExternalView(OFFLINE_TABLE_NAME);
-      IdealState idealState = _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME);
-
-      Map<String, MapDifference.ValueDifference<Map<String, String>>> diff =
-          tableRebalancer.rebalanceStatus(OFFLINE_TABLE_NAME, idealState, extView);
-
-      // Exterval view and ideal state has not converged
-      assertNotEquals(diff, null);
-
-      // Add 3 more servers
-      int numServersToAdd = 3;
-      for (int i = 0; i < numServersToAdd; i++) {
-          addFakeServerInstanceToAutoJoinHelixCluster(server + (numServers + i), true);
-      }
-
-      // With instances reassignment, the instance partitions should be removed, and the default instance partitions
-      // should be used for segment assignment
-      Configuration rebalanceConfig = new BaseConfiguration();
-      rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, true);
-        tableRebalancer.rebalance(tableConfig, rebalanceConfig);
-
-      ExternalView extView1 = _helixResourceManager.getTableExternalView(OFFLINE_TABLE_NAME);
-      IdealState idealState1 = _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME);
-
-
-      Map<String, MapDifference.ValueDifference<Map<String, String>>> status =
-          tableRebalancer.rebalanceStatus(OFFLINE_TABLE_NAME, idealState1, extView1);
-
-      // Exterval view and ideal state  converged
-
-      assertNull(status);
-  }
-
   /**
    * Tests rebalance with tier configs
    * Add 10 segments, with segment metadata end time 3 days apart starting from now to 30 days ago
@@ -481,7 +413,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
   }
-
   @AfterClass
   public void tearDown() {
     stopFakeInstances();

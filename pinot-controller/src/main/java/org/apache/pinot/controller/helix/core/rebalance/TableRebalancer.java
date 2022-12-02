@@ -20,8 +20,6 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.MapDifference;
-import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -383,25 +381,6 @@ public class TableRebalancer {
             instancePartitionsMap, targetAssignment);
       }
     }
-  }
-
-  public Map<String, MapDifference.ValueDifference<Map<String, String>>> rebalanceStatus(String tableNameWithType,
-      IdealState idealState, ExternalView externalView) {
-
-    if (idealState == null) {
-      throw new IllegalStateException("ideal state is empty");
-    }
-      if (externalView == null) {
-         return null;
-      }
-      Map<String, Map<String, String>> ideal = idealState.getRecord().getMapFields();
-      Map<String, Map<String, String>> extView = externalView.getRecord().getMapFields();
-
-      if (!isExternalViewConverged(tableNameWithType, extView,
-        ideal, true)) {
-          return Maps.difference(ideal, extView).entriesDiffering();
-    }
-    return null;
   }
 
   private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap(TableConfig tableConfig,

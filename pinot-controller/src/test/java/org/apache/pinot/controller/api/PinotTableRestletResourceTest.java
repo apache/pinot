@@ -475,31 +475,6 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
   }
 
-
-  @Test
-  public void checkRebalanceStatus()
-      throws Exception {
-    String tableName = "testTable1";
-    TableConfig testTableConfig = _offlineBuilder.setTableName(tableName).build();
-
-    // Create the table
-    ControllerTest.sendPostRequest(_createTableUrl, testTableConfig.toJsonString());
-
-    // Rebalance table
-    ControllerTest.sendPostRequest(
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(tableName, "offline"),
-        null);
-
-    // Check rebalance status
-    String response = ControllerTest.sendGetRequest(
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableRebalanceStatus(tableName, "offline"),
-        null);
-
-    _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).build();
-
-      assertEquals(response, "{\"segments\":null}");
-  }
-
   @Test
   public void testDeleteTable()
       throws IOException {

@@ -218,10 +218,6 @@ public class ControllerRequestURLBuilder {
     return stringBuilder.toString();
   }
 
-  public String forTableRebalanceStatus(String tableName, String tableType) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance", "status?type=" + tableType);
-  }
-
   public String forTableReload(String tableName, TableType tableType, boolean forceDownload) {
     String query = String.format("reload?type=%s&forceDownload=%s", tableType.name(), forceDownload);
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
@@ -360,6 +356,10 @@ public class ControllerRequestURLBuilder {
 
   public String forSegmentMetadata(String tableName, String segmentName) {
     return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName), "metadata");
+  }
+
+  public String forSegmentMismatch(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "externalViewMismatch?type=" + tableType);
   }
 
   public String forListAllSegmentLineages(String tableName, String tableType) {

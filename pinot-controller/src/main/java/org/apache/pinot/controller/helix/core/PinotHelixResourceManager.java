@@ -26,6 +26,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -3081,15 +3082,21 @@ public class PinotHelixResourceManager {
     return new TableRebalancer(_helixZkManager).rebalance(tableConfig, rebalanceConfig);
   }
 
-  public Map<String, MapDifference.ValueDifference<Map<String, String>>> rebalanceTableStatus(String tableNameWithType)
-      throws TableNotFoundException {
-    TableConfig tableConfig = getTableConfig(tableNameWithType);
-    if (tableConfig == null) {
-      throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
-    }
+  public Map<String, MapDifference.ValueDifference<Map<String, String>>> getExternalViewSegementMismatch(
+      String tableNameWithType) {
     IdealState idealState = getHelixAdmin().getResourceIdealState(getHelixClusterName(), tableNameWithType);
     ExternalView externalView = getHelixAdmin().getResourceExternalView(getHelixClusterName(), tableNameWithType);
-    return new TableRebalancer(_helixZkManager).rebalanceStatus(tableNameWithType, idealState, externalView);
+
+    if (idealState == null) {
+      throw new IllegalStateException("ideal state is empty");
+    }
+    if (externalView == null) {
+      return null;
+    }
+    Map<String, Map<String, String>> ideal = idealState.getRecord().getMapFields();
+    Map<String, Map<String, String>> extView = externalView.getRecord().getMapFields();
+
+    return Maps.difference(ideal, extView).entriesDiffering();
   }
 
   /**

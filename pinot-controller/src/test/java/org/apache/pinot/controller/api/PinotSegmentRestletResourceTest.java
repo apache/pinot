@@ -195,6 +195,30 @@ public class PinotSegmentRestletResourceTest {
     assertEquals(crcMap.size(), expectedSize);
   }
 
+  @Test
+  public void checkTableSegmentMismatch()
+      throws Exception {
+    String createTableUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate();
+    TableConfigBuilder offlineBuilder = new TableConfigBuilder(TableType.OFFLINE);
+
+    TableConfig testTableConfig = offlineBuilder.setTableName(TABLE_NAME_OFFLINE).build();
+
+    // Create the table
+    ControllerTest.sendPostRequest(createTableUrl, testTableConfig.toJsonString());
+
+    // Rebalance table
+    ControllerTest.sendPostRequest(
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(TABLE_NAME_OFFLINE, "offline"),
+        null);
+
+    // Check rebalance status
+    String response = ControllerTest.sendGetRequest(
+        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMismatch(TABLE_NAME_OFFLINE, "offline"),
+        null);
+
+    assertEquals(response, "{\"segments\":null}");
+  }
+
   @AfterClass
   public void tearDown() {
     TEST_INSTANCE.cleanup();
