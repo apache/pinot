@@ -20,6 +20,7 @@ package org.apache.pinot.client;
 
 import java.util.Collections;
 import java.util.concurrent.Future;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -30,6 +31,26 @@ import org.testng.annotations.Test;
  */
 public class PreparedStatementTest {
   private final DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
+
+  @Test
+  public void testPreparedStatementWithDynamicBroker() {
+    // Create a connection with dynamic broker selector.
+    BrokerSelector mockBrokerSelector = Mockito.mock(BrokerSelector.class);
+    Mockito.when(mockBrokerSelector.selectBroker(Mockito.anyString())).thenAnswer(i -> i.getArgument(0));
+    Connection connection = new Connection(mockBrokerSelector, _dummyPinotClientTransport);
+
+    PreparedStatement preparedStatement = connection.prepareStatement("SELECT foo FROM bar WHERE baz = ?");
+    preparedStatement.setString(0, "'hello'");
+    preparedStatement.execute();
+    Assert.assertEquals("SELECT foo FROM bar WHERE baz = '''hello'''", _dummyPinotClientTransport.getLastQuery());
+    Assert.assertEquals("bar", _dummyPinotClientTransport.getLastBrokerAddress());
+
+    preparedStatement = connection.prepareStatement("SELECT bar FROM foo WHERE baz = ?");
+    preparedStatement.setString(0, "'world'");
+    preparedStatement.executeAsync();
+    Assert.assertEquals("SELECT bar FROM foo WHERE baz = '''world'''", _dummyPinotClientTransport.getLastQuery());
+    Assert.assertEquals("foo", _dummyPinotClientTransport.getLastBrokerAddress());
+  }
 
   @Test
   public void testPreparedStatementEscaping() {
@@ -45,11 +66,13 @@ public class PreparedStatementTest {
   }
 
   static class DummyPinotClientTransport implements PinotClientTransport {
+    private String _lastBrokerAddress;
     private String _lastQuery;
 
     @Override
     public BrokerResponse executeQuery(String brokerAddress, String query)
         throws PinotClientException {
+      _lastBrokerAddress = brokerAddress;
       _lastQuery = query;
       return BrokerResponse.empty();
     }
@@ -57,6 +80,7 @@ public class PreparedStatementTest {
     @Override
     public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
         throws PinotClientException {
+      _lastBrokerAddress = brokerAddress;
       _lastQuery = query;
       return null;
     }
@@ -64,6 +88,7 @@ public class PreparedStatementTest {
     @Override
     public BrokerResponse executeQuery(String brokerAddress, Request request)
         throws PinotClientException {
+      _lastBrokerAddress = brokerAddress;
       _lastQuery = request.getQuery();
       return BrokerResponse.empty();
     }
@@ -71,12 +96,17 @@ public class PreparedStatementTest {
     @Override
     public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
         throws PinotClientException {
+      _lastBrokerAddress = brokerAddress;
       _lastQuery = request.getQuery();
       return null;
     }
 
     public String getLastQuery() {
       return _lastQuery;
+    }
+
+    public String getLastBrokerAddress() {
+      return _lastBrokerAddress;
     }
 
     @Override

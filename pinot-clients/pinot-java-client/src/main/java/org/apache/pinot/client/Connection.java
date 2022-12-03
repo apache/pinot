@@ -25,6 +25,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,6 +116,7 @@ public class Connection {
    */
   public ResultSetGroup execute(@Nullable String tableName, String query)
       throws PinotClientException {
+    tableName = tableName == null ? resolveTableName(query) : tableName;
     String brokerHostPort = _brokerSelector.selectBroker(tableName);
     if (brokerHostPort == null) {
       throw new PinotClientException("Could not find broker to query for table: " + tableName);
@@ -148,11 +150,7 @@ public class Connection {
    */
   public Future<ResultSetGroup> executeAsync(String query)
       throws PinotClientException {
-    String brokerHostPort = _brokerSelector.selectBroker(null);
-    if (brokerHostPort == null) {
-      throw new PinotClientException("Could not find broker to query for statement: " + query);
-    }
-    return new ResultSetGroupFuture(_transport.executeQueryAsync(brokerHostPort, query));
+    return executeAsync(null, query);
   }
 
   /**
@@ -165,7 +163,34 @@ public class Connection {
   @Deprecated
   public Future<ResultSetGroup> executeAsync(Request request)
       throws PinotClientException {
-    return executeAsync(request.getQuery());
+    return executeAsync(null, request.getQuery());
+  }
+
+  /**
+   * Executes a query asynchronously.
+   *
+   * @param query The query to execute
+   * @return A future containing the result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public Future<ResultSetGroup> executeAsync(@Nullable String tableName, String query)
+      throws PinotClientException {
+    tableName = tableName == null ? resolveTableName(query) : tableName;
+    String brokerHostPort = _brokerSelector.selectBroker(tableName);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to query for statement: " + query);
+    }
+    return new ResultSetGroupFuture(_transport.executeQueryAsync(brokerHostPort, query));
+  }
+
+  @Nullable
+  private static String resolveTableName(String query) {
+    try {
+      return CalciteSqlCompiler.compileToBrokerRequest(query).querySource.tableName;
+    } catch (Exception e) {
+      LOGGER.error("Cannot parse table name from query: {}", query, e);
+      return null;
+    }
   }
 
   /**
