@@ -1,5 +1,5 @@
 {
-  "generate_distinct": {
+  "general_distinct": {
     "tables": {
       "tbl": {
         "schema": [
@@ -33,7 +33,15 @@
       { "sql":  "SELECT strCol, boolCol FROM {tbl} GROUP BY strCol, boolCol ORDER BY boolCol" },
       { "sql":  "SELECT strCol, boolCol FROM {tbl} GROUP BY boolCol, strCol ORDER BY strCol" },
       { "sql":  "SELECT strCol FROM {tbl} GROUP BY strCol, boolCol ORDER BY boolCol" },
-      { "sql":  "SELECT boolCol FROM {tbl} GROUP BY strCol, boolCol ORDER BY boolCol" }
+      { "sql":  "SELECT strCol FROM (SELECT strCol FROM {tbl} GROUP BY boolCol, strCol ORDER BY strCol) WHERE strCol <> 'foo'" },
+      { "sql":  "SELECT intCol FROM (SELECT DISTINCT intCol FROM {tbl}) WHERE intCol < 100" },
+      { "sql":  "SELECT intCol FROM (SELECT intCol FROM {tbl} GROUP BY intCol) WHERE intCol < 100" },
+      { "sql":  "SELECT strCol FROM (SELECT DISTINCT strCol, boolCol FROM {tbl}) WHERE boolCol = false" },
+      { "sql":  "SELECT strCol FROM (SELECT strCol, boolCol FROM {tbl} GROUP BY strCol, boolCol) WHERE strCol <> 'foo'" },
+      { "sql":  "SELECT strCol, boolCol FROM (SELECT strCol, boolCol FROM {tbl} GROUP BY boolCol, strCol) WHERE strCol <> 'foo'" },
+      { "sql":  "SELECT strCol FROM (SELECT strCol FROM {tbl} GROUP BY strCol, boolCol) WHERE strCol != 'lol'" },
+      { "sql":  "SELECT intCol FROM (SELECT DISTINCT intCol, doubleCol FROM {tbl} ORDER BY doubleCol) WHERE doubleCol < 100" },
+      { "sql":  "SELECT strCol FROM (SELECT DISTINCT strCol, boolCol, intCol FROM {tbl} ORDER BY intCol) WHERE intCol > 10" }
     ]
   }
 }
