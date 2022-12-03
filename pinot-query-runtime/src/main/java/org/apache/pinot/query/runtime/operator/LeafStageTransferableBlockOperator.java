@@ -138,23 +138,21 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
    * we only need to rearrange columns when distinct is not conforming with selection columns, specifically:
    * <ul>
    *   <li> when distinct is not returning final result:
-   *       it should never happen as non-final result contains Object opaque columns v2 engine can't process. </li>
+   *       it should never happen as non-final result contains Object opaque columns v2 engine can't process.</li>
    *   <li> when distinct columns are not all being selected:
    *       it should never happen as leaf stage MUST return the entire list.</li>
    * </ul>
-   * thus we only need to check for compatibility between response schema against query context schema.
    *
    * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
    */
   @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeDistinctTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
-    DataSchema resultSchema = responseBlock.getDataSchema();
     List<String> selectionColumns = Arrays.asList(
         ((DistinctAggregationFunction) responseBlock.getQueryContext().getAggregationFunctions()[0]).getColumns());
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, desiredDataSchema);
     Preconditions.checkState(inOrder(columnIndices), "Incompatible distinct table schema for leaf stage."
-        + "Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
+        + "Expected: " + desiredDataSchema + ". Actual: " + desiredDataSchema);
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
@@ -213,30 +211,41 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
         resultSchema);
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
     if (!inOrder(columnIndices)) {
+      DataSchema adjustedResultSchema = SelectionOperatorUtils.getSchemaForProjection(resultSchema, columnIndices);
+      Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
+          adjustedResultSchema.getColumnDataTypes()), "Incompatible result data schema: "
+          + "Expecting: " + desiredDataSchema + " Actual: " + adjustedResultSchema);
       // Extract the result rows
       Collection<Object[]> resultRows = responseBlock.getRows();
       List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
-      DataSchema adjustedResultSchema = SelectionOperatorUtils.getSchemaForProjection(resultSchema, columnIndices);
-      Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
-              adjustedResultSchema.getColumnDataTypes()),
-          "Incompatible result data schema: " + "Expecting: " + desiredDataSchema + " Actual: " + adjustedResultSchema);
-
-      if (responseBlock.getQueryContext().getOrderByExpressions() != null) {
-        // extract result row in ordered fashion
-        PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
-        while (!priorityQueue.isEmpty()) {
-          extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema, columnIndices));
-        }
-      } else {
-        // extract result row in non-ordered fashion
-        for (Object[] row : resultRows) {
-          extractedRows.add(canonicalizeRow(row, desiredDataSchema, columnIndices));
-        }
-      }
-      return new TransferableBlock(extractedRows, desiredDataSchema, DataBlock.Type.ROW);
+      return composeColumnIndexedTransferableBlock(responseBlock, adjustedResultSchema, columnIndices);
     } else {
       return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
     }
+  }
+
+  /**
+   * Created {@link TransferableBlock} using column indices.
+   *
+   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
+   */
+  private static TransferableBlock composeColumnIndexedTransferableBlock(InstanceResponseBlock responseBlock,
+      DataSchema desiredDataSchema, int[] columnIndices) {
+    Collection<Object[]> resultRows = responseBlock.getRows();
+    List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
+    if (responseBlock.getQueryContext().getOrderByExpressions() != null) {
+      // extract result row in ordered fashion
+      PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
+      while (!priorityQueue.isEmpty()) {
+        extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema, columnIndices));
+      }
+    } else {
+      // extract result row in non-ordered fashion
+      for (Object[] row : resultRows) {
+        extractedRows.add(canonicalizeRow(row, desiredDataSchema, columnIndices));
+      }
+    }
+    return new TransferableBlock(extractedRows, desiredDataSchema, DataBlock.Type.ROW);
   }
 
   /**
