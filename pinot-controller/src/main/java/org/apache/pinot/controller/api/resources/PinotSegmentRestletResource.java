@@ -1084,10 +1084,12 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
     try {
-      String tableNameWithType = TableNameBuilder.forType(TableType.valueOf(tableTypeStr)).tableNameWithType(tableName);
-      if(tableNameWithType==null){
-        throw new TableNotFoundException("bingogogogo");
+      TableType tableType = Constants.validateTableType(tableTypeStr);
+
+      if (tableType == null) {
+        throw new ControllerApplicationException(LOGGER, "Table type must not be null", Status.BAD_REQUEST);
       }
+      String tableNameWithType = TableNameBuilder.forType(TableType.valueOf(tableTypeStr)).tableNameWithType(tableName);
 
       if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
         throw new TableNotFoundException(String.format("Table=%s not found", tableName));
@@ -1096,7 +1098,8 @@ public class PinotSegmentRestletResource {
       Map<String, MapDifference.ValueDifference<Map<String, String>>> view =
           _pinotHelixResourceManager.getExternalViewSegementMismatch(tableNameWithType);
       ObjectNode data = JsonUtils.newObjectNode();
-      data.put("segments", (JsonNode) view);
+      data.put("segments", view.toString());
+
       return data.toString();
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);

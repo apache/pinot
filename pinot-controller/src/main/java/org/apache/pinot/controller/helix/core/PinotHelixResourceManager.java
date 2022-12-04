@@ -3090,8 +3090,9 @@ public class PinotHelixResourceManager {
     if (idealState == null) {
       throw new IllegalStateException("ideal state is empty");
     }
+
     if (externalView == null) {
-      return null;
+      return Collections.emptyMap();
     }
     Map<String, Map<String, String>> ideal = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> extView = externalView.getRecord().getMapFields();
