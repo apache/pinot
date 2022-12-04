@@ -268,7 +268,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
       String resource;
       while ((resource = br.readLine()) != null) {
-        testFilenames.add(resource);
+        if(resource.contains("Join.json")) {
+          System.out.println(resource);
+          testFilenames.add(resource);
+        }
       }
     }
     // Load each test file.

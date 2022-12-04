@@ -66,6 +66,7 @@ import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
+import org.apache.pinot.sql.parsers.rewriter.join.RightJoinRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,6 +128,7 @@ public class CalciteSqlParser {
       SqlNodeList sqlNodeList = sqlParser.SqlStmtsEof();
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sql, sqlNodeList);
+      System.out.println("after rewrite:" + sqlNodeAndOptions.getSqlNode().toString());
       // add legacy OPTIONS keyword-based options
       if (options.size() > 0) {
         sqlNodeAndOptions.setExtraOptions(extractOptionsMap(options));
@@ -171,7 +173,7 @@ public class CalciteSqlParser {
     if (sqlType == null) {
       throw new SqlCompilationException("SqlNode with executable statement not found!");
     }
-    return new SqlNodeAndOptions(statementNode, sqlType, options);
+    return new SqlNodeAndOptions(statementNode.accept(new RightJoinRewriter()), sqlType, options);
   }
 
   public static PinotQuery compileToPinotQuery(String sql)

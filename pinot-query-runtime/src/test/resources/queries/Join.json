@@ -4,23 +4,26 @@
       "tbl1" : {
         "schema": [
           {"name": "num", "type": "INT"},
-          {"name": "name", "type": "STRING"}
+          {"name": "name", "type": "STRING"},
+          {"name": "num2", "type": "INT"}
         ],
         "inputs": [
-          [1, "a"],
-          [2, "b"],
-          [3, "c"]
+          [1, "a", 3],
+          [2, "b", 4],
+          [3, "c", 5]
         ]
       },
       "tbl2" : {
         "schema": [
           {"name": "num", "type": "INT"},
-          {"name": "value", "type": "STRING"}
+          {"name": "value", "type": "STRING"},
+          {"name": "num2", "type": "INT"},
+          {"name": "num3", "type": "INT"}
         ],
         "inputs": [
-          [1, "xxx"],
-          [3, "yyy"],
-          [5, "zzz"]
+          [1, "zzz", 3, 7],
+          [3, "yyy",4, 8],
+          [5, "xxx",6, 9]
         ]
       }
     },
@@ -29,7 +32,7 @@
         "psql": "7.2.1.1",
         "comments": "select all doesn't work because h2 output the rows in different order from Pinot and test framework doesn't consider the column order for rows and blindly assume they are in the same order",
         "description": "RIGHT OUTER JOIN",
-        "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.value FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+        "sql": "SELECT * FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num order by 2"
       }
     ]
   }
