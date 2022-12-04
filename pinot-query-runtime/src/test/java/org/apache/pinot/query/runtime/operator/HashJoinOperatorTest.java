@@ -453,29 +453,55 @@ public class HashJoinOperatorTest {
     HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*FULL is not supported.*")
-  public void shouldThrowOnFullJoin() {
+  @Test
+  public void shouldHandleFullJoin() {
     DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+    Mockito.when(_leftOperator.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{4, "CC"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
     List<RexExpression> joinClauses = new ArrayList<>();
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
         DataSchema.ColumnDataType.STRING
     });
     JoinNode node =
-        new JoinNode(1, resultSchema, JoinRelType.FULL, getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
+        new JoinNode(1, resultSchema, JoinRelType.FULL, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
     HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    TransferableBlock result = join.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = join.nextBlock();
+    }
+    List<Object[]> resultRows = result.getContainer();
+    List<Object[]> expectedRows = ImmutableList.of(new Object[]{1, "Aa", null, null}, new Object[]{2, "BB", 2, "Aa"},
+        new Object[]{2, "BB", 2, "BB"}, new Object[]{4, "CC", null, null});
+    Assert.assertEquals(resultRows.size(), expectedRows.size());
+    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
+    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
+    Assert.assertEquals(resultRows.get(3), expectedRows.get(3));
+    // Second block should be non-matched broadcast rows
+    result = join.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = join.nextBlock();
+    }
+    resultRows = result.getContainer();
+    expectedRows = ImmutableList.of(new Object[]{null, null, 3, "BB"});
+    Assert.assertEquals(resultRows.size(), expectedRows.size());
+    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
+    // Third block is EOS block.
+    result = join.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = join.nextBlock();
+    }
+    Assert.assertTrue(result.isEOSBlock());
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*ANTI is not supported.*")

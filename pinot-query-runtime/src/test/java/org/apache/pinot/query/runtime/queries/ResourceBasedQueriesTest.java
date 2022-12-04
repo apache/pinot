@@ -98,10 +98,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         factory1.addSegment(tableNameWithType, toRow(columnAndTypes, tableEntry.getValue()._inputs));
       }
 
-      boolean anyHaveOutput = testCase._queries.stream().anyMatch(q -> q._outputs != null && !q._outputs.isEmpty());
+      boolean anyHaveOutput =
+          testCase._queries.stream().anyMatch(q -> q._outputs != null);
 
       if (anyHaveOutput) {
-        boolean allHaveOutput = testCase._queries.stream().allMatch(q -> q._outputs != null && !q._outputs.isEmpty());
+        boolean allHaveOutput =
+            testCase._queries.stream().allMatch(q -> q._outputs != null);
         if (!allHaveOutput) {
           throw new IllegalArgumentException("Cannot support one test where some queries require H2 and others don't");
         }
@@ -130,9 +132,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         ignored -> { });
     _mailboxService.start();
 
-    _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
-        server2.getPort(), factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(),
-        factory2.buildTableSegmentNameMap());
+    _queryEnvironment =
+        QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
+            factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap());
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
@@ -178,8 +180,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       List<Object[]> resultRows = queryRunner(sql);
 
       Assert.assertNull(except,
-        "Expected error with message '" + except + "'. But instead rows were returned: "
-            + resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")));
+          "Expected error with message '" + except + "'. But instead rows were returned: " + resultRows.stream()
+              .map(Arrays::toString).collect(Collectors.joining(",\n")));
 
       return Optional.of(resultRows);
     } catch (Exception e) {
@@ -188,8 +190,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       } else {
         Pattern pattern = Pattern.compile(except);
         Assert.assertTrue(pattern.matcher(e.getMessage()).matches(),
-            String.format("Caught exception '%s', but it did not match the expected pattern '%s'.",
-                e.getMessage(), except));
+            String.format("Caught exception '%s', but it did not match the expected pattern '%s'.", e.getMessage(),
+                except));
       }
     }
 
@@ -213,7 +215,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           continue;
         }
 
-        if (queryCase._outputs != null && !queryCase._outputs.isEmpty()) {
+        if (queryCase._outputs != null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           List<List<Object>> orgRows = queryCase._outputs;
           List<Object[]> expectedRows = new ArrayList<>(orgRows.size());
@@ -244,7 +246,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         if (queryCase._ignored) {
           continue;
         }
-        if (queryCase._outputs == null || queryCase._outputs.isEmpty()) {
+        if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           Object[] testEntry = new Object[]{testCaseName, sql, queryCase._expectedException};
           providerContent.add(testEntry);
@@ -279,6 +281,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       URL testFileUrl = classLoader.getResource(testCaseFile);
       // This test only supports local resource loading (e.g. must be a file), not support JAR test loading.
       if (testFileUrl != null && new File(testFileUrl.getFile()).exists()) {
+<<<<<<< HEAD
         Map<String, QueryTestCase> testCases = MAPPER.readValue(new File(testFileUrl.getFile()),
             new TypeReference<Map<String, QueryTestCase>>() { });
         {
@@ -288,6 +291,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             throw new IllegalArgumentException("testCase already exist for the following names: " + hashSet);
           }
         }
+=======
+        Map<String, QueryTestCase> testCases =
+            MAPPER.readValue(new File(testFileUrl.getFile()), new TypeReference<Map<String, QueryTestCase>>() {
+            });
+        // TODO: potential test case conflicts between files, address later by throwing during setUp if already exist.
+>>>>>>> e2ce23f86c (full join)
         testCaseMap.putAll(testCases);
       }
     }

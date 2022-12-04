@@ -43,11 +43,22 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
  * This basic {@code BroadcastJoinOperator} implement a basic broadcast join algorithm.
  * This algorithm assumes that the broadcast table has to fit in memory since we are not supporting any spilling.
  *
+<<<<<<< HEAD
  * For left join, inner join, right join and full join,
+=======
+ * For left join, inner join and full join,
+>>>>>>> e2ce23f86c (full join)
  * <p>It takes the right table as the broadcast side and materialize a hash table. Then for each of the left table row,
  * it looks up for the corresponding row(s) from the hash table and create a joint row.
  *
  * <p>For each of the data block received from the left table, it will generate a joint data block.
+<<<<<<< HEAD
+=======
+ *
+ * For right join,
+ * We broadcast the left table and probe the hash table using right table.
+ *
+>>>>>>> e2ce23f86c (full join)
  * We currently support left join, inner join, right join and full join.
  * The output is in the format of [left_row, right_row]
  */
@@ -58,11 +69,17 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       _rows = rows;
       _hasMatch = hasMatch;
     }
+<<<<<<< HEAD
 
     public List<Object[]> _rows;
     public boolean _hasMatch = false;
   };
 
+=======
+    public List<Object[]> _rows;
+    public boolean _hasMatch = false;
+  };
+>>>>>>> e2ce23f86c (full join)
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES =
       ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL);
@@ -144,6 +161,105 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
+<<<<<<< HEAD
+=======
+  private Operator<TransferableBlock> getBroadcastOperator() {
+    switch (_joinType) {
+      case LEFT:
+        // Intentional fall through
+      case INNER:
+        // Intentional fall through
+      case FULL:
+        return _rightTableOperator;
+      case RIGHT:
+        return _leftTableOperator;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
+    }
+  }
+
+  private KeySelector<Object[], Object[]> getBroadcastKeySelector() {
+    switch (_joinType) {
+      case LEFT:
+        // Intentional fall through
+      case INNER:
+        // Intentional fall through
+      case FULL:
+        return _rightKeySelector;
+      case RIGHT:
+        return _leftKeySelector;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
+    }
+  }
+
+  private Operator<TransferableBlock> getProbeOperator() {
+    switch (_joinType) {
+      case LEFT:
+        // Intentional fall through
+      case INNER:
+        // Intentional fall through
+      case FULL:
+        return _leftTableOperator;
+      case RIGHT:
+        return _rightTableOperator;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
+    }
+  }
+
+  private KeySelector<Object[], Object[]> getProbeKeySelector() {
+    switch (_joinType) {
+      case LEFT:
+        // Intentional fall through
+      case INNER:
+        // Intentional fall through
+      case FULL:
+        return _leftKeySelector;
+      case RIGHT:
+        return _rightKeySelector;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
+    }
+  }
+
+  private Object[] getLeftRow(Object[] probeRow, Object[] broadcastRow) {
+    switch (_joinType) {
+      case LEFT:
+        // Intentional fall through
+      case INNER:
+        // Intentional fall through
+      case FULL:
+        return probeRow;
+      case RIGHT:
+        return broadcastRow;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
+    }
+  }
+
+  private Object[] getRightRow(Object[] probeRow, Object[] broadcastRow) {
+    switch (_joinType) {
+      case LEFT:
+        // Intentional fall through
+      case INNER:
+        // Intentional fall through
+      case FULL:
+        return broadcastRow;
+      case RIGHT:
+        return probeRow;
+      default:
+        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
+        return null;
+    }
+  }
+
+>>>>>>> e2ce23f86c (full join)
   private void buildBroadcastHashTable() {
     TransferableBlock rightBlock = _rightTableOperator.nextBlock();
     if (rightBlock.isErrorBlock()) {
@@ -161,7 +277,11 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     List<Object[]> container = rightBlock.getContainer();
     // put all the rows into corresponding hash collections keyed by the key selector function.
     for (Object[] row : container) {
+<<<<<<< HEAD
       BroadcastRows hashCollection = _broadcastHashTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)),
+=======
+      BroadcastRows hashCollection = _broadcastHashTable.computeIfAbsent(new Key(getBroadcastKeySelector().getKey(row)),
+>>>>>>> e2ce23f86c (full join)
           k -> new BroadcastRows(new ArrayList<>(), false));
       hashCollection._rows.add(row);
     }
@@ -173,6 +293,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       _upstreamErrorBlock = leftBlock;
       return _upstreamErrorBlock;
     }
+<<<<<<< HEAD
     if (leftBlock.isNoOpBlock() || (leftBlock.isEOSBlock() && (_joinType != JoinRelType.FULL
         && _joinType != JoinRelType.RIGHT))) {
       return leftBlock;
@@ -193,21 +314,52 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       }
       _isTerminated = true;
       return new TransferableBlock(returnRows, _resultSchema, DataBlock.Type.ROW);
+=======
+    if (probeBlock.isNoOpBlock() || (probeBlock.isEOSBlock() && _joinType != JoinRelType.FULL)) {
+      return probeBlock;
+>>>>>>> e2ce23f86c (full join)
+    }
+    if (probeBlock.isEOSBlock()) {
+      // Return remaining non-matched rows for full join in broadcast table
+      List<Object[]> returnRows = new ArrayList<>();
+      for (BroadcastRows rows : _broadcastHashTable.values()) {
+        if (!rows._hasMatch) {
+          for (Object[] notMatchedRow : rows._rows) {
+            Object[] resultRow = joinRow(null, notMatchedRow);
+            returnRows.add(resultRow);
+          }
+        }
+      }
+      _isTerminated = true;
+      return new TransferableBlock(returnRows, _resultSchema, DataBlock.Type.ROW);
     }
     List<Object[]> rows = new ArrayList<>();
     List<Object[]> container = leftBlock.isEndOfStreamBlock() ? new ArrayList<>() : leftBlock.getContainer();
     for (Object[] leftRow : container) {
       // NOTE: Empty key selector will always give same hash code.
+<<<<<<< HEAD
       BroadcastRows broadcastRows = _broadcastHashTable.getOrDefault(new Key(_leftKeySelector.getKey(leftRow)), null);
+=======
+      BroadcastRows broadcastRows =
+          _broadcastHashTable.getOrDefault(new Key(getProbeKeySelector().getKey(probeRow)), null);
+>>>>>>> e2ce23f86c (full join)
       if (broadcastRows == null) {
         switch (_joinType) {
           case LEFT:
             // intentional fall through
+<<<<<<< HEAD
           case FULL:
             rows.add(joinRow(leftRow, null));
             break;
           case RIGHT:
             // intentional fall through
+=======
+          case RIGHT:
+            // intentional fall through
+          case FULL:
+            rows.add(joinRow(probeRow, null));
+            break;
+>>>>>>> e2ce23f86c (full join)
           case INNER:
             break;
           default:
@@ -217,9 +369,15 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         continue;
       }
       broadcastRows._hasMatch = true;
+<<<<<<< HEAD
       for (Object[] rightRow : broadcastRows._rows) {
         // TODO: Optimize this to avoid unnecessary object copy.
         Object[] resultRow = joinRow(leftRow, rightRow);
+=======
+      for (Object[] matchedRow : broadcastRows._rows) {
+        // TODO: Optimize this to avoid unnecessary object copy.
+        Object[] resultRow = joinRow(probeRow, matchedRow);
+>>>>>>> e2ce23f86c (full join)
         if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream()
             .allMatch(evaluator -> evaluator.apply(resultRow))) {
           rows.add(resultRow);
@@ -229,7 +387,11 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
   }
 
+<<<<<<< HEAD
   private Object[] joinRow(@Nullable Object[] leftRow, @Nullable Object[] rightRow) {
+=======
+  private Object[] joinRow(@Nullable Object[] probeRow, @Nullable Object[] broadcastRow) {
+>>>>>>> e2ce23f86c (full join)
     Object[] resultRow = new Object[_resultRowSize];
     int idx = 0;
     if (leftRow != null) {
