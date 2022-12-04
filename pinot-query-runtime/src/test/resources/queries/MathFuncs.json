@@ -164,6 +164,10 @@
       {
         "description": "test multiply on doubleCol with intCol",
         "sql": "SELECT doubleCol * intCol FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on overflow",
+        "sql": "SELECT intCol * 2^30 FROM {numTbl}"
       }
     ]
   },
@@ -228,7 +232,11 @@
       },
       {
         "description": "test divide on doubleCol with intCol",
-        "sql": "SELECT doubleCol * intCol FROM {numTbl}"
+        "sql": "SELECT doubleCol / intCol FROM {numTbl}"
+      },
+      {
+        "description": "test divide on overflow",
+        "sql": "SELECT floatCol / 1e-15 FROM {numTbl}"
       }
     ]
   },
