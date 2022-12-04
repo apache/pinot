@@ -1,0 +1,119 @@
+{
+  "with_statement_tests": {
+    "psql": "7.8.1",
+    "tables": {
+      "tbl1": {
+        "schema": [
+          {"name": "strCol", "type": "STRING"},
+          {"name": "intCol", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 3],
+          ["b", 2],
+          ["c", 5],
+          ["a", 1]
+        ]
+      },
+      "tbl2": {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "strCol2", "type": "STRING"},
+          {"name": "intCol", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", "foo", 1],
+          ["a", "bar", 2],
+          ["b", "alice", 42],
+          ["b", "bob", 196883]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "single 'with' with group by",
+        "sql": "WITH w AS ( SELECT strCol, SUM(intCol) AS sumRes FROM {tbl1} GROUP BY strCol ) SELECT strCol, strCol2, sumRes FROM w JOIN {tbl2} ON w.strCol = {tbl2}.strCol1",
+        "outputs": [
+          ["a", "foo", 4],
+          ["a", "bar", 4],
+          ["b", "alice", 2],
+          ["b", "bob", 2]
+        ]
+      },
+      {
+        "description": "multi 'with' table",
+        "sql": "WITH agg1 AS ( SELECT strCol, sum(intCol) AS sumVal FROM {tbl1} GROUP BY strCol), agg2 AS (SELECT strCol1, avg(intCol) AS avgVal FROM {tbl2} GROUP BY strCol1) SELECT strCol, sumVal - avgVal FROM agg1, agg2 WHERE agg1.strCol = agg2.strCol1",
+        "outputs": [
+          ["a", 3],
+          ["b", -98460]
+        ]
+      },
+      {
+        "description": "nested 'with' on agg table: (with a as ( ... ), select ... ",
+        "sql": "WITH agg1 AS (SELECT strCol1, strCol2, sum(intCol) AS sumVal FROM {tbl2} GROUP BY strCol1, strCol2) SELECT strCol1, avg(sumVal) AS avgVal FROM agg1 GROUP BY strCol1",
+        "outputs": [
+          ["a", 1],
+          ["b", 98462]
+        ]
+      },
+      {
+        "description": "nested multi 'with' table: (with a as ( ... ), with b as ( ... from a ... ) select ... ",
+        "sql": "WITH agg1 AS (SELECT strCol1, strCol2, sum(intCol) AS sumVal FROM {tbl2} GROUP BY strCol1, strCol2), agg2 AS ( SELECT strCol1, avg(sumVal) AS avgVal FROM agg1 GROUP BY strCol1) SELECT strCol1, avgVal FROM agg2 WHERE avgVal < 100",
+        "outputs": [
+          ["a", 1]
+        ]
+      },
+      {
+        "description": "'with' collapse into single query",
+        "sql": "WITH can_collapse AS ( SELECT strCol, intCol FROM {tbl1} ) SELECT * FROM can_collapse WHERE intCol > 2",
+        "outputs": [
+          ["a", 3],
+          ["c", 5]
+        ]
+      },
+      {
+        "description": "'with' include various transform",
+        "sql": "WITH transformed AS (SELECT strCol1, strCol2, SUM(intCol + 2 * intCol) AS sumVal, AVG(intCol) AS avgVal FROM {tbl2} GROUP BY strCol1, strCol2) SELECT strCol1, MAX(sumVal), MAX(sumVal + avgVal) AS transVal FROM transformed GROUP BY strCol1 ORDER BY MAX(sumVal)",
+        "outputs": [
+          ["a", 6, 8],
+          ["b", 590649, 787532]
+        ]
+      },
+      {
+        "description": "'with' statement table being reused multiple times",
+        "sql": "WITH reused AS ( SELECT strCol, intCol FROM {tbl1} ) SELECT a.strCol, a.intCol, b.intCol FROM reused AS a JOIN reused AS b ON a.strCol = b.strCol WHERE b.intCol > ( SELECT AVG(intCol) FROM reused )",
+        "outputs": [
+          ["a", 1, 3],
+          ["a", 3, 3],
+          ["c", 5, 5]
+        ]
+      },
+      {
+        "description": "slice-and-dice reshuffle join using 'with'",
+        "sql": "WITH maxRes AS (SELECT strCol1, MAX(intCol) AS maxVal FROM {tbl2} GROUP BY strCol1) SELECT maxRes.*, {tbl1}.intCol FROM {tbl1} JOIN maxRes ON {tbl1}.strCol = maxRes.strCol1",
+        "outputs": [
+          ["a", 2, 1],
+          ["a", 2, 3],
+          ["b", 196883, 2]
+        ]
+      },
+      {
+        "ignored": true,
+        "comment": "materialized is not supported",
+        "description": "'with materializaed' or not flag",
+        "sql": "WITH w AS NOT MATERIALIZED ( SELECT strCol, SUM(intCol) AS sumRes FROM {tbl1} GROUP BY strCol ) SELECT strCol, strCol2, sumRes FROM w JOIN {tbl2} ON w.strCol = {tbl2}.strCol1",
+        "outputs": [
+          []
+        ]
+      },
+      {
+        "ignored": true,
+        "comment": "recursive is not supported",
+        "description": "'with recursive' or not flag",
+        "sql": "WITH RECURSIVE search_tree(id, data) AS ( SELECT {tbl1}.strCol, {tbl1}.intCol, {tbl1}.intCol FROM {tbl1} UNION ALL SELECT {tbl2}.strCol1, {tbl2}.intCol ) SELECT * FROM search_tree",
+        "outputs": [
+          []
+        ]
+      }
+    ]
+  }
+}
