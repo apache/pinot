@@ -90,8 +90,6 @@
         "sql": "SELECT 3 - 5 FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comment": "could be floating comparison issue",
         "description": "test subtraction on literals",
         "sql": "SELECT 3 - 2.4 FROM {numTbl}"
       },
@@ -140,8 +138,6 @@
         "sql": "SELECT intCol * 10 FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comment": "could be floating comparison issue",
         "description": "test multiply on double literal with columns",
         "sql": "SELECT intCol * 1.2 FROM {numTbl}"
       },
@@ -150,8 +146,6 @@
         "sql": "SELECT 3 * 5 FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comment": "could be floating comparison issue",
         "description": "test multiply on literals",
         "sql": "SELECT 3 * 2.4 FROM {numTbl}"
       },
@@ -227,7 +221,7 @@
       },
       {
         "ignored": true,
-        "comment": "should throw infinity but we throw an exception",
+        "comment": "should return infinity but we throw an exception",
         "description": "test divide by zero",
         "expectedException": ".*Division by zero.*",
         "sql": "SELECT doubleCol / 0 FROM {numTbl}"
@@ -273,13 +267,10 @@
         "sql": "SELECT intCol %  1.2 FROM {numTbl}"
       },
       {
-        "comment": "should round on the integer but we return a floating point",
         "description": "test mod on literals",
         "sql": "SELECT 3 %  5 FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comment": "diff due to floating point comparison",
         "description": "test mod on literals",
         "sql": "SELECT 3 % 2.4 FROM {numTbl}"
       },
