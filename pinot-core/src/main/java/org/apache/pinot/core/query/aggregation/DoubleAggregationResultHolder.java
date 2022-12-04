@@ -42,6 +42,11 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
     _value = value;
   }
 
+  @Override
+  public void setValue(int value) {
+    throw new RuntimeException("Method 'setValue' (with int value) not supported for class " + getClass().getName());
+  }
+
   /**
    * {@inheritDoc}
    * Value for this class is 'primitive double', so this method is not implemented.
@@ -59,6 +64,16 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
   @Override
   public double getDoubleResult() {
     return _value;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @return
+   */
+  @Override
+  public int getIntResult() {
+    throw new RuntimeException("Method 'getIntResult' not supported for class " + getClass().getName());
   }
 
   /**

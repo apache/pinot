@@ -444,6 +444,20 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGESTMV);
     assertEquals(aggregationFunction.getColumnName(), "percentileTDigest95.0MV_column");
     assertEquals(aggregationFunction.getResultColumnName(), "percentiletdigestmv(column, 95.0)");
+
+    function = getFunction("bool_and");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof BooleanAndAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.BOOLAND);
+    assertEquals(aggregationFunction.getColumnName(), "boolAnd_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "booland(column)");
+
+    function = getFunction("bool_or");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof BooleanOrAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.BOOLOR);
+    assertEquals(aggregationFunction.getColumnName(), "boolOr_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "boolor(column)");
   }
 
   private FunctionContext getFunction(String functionName) {

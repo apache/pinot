@@ -23,8 +23,19 @@ import org.apache.calcite.rel.type.RelDataTypeSystemImpl;
 
 /**
  * The {@code TypeSystem} overwrites Calcite type system with Pinot specific logics.
- *
- * TODO: no overwrite for now.
  */
 public class TypeSystem extends RelDataTypeSystemImpl {
+
+  @Override
+  public boolean shouldConvertRaggedUnionTypesToVarying() {
+    // A "ragged" union refers to a union of two or more data types that don't all
+    // have the same precision or scale. In these cases, Calcite may need to promote
+    // one or more of the data types in order to maintain consistency.
+    //
+    // Pinot doesn't properly handle CHAR(FIXED) - by default, Calcite will cast a
+    // CHAR(2) to a CHAR(3), but this will cause 2-char strings to be expanded with
+    // spaces at the end (e.g. 'No' -> 'No '), which ultimately causes incorrect
+    // behavior. This calcite flag will cause this to be cast to VARCHAR instead
+    return true;
+  }
 }

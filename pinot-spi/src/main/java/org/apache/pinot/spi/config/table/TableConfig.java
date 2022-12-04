@@ -55,6 +55,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String FIELD_CONFIG_LIST_KEY = "fieldConfigList";
   public static final String UPSERT_CONFIG_KEY = "upsertConfig";
   public static final String DEDUP_CONFIG_KEY = "dedupConfig";
+  public static final String DIMENSION_TABLE_CONFIG_KEY = "dimensionTableConfig";
   public static final String INGESTION_CONFIG_KEY = "ingestionConfig";
   public static final String TIER_CONFIGS_LIST_KEY = "tierConfigs";
   public static final String TUNER_CONFIG_LIST_KEY = "tunerConfigs";
@@ -102,6 +103,9 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "Dedup related config")
   private DedupConfig _dedupConfig;
 
+  @JsonPropertyDescription(value = "Dimension Table related config")
+  private DimensionTableConfig _dimensionTableConfig;
+
   @JsonPropertyDescription(value = "Config related to ingesting data into the table")
   private IngestionConfig _ingestionConfig;
 
@@ -128,6 +132,7 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(FIELD_CONFIG_LIST_KEY) @Nullable List<FieldConfig> fieldConfigList,
       @JsonProperty(UPSERT_CONFIG_KEY) @Nullable UpsertConfig upsertConfig,
       @JsonProperty(DEDUP_CONFIG_KEY) @Nullable DedupConfig dedupConfig,
+      @JsonProperty(DIMENSION_TABLE_CONFIG_KEY) @Nullable DimensionTableConfig dimensionTableConfig,
       @JsonProperty(INGESTION_CONFIG_KEY) @Nullable IngestionConfig ingestionConfig,
       @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList,
       @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable,
@@ -160,6 +165,7 @@ public class TableConfig extends BaseJsonConfig {
     _fieldConfigList = fieldConfigList;
     _upsertConfig = upsertConfig;
     _dedupConfig = dedupConfig;
+    _dimensionTableConfig = dimensionTableConfig;
     _ingestionConfig = ingestionConfig;
     _tierConfigsList = tierConfigsList;
     _dimTable = dimTable;
@@ -305,6 +311,15 @@ public class TableConfig extends BaseJsonConfig {
 
   public void setDedupConfig(DedupConfig dedupConfig) {
     _dedupConfig = dedupConfig;
+  }
+
+  @Nullable
+  public DimensionTableConfig getDimensionTableConfig() {
+    return _dimensionTableConfig;
+  }
+
+  public void setDimensionTableConfig(DimensionTableConfig dimensionTableConfig) {
+    _dimensionTableConfig = dimensionTableConfig;
   }
 
   @JsonProperty(INGESTION_CONFIG_KEY)

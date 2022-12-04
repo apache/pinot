@@ -29,6 +29,7 @@ import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -139,6 +140,12 @@ public class TableConfigUtils {
       dedupConfig = JsonUtils.stringToObject(dedupConfigString, DedupConfig.class);
     }
 
+    DimensionTableConfig dimensionTableConfig = null;
+    String dimensionTableConfigString = simpleFields.get(TableConfig.DIMENSION_TABLE_CONFIG_KEY);
+    if (dimensionTableConfigString != null) {
+      dimensionTableConfig = JsonUtils.stringToObject(dimensionTableConfigString, DimensionTableConfig.class);
+    }
+
     IngestionConfig ingestionConfig = null;
     String ingestionConfigString = simpleFields.get(TableConfig.INGESTION_CONFIG_KEY);
     if (ingestionConfigString != null) {
@@ -175,7 +182,7 @@ public class TableConfigUtils {
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap,
-        fieldConfigList, upsertConfig, dedupConfig, ingestionConfig, tierConfigList, isDimTable,
+        fieldConfigList, upsertConfig, dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable,
         tunerConfigList, instancePartitionsMap, segmentAssignmentConfigMap);
   }
 
@@ -226,6 +233,10 @@ public class TableConfigUtils {
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
     if (dedupConfig != null) {
       simpleFields.put(TableConfig.DEDUP_CONFIG_KEY, JsonUtils.objectToString(dedupConfig));
+    }
+    DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
+    if (dimensionTableConfig != null) {
+      simpleFields.put(TableConfig.DIMENSION_TABLE_CONFIG_KEY, JsonUtils.objectToString(dimensionTableConfig));
     }
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig != null) {

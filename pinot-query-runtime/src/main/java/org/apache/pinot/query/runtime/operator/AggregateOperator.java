@@ -208,6 +208,14 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     return ((Number) left).doubleValue() + 1;
   }
 
+  private static Boolean mergeBoolAnd(Object left, Object right) {
+    return ((Boolean) left) && ((Boolean) right);
+  }
+
+  private static Boolean mergeBoolOr(Object left, Object right) {
+    return ((Boolean) left) || ((Boolean) right);
+  }
+
   private static Key extraRowKey(Object[] row, List<RexExpression> groupSet) {
     Object[] keyElements = new Object[groupSet.size()];
     for (int i = 0; i < groupSet.size(); i++) {
@@ -233,6 +241,12 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         .put("$MAX", AggregateOperator::mergeMax)
         .put("$MAX0", AggregateOperator::mergeMax)
         .put("COUNT", AggregateOperator::mergeCount)
+        .put("BOOL_AND", AggregateOperator::mergeBoolAnd)
+        .put("$BOOL_AND", AggregateOperator::mergeBoolAnd)
+        .put("$BOOL_AND0", AggregateOperator::mergeBoolAnd)
+        .put("BOOL_OR", AggregateOperator::mergeBoolOr)
+        .put("$BOOL_OR", AggregateOperator::mergeBoolOr)
+        .put("$BOOL_OR0", AggregateOperator::mergeBoolOr)
         .build();
 
     final int _inputRef;

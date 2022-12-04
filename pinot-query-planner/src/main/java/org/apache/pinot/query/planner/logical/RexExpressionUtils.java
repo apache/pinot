@@ -86,4 +86,14 @@ public class RexExpressionUtils {
     }
     return result;
   }
+
+  public static Integer getValueAsInt(RexNode in) {
+    if (in == null) {
+      return 0;
+    }
+
+    Preconditions.checkArgument(in instanceof RexLiteral, "expected literal, got " + in);
+    RexLiteral literal = (RexLiteral) in;
+    return literal.getValueAs(Integer.class);
+  }
 }

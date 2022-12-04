@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -115,6 +116,7 @@ public class TableConfigBuilder {
 
   private UpsertConfig _upsertConfig;
   private DedupConfig _dedupConfig;
+  private DimensionTableConfig _dimensionTableConfig;
   private IngestionConfig _ingestionConfig;
   private List<TierConfig> _tierConfigList;
   private List<TunerConfig> _tunerConfigList;
@@ -357,6 +359,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setDimensionTableConfig(DimensionTableConfig dimensionTableConfig) {
+    _dimensionTableConfig = dimensionTableConfig;
+    return this;
+  }
+
   public TableConfigBuilder setPeerSegmentDownloadScheme(String peerSegmentDownloadScheme) {
     _peerSegmentDownloadScheme = peerSegmentDownloadScheme;
     return this;
@@ -439,7 +446,7 @@ public class TableConfigBuilder {
 
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _dedupConfig, _ingestionConfig, _tierConfigList, _isDimTable, _tunerConfigList,
-        _instancePartitionsMap, _segmentAssignmentConfigMap);
+        _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
+        _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap);
   }
 }

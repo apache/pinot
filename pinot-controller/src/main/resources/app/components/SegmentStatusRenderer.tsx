@@ -83,7 +83,7 @@ export const SegmentStatusRenderer = ({
 
   useEffect(() => {
     initializeValues();
-  }, []);
+  }, [status]);
 
   const initializeValues = () => {
     switch (status) {

@@ -30,6 +30,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.SchemaUtils;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
@@ -41,12 +42,16 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.DimensionTableConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -101,6 +106,13 @@ public class DimensionTableDataManagerTest {
     return new Schema.SchemaBuilder().setSchemaName("dimBaseballTeams")
         .addSingleValueDimension("teamID", DataType.STRING).addSingleValueDimension("teamName", DataType.STRING)
         .setPrimaryKeyColumns(Collections.singletonList("teamID")).build();
+  }
+
+  private TableConfig getTableConfig(boolean disablePreload) {
+    DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload);
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("dimBaseballTeams").setSchemaName("dimBaseballTeams")
+        .setDimensionTableConfig(dimensionTableConfig).build();
   }
 
   private Schema getSchemaWithExtraColumn() {
@@ -238,5 +250,50 @@ public class DimensionTableDataManagerTest {
     assertEquals(resp.getValue("teamID"), "SF");
     assertEquals(resp.getValue("teamName"), "San Francisco Giants");
     assertEquals(resp.getValue("teamCity"), "null");
+  }
+
+  @Test
+  public void testLookupWithoutPreLoad()
+      throws Exception {
+    HelixManager helixManager = mock(HelixManager.class);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
+        SchemaUtils.toZNRecord(getSchema()));
+    when(propertyStore.get("/CONFIGS/TABLE/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
+        TableConfigUtils.toZNRecord(getTableConfig(true)));
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
+
+    // try fetching data BEFORE loading segment
+    GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
+    assertNull(resp, "Response should be null if no segment is loaded");
+
+    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+
+    // Confirm table is loaded and available for lookup
+    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
+    assertNotNull(resp, "Should return response after segment load");
+    assertEquals(resp.getFieldToValueMap().size(), 2);
+    assertEquals(resp.getValue("teamID"), "SF");
+    assertEquals(resp.getValue("teamName"), "San Francisco Giants");
+
+    // Confirm we can get FieldSpec for loaded tables columns.
+    FieldSpec spec = tableDataManager.getColumnFieldSpec("teamName");
+    assertNotNull(spec, "Should return spec for existing column");
+    assertEquals(spec.getDataType(), DataType.STRING, "Should return correct data type for teamName column");
+
+    // Confirm we can read primary column list
+    List<String> pkColumns = tableDataManager.getPrimaryKeyColumns();
+    assertEquals(pkColumns, Collections.singletonList("teamID"), "Should return PK column list");
+
+    // Remove the segment
+    List<SegmentDataManager> segmentManagers = tableDataManager.acquireAllSegments();
+    assertEquals(segmentManagers.size(), 1, "Should have exactly one segment manager");
+    SegmentDataManager segMgr = segmentManagers.get(0);
+    String segmentName = segMgr.getSegmentName();
+    tableDataManager.removeSegment(segmentName);
+    // confirm table is cleaned up
+    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
+    assertNull(resp, "Response should be null if no segment is loaded");
   }
 }

@@ -223,6 +223,8 @@ declare module 'Models' {
     }
   }
 
+  export type TableSortFunction = (a: any, b: any, column: string, index: number, order: boolean) => number;
+
   export const enum SEGMENT_STATUS {
     ONLINE = "ONLINE",
     OFFLINE = "OFFLINE",

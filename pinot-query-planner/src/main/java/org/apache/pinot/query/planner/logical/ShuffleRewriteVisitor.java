@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
@@ -66,20 +69,8 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
   @Override
   public Set<Integer> visitAggregate(AggregateNode node, Void context) {
     Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
-
-    // any input reference directly carries over in group set of aggregation
-    // should still be a partition key
-    Set<Integer> partitionKeys = new HashSet<>();
-    for (int i = 0; i < node.getGroupSet().size(); i++) {
-      RexExpression rex = node.getGroupSet().get(i);
-      if (rex instanceof RexExpression.InputRef) {
-        if (oldPartitionKeys.contains(((RexExpression.InputRef) rex).getIndex())) {
-          partitionKeys.add(i);
-        }
-      }
-    }
-
-    return partitionKeys;
+    List<RexExpression> groupSet = node.getGroupSet();
+    return deriveNewPartitionKeysFromRexExpressions(groupSet, oldPartitionKeys);
   }
 
   @Override
@@ -105,11 +96,15 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
       if (leftPKs.contains(leftIdx)) {
         partitionKeys.add(leftIdx);
       }
+      // TODO: enable right key carrying. currently we only support left key carrying b/c of the partition key list
+      // doesn't understand equivalent partition key column or group partition key columns, yet.
+      /*
       if (rightPks.contains(rightIdx)) {
         // combined schema will have all the left fields before the right fields
         // so add the leftDataSchemaSize before adding the key
         partitionKeys.add(leftDataSchemaSize + rightIdx);
       }
+      */
     }
 
     return partitionKeys;
@@ -150,19 +145,7 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
   @Override
   public Set<Integer> visitProject(ProjectNode node, Void context) {
     Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
-
-    // all inputs carry over if they're still in the projection result
-    Set<Integer> partitionKeys = new HashSet<>();
-    for (int i = 0; i < node.getProjects().size(); i++) {
-      RexExpression rex = node.getProjects().get(i);
-      if (rex instanceof RexExpression.InputRef) {
-        if (oldPartitionKeys.contains(((RexExpression.InputRef) rex).getIndex())) {
-          partitionKeys.add(i);
-        }
-      }
-    }
-
-    return partitionKeys;
+    return deriveNewPartitionKeysFromRexExpressions(node.getProjects(), oldPartitionKeys);
   }
 
   @Override
@@ -188,5 +171,28 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
       return targetSet.containsAll(partitionKeys);
     }
     return false;
+  }
+
+  private static Set<Integer> deriveNewPartitionKeysFromRexExpressions(List<RexExpression> rexExpressionList,
+      Set<Integer> oldPartitionKeys) {
+    Map<Integer, Integer> partitionKeyMap = new HashMap<>();
+    for (int i = 0; i < rexExpressionList.size(); i++) {
+      RexExpression rex = rexExpressionList.get(i);
+      if (rex instanceof RexExpression.InputRef) {
+        // put the old-index to new-index mapping
+        // TODO: it doesn't handle duplicate references. e.g. if the same old partition key is referred twice. it will
+        // only keep the second one. (see JOIN handling on left/right as another example)
+        partitionKeyMap.put(((RexExpression.InputRef) rex).getIndex(), i);
+      }
+    }
+    if (partitionKeyMap.keySet().containsAll(oldPartitionKeys)) {
+      Set<Integer> newPartitionKeys = new HashSet<>();
+      for (int oldKey : oldPartitionKeys) {
+        newPartitionKeys.add(partitionKeyMap.get(oldKey));
+      }
+      return newPartitionKeys;
+    } else {
+      return new HashSet<>();
+    }
   }
 }

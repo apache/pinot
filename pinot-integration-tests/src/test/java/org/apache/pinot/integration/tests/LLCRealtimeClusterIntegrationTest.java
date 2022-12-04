@@ -60,8 +60,9 @@ import static org.testng.Assert.assertTrue;
  */
 public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  // NOTE: The test query should match all the segments so that all the segments are guaranteed to be reloaded
   private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
-      "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
+      "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = -9999";
   private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS = Collections.singletonList("DivActualElapsedTime");
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
@@ -237,6 +238,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertTrue(queryResponse.get("numEntriesScannedInFilter").asLong() > 0L);
+    long result = queryResponse.get("resultTable").get("rows").get(0).get(0).asLong();
 
     TableConfig tableConfig = getRealtimeTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
@@ -246,7 +248,8 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-        // Total docs should not change during reload
+        // Query result and total docs should not change during reload
+        assertEquals(queryResponse1.get("resultTable").get("rows").get(0).get(0).asLong(), result);
         assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
 
         long numConsumingSegmentsQueried = queryResponse1.get("numConsumingSegmentsQueried").asLong();
