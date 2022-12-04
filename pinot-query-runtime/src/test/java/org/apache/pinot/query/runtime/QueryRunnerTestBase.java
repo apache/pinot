@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.math.DoubleMath;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -59,10 +60,10 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.testng.Assert;
 
 
-
 public abstract class QueryRunnerTestBase extends QueryTestSet {
-  protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
+  protected static final double DOUBLE_CMP_EPSILON = 0.0001d;
 
+  protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
   protected QueryEnvironment _queryEnvironment;
   protected String _reducerHostname;
   protected int _reducerGrpcPort;
@@ -84,8 +85,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
         mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)),
-            reduceNode.getSenderStageId(), reduceNode.getDataSchema(), "localhost", _reducerGrpcPort,
+            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)), reduceNode.getSenderStageId(),
+            reduceNode.getDataSchema(), "localhost", _reducerGrpcPort,
             Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)));
       } else {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
@@ -96,8 +97,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       }
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
-    return QueryDispatcher.toResultTable(QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator,
-            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS),
+    return QueryDispatcher.toResultTable(
+        QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS),
         queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
   }
 
@@ -137,8 +138,14 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       } else if (l instanceof Long) {
         return Long.compare((Long) l, ((Number) r).longValue());
       } else if (l instanceof Float) {
+        if (DoubleMath.fuzzyEquals((Float) l, ((Number) r).floatValue(), DOUBLE_CMP_EPSILON)) {
+          return 0;
+        }
         return Float.compare((Float) l, ((Number) r).floatValue());
       } else if (l instanceof Double) {
+        if (DoubleMath.fuzzyEquals((Double) l, ((Number) r).doubleValue(), DOUBLE_CMP_EPSILON)) {
+          return 0;
+        }
         return Double.compare((Double) l, ((Number) r).doubleValue());
       } else if (l instanceof String) {
         return ((String) l).compareTo((String) r);
@@ -178,8 +185,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
               Arrays.toString(resultRow)));
       for (int j = 0; j < resultRow.length; j++) {
         Assert.assertEquals(valueComp.compare(resultRow[j], expectedRow[j]), 0,
-            "Not match at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow)
-                + " Actual: " + Arrays.toString(resultRow));
+            "Not match at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow) + " Actual: "
+                + Arrays.toString(resultRow));
       }
     }
   }
