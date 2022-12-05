@@ -87,21 +87,21 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   @Nullable
   @Override
   public String selectBroker(String table) {
-    if (table == null) {
-      List<String> list = _allBrokerListRef.get();
+    if (table != null) {
+      String tableName =
+          table.replace(ExternalViewReader.OFFLINE_SUFFIX, "").replace(ExternalViewReader.REALTIME_SUFFIX, "");
+      List<String> list = _tableToBrokerListMapRef.get().get(tableName);
       if (list != null && !list.isEmpty()) {
         return list.get(RANDOM.nextInt(list.size()));
-      } else {
-        return null;
       }
     }
-    String tableName = table.replace(ExternalViewReader.OFFLINE_SUFFIX, "")
-        .replace(ExternalViewReader.REALTIME_SUFFIX, "");
-    List<String> list = _tableToBrokerListMapRef.get().get(tableName);
+    // Return a one randomly if table is null or no broker is found for the specified table.
+    List<String> list = _allBrokerListRef.get();
     if (list != null && !list.isEmpty()) {
       return list.get(RANDOM.nextInt(list.size()));
+    } else {
+      return null;
     }
-    return null;
   }
 
   @Override
