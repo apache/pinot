@@ -194,8 +194,8 @@ public class TransformOperatorTest {
         }));
     RexExpression.Literal boolLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
     RexExpression.Literal strLiteral = new RexExpression.Literal(FieldSpec.DataType.STRING, "str");
-    DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+    DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "strCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.STRING});
     TransformOperator op =
         new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();

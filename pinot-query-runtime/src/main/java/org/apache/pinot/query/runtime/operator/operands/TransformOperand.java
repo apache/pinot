@@ -26,11 +26,11 @@ public abstract class TransformOperand {
   protected String _resultName;
   protected DataSchema.ColumnDataType _resultType;
 
-  public static TransformOperand toTransformOperand(RexExpression rexExpression, DataSchema dataSchema) {
+  public static TransformOperand toTransformOperand(RexExpression rexExpression, DataSchema inputDataSchema) {
     if (rexExpression instanceof RexExpression.InputRef) {
-      return new ReferenceOperand((RexExpression.InputRef) rexExpression, dataSchema);
+      return new ReferenceOperand((RexExpression.InputRef) rexExpression, inputDataSchema);
     } else if (rexExpression instanceof RexExpression.FunctionCall) {
-      return new FunctionOperand((RexExpression.FunctionCall) rexExpression, dataSchema);
+      return new FunctionOperand((RexExpression.FunctionCall) rexExpression, inputDataSchema);
     } else if (rexExpression instanceof RexExpression.Literal) {
       return new LiteralOperand((RexExpression.Literal) rexExpression);
     } else {

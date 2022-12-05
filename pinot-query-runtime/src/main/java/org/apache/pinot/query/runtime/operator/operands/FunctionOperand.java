@@ -27,7 +27,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.OperatorUtils;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 /*
  * FunctionOperands are generated from {@link RexExpression}s.
