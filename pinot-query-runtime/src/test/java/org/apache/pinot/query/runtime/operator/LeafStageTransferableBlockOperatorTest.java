@@ -26,28 +26,57 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
+// TODO: add tests for Agg / GroupBy / Distinct result blocks
 public class LeafStageTransferableBlockOperatorTest {
 
   @Test
   public void shouldReturnDataBlockThenMetadataBlock() {
     // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})), null));
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})), queryContext));
     LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
 
     // When:
-    TransferableBlock transferableBlock = operator.nextBlock();
+    TransferableBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertEquals(transferableBlock.getContainer().get(0), new Object[]{"foo", 1});
-    Assert.assertEquals(transferableBlock.getContainer().get(1), new Object[]{"", 2});
+    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{"foo", 1});
+    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{"", 2});
+    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
+  }
+
+  @Test
+  public void shouldHandleDesiredDataSchemaConversionCorrectly() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT boolCol, tsCol, boolCol AS newNamedBoolCol FROM tbl");
+    DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "tsCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP});
+    DataSchema desiredSchema = new DataSchema(new String[]{"boolCol", "tsCol", "newNamedBoolCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP,
+            DataSchema.ColumnDataType.BOOLEAN});
+    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
+        new SelectionResultsBlock(resultSchema, Arrays.asList(new Object[]{1, 1660000000000L},
+            new Object[]{0, 1600000000000L})), queryContext));
+    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList,
+        desiredSchema);
+
+    // When:
+    TransferableBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{true, new Timestamp(1660000000000L), true});
+    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{false, new Timestamp(1600000000000L), false});
     Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
   }
 
@@ -55,67 +84,70 @@ public class LeafStageTransferableBlockOperatorTest {
   public void shouldHandleCanonicalizationCorrectly() {
     // TODO: not all stored types are supported, add additional datatype when they are supported.
     // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT boolCol, tsCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"boolCol", "tsCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP});
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{1, 1660000000000L},
-            new Object[]{0, 1600000000000L})), null));
+            new Object[]{0, 1600000000000L})), queryContext));
     LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
 
     // When:
-    TransferableBlock transferableBlock = operator.nextBlock();
+    TransferableBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertEquals(transferableBlock.getContainer().get(0), new Object[]{true, new Timestamp(1660000000000L)});
-    Assert.assertEquals(transferableBlock.getContainer().get(1), new Object[]{false, new Timestamp(1600000000000L)});
+    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{true, new Timestamp(1660000000000L)});
+    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{false, new Timestamp(1600000000000L)});
     Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
   }
 
   @Test
   public void shouldReturnMultipleDataBlockThenMetadataBlock() {
     // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     List<InstanceResponseBlock> resultsBlockList = Arrays.asList(
         new InstanceResponseBlock(new SelectionResultsBlock(schema,
-            Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})), null),
+            Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})), queryContext),
         new InstanceResponseBlock(new SelectionResultsBlock(schema,
-            Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4})), null),
-        new InstanceResponseBlock(new SelectionResultsBlock(schema, Collections.emptyList()), null));
+            Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4})), queryContext),
+        new InstanceResponseBlock(new SelectionResultsBlock(schema, Collections.emptyList()), queryContext));
     LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
 
     // When:
-    TransferableBlock transferableBlock1 = operator.nextBlock();
-    TransferableBlock transferableBlock2 = operator.nextBlock();
-    TransferableBlock transferableBlock3 = operator.nextBlock();
+    TransferableBlock resultBlock1 = operator.nextBlock();
+    TransferableBlock resultBlock2 = operator.nextBlock();
+    TransferableBlock resultBlock3 = operator.nextBlock();
 
     // Then:
-    Assert.assertEquals(transferableBlock1.getContainer().get(0), new Object[]{"foo", 1});
-    Assert.assertEquals(transferableBlock1.getContainer().get(1), new Object[]{"", 2});
-    Assert.assertEquals(transferableBlock2.getContainer().get(0), new Object[]{"bar", 3});
-    Assert.assertEquals(transferableBlock2.getContainer().get(1), new Object[]{"foo", 4});
-    Assert.assertEquals(transferableBlock3.getContainer().size(), 0);
+    Assert.assertEquals(resultBlock1.getContainer().get(0), new Object[]{"foo", 1});
+    Assert.assertEquals(resultBlock1.getContainer().get(1), new Object[]{"", 2});
+    Assert.assertEquals(resultBlock2.getContainer().get(0), new Object[]{"bar", 3});
+    Assert.assertEquals(resultBlock2.getContainer().get(1), new Object[]{"foo", 4});
+    Assert.assertEquals(resultBlock3.getContainer().size(), 0);
     Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
   }
 
   @Test
   public void shouldGetErrorBlockWhenInstanceResponseContainsError() {
     // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     InstanceResponseBlock errorBlock = new InstanceResponseBlock();
     errorBlock.addException(QueryException.QUERY_EXECUTION_ERROR.getErrorCode(), "foobar");
     List<InstanceResponseBlock> resultsBlockList = Arrays.asList(
         new InstanceResponseBlock(new SelectionResultsBlock(schema,
-            Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})), null),
+            Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})), queryContext),
         errorBlock,
-        new InstanceResponseBlock(new SelectionResultsBlock(schema, Collections.emptyList()), null));
+        new InstanceResponseBlock(new SelectionResultsBlock(schema, Collections.emptyList()), queryContext));
     LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
 
     // When:
-    TransferableBlock transferableBlock = operator.nextBlock();
+    TransferableBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertTrue(transferableBlock.isErrorBlock());
+    Assert.assertTrue(resultBlock.isErrorBlock());
   }
 }
