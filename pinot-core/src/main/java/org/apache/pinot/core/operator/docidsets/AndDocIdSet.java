@@ -29,9 +29,9 @@ import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
-import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.SortedRangeIntersection;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
+import org.apache.pinot.spi.utils.QueryOptionsUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 

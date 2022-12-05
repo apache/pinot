@@ -16,9 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util;
+package org.apache.pinot.spi.utils;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -30,6 +34,59 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValu
  */
 public class QueryOptionsUtils {
   private QueryOptionsUtils() {
+  }
+
+
+  private static final Map<String, String> CONFIG_RESOLVER;
+  private static final RuntimeException CLASS_LOAD_ERROR;
+
+  static {
+    // this is a bit hacky, but lots of the code depends directly on usage of
+    // Map<String, String> (JSON serialization/GRPC code) so we cannot just
+    // refactor all code to use a case-insensitive abstraction like PinotConfiguration
+    // without a lot of work - additionally, the config constants are string constants
+    // instead of enums so there's no good way to iterate over them, but they are
+    // public API so we cannot just change them to be an enum
+    Map<String, String> configResolver = new HashMap<>();
+    Throwable classLoadError = null;
+
+    try {
+      for (Field declaredField : QueryOptionKey.class.getDeclaredFields()) {
+        if (declaredField.getType().equals(String.class)) {
+          int mods = declaredField.getModifiers();
+          if (Modifier.isStatic(mods) && Modifier.isFinal(mods)) {
+            String config = (String) declaredField.get(null);
+            configResolver.put(config.toLowerCase(), config);
+          }
+        }
+      }
+    } catch (IllegalAccessException e) {
+      // prefer rethrowing this during runtime instead of a ClassNotFoundException
+      configResolver = null;
+      classLoadError = e;
+    }
+
+    CONFIG_RESOLVER = configResolver == null ? null : ImmutableMap.copyOf(configResolver);
+    CLASS_LOAD_ERROR = classLoadError == null ? null
+        : new RuntimeException("Failure to build case insensitive mapping.", classLoadError);
+  }
+
+  public static Map<String, String> resolveCaseInsensitiveOptions(Map<String, String> queryOptions) {
+    if (CLASS_LOAD_ERROR != null) {
+      throw CLASS_LOAD_ERROR;
+    }
+
+    Map<String, String> resolved = new HashMap<>();
+    for (Map.Entry<String, String> configEntry : queryOptions.entrySet()) {
+      String config = CONFIG_RESOLVER.get(configEntry.getKey().toLowerCase());
+      if (config != null) {
+        resolved.put(config, configEntry.getValue());
+      } else {
+        resolved.put(configEntry.getKey(), configEntry.getValue());
+      }
+    }
+
+    return resolved;
   }
 
   @Nullable
