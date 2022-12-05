@@ -49,6 +49,7 @@ public abstract class FilterOperand extends TransformOperand {
     return new BooleanInputRef(inputRef, dataSchema);
   }
 
+  @SuppressWarnings({"rawtypes", "unchecked"})
   private static FilterOperand toFilterOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
     int operandSize = functionCall.getFunctionOperands().size();
     // TODO: Move these functions out of this class.
@@ -66,48 +67,72 @@ public abstract class FilterOperand extends TransformOperand {
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
-                == 0;
+            if (_requireCasting) {
+              return ((Comparable) _commonCastType.convert(_lhs.apply(row))).compareTo(
+                  _commonCastType.convert(_rhs.apply(row))) == 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) == 0;
+            }
           }
         };
       case "notEquals":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
-                != 0;
+            if (_requireCasting) {
+              return ((Comparable) _commonCastType.convert(_lhs.apply(row))).compareTo(
+                  _commonCastType.convert(_rhs.apply(row))) != 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) != 0;
+            }
           }
         };
       case "greaterThan":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
-                > 0;
+            if (_requireCasting) {
+              return ((Comparable) _commonCastType.convert(_lhs.apply(row))).compareTo(
+                  _commonCastType.convert(_rhs.apply(row))) > 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) > 0;
+            }
           }
         };
       case "greaterThanOrEqual":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
-                >= 0;
+            if (_requireCasting) {
+              return ((Comparable) _commonCastType.convert(_lhs.apply(row))).compareTo(
+                  _commonCastType.convert(_rhs.apply(row))) >= 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) >= 0;
+            }
           }
         };
       case "lessThan":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
-                < 0;
+            if (_requireCasting) {
+              return ((Comparable) _commonCastType.convert(_lhs.apply(row))).compareTo(
+                  _commonCastType.convert(_rhs.apply(row))) < 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) < 0;
+            }
           }
         };
       case "lessThanOrEqual":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
-            return ((Comparable) _resultType.convert(_lhs.apply(row))).compareTo(_resultType.convert(_rhs.apply(row)))
-                <= 0;
+            if (_requireCasting) {
+              return ((Comparable) _commonCastType.convert(_lhs.apply(row))).compareTo(
+                  _commonCastType.convert(_rhs.apply(row))) <= 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) <= 0;
+            }
           }
         };
       default:
@@ -146,7 +171,7 @@ public abstract class FilterOperand extends TransformOperand {
 
     @Override
     public Boolean apply(Object[] row) {
-      return (boolean) row[_inputRef.getIndex()];
+      return (Boolean) row[_inputRef.getIndex()];
     }
   }
 
@@ -161,7 +186,7 @@ public abstract class FilterOperand extends TransformOperand {
 
     @Override
     public Boolean apply(Object[] row) {
-      return (boolean) _literalValue;
+      return (Boolean) _literalValue;
     }
   }
 
@@ -223,18 +248,12 @@ public abstract class FilterOperand extends TransformOperand {
   private static abstract class Predicate extends FilterOperand {
     protected final TransformOperand _lhs;
     protected final TransformOperand _rhs;
-    protected final DataSchema.ColumnDataType _resultType;
-
-    public Predicate(List<RexExpression> functionOperands, DataSchema dataSchema) {
-      Preconditions.checkState(functionOperands.size() == 2,
-          "Expected 2 function ops for Predicate but got:" + functionOperands.size());
-      _lhs = TransformOperand.toTransformOperand(functionOperands.get(0), dataSchema);
-      _rhs = TransformOperand.toTransformOperand(functionOperands.get(1), dataSchema);
-      _resultType = resolveResultType(_lhs._resultType, _rhs._resultType);
-    }
+    protected final boolean _requireCasting;
+    protected final DataSchema.ColumnDataType _commonCastType;
 
     /**
-     * Resolve data type, since we don't have a exhausted list of filter function signatures. we rely on type casting.
+     * Predicate constructor also resolve data type,
+     * since we don't have a exhausted list of filter function signatures. we rely on type casting.
      *
      * <ul>
      *   <li>if both RHS and LHS has null data type, exception occurs.</li>
@@ -243,28 +262,30 @@ public abstract class FilterOperand extends TransformOperand {
      *   <li>if we can't resolve a common data type, exception occurs.</li>
      * </ul>
      *
-     * @param lhsType left-hand-side type
-     * @param rhsType right-hand-side type
-     * @return best common conversion data type.
-     * @see DataSchema.ColumnDataType#isSuperTypeOf(DataSchema.ColumnDataType)
+     *
      */
-    private static DataSchema.ColumnDataType resolveResultType(DataSchema.ColumnDataType lhsType,
-        DataSchema.ColumnDataType rhsType) {
+    public Predicate(List<RexExpression> functionOperands, DataSchema dataSchema) {
+      Preconditions.checkState(functionOperands.size() == 2,
+          "Expected 2 function ops for Predicate but got:" + functionOperands.size());
+      _lhs = TransformOperand.toTransformOperand(functionOperands.get(0), dataSchema);
+      _rhs = TransformOperand.toTransformOperand(functionOperands.get(1), dataSchema);
+
       // TODO: Correctly throw exception instead of returning null.
       // Currently exception thrown during constructor is not piped back to query dispatcher, thus in order to
       // avoid silent failure, we deliberately set to null here, make the exception thrown during data processing.
-      if (lhsType == null && rhsType == null) {
-        return null;
-      } else if (lhsType == null || lhsType == DataSchema.ColumnDataType.OBJECT) {
-        return rhsType;
-      } else if (rhsType == null || rhsType == DataSchema.ColumnDataType.OBJECT) {
-        return lhsType;
-      } else if (lhsType.isSuperTypeOf(rhsType)) {
-        return lhsType;
-      } else if (rhsType.isSuperTypeOf(rhsType)) {
-        return rhsType;
+      if (_lhs._resultType == null || _lhs._resultType == DataSchema.ColumnDataType.OBJECT
+        || _rhs._resultType == null || _rhs._resultType == DataSchema.ColumnDataType.OBJECT) {
+        _requireCasting = false;
+        _commonCastType = null;
+      } else if (_lhs._resultType.isSuperTypeOf(_rhs._resultType)) {
+        _requireCasting = _lhs._resultType != _rhs._resultType;
+        _commonCastType = _lhs._resultType;
+      } else if (_rhs._resultType.isSuperTypeOf(_lhs._resultType)) {
+        _requireCasting = _lhs._resultType != _rhs._resultType;
+        _commonCastType = _rhs._resultType;
       } else {
-        return null;
+        _requireCasting = false;
+        _commonCastType = null;
       }
     }
   }
