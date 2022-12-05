@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -36,7 +37,6 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -59,8 +59,6 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKe
  *
  * For multi-value columns the following invariants cannot be maintained:
  * - Ordering of elements within a given multi-value row. This will always be a limitation.
- * - Data loss is possible if there repeats for elements within a given multi-value row. This limitation will be
- *   addressed as a future change
  *
  * TODO: Currently for multi-value columns generating the forward index can lead to a data loss as frequency information
  *       is not available for repeats within a given row. This needs to be addressed by tracking the frequency data
@@ -173,30 +171,24 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   }
 
   private ChunkCompressionType getColumnCompressionType() {
-    if (!_indexLoadingConfig.getNoDictionaryColumns().contains(_columnName)) {
+    if (_dictionaryEnabled) {
       return null;
     }
 
-    ChunkCompressionType compressionType = null;
-    if (_indexLoadingConfig.getCompressionConfigs().containsKey(_columnName)) {
-      compressionType = _indexLoadingConfig.getCompressionConfigs().get(_columnName);
-    } else if (_indexLoadingConfig.getNoDictionaryConfig().containsKey(_columnName)) {
+    Map<String, ChunkCompressionType> compressionConfigs = _indexLoadingConfig.getCompressionConfigs();
+    Map<String, String> noDictionaryConfig = _indexLoadingConfig.getNoDictionaryConfig();
+    ChunkCompressionType compressionType;
+    if (compressionConfigs.containsKey(_columnName)) {
+      compressionType = compressionConfigs.get(_columnName);
+    } else if (noDictionaryConfig.containsKey(_columnName)) {
       compressionType = ChunkCompressionType.valueOf(_indexLoadingConfig.getNoDictionaryConfig().get(_columnName));
-    }
-
-    // This logic to choose the default compressionType is duplicated from
-    // SegmentColumnarIndexCreator::getColumnCompressionType
-    if (compressionType == null) {
-      if (_columnMetadata.getFieldSpec().getFieldType() == FieldSpec.FieldType.METRIC) {
-        compressionType = ChunkCompressionType.PASS_THROUGH;
-      } else {
-        compressionType = ChunkCompressionType.LZ4;
-      }
+    } else {
+      compressionType = SegmentColumnarIndexCreator.getDefaultCompressionType(_columnMetadata.getFieldType());
     }
     return compressionType;
   }
 
-  public void constructForwardIndexFromInvertedIndexAndDictionary()
+  public void regenerateForwardIndex()
       throws IOException {
     File indexDir = _segmentMetadata.getIndexDir();
     String segmentName = _segmentMetadata.getName();
@@ -275,7 +267,6 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         }
       }
 
-      // TODO: Figure out which extra configs to set for RAW, e.g. compression type, length of longest value etc
       IndexCreationContext.Forward context =
           IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir())
               .withColumnMetadata(_columnMetadata).withforwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
@@ -355,7 +346,6 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         });
       }
 
-      // TODO: Figure out which extra configs to set for RAW, e.g. compression type, length of longest value etc
       IndexCreationContext.Forward context =
           IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir())
               .withColumnMetadata(_columnMetadata).withforwardIndexDisabled(false).withDictionary(_dictionaryEnabled)

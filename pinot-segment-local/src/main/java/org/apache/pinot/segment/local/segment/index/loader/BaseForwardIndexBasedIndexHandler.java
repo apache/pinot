@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
@@ -40,12 +41,12 @@ public abstract class BaseForwardIndexBasedIndexHandler implements IndexHandler 
 
   protected final SegmentMetadata _segmentMetadata;
   protected final IndexLoadingConfig _indexLoadingConfig;
-  protected final Set<String> _forwardIndexDisabledColumnsToCleanup;
+  protected final Set<String> _tmpForwardIndexColumns;
 
   public BaseForwardIndexBasedIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
     _indexLoadingConfig = indexLoadingConfig;
-    _forwardIndexDisabledColumnsToCleanup = new HashSet<>();
+    _tmpForwardIndexColumns = new HashSet<>();
   }
 
   @Override
@@ -54,7 +55,7 @@ public abstract class BaseForwardIndexBasedIndexHandler implements IndexHandler 
     // Delete the forward index for columns which have it disabled. Perform this as a post-processing step after all
     // IndexHandlers have updated their indexes as some of them need to temporarily create a forward index to
     // generate other indexes off of.
-    for (String column : _forwardIndexDisabledColumnsToCleanup) {
+    for (String column : _tmpForwardIndexColumns) {
       segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
     }
   }
@@ -68,11 +69,17 @@ public abstract class BaseForwardIndexBasedIndexHandler implements IndexHandler 
       return;
     }
 
+    // If forward index is disabled it means that it has to be dictionary based and the inverted index must exist.
+    Preconditions.checkState(segmentWriter.hasIndexFor(columnName, ColumnIndexType.DICTIONARY),
+        String.format("Forward index disabled column %s must have a dictionary", columnName));
+    Preconditions.checkState(segmentWriter.hasIndexFor(columnName, ColumnIndexType.INVERTED_INDEX),
+        String.format("Forward index disabled column %s must have an inverted index", columnName));
+
     InvertedIndexAndDictionaryBasedForwardIndexCreator invertedIndexAndDictionaryBasedForwardIndexCreator =
         new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentMetadata, _indexLoadingConfig,
             segmentWriter, indexCreatorProvider, isTemporaryForwardIndex);
-    invertedIndexAndDictionaryBasedForwardIndexCreator.constructForwardIndexFromInvertedIndexAndDictionary();
-    // If forward index is disabled it means that it has to be dictionary based and the inverted index must exist.
+    invertedIndexAndDictionaryBasedForwardIndexCreator.regenerateForwardIndex();
+
     // Validate that the forward index is created.
     if (!segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)) {
       throw new IOException(String.format("Forward index was not created for column: %s, is temporary: %s", columnName,
@@ -80,7 +87,7 @@ public abstract class BaseForwardIndexBasedIndexHandler implements IndexHandler 
     }
 
     if (isTemporaryForwardIndex) {
-      _forwardIndexDisabledColumnsToCleanup.add(columnName);
+      _tmpForwardIndexColumns.add(columnName);
     }
   }
 }

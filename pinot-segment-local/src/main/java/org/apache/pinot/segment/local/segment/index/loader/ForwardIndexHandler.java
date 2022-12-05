@@ -82,7 +82,7 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKe
  * 2. Enable dictionary
  * 3. Disable dictionary
  * 4. Disable forward index
- * 5. Enable forward index on a forward index disabled column
+ * 5. Rebuild the forward index for a forwardIndexDisabled column
  *
  *  TODO: Add support for the following:
  *  1. Segment versions < V3
@@ -91,7 +91,7 @@ public class ForwardIndexHandler extends BaseForwardIndexBasedIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(ForwardIndexHandler.class);
 
   // This should contain a list of all indexes that need to be rewritten if the dictionary is enabled or disabled
-  private static final List<ColumnIndexType> DICTIONARY_RELATED_INDEX_TO_REMOVE =
+  private static final List<ColumnIndexType> DICTIONARY_BASED_INDEXES_TO_REWRITE =
       Arrays.asList(ColumnIndexType.RANGE_INDEX, ColumnIndexType.FST_INDEX, ColumnIndexType.INVERTED_INDEX);
 
   private final Schema _schema;
@@ -135,7 +135,7 @@ public class ForwardIndexHandler extends BaseForwardIndexBasedIndexHandler {
           // Deletion of the forward index will be handled outside the index handler to ensure that other index
           // handlers that need the forward index to construct their own indexes will have it available.
           // The existing forward index must be in dictionary format for this to be a no-op.
-          _forwardIndexDisabledColumnsToCleanup.add(column);
+          _tmpForwardIndexColumns.add(column);
           break;
         }
         case DISABLE_FORWARD_INDEX_FOR_RAW_COLUMN: {
@@ -148,14 +148,16 @@ public class ForwardIndexHandler extends BaseForwardIndexBasedIndexHandler {
           if (!segmentWriter.hasIndexFor(column, ColumnIndexType.FORWARD_INDEX)) {
             throw new IOException(String.format("Temporary forward index was not created for column: %s", column));
           }
-          _forwardIndexDisabledColumnsToCleanup.add(column);
+          _tmpForwardIndexColumns.add(column);
           break;
         }
         case ENABLE_FORWARD_INDEX_FOR_DICT_COLUMN: {
           createForwardIndexIfNeeded(segmentWriter, _segmentMetadata.getColumnMetadataFor(column), indexCreatorProvider,
               false);
           if (!segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
-            throw new IOException(String.format("Dictionary is not present for dictionary based column: %s", column));
+            throw new IOException(
+                String.format("Dictionary should still exist after rebuilding forward index for dictionary column: %s",
+                    column));
           }
           break;
         }
@@ -163,7 +165,8 @@ public class ForwardIndexHandler extends BaseForwardIndexBasedIndexHandler {
           createForwardIndexIfNeeded(segmentWriter, _segmentMetadata.getColumnMetadataFor(column), indexCreatorProvider,
               false);
           if (segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
-            throw new IOException(String.format("Dictionary is still present for noDictionary column: %s", column));
+            throw new IOException(
+                String.format("Dictionary should not exist after rebuilding forward index for raw column: %s", column));
           }
           break;
         }
@@ -826,7 +829,7 @@ public class ForwardIndexHandler extends BaseForwardIndexBasedIndexHandler {
 
     // Remove all dictionary related indexes. They will be recreated if necessary by the respective handlers. Note that
     // the remove index call will be a no-op if the index doesn't exist.
-    DICTIONARY_RELATED_INDEX_TO_REMOVE.forEach((index) -> segmentWriter.removeIndex(column, index));
+    DICTIONARY_BASED_INDEXES_TO_REWRITE.forEach((index) -> segmentWriter.removeIndex(column, index));
   }
 
   static void updateMetadataProperties(File indexDir, Map<String, String> metadataProperties)
