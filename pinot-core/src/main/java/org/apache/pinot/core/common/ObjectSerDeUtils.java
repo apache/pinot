@@ -72,6 +72,7 @@ import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
+import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -123,7 +124,8 @@ public class ObjectSerDeUtils {
     FloatLongPair(29),
     DoubleLongPair(30),
     StringLongPair(31),
-    CovarianceTuple(32);
+    CovarianceTuple(32),
+    VarianceTuple(33);
 
     private final int _value;
 
@@ -205,6 +207,8 @@ public class ObjectSerDeUtils {
         return ObjectType.StringLongPair;
       } else if (value instanceof CovarianceTuple) {
         return ObjectType.CovarianceTuple;
+      } else if (value instanceof VarianceTuple) {
+        return ObjectType.VarianceTuple;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -461,6 +465,24 @@ public class ObjectSerDeUtils {
       return CovarianceTuple.fromByteBuffer(byteBuffer);
     }
   };
+
+  public static final ObjectSerDe<VarianceTuple> VARIANCE_TUPLE_OBJECT_SER_DE = new ObjectSerDe<VarianceTuple>() {
+    @Override
+    public byte[] serialize(VarianceTuple varianceTuple) {
+      return varianceTuple.toBytes();
+    }
+
+    @Override
+    public VarianceTuple deserialize(byte[] bytes) {
+      return VarianceTuple.fromBytes(bytes);
+    }
+
+    @Override
+    public VarianceTuple deserialize(ByteBuffer byteBuffer) {
+      return VarianceTuple.fromByteBuffer(byteBuffer);
+    }
+  };
+
 
   public static final ObjectSerDe<HyperLogLog> HYPER_LOG_LOG_SER_DE = new ObjectSerDe<HyperLogLog>() {
 
@@ -1191,7 +1213,8 @@ public class ObjectSerDeUtils {
       FLOAT_LONG_PAIR_SER_DE,
       DOUBLE_LONG_PAIR_SER_DE,
       STRING_LONG_PAIR_SER_DE,
-      COVARIANCE_TUPLE_OBJECT_SER_DE
+      COVARIANCE_TUPLE_OBJECT_SER_DE,
+      VARIANCE_TUPLE_OBJECT_SER_DE
   };
   //@formatter:on
 
