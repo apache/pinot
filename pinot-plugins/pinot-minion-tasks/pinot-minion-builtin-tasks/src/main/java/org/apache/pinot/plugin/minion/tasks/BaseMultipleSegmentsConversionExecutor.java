@@ -24,7 +24,6 @@ import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -279,7 +278,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             TableNameBuilder.extractRawTableName(tableNameWithType));
         List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
-        pushSegment(tableNameParameter.getValue(), configs, outputSegmentTarURI, httpHeaders, parameters);
+        pushSegment(tableNameParameter.getValue(), configs, outputSegmentTarURI, httpHeaders, parameters,
+            segmentConversionResult);
         if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
         }
@@ -301,7 +301,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   }
 
   private void pushSegment(String tableName, Map<String, String> taskConfigs, URI outputSegmentTarURI,
-      List<Header> headers, List<NameValuePair> parameters) throws Exception {
+      List<Header> headers, List<NameValuePair> parameters, SegmentConversionResult segmentConversionResult)
+      throws Exception {
     String pushMode = taskConfigs.get(BatchConfigProperties.PUSH_MODE);
     LOGGER.info("Trying to push Pinot segment with push mode {} from {}", pushMode, outputSegmentTarURI);
 
@@ -316,9 +317,13 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
     switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
       case TAR:
-        try (PinotFS pinotFS = MinionTaskUtils.getLocalPinotFs()) {
-          SegmentPushUtils.pushSegments(
-              spec, pinotFS, Collections.singletonList(outputSegmentTarURI.toString()), headers, parameters);
+        try {
+          File tarFile = new File(outputSegmentTarURI);
+          String segmentName = segmentConversionResult.getSegmentName();
+          String tableNameWithType = segmentConversionResult.getTableNameWithType();
+          String uploadURL = taskConfigs.get(MinionConstants.UPLOAD_URL_KEY);
+          SegmentConversionUtils.uploadSegment(taskConfigs, headers, parameters, tableNameWithType, segmentName,
+              uploadURL, tarFile);
         } catch (RetriableOperationException | AttemptsExceededException e) {
           throw new RuntimeException(e);
         }
