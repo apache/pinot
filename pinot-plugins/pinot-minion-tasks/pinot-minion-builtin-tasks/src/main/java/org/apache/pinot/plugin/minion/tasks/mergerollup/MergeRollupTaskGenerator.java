@@ -66,14 +66,14 @@ import org.slf4j.LoggerFactory;
  * A {@link PinotTaskGenerator} implementation for generating tasks of type {@link MergeRollupTask}
  *
  * Assumptions:
- *  - When the MergeRollupTask starts the first time, records older than the bufferTimeMs have already been ingested.
- *    If not, newly ingested records older than the bufferTimeMs may not be properly merged (Due to the latest
- *    watermarks advanced too far before records are ingested).
+ *  - When the MergeRollupTask starts the first time, records older than the min(now ms, max end time ms of all ready to
+ *    process segments) - bufferTimeMs have already been ingested. If not, newly ingested records older than that time
+ *    may not be properly merged (Due to the latest watermarks advanced too far before records are ingested).
  *  - If it is needed, there are backfill protocols to ingest and replace records older than the latest watermarks.
  *    Those protocols can handle time alignment (according to merge levels configurations) correctly.
  *  - If it is needed, there are reconcile protocols to merge & rollup newly ingested segments that are (1) older than
  *    the latest watermarks, and (2) not time aligned according to merge levels configurations
- *    - For realtime tables, those protocols are needed if streaming records reach late (older thant the latest
+ *    - For realtime tables, those protocols are needed if streaming records arrive late (older thant the latest
  *      watermarks)
  *    - For offline tables, those protocols are needed if there are non-time-aligned segments ingested accidentally.
  *
@@ -451,15 +451,15 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   @VisibleForTesting
   static List<SegmentZKMetadata> filterSegmentsBasedOnStatus(TableType tableType, List<SegmentZKMetadata> allSegments) {
     if (tableType == TableType.REALTIME) {
-      // For realtime table, filter out
+      // For realtime table, don't process
       // 1. in-progress segments
       // 2. sealed segments with start time later than the earliest start time of all in progress segments
       // This prevents those in-progress segments from not being merged.
       //
       // Note that we make the following two assumptions here:
       // 1. streaming data consumer lags are negligible
-      // 2. streaming data records are ingested mostly in chronological order (no records are ingested later than
-      //    bufferTimeMS)
+      // 2. streaming data records are ingested mostly in chronological order (no records are ingested with delay larger
+      //    than bufferTimeMS)
       long earliestStartTimeMsOfInProgressSegments = Long.MAX_VALUE;
       for (SegmentZKMetadata segmentZKMetadata : allSegments) {
         if (!segmentZKMetadata.getStatus().isCompleted()
