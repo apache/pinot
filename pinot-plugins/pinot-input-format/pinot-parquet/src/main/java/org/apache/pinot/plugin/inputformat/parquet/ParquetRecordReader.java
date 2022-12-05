@@ -27,6 +27,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
+import static org.apache.pinot.plugin.inputformat.parquet.ParquetUtils.unpackIfRequired;
+
 
 /**
  * Pinot Record reader for Parquet file.<p>
@@ -39,6 +41,7 @@ public class ParquetRecordReader implements RecordReader {
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
+    File parquetFile = unpackIfRequired(dataFile);
     if (recordReaderConfig != null && ((ParquetRecordReaderConfig) recordReaderConfig).useParquetAvroRecordReader()) {
       _internalParquetRecordReader = new ParquetAvroRecordReader();
     } else if (recordReaderConfig != null
@@ -47,14 +50,14 @@ public class ParquetRecordReader implements RecordReader {
       _internalParquetRecordReader = new ParquetNativeRecordReader();
     } else {
       // No reader type specified. Determine using file metadata
-      if (ParquetUtils.hasAvroSchemaInFileMetadata(new Path(dataFile.getAbsolutePath()))) {
+      if (ParquetUtils.hasAvroSchemaInFileMetadata(new Path(parquetFile.getAbsolutePath()))) {
         _internalParquetRecordReader = new ParquetAvroRecordReader();
       } else {
         _useAvroParquetRecordReader = false;
         _internalParquetRecordReader = new ParquetNativeRecordReader();
       }
     }
-    _internalParquetRecordReader.init(dataFile, fieldsToRead, recordReaderConfig);
+    _internalParquetRecordReader.init(parquetFile, fieldsToRead, recordReaderConfig);
   }
 
   @Override

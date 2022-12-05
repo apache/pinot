@@ -25,6 +25,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.GZIPInputStream;
 
@@ -56,5 +57,14 @@ public class RecordReaderUtils {
       fileInputStream.close();
       return new FileInputStream(dataFile);
     }
+  }
+
+  public static boolean isGZippedFile(File file)
+          throws IOException {
+    int magic = 0;
+    try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+      magic = raf.read() & 0xff | ((raf.read() << 8) & 0xff00);
+    }
+    return magic == GZIPInputStream.GZIP_MAGIC;
   }
 }

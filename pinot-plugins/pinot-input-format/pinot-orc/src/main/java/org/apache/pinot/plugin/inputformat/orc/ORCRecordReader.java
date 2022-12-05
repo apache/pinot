@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -80,7 +81,7 @@ public class ORCRecordReader implements RecordReader {
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     Configuration configuration = new Configuration();
-    File orcFile = unzipIfRequired(dataFile);
+    File orcFile = unpackIfRequired(dataFile);
     Reader orcReader = OrcFile.createReader(new Path(orcFile.getAbsolutePath()),
         OrcFile.readerOptions(configuration).filesystem(FileSystem.getLocal(configuration)));
     TypeDescription orcSchema = orcReader.getSchema();
@@ -110,12 +111,11 @@ public class ORCRecordReader implements RecordReader {
     _nextRowId = 0;
   }
 
-  private File unzipIfRequired(File dataFile) throws IOException {
-    if (dataFile.getName().endsWith(".gz")) {
+  private File unpackIfRequired(File dataFile) throws IOException {
+    if (RecordReaderUtils.isGZippedFile(dataFile)) {
       try(final InputStream inputStream = RecordReaderUtils.getInputStream(dataFile)) {
-        String pathname = dataFile.getAbsolutePath().split(".gz")[0];
-        File targetFile = new File(pathname);
-        Files.copy(inputStream, targetFile.toPath());
+        File targetFile = new File(String.format("%s.orc", dataFile.getAbsolutePath()));
+        Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
         return targetFile;
       }
     } else {

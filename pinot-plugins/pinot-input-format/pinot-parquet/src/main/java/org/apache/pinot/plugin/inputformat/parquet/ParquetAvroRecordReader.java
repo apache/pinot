@@ -30,6 +30,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
+import static org.apache.pinot.plugin.inputformat.parquet.ParquetUtils.unpackIfRequired;
+
 
 /**
  * Avro Record reader for Parquet file. This reader doesn't read parquet file with incompatible Avro schemas,
@@ -48,7 +50,8 @@ public class ParquetAvroRecordReader implements RecordReader {
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    _dataFilePath = new Path(dataFile.getAbsolutePath());
+    File parquetFile = unpackIfRequired(dataFile);
+    _dataFilePath = new Path(parquetFile.getAbsolutePath());
     _parquetReader = ParquetUtils.getParquetAvroReader(_dataFilePath);
     _recordExtractor = new AvroRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
