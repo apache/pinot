@@ -273,15 +273,17 @@ public abstract class FilterOperand extends TransformOperand {
       // TODO: Correctly throw exception instead of returning null.
       // Currently exception thrown during constructor is not piped back to query dispatcher, thus in order to
       // avoid silent failure, we deliberately set to null here, make the exception thrown during data processing.
+      // TODO: right now all the numeric columns are still doing conversion b/c even if the dataSchema asked for
+      // one of the number type, it might not contain the exact type in the payload.
       if (_lhs._resultType == null || _lhs._resultType == DataSchema.ColumnDataType.OBJECT
         || _rhs._resultType == null || _rhs._resultType == DataSchema.ColumnDataType.OBJECT) {
         _requireCasting = false;
         _commonCastType = null;
       } else if (_lhs._resultType.isSuperTypeOf(_rhs._resultType)) {
-        _requireCasting = _lhs._resultType != _rhs._resultType;
+        _requireCasting = _lhs._resultType != _rhs._resultType || _lhs._resultType.isNumber();
         _commonCastType = _lhs._resultType;
       } else if (_rhs._resultType.isSuperTypeOf(_lhs._resultType)) {
-        _requireCasting = _lhs._resultType != _rhs._resultType;
+        _requireCasting = _lhs._resultType != _rhs._resultType || _rhs._resultType.isNumber();
         _commonCastType = _rhs._resultType;
       } else {
         _requireCasting = false;
