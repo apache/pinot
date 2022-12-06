@@ -150,14 +150,16 @@ public class MailboxSendOperatorTest {
         server -> new StringMailboxIdentifier("123:from:1:to:2"), _exchangeFactory);
     TransferableBlock dataBlock = block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
     Mockito.when(_input.nextBlock())
-        .thenReturn(dataBlock);
+        .thenReturn(dataBlock)
+        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    operator.nextBlock();
 
     // Then:
-    Assert.assertSame(block.getType(), DataBlock.Type.ROW, "expected data block to propagate");
-    Mockito.verify(_exchange).send(dataBlock);
+    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    Mockito.verify(_exchange).send(captor.capture());
+    Assert.assertSame(captor.getValue().getType(), DataBlock.Type.ROW, "expected data block to propagate");
   }
 
   private static TransferableBlock block(DataSchema schema, Object[]... rows) {

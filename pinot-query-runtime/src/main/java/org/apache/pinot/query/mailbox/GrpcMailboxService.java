@@ -20,6 +20,7 @@ package org.apache.pinot.query.mailbox;
 
 import io.grpc.ManagedChannel;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -54,10 +55,11 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   private final ConcurrentHashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap =
       new ConcurrentHashMap<>();
 
-  public GrpcMailboxService(String hostname, int mailboxPort, PinotConfiguration extraConfig) {
+  public GrpcMailboxService(String hostname, int mailboxPort, PinotConfiguration extraConfig,
+      Consumer<MailboxIdentifier> gotMailCallback) {
     _hostname = hostname;
     _mailboxPort = mailboxPort;
-    _channelManager = new ChannelManager(this, extraConfig);
+    _channelManager = new ChannelManager(this, extraConfig, gotMailCallback);
   }
 
   @Override

@@ -165,28 +165,31 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
    */
   private boolean consumeInputBlocks() {
     TransferableBlock block = _inputOperator.nextBlock();
-    // setting upstream error block
-    if (block.isErrorBlock()) {
-      _upstreamErrorBlock = block;
-      return true;
-    } else if (block.isEndOfStreamBlock()) {
-      _readyToConstruct = true;
-      return true;
-    }
+    while (!block.isNoOpBlock()) {
+      // setting upstream error block
+      if (block.isErrorBlock()) {
+        _upstreamErrorBlock = block;
+        return true;
+      } else if (block.isEndOfStreamBlock()) {
+        _readyToConstruct = true;
+        return true;
+      }
 
-    DataBlock dataBlock = block.getDataBlock();
-    int numRows = dataBlock.getNumberOfRows();
-    if (numRows > 0) {
-      RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
-            dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
-        Key key = extraRowKey(row, _groupSet);
-        _groupByKeyHolder.put(key, key.getValues());
-        for (int i = 0; i < _aggCalls.size(); i++) {
-          _accumulators[i].accumulate(key, row);
+      DataBlock dataBlock = block.getDataBlock();
+      int numRows = dataBlock.getNumberOfRows();
+      if (numRows > 0) {
+        RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
+              dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
+          Key key = extraRowKey(row, _groupSet);
+          _groupByKeyHolder.put(key, key.getValues());
+          for (int i = 0; i < _aggCalls.size(); i++) {
+            _accumulators[i].accumulate(key, row);
+          }
         }
       }
+      block = _inputOperator.nextBlock();
     }
     return false;
   }

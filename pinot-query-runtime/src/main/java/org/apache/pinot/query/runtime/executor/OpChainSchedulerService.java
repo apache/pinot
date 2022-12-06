@@ -95,9 +95,9 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
 
               if (!result.isEndOfStreamBlock()) {
                 // not complete, needs to re-register for scheduling
-                register(operatorChain);
+                register(operatorChain, false);
               } else {
-                LOGGER.info("Execution time: " + timer.getThreadTimeNs());
+                LOGGER.debug("Execution time: " + timer.getThreadTimeNs());
               }
             } catch (Exception e) {
               LOGGER.error("Failed to execute query!", e);
@@ -116,9 +116,13 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    * @param operatorChain the chain to register
    */
   public final void register(OpChain operatorChain) {
+    register(operatorChain, true);
+  }
+
+  public final void register(OpChain operatorChain, boolean isNew) {
     _monitor.enter();
     try {
-      _scheduler.register(operatorChain);
+      _scheduler.register(operatorChain, isNew);
     } finally {
       _monitor.leave();
     }

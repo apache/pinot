@@ -122,24 +122,27 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   private void buildBroadcastHashTable() {
     TransferableBlock rightBlock = _rightTableOperator.nextBlock();
-    if (rightBlock.isErrorBlock()) {
-      _upstreamErrorBlock = rightBlock;
-      return;
-    }
+    while (!rightBlock.isNoOpBlock()) {
 
-    if (TransferableBlockUtils.isEndOfStream(rightBlock)) {
-      _isHashTableBuilt = true;
-      return;
-    } else if (TransferableBlockUtils.isNoOpBlock(rightBlock)) {
-      return;
-    }
+      if (rightBlock.isErrorBlock()) {
+        _upstreamErrorBlock = rightBlock;
+        return;
+      }
 
-    List<Object[]> container = rightBlock.getContainer();
-    // put all the rows into corresponding hash collections keyed by the key selector function.
-    for (Object[] row : container) {
-      List<Object[]> hashCollection =
-          _broadcastHashTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>());
-      hashCollection.add(row);
+      if (TransferableBlockUtils.isEndOfStream(rightBlock)) {
+        _isHashTableBuilt = true;
+        return;
+      }
+
+      List<Object[]> container = rightBlock.getContainer();
+      // put all the rows into corresponding hash collections keyed by the key selector function.
+      for (Object[] row : container) {
+        List<Object[]> hashCollection = _broadcastHashTable.computeIfAbsent(
+            new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>());
+        hashCollection.add(row);
+      }
+
+      rightBlock = _rightTableOperator.nextBlock();
     }
   }
 

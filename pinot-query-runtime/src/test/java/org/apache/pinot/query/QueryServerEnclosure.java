@@ -21,6 +21,7 @@ package org.apache.pinot.query;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -127,11 +128,15 @@ public class QueryServerEnclosure {
   }
 
   public void shutDown() {
-    _queryRunner.shutDown();
-    _scheduler.stopAsync().awaitTerminated();
+    try {
+      _queryRunner.shutDown();
+      _scheduler.stopAsync().awaitTerminated();
+    } catch (TimeoutException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
-    _queryRunner.processQuery(distributedStagePlan, _scheduler, requestMetadataMap);
+    _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
   }
 }
