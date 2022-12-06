@@ -87,7 +87,7 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKe
  *  TODO: Add support for the following:
  *  1. Segment versions < V3
  */
-public class ForwardIndexHandler extends BaseForwardIndexBasedIndexHandler {
+public class ForwardIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(ForwardIndexHandler.class);
 
   // This should contain a list of all indexes that need to be rewritten if the dictionary is enabled or disabled

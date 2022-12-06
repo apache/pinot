@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
@@ -64,15 +64,14 @@ import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EX
  * added column. In this case, the default column handler would have taken care of adding
  * dictionary for the new column. Read the dictionary to create FST index.
  */
-public class FSTIndexHandler implements IndexHandler {
+public class FSTIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(FSTIndexHandler.class);
 
-  private final SegmentMetadata _segmentMetadata;
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
 
   public FSTIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    _segmentMetadata = segmentMetadata;
+    super(segmentMetadata, indexLoadingConfig);
     _fstType = indexLoadingConfig.getFSTIndexType();
     _columnsToAddIdx = indexLoadingConfig.getFSTIndexColumns();
   }
@@ -120,6 +119,11 @@ public class FSTIndexHandler implements IndexHandler {
         createFSTIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
+  }
+
+  @Override
+  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
+      throws Exception {
   }
 
   private boolean shouldCreateFSTIndex(ColumnMetadata columnMetadata) {

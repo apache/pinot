@@ -41,7 +41,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.segment.local.segment.index.loader.BaseForwardIndexBasedIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
  * forward index for the new column. Read the forward index to create text index.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class TextIndexHandler extends BaseForwardIndexBasedIndexHandler {
+public class TextIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
 
   private final Set<String> _columnsToAddIdx;

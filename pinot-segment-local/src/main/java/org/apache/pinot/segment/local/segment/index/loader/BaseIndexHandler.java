@@ -32,18 +32,20 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Base class for all of the {@link IndexHandler} classes which need to build their indexes from the forward index.
- * This class handles temporarily rebuilding the forward index if the forward index does not exist and cleaning up
- * the forward index once all handlers have completed via overriding the postUpdateIndicesCleanup() method.
+ * Base class for all of the {@link IndexHandler} classes. This class provides a mechanism to rebuild the forward
+ * index if the forward index does not exist and is required to rebuild the index of interest. It also handles cleaning
+ * up the forward index if temporarily built once all handlers have completed via overriding the
+ * postUpdateIndicesCleanup() method. For {@link IndexHandler} classes which do not utilize the forward index or do not
+ * need this behavior, the postUpdateIndicesCleanup() method can be overridden to be a no-op.
  */
-public abstract class BaseForwardIndexBasedIndexHandler implements IndexHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseForwardIndexBasedIndexHandler.class);
+public abstract class BaseIndexHandler implements IndexHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseIndexHandler.class);
 
   protected final SegmentMetadata _segmentMetadata;
   protected final IndexLoadingConfig _indexLoadingConfig;
   protected final Set<String> _tmpForwardIndexColumns;
 
-  public BaseForwardIndexBasedIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
+  public BaseIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
     _indexLoadingConfig = indexLoadingConfig;
     _tmpForwardIndexColumns = new HashSet<>();
@@ -75,6 +77,7 @@ public abstract class BaseForwardIndexBasedIndexHandler implements IndexHandler 
     Preconditions.checkState(segmentWriter.hasIndexFor(columnName, ColumnIndexType.INVERTED_INDEX),
         String.format("Forward index disabled column %s must have an inverted index", columnName));
 
+    LOGGER.info("Rebuilding the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
     InvertedIndexAndDictionaryBasedForwardIndexCreator invertedIndexAndDictionaryBasedForwardIndexCreator =
         new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentMetadata, _indexLoadingConfig,
             segmentWriter, indexCreatorProvider, isTemporaryForwardIndex);
@@ -89,5 +92,7 @@ public abstract class BaseForwardIndexBasedIndexHandler implements IndexHandler 
     if (isTemporaryForwardIndex) {
       _tmpForwardIndexColumns.add(columnName);
     }
+
+    LOGGER.info("Rebuilt the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
   }
 }

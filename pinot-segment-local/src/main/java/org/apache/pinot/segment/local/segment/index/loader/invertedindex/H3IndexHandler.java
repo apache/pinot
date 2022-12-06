@@ -25,7 +25,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.BaseForwardIndexBasedIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class H3IndexHandler extends BaseForwardIndexBasedIndexHandler {
+public class H3IndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(H3IndexHandler.class);
 
   private final Map<String, H3IndexConfig> _h3Configs;
