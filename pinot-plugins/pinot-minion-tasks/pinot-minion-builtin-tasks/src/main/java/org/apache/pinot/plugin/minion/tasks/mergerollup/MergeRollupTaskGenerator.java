@@ -494,21 +494,21 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
    */
   @VisibleForTesting
   static boolean validate(TableConfig tableConfig, String taskType) {
-    String tableName = tableConfig.getTableName();
+    String tableNameWithType = tableConfig.getTableName();
     if (REFRESH.equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig))) {
       LOGGER.warn("Skip generating task: {} for non-APPEND table: {}, REFRESH table is not supported", taskType,
-          tableName);
+          tableNameWithType);
       return false;
     }
     if (tableConfig.getTableType() == TableType.REALTIME) {
       if (tableConfig.isUpsertEnabled()) {
         LOGGER.warn("Skip generating task: {} for table: {}, table with upsert enabled is not supported", taskType,
-            tableName);
+            tableNameWithType);
         return false;
       }
       if (tableConfig.isDedupEnabled()) {
         LOGGER.warn("Skip generating task: {} for table: {}, table with dedup enabled is not supported", taskType,
-            tableName);
+            tableNameWithType);
         return false;
       }
     }
