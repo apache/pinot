@@ -452,7 +452,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   static List<SegmentZKMetadata> filterSegmentsBasedOnStatus(TableType tableType, List<SegmentZKMetadata> allSegments) {
     if (tableType == TableType.REALTIME) {
       // For realtime table, don't process
-      // 1. in-progress segments
+      // 1. in-progress segments (Segment.Realtime.Status.IN_PROGRESS)
       // 2. sealed segments with start time later than the earliest start time of all in progress segments
       // This prevents those in-progress segments from not being merged.
       //
@@ -460,6 +460,17 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       // 1. streaming data consumer lags are negligible
       // 2. streaming data records are ingested mostly in chronological order (no records are ingested with delay larger
       //    than bufferTimeMS)
+      //
+      // We don't handle the following cases intentionally because it will be either overkill or too complex
+      // 1. New partition added. If new partitions are not picked up timely, the MergeRollupTask will move watermarks
+      //    forward, and may not be able to merge some lately-created segments for those new partitions -- users should
+      //    configure pinot properly to discover new partitions timely, or they should restart pinot servers manually
+      //    for new partitions to be picked up
+      // 2. (1) no new in-progress segments are created for some partitions (2) new in-progress segments are created for
+      //    partitions, but there is no record consumed (i.e, empty in-progress segments). In those two cases,
+      //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
+      //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
+      //    records correctly.
       long earliestStartTimeMsOfInProgressSegments = Long.MAX_VALUE;
       for (SegmentZKMetadata segmentZKMetadata : allSegments) {
         if (!segmentZKMetadata.getStatus().isCompleted()
