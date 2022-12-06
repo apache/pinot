@@ -46,11 +46,13 @@ import org.apache.pinot.core.common.MinionConstants.MergeRollupTask;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -558,12 +560,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     String partitionSuffix = partitionSuffixBuilder.toString();
 
     for (int i = 0; i < segmentNamesList.size(); i++) {
-      Map<String, String> configs = new HashMap<>();
+      String downloadURL = StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR);
+      Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(offlineTableName, taskConfigs,
+          _clusterInfoAccessor);
       configs.put(MinionConstants.TABLE_NAME_KEY, offlineTableName);
       configs.put(MinionConstants.SEGMENT_NAME_KEY,
           StringUtils.join(segmentNamesList.get(i), MinionConstants.SEGMENT_NAME_SEPARATOR));
-      configs.put(MinionConstants.DOWNLOAD_URL_KEY,
-          StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR));
+      configs.put(MinionConstants.DOWNLOAD_URL_KEY, downloadURL);
       configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
       configs.put(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY, "true");
 
@@ -573,6 +576,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         }
       }
 
+      configs.put(BatchConfigProperties.OVERWRITE_OUTPUT,
+          taskConfigs.getOrDefault(BatchConfigProperties.OVERWRITE_OUTPUT, "false"));
       configs.put(MergeRollupTask.MERGE_TYPE_KEY, mergeConfigs.get(MergeTask.MERGE_TYPE_KEY));
       configs.put(MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
       configs.put(MergeTask.PARTITION_BUCKET_TIME_PERIOD_KEY, mergeConfigs.get(MergeTask.BUCKET_TIME_PERIOD_KEY));
