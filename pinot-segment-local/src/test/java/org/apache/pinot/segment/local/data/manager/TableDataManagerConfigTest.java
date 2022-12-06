@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.data.manager;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.testng.annotations.Test;
@@ -37,7 +38,8 @@ public class TableDataManagerConfigTest {
     // Use tableConfig's peer download scheme is present
     Configuration defaultConfig = new PropertiesConfiguration();
     defaultConfig.addProperty("peerDownloadScheme", "foo");
-    TableDataManagerConfig finalConfig = new TableDataManagerConfig(defaultConfig);
+    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    TableDataManagerConfig finalConfig = new TableDataManagerConfig(defaultConfig, instanceDataManagerConfig);
     TableConfig tableConfig = mock(TableConfig.class);
     SegmentsValidationAndRetentionConfig segConfig = mock(SegmentsValidationAndRetentionConfig.class);
     when(tableConfig.getValidationConfig()).thenReturn(segConfig);
@@ -46,7 +48,7 @@ public class TableDataManagerConfigTest {
     assertEquals("http", finalConfig.getTablePeerDownloadScheme());
 
     // Use default value if tableConfig's peer download scheme is absent
-    finalConfig = new TableDataManagerConfig(new PropertiesConfiguration());
+    finalConfig = new TableDataManagerConfig(new PropertiesConfiguration(), instanceDataManagerConfig);
     when(segConfig.getPeerSegmentDownloadScheme()).thenReturn(null);
     finalConfig.overrideConfigs(tableConfig);
     assertNull(finalConfig.getTablePeerDownloadScheme());
