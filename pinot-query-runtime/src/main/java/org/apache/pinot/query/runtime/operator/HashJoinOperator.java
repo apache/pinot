@@ -59,12 +59,11 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 public class HashJoinOperator extends BaseOperator<TransferableBlock> {
-  private static class JoinResolver{
-    public static JoinResolver create(JoinRelType joinType,
-        Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
-        KeySelector leftKeySelector, KeySelector rightKeySelector){
+  private static class JoinResolver {
+    public static JoinResolver create(JoinRelType joinType, Operator<TransferableBlock> leftTableOperator,
+        Operator<TransferableBlock> rightTableOperator, KeySelector leftKeySelector, KeySelector rightKeySelector) {
       JoinResolver resolver = new JoinResolver();
-      switch (joinType){
+      switch (joinType) {
         case LEFT:
         case INNER:
           resolver._broadcastOperator = rightTableOperator;
@@ -75,7 +74,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
           resolver._getRightRow = (Object[] probeRow, Object[] broadcastRow) -> broadcastRow;
           break;
         case RIGHT:
-           resolver._broadcastOperator = leftTableOperator;
+          resolver._broadcastOperator = leftTableOperator;
           resolver._probeOperator = rightTableOperator;
           resolver._probeKeySelector = rightKeySelector;
           resolver._broadcastKeySelector = leftKeySelector;
@@ -83,11 +82,12 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
           resolver._getRightRow = (Object[] probeRow, Object[] broadcastRow) -> probeRow;
           break;
         default:
-           Preconditions.checkState(false, "Join type shouldn't be supported:" + joinType);
-           break;
+          Preconditions.checkState(false, "Join type shouldn't be supported:" + joinType);
+          break;
       }
       return resolver;
     }
+
     public Operator<TransferableBlock> _broadcastOperator;
     public Operator<TransferableBlock> _probeOperator;
     public KeySelector<Object[], Object[]> _broadcastKeySelector;
@@ -95,6 +95,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     public BiFunction<Object[], Object[], Object[]> _getLeftRow;
     public BiFunction<Object[], Object[], Object[]> _getRightRow;
   }
+
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES =
       ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT);
@@ -132,8 +133,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     _isHashTableBuilt = false;
     _broadcastHashTable = new HashMap<>();
     _upstreamErrorBlock = null;
-    _joinResolver = JoinResolver.create(_joinType, leftTableOperator, rightTableOperator, leftKeySelector,
-        rightKeySelector);
+    _joinResolver =
+        JoinResolver.create(_joinType, leftTableOperator, rightTableOperator, leftKeySelector, rightKeySelector);
   }
 
   @Override
@@ -185,7 +186,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     // put all the rows into corresponding hash collections keyed by the key selector function.
     for (Object[] row : container) {
       List<Object[]> hashCollection =
-          _broadcastHashTable.computeIfAbsent(new Key(_joinResolver._broadcastKeySelector.getKey(row)), k -> new ArrayList<>());
+          _broadcastHashTable.computeIfAbsent(new Key(_joinResolver._broadcastKeySelector.getKey(row)),
+              k -> new ArrayList<>());
       hashCollection.add(row);
     }
   }
@@ -203,7 +205,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     for (Object[] probeRow : container) {
       // NOTE: Empty key selector will always give same hash code.
       List<Object[]> hashCollection =
-          _broadcastHashTable.getOrDefault(new Key(_joinResolver._probeKeySelector.getKey(probeRow)), Collections.emptyList());
+          _broadcastHashTable.getOrDefault(new Key(_joinResolver._probeKeySelector.getKey(probeRow)),
+              Collections.emptyList());
       // If it is a left join and right table is empty, we return left rows.
       if (hashCollection.isEmpty() && (_joinType == JoinRelType.LEFT || _joinType == JoinRelType.RIGHT)) {
         rows.add(joinRow(probeRow, null));
