@@ -56,8 +56,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
-import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -317,16 +315,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
     switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
       case TAR:
-        try {
           File tarFile = new File(outputSegmentTarURI);
           String segmentName = segmentConversionResult.getSegmentName();
           String tableNameWithType = segmentConversionResult.getTableNameWithType();
           String uploadURL = taskConfigs.get(MinionConstants.UPLOAD_URL_KEY);
           SegmentConversionUtils.uploadSegment(taskConfigs, headers, parameters, tableNameWithType, segmentName,
               uploadURL, tarFile);
-        } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(e);
-        }
         break;
       case METADATA:
         if (taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
@@ -336,8 +330,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
                 SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
                     new String[]{outputSegmentTarURI.toString()});
             SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, headers, parameters);
-          } catch (RetriableOperationException | AttemptsExceededException e) {
-            throw new RuntimeException(e);
           }
         } else {
           throw new RuntimeException("Output dir URI missing for metadata push");
