@@ -150,7 +150,7 @@ public final class RelToStageConverter {
       case BIGINT:
         return DataSchema.ColumnDataType.LONG;
       case DECIMAL:
-        return DataSchema.ColumnDataType.BIG_DECIMAL;
+        return resolveDecimal(relDataTypeField);
       case FLOAT:
         return DataSchema.ColumnDataType.FLOAT;
       case REAL:
@@ -169,6 +169,35 @@ public final class RelToStageConverter {
       default:
         throw new IllegalStateException("Unexpected RelDataTypeField: " + relDataTypeField.getType() + " for column: "
             + relDataTypeField.getName());
+    }
+  }
+
+  /**
+   * Calcite uses DEMICAL type to infer data type hoisting and infer arithmetic result types. down casting this
+   * back to the proper primitive type for Pinot.
+   *
+   * @param relDataType the DECIMAL rel data type.
+   * @return proper {@link DataSchema.ColumnDataType}.
+   */
+  private static DataSchema.ColumnDataType resolveDecimal(RelDataTypeField relDataType) {
+    int precision = relDataType.getType().getPrecision();
+    int scale = relDataType.getType().getScale();
+    if (scale == 0) {
+      if (precision <= 10) {
+        return DataSchema.ColumnDataType.INT;
+      } else if (precision <= 38) {
+        return DataSchema.ColumnDataType.LONG;
+      } else {
+        return DataSchema.ColumnDataType.BIG_DECIMAL;
+      }
+    } else {
+      if (precision <= 14) {
+        return DataSchema.ColumnDataType.FLOAT;
+      } else if (precision <= 30) {
+        return DataSchema.ColumnDataType.DOUBLE;
+      } else {
+        return DataSchema.ColumnDataType.BIG_DECIMAL;
+      }
     }
   }
 }
