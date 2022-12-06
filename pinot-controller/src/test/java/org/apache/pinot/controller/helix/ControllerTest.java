@@ -41,6 +41,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
+import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.ResourceConfig;
@@ -253,6 +254,10 @@ public class ControllerTest {
       case PINOT_ONLY:
         _helixAdmin = _helixResourceManager.getHelixAdmin();
         _propertyStore = _helixResourceManager.getPropertyStore();
+        // TODO: Enable periodic rebalance per 10 seconds as a temporary work-around for the Helix issue:
+        //       https://github.com/apache/helix/issues/331 and https://github.com/apache/helix/issues/2309.
+        //       Remove this after Helix fixing the issue.
+        configAccessor.set(scope, ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000");
         break;
       case HELIX_ONLY:
         _helixAdmin = _helixManager.getClusterManagmentTool();
