@@ -37,20 +37,7 @@
       { "sql": "SELECT intCol as \"from\" FROM {tbl1}"},
       { "sql": "SELECT intCol as key, SUM(doubleCol + floatCol) AS aggSum FROM {tbl1} GROUP BY intCol"},
       { "sql": "SELECT intCol, SUM(avgVal) FROM (SELECT strCol, intCol, AVG(doubleCol) AS avgVal FROM {tbl1} GROUP BY intCol, strCol) GROUP BY intCol"},
-      { "sql": "SELECT strCol, MAX(sumVal), MAX(sumVal + avgVal) AS transVal FROM (SELECT strCol, intCol, SUM(floatCol + 2 * intCol) AS sumVal, AVG(doubleCol) AS avgVal FROM {tbl1} GROUP BY strCol, intCol) GROUP BY strCol ORDER BY MAX(sumVal)" },
-      { "sql": "SELECT intCol, intCol FROM {tbl1} WHERE intCol < 100" },
-      { "sql": "SELECT intCol, intCol, doubleCol, strCol, strCol FROM {tbl1}" },
-      { "sql": "SELECT intCol, intCol FROM {tbl1} WHERE intCol < 100 ORDER BY doubleCol" },
-      { "sql": "SELECT intCol, intCol FROM {tbl1} WHERE intCol < 100 ORDER BY intCol" },
-      { "sql": "SELECT intCol, intCol, doubleCol, strCol, strCol FROM {tbl1} ORDER BY intCol" },
-      { "sql": "SELECT intCol, intCol, doubleCol, strCol, strCol FROM {tbl1} ORDER BY strCol, intCol" },
-      { "sql": "SELECT intCol, intCol, doubleCol, strCol, strCol FROM {tbl1} ORDER BY floatCol, intCol" },
-      { "sql": "SELECT intCol, intCol, doubleCol, strCol, strCol FROM {tbl1} ORDER BY floatCol" },
-
-      { "sql": "SELECT intCol + alias FROM (SELECT intCol, intCol as alias FROM {tbl1}) WHERE intCol < 100" },
-      { "sql": "SELECT intCol, intCol, doubleCol, strCol, strCol FROM {tbl1}" },
-      { "sql": "SELECT {tbl1}.intCol, {tbl1}.intCol, {tbl1}.doubleCol, {tbl2}.strCol, {tbl2}.strCol FROM {tbl1}, {tbl2} WHERE {tbl1}.intCol = {tbl2}.intCol" },
-      { "sql": "SELECT {tbl2}.intCol, {tbl2}.intCol FROM {tbl1}, {tbl2} WHERE {tbl1}.intCol = {tbl2}.intCol AND {tbl1}.intCol < 100 ORDER BY {tbl1}.doubleCol" }
+      { "sql": "SELECT strCol, MAX(sumVal), MAX(sumVal + avgVal) AS transVal FROM (SELECT strCol, intCol, SUM(floatCol + 2 * intCol) AS sumVal, AVG(doubleCol) AS avgVal FROM {tbl1} GROUP BY strCol, intCol) GROUP BY strCol ORDER BY MAX(sumVal)" }
     ]
   }
 }

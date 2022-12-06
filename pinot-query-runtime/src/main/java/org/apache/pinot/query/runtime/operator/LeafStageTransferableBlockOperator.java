@@ -18,14 +18,11 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.clearspring.analytics.util.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -35,13 +32,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
-import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
-import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
@@ -63,12 +54,10 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
 
   private final InstanceResponseBlock _errorBlock;
   private final List<InstanceResponseBlock> _baseResultBlock;
-  private final DataSchema _desiredDataSchema;
   private int _currentIndex;
 
   public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema) {
     _baseResultBlock = baseResultBlock;
-    _desiredDataSchema = dataSchema;
     _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
     _currentIndex = 0;
   }
@@ -95,191 +84,19 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
     } else {
       if (_currentIndex < _baseResultBlock.size()) {
         InstanceResponseBlock responseBlock = _baseResultBlock.get(_currentIndex++);
-        if (responseBlock.getResultsBlock() != null) {
-          return composeTransferableBlock(responseBlock, _desiredDataSchema);
+        BaseResultsBlock resultsBlock = responseBlock.getResultsBlock();
+        if (resultsBlock != null) {
+          List<Object[]> rows =
+              toList(resultsBlock.getRows(responseBlock.getQueryContext()), responseBlock.getDataSchema());
+          return new TransferableBlock(rows, responseBlock.getDataSchema(), DataBlock.Type.ROW);
         } else {
-          return new TransferableBlock(Collections.emptyList(), _desiredDataSchema, DataBlock.Type.ROW);
+          return new TransferableBlock(Collections.emptyList(), responseBlock.getDataSchema(), DataBlock.Type.ROW);
         }
       } else {
         _currentIndex = -1;
         return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
       }
     }
-  }
-
-  /**
-   * this is data transfer block compose method is here to ensure that V1 results match what the expected projection
-   * schema in the calcite logical operator.
-   * <p> it applies different clean up mechanism based on different type of {@link BaseResultsBlock} and the
-   *     {@link org.apache.pinot.core.query.request.context.QueryContext}.</p>
-   * <p> this also applies to the canonicalization of the data types during post post-process step.</p>
-   *
-   * @param responseBlock result block from leaf stage
-   * @param desiredDataSchema the desired schema for send operator
-   * @return the converted {@link TransferableBlock} that conform with the desiredDataSchema
-   */
-  private static TransferableBlock composeTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema) {
-    BaseResultsBlock resultsBlock = responseBlock.getResultsBlock();
-    if (resultsBlock instanceof SelectionResultsBlock) {
-      return composeSelectTransferableBlock(responseBlock, desiredDataSchema);
-    } else if (resultsBlock instanceof AggregationResultsBlock) {
-      return composeAggregationTransferableBlock(responseBlock, desiredDataSchema);
-    } else if (resultsBlock instanceof GroupByResultsBlock) {
-      return composeGroupByTransferableBlock(responseBlock, desiredDataSchema);
-    } else if (resultsBlock instanceof DistinctResultsBlock) {
-      return composeDistinctTransferableBlock(responseBlock, desiredDataSchema);
-    } else {
-      throw new IllegalArgumentException("Unsupported result block type: " + resultsBlock);
-    }
-  }
-
-  /**
-   * we only need to rearrange columns when distinct is not conforming with selection columns, specifically:
-   * <ul>
-   *   <li> when distinct is not returning final result:
-   *       it should never happen as non-final result contains Object opaque columns v2 engine can't process.</li>
-   *   <li> when distinct columns are not all being selected:
-   *       it should never happen as leaf stage MUST return the entire list.</li>
-   * </ul>
-   *
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  @SuppressWarnings("ConstantConditions")
-  private static TransferableBlock composeDistinctTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema) {
-    List<String> selectionColumns = Arrays.asList(
-        ((DistinctAggregationFunction) responseBlock.getQueryContext().getAggregationFunctions()[0]).getColumns());
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, desiredDataSchema);
-    Preconditions.checkState(inOrder(columnIndices), "Incompatible distinct table schema for leaf stage."
-        + "Expected: " + desiredDataSchema + ". Actual: " + desiredDataSchema);
-    return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
-  }
-
-  /**
-   * Calcite generated {@link DataSchema} should conform with Pinot's group by result schema thus we only need to check
-   * for correctness similar to distinct case.
-   *
-   * @see LeafStageTransferableBlockOperator#composeDirectTransferableBlock(InstanceResponseBlock, DataSchema).
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  @SuppressWarnings("ConstantConditions")
-  private static TransferableBlock composeGroupByTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema) {
-    DataSchema resultSchema = responseBlock.getDataSchema();
-    // GROUP-BY column names conforms with selection expression
-    List<String> selectionColumns = responseBlock.getQueryContext().getSelectExpressions().stream()
-        .map(e -> e.toString()).collect(Collectors.toList());
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
-    Preconditions.checkState(inOrder(columnIndices), "Incompatible group by result schema for leaf stage."
-        + "Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
-    return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
-  }
-
-
-  /**
-   * Calcite generated {@link DataSchema} should conform with Pinot's agg result schema thus we only need to check
-   * for correctness similar to distinct case.
-   *
-   * @see LeafStageTransferableBlockOperator#composeDirectTransferableBlock(InstanceResponseBlock, DataSchema).
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  @SuppressWarnings("ConstantConditions")
-  private static TransferableBlock composeAggregationTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema) {
-    DataSchema resultSchema = responseBlock.getDataSchema();
-    // AGG-ONLY column names are derived from AggFunction.getColumnName()
-    List<String> selectionColumns = Arrays.stream(responseBlock.getQueryContext().getAggregationFunctions()).map(
-        a -> a.getColumnName()).collect(Collectors.toList());
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
-    Preconditions.checkState(inOrder(columnIndices), "Incompatible aggregate result schema for leaf stage."
-        + "Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
-    return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
-  }
-
-  /**
-   * Only re-arrange columns to match the projection in the case of select / order-by, when the desiredDataSchema
-   * doesn't conform with the result block schema exactly.
-   *
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  @SuppressWarnings("ConstantConditions")
-  private static TransferableBlock composeSelectTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema) {
-    DataSchema resultSchema = responseBlock.getDataSchema();
-    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(responseBlock.getQueryContext(),
-        resultSchema);
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
-    if (!inOrder(columnIndices)) {
-      DataSchema adjustedResultSchema = SelectionOperatorUtils.getSchemaForProjection(resultSchema, columnIndices);
-      Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
-          adjustedResultSchema.getColumnDataTypes()), "Incompatible result data schema: "
-          + "Expecting: " + desiredDataSchema + " Actual: " + adjustedResultSchema);
-      // Extract the result rows
-      Collection<Object[]> resultRows = responseBlock.getRows();
-      List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
-      return composeColumnIndexedTransferableBlock(responseBlock, adjustedResultSchema, columnIndices);
-    } else {
-      return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
-    }
-  }
-
-  /**
-   * Created {@link TransferableBlock} using column indices.
-   *
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  private static TransferableBlock composeColumnIndexedTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema, int[] columnIndices) {
-    Collection<Object[]> resultRows = responseBlock.getRows();
-    List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
-    if (responseBlock.getQueryContext().getOrderByExpressions() != null) {
-      // extract result row in ordered fashion
-      PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
-      while (!priorityQueue.isEmpty()) {
-        extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema, columnIndices));
-      }
-    } else {
-      // extract result row in non-ordered fashion
-      for (Object[] row : resultRows) {
-        extractedRows.add(canonicalizeRow(row, desiredDataSchema, columnIndices));
-      }
-    }
-    return new TransferableBlock(extractedRows, desiredDataSchema, DataBlock.Type.ROW);
-  }
-
-  /**
-   * Fallback mechanism for {@link TransferableBlock}, used when no special handling is necessary. This method only
-   * performs {@link DataSchema.ColumnDataType} canonicalization.
-   *
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  private static TransferableBlock composeDirectTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema) {
-    Collection<Object[]> resultRows = responseBlock.getRows();
-    List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
-    if (resultRows instanceof List) {
-      for (Object[] orgRow : resultRows) {
-        extractedRows.add(canonicalizeRow(orgRow, desiredDataSchema));
-      }
-    } else if (resultRows instanceof PriorityQueue) {
-      PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
-      while (!priorityQueue.isEmpty()) {
-        extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema));
-      }
-    } else {
-      throw new UnsupportedOperationException("Unsupported collection type: " + resultRows.getClass());
-    }
-    return new TransferableBlock(extractedRows, desiredDataSchema, DataBlock.Type.ROW);
-  }
-
-  private static boolean inOrder(int[] columnIndices) {
-    for (int i = 0; i < columnIndices.length; i++) {
-      if (columnIndices[i] != i) {
-        return false;
-      }
-    }
-    return true;
   }
 
   /**
@@ -294,35 +111,28 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
   private static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema) {
     Object[] resultRow = new Object[row.length];
     for (int colId = 0; colId < row.length; colId++) {
-      Object value = row[colId];
-      if (value != null) {
-        resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
-      }
+      resultRow[colId] = dataSchema.getColumnDataType(colId).convert(row[colId]);
     }
     return resultRow;
   }
 
-  private static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema, int[] columnIndices) {
-    Object[] resultRow = new Object[columnIndices.length];
-    for (int colId = 0; colId < columnIndices.length; colId++) {
-      Object value = row[columnIndices[colId]];
-      if (value != null) {
-        resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
+  private static List<Object[]> toList(Collection<Object[]> collection, DataSchema dataSchema) {
+    if (collection == null || collection.isEmpty()) {
+      return new ArrayList<>();
+    }
+    List<Object[]> resultRows = new ArrayList<>(collection.size());
+    if (collection instanceof List) {
+      for (Object[] orgRow : collection) {
+        resultRows.add(canonicalizeRow(orgRow, dataSchema));
       }
-    }
-    return resultRow;
-  }
-
-  private static boolean isDataSchemaColumnTypesCompatible(DataSchema.ColumnDataType[] desiredTypes,
-      DataSchema.ColumnDataType[] givenTypes) {
-    if (desiredTypes.length != givenTypes.length) {
-      return false;
-    }
-    for (int i = 0; i < desiredTypes.length; i++) {
-      if (desiredTypes[i] != givenTypes[i] && !givenTypes[i].isSuperTypeOf(desiredTypes[i])) {
-        return false;
+    } else if (collection instanceof PriorityQueue) {
+      PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) collection;
+      while (!priorityQueue.isEmpty()) {
+        resultRows.add(canonicalizeRow(priorityQueue.poll(), dataSchema));
       }
+    } else {
+      throw new UnsupportedOperationException("Unsupported collection type: " + collection.getClass());
     }
-    return true;
+    return resultRows;
   }
 }
