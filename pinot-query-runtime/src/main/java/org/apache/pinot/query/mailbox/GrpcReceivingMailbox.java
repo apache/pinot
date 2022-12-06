@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -41,22 +42,26 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   private static final long DEFAULT_MAILBOX_INIT_TIMEOUT = 100L;
   private final GrpcMailboxService _mailboxService;
   private final String _mailboxId;
+  private Consumer<MailboxIdentifier> _gotMailCallback;
   private final CountDownLatch _initializationLatch;
   private final AtomicInteger _totalMsgReceived = new AtomicInteger(0);
 
   private MailboxContentStreamObserver _contentStreamObserver;
 
-  public GrpcReceivingMailbox(String mailboxId, GrpcMailboxService mailboxService) {
+  public GrpcReceivingMailbox(String mailboxId, GrpcMailboxService mailboxService,
+      Consumer<MailboxIdentifier> gotMailCallback) {
     _mailboxService = mailboxService;
     _mailboxId = mailboxId;
+    _gotMailCallback = gotMailCallback;
     _initializationLatch = new CountDownLatch(1);
   }
 
-  public void init(MailboxContentStreamObserver streamObserver) {
+  public Consumer<MailboxIdentifier> init(MailboxContentStreamObserver streamObserver) {
     if (_initializationLatch.getCount() > 0) {
       _contentStreamObserver = streamObserver;
       _initializationLatch.countDown();
     }
+    return _gotMailCallback;
   }
 
   /**
