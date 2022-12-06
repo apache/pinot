@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.loader;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -59,6 +60,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -815,13 +817,17 @@ public class ForwardIndexHandler implements IndexHandler {
       throws Exception {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, SegmentVersion.v3);
     File metadataFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-    PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
 
     for (Map.Entry<String, String> entry : metadataProperties.entrySet()) {
       properties.setProperty(entry.getKey(), entry.getValue());
     }
 
-    properties.save();
+    // Commons Configuration 1.10 does not support file path containing '%'.
+    // Explicitly providing the output stream for save bypasses the problem.
+    try (FileOutputStream fileOutputStream = new FileOutputStream(properties.getFile())) {
+      properties.save(fileOutputStream);
+    }
   }
 
   private void disableDictionaryAndCreateRawForwardIndex(String column, SegmentDirectory.Writer segmentWriter,

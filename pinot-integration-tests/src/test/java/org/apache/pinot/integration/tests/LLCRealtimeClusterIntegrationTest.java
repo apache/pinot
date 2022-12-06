@@ -31,7 +31,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -42,7 +41,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -302,68 +300,18 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     testReload(false);
   }
 
-  private String reloadRealtimeTable(String tableName, boolean forceDownload)
-      throws IOException {
-    String jobId = null;
-    String response =
-        sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.REALTIME, forceDownload),
-            null);
-    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    JsonNode tableLevelDetails =
-        JsonUtils.stringToJsonNode(StringEscapeUtils.unescapeJava(response.split(": ")[1])).get(tableNameWithType);
-    String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
-    assertEquals("SUCCESS", isZKWriteSuccess);
-    jobId = tableLevelDetails.get("reloadJobId").asText();
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(jobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
-
-    // Validate all fields are present
-    assertEquals(jobStatus.get("metadata").get("jobId").asText(), jobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
-    assertEquals(jobStatus.get("metadata").get("tableName").asText(), tableNameWithType);
-    return jobId;
-  }
-
-  private boolean isReloadJobCompleted(String reloadJobId)
-      throws Exception {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(reloadJobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
-
-    assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
-    return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
-  }
-
   @Test
-  public void testDisableDictionaryAndReload()
-      throws Exception {
-    TableConfig tableConfig = getRealtimeTableConfig();
-    tableConfig.getIndexingConfig().getNoDictionaryColumns().add("AirTime");
-    updateTableConfig(tableConfig);
-    String enableDictReloadId = reloadRealtimeTable(getTableName(), false);
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return isReloadJobCompleted(enableDictReloadId);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to reload.");
-
-    assertEquals(5, 5);
-  }
-
-  @Test
-  public void testEnableDisableDictionaryAndReload()
+  public void testEnableDisableDictionaryWithReload()
       throws Exception {
     String query = "SELECT * FROM myTable WHERE ActualElapsedTime > 0";
     JsonNode queryResponse = postQuery(query);
-    long numTotalDocsBefore = queryResponse.get("totalDocs").asLong();
+    long numTotalDocs = queryResponse.get("totalDocs").asLong();
 
     // Enable dictionary.
     TableConfig tableConfig = getRealtimeTableConfig();
     tableConfig.getIndexingConfig().getNoDictionaryColumns().remove("ActualElapsedTime");
     updateTableConfig(tableConfig);
-    String enableDictReloadId = reloadRealtimeTable(getTableName(), false);
+    String enableDictReloadId = reloadTableAndValidateResponse(getTableName(), TableType.REALTIME, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         return isReloadJobCompleted(enableDictReloadId);
@@ -373,14 +321,14 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     }, 60_000L, "Failed to reload.");
 
     queryResponse = postQuery(query);
-    long numTotalDocsAfter = queryResponse.get("totalDocs").asLong();
-    assertEquals(numTotalDocsBefore, numTotalDocsAfter);
+    long numTotalDocsAfterReload = queryResponse.get("totalDocs").asLong();
+    assertEquals(numTotalDocs, numTotalDocsAfterReload);
 
     // Disable dictionary.
     tableConfig = getRealtimeTableConfig();
     tableConfig.getIndexingConfig().getNoDictionaryColumns().add("ActualElapsedTime");
     updateTableConfig(tableConfig);
-    String disableDictReloadId = reloadRealtimeTable(getTableName(), false);
+    String disableDictReloadId = reloadTableAndValidateResponse(getTableName(), TableType.REALTIME, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         return isReloadJobCompleted(disableDictReloadId);
@@ -390,8 +338,8 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     }, 60_000L, "Failed to reload.");
 
     queryResponse = postQuery(query);
-    numTotalDocsAfter = queryResponse.get("totalDocs").asLong();
-    assertEquals(numTotalDocsBefore, numTotalDocsAfter);
+    numTotalDocsAfterReload = queryResponse.get("totalDocs").asLong();
+    assertEquals(numTotalDocs, numTotalDocsAfterReload);
   }
 
   @Test
