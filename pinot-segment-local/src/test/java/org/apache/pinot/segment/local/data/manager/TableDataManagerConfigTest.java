@@ -29,6 +29,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class TableDataManagerConfigTest {
@@ -56,20 +57,18 @@ public class TableDataManagerConfigTest {
   @Test
   public void testGetTierConfigMaps() {
     Configuration defaultConfig = new PropertiesConfiguration();
-    defaultConfig.setProperty("tierConfigs.0.tierName", "tierX");
-    defaultConfig.setProperty("tierConfigs.1.tierName", "tierY");
-    defaultConfig.setProperty("tierConfigs.c.tierName", "tierZ");
-    defaultConfig.setProperty("tierConfigs.0.dataDir", "/foo/bar");
-    defaultConfig.setProperty("tierConfigs.1.dataDir", "/xyz/abc");
-    defaultConfig.setProperty("tierConfigs.c.somepath", "somewhere");
     Map<String, Map<String, String>> tierCfgs =
         TableDataManagerConfig.getTierConfigMaps(defaultConfig.subset("tierConfigs"));
+    assertTrue(tierCfgs.isEmpty());
+    // The config names are lower cased, which is done for all instance configs.
+    defaultConfig.setProperty("tierConfigs.tiernames", "tierX,tierY,tierZ.a.B.c");
+    defaultConfig.setProperty("tierConfigs.tierx.datadir", "/foo/bar");
+    defaultConfig.setProperty("tierConfigs.tiery.datadir", "/xyz/abc");
+    defaultConfig.setProperty("tierConfigs.tierz.a.b.c.somepath", "somewhere");
+    tierCfgs = TableDataManagerConfig.getTierConfigMaps(defaultConfig.subset("tierConfigs"));
     assertEquals(tierCfgs.size(), 3);
-    assertEquals(tierCfgs.get("tierX").get("tierName"), "tierX");
-    assertEquals(tierCfgs.get("tierX").get("dataDir"), "/foo/bar");
-    assertEquals(tierCfgs.get("tierY").get("tierName"), "tierY");
-    assertEquals(tierCfgs.get("tierY").get("dataDir"), "/xyz/abc");
-    assertEquals(tierCfgs.get("tierZ").get("tierName"), "tierZ");
-    assertEquals(tierCfgs.get("tierZ").get("somepath"), "somewhere");
+    assertEquals(tierCfgs.get("tierX").get("datadir"), "/foo/bar");
+    assertEquals(tierCfgs.get("tierY").get("datadir"), "/xyz/abc");
+    assertEquals(tierCfgs.get("tierZ.a.B.c").get("somepath"), "somewhere");
   }
 }

@@ -50,10 +50,9 @@ public class MultiDirQuickstart extends Quickstart {
      *     "dataDir": "/tmp/multidir_test/hotTier"
      *  }
      */
-    properties.put("pinot.server.instance.tierConfigs.0.tierName", "hotTier");
-    properties.put("pinot.server.instance.tierConfigs.0.dataDir", "/tmp/multidir_test/hotTier");
-    properties.put("pinot.server.instance.tierConfigs.1.tierName", "coldTier");
-    properties.put("pinot.server.instance.tierConfigs.1.dataDir", "/tmp/multidir_test/coldTier");
+    properties.put("pinot.server.instance.tierConfigs.tierNames", "hotTier,coldTier");
+    properties.put("pinot.server.instance.tierConfigs.hotTier.dataDir", "/tmp/multidir_test/hotTier");
+    properties.put("pinot.server.instance.tierConfigs.coldTier.dataDir", "/tmp/multidir_test/coldTier");
     return properties;
   }
 

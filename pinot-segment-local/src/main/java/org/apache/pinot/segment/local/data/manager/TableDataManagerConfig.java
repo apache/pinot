@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -30,7 +30,6 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +49,7 @@ public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_AUTH = "auth";
 
   private static final String TABLE_DATA_MANAGER_TIER_CONFIGS = "tierConfigs";
-  private static final String TABLE_DATA_MANAGER_TIER_NAME = "tierName";
+  private static final String TIER_CONFIGS_TIER_NAMES = "tierNames";
   private static final String TABLE_DELETED_SEGMENTS_CACHE_SIZE = "deletedSegmentsCacheSize";
   private static final String TABLE_DELETED_SEGMENTS_CACHE_TTL_MINUTES = "deletedSegmentsCacheTTL";
   private static final String TABLE_PEER_DOWNLOAD_SCHEME = "peerDownloadScheme";
@@ -100,38 +99,28 @@ public class TableDataManagerConfig {
   }
 
   @VisibleForTesting
-  static Map<String, Map<String, String>> getTierConfigMaps(Configuration tierCfgs) {
-    List<String> cfgKeys = CommonsConfigurationUtils.getKeys(tierCfgs);
-    Collections.sort(cfgKeys);
+  static Map<String, Map<String, String>> getTierConfigMaps(Configuration allTierCfgs) {
+    // Note that config names from the instance configs are all lowered cased, e.g.
+    // - tiernames:[hotTier, coldTier]
+    // - hottier.datadir:/tmp/multidir_test/hotTier
+    // - coldtier.datadir:/tmp/multidir_test/coldTier
+    // And Configuration uses ',' as the list separator to get the list of strings.
+    // Therefore, the tier name should not contain ',' and must be unique case-insensitive.
+    String[] tierNames = allTierCfgs.getStringArray(TIER_CONFIGS_TIER_NAMES.toLowerCase());
+    if (tierNames == null) {
+      LOGGER.debug("No tierConfigs from instanceConfig");
+      return Collections.emptyMap();
+    }
     Map<String, Map<String, String>> tierCfgMaps = new HashMap<>();
-    // Collect the cfgs for each tier into the tierCfgMaps.
-    Map<String, String> cfgMap = new HashMap<>();
-    String lastIdx = null;
-    String tierName = null;
-    for (String key : cfgKeys) {
-      String value = tierCfgs.getString(key);
-      String cfgIdx = key.substring(0, key.indexOf('.'));
-      if (lastIdx == null) {
-        lastIdx = cfgIdx;
-      } else if (!cfgIdx.equals(lastIdx)) {
-        Preconditions.checkNotNull(tierName, "Missing tier name in instance tier configs with index: %s", lastIdx);
-        tierCfgMaps.put(tierName, cfgMap);
-        // Reset to collect cfgs for the next tier.
-        cfgMap = new HashMap<>();
-        lastIdx = cfgIdx;
-        tierName = null;
-      }
-      String cfgName = key.substring(key.indexOf('.') + 1);
-      cfgMap.put(cfgName, value);
-      // All config names are lower cased while being passed down here.
-      if (cfgName.equalsIgnoreCase(TABLE_DATA_MANAGER_TIER_NAME)) {
-        tierName = value;
+    for (String tierName : tierNames) {
+      Configuration tierCfgs = allTierCfgs.subset(tierName.toLowerCase());
+      for (Iterator<String> cfgKeys = tierCfgs.getKeys(); cfgKeys.hasNext(); ) {
+        String cfgKey = cfgKeys.next();
+        String cfgValue = tierCfgs.getString(cfgKey);
+        tierCfgMaps.computeIfAbsent(tierName, (k) -> new HashMap<>()).put(cfgKey, cfgValue);
       }
     }
-    if (!cfgMap.isEmpty()) {
-      Preconditions.checkNotNull(tierName, "Missing tier name in instance tier configs with index: %s", lastIdx);
-      tierCfgMaps.put(tierName, cfgMap);
-    }
+    LOGGER.debug("Got tierConfigs: {} from instanceConfig", tierCfgMaps);
     return tierCfgMaps;
   }
 
