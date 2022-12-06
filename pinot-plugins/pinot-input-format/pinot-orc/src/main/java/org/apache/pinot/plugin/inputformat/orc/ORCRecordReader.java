@@ -20,10 +20,7 @@ package org.apache.pinot.plugin.inputformat.orc;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.InputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -81,7 +78,7 @@ public class ORCRecordReader implements RecordReader {
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     Configuration configuration = new Configuration();
-    File orcFile = unpackIfRequired(dataFile);
+    File orcFile = RecordReaderUtils.unpackIfRequired(dataFile, "orc");
     Reader orcReader = OrcFile.createReader(new Path(orcFile.getAbsolutePath()),
         OrcFile.readerOptions(configuration).filesystem(FileSystem.getLocal(configuration)));
     TypeDescription orcSchema = orcReader.getSchema();
@@ -109,18 +106,6 @@ public class ORCRecordReader implements RecordReader {
     _rowBatch = orcSchema.createRowBatch();
     _hasNext = _orcRecordReader.nextBatch(_rowBatch);
     _nextRowId = 0;
-  }
-
-  private File unpackIfRequired(File dataFile) throws IOException {
-    if (RecordReaderUtils.isGZippedFile(dataFile)) {
-      try(final InputStream inputStream = RecordReaderUtils.getInputStream(dataFile)) {
-        File targetFile = new File(String.format("%s.orc", dataFile.getAbsolutePath()));
-        Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        return targetFile;
-      }
-    } else {
-      return dataFile;
-    }
   }
 
   /**

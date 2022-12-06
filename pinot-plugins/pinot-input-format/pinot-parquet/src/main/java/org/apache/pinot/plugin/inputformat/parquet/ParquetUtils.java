@@ -18,11 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.parquet;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -38,7 +34,6 @@ import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
 public class ParquetUtils {
@@ -106,17 +101,5 @@ public class ParquetUtils {
     conf.set("fs.defaultFS", DEFAULT_FS);
     conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
     return conf;
-  }
-
-  public static File unpackIfRequired(File dataFile) throws IOException {
-    if (RecordReaderUtils.isGZippedFile(dataFile)) {
-      try(final InputStream inputStream = RecordReaderUtils.getInputStream(dataFile)) {
-        File targetFile = new File(String.format("%s.parquet", dataFile.getAbsolutePath()));
-        Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        return targetFile;
-      }
-    } else {
-      return dataFile;
-    }
   }
 }

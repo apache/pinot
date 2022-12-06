@@ -27,6 +27,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.zip.GZIPInputStream;
 
 
@@ -59,7 +61,19 @@ public class RecordReaderUtils {
     }
   }
 
-  public static boolean isGZippedFile(File file)
+  public static File unpackIfRequired(File dataFile, String extension) throws IOException {
+    if (isGZippedFile(dataFile)) {
+      try(final InputStream inputStream = getInputStream(dataFile)) {
+        File targetFile = new File(String.format("%s.%s", dataFile.getAbsolutePath(), extension));
+        Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        return targetFile;
+      }
+    } else {
+      return dataFile;
+    }
+  }
+
+  private static boolean isGZippedFile(File file)
           throws IOException {
     int magic = 0;
     try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {

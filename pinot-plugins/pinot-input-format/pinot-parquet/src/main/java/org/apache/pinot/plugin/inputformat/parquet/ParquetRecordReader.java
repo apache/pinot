@@ -26,8 +26,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-
-import static org.apache.pinot.plugin.inputformat.parquet.ParquetUtils.unpackIfRequired;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
 /**
@@ -41,7 +40,7 @@ public class ParquetRecordReader implements RecordReader {
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    File parquetFile = unpackIfRequired(dataFile);
+    File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, "parquet");
     if (recordReaderConfig != null && ((ParquetRecordReaderConfig) recordReaderConfig).useParquetAvroRecordReader()) {
       _internalParquetRecordReader = new ParquetAvroRecordReader();
     } else if (recordReaderConfig != null
