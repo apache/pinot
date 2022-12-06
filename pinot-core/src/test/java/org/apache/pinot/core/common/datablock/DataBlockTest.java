@@ -55,8 +55,8 @@ public class DataBlockTest {
     // Assert processing exception and original exception both matches.
     String actual = dataBlock.getExceptions().get(QueryException.QUERY_EXECUTION_ERROR.getErrorCode());
     Assert.assertEquals(actual, expected);
-    Assert.assertEquals(dataBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE),
-        originalException.getMessage());
+    Assert.assertTrue(dataBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
+        .contains(originalException.getMessage()));
   }
 
   @Test(dataProvider = "testTypeNullPercentile")
