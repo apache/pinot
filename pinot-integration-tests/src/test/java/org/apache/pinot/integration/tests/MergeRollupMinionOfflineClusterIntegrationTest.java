@@ -65,9 +65,9 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * Integration test for minion task of type "MergeRollupTask"
+ * Integration test for minion task of type "MergeRollupTask" configured on offline tables
  */
-public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class MergeRollupMinionOfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String SINGLE_LEVEL_CONCAT_TEST_TABLE = "myTable1";
   private static final String SINGLE_LEVEL_ROLLUP_TEST_TABLE = "myTable2";
   private static final String MULTI_LEVEL_CONCAT_TEST_TABLE = "myTable3";

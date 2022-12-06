@@ -274,7 +274,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true");
         NameValuePair tableNameParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
             TableNameBuilder.extractRawTableName(tableNameWithType));
-        List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
+        NameValuePair tableTypeParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE,
+            TableNameBuilder.getTableTypeFromTableName(tableNameWithType).toString());
+        List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter,
+            tableTypeParameter);
 
         pushSegment(tableNameParameter.getValue(), configs, outputSegmentTarURI, httpHeaders, parameters,
             segmentConversionResult);

@@ -463,6 +463,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       long earliestStartTimeMsOfInProgressSegments = Long.MAX_VALUE;
       for (SegmentZKMetadata segmentZKMetadata : allSegments) {
         if (!segmentZKMetadata.getStatus().isCompleted()
+            && segmentZKMetadata.getTotalDocs() > 0
             && segmentZKMetadata.getStartTimeMs() < earliestStartTimeMsOfInProgressSegments) {
           earliestStartTimeMsOfInProgressSegments = segmentZKMetadata.getStartTimeMs();
         }
