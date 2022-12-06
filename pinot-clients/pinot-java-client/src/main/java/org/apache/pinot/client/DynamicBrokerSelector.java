@@ -94,14 +94,22 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
       if (list != null && !list.isEmpty()) {
         return list.get(RANDOM.nextInt(list.size()));
       }
+      // In case tableName is formatted as <db>.<table>
+      int idx = tableName.indexOf('.');
+      if (idx > 0) {
+        tableName = tableName.substring(idx + 1);
+      }
+      list = _tableToBrokerListMapRef.get().get(tableName);
+      if (list != null && !list.isEmpty()) {
+        return list.get(RANDOM.nextInt(list.size()));
+      }
     }
-    // Return a one randomly if table is null or no broker is found for the specified table.
+    // Return a broker randomly if table is null or no broker is found for the specified table.
     List<String> list = _allBrokerListRef.get();
     if (list != null && !list.isEmpty()) {
       return list.get(RANDOM.nextInt(list.size()));
-    } else {
-      return null;
     }
+    return null;
   }
 
   @Override
