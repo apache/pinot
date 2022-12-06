@@ -25,6 +25,7 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
@@ -58,19 +59,18 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     try {
       _queryRunner.start();
       _server.start();
-    } catch (IOException e) {
+    } catch (IOException | TimeoutException e) {
       throw new RuntimeException(e);
     }
   }
 
   public void shutdown() {
     LOGGER.info("Shutting down QueryWorker");
-    _queryRunner.shutDown();
-    _server.shutdown();
-
     try {
+      _queryRunner.shutDown();
+      _server.shutdown();
       _server.awaitTermination();
-    } catch (InterruptedException e) {
+    } catch (InterruptedException | TimeoutException e) {
       throw new RuntimeException(e);
     }
   }

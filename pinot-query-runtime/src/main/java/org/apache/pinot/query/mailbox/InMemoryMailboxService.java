@@ -30,17 +30,18 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   // channel manager
   private final String _hostname;
   private final int _mailboxPort;
-  private final Consumer<MailboxIdentifier> _gotMailCallback;
+  private final Consumer<MailboxIdentifier> _receivedMailContentCallback;
   static final int DEFAULT_CHANNEL_CAPACITY = 5;
   // TODO: This should come from a config and should be consistent with the timeout for GrpcMailboxService
   static final int DEFAULT_CHANNEL_TIMEOUT_SECONDS = 1;
 
   private final ConcurrentHashMap<String, InMemoryMailboxState> _mailboxStateMap = new ConcurrentHashMap<>();
 
-  public InMemoryMailboxService(String hostname, int mailboxPort, Consumer<MailboxIdentifier> gotMailCallback) {
+  public InMemoryMailboxService(String hostname, int mailboxPort,
+      Consumer<MailboxIdentifier> receivedMailContentCallback) {
     _hostname = hostname;
     _mailboxPort = mailboxPort;
-    _gotMailCallback = gotMailCallback;
+    _receivedMailContentCallback = receivedMailContentCallback;
   }
 
   @Override
@@ -76,7 +77,7 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   InMemoryMailboxState newMailboxState(String mailboxId) {
     BlockingQueue<TransferableBlock> queue = createDefaultChannel();
     return new InMemoryMailboxState(
-        new InMemorySendingMailbox(mailboxId, queue, _gotMailCallback),
+        new InMemorySendingMailbox(mailboxId, queue, _receivedMailContentCallback),
         new InMemoryReceivingMailbox(mailboxId, queue),
         queue);
   }

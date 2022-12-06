@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -109,17 +111,19 @@ public class QueryRunner {
     }
   }
 
-  public void start() {
+  public void start()
+      throws TimeoutException {
     _helixPropertyStore = _helixManager.getHelixPropertyStore();
     _mailboxService.start();
     _serverExecutor.start();
-    _scheduler.startAsync().awaitRunning();
+    _scheduler.startAsync().awaitRunning(30, TimeUnit.SECONDS);
   }
 
-  public void shutDown() {
+  public void shutDown()
+      throws TimeoutException {
     _serverExecutor.shutDown();
     _mailboxService.shutdown();
-    _scheduler.stopAsync().awaitTerminated();
+    _scheduler.stopAsync().awaitTerminated(30, TimeUnit.SECONDS);
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
