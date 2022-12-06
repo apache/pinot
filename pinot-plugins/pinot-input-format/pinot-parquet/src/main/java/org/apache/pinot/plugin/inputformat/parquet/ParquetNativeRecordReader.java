@@ -65,19 +65,16 @@ public class ParquetNativeRecordReader implements RecordReader {
     _recordExtractor = new ParquetNativeRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
 
-    _parquetReadOptions = ParquetReadOptions.builder()
-        .withMetadataFilter(ParquetMetadataConverter.NO_FILTER)
-        .build();
+    _parquetReadOptions = ParquetReadOptions.builder().withMetadataFilter(ParquetMetadataConverter.NO_FILTER).build();
 
-    _parquetFileReader = ParquetFileReader.open(HadoopInputFile.fromPath(_dataFilePath, _hadoopConf),
-        _parquetReadOptions);
+    _parquetFileReader =
+        ParquetFileReader.open(HadoopInputFile.fromPath(_dataFilePath, _hadoopConf), _parquetReadOptions);
     _schema = _parquetFileReader.getFooter().getFileMetaData().getSchema();
     _pageReadStore = _parquetFileReader.readNextRowGroup();
     _columnIO = new ColumnIOFactory().getColumnIO(_schema);
     _parquetRecordReader = _columnIO.getRecordReader(_pageReadStore, new GroupRecordConverter(_schema));
     _currentPageIdx = 0;
   }
-
 
   @Override
   public boolean hasNext() {
@@ -121,8 +118,8 @@ public class ParquetNativeRecordReader implements RecordReader {
   public void rewind()
       throws IOException {
     _parquetFileReader.close();
-    _parquetFileReader = ParquetFileReader.open(HadoopInputFile.fromPath(_dataFilePath, _hadoopConf),
-        _parquetReadOptions);
+    _parquetFileReader =
+        ParquetFileReader.open(HadoopInputFile.fromPath(_dataFilePath, _hadoopConf), _parquetReadOptions);
     _pageReadStore = _parquetFileReader.readNextRowGroup();
     _parquetRecordReader = _columnIO.getRecordReader(_pageReadStore, new GroupRecordConverter(_schema));
     _currentPageIdx = 0;

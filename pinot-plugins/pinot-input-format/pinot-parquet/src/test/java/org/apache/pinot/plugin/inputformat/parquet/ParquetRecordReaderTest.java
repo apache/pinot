@@ -69,17 +69,17 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
       }
       records.add(record);
     }
-    try (ParquetWriter<GenericRecord> writer = ParquetUtils
-        .getParquetAvroWriter(new Path(_dataFile.getAbsolutePath()), schema)) {
+    try (ParquetWriter<GenericRecord> writer = ParquetUtils.getParquetAvroWriter(new Path(_dataFile.getAbsolutePath()),
+        schema)) {
       for (GenericRecord record : records) {
         writer.write(record);
       }
     }
   }
 
-  private void compressGzip(String sourcePath, String targetPath) throws IOException {
-    try (GZIPOutputStream gos = new GZIPOutputStream(
-            new FileOutputStream(Paths.get(targetPath).toFile()))) {
+  private void compressGzip(String sourcePath, String targetPath)
+      throws IOException {
+    try (GZIPOutputStream gos = new GZIPOutputStream(new FileOutputStream(Paths.get(targetPath).toFile()))) {
       Files.copy(Paths.get(sourcePath), gos);
     }
   }
@@ -120,7 +120,6 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
     parquetRecordReader.init(avroParquetFile, null, null);
     // Should be avro since file metadata has avro schema
     Assert.assertTrue(parquetRecordReader.useAvroParquetRecordReader());
-
 
     final ParquetRecordReader parquetRecordReader2 = new ParquetRecordReader();
     File nativeParquetFile = new File(getClass().getClassLoader().getResource("users.parquet").getFile());
@@ -173,7 +172,7 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
 
   @Test
   public void testGzipParquetRecordReader()
-          throws IOException {
+      throws IOException {
     compressGzip(_dataFile.getAbsolutePath(), String.format("%s/%s", _tempDir, _gzipFileName));
     final File gzDataFile = new File(_tempDir, _gzipFileName);
     ParquetRecordReader recordReader = new ParquetRecordReader();
@@ -183,7 +182,7 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
 
   @Test
   public void testGzipParquetAvroRecordReader()
-          throws IOException {
+      throws IOException {
     ParquetAvroRecordReader avroRecordReader = new ParquetAvroRecordReader();
     compressGzip(_dataFile.getAbsolutePath(), String.format("%s/%s", _tempDir, _gzipFileName));
     final File gzDataFile = new File(_tempDir, _gzipFileName);
@@ -193,11 +192,11 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
 
   @Test
   public void testGzipParquetNativeRecordReader()
-          throws IOException {
+      throws IOException {
     ParquetNativeRecordReader nativeRecordReader = new ParquetNativeRecordReader();
 
-    final String gzParquetFileWithInt96AndDecimal
-            = String.format("%s.gz", _testParquetFileWithInt96AndDecimal.getAbsolutePath());
+    final String gzParquetFileWithInt96AndDecimal =
+        String.format("%s.gz", _testParquetFileWithInt96AndDecimal.getAbsolutePath());
     compressGzip(_testParquetFileWithInt96AndDecimal.getAbsolutePath(), gzParquetFileWithInt96AndDecimal);
     final File gzTestParquetFileWithInt96AndDecimal = new File(gzParquetFileWithInt96AndDecimal);
     nativeRecordReader.init(gzTestParquetFileWithInt96AndDecimal, ImmutableSet.of(), new ParquetRecordReaderConfig());

@@ -17,6 +17,7 @@ package org.apache.pinot.plugin.inputformat.orc;
  * specific language governing permissions and limitations
  * under the License.
  */
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -46,9 +47,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class ORCRecordReaderTest extends AbstractRecordReaderTest {
   private final File _dataFile = new File(_tempDir, "data.orc");
 
-  private void compressGzip(String sourcePath, String targetPath) throws IOException {
-    try (GZIPOutputStream gos = new GZIPOutputStream(
-            new FileOutputStream(Paths.get(targetPath).toFile()))) {
+  private void compressGzip(String sourcePath, String targetPath)
+      throws IOException {
+    try (GZIPOutputStream gos = new GZIPOutputStream(new FileOutputStream(Paths.get(targetPath).toFile()))) {
       Files.copy(Paths.get(sourcePath), gos);
     }
   }
@@ -160,7 +161,7 @@ public class ORCRecordReaderTest extends AbstractRecordReaderTest {
 
   @Test
   public void testGzipORCRecordReader()
-          throws Exception {
+      throws Exception {
     String gzipFileName = "data.orc.gz";
     compressGzip(_dataFile.getAbsolutePath(), String.format("%s/%s", _tempDir, gzipFileName));
     final File gzDataFile = new File(_tempDir, gzipFileName);
