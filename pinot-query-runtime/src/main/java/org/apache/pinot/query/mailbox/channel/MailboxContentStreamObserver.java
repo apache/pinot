@@ -46,24 +46,22 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
   private final GrpcMailboxService _mailboxService;
   private final StreamObserver<Mailbox.MailboxStatus> _responseObserver;
-  private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final boolean _isEnabledFeedback;
 
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
   private final ArrayBlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
   private StringMailboxIdentifier _mailboxId;
+  private Consumer<MailboxIdentifier> _gotMailCallback;
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
-      StreamObserver<Mailbox.MailboxStatus> responseObserver, Consumer<MailboxIdentifier> gotMailCallback) {
-    this(mailboxService, responseObserver, false, gotMailCallback);
+      StreamObserver<Mailbox.MailboxStatus> responseObserver) {
+    this(mailboxService, responseObserver, false);
   }
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
-      StreamObserver<Mailbox.MailboxStatus> responseObserver, boolean isEnabledFeedback,
-      Consumer<MailboxIdentifier> gotMailCallback) {
+      StreamObserver<Mailbox.MailboxStatus> responseObserver, boolean isEnabledFeedback) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
-    _gotMailCallback = gotMailCallback;
     _receivingBuffer = new ArrayBlockingQueue<>(DEFAULT_MAILBOX_QUEUE_CAPACITY);
     _isEnabledFeedback = isEnabledFeedback;
   }
@@ -91,7 +89,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     _mailboxId = new StringMailboxIdentifier(mailboxContent.getMailboxId());
 
     GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
-    receivingMailbox.init(this);
+    _gotMailCallback = receivingMailbox.init(this);
 
     if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {
       // when the receiving end receives a message put it in the mailbox queue.

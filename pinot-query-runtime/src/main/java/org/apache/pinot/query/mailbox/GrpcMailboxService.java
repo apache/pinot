@@ -54,12 +54,14 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
       new ConcurrentHashMap<>();
   private final ConcurrentHashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap =
       new ConcurrentHashMap<>();
+  private final Consumer<MailboxIdentifier> _gotMailCallback;
 
   public GrpcMailboxService(String hostname, int mailboxPort, PinotConfiguration extraConfig,
       Consumer<MailboxIdentifier> gotMailCallback) {
     _hostname = hostname;
     _mailboxPort = mailboxPort;
-    _channelManager = new ChannelManager(this, extraConfig, gotMailCallback);
+    _channelManager = new ChannelManager(this, extraConfig);
+    _gotMailCallback = gotMailCallback;
   }
 
   @Override
@@ -95,7 +97,8 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * @param mailboxId the id of the mailbox.
    */
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
-    return _receivingMailboxMap.computeIfAbsent(mailboxId.toString(), (mId) -> new GrpcReceivingMailbox(mId, this));
+    return _receivingMailboxMap.computeIfAbsent(
+        mailboxId.toString(), (mId) -> new GrpcReceivingMailbox(mId, this, _gotMailCallback));
   }
 
   public ManagedChannel getChannel(String mailboxId) {
