@@ -47,9 +47,12 @@ public class TableDataManagerConfig {
   private static final String TABLE_PEER_DOWNLOAD_SCHEME = "peerDownloadScheme";
 
   private final Configuration _tableDataManagerConfig;
+  private final InstanceDataManagerConfig _instanceDataManagerConfig;
 
-  public TableDataManagerConfig(Configuration tableDataManagerConfig) {
+  public TableDataManagerConfig(Configuration tableDataManagerConfig,
+      InstanceDataManagerConfig instanceDataManagerConfig) {
     _tableDataManagerConfig = tableDataManagerConfig;
+    _instanceDataManagerConfig = instanceDataManagerConfig;
   }
 
   public Configuration getConfig() {
@@ -70,6 +73,10 @@ public class TableDataManagerConfig {
 
   public String getTableName() {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_NAME);
+  }
+
+  public InstanceDataManagerConfig getInstanceDataManagerConfig() {
+    return _instanceDataManagerConfig;
   }
 
   public boolean isDimTable() {
@@ -111,12 +118,11 @@ public class TableDataManagerConfig {
     LOGGER.info("instance level segment peer download scheme = {}", segmentPeerDownloadScheme);
     defaultConfig.addProperty(TABLE_PEER_DOWNLOAD_SCHEME, segmentPeerDownloadScheme);
 
-
     // copy auth-related configs
     instanceDataManagerConfig.getConfig().subset(TABLE_DATA_MANAGER_AUTH).toMap()
         .forEach((key, value) -> defaultConfig.setProperty(TABLE_DATA_MANAGER_AUTH + "." + key, value));
 
-    return new TableDataManagerConfig(defaultConfig);
+    return new TableDataManagerConfig(defaultConfig, instanceDataManagerConfig);
   }
 
   public void overrideConfigs(TableConfig tableConfig) {

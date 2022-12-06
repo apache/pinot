@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -181,6 +182,11 @@ public interface TableDataManager {
    * Returns the dir which contains the data segments.
    */
   File getTableDataDir();
+
+  /**
+   * Returns the instance config
+   */
+  PinotConfiguration getInstanceDataManagerConfig();
 
   /**
    * Add error related to segment, if any. The implementation
