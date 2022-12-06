@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.starter.helix;
+package org.apache.pinot.server.api;
 
 import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
@@ -25,6 +25,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
@@ -52,21 +53,20 @@ public class AdminApiApplication extends ResourceConfig {
   public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
   public static final String SERVER_INSTANCE_ID = "serverInstanceId";
 
+  private final AtomicBoolean _shutDownInProgress = new AtomicBoolean();
   private final ServerInstance _serverInstance;
-  private final AccessControlFactory _accessControlFactory;
-  private boolean _started = false;
   private HttpServer _httpServer;
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
       PinotConfiguration serverConf) {
     _serverInstance = instance;
-    _accessControlFactory = accessControlFactory;
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, serverConf);
 
     register(new AbstractBinder() {
       @Override
       protected void configure() {
+        bind(_shutDownInProgress).to(AtomicBoolean.class);
         bind(_serverInstance).to(ServerInstance.class);
         bind(_serverInstance.getServerMetrics()).to(ServerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
@@ -110,7 +110,6 @@ public class AdminApiApplication extends ResourceConfig {
       LOGGER.info("Starting swagger for the Pinot server.");
       PinotReflectionUtils.runWithLock(() -> setupSwagger(pinotConfiguration));
     }
-    _started = true;
     return true;
   }
 
@@ -147,10 +146,17 @@ public class AdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
+  /**
+   * Starts shutting down the HTTP server, which rejects all requests except for the liveness check.
+   */
+  public void startShuttingDown() {
+    _shutDownInProgress.set(true);
+  }
+
+  /**
+   * Stops the HTTP server.
+   */
   public void stop() {
-    if (!_started) {
-      return;
-    }
     _httpServer.shutdownNow();
   }
 }

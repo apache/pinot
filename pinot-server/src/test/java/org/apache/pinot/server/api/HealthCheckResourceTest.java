@@ -20,17 +20,17 @@ package org.apache.pinot.server.api;
 
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.ServiceStatus;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class HealthCheckResourceTest extends BaseResourceTest {
+
   @Test
-  public void checkHealthProbes()
-      throws Exception {
+  public void checkHealthProbes() {
     String healthPath = "/health";
     String livenessPath = "/health/liveness";
     String readinessPath = "/health/readiness";
@@ -40,22 +40,30 @@ public class HealthCheckResourceTest extends BaseResourceTest {
     when(mockSuccessCallback.getServiceStatus()).thenReturn(ServiceStatus.Status.GOOD);
     when(mockFailureCallback.getServiceStatus()).thenReturn(ServiceStatus.Status.BAD);
 
-    Assert.assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
-    Assert.assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 503);
-    Assert.assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 503);
+    assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 503);
+    assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 503);
 
     ServiceStatus.setServiceStatusCallback(_instanceId, mockSuccessCallback);
-    Assert.assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
-    Assert.assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 200);
-    Assert.assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 200);
 
     ServiceStatus.setServiceStatusCallback(_instanceId, mockFailureCallback);
-    Assert.assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
-    Assert.assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 503);
-    Assert.assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 503);
-    Assert.assertEquals(_webTarget.path(healthPath).queryParam("checkType", "readiness")
-        .request().get(Response.class).getStatus(), 503);
-    Assert.assertEquals(_webTarget.path(healthPath).queryParam("checkType", "liveness")
-        .request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 503);
+    assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 503);
+    assertEquals(
+        _webTarget.path(healthPath).queryParam("checkType", "readiness").request().get(Response.class).getStatus(),
+        503);
+    assertEquals(
+        _webTarget.path(healthPath).queryParam("checkType", "liveness").request().get(Response.class).getStatus(), 200);
+
+    // Start shutting down the HTTP server, only liveness check should go through
+    ServiceStatus.setServiceStatusCallback(_instanceId, mockSuccessCallback);
+    _adminApiApplication.startShuttingDown();
+    assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 503);
+    assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 503);
   }
 }

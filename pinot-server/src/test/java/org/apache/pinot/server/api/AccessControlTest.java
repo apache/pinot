@@ -41,7 +41,6 @@ import org.apache.pinot.server.access.GrpcRequesterIdentity;
 import org.apache.pinot.server.access.HttpRequesterIdentity;
 import org.apache.pinot.server.access.RequesterIdentity;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
