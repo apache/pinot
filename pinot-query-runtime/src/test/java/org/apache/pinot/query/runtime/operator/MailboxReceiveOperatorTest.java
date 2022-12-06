@@ -288,7 +288,7 @@ public class MailboxReceiveOperatorTest {
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     Assert.assertTrue(receivedBlock.isErrorBlock());
     MetadataBlock error = (MetadataBlock) receivedBlock.getDataBlock();
-    Assert.assertEquals(error.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE), "errorBlock");
+    Assert.assertTrue(error.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("errorBlock"));
   }
 
   @Test
@@ -461,7 +461,7 @@ public class MailboxReceiveOperatorTest {
     TransferableBlock receivedBlock = receiveOp.nextBlock();
     Assert.assertTrue(receivedBlock.isErrorBlock());
     MetadataBlock error = (MetadataBlock) receivedBlock.getDataBlock();
-    Assert.assertEquals(error.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE), "mailboxError");
+    Assert.assertTrue(error.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("mailboxError"));
   }
 
   // TODO: Exception should be passed as an errorBlock.
