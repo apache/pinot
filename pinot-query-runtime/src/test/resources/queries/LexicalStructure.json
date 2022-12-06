@@ -135,22 +135,11 @@
         "inputs": [["1"]]
       }
     },
-    "queries": [
-      {
-        "ignored": true,
-        "comments": "numeric constant without specific type will cast all floating points into BIG DECIMAL which is not supported by type-hoisting on leaf stage",
-        "psql": "4.1.2.6",
-        "description": "numeric constant supports",
-        "sql": "SELECT data, 42, 3.5, 4., .001, 5e2, 1.925e-3 FROM {tbl}"
-      },
-      {
-        "ignored": true,
-        "comments": "floating point comparison missing precision checker",
-        "psql": "4.1.2.6",
-        "description": "numeric constant supports",
-        "sql": "SELECT data, 42, CAST(3.5 AS FLOAT), CAST(4. AS FLOAT), CAST(.001 AS FLOAT), CAST(5e2 AS FLOAT), CAST(1.925e-3 AS FLOAT) FROM {tbl}"
-      }
-    ]
+    "queries": [{
+      "psql": "4.1.2.6",
+      "description": "numeric constant supports",
+      "sql": "SELECT data, 42, 3.5, 4., .001, 5e2, 1.925e-3 FROM {tbl}"
+    }]
   },
   "constant_casting": {
     "tables": {
