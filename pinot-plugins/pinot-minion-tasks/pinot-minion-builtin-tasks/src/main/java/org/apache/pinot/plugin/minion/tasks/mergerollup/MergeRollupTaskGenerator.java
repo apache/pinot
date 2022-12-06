@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
  *    - Fetch all segments, select segments based on segment lineage (removing segmentsFrom for COMPLETED lineage
  *      entry and segmentsTo for IN_PROGRESS lineage entry)
  *    - For realtime tables, remove
- *      - in-progress segments, and
+ *      - in-progress segments (Segment.Realtime.Status.IN_PROGRESS), and
  *      - sealed segments with start time later than the earliest start time of all in progress segments
  *    - Remove empty segments
  *    - Sort segments based on startTime and endTime in ascending order
@@ -148,17 +148,17 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       if (!validate(tableConfig, taskType)) {
         continue;
       }
-      String tableName = tableConfig.getTableName();
-      LOGGER.info("Start generating task configs for table: {} for task: {}", tableName, taskType);
+      String tableNameWithType = tableConfig.getTableName();
+      LOGGER.info("Start generating task configs for table: {} for task: {}", tableNameWithType, taskType);
 
       // Get all segment metadata
-      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
+      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
       // Filter segments based on status
       List<SegmentZKMetadata> preSelectedSegmentsBasedOnStatus
           = filterSegmentsBasedOnStatus(tableConfig.getTableType(), allSegments);
 
       // Select current segment snapshot based on lineage, filter out empty segments
-      SegmentLineage segmentLineage = _clusterInfoAccessor.getSegmentLineage(tableName);
+      SegmentLineage segmentLineage = _clusterInfoAccessor.getSegmentLineage(tableNameWithType);
       Set<String> preSelectedSegmentsBasedOnLineage = new HashSet<>();
       for (SegmentZKMetadata segment : preSelectedSegmentsBasedOnStatus) {
         preSelectedSegmentsBasedOnLineage.add(segment.getSegmentName());
@@ -176,8 +176,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       if (preSelectedSegments.isEmpty()) {
         // Reset the watermark time if no segment found. This covers the case where the table is newly created or
         // all segments for the existing table got deleted.
-        resetDelayMetrics(tableName);
-        LOGGER.info("Skip generating task: {} for table: {}, no segment is found.", taskType, tableName);
+        resetDelayMetrics(tableNameWithType);
+        LOGGER.info("Skip generating task: {} for table: {}, no segment is found.", taskType, tableNameWithType);
         continue;
       }
 
@@ -204,7 +204,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
 
       // Get incomplete merge levels
       Set<String> inCompleteMergeLevels = new HashSet<>();
-      for (Map.Entry<String, TaskState> entry : TaskGeneratorUtils.getIncompleteTasks(taskType, tableName,
+      for (Map.Entry<String, TaskState> entry : TaskGeneratorUtils.getIncompleteTasks(taskType, tableNameWithType,
           _clusterInfoAccessor).entrySet()) {
         for (PinotTaskConfig taskConfig : _clusterInfoAccessor.getTaskConfigs(entry.getKey())) {
           inCompleteMergeLevels.add(taskConfig.getConfigs().get(MergeRollupTask.MERGE_LEVEL_KEY));
@@ -212,11 +212,11 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       }
 
       ZNRecord mergeRollupTaskZNRecord = _clusterInfoAccessor
-          .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, tableName);
+          .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
       int expectedVersion = mergeRollupTaskZNRecord != null ? mergeRollupTaskZNRecord.getVersion() : -1;
       MergeRollupTaskMetadata mergeRollupTaskMetadata =
           mergeRollupTaskZNRecord != null ? MergeRollupTaskMetadata.fromZNRecord(mergeRollupTaskZNRecord)
-              : new MergeRollupTaskMetadata(tableName, new TreeMap<>());
+              : new MergeRollupTaskMetadata(tableNameWithType, new TreeMap<>());
       List<PinotTaskConfig> pinotTaskConfigsForTable = new ArrayList<>();
 
       // Schedule tasks from lowest to highest merge level (e.g. Hourly -> Daily -> Monthly -> Yearly)
@@ -229,7 +229,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         // Skip scheduling if there's incomplete task for current mergeLevel
         if (inCompleteMergeLevels.contains(mergeLevel)) {
           LOGGER.info("Found incomplete task of merge level: {} for the same table: {}, Skipping task generation: {}",
-              mergeLevel, tableName, taskType);
+              mergeLevel, tableNameWithType, taskType);
           continue;
         }
 
@@ -238,14 +238,14 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         long bucketMs = TimeUtils.convertPeriodToMillis(bucketPeriod);
         if (bucketMs <= 0) {
           LOGGER.error("Bucket time period: {} (table : {}, mergeLevel : {}) must be larger than 0", bucketPeriod,
-              tableName, mergeLevel);
+              tableNameWithType, mergeLevel);
           continue;
         }
         String bufferPeriod = mergeConfigs.get(MergeTask.BUFFER_TIME_PERIOD_KEY);
         long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
         if (bufferMs < 0) {
           LOGGER.error("Buffer time period: {} (table : {}, mergeLevel : {}) must be larger or equal to 0",
-              bufferPeriod, tableName, mergeLevel);
+              bufferPeriod, tableNameWithType, mergeLevel);
           continue;
         }
         String maxNumParallelBucketsStr = mergeConfigs.get(MergeTask.MAX_NUM_PARALLEL_BUCKETS);
@@ -253,7 +253,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             : DEFAULT_NUM_PARALLEL_BUCKETS;
         if (maxNumParallelBuckets <= 0) {
           LOGGER.error("Maximum number of parallel buckets: {} (table : {}, mergeLevel : {}) must be larger than 0",
-              maxNumParallelBuckets, tableName, mergeLevel);
+              maxNumParallelBuckets, tableNameWithType, mergeLevel);
           continue;
         }
 
@@ -273,14 +273,14 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             lowestLevelMaxValidBucketEndTimeMs =
                 Math.max(lowestLevelMaxValidBucketEndTimeMs, currentValidBucketEndTimeMs);
           }
-          _tableLowestLevelMaxValidBucketEndTimeMs.put(tableName, lowestLevelMaxValidBucketEndTimeMs);
+          _tableLowestLevelMaxValidBucketEndTimeMs.put(tableNameWithType, lowestLevelMaxValidBucketEndTimeMs);
         }
         // Create delay metrics even if there's no task scheduled, this helps the case that the controller is restarted
         // but the metrics are not available until the controller schedules a valid task
-        createOrUpdateDelayMetrics(tableName, mergeLevel, null, watermarkMs, bufferMs, bucketMs);
+        createOrUpdateDelayMetrics(tableNameWithType, mergeLevel, null, watermarkMs, bufferMs, bucketMs);
         if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata)) {
           LOGGER.info("Bucket with start: {} and end: {} (table : {}, mergeLevel : {}) cannot be merged yet",
-              bucketStartMs, bucketEndMs, tableName, mergeLevel);
+              bucketStartMs, bucketEndMs, tableNameWithType, mergeLevel);
           continue;
         }
 
@@ -354,18 +354,18 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         }
 
         if (selectedSegmentsForAllBuckets.isEmpty()) {
-          LOGGER.info("No unmerged segment found for table: {}, mergeLevel: {}", tableName, mergeLevel);
+          LOGGER.info("No unmerged segment found for table: {}, mergeLevel: {}", tableNameWithType, mergeLevel);
           continue;
         }
 
         // Bump up watermark to the earliest start time of selected segments truncated to the closest bucket boundary
         long newWatermarkMs = selectedSegmentsForAllBuckets.get(0).get(0).getStartTimeMs() / bucketMs * bucketMs;
         mergeRollupTaskMetadata.getWatermarkMap().put(mergeLevel, newWatermarkMs);
-        LOGGER.info("Update watermark for table: {}, mergeLevel: {} from: {} to: {}", tableName, mergeLevel,
+        LOGGER.info("Update watermark for table: {}, mergeLevel: {} from: {} to: {}", tableNameWithType, mergeLevel,
             watermarkMs, newWatermarkMs);
 
         // Update the delay metrics
-        createOrUpdateDelayMetrics(tableName, mergeLevel, lowerMergeLevel, newWatermarkMs, bufferMs, bucketMs);
+        createOrUpdateDelayMetrics(tableNameWithType, mergeLevel, lowerMergeLevel, newWatermarkMs, bufferMs, bucketMs);
 
         // Create task configs
         int maxNumRecordsPerTask =
@@ -375,7 +375,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         if (segmentPartitionConfig == null) {
           for (List<SegmentZKMetadata> selectedSegmentsPerBucket : selectedSegmentsForAllBuckets) {
             pinotTaskConfigsForTable.addAll(
-                createPinotTaskConfigs(selectedSegmentsPerBucket, tableName, maxNumRecordsPerTask, mergeLevel,
+                createPinotTaskConfigs(selectedSegmentsPerBucket, tableNameWithType, maxNumRecordsPerTask, mergeLevel,
                     null, mergeConfigs, taskConfigs));
           }
         } else {
@@ -414,13 +414,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
               List<Integer> partition = entry.getKey();
               List<SegmentZKMetadata> partitionedSegments = entry.getValue();
               pinotTaskConfigsForTable.addAll(
-                  createPinotTaskConfigs(partitionedSegments, tableName, maxNumRecordsPerTask, mergeLevel,
+                  createPinotTaskConfigs(partitionedSegments, tableNameWithType, maxNumRecordsPerTask, mergeLevel,
                       partition, mergeConfigs, taskConfigs));
             }
 
             if (!outlierSegments.isEmpty()) {
               pinotTaskConfigsForTable.addAll(
-                  createPinotTaskConfigs(outlierSegments, tableName, maxNumRecordsPerTask, mergeLevel,
+                  createPinotTaskConfigs(outlierSegments, tableNameWithType, maxNumRecordsPerTask, mergeLevel,
                       null, mergeConfigs, taskConfigs));
             }
           }
@@ -434,11 +434,11 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       } catch (ZkException e) {
         LOGGER.error(
             "Version changed while updating merge/rollup task metadata for table: {}, skip scheduling. There are "
-                + "multiple task schedulers for the same table, need to investigate!", tableName);
+                + "multiple task schedulers for the same table, need to investigate!", tableNameWithType);
         continue;
       }
       pinotTaskConfigs.addAll(pinotTaskConfigsForTable);
-      LOGGER.info("Finished generating task configs for table: {} for task: {}, numTasks: {}", tableName,
+      LOGGER.info("Finished generating task configs for table: {} for task: {}, numTasks: {}", tableNameWithType,
           taskType, pinotTaskConfigsForTable.size());
     }
 
@@ -582,7 +582,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
    * Create pinot task configs with selected segments and configs
    */
   private List<PinotTaskConfig> createPinotTaskConfigs(List<SegmentZKMetadata> selectedSegments,
-      String tableName, int maxNumRecordsPerTask, String mergeLevel, List<Integer> partition,
+      String tableNameWithType, int maxNumRecordsPerTask, String mergeLevel, List<Integer> partition,
       Map<String, String> mergeConfigs, Map<String, String> taskConfigs) {
     int numRecordsPerTask = 0;
     List<List<String>> segmentNamesList = new ArrayList<>();
@@ -616,9 +616,9 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
 
     for (int i = 0; i < segmentNamesList.size(); i++) {
       String downloadURL = StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR);
-      Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(tableName, taskConfigs,
+      Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs,
           _clusterInfoAccessor);
-      configs.put(MinionConstants.TABLE_NAME_KEY, tableName);
+      configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
       configs.put(MinionConstants.SEGMENT_NAME_KEY,
           StringUtils.join(segmentNamesList.get(i), MinionConstants.SEGMENT_NAME_SEPARATOR));
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, downloadURL);
@@ -646,7 +646,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       configs.put(MergeRollupTask.SEGMENT_NAME_PREFIX_KEY,
           MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + DELIMITER_IN_SEGMENT_NAME
               + System.currentTimeMillis() + partitionSuffix + DELIMITER_IN_SEGMENT_NAME + i
-              + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(tableName));
+              + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(tableNameWithType));
       pinotTaskConfigs.add(new PinotTaskConfig(MergeRollupTask.TASK_TYPE, configs));
     }
 
