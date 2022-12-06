@@ -36,7 +36,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
-import org.apache.pinot.server.starter.helix.AdminApiApplication;
+import org.apache.pinot.server.api.AdminApiApplication;
 
 
 /**

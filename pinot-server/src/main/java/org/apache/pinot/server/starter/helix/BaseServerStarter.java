@@ -70,6 +70,7 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.server.access.AccessControlFactory;
+import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -614,7 +615,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } catch (IOException e) {
       LOGGER.warn("Caught exception closing PinotFS classes", e);
     }
-    _adminApiApplication.stop();
+    _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
 
@@ -634,6 +635,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _realtimeLuceneIndexRefreshState.stop();
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
+    _adminApiApplication.stop();
     LOGGER.info("Finish shutting down Pinot server for {}", _instanceId);
   }
 
