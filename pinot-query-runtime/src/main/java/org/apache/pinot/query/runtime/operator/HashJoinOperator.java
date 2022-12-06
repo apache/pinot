@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiFunction;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -58,12 +59,46 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 public class HashJoinOperator extends BaseOperator<TransferableBlock> {
+  private static class JoinResolver{
+    public static JoinResolver create(JoinRelType joinType,
+        Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
+        KeySelector leftKeySelector, KeySelector rightKeySelector){
+      JoinResolver resolver = new JoinResolver();
+      switch (joinType){
+        case LEFT:
+        case INNER:
+          resolver._broadcastOperator = rightTableOperator;
+          resolver._probeOperator = leftTableOperator;
+          resolver._probeKeySelector = leftKeySelector;
+          resolver._broadcastKeySelector = rightKeySelector;
+          resolver._getLeftRow = (Object[] probeRow, Object[] broadcastRow) -> probeRow;
+          resolver._getRightRow = (Object[] probeRow, Object[] broadcastRow) -> broadcastRow;
+          break;
+        case RIGHT:
+           resolver._broadcastOperator = leftTableOperator;
+          resolver._probeOperator = rightTableOperator;
+          resolver._probeKeySelector = rightKeySelector;
+          resolver._broadcastKeySelector = leftKeySelector;
+          resolver._getLeftRow = (Object[] probeRow, Object[] broadcastRow) -> broadcastRow;
+          resolver._getRightRow = (Object[] probeRow, Object[] broadcastRow) -> probeRow;
+          break;
+        default:
+           Preconditions.checkState(false, "Join type shouldn't be supported:" + joinType);
+           break;
+      }
+      return resolver;
+    }
+    public Operator<TransferableBlock> _broadcastOperator;
+    public Operator<TransferableBlock> _probeOperator;
+    public KeySelector<Object[], Object[]> _broadcastKeySelector;
+    public KeySelector<Object[], Object[]> _probeKeySelector;
+    public BiFunction<Object[], Object[], Object[]> _getLeftRow;
+    public BiFunction<Object[], Object[], Object[]> _getRightRow;
+  }
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES =
       ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT);
   private final HashMap<Key, List<Object[]>> _broadcastHashTable;
-  private final Operator<TransferableBlock> _leftTableOperator;
-  private final Operator<TransferableBlock> _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
   private final int _leftRowSize;
@@ -71,26 +106,25 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private final List<FilterOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
   private TransferableBlock _upstreamErrorBlock;
-  private KeySelector<Object[], Object[]> _leftKeySelector;
-  private KeySelector<Object[], Object[]> _rightKeySelector;
+
+  private JoinResolver _joinResolver;
 
   public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
       DataSchema leftSchema, JoinNode node) {
-    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
-        "Join type: " + node.getJoinRelType() + " is not supported!");
     _joinType = node.getJoinRelType();
-    _leftKeySelector = node.getJoinKeys().getLeftJoinKeySelector();
-    _rightKeySelector = node.getJoinKeys().getRightJoinKeySelector();
-    Preconditions.checkState(_leftKeySelector != null, "LeftKeySelector for join cannot be null");
-    Preconditions.checkState(_rightKeySelector != null, "RightKeySelector for join cannot be null");
+    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
+        "Join type: " + _joinType + " is not supported!");
+    KeySelector<Object[], Object[]> leftKeySelector = node.getJoinKeys().getLeftJoinKeySelector();
+    Preconditions.checkState(leftKeySelector != null, "LeftKeySelector for join cannot be null");
+    KeySelector<Object[], Object[]> rightKeySelector = node.getJoinKeys().getRightJoinKeySelector();
+    Preconditions.checkState(rightKeySelector != null, "RightKeySelector for join cannot be null");
     _leftRowSize = leftSchema.size();
     Preconditions.checkState(_leftRowSize > 0, "leftRowSize has to be greater than zero:" + _leftRowSize);
     _resultSchema = node.getDataSchema();
     _resultRowSize = _resultSchema.size();
     Preconditions.checkState(_resultRowSize > _leftRowSize,
         "Result row size" + _leftRowSize + " has to be greater than left row size:" + _leftRowSize);
-    _leftTableOperator = leftTableOperator;
-    _rightTableOperator = rightTableOperator;
+
     _joinClauseEvaluators = new ArrayList<>(node.getJoinClauses().size());
     for (RexExpression joinClause : node.getJoinClauses()) {
       _joinClauseEvaluators.add(FilterOperand.toFilterOperand(joinClause, _resultSchema));
@@ -98,6 +132,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     _isHashTableBuilt = false;
     _broadcastHashTable = new HashMap<>();
     _upstreamErrorBlock = null;
+    _joinResolver = JoinResolver.create(_joinType, leftTableOperator, rightTableOperator, leftKeySelector,
+        rightKeySelector);
   }
 
   @Override
@@ -125,98 +161,14 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         return TransferableBlockUtils.getNoOpTransferableBlock();
       }
       // JOIN each left block with the right block.
-      return buildJoinedDataBlock(getProbeOperator().nextBlock());
+      return buildJoinedDataBlock(_joinResolver._probeOperator.nextBlock());
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
   }
 
-  private Operator<TransferableBlock> getBroadcastOperator() {
-    switch (_joinType) {
-      case LEFT:
-        // Intentional fall through
-      case INNER:
-        return _rightTableOperator;
-      case RIGHT:
-        return _leftTableOperator;
-      default:
-        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
-        return null;
-    }
-  }
-
-  private KeySelector<Object[], Object[]> getBroadcastKeySelector() {
-    switch (_joinType) {
-      case LEFT:
-        // Intentional fall through
-      case INNER:
-        return _rightKeySelector;
-      case RIGHT:
-        return _leftKeySelector;
-      default:
-        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
-        return null;
-    }
-  }
-
-  private Operator<TransferableBlock> getProbeOperator() {
-    switch (_joinType) {
-      case LEFT:
-        // Intentional fall through
-      case INNER:
-        return _leftTableOperator;
-      case RIGHT:
-        return _rightTableOperator;
-      default:
-        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
-        return null;
-    }
-  }
-
-  private KeySelector<Object[], Object[]> getProbeKeySelector() {
-    switch (_joinType) {
-      case LEFT:
-        // Intentional fall through
-      case INNER:
-        return _leftKeySelector;
-      case RIGHT:
-        return _rightKeySelector;
-      default:
-        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
-        return null;
-    }
-  }
-
-  private Object[] getLeftRow(Object[] probeRow, Object[] broadcastRow) {
-    switch (_joinType) {
-      case LEFT:
-        // Intentional fall through
-      case INNER:
-        return probeRow;
-      case RIGHT:
-        return broadcastRow;
-      default:
-        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
-        return null;
-    }
-  }
-
-  private Object[] getRightRow(Object[] probeRow, Object[] broadcastRow) {
-    switch (_joinType) {
-      case LEFT:
-        // Intentional fall through
-      case INNER:
-        return broadcastRow;
-      case RIGHT:
-        return probeRow;
-      default:
-        Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
-        return null;
-    }
-  }
-
   private void buildBroadcastHashTable() {
-    TransferableBlock rightBlock = getBroadcastOperator().nextBlock();
+    TransferableBlock rightBlock = _joinResolver._broadcastOperator.nextBlock();
     if (rightBlock.isErrorBlock()) {
       _upstreamErrorBlock = rightBlock;
       return;
@@ -233,7 +185,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     // put all the rows into corresponding hash collections keyed by the key selector function.
     for (Object[] row : container) {
       List<Object[]> hashCollection =
-          _broadcastHashTable.computeIfAbsent(new Key(getBroadcastKeySelector().getKey(row)), k -> new ArrayList<>());
+          _broadcastHashTable.computeIfAbsent(new Key(_joinResolver._broadcastKeySelector.getKey(row)), k -> new ArrayList<>());
       hashCollection.add(row);
     }
   }
@@ -251,7 +203,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     for (Object[] probeRow : container) {
       // NOTE: Empty key selector will always give same hash code.
       List<Object[]> hashCollection =
-          _broadcastHashTable.getOrDefault(new Key(getProbeKeySelector().getKey(probeRow)), Collections.emptyList());
+          _broadcastHashTable.getOrDefault(new Key(_joinResolver._probeKeySelector.getKey(probeRow)), Collections.emptyList());
       // If it is a left join and right table is empty, we return left rows.
       if (hashCollection.isEmpty() && (_joinType == JoinRelType.LEFT || _joinType == JoinRelType.RIGHT)) {
         rows.add(joinRow(probeRow, null));
@@ -273,15 +225,15 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private Object[] joinRow(Object[] probeRow, @Nullable Object[] broadcastRow) {
     Object[] resultRow = new Object[_resultRowSize];
     int idx = 0;
-    if (getLeftRow(probeRow, broadcastRow) != null) {
-      for (Object obj : getLeftRow(probeRow, broadcastRow)) {
+    if (_joinResolver._getLeftRow.apply(probeRow, broadcastRow) != null) {
+      for (Object obj : _joinResolver._getLeftRow.apply(probeRow, broadcastRow)) {
         resultRow[idx++] = obj;
       }
     }
     // This is needed since left row can be null and we need to advance the idx to the beginning of right row.
     idx = _leftRowSize;
-    if (getRightRow(probeRow, broadcastRow) != null) {
-      for (Object obj : getRightRow(probeRow, broadcastRow)) {
+    if (_joinResolver._getRightRow.apply(probeRow, broadcastRow) != null) {
+      for (Object obj : _joinResolver._getRightRow.apply(probeRow, broadcastRow)) {
         resultRow[idx++] = obj;
       }
     }

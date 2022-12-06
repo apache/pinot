@@ -64,7 +64,7 @@
       {
         "psql": "7.2.1.1",
         "description": "RIGHT OUTER JOIN output rows in different order than join order",
-        "sql": "SELECT {tbl2}.num, {tbl2}.name, {tbl1}.num, {tbl1}.value FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+        "sql": "SELECT {tbl2}.num, {tbl2}.value, {tbl1}.num, {tbl1}.name FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
       },
       {
         "psql": "7.2.1.1",
