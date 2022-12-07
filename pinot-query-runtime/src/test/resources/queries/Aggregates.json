@@ -251,11 +251,11 @@
       { "sql": "SELECT string_col, string_col AS alias, count(int_col), count(*) FROM {tbl} GROUP BY bool_col, string_col ORDER BY bool_col, alias"},
       { "sql": "SELECT string_col, bool_col, bool_col AS alias, sum(int_col), count(int_col), count(*) FROM {tbl} GROUP BY bool_col, string_col ORDER BY alias" },
       { "sql": "SELECT sum(int_col), count(int_col) FROM {tbl} GROUP BY string_col ORDER BY string_col" },
-      { "sql": "SELECT * FROM (SELECT string_col, bool_col, min(int_col) AS m, count(int_col), count(*) AS c FROM {tbl} GROUP BY string_col, bool_col ORDER BY string_col) WHERE c < m" },
-      { "sql": "SELECT * FROM (SELECT string_col, bool_col, min(int_col) AS m, count(int_col), count(*) AS c FROM {tbl} GROUP BY string_col, bool_col ORDER BY bool_col, string_col) WHERE c < m" },
       { "sql": "SELECT CASE WHEN bool_col THEN int_col ELSE int_col - 5 END, count(int_col) FROM {tbl} GROUP BY CASE WHEN bool_col THEN int_col ELSE int_col - 5 END ORDER BY CASE WHEN bool_col THEN int_col ELSE int_col - 5 END" },
       { "sql": "SELECT upper(string_col), count(int_col) FROM {tbl} GROUP BY upper(string_col) ORDER BY upper(string_col)" },
-      { "sql": "SELECT upper(string_col), count(int_col) FROM {tbl} GROUP BY upper(string_col) ORDER BY count(int_col)" }
+      { "sql": "SELECT upper(string_col), count(int_col) FROM {tbl} GROUP BY upper(string_col) ORDER BY count(int_col)" },
+      { "sql": "SELECT * FROM (SELECT string_col, bool_col, min(int_col) AS m, count(int_col), count(*) AS c FROM {tbl} GROUP BY string_col, bool_col ORDER BY string_col) WHERE c < m" },
+      { "sql": "SELECT * FROM (SELECT string_col, bool_col, min(int_col) AS m, count(int_col), count(*) AS c FROM {tbl} GROUP BY string_col, bool_col ORDER BY bool_col, string_col) WHERE c < m" }
     ]
   }
 }
