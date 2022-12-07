@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -166,17 +167,15 @@ public class StarTreeIndexMapUtils {
   }
 
   /**
-   * Loads the index maps for multiple star-trees from a file.
+   * Loads the index maps for multiple star-trees from an input stream.
    */
-  public static List<Map<IndexKey, IndexValue>> loadFromFile(File indexMapFile, int numStarTrees) {
-    Preconditions.checkState(indexMapFile.exists(), "Star-tree index map file does not exist");
-
+  public static List<Map<IndexKey, IndexValue>> loadFromInputStream(InputStream indexMapInputStream, int numStarTrees) {
     List<Map<IndexKey, IndexValue>> indexMaps = new ArrayList<>(numStarTrees);
     for (int i = 0; i < numStarTrees; i++) {
       indexMaps.add(new HashMap<>());
     }
 
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(indexMapFile);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromInputStream(indexMapInputStream);
     for (String key : CommonsConfigurationUtils.getKeys(configuration)) {
       String[] split = StringUtils.split(key, KEY_SEPARATOR);
       int starTreeId = Integer.parseInt(split[0]);
