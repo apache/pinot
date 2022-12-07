@@ -291,10 +291,6 @@ public class CommonConstants {
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
-        // If true, enable the skip shuffle optimization for multistage query engine.
-        // Only used for multistage query engine.
-        public static final String SKIP_SHUFFLE = "SkipShuffle";
-
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
         public static final String PRESERVE_TYPE = "preserveType";

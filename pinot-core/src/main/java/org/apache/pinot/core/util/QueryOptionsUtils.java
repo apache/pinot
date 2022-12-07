@@ -105,8 +105,4 @@ public class QueryOptionsUtils {
   public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
     return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
   }
-
-  public static boolean isSkipShuffleEnabled(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.SKIP_SHUFFLE, "true"));
-  }
 }

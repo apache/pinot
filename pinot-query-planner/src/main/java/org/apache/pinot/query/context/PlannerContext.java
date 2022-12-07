@@ -27,7 +27,6 @@ import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.tools.FrameworkConfig;
-import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.validate.Validator;
 
@@ -68,10 +67,6 @@ public class PlannerContext implements AutoCloseable {
 
   public void setOptions(Map<String, String> options) {
     _options = options;
-  }
-
-  public boolean isShuffleRewriteEnabled() {
-    return QueryOptionsUtils.isSkipShuffleEnabled(_options);
   }
 
   public Map<String, String> getOptions() {
