@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.data.manager;
 
+import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class TableDataManagerConfigTest {
@@ -50,5 +52,23 @@ public class TableDataManagerConfigTest {
     when(segConfig.getPeerSegmentDownloadScheme()).thenReturn(null);
     finalConfig.overrideConfigs(tableConfig);
     assertNull(finalConfig.getTablePeerDownloadScheme());
+  }
+
+  @Test
+  public void testGetTierConfigMaps() {
+    Configuration defaultConfig = new PropertiesConfiguration();
+    Map<String, Map<String, String>> tierCfgs =
+        TableDataManagerConfig.getTierConfigMaps(defaultConfig.subset("tierConfigs"));
+    assertTrue(tierCfgs.isEmpty());
+    // The config names are lower cased, which is done for all instance configs.
+    defaultConfig.setProperty("tierConfigs.tiernames", "tierX,tierY,tierZ.a.B.c");
+    defaultConfig.setProperty("tierConfigs.tierx.datadir", "/foo/bar");
+    defaultConfig.setProperty("tierConfigs.tiery.datadir", "/xyz/abc");
+    defaultConfig.setProperty("tierConfigs.tierz.a.b.c.somepath", "somewhere");
+    tierCfgs = TableDataManagerConfig.getTierConfigMaps(defaultConfig.subset("tierConfigs"));
+    assertEquals(tierCfgs.size(), 3);
+    assertEquals(tierCfgs.get("tierX").get("datadir"), "/foo/bar");
+    assertEquals(tierCfgs.get("tierY").get("datadir"), "/xyz/abc");
+    assertEquals(tierCfgs.get("tierZ.a.B.c").get("somepath"), "somewhere");
   }
 }
