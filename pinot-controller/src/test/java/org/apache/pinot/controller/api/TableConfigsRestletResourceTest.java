@@ -27,6 +27,7 @@ import java.util.List;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TunerConfig;
@@ -552,6 +553,32 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
         "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs updated for testUnrecognized1\"}");
     // Delete
     sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+  }
+
+  /**
+   * Tests get TableConfigs for backwards compatibility
+   */
+  @Test
+  public void testGetConfigCompatibility()
+      throws IOException {
+    // Should not fail if schema name does not match raw table name in the case they are created separately
+    String schemaName = "schema1";
+    Schema schema = createDummySchema(schemaName);
+    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(), schema.toPrettyJsonString());
+    String tableName = "table1";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
+    validationConfig.setSchemaName(schemaName);
+    validationConfig.setReplication("1");
+    offlineTableConfig.setValidationConfig(validationConfig);
+    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
+        offlineTableConfig.toJsonString());
+
+    String response = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsGet(tableName));
+    TableConfigs tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
+    Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
+    Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
+    Assert.assertEquals(tableConfigsResponse.getSchema().getSchemaName(), schema.getSchemaName());
   }
 
   @AfterClass
