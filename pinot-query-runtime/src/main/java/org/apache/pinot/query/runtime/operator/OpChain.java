@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Suppliers;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 
 
 /**
@@ -36,28 +33,32 @@ import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 public class OpChain {
 
   private final Operator<TransferableBlock> _root;
-  // TODO: build timers that are partial-execution aware
-  private final Supplier<ThreadResourceUsageProvider> _timer;
   private final Set<MailboxIdentifier> _receivingMailbox;
+  private final OpChainStats _stats;
+  private final String _id;
 
-  public OpChain(Operator<TransferableBlock> root, List<MailboxIdentifier> receivingMailboxes) {
+  public OpChain(Operator<TransferableBlock> root, List<MailboxIdentifier> receivingMailboxes, long requestId,
+      int stageId) {
     _root = root;
     _receivingMailbox = new HashSet<>(receivingMailboxes);
-
-    // use memoized supplier so that the timing doesn't start until the
-    // first time we get the timer
-    _timer = Suppliers.memoize(ThreadResourceUsageProvider::new)::get;
+    _id = String.format("%s_%s", requestId, stageId);
+    _stats = new OpChainStats(_id);
   }
 
   public Operator<TransferableBlock> getRoot() {
     return _root;
   }
 
-  public ThreadResourceUsageProvider getAndStartTimer() {
-    return _timer.get();
-  }
-
   public Set<MailboxIdentifier> getReceivingMailbox() {
     return _receivingMailbox;
+  }
+
+  public OpChainStats getStats() {
+    return _stats;
+  }
+
+  @Override
+  public String toString() {
+    return "OpChain{ " + _id + "}";
   }
 }

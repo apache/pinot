@@ -55,4 +55,9 @@ public interface OpChainScheduler {
    *         prior to this call
    */
   OpChain next();
+
+  /**
+   * @return the number of operator chains that are awaiting execution
+   */
+  int size();
 }

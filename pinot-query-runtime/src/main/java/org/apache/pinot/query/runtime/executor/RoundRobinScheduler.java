@@ -64,6 +64,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
     // immediately be considered ready in case it does not need
     // read from any mailbox (e.g. with a LiteralValueOperator)
     (isNew ? _ready : _available).add(operatorChain);
+    trace("registered " + operatorChain);
   }
 
   @Override
@@ -85,6 +86,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
     //
     // TODO: fix the memory leak by adding a close(opChain) callback
     _seenMail.add(mailbox);
+    trace("got mail for " + mailbox);
   }
 
   @Override
@@ -95,7 +97,14 @@ public class RoundRobinScheduler implements OpChainScheduler {
 
   @Override
   public OpChain next() {
-    return _ready.poll();
+    OpChain op = _ready.poll();
+    trace("Polled " + op);
+    return op;
+  }
+
+  @Override
+  public int size() {
+    return _ready.size() + _available.size();
   }
 
   private void computeReady() {
@@ -120,5 +129,10 @@ public class RoundRobinScheduler implements OpChainScheduler {
         availableChains.remove();
       }
     }
+  }
+
+  private void trace(String operation) {
+    LOGGER.trace("({}) Ready: {}, Available: {}, Mail: {}",
+        operation, _ready, _available, _seenMail);
   }
 }
