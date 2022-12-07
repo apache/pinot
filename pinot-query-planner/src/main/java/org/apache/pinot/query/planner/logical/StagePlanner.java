@@ -65,7 +65,7 @@ public class StagePlanner {
 
     // walk the plan and create stages.
     StageNode globalStageRoot = walkRelPlan(relRootNode, getNewStageId());
-    if (!_plannerContext.isShuffleRewriteDisabled()) {
+    if (_plannerContext.isShuffleRewriteEnabled()) {
       ShuffleRewriteVisitor.optimizeShuffles(globalStageRoot);
     }
     // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one

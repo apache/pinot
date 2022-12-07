@@ -70,8 +70,8 @@ public class PlannerContext implements AutoCloseable {
     _options = options;
   }
 
-  public boolean isShuffleRewriteDisabled() {
-    return QueryOptionsUtils.isSkipShuffleDisabled(_options);
+  public boolean isShuffleRewriteEnabled() {
+    return QueryOptionsUtils.isSkipShuffleEnabled(_options);
   }
 
   public Map<String, String> getOptions() {

@@ -106,7 +106,7 @@ public class QueryOptionsUtils {
     return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
   }
 
-  public static boolean isSkipShuffleDisabled(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.DISABLE_SKIP_SHUFFLE, "false"));
+  public static boolean isSkipShuffleEnabled(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.SKIP_SHUFFLE, "true"));
   }
 }
