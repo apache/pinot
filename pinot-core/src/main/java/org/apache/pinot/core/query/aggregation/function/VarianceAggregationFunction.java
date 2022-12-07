@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -27,6 +26,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.utils.StatisticalAggregationFunctionUtils;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
@@ -71,7 +71,7 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] values = getValSet(blockValSetMap, _expression);
+    double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
 
     long count = 0;
     double sum = 0.0;
@@ -112,26 +112,10 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
     }
   }
 
-  private double[] getValSet(Map<ExpressionContext, BlockValSet> blockValSetMap, ExpressionContext expression) {
-    BlockValSet blockValSet = blockValSetMap.get(expression);
-    // TODO: Add MV support for variance
-    Preconditions.checkState(blockValSet.isSingleValue(),
-        "Variance function currently only supports single-valued column");
-    switch (blockValSet.getValueType().getStoredType()) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-        return blockValSet.getDoubleValuesSV();
-      default:
-        throw new IllegalStateException("Cannot compute variance for non-numeric type: " + blockValSet.getValueType());
-    }
-  }
-
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] values = getValSet(blockValSetMap, _expression);
+    double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
     for (int i = 0; i < length; i++) {
       setGroupByResult(groupKeyArray[i], groupByResultHolder, 1L, values[i], 0.0);
     }
@@ -140,7 +124,7 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] values = getValSet(blockValSetMap, _expression);
+    double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
     for (int i = 0; i < length; i++) {
       for (int groupKey : groupKeysArray[i]) {
         setGroupByResult(groupKey, groupByResultHolder, 1L, values[i], 0.0);

@@ -55,6 +55,12 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
+/**
+ * Queries test for variance and standard deviation queries.
+ *
+ * TODO: Combine the test with {@link CovarianceQueriesTest}.
+ *
+ */
 public class VarianceQueriesTest extends BaseQueriesTest {
 
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "VarianceQueriesTest");
@@ -66,7 +72,6 @@ public class VarianceQueriesTest extends BaseQueriesTest {
   private static final int NUM_GROUPS = 10;
   private static final int MAX_VALUE = 500;
   private static final double RELATIVE_EPSILON = 0.0001;
-  private static final double DELTA = 0.0001;
 
   private static final String INT_COLUMN = "intColumn";
   private static final String LONG_COLUMN = "longColumn";

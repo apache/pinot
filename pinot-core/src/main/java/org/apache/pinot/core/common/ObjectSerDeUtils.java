@@ -483,7 +483,6 @@ public class ObjectSerDeUtils {
     }
   };
 
-
   public static final ObjectSerDe<HyperLogLog> HYPER_LOG_LOG_SER_DE = new ObjectSerDe<HyperLogLog>() {
 
     @Override
