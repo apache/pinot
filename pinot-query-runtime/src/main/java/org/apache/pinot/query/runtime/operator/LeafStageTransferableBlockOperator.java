@@ -215,9 +215,6 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
       Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
           adjustedResultSchema.getColumnDataTypes()), "Incompatible result data schema: "
           + "Expecting: " + desiredDataSchema + " Actual: " + adjustedResultSchema);
-      // Extract the result rows
-      Collection<Object[]> resultRows = responseBlock.getRows();
-      List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
       return composeColumnIndexedTransferableBlock(responseBlock, adjustedResultSchema, columnIndices);
     } else {
       return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
@@ -233,16 +230,14 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
       DataSchema desiredDataSchema, int[] columnIndices) {
     Collection<Object[]> resultRows = responseBlock.getRows();
     List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
-    if (responseBlock.getQueryContext().getOrderByExpressions() != null) {
-      // extract result row in ordered fashion
+    if (resultRows instanceof List) {
+      for (Object[] row : resultRows) {
+        extractedRows.add(canonicalizeRow(row, desiredDataSchema, columnIndices));
+      }
+    } else if (resultRows instanceof PriorityQueue) {
       PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
       while (!priorityQueue.isEmpty()) {
         extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema, columnIndices));
-      }
-    } else {
-      // extract result row in non-ordered fashion
-      for (Object[] row : resultRows) {
-        extractedRows.add(canonicalizeRow(row, desiredDataSchema, columnIndices));
       }
     }
     return new TransferableBlock(extractedRows, desiredDataSchema, DataBlock.Type.ROW);

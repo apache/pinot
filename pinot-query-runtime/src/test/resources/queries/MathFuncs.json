@@ -166,8 +166,18 @@
         "sql": "SELECT doubleCol * intCol FROM {numTbl}"
       },
       {
+        "ignored": true,
+        "comments": "calcite doesn't support up-cast automatically",
         "description": "test multiply on overflow",
         "sql": "SELECT intCol * 1073741824 FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on overflow",
+        "sql": "SELECT intCol * CAST(1073741824 AS BIGINT) FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on overflow",
+        "sql": "SELECT intCol * 10737418e2 FROM {numTbl}"
       }
     ]
   },

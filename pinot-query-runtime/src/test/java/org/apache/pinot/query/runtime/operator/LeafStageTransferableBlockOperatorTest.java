@@ -24,13 +24,21 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
+import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
 
 
 // TODO: add tests for Agg / GroupBy / Distinct result blocks
@@ -149,5 +157,89 @@ public class LeafStageTransferableBlockOperatorTest {
 
     // Then:
     Assert.assertTrue(resultBlock.isErrorBlock());
+  }
+
+  @Test
+  public void shouldReorderWhenQueryContextAskForNotInOrderGroupByAsDistinct() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT intCol, strCol FROM tbl GROUP BY strCol, intCol");
+    // result schema doesn't match with DISTINCT columns using GROUP BY.
+    DataSchema schema = new DataSchema(new String[]{"intCol", "strCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
+        new InstanceResponseBlock(new DistinctResultsBlock(mock(DistinctAggregationFunction.class),
+            new DistinctTable(schema, Arrays.asList(
+                new Record(new Object[]{1, "foo"}), new Record(new Object[]{2, "bar"})))), queryContext));
+    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+
+    // When:
+    TransferableBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, "foo"});
+    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{2, "bar"});
+  }
+
+  @Test
+  public void shouldParsedBlocksSuccessfullyWithDistinctQuery() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT DISTINCT strCol, intCol FROM tbl");
+    // result schema doesn't match with DISTINCT columns using GROUP BY.
+    DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
+        new InstanceResponseBlock(new DistinctResultsBlock(mock(DistinctAggregationFunction.class),
+            new DistinctTable(schema, Arrays.asList(
+                new Record(new Object[]{"foo", 1}), new Record(new Object[]{"bar", 2})))), queryContext));
+    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+
+    // When:
+    TransferableBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{"foo", 1});
+    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{"bar", 2});
+  }
+
+  @Test
+  public void shouldReorderWhenQueryContextAskForGroupByOutOfOrder() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT intCol, count(*), sum(doubleCol), strCol FROM tbl GROUP BY strCol, intCol");
+    // result schema doesn't match with DISTINCT columns using GROUP BY.
+    DataSchema schema = new DataSchema(new String[]{"intCol", "count(*)", "sum(doubleCol)", "strCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.STRING});
+    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
+        new InstanceResponseBlock(new GroupByResultsBlock(schema, Collections.emptyList()), queryContext));
+    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+
+    // When:
+    TransferableBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    Assert.assertFalse(resultBlock.isErrorBlock());
+  }
+
+  @Test
+  public void shouldNotErrorOutWhenDealingWithAggregationResults() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT count(*), sum(doubleCol) FROM tbl");
+    // result schema doesn't match with DISTINCT columns using GROUP BY.
+    DataSchema schema = new DataSchema(new String[]{"count_star", "sum(doubleCol)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
+    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
+        new InstanceResponseBlock(new AggregationResultsBlock(queryContext.getAggregationFunctions(),
+            Collections.emptyList()), queryContext));
+    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+
+    // When:
+    TransferableBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    Assert.assertFalse(resultBlock.isErrorBlock());
   }
 }
