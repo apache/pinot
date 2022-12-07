@@ -38,13 +38,19 @@ public final class DataBlockUtils {
   static final int VERSION_TYPE_SHIFT = 5;
 
   public static MetadataBlock getErrorDataBlock(Exception e) {
-    String errorMessage = e.getMessage() == null ? e.toString() : e.getMessage();
     if (e instanceof ProcessingException) {
-      return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), errorMessage));
+      return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), extractErrorMsg(e)));
     } else {
       // TODO: Pass in meaningful error code.
-      return getErrorDataBlock(Collections.singletonMap(QueryException.UNKNOWN_ERROR_CODE, errorMessage));
+      return getErrorDataBlock(Collections.singletonMap(QueryException.UNKNOWN_ERROR_CODE, extractErrorMsg(e)));
     }
+  }
+
+  private static String extractErrorMsg(Throwable t) {
+    while (t.getMessage() == null) {
+      t = t.getCause();
+    }
+    return QueryException.getTruncatedStackTrace(t);
   }
 
   public static MetadataBlock getErrorDataBlock(Map<Integer, String> exceptions) {

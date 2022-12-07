@@ -334,7 +334,7 @@ public class HashJoinOperatorTest {
     }
     Assert.assertTrue(result.isErrorBlock());
     MetadataBlock errorBlock = (MetadataBlock) result.getDataBlock();
-    Assert.assertTrue(errorBlock.getExceptions().get(1000).matches(".*notEquals.*"));
+    Assert.assertTrue(errorBlock.getExceptions().get(1000).contains("notEquals"));
   }
 
   @Test
@@ -501,7 +501,7 @@ public class HashJoinOperatorTest {
     }
     Assert.assertTrue(result.isErrorBlock());
     Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
-        .matches("testInnerJoinRightError"));
+        .contains("testInnerJoinRightError"));
   }
 
   @Test
@@ -529,8 +529,8 @@ public class HashJoinOperatorTest {
       result = join.nextBlock();
     }
     Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(
-        result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).matches("testInnerJoinLeftError"));
+    Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
+        .contains("testInnerJoinLeftError"));
   }
 
   @Test
