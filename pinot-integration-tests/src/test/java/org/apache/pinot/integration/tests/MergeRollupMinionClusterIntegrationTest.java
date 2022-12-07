@@ -881,7 +881,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
-      }, TIMEOUT_IN_MS * 2, "Timeout while validating segments");
+      }, TIMEOUT_IN_MS, "Timeout while validating segments");
     }
     // Check total tasks
     assertEquals(numTasks, 5);
