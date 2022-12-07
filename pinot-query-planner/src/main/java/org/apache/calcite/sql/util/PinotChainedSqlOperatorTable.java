@@ -18,19 +18,16 @@
  */
 package org.apache.calcite.sql.util;
 
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
-
-import com.google.common.collect.ImmutableList;
-
 import org.checkerframework.checker.nullness.qual.Nullable;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * ============================================================================

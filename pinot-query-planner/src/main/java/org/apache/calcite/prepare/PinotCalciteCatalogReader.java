@@ -18,6 +18,17 @@
  */
 package org.apache.calcite.prepare;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
@@ -63,21 +74,7 @@ import org.apache.calcite.sql.validate.SqlUserDefinedTableMacro;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.util.Optionality;
 import org.apache.calcite.util.Util;
-
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-
 import org.checkerframework.checker.nullness.qual.Nullable;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableSet;
-import java.util.Objects;
-import java.util.function.Function;
-import java.util.function.Predicate;
 
 
 /**
