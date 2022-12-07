@@ -52,16 +52,19 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
  */
 public class KinesisConsumer extends KinesisConnectionHandler implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisConsumer.class);
+  public static final long SLEEP_TIME_BETWEEN_REQUESTS = 1000L;
   private final String _streamTopicName;
   private final int _numMaxRecordsToFetch;
   private final ExecutorService _executorService;
   private final ShardIteratorType _shardIteratorType;
+  private final int _rpsLimit;
 
   public KinesisConsumer(KinesisConfig kinesisConfig) {
     super(kinesisConfig);
     _streamTopicName = kinesisConfig.getStreamTopicName();
     _numMaxRecordsToFetch = kinesisConfig.getNumMaxRecordsToFetch();
     _shardIteratorType = kinesisConfig.getShardIteratorType();
+    _rpsLimit = kinesisConfig.getRpsLimit();
     _executorService = Executors.newSingleThreadExecutor();
   }
 
@@ -72,6 +75,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     _streamTopicName = kinesisConfig.getStreamTopicName();
     _numMaxRecordsToFetch = kinesisConfig.getNumMaxRecordsToFetch();
     _shardIteratorType = kinesisConfig.getShardIteratorType();
+    _rpsLimit = kinesisConfig.getRpsLimit();
     _executorService = Executors.newSingleThreadExecutor();
   }
 
@@ -125,9 +129,12 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
       String nextStartSequenceNumber;
       boolean isEndOfShard = false;
-
+      long currentWindow = System.currentTimeMillis() / SLEEP_TIME_BETWEEN_REQUESTS;
+      int currentWindowRequests = 0;
       while (shardIterator != null) {
         GetRecordsRequest getRecordsRequest = GetRecordsRequest.builder().shardIterator(shardIterator).build();
+
+        long requestSentTime = System.currentTimeMillis() / 1000;
         GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordsRequest);
 
         if (!getRecordsResponse.records().isEmpty()) {
@@ -154,6 +161,19 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
         if (Thread.interrupted()) {
           break;
+        }
+
+        // Kinesis enforces a limit of 5 .getRecords request per second on each shard from AWS end
+        // Beyond this limit we start getting ProvisionedThroughputExceededException which affect the ingestion
+        if (requestSentTime == currentWindow) {
+          currentWindowRequests++;
+        } else if (requestSentTime > currentWindow) {
+          currentWindow = requestSentTime;
+          currentWindowRequests = 0;
+        }
+
+        if (currentWindowRequests >= _rpsLimit) {
+          Thread.sleep(SLEEP_TIME_BETWEEN_REQUESTS);
         }
       }
 
