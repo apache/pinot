@@ -30,7 +30,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
-import org.apache.calcite.prepare.CalciteCatalogReader;
+import org.apache.calcite.prepare.PinotCalciteCatalogReader;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
@@ -45,7 +45,7 @@ import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.PinotOperatorTable;
-import org.apache.calcite.sql.util.ChainedSqlOperatorTable;
+import org.apache.calcite.sql.util.PinotChainedSqlOperatorTable;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -88,11 +88,11 @@ public class QueryEnvironment {
     // catalog
     Properties catalogReaderConfigProperties = new Properties();
     catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
-    _catalogReader = new CalciteCatalogReader(_rootSchema, _rootSchema.path(null), _typeFactory,
+    _catalogReader = new PinotCalciteCatalogReader(_rootSchema, _rootSchema.path(null), _typeFactory,
         new CalciteConnectionConfigImpl(catalogReaderConfigProperties));
 
     _config = Frameworks.newConfigBuilder().traitDefs()
-        .operatorTable(new ChainedSqlOperatorTable(Arrays.asList(
+        .operatorTable(new PinotChainedSqlOperatorTable(Arrays.asList(
             PinotOperatorTable.instance(),
             _catalogReader)))
         .defaultSchema(_rootSchema.plus())
