@@ -870,6 +870,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       final int finalNumTasks = numTasks;
       TestUtils.waitForCondition(aVoid -> {
         try {
+          Thread.sleep(5000);
           // Check num total doc of merged segments are the same as the original segments
           JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
           if (!SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery)) {
@@ -877,11 +878,12 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
           }
           // Check query routing
           int numSegmentsQueried = actualJson.get("numSegmentsQueried").asInt();
+          System.out.println(numSegmentsQueried);
           return numSegmentsQueried == expectedNumSegmentsQueried[finalNumTasks];
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
-      }, 1000L, TIMEOUT_IN_MS, "Timeout while validating segments");
+      }, TIMEOUT_IN_MS, "Timeout while validating segments");
     }
     // Check total tasks
     assertEquals(numTasks, 5);
