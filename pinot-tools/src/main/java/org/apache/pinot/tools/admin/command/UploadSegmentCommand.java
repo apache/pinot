@@ -149,6 +149,10 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
+  public void setTableType(TableType tableType) {
+    _tableType = tableType;
+  }
+
   @Override
   public boolean execute()
       throws Exception {
