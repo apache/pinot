@@ -75,6 +75,10 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
+  @CommandLine.Option(names = {"-update"}, required = false,
+      description = "Update the existing table instead of creating new one")
+  private boolean _update = false;
+
   @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
   private boolean _exec;
 
@@ -191,6 +195,15 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return res.contains("successfully added");
   }
 
+  public boolean sendTableUpdateRequest(JsonNode node, String tableName)
+      throws IOException {
+    String res = AbstractBaseAdminCommand.sendRequest("PUT",
+        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsUpdate(tableName), node.toString(),
+        makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
+    LOGGER.info(res);
+    return res.contains("TableConfigs updated");
+  }
+
   @Override
   public boolean execute()
       throws Exception {
@@ -239,7 +252,11 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
         "Failed reading schema " + _schemaFile);
     TableConfigs tableConfigs = new TableConfigs(rawTableName, schema, offlineTableConfig, realtimeTableConfig);
 
-    return sendTableCreationRequest(JsonUtils.objectToJsonNode(tableConfigs));
+    if (_update) {
+      return sendTableUpdateRequest(tableConfigs.toJsonNode(), rawTableName);
+    } else {
+      return sendTableCreationRequest(tableConfigs.toJsonNode());
+    }
   }
 
   private static <T> T attempt(Callable<T> callable, String errorMessage) {
