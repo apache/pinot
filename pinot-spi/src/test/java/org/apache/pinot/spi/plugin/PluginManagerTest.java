@@ -22,7 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.jar.JarEntry;
@@ -96,19 +96,19 @@ public class PluginManagerTest {
     HashMap<String, File> actualPluginsMap = PluginManager.get().getPluginsToLoad(pluginsDirs, pluginsToInclude);
     Assert.assertEquals(actualPluginsMap.size(), 3);
 
-    ArrayList<String> actualPluginNames = new ArrayList<>();
-    ArrayList<String> actualPluginPaths = new ArrayList<>();
+    HashSet<String> actualPluginNames = new HashSet<>();
+    HashSet<String> actualPluginPaths = new HashSet<>();
 
     for (Map.Entry<String, File> entry : actualPluginsMap.entrySet()) {
       actualPluginNames.add(entry.getKey());
       actualPluginPaths.add(entry.getValue().getAbsolutePath());
     }
 
-    ArrayList<String> expectedPluginNames = new ArrayList<>();
+    HashSet<String> expectedPluginNames = new HashSet<>();
     expectedPluginNames.add("p1");
     expectedPluginNames.add("p2");
     expectedPluginNames.add("p3");
-    ArrayList<String> expectedPluginPaths = new ArrayList<>();
+    HashSet<String> expectedPluginPaths = new HashSet<>();
     expectedPluginPaths.add(_p1.getParentFile().getAbsolutePath());
     expectedPluginPaths.add(_p2.getParentFile().getAbsolutePath());
     expectedPluginPaths.add(_p3.getParentFile().getAbsolutePath());
