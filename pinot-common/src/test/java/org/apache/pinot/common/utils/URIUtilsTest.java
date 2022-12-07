@@ -20,7 +20,7 @@ package org.apache.pinot.common.utils;
 
 import java.net.URI;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -82,7 +82,7 @@ public class URIUtilsTest {
     Assert.assertEquals(uri.getPort(), 8080);
 
     // test that params get encoded
-    Map<String, String> params = new HashMap<>();
+    Map<String, String> params = new LinkedHashMap<>();
     params.put("stringParam", "aString");
     params.put("stringParamNeedsEncoding", "{\"format\":\"JSON\",\"timeout\":1000}");
     uri = URIUtils.buildURI("http", "foo", "bar", params);
