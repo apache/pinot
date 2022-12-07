@@ -152,7 +152,8 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
         ((DistinctAggregationFunction) responseBlock.getQueryContext().getAggregationFunctions()[0]).getColumns());
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, desiredDataSchema);
     Preconditions.checkState(inOrder(columnIndices), "Incompatible distinct table schema for leaf stage."
-        + "Expected: " + desiredDataSchema + ". Actual: " + desiredDataSchema);
+        + " Expected: " + desiredDataSchema + ". Actual Columns: " + selectionColumns
+        + " Column Ordering: " + Arrays.toString(columnIndices));
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
@@ -172,7 +173,8 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
         .map(e -> e.toString()).collect(Collectors.toList());
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
     Preconditions.checkState(inOrder(columnIndices), "Incompatible group by result schema for leaf stage."
-        + "Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
+        + " Expected: " + desiredDataSchema + ". Actual: " + resultSchema
+        + " Column Ordering: " + Arrays.toString(columnIndices));
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
@@ -193,7 +195,8 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
         a -> a.getColumnName()).collect(Collectors.toList());
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
     Preconditions.checkState(inOrder(columnIndices), "Incompatible aggregate result schema for leaf stage."
-        + "Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
+        + " Expected: " + desiredDataSchema + ". Actual: " + resultSchema
+        + " Column Ordering: " + Arrays.toString(columnIndices));
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
@@ -213,8 +216,9 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
     if (!inOrder(columnIndices)) {
       DataSchema adjustedResultSchema = SelectionOperatorUtils.getSchemaForProjection(resultSchema, columnIndices);
       Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
-          adjustedResultSchema.getColumnDataTypes()), "Incompatible result data schema: "
-          + "Expecting: " + desiredDataSchema + " Actual: " + adjustedResultSchema);
+          adjustedResultSchema.getColumnDataTypes()), "Incompatible selection result data schema: "
+          + " Expected: " + desiredDataSchema + ". Actual: " + adjustedResultSchema
+          + " Column Ordering: " + Arrays.toString(columnIndices));
       return composeColumnIndexedTransferableBlock(responseBlock, adjustedResultSchema, columnIndices);
     } else {
       return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
