@@ -878,6 +878,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
           // Check query routing
           int numSegmentsQueried = actualJson.get("numSegmentsQueried").asInt();
           return numSegmentsQueried == expectedNumSegmentsQueried[finalNumTasks]
+              // when running on github tests, the consumer sometimes queries one more segment
               || numSegmentsQueried == expectedNumSegmentsQueried[finalNumTasks] + 1;
         } catch (Exception e) {
           throw new RuntimeException(e);
