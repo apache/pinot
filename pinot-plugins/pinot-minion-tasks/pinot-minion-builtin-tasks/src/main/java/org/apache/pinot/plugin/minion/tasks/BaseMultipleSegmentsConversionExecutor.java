@@ -254,7 +254,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
                 segmentZKMetadataCustomMapModifier.toJsonString());
 
-        String pushMode = configs.get(BatchConfigProperties.PUSH_MODE);
+        String pushMode =
+            configs.getOrDefault(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.TAR.name());
         URI outputSegmentTarURI;
         if (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())
             != BatchConfigProperties.SegmentPushType.TAR) {
@@ -301,7 +302,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   private void pushSegment(String tableName, Map<String, String> taskConfigs, URI outputSegmentTarURI,
       List<Header> headers, List<NameValuePair> parameters, SegmentConversionResult segmentConversionResult)
       throws Exception {
-    String pushMode = taskConfigs.get(BatchConfigProperties.PUSH_MODE);
+    String pushMode =
+        taskConfigs.getOrDefault(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.TAR.name());
     LOGGER.info("Trying to push Pinot segment with push mode {} from {}", pushMode, outputSegmentTarURI);
 
     PushJobSpec pushJobSpec = new PushJobSpec();
