@@ -325,6 +325,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
+  public TableDataManagerConfig getTableDataManagerConfig() {
+    return _tableDataManagerConfig;
+  }
+
+  @Override
   public void addSegmentError(String segmentName, SegmentErrorInfo segmentErrorInfo) {
     _errorCache.put(Pair.of(_tableNameWithType, segmentName), segmentErrorInfo);
   }
