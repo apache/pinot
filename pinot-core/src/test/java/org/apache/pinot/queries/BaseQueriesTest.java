@@ -111,7 +111,7 @@ public abstract class BaseQueriesTest {
    * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
    * different index segments in the test and overriding getDistinctInstances.
    * This can be particularly useful to test statistical aggregation functions.
-   * @see CovarianceQueriesTest for an example use case.
+   * @see StatisticalQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponse(String query) {
     return getBrokerResponse(query, PLAN_MAKER);
@@ -125,7 +125,7 @@ public abstract class BaseQueriesTest {
    * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
    * different index segments in the test and overriding getDistinctInstances.
    * This can be particularly useful to test statistical aggregation functions.
-   * @see CovarianceQueriesTest for an example use case.
+   * @see StatisticalQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponseWithFilter(String query) {
     return getBrokerResponse(query + getFilter());
@@ -139,7 +139,7 @@ public abstract class BaseQueriesTest {
    * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
    * different index segments in the test and overriding getDistinctInstances.
    * This can be particularly useful to test statistical aggregation functions.
-   * @see CovarianceQueriesTest for an example use case.
+   * @see StatisticalQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker) {
     return getBrokerResponse(query, planMaker, null);
@@ -153,7 +153,7 @@ public abstract class BaseQueriesTest {
    * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
    * different index segments in the test and overriding getDistinctInstances.
    * This can be particularly useful to test statistical aggregation functions.
-   * @see CovarianceQueriesTest for an example use case.
+   * @see StatisticalQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponse(String query, @Nullable Map<String, String> extraQueryOptions) {
     return getBrokerResponse(query, PLAN_MAKER, extraQueryOptions);
@@ -167,7 +167,7 @@ public abstract class BaseQueriesTest {
    * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
    * different index segments in the test and overriding getDistinctInstances.
    * This can be particularly useful to test statistical aggregation functions.
-   * @see CovarianceQueriesTest for an example use case.
+   * @see StatisticalQueriesTest for an example use case.
    */
   private BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker,
       @Nullable Map<String, String> extraQueryOptions) {
@@ -191,7 +191,7 @@ public abstract class BaseQueriesTest {
    * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
    * different index segments in the test and overriding getDistinctInstances.
    * This can be particularly useful to test statistical aggregation functions.
-   * @see CovarianceQueriesTest for an example use case.
+   * @see StatisticalQueriesTest for an example use case.
    */
   private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
@@ -249,7 +249,7 @@ public abstract class BaseQueriesTest {
    * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
    * different index segments in the test and overriding getDistinctInstances.
    * This can be particularly useful to test statistical aggregation functions.
-   * @see CovarianceQueriesTest for an example use case.
+   * @see StatisticalQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponseForOptimizedQuery(String query, @Nullable TableConfig config,
       @Nullable Schema schema) {
@@ -286,7 +286,7 @@ public abstract class BaseQueriesTest {
    * The caller of this function should handle initializing 2 instances with different index segments in the test and
    * overriding getDistinctInstances.
    * This can be particularly useful to test statistical aggregation functions.
-   * @see CovarianceQueriesTest for an example use case.
+   * @see StatisticalQueriesTest for an example use case.
    */
   private BrokerResponseNative getBrokerResponseDistinctInstances(PinotQuery pinotQuery, PlanMaker planMaker) {
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);

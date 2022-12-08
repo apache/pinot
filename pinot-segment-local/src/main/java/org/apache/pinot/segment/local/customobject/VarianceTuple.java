@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.nio.ByteBuffer;
-import javax.annotation.Nonnull;
 
 
 public class VarianceTuple implements Comparable<VarianceTuple> {
@@ -34,13 +33,19 @@ public class VarianceTuple implements Comparable<VarianceTuple> {
   }
 
   public void apply(long count, double sum, double m2) {
+    if (count == 0) {
+      return;
+    }
     double delta = (sum / count) - (_sum / _count);
     _m2 += m2 + delta * delta * count * _count / (count + _count);
     _count += count;
     _sum += sum;
   }
 
-  public void apply(@Nonnull VarianceTuple varianceTuple) {
+  public void apply(VarianceTuple varianceTuple) {
+    if (varianceTuple._count == 0) {
+      return;
+    }
     double delta = (varianceTuple._sum / varianceTuple._count) - (_sum / _count);
     _m2 += varianceTuple._m2 + delta * delta * varianceTuple._count * _count / (varianceTuple._count + _count);
     _count += varianceTuple._count;
@@ -59,7 +64,6 @@ public class VarianceTuple implements Comparable<VarianceTuple> {
     return _m2;
   }
 
-  @Nonnull
   public byte[] toBytes() {
     ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES * 2 + Long.BYTES);
     byteBuffer.putLong(_count);
@@ -68,18 +72,16 @@ public class VarianceTuple implements Comparable<VarianceTuple> {
     return byteBuffer.array();
   }
 
-  @Nonnull
   public static VarianceTuple fromBytes(byte[] bytes) {
     return fromByteBuffer(ByteBuffer.wrap(bytes));
   }
 
-  @Nonnull
   public static VarianceTuple fromByteBuffer(ByteBuffer byteBuffer) {
     return new VarianceTuple(byteBuffer.getLong(), byteBuffer.getDouble(), byteBuffer.getDouble());
   }
 
   @Override
-  public int compareTo(@Nonnull VarianceTuple varianceTuple) {
+  public int compareTo(VarianceTuple varianceTuple) {
     if (_count == 0) {
       if (varianceTuple._count == 0) {
         return 0;
