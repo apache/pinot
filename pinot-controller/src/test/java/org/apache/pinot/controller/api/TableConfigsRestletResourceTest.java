@@ -579,6 +579,10 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
     Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
     Assert.assertEquals(tableConfigsResponse.getSchema().getSchemaName(), schema.getSchemaName());
+
+    // Delete
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaDelete(schemaName));
   }
 
   @AfterClass
