@@ -17,15 +17,9 @@ package org.apache.pinot.plugin.inputformat.orc;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.GZIPOutputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
@@ -38,26 +32,17 @@ import org.apache.orc.TypeDescription;
 import org.apache.orc.Writer;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class ORCRecordReaderTest extends AbstractRecordReaderTest {
-  private final File _dataFile = new File(_tempDir, "data.orc");
-
-  private void compressGzip(String sourcePath, String targetPath)
-      throws IOException {
-    try (GZIPOutputStream gos = new GZIPOutputStream(new FileOutputStream(Paths.get(targetPath).toFile()))) {
-      Files.copy(Paths.get(sourcePath), gos);
-    }
-  }
 
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(File file)
       throws Exception {
     ORCRecordReader orcRecordReader = new ORCRecordReader();
-    orcRecordReader.init(_dataFile, _sourceFields, null);
+    orcRecordReader.init(file, _sourceFields, null);
     return orcRecordReader;
   }
 
@@ -158,16 +143,8 @@ public class ORCRecordReaderTest extends AbstractRecordReaderTest {
     writer.close();
   }
 
-  @Test
-  public void testGzipORCRecordReader()
-      throws Exception {
-    String gzipFileName = "data.orc.gz";
-    compressGzip(_dataFile.getAbsolutePath(), String.format("%s/%s", _tempDir, gzipFileName));
-    final File gzDataFile = new File(_tempDir, gzipFileName);
-    ORCRecordReader orcRecordReader = new ORCRecordReader();
-    orcRecordReader.init(gzDataFile, _sourceFields, null);
-    checkValue(orcRecordReader, _records, _primaryKeys);
-    orcRecordReader.rewind();
-    checkValue(orcRecordReader, _records, _primaryKeys);
+  @Override
+  protected String getDataFileName() {
+    return "data.orc";
   }
 }

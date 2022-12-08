@@ -34,13 +34,15 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
  * It has two implementations: {@link ParquetAvroRecordReader} (Default) and {@link ParquetNativeRecordReader}.
  */
 public class ParquetRecordReader implements RecordReader {
+  private static final String EXTENSION = "parquet";
+
   private RecordReader _internalParquetRecordReader;
   private boolean _useAvroParquetRecordReader = true;
 
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, "parquet");
+    File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, EXTENSION);
     if (recordReaderConfig != null && ((ParquetRecordReaderConfig) recordReaderConfig).useParquetAvroRecordReader()) {
       _internalParquetRecordReader = new ParquetAvroRecordReader();
     } else if (recordReaderConfig != null

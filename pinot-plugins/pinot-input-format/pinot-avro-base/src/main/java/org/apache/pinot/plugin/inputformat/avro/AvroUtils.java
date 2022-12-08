@@ -39,6 +39,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
 /**
@@ -214,7 +215,7 @@ public class AvroUtils {
    */
   public static DataFileStream<GenericRecord> getAvroReader(File avroFile)
       throws IOException {
-    if (avroFile.getName().endsWith(".gz")) {
+    if (RecordReaderUtils.isGZippedFile(avroFile)) {
       return new DataFileStream<>(new GZIPInputStream(new FileInputStream(avroFile)), new GenericDatumReader<>());
     } else {
       return new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<>());

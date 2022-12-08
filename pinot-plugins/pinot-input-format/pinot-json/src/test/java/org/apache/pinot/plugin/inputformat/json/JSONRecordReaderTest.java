@@ -33,20 +33,19 @@ import org.testng.Assert;
 
 
 public class JSONRecordReaderTest extends AbstractRecordReaderTest {
-  private final File _dateFile = new File(_tempDir, "data.json");
 
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(File file)
       throws Exception {
     JSONRecordReader recordReader = new JSONRecordReader();
-    recordReader.init(_dateFile, _sourceFields, null);
+    recordReader.init(file, _sourceFields, null);
     return recordReader;
   }
 
   @Override
   protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
       throws Exception {
-    try (FileWriter fileWriter = new FileWriter(_dateFile)) {
+    try (FileWriter fileWriter = new FileWriter(_dataFile)) {
       for (Map<String, Object> r : recordsToWrite) {
         ObjectNode jsonRecord = JsonUtils.newObjectNode();
         for (String key : r.keySet()) {
@@ -55,6 +54,11 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
         fileWriter.write(jsonRecord.toString());
       }
     }
+  }
+
+  @Override
+  protected String getDataFileName() {
+    return "data.json";
   }
 
   @Override

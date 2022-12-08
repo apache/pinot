@@ -20,14 +20,10 @@ package org.apache.pinot.plugin.inputformat.parquet;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.GZIPOutputStream;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -43,16 +39,16 @@ import org.testng.annotations.Test;
 
 
 public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
-  private final File _dataFile = new File(_tempDir, "data.parquet");
-  private final String _gzipFileName = "data.parquet.gz";
   private final File _testParquetFileWithInt96AndDecimal =
       new File(getClass().getClassLoader().getResource("test-file-with-int96-and-decimal.snappy.parquet").getFile());
 
+  private static final int NUM_RECORDS_TEST_PARQUET_WITH_INT96 = 1965;
+
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(File file)
       throws Exception {
     ParquetRecordReader recordReader = new ParquetRecordReader();
-    recordReader.init(_dataFile, _sourceFields, null);
+    recordReader.init(file, _sourceFields, null);
     return recordReader;
   }
 
@@ -76,11 +72,9 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
     }
   }
 
-  private void compressGzip(String sourcePath, String targetPath)
-      throws IOException {
-    try (GZIPOutputStream gos = new GZIPOutputStream(new FileOutputStream(Paths.get(targetPath).toFile()))) {
-      Files.copy(Paths.get(sourcePath), gos);
-    }
+  @Override
+  protected String getDataFileName() {
+    return "data.parquet";
   }
 
   @Test
@@ -122,9 +116,9 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
 
     final ParquetRecordReader parquetRecordReader2 = new ParquetRecordReader();
     File nativeParquetFile = new File(getClass().getClassLoader().getResource("users.parquet").getFile());
-    parquetRecordReader.init(nativeParquetFile, null, null);
+    parquetRecordReader2.init(nativeParquetFile, null, null);
     // Should be native since file metadata does not have avro schema
-    Assert.assertFalse(parquetRecordReader.useAvroParquetRecordReader());
+    Assert.assertFalse(parquetRecordReader2.useAvroParquetRecordReader());
   }
 
   @Test
@@ -167,43 +161,5 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
     }
     Assert.assertEquals(recordsRead, totalRecords,
         "Message read from ParquetRecordReader doesn't match the expected number.");
-  }
-
-  @Test
-  public void testGzipParquetRecordReader()
-      throws IOException {
-    compressGzip(_dataFile.getAbsolutePath(), String.format("%s/%s", _tempDir, _gzipFileName));
-    final File gzDataFile = new File(_tempDir, _gzipFileName);
-    ParquetRecordReader recordReader = new ParquetRecordReader();
-    recordReader.init(gzDataFile, _sourceFields, null);
-    testReadParquetFile(recordReader, SAMPLE_RECORDS_SIZE);
-  }
-
-  @Test
-  public void testGzipParquetAvroRecordReader()
-      throws IOException {
-    ParquetAvroRecordReader avroRecordReader = new ParquetAvroRecordReader();
-    compressGzip(_dataFile.getAbsolutePath(), String.format("%s/%s", _tempDir, _gzipFileName));
-    final File gzDataFile = new File(_tempDir, _gzipFileName);
-    avroRecordReader.init(gzDataFile, null, new ParquetRecordReaderConfig());
-    testReadParquetFile(avroRecordReader, SAMPLE_RECORDS_SIZE);
-  }
-
-  @Test
-  public void testGzipParquetNativeRecordReader()
-      throws IOException {
-    ParquetNativeRecordReader nativeRecordReader = new ParquetNativeRecordReader();
-
-    final String gzParquetFileWithInt96AndDecimal =
-        String.format("%s.gz", _testParquetFileWithInt96AndDecimal.getAbsolutePath());
-    compressGzip(_testParquetFileWithInt96AndDecimal.getAbsolutePath(), gzParquetFileWithInt96AndDecimal);
-    final File gzTestParquetFileWithInt96AndDecimal = new File(gzParquetFileWithInt96AndDecimal);
-    nativeRecordReader.init(gzTestParquetFileWithInt96AndDecimal, ImmutableSet.of(), new ParquetRecordReaderConfig());
-    testReadParquetFile(nativeRecordReader, 1965);
-
-    compressGzip(_dataFile.getAbsolutePath(), String.format("%s/%s", _tempDir, _gzipFileName));
-    final File gzDataFile = new File(_tempDir, _gzipFileName);
-    nativeRecordReader.init(gzDataFile, ImmutableSet.of(), new ParquetRecordReaderConfig());
-    testReadParquetFile(nativeRecordReader, SAMPLE_RECORDS_SIZE);
   }
 }

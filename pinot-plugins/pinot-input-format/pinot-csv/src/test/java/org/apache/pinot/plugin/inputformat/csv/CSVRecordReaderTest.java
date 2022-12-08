@@ -38,22 +38,20 @@ import org.testng.annotations.Test;
 
 public class CSVRecordReaderTest extends AbstractRecordReaderTest {
   private static final char CSV_MULTI_VALUE_DELIMITER = '\t';
-  private final File _dataFile = new File(_tempDir, "data.csv");
 
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(File file)
       throws Exception {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     CSVRecordReader csvRecordReader = new CSVRecordReader();
-    csvRecordReader.init(_dataFile, _sourceFields, csvRecordReaderConfig);
+    csvRecordReader.init(file, _sourceFields, csvRecordReaderConfig);
     return csvRecordReader;
   }
 
   @Override
   protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
       throws Exception {
-
     Schema pinotSchema = getPinotSchema();
     String[] columns = pinotSchema.getColumnNames().toArray(new String[0]);
     try (FileWriter fileWriter = new FileWriter(_dataFile);
@@ -71,6 +69,11 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
         csvPrinter.printRecord(record);
       }
     }
+  }
+
+  @Override
+  protected String getDataFileName() {
+    return "data.csv";
   }
 
   @Override
