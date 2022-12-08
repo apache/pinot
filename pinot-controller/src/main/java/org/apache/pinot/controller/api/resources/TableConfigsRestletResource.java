@@ -141,7 +141,7 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName) {
 
     try {
-      Schema schema = _pinotHelixResourceManager.getSchema(tableName);
+      Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
       TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
