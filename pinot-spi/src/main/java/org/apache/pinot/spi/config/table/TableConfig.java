@@ -313,6 +313,11 @@ public class TableConfig extends BaseJsonConfig {
     _dedupConfig = dedupConfig;
   }
 
+  @JsonIgnore
+  public boolean isDedupEnabled() {
+    return _dedupConfig != null && _dedupConfig.isDedupEnabled();
+  }
+
   @Nullable
   public DimensionTableConfig getDimensionTableConfig() {
     return _dimensionTableConfig;
@@ -345,6 +350,11 @@ public class TableConfig extends BaseJsonConfig {
   @JsonIgnore
   public UpsertConfig.Mode getUpsertMode() {
     return _upsertConfig == null ? UpsertConfig.Mode.NONE : _upsertConfig.getMode();
+  }
+
+  @JsonIgnore
+  public boolean isUpsertEnabled() {
+    return _upsertConfig != null && _upsertConfig.getMode() != UpsertConfig.Mode.NONE;
   }
 
   @JsonIgnore

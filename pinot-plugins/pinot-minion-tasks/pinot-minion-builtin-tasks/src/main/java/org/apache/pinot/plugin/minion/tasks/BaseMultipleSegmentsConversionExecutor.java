@@ -49,6 +49,7 @@ import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
@@ -275,7 +276,17 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true");
         NameValuePair tableNameParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
             TableNameBuilder.extractRawTableName(tableNameWithType));
-        List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
+        NameValuePair tableTypeParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE,
+            TableNameBuilder.getTableTypeFromTableName(tableNameWithType).toString());
+        // RealtimeToOfflineSegmentsTask pushed segments to the corresponding offline table
+        // TODO: This is not clean to put the override here, but let's think about it harder to see what is the proper
+        //  way to override it.
+        if (MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE.equals(taskType)) {
+          tableTypeParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE,
+              TableType.OFFLINE.toString());
+        }
+        List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter,
+            tableTypeParameter);
 
         pushSegment(tableNameParameter.getValue(), configs, outputSegmentTarURI, httpHeaders, parameters,
             segmentConversionResult);
