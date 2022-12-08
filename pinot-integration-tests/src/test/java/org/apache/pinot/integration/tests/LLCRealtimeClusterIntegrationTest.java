@@ -286,7 +286,6 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     }, 600_000L, "Failed to remove inverted index");
   }
 
-
   @Test(expectedExceptions = IOException.class)
   public void testAddHLCTableShouldFail()
       throws IOException {

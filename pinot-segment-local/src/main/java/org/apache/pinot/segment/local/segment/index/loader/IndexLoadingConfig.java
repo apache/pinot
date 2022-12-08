@@ -106,9 +106,8 @@ public class IndexLoadingConfig {
    */
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig,
       @Nullable Schema schema) {
-    _instanceDataManagerConfig = instanceDataManagerConfig;
-    extractFromInstanceConfig();
-    updateTableConfigAndSchema(tableConfig, schema);
+    extractFromInstanceConfig(instanceDataManagerConfig);
+    extractFromTableConfigAndSchema(tableConfig, schema);
   }
 
   @VisibleForTesting
@@ -124,7 +123,7 @@ public class IndexLoadingConfig {
     return _instanceDataManagerConfig;
   }
 
-  public void updateTableConfigAndSchema(TableConfig tableConfig, @Nullable Schema schema) {
+  private void extractFromTableConfigAndSchema(TableConfig tableConfig, @Nullable Schema schema) {
     if (schema != null) {
       TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     }
@@ -300,35 +299,37 @@ public class IndexLoadingConfig {
     }
   }
 
-  private void extractFromInstanceConfig() {
-    if (_instanceDataManagerConfig == null) {
+  private void extractFromInstanceConfig(InstanceDataManagerConfig instanceDataManagerConfig) {
+    if (instanceDataManagerConfig == null) {
       return;
     }
-    _instanceId = _instanceDataManagerConfig.getInstanceId();
 
-    ReadMode instanceReadMode = _instanceDataManagerConfig.getReadMode();
+    _instanceDataManagerConfig = instanceDataManagerConfig;
+    _instanceId = instanceDataManagerConfig.getInstanceId();
+
+    ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
     if (instanceReadMode != null) {
       _readMode = instanceReadMode;
     }
 
-    String instanceSegmentVersion = _instanceDataManagerConfig.getSegmentFormatVersion();
+    String instanceSegmentVersion = instanceDataManagerConfig.getSegmentFormatVersion();
     if (instanceSegmentVersion != null) {
       _segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
     }
 
-    _enableSplitCommit = _instanceDataManagerConfig.isEnableSplitCommit();
+    _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
 
-    _isRealtimeOffHeapAllocation = _instanceDataManagerConfig.isRealtimeOffHeapAllocation();
-    _isDirectRealtimeOffHeapAllocation = _instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
+    _isRealtimeOffHeapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
+    _isDirectRealtimeOffHeapAllocation = instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
 
-    String avgMultiValueCount = _instanceDataManagerConfig.getAvgMultiValueCount();
+    String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
     if (avgMultiValueCount != null) {
       _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
-    _enableSplitCommitEndWithMetadata = _instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
+    _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
     _segmentStoreURI =
-        _instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
-    _segmentDirectoryLoader = _instanceDataManagerConfig.getSegmentDirectoryLoader();
+        instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
+    _segmentDirectoryLoader = instanceDataManagerConfig.getSegmentDirectoryLoader();
   }
 
   /**
