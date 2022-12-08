@@ -65,7 +65,13 @@ public class RecordReaderUtils {
       throws IOException {
     if (isGZippedFile(dataFile)) {
       try (final InputStream inputStream = getInputStream(dataFile)) {
-        File targetFile = new File(String.format("%s.%s", dataFile.getAbsolutePath(), extension));
+        String targetFileName = dataFile.getName();
+        if (targetFileName.endsWith(".gz")) {
+          targetFileName = targetFileName.substring(0, targetFileName.length() - 3);
+        } else {
+          targetFileName = targetFileName + "." + extension;
+        }
+        File targetFile = new File(dataFile.getParentFile(), targetFileName);
         Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
         return targetFile;
       }
@@ -74,7 +80,7 @@ public class RecordReaderUtils {
     }
   }
 
-  private static boolean isGZippedFile(File file)
+  public static boolean isGZippedFile(File file)
       throws IOException {
     int magic = 0;
     try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {

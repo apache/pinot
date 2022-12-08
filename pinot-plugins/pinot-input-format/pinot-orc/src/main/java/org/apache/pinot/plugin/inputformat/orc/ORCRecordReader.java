@@ -66,6 +66,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * </ul>
  */
 public class ORCRecordReader implements RecordReader {
+  private static final String EXTENSION = "orc";
+
   private List<String> _orcFields;
   private List<TypeDescription> _orcFieldTypes;
   private boolean[] _includeOrcFields;
@@ -78,7 +80,7 @@ public class ORCRecordReader implements RecordReader {
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     Configuration configuration = new Configuration();
-    File orcFile = RecordReaderUtils.unpackIfRequired(dataFile, "orc");
+    File orcFile = RecordReaderUtils.unpackIfRequired(dataFile, EXTENSION);
     Reader orcReader = OrcFile.createReader(new Path(orcFile.getAbsolutePath()),
         OrcFile.readerOptions(configuration).filesystem(FileSystem.getLocal(configuration)));
     TypeDescription orcSchema = orcReader.getSchema();
