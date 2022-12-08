@@ -206,7 +206,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   @Override
   public void tearDown()
       throws Exception {
-     FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
+    FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
     super.tearDown();
   }
 
@@ -303,18 +303,49 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   @Test
   public void testEnableDisableDictionaryWithReload()
       throws Exception {
-    String query = "SELECT * FROM myTable WHERE ActualElapsedTime > 0";
+    // Issue a query before enabling dictionary and validate.
+    String query = "SELECT COUNT(*) FROM myTable WHERE ActualElapsedTime = -5";
     JsonNode queryResponse = postQuery(query);
     long numTotalDocs = queryResponse.get("totalDocs").asLong();
+    int queryResult = queryResponse.get("resultTable").get("rows").get(0).get(0).asInt();
+    int numDocsScanned = queryResponse.get("numDocsScanned").asInt();
+    assertTrue(queryResponse.get("numEntriesScannedInFilter").asLong() > 0);
 
-    // Enable dictionary.
+    // Enable dictionary and inverted index.
     TableConfig tableConfig = getRealtimeTableConfig();
     tableConfig.getIndexingConfig().getNoDictionaryColumns().remove("ActualElapsedTime");
+    tableConfig.getIndexingConfig().getInvertedIndexColumns().add("ActualElapsedTime");
     updateTableConfig(tableConfig);
     String enableDictReloadId = reloadTableAndValidateResponse(getTableName(), TableType.REALTIME, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return isReloadJobCompleted(enableDictReloadId);
+        JsonNode queryResponse1 = postQuery(query);
+        long numTotalDocsAfterReload = queryResponse1.get("totalDocs").asLong();
+        assertEquals(numTotalDocs, numTotalDocsAfterReload);
+        int queryResultAfterReload = queryResponse1.get("resultTable").get("rows").get(0).get(0).asInt();
+        assertEquals(queryResult, queryResultAfterReload);
+        int numDocsScannedAfterReload = queryResponse1.get("numDocsScanned").asInt();
+        assertEquals(numDocsScanned, numDocsScannedAfterReload);
+
+        // numEntriesScannedInFilter should be zero as inverted index is enabled.
+        long numEntriesScannedInFilterAfterReload = queryResponse1.get("numEntriesScannedInFilter").asLong();
+        return isReloadJobCompleted(enableDictReloadId) && numEntriesScannedInFilterAfterReload == 0;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to reload.");
+
+    // Disable dictionary and inverted index.
+    tableConfig = getRealtimeTableConfig();
+    tableConfig.getIndexingConfig().getNoDictionaryColumns().add("ActualElapsedTime");
+    tableConfig.getIndexingConfig().getInvertedIndexColumns().remove("ActualElapsedTime");
+    updateTableConfig(tableConfig);
+    String disableDictReloadId = reloadTableAndValidateResponse(getTableName(), TableType.REALTIME, false);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        // At this point, all kafka records are already consumed and the segment with data is completed. The ongoing
+        // consuming segments do not have any records.
+        return isReloadJobCompleted(disableDictReloadId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -324,22 +355,14 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     long numTotalDocsAfterReload = queryResponse.get("totalDocs").asLong();
     assertEquals(numTotalDocs, numTotalDocsAfterReload);
 
-    // Disable dictionary.
-    tableConfig = getRealtimeTableConfig();
-    tableConfig.getIndexingConfig().getNoDictionaryColumns().add("ActualElapsedTime");
-    updateTableConfig(tableConfig);
-    String disableDictReloadId = reloadTableAndValidateResponse(getTableName(), TableType.REALTIME, false);
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return isReloadJobCompleted(disableDictReloadId);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to reload.");
+    int queryResultAfterReload = queryResponse.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(queryResult, queryResultAfterReload);
 
-    queryResponse = postQuery(query);
-    numTotalDocsAfterReload = queryResponse.get("totalDocs").asLong();
-    assertEquals(numTotalDocs, numTotalDocsAfterReload);
+    int numDocsScannedAfterReload = queryResponse.get("numDocsScanned").asInt();
+    assertEquals(numDocsScanned, numDocsScannedAfterReload);
+
+    // Should be non-zero as dictionary is disabled.
+    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocsAfterReload);
   }
 
   @Test

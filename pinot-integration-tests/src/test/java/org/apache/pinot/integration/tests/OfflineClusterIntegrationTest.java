@@ -476,7 +476,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
 
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
 
@@ -548,13 +548,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index in table");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
     // With force download, the table size gets back to the initial value.
     assertEquals(getTableSize(getTableName()), DISK_SIZE_IN_BYTES);
   }
 
   private void addInvertedIndex()
-      throws IOException {
+      throws Exception {
     // Update table config to add inverted index on DivActualElapsedTime column, and
     // reload the table to get config change into effect and add the inverted index.
     TableConfig tableConfig = getOfflineTableConfig();
@@ -577,7 +577,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
   }
 
   @Test
@@ -1039,7 +1039,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate range index");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
 
     // Update table config to remove the new range index, and
     // reload table to clean the new range index physically.
@@ -1058,7 +1058,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
 
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
@@ -1084,7 +1084,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate bloom filter");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
 
     // Update table config to remove the new bloom filter, and
     // reload table to clean the new bloom filter physically.
@@ -1103,7 +1103,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
 
@@ -1155,7 +1155,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to add first star-tree index");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
 
     // Reload again should have no effect
     reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
@@ -1201,7 +1201,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to change to second star-tree index");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
 
     // First query should not be able to use the star-tree
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
@@ -1248,7 +1248,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to remove star-tree index");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
     assertEquals(getTableSize(getTableName()), tableSizeWithDefaultIndex);
 
     // First query should not be able to use the star-tree
@@ -1410,7 +1410,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to add default columns");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
   }
 
   private void reloadWithMissingColumns()
@@ -1452,7 +1452,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to skip missing columns");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
   }
 
   private void reloadWithRegularColumns()
@@ -1480,7 +1480,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to reload regular columns");
-    validateReloadJobSuccess(reloadJobId);
+    assertTrue(isReloadJobCompleted(reloadJobId));
   }
 
   private void testNewAddedColumns()
@@ -2748,16 +2748,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Properties jdbcProps = new Properties();
     jdbcProps.put(PinotConnection.BROKER_LIST, "localhost:" + brokerPort);
     return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
-  }
-
-  private boolean validateReloadJobSuccess(String reloadJobId)
-      throws IOException {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(reloadJobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
-
-    assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
-    return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
   }
 
   @Test

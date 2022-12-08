@@ -290,7 +290,7 @@ public class ForwardIndexHandler implements IndexHandler {
     // dictionary will only be allowed if FST and inverted index are also disabled.
     if (_indexLoadingConfig.getInvertedIndexColumns().contains(column) || _indexLoadingConfig.getFSTIndexColumns()
         .contains(column)) {
-      LOGGER.warn("Cannot disabled dictionary as column={} has FST index or inverted index or both.", column);
+      LOGGER.warn("Cannot disable dictionary as column={} has FST index or inverted index or both.", column);
       return false;
     }
 
