@@ -148,6 +148,12 @@
     </file>
     <file>
       <source>
+        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-clp-log/target/pinot-clp-log-${project.version}-shaded.jar
+      </source>
+      <destName>plugins/pinot-input-format/pinot-clp-log/pinot-clp-log-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>
         ${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-avro/target/pinot-confluent-avro-${project.version}-shaded.jar
       </source>
       <destName>plugins/pinot-input-format/pinot-confluent-avro/pinot-confluent-avro-${project.version}-shaded.jar
