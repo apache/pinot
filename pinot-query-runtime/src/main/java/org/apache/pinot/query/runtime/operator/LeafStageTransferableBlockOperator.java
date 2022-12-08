@@ -25,7 +25,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -40,7 +39,6 @@ import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -148,12 +146,10 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
   @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeDistinctTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
-    List<String> selectionColumns = Arrays.asList(
-        ((DistinctAggregationFunction) responseBlock.getQueryContext().getAggregationFunctions()[0]).getColumns());
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, desiredDataSchema);
-    Preconditions.checkState(inOrder(columnIndices), "Incompatible distinct table schema for leaf stage."
-        + " Expected: " + desiredDataSchema + ". Actual Columns: " + selectionColumns
-        + " Column Ordering: " + Arrays.toString(columnIndices));
+    DataSchema resultSchema = responseBlock.getDataSchema();
+    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
+        resultSchema.getColumnDataTypes()), "Incompatible selection result data schema: "
+        + " Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
@@ -168,13 +164,9 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
   private static TransferableBlock composeGroupByTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
     DataSchema resultSchema = responseBlock.getDataSchema();
-    // GROUP-BY column names conforms with selection expression
-    List<String> selectionColumns = responseBlock.getQueryContext().getSelectExpressions().stream()
-        .map(e -> e.toString()).collect(Collectors.toList());
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
-    Preconditions.checkState(inOrder(columnIndices), "Incompatible group by result schema for leaf stage."
-        + " Expected: " + desiredDataSchema + ". Actual: " + resultSchema
-        + " Column Ordering: " + Arrays.toString(columnIndices));
+    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
+        resultSchema.getColumnDataTypes()), "Incompatible selection result data schema: "
+        + " Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
@@ -190,13 +182,9 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
   private static TransferableBlock composeAggregationTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
     DataSchema resultSchema = responseBlock.getDataSchema();
-    // AGG-ONLY column names are derived from AggFunction.getColumnName()
-    List<String> selectionColumns = Arrays.stream(responseBlock.getQueryContext().getAggregationFunctions()).map(
-        a -> a.getColumnName()).collect(Collectors.toList());
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
-    Preconditions.checkState(inOrder(columnIndices), "Incompatible aggregate result schema for leaf stage."
-        + " Expected: " + desiredDataSchema + ". Actual: " + resultSchema
-        + " Column Ordering: " + Arrays.toString(columnIndices));
+    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
+        resultSchema.getColumnDataTypes()), "Incompatible selection result data schema: "
+        + " Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
