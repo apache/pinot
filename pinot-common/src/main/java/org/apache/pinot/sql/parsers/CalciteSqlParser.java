@@ -494,13 +494,6 @@ public class CalciteSqlParser {
     return options;
   }
 
-  private static void setOptions(PinotQuery pinotQuery, List<String> optionsStatements) {
-    if (optionsStatements.isEmpty()) {
-      return;
-    }
-    pinotQuery.setQueryOptions(extractOptionsMap(optionsStatements));
-  }
-
   /**
    * Removes comments from the query.
    * NOTE: Comment indicator within single quotes (literal) and double quotes (identifier) are ignored.
