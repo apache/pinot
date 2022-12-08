@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
+import com.clearspring.analytics.util.Preconditions;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 
 public abstract class TransformOperand {
@@ -30,11 +33,102 @@ public abstract class TransformOperand {
     if (rexExpression instanceof RexExpression.InputRef) {
       return new ReferenceOperand((RexExpression.InputRef) rexExpression, inputDataSchema);
     } else if (rexExpression instanceof RexExpression.FunctionCall) {
-      return new FunctionOperand((RexExpression.FunctionCall) rexExpression, inputDataSchema);
+      return toTransformOperand((RexExpression.FunctionCall) rexExpression, inputDataSchema);
     } else if (rexExpression instanceof RexExpression.Literal) {
       return new LiteralOperand((RexExpression.Literal) rexExpression);
     } else {
       throw new UnsupportedOperationException("Unsupported RexExpression: " + rexExpression);
+    }
+  }
+
+  @SuppressWarnings({"ConstantConditions", "rawtypes", "unchecked"})
+  private static TransformOperand toTransformOperand(RexExpression.FunctionCall functionCall,
+      DataSchema inputDataSchema) {
+    int operandSize = functionCall.getFunctionOperands().size();
+    switch (OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName())) {
+      case "AND":
+        Preconditions.checkState(operandSize >= 2, "AND takes >=2 argument, passed in argument size:" + operandSize);
+        return new FilterOperand.And(functionCall.getFunctionOperands(), inputDataSchema);
+      case "OR":
+        Preconditions.checkState(operandSize >= 2, "OR takes >=2 argument, passed in argument size:" + operandSize);
+        return new FilterOperand.Or(functionCall.getFunctionOperands(), inputDataSchema);
+      case "NOT":
+        Preconditions.checkState(operandSize == 1, "NOT takes one argument, passed in argument size:" + operandSize);
+        return new FilterOperand.Not(toTransformOperand(functionCall.getFunctionOperands().get(0), inputDataSchema));
+      case "equals":
+        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            if (_requireCasting) {
+              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
+                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) == 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) == 0;
+            }
+          }
+        };
+      case "notEquals":
+        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            if (_requireCasting) {
+              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
+                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) != 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) != 0;
+            }
+          }
+        };
+      case "greaterThan":
+        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            if (_requireCasting) {
+              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
+                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) > 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) > 0;
+            }
+          }
+        };
+      case "greaterThanOrEqual":
+        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            if (_requireCasting) {
+              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
+                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) >= 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) >= 0;
+            }
+          }
+        };
+      case "lessThan":
+        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            if (_requireCasting) {
+              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
+                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) < 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) < 0;
+            }
+          }
+        };
+      case "lessThanOrEqual":
+        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            if (_requireCasting) {
+              return ((Comparable) FunctionInvokeUtils.convert(_lhs.apply(row), _commonCastType)).compareTo(
+                  FunctionInvokeUtils.convert(_rhs.apply(row), _commonCastType)) <= 0;
+            } else {
+              return ((Comparable) _lhs.apply(row)).compareTo(_rhs.apply(row)) <= 0;
+            }
+          }
+        };
+      default:
+        return new FunctionOperand(functionCall, inputDataSchema);
     }
   }
 
