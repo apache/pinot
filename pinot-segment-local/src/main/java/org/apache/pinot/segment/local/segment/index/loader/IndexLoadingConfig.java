@@ -57,6 +57,7 @@ public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String READ_MODE_KEY = "readMode";
 
+  private InstanceDataManagerConfig _instanceDataManagerConfig = null;
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
@@ -105,7 +106,8 @@ public class IndexLoadingConfig {
    */
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig,
       @Nullable Schema schema) {
-    extractFromInstanceConfig(instanceDataManagerConfig);
+    _instanceDataManagerConfig = instanceDataManagerConfig;
+    extractFromInstanceConfig();
     updateTableConfigAndSchema(tableConfig, schema);
   }
 
@@ -116,6 +118,10 @@ public class IndexLoadingConfig {
 
   @VisibleForTesting
   public IndexLoadingConfig() {
+  }
+
+  public InstanceDataManagerConfig getInstanceDataManagerConfig() {
+    return _instanceDataManagerConfig;
   }
 
   public void updateTableConfigAndSchema(TableConfig tableConfig, @Nullable Schema schema) {
@@ -294,35 +300,35 @@ public class IndexLoadingConfig {
     }
   }
 
-  private void extractFromInstanceConfig(InstanceDataManagerConfig instanceDataManagerConfig) {
-    if (instanceDataManagerConfig == null) {
+  private void extractFromInstanceConfig() {
+    if (_instanceDataManagerConfig == null) {
       return;
     }
-    _instanceId = instanceDataManagerConfig.getInstanceId();
+    _instanceId = _instanceDataManagerConfig.getInstanceId();
 
-    ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
+    ReadMode instanceReadMode = _instanceDataManagerConfig.getReadMode();
     if (instanceReadMode != null) {
       _readMode = instanceReadMode;
     }
 
-    String instanceSegmentVersion = instanceDataManagerConfig.getSegmentFormatVersion();
+    String instanceSegmentVersion = _instanceDataManagerConfig.getSegmentFormatVersion();
     if (instanceSegmentVersion != null) {
       _segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
     }
 
-    _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
+    _enableSplitCommit = _instanceDataManagerConfig.isEnableSplitCommit();
 
-    _isRealtimeOffHeapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
-    _isDirectRealtimeOffHeapAllocation = instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
+    _isRealtimeOffHeapAllocation = _instanceDataManagerConfig.isRealtimeOffHeapAllocation();
+    _isDirectRealtimeOffHeapAllocation = _instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
 
-    String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
+    String avgMultiValueCount = _instanceDataManagerConfig.getAvgMultiValueCount();
     if (avgMultiValueCount != null) {
       _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
-    _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
+    _enableSplitCommitEndWithMetadata = _instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
     _segmentStoreURI =
-        instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
-    _segmentDirectoryLoader = instanceDataManagerConfig.getSegmentDirectoryLoader();
+        _instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
+    _segmentDirectoryLoader = _instanceDataManagerConfig.getSegmentDirectoryLoader();
   }
 
   /**

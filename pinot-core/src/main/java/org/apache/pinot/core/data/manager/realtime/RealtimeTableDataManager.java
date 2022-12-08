@@ -64,6 +64,7 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -543,9 +544,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to get table config for table: {}", _tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
-    indexLoadingConfig.updateTableConfigAndSchema(tableConfig, schema);
+
+    // Construct a new indexLoadingConfig with the updated tableConfig and schema.
+    InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();
+    IndexLoadingConfig newIndexLoadingConfig = new IndexLoadingConfig(instanceDataManagerConfig, tableConfig, schema);
+
     try {
-      addSegment(indexDir, indexLoadingConfig);
+      addSegment(indexDir, newIndexLoadingConfig);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

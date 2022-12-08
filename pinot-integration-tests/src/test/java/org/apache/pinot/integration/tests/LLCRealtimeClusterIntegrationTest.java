@@ -231,7 +231,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   }
 
   @Test
-  public void testInvertedIndexTriggering()
+  public void testAddRemoveInvertedIndex()
       throws Exception {
     long numTotalDocs = getCountStarResult();
 
@@ -240,7 +240,9 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     assertTrue(queryResponse.get("numEntriesScannedInFilter").asLong() > 0L);
     long result = queryResponse.get("resultTable").get("rows").get(0).get(0).asLong();
 
+    // Add inverted index and check if numEntriesScannedInFilter is 0.
     TableConfig tableConfig = getRealtimeTableConfig();
+    List<String> invertedIndexCols = tableConfig.getIndexingConfig().getInvertedIndexColumns();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
     reloadRealtimeTable(getTableName());
@@ -261,7 +263,29 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
+
+    // Now, remove the inverted index and check if numEntriesScannedInFilter matches totalDocs.
+    tableConfig = getRealtimeTableConfig();
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(invertedIndexCols);
+    updateTableConfig(tableConfig);
+    reloadRealtimeTable(getTableName());
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        // Query result and total docs should not change during reload
+        assertEquals(queryResponse1.get("resultTable").get("rows").get(0).get(0).asLong(), result);
+        long numEntriesScannedInFilter = queryResponse1.get("numEntriesScannedInFilter").asLong();
+        long totalDocs = queryResponse1.get("totalDocs").asLong();
+        assertEquals(totalDocs, numTotalDocs);
+
+        return numEntriesScannedInFilter == totalDocs;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to remove inverted index");
   }
+
 
   @Test(expectedExceptions = IOException.class)
   public void testAddHLCTableShouldFail()
