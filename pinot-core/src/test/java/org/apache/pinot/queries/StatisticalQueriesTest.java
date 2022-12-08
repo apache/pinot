@@ -431,6 +431,40 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testVarianceTuple() {
+    // Start from empty variance and try to merge non-empty variance
+    VarianceTuple varianceTuple = new VarianceTuple(0, 0.0, 0.0);
+    Variance variance = new Variance(false);
+    assertEquals(computeVariancePop(varianceTuple), variance.getResult());
+    assertEquals(variance.getResult(), Double.NaN);
+
+    VarianceTuple firstValueVarianceTuple = new VarianceTuple(1, 1.0, 0.0);
+    varianceTuple.apply(firstValueVarianceTuple);
+    variance.increment(1.0);
+    assertTrue(Precision.equalsWithRelativeTolerance(computeVariancePop(varianceTuple), variance.getResult(),
+        RELATIVE_EPSILON));
+
+    VarianceTuple secondValueVarianceTuple = new VarianceTuple(1, 3.0, 0.0);
+    varianceTuple.apply(secondValueVarianceTuple);
+    variance.increment(3.0);
+    assertTrue(Precision.equalsWithRelativeTolerance(computeVariancePop(varianceTuple), variance.getResult(),
+        RELATIVE_EPSILON));
+
+
+    // For this time, start from non-empty variance and try to merge empty variance
+    varianceTuple = new VarianceTuple(0, 0.0, 0.0);
+    varianceTuple.apply(new VarianceTuple(1, 1.0, 0.0));
+    varianceTuple.apply(new VarianceTuple(1, 2.0, 0.0));
+    variance = new Variance(false);
+    variance.increment(1.0);
+    variance.increment(2.0);
+
+    varianceTuple.apply(new VarianceTuple(0, 0.0, 0.0));
+    assertTrue(Precision.equalsWithRelativeTolerance(computeVariancePop(varianceTuple), variance.getResult(),
+        RELATIVE_EPSILON));
+  }
+
+  @Test
   public void testVarianceAggregationOnly() {
     // Compute the expected values
     Variance[] expectedVariances = new Variance[8];
@@ -506,9 +540,6 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     assertTrue(
         Precision.equalsWithRelativeTolerance((double) results[7], expectedVariances[7].getResult(), RELATIVE_EPSILON));
 
-    VarianceTuple test = ((VarianceTuple) aggregationResult.get(0));
-    test.apply((new VarianceTuple(0, 0, 0.0d)));
-    System.out.println(test.getM2());
     // Validate the response for a query with a filter
     query = "SELECT VAR_POP(intColumnX) from testTable" + getFilter();
     brokerResponse = getBrokerResponse(query);
@@ -733,6 +764,10 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
           Precision.equalsWithRelativeTolerance(tuple.getM2(), expectedStdDev * expectedStdDev * (expectedCount - 1),
               RELATIVE_EPSILON));
     }
+  }
+
+  private double computeVariancePop(VarianceTuple varianceTuple) {
+    return varianceTuple.getM2() / varianceTuple.getCount();
   }
 
   @AfterClass

@@ -36,7 +36,8 @@ public class VarianceTuple implements Comparable<VarianceTuple> {
     if (count == 0) {
       return;
     }
-    double delta = (sum / count) - (_sum / _count);
+    double currAvg = (_count == 0) ? 0 : _sum / _count;
+    double delta = (sum / count) - currAvg;
     _m2 += m2 + delta * delta * count * _count / (count + _count);
     _count += count;
     _sum += sum;
@@ -46,7 +47,8 @@ public class VarianceTuple implements Comparable<VarianceTuple> {
     if (varianceTuple._count == 0) {
       return;
     }
-    double delta = (varianceTuple._sum / varianceTuple._count) - (_sum / _count);
+    double currAvg = (_count == 0) ? 0 : _sum / _count;
+    double delta = (varianceTuple._sum / varianceTuple._count) - currAvg;
     _m2 += varianceTuple._m2 + delta * delta * varianceTuple._count * _count / (varianceTuple._count + _count);
     _count += varianceTuple._count;
     _sum += varianceTuple._sum;
