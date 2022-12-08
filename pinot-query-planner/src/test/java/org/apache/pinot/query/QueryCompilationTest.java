@@ -78,39 +78,6 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
-  @Test
-  public void testQueryGroupByAfterJoinShouldProperlyRewriteShuffle()
-      throws Exception {
-    String query = "SELECT a.col1, a.col2, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 "
-        + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1, a.col2";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    assertGroupBySingletonAfterJoin(queryPlan, true);
-
-    // same query with selection list re-odering should also work
-    query = "SELECT a.col2, a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 "
-        + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col2, a.col1";
-    queryPlan = _queryEnvironment.planQuery(query);
-    assertGroupBySingletonAfterJoin(queryPlan, true);
-
-    // exact same group key should also work
-    query = "SELECT a.col1, a.col2, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 AND a.col2 = b.col2"
-        + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1, a.col2";
-    queryPlan = _queryEnvironment.planQuery(query);
-    assertGroupBySingletonAfterJoin(queryPlan, true);
-
-    // shrinking group key should not rewrite into singleton
-    query = "SELECT a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 AND a.col2 = b.col2"
-        + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1";
-    queryPlan = _queryEnvironment.planQuery(query);
-    assertGroupBySingletonAfterJoin(queryPlan, false);
-
-    // mismatched group key should not rewrite into singleton
-    query = "SELECT a.col3, a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 AND a.col2 = b.col2"
-        + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1, a.col3";
-    queryPlan = _queryEnvironment.planQuery(query);
-    assertGroupBySingletonAfterJoin(queryPlan, false);
-  }
-
   private static void assertGroupBySingletonAfterJoin(QueryPlan queryPlan, boolean shouldRewrite) throws Exception {
     for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
       if (e.getValue().getScannedTables().size() == 0 && !PlannerUtils.isRootStage(e.getKey())) {
