@@ -36,6 +36,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -60,9 +61,6 @@ import static org.testng.Assert.assertTrue;
  */
 public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
-  // NOTE: The test query should match all the segments so that all the segments are guaranteed to be reloaded
-  private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
-      "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = -9999";
   private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS = Collections.singletonList("DivActualElapsedTime");
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
@@ -230,62 +228,6 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     }
   }
 
-  @Test
-  public void testAddRemoveInvertedIndex()
-      throws Exception {
-    long numTotalDocs = getCountStarResult();
-
-    JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertTrue(queryResponse.get("numEntriesScannedInFilter").asLong() > 0L);
-    long result = queryResponse.get("resultTable").get("rows").get(0).get(0).asLong();
-
-    // Add inverted index and check if numEntriesScannedInFilter is 0.
-    TableConfig tableConfig = getRealtimeTableConfig();
-    List<String> invertedIndexCols = tableConfig.getIndexingConfig().getInvertedIndexColumns();
-    tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
-    updateTableConfig(tableConfig);
-    reloadRealtimeTable(getTableName());
-
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-        // Query result and total docs should not change during reload
-        assertEquals(queryResponse1.get("resultTable").get("rows").get(0).get(0).asLong(), result);
-        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
-
-        long numConsumingSegmentsQueried = queryResponse1.get("numConsumingSegmentsQueried").asLong();
-        long minConsumingFreshnessTimeMs = queryResponse1.get("minConsumingFreshnessTimeMs").asLong();
-        long numEntriesScannedInFilter = queryResponse1.get("numEntriesScannedInFilter").asLong();
-        return numConsumingSegmentsQueried == 2 && minConsumingFreshnessTimeMs > _startTime
-            && minConsumingFreshnessTimeMs < System.currentTimeMillis() && numEntriesScannedInFilter == 0;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 600_000L, "Failed to generate inverted index");
-
-    // Now, remove the inverted index and check if numEntriesScannedInFilter matches totalDocs.
-    tableConfig = getRealtimeTableConfig();
-    tableConfig.getIndexingConfig().setInvertedIndexColumns(invertedIndexCols);
-    updateTableConfig(tableConfig);
-    reloadRealtimeTable(getTableName());
-
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-        // Query result and total docs should not change during reload
-        assertEquals(queryResponse1.get("resultTable").get("rows").get(0).get(0).asLong(), result);
-        long numEntriesScannedInFilter = queryResponse1.get("numEntriesScannedInFilter").asLong();
-        long totalDocs = queryResponse1.get("totalDocs").asLong();
-        assertEquals(totalDocs, numTotalDocs);
-
-        return numEntriesScannedInFilter == totalDocs;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 600_000L, "Failed to remove inverted index");
-  }
-
   @Test(expectedExceptions = IOException.class)
   public void testAddHLCTableShouldFail()
       throws IOException {
@@ -301,68 +243,64 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   }
 
   @Test
-  public void testEnableDisableDictionaryWithReload()
+  public void testAddRemoveDictionaryAndInvertedIndex()
       throws Exception {
-    // Issue a query before enabling dictionary and validate.
-    String query = "SELECT COUNT(*) FROM myTable WHERE ActualElapsedTime = -5";
+    String query = "SELECT COUNT(*) FROM myTable WHERE ActualElapsedTime = -9999";
+    long numTotalDocs = getCountStarResult();
+
     JsonNode queryResponse = postQuery(query);
-    long numTotalDocs = queryResponse.get("totalDocs").asLong();
-    int queryResult = queryResponse.get("resultTable").get("rows").get(0).get(0).asInt();
-    int numDocsScanned = queryResponse.get("numDocsScanned").asInt();
-    assertTrue(queryResponse.get("numEntriesScannedInFilter").asLong() > 0);
+    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+    // Full table scan without dictionary
+    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+    long queryResult = queryResponse.get("resultTable").get("rows").get(0).get(0).asLong();
 
     // Enable dictionary and inverted index.
     TableConfig tableConfig = getRealtimeTableConfig();
-    tableConfig.getIndexingConfig().getNoDictionaryColumns().remove("ActualElapsedTime");
-    tableConfig.getIndexingConfig().getInvertedIndexColumns().add("ActualElapsedTime");
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    assertNotNull(indexingConfig.getNoDictionaryColumns());
+    assertNotNull(indexingConfig.getInvertedIndexColumns());
+    indexingConfig.getNoDictionaryColumns().remove("ActualElapsedTime");
+    indexingConfig.getInvertedIndexColumns().add("ActualElapsedTime");
     updateTableConfig(tableConfig);
     String enableDictReloadId = reloadTableAndValidateResponse(getTableName(), TableType.REALTIME, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
+        // Query result and total docs should not change during reload
         JsonNode queryResponse1 = postQuery(query);
-        long numTotalDocsAfterReload = queryResponse1.get("totalDocs").asLong();
-        assertEquals(numTotalDocs, numTotalDocsAfterReload);
-        int queryResultAfterReload = queryResponse1.get("resultTable").get("rows").get(0).get(0).asInt();
-        assertEquals(queryResult, queryResultAfterReload);
-        int numDocsScannedAfterReload = queryResponse1.get("numDocsScanned").asInt();
-        assertEquals(numDocsScanned, numDocsScannedAfterReload);
+        assertEquals(queryResponse1.get("resultTable").get("rows").get(0).get(0).asLong(), queryResult);
+        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
 
-        // numEntriesScannedInFilter should be zero as inverted index is enabled.
-        long numEntriesScannedInFilterAfterReload = queryResponse1.get("numEntriesScannedInFilter").asLong();
-        return isReloadJobCompleted(enableDictReloadId) && numEntriesScannedInFilterAfterReload == 0;
+        long numConsumingSegmentsQueried = queryResponse1.get("numConsumingSegmentsQueried").asLong();
+        long minConsumingFreshnessTimeMs = queryResponse1.get("minConsumingFreshnessTimeMs").asLong();
+        return numConsumingSegmentsQueried == 2 && minConsumingFreshnessTimeMs > _startTime
+            && minConsumingFreshnessTimeMs < System.currentTimeMillis() && isReloadJobCompleted(enableDictReloadId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to reload.");
+    }, 600_000L, "Failed to generate dictionary and inverted index");
+    // numEntriesScannedInFilter should be zero with inverted index
+    queryResponse = postQuery(query);
+    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), 0L);
 
     // Disable dictionary and inverted index.
-    tableConfig = getRealtimeTableConfig();
-    tableConfig.getIndexingConfig().getNoDictionaryColumns().add("ActualElapsedTime");
-    tableConfig.getIndexingConfig().getInvertedIndexColumns().remove("ActualElapsedTime");
+    indexingConfig.getNoDictionaryColumns().add("ActualElapsedTime");
+    indexingConfig.getInvertedIndexColumns().remove("ActualElapsedTime");
     updateTableConfig(tableConfig);
     String disableDictReloadId = reloadTableAndValidateResponse(getTableName(), TableType.REALTIME, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // At this point, all kafka records are already consumed and the segment with data is completed. The ongoing
-        // consuming segments do not have any records.
+        // Query result and total docs should not change during reload
+        JsonNode queryResponse1 = postQuery(query);
+        assertEquals(queryResponse1.get("resultTable").get("rows").get(0).get(0).asLong(), queryResult);
+        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
         return isReloadJobCompleted(disableDictReloadId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 60_000L, "Failed to reload.");
-
+    }, 60_000L, "Failed to remove dictionary and inverted index");
+    // Should get back to full table scan
     queryResponse = postQuery(query);
-    long numTotalDocsAfterReload = queryResponse.get("totalDocs").asLong();
-    assertEquals(numTotalDocs, numTotalDocsAfterReload);
-
-    int queryResultAfterReload = queryResponse.get("resultTable").get("rows").get(0).get(0).asInt();
-    assertEquals(queryResult, queryResultAfterReload);
-
-    int numDocsScannedAfterReload = queryResponse.get("numDocsScanned").asInt();
-    assertEquals(numDocsScanned, numDocsScannedAfterReload);
-
-    // Should be non-zero as dictionary is disabled.
-    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocsAfterReload);
+    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
   }
 
   @Test
