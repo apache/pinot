@@ -255,18 +255,31 @@ public class DateTimeFunctionsTest {
 
     GenericRow row122 = new GenericRow();
     row122.putValue("tz", "Pacific/Marquesas");
-    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row122, 14});
-    inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row122, 30});
+    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row122, -9});
+    inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row122, -30});
 
     GenericRow row123 = new GenericRow();
     row123.putValue("tz", "Etc/GMT+12");
-    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row123, 12});
+    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row123, -12});
     inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row123, 0});
 
     GenericRow row124 = new GenericRow();
     row124.putValue("tz", "Etc/GMT+1");
-    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row124, 23});
+    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row124, -1});
     inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row124, 0});
+
+    GenericRow row125 = new GenericRow();
+    row125.putValue("tz", "America/Toronto");
+    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row125, -5});
+    inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row125, 0});
+
+    // standard time (2022-01-01 6:23:01)
+    inputs.add(new Object[]{"timezone_hour(tz, 1641046981000)", expectedArguments, row125, -5});
+    inputs.add(new Object[]{"timezone_minute(tz, 1641046981000)", expectedArguments, row125, 0});
+
+    // daylight savings time (2022-07-01 6:23:01)
+    inputs.add(new Object[]{"timezone_hour(tz, 1656685381000)", expectedArguments, row125, -4});
+    inputs.add(new Object[]{"timezone_minute(tz, 1656685381000)", expectedArguments, row125, 0});
 
     // Convenience extraction functions
     expectedArguments = Collections.singletonList("millis");
