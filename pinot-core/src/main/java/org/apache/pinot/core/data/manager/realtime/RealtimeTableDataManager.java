@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -115,6 +116,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
+  // Object to track ingestion delay for all partitions
+  private ConsumptionDelayTracker _consumptionDelayTracker;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
@@ -123,7 +126,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
-
+    // Tracks maximum consumption delay amongst all partitions being served for this table
+    _consumptionDelayTracker = new ConsumptionDelayTracker(_serverMetrics, _tableNameWithType,
+        this);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
@@ -212,6 +217,87 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (_leaseExtender != null) {
       _leaseExtender.shutDown();
     }
+    // Make sure we do metric cleanup when we shut down the table.
+    if (_consumptionDelayTracker != null) {
+      _consumptionDelayTracker.shutdown();
+    }
+    // Now that segments can't report metric destroy metric for this table
+    _serverMetrics.removeTableGauge(_tableNameWithType, ServerGauge.MAX_PINOT_CONSUMPTION_DELAY_MS);
+  }
+
+  /*
+   * Method to handle CONSUMING->DROPPED transition.
+   *
+   * @param partitionGroupId Partition id that we must stop tracking on this server.
+   */
+  private void stopTrackingPartitionDelay(int partitionGroupId) {
+    if (_consumptionDelayTracker != null) {
+      _consumptionDelayTracker.stopTrackingPartitionConsumptionDelay(partitionGroupId);
+    }
+  }
+
+  /*
+   * Method to handle CONSUMING->ONLINE transition.
+   * If no new consumption is noticed for this segment in some timeout, we will read
+   * ideal state to verify the partition is still hosted in this server.
+   *
+   * @param partitionGroupId partition id of partition to be verified as hosted by this server.
+   */
+  private void markPartitionForVerification(int partitionGroupId) {
+    if (_consumptionDelayTracker != null) {
+      _consumptionDelayTracker.markPartitionForConfirmation(partitionGroupId);
+    }
+  }
+
+  /*
+   * Method used by LLRealtimeSegmentManagers to update their partition delays
+   *
+   * @param ingestionDelayMillis Ingestion delay being reported.
+   * @param currentTimeMillis Timestamp of the measure being provided, i.e. when this delay was computed.
+   * @param partitionGroupId Partition ID for which delay is being updated.
+   */
+  public void updatePinotIngestionDelay(long ingestionDelayMillis, long currenTimeMillis, int partitionGroupId) {
+    if (_consumptionDelayTracker != null) {
+      _consumptionDelayTracker.storeConsumptionDelay(ingestionDelayMillis, currenTimeMillis, partitionGroupId);
+    }
+  }
+
+  /*
+   * Method ta handle CONSUMING to ONLINE transitions of segments in this table.
+   * We mark partitions for verification with ideal state when we do not see a consuming segment for some time
+   * for that partition. The idea is to remove the related metrics when the partition moves from the current server.
+   *
+   * @param segmentNameStr name of segment which is transitioning state.
+   */
+  @Override
+  public void onConsumingToOnline(String segmentNameStr) {
+    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    markPartitionForVerification(segmentName.getPartitionGroupId());
+  }
+
+  /*
+   * Method ta handle CONSUMING to DROPPED transitions of segments in this table.
+   *
+   * @param segmentNameStr name of segment which is transitioning state.
+   */
+  @Override
+  public void onConsumingToDropped(String segmentNameStr) {
+    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    // We stop tracking ingestion delay partitions for which their segments go into DROPPED state.
+    stopTrackingPartitionDelay(segmentName.getPartitionGroupId());
+  }
+
+  /**
+   * Returns all partitionGroupIds for the partitions hosted by this server for current table.
+   */
+  public List<Integer> getHostedPartitionsGroupIds() {
+    ArrayList<Integer> partitionsHostedByThisServer = new ArrayList<>();
+    List<String> segments = TableStateUtils.getOnlineSegmentsForThisInstance(_helixManager, _tableNameWithType);
+    for (String segmentNameStr : segments) {
+      LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+      partitionsHostedByThisServer.add(segmentName.getPartitionGroupId());
+    }
+    return partitionsHostedByThisServer;
   }
 
   public RealtimeSegmentStatsHistory getStatsHistory() {
