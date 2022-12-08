@@ -1,0 +1,20 @@
+{
+  "select_expression_test": {
+    "tables": {
+      "cast_as_int": {
+        "schema":[
+          {"name": "strCol", "type": "STRING"}
+        ],
+        "inputs": [
+          ["123"],
+          ["456"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql":"SELECT cast strCol as INT FROM {cast_as_int};"
+      }
+    ]
+  }
+}

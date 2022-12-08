@@ -569,12 +569,13 @@
       {
         "description": "test round on double columns",
         "ignored": true,
-        "comment": "double is rounded t 0",
+        "comment": "double is rounded to 0",
         "sql": "SELECT round(doubleCol, 2) FROM {numTbl}"
       },
       {
         "description": "test ceil on float columns",
-        "comment": "float is rounded t 0",
+        "ignored": true,
+        "comment": "float is rounded to 0",
         "sql": "SELECT round(floatCol, 2) FROM {numTbl}"
       },
       {
