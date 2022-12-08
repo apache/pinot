@@ -52,6 +52,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   OFFLINE_TABLE_COUNT("TableCount", true),
   DISABLED_TABLE_COUNT("TableCount", true),
   PERIODIC_TASK_NUM_TABLES_PROCESSED("PeriodicTaskNumTablesProcessed", true),
+  MINION_TASK_METADATA_LAST_UPDATE_TIME_MS("MinionTaskMetadataLastUpdateTimeMs", true),
   NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
   NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
   NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),

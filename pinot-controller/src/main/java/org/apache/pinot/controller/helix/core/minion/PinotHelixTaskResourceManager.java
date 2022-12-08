@@ -37,6 +37,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
@@ -834,6 +835,17 @@ public class PinotHelixTaskResourceManager {
   public void deleteTaskMetadataByTable(String taskType, String tableNameWithType) {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
     MinionTaskMetadataUtils.deleteTaskMetadata(propertyStore, taskType, tableNameWithType);
+  }
+
+  /**
+   * Gets the last update time (in ms) of all minion task metadata.
+   * @return a map storing the last update time (in ms) of all minion task metadata: (tableNameWithType -> taskType
+   *         -> last update time in ms)
+   */
+  @Nonnull
+  public Map<String, Map<String, Long>> getTaskMetadataLastUpdateTimeMs() {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
+    return MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
   }
 
   @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "finishTime", "subtaskInfos"})
