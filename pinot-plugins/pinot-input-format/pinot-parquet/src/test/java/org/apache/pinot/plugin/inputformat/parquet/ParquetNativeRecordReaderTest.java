@@ -56,8 +56,8 @@ public class ParquetNativeRecordReaderTest extends AbstractRecordReaderTest {
       }
       records.add(record);
     }
-    try (ParquetWriter<GenericRecord> writer = ParquetUtils
-        .getParquetAvroWriter(new Path(_dataFile.getAbsolutePath()), schema)) {
+    try (ParquetWriter<GenericRecord> writer = ParquetUtils.getParquetAvroWriter(new Path(_dataFile.getAbsolutePath()),
+        schema)) {
       for (GenericRecord record : records) {
         writer.write(record);
       }
