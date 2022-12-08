@@ -32,7 +32,8 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 /**
  * ============================================================================
  * THIS CLASS IS COPIED FROM Calcite's {@link org.apache.calcite.sql.util.ChainedSqlOperatorTable} and modified the
- * function lookup to terminate early once found from ordered SqlOperatorTable list.
+ * function lookup to terminate early once found from ordered SqlOperatorTable list. This is to avoid some
+ * hard-coded casting assuming all Sql identifier looked-up are of the same SqlOperator type.
  * ============================================================================
  *
  * PinotChainedSqlOperatorTable implements the {@link SqlOperatorTable} interface by
@@ -69,12 +70,15 @@ public class PinotChainedSqlOperatorTable implements SqlOperatorTable {
     for (SqlOperatorTable table : _tableList) {
       table.lookupOperatorOverloads(opName, category, syntax, operatorList,
           nameMatcher);
-      // ======================================================================
-      // CHANGED LINES BELOW
-      // ======================================================================
+      // ====================================================================
+      // LINES CHANGED BELOW
+      // ====================================================================
       if (!operatorList.isEmpty()) {
         break;
       }
+      // ====================================================================
+      // LINES CHANGED ABOVE
+      // ====================================================================
     }
   }
 

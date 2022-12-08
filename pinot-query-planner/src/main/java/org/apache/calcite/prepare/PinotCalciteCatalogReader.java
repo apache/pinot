@@ -173,9 +173,12 @@ public class PinotCalciteCatalogReader implements Prepare.CatalogReader {
       if (schema != null) {
         final String name = Util.last(names);
         // ====================================================================
-        // LINE CHANGED BELOW
+        // LINES CHANGED BELOW
         // ====================================================================
         functions2.addAll(schema.getFunctions(name, false));
+        // ====================================================================
+        // LINES CHANGED ABOVE
+        // ====================================================================
       }
     }
     return functions2;
