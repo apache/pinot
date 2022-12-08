@@ -31,7 +31,6 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
-import org.apache.pinot.spi.config.table.TableType;
 
 
 /**
@@ -56,7 +55,7 @@ public class TableDataManagerProvider {
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
       LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache) {
     TableDataManager tableDataManager;
-    switch (TableType.valueOf(tableDataManagerConfig.getTableDataManagerType())) {
+    switch (tableDataManagerConfig.getTableType()) {
       case OFFLINE:
         if (tableDataManagerConfig.isDimTable()) {
           tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableDataManagerConfig.getTableName());

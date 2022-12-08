@@ -52,6 +52,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -66,7 +67,8 @@ import static org.testng.Assert.assertNull;
 @SuppressWarnings("unchecked")
 public class DimensionTableDataManagerTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), LoaderTest.class.getName());
-  private static final String TABLE_NAME = "dimBaseballTeams";
+  private static final String RAW_TABLE_NAME = "dimBaseballTeams";
+  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String AVRO_DATA_PATH = "data/dimBaseballTeams.avro";
 
   private File _indexDir;
@@ -84,7 +86,7 @@ public class DimensionTableDataManagerTest {
 
     // create segment
     SegmentGeneratorConfig segmentGeneratorConfig =
-        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, TABLE_NAME);
+        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, RAW_TABLE_NAME);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(segmentGeneratorConfig);
     driver.build();
@@ -110,8 +112,7 @@ public class DimensionTableDataManagerTest {
 
   private TableConfig getTableConfig(boolean disablePreload) {
     DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload);
-    return new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("dimBaseballTeams").setSchemaName("dimBaseballTeams")
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("dimBaseballTeams").setSchemaName("dimBaseballTeams")
         .setDimensionTableConfig(dimensionTableConfig).build();
   }
 
@@ -123,11 +124,12 @@ public class DimensionTableDataManagerTest {
   }
 
   private DimensionTableDataManager makeTableDataManager(HelixManager helixManager) {
-    DimensionTableDataManager tableDataManager = DimensionTableDataManager.createInstanceByTableName(TABLE_NAME);
+    DimensionTableDataManager tableDataManager =
+        DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
     TableDataManagerConfig config;
     {
       config = mock(TableDataManagerConfig.class);
-      when(config.getTableName()).thenReturn(TABLE_NAME);
+      when(config.getTableName()).thenReturn(OFFLINE_TABLE_NAME);
       when(config.getDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     }
     tableDataManager.init(config, "dummyInstance", helixManager.getHelixPropertyStore(),
@@ -146,10 +148,10 @@ public class DimensionTableDataManagerTest {
         SchemaUtils.toZNRecord(getSchema()));
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
-    assertEquals(tableDataManager.getTableName(), TABLE_NAME);
+    assertEquals(tableDataManager.getTableName(), OFFLINE_TABLE_NAME);
 
     // fetch the same instance via static method
-    DimensionTableDataManager returnedManager = DimensionTableDataManager.getInstanceByTableName(TABLE_NAME);
+    DimensionTableDataManager returnedManager = DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME);
     assertNotNull(returnedManager, "Manager should find instance");
     assertEquals(tableDataManager, returnedManager, "Manager should return already created instance");
 
