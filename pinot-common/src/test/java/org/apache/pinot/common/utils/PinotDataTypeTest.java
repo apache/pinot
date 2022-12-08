@@ -144,7 +144,11 @@ public class PinotDataTypeTest {
         {TIMESTAMP_ARRAY, TIMESTAMP_ARRAY, new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) },
         new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
         {BYTES_ARRAY, BYTES_ARRAY, new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) },
-            new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) }}
+            new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) }},
+        {COLLECTION, STRING_ARRAY, Arrays.asList("test1", "test2"), new String[] {"test1", "test2"}},
+        {COLLECTION, FLOAT_ARRAY, Arrays.asList(1.0f, 2.0f), new Float[] {1.0f, 2.0f}},
+        {OBJECT_ARRAY, STRING_ARRAY, new Object[] {"test1", "test2"}, new String[] {"test1", "test2"}},
+        {OBJECT_ARRAY, FLOAT_ARRAY, new Object[] {1.0f, 2.0f}, new Float[] {1.0f, 2.0f}},
     };
   }
 

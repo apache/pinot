@@ -20,6 +20,7 @@ package org.apache.pinot.common.function;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -80,6 +81,7 @@ public class FunctionUtils {
     put(Double[].class, PinotDataType.DOUBLE_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
     put(Object.class, PinotDataType.OBJECT);
+    put(Object[].class, PinotDataType.OBJECT_ARRAY);
   }};
 
   private static final Map<Class<?>, DataType> DATA_TYPE_MAP = new HashMap<Class<?>, DataType>() {{
@@ -140,6 +142,9 @@ public class FunctionUtils {
    */
   @Nullable
   public static PinotDataType getArgumentType(Class<?> clazz) {
+    if (Collection.class.isAssignableFrom(clazz)) {
+      return PinotDataType.COLLECTION;
+    }
     return ARGUMENT_TYPE_MAP.get(clazz);
   }
 
