@@ -911,6 +911,83 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
   }
 
   @Test
+  public void testSelectAllResultsQueryWithReload()
+      throws Exception {
+    // Select query with order by on column9 with limit == totalDocs
+    String query = "SELECT column9 FROM testTable ORDER BY column9 LIMIT 120000";
+    BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 120_000);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 120_000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 120_000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    DataSchema dataSchema = new DataSchema(new String[]{"column9"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    assertEquals(resultTable.getDataSchema(), dataSchema);
+    List<Object[]> resultRowsBeforeDisabling = resultTable.getRows();
+    int previousColumn9 = Integer.MIN_VALUE;
+    for (Object[] resultRow : resultRowsBeforeDisabling) {
+      assertEquals(resultRow.length, 1);
+      assertTrue((Integer) resultRow[0] >= previousColumn9);
+      previousColumn9 = (Integer) resultRow[0];
+    }
+
+    // Disable forward index for columns: column9 and column11
+    disableForwardIndexForSomeColumns();
+
+    // Run the same query and validate that an exception is thrown since we are running select query on forward index
+    // disabled column
+    try {
+      getBrokerResponse(query);
+      Assert.fail("Query should fail since forwardIndexDisabled on column9 and is on select list");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Forward index disabled for column:")
+          && e.getMessage().contains("cannot create DataFetcher!"));
+    }
+
+    // Re-enable forward index for column9, column11, and column6
+    reenableForwardIndexForSomeColumns();
+
+    // The first query should work now
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 120_000);
+    assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 120_000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 120_000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    dataSchema = new DataSchema(new String[]{"column9"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    assertEquals(resultTable.getDataSchema(), dataSchema);
+    List<Object[]> resultRowsAfterReenabling = resultTable.getRows();
+    // Validate that the result row size before disabling the forward index matches the result row size after
+    // re-enabling the forward index
+    assertEquals(resultRowsAfterReenabling.size(), resultRowsBeforeDisabling.size());
+    previousColumn9 = Integer.MIN_VALUE;
+    for (int i = 0; i < resultRowsAfterReenabling.size(); i++) {
+      Object[] resultRow = resultRowsAfterReenabling.get(i);
+      assertEquals(resultRow.length, 1);
+      assertTrue((Integer) resultRow[0] >= previousColumn9);
+      previousColumn9 = (Integer) resultRow[0];
+      // Validate that the value of result row matches the value at this index before forward index was disabled
+      assertEquals(resultRow[0], resultRowsBeforeDisabling.get(i)[0]);
+    }
+  }
+
+  @Test
   public void testSelectWithDistinctQueries() {
     {
       // Select a mix of forwardIndexDisabled and non-forwardIndexDisabled columns with distinct

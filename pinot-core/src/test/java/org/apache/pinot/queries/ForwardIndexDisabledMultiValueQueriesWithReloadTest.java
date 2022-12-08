@@ -351,6 +351,83 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
   }
 
   @Test
+  public void testSelectAllResultsQueryWithReload()
+      throws Exception {
+    // Select query with order by on column9 with limit == totalDocs
+    String query = "SELECT column7 FROM testTable ORDER BY column1 LIMIT 400000";
+    BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 400_000);
+    assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 800_000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    DataSchema dataSchema = new DataSchema(new String[]{"column7"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT_ARRAY});
+    assertEquals(resultTable.getDataSchema(), dataSchema);
+    List<Object[]> resultRowsBeforeDisabling = resultTable.getRows();
+    for (Object[] resultRow : resultRowsBeforeDisabling) {
+      assertEquals(resultRow.length, 1);
+    }
+
+    // Disable forward index for column7
+    disableForwardIndexForSomeColumns();
+
+    // Run the same query and validate that an exception is thrown since we are running select query on forward index
+    // disabled column
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() != null
+        && brokerResponseNative.getProcessingExceptions().size() > 0);
+
+    // Re-enable forward index for column7 and column6
+    reenableForwardIndexForSomeColumns();
+
+    // The first query should work now
+    brokerResponseNative = getBrokerResponse(query);
+    assertTrue(brokerResponseNative.getProcessingExceptions() == null
+        || brokerResponseNative.getProcessingExceptions().size() == 0);
+    resultTable = brokerResponseNative.getResultTable();
+    assertEquals(brokerResponseNative.getNumRowsResultSet(), 400_000);
+    assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+    assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
+    assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+    assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 800_000L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+    assertNotNull(brokerResponseNative.getProcessingExceptions());
+    assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+    dataSchema = new DataSchema(new String[]{"column7"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT_ARRAY});
+    assertEquals(resultTable.getDataSchema(), dataSchema);
+    List<Object[]> resultRowsAfterReenabling = resultTable.getRows();
+    // Validate that the result row size before disabling the forward index matches the result row size after
+    // re-enabling the forward index
+    assertEquals(resultRowsAfterReenabling.size(), resultRowsBeforeDisabling.size());
+    for (int i = 0; i < resultRowsAfterReenabling.size(); i++) {
+      Object[] resultRow = resultRowsAfterReenabling.get(i);
+      assertEquals(resultRow.length, 1);
+      int[] rowValuesAfterReenabling = (int[]) resultRow[0];
+      int[] rowValuesBeforeDisabling = (int[]) resultRowsBeforeDisabling.get(i)[0];
+      assertEquals(rowValuesAfterReenabling.length, rowValuesBeforeDisabling.length);
+      // Validate that the value of result row matches the value at this index before forward index was disabled
+      // Since ordering cannot be guaranteed for multi-value rows, validate all entries are present
+      Set<Integer> rowValuesSetAfterReenabling = new HashSet<>();
+      Set<Integer> rowValuesSetBeforeDisabling = new HashSet<>();
+      for (int j = 0; j < rowValuesAfterReenabling.length; j++) {
+        rowValuesSetAfterReenabling.add(rowValuesAfterReenabling[j]);
+        rowValuesSetBeforeDisabling.add(rowValuesBeforeDisabling[j]);
+      }
+      assertEquals(rowValuesSetAfterReenabling, rowValuesSetBeforeDisabling);
+    }
+  }
+
+  @Test
   public void testSelectWithDistinctQueriesWithReload()
       throws Exception {
     // Distinct query without filters including column7

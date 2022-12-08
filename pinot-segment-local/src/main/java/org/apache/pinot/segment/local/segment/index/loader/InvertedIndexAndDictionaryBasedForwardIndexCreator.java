@@ -37,12 +37,14 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.HAS_DICTIONARY;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMENTS;
@@ -88,6 +90,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private final int _cardinality;
   private final int _numDocs;
   private final int _maxNumberOfMultiValues;
+  private final FieldSpec.DataType _storedType;
   private final int _totalNumberOfEntries;
   private final boolean _dictionaryEnabled;
   private final ChunkCompressionType _chunkCompressionType;
@@ -124,6 +127,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     _numDocs = _columnMetadata.getTotalDocs();
     _totalNumberOfEntries = _columnMetadata.getTotalNumberOfEntries();
     _maxNumberOfMultiValues = _columnMetadata.getMaxNumberOfMultiValues();
+    _storedType = _columnMetadata.getFieldSpec().getDataType().getStoredType();
     _dictionaryEnabled = !_indexLoadingConfig.getNoDictionaryColumns().contains(columnName);
     _chunkCompressionType = getColumnCompressionType();
     int numValues = _singleValue ? _numDocs : _totalNumberOfEntries;
@@ -255,22 +259,22 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     try (BitmapInvertedIndexReader invertedIndexReader =
         (BitmapInvertedIndexReader) LoaderUtils.getInvertedIndexReader(_segmentWriter, _columnMetadata);
         Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, _columnMetadata)) {
-      boolean shouldTrackVarLengthMetadata = !_columnMetadata.getFieldSpec().getDataType().isFixedWidth();
-      int[] lengthOfLongestEntry = shouldTrackVarLengthMetadata ? new int[]{0} : new int[]{-1};
+      boolean isFixedWidth = _columnMetadata.getFieldSpec().getDataType().isFixedWidth();
+      int lengthOfLongestEntry = isFixedWidth ? -1 : 0;
       // Construct the forward index in the values buffer
       for (int dictId = 0; dictId < _cardinality; dictId++) {
         ImmutableRoaringBitmap docIdsBitmap = invertedIndexReader.getDocIds(dictId);
         int finalDictId = dictId;
         docIdsBitmap.stream().forEach(docId -> putInt(_forwardIndexValueBuffer, docId, finalDictId));
-        if (shouldTrackVarLengthMetadata) {
-          trackLengthOfLongestEntry(dictionary, lengthOfLongestEntry, dictId);
+        if (!isFixedWidth) {
+          lengthOfLongestEntry = trackLengthOfLongestEntry(dictionary, lengthOfLongestEntry, dictId);
         }
       }
 
       IndexCreationContext.Forward context =
           IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir())
               .withColumnMetadata(_columnMetadata).withforwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
-              .withLengthOfLongestEntry(lengthOfLongestEntry[0]).build()
+              .withLengthOfLongestEntry(lengthOfLongestEntry).build()
               .forForwardIndex(_chunkCompressionType, _indexLoadingConfig.getColumnProperties());
 
       writeToForwardIndex(dictionary, context);
@@ -291,9 +295,9 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, _columnMetadata)) {
       // Construct the forward index length buffer and create the inverted index values and length buffers
       int[] maxNumberOfMultiValues = new int[]{0};
-      final boolean shouldTrackVarLengthMetadata = !_columnMetadata.getFieldSpec().getDataType().isFixedWidth();
-      int[] lengthOfLongestEntry = shouldTrackVarLengthMetadata ? new int[]{0} : new int[]{-1};
-      int[] maxRowLengthInBytes = shouldTrackVarLengthMetadata ? new int[]{0} : new int[]{-1};
+      final boolean isFixedWidth = _columnMetadata.getFieldSpec().getDataType().isFixedWidth();
+      int lengthOfLongestEntry = isFixedWidth ? -1 : 0;
+      int[] maxRowLengthInBytes = isFixedWidth ? new int[]{-1} : new int[]{0};
       for (int dictId = 0; dictId < _cardinality; dictId++) {
         ImmutableRoaringBitmap docIdsBitmap = invertedIndexReader.getDocIds(dictId);
         docIdsBitmap.stream().forEach(docId -> {
@@ -303,8 +307,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           _nextValueId++;
         });
 
-        if (shouldTrackVarLengthMetadata) {
-          trackLengthOfLongestEntry(dictionary, lengthOfLongestEntry, dictId);
+        if (!isFixedWidth) {
+          lengthOfLongestEntry = trackLengthOfLongestEntry(dictionary, lengthOfLongestEntry, dictId);
         }
       }
 
@@ -340,7 +344,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           int index = getInt(_forwardIndexLengthBuffer, docId);
           putInt(_forwardIndexValueBuffer, index, finalDictId);
           putInt(_forwardIndexLengthBuffer, docId, index + 1);
-          if (shouldTrackVarLengthMetadata) {
+          if (!isFixedWidth) {
             trackMaxRowLengthInBytes(dictionary, maxRowLengthInBytes, docId, finalDictId);
           }
         });
@@ -350,7 +354,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir())
               .withColumnMetadata(_columnMetadata).withforwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
               .withTotalNumberOfEntries(_nextValueId).withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
-              .withMaxRowLengthInBytes(maxRowLengthInBytes[0]).withLengthOfLongestEntry(lengthOfLongestEntry[0])
+              .withMaxRowLengthInBytes(maxRowLengthInBytes[0]).withLengthOfLongestEntry(lengthOfLongestEntry)
               .build().forForwardIndex(_chunkCompressionType, _indexLoadingConfig.getColumnProperties());
 
       writeToForwardIndex(dictionary, context);
@@ -368,29 +372,31 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     }
   }
 
-  private void trackLengthOfLongestEntry(Dictionary dictionary, int[] lengthOfLongestEntry, int dictId) {
-    switch (_columnMetadata.getFieldSpec().getDataType().getStoredType()) {
+  private int trackLengthOfLongestEntry(Dictionary dictionary, int lengthOfLongestEntry, int dictId) {
+    int updatedLengthOfLongestEntry;
+    switch (_storedType) {
       case STRING:
-        lengthOfLongestEntry[0] = Math.max(dictionary.getStringValue(dictId).length(),
-            lengthOfLongestEntry[0]);
+        updatedLengthOfLongestEntry = Math.max(dictionary.getStringValue(dictId).getBytes(UTF_8).length,
+            lengthOfLongestEntry);
         break;
       case BYTES:
         ByteArray value = new ByteArray(dictionary.getBytesValue(dictId));
-        lengthOfLongestEntry[0] = Math.max(value.length(), lengthOfLongestEntry[0]);
+        updatedLengthOfLongestEntry = Math.max(value.length(), lengthOfLongestEntry);
         break;
       case BIG_DECIMAL:
-        lengthOfLongestEntry[0] = Math.max(
-            BigDecimalUtils.byteSize(dictionary.getBigDecimalValue(dictId)), lengthOfLongestEntry[0]);
+        updatedLengthOfLongestEntry = Math.max(
+            BigDecimalUtils.byteSize(dictionary.getBigDecimalValue(dictId)), lengthOfLongestEntry);
         break;
       default:
         throw new IllegalStateException("Trying to calculate lengthOfLongestEntry for invalid stored type: "
-            + _columnMetadata.getFieldSpec().getDataType().getStoredType());
+            + _storedType);
     }
+    return updatedLengthOfLongestEntry;
   }
 
   private void trackMaxRowLengthInBytes(Dictionary dictionary, int[] maxRowLengthInBytes, int docId, int dictId) {
     int curSizeOfRow = getInt(_forwardIndexMaxSizeBuffer, docId);
-    switch (_columnMetadata.getFieldSpec().getDataType().getStoredType()) {
+    switch (_storedType) {
       case STRING:
         int newSizeOfEntry = dictionary.getStringValue(dictId).length() + curSizeOfRow;
         putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
@@ -409,7 +415,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         break;
       default:
         throw new IllegalStateException("Trying to calculate maxRowLengthInBytes for invalid stored type: "
-            + _columnMetadata.getFieldSpec().getDataType().getStoredType());
+            + _storedType);
     }
   }
 
