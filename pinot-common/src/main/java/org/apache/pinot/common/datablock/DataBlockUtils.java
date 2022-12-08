@@ -50,7 +50,7 @@ public final class DataBlockUtils {
     while (t.getMessage() == null) {
       t = t.getCause();
     }
-    return QueryException.getTruncatedStackTrace(t);
+    return t.getMessage() + "\n" + QueryException.getTruncatedStackTrace(t);
   }
 
   public static MetadataBlock getErrorDataBlock(Map<Integer, String> exceptions) {

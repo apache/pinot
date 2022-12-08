@@ -208,10 +208,30 @@ public class LeafStageTransferableBlockOperatorTest {
     // Given:
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT intCol, count(*), sum(doubleCol), strCol FROM tbl GROUP BY strCol, intCol");
-    // result schema doesn't match with DISTINCT columns using GROUP BY.
+    // result schema doesn't match with columns ordering using GROUP BY, this should not occur.
     DataSchema schema = new DataSchema(new String[]{"intCol", "count(*)", "sum(doubleCol)", "strCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.STRING});
+    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
+        new InstanceResponseBlock(new GroupByResultsBlock(schema, Collections.emptyList()), queryContext));
+    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);
+
+    // When:
+    TransferableBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    Assert.assertFalse(resultBlock.isErrorBlock());
+  }
+
+  @Test
+  public void shouldNotErrorOutWhenQueryContextAskForGroupByOutOfOrderWithHaving() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol, count(*), "
+        + "sum(doubleCol) FROM tbl GROUP BY strCol, intCol HAVING sum(doubleCol) < 10 AND count(*) > 0");
+    // result schema contains duplicate reference from agg and having. it will repeat itself.
+    DataSchema schema = new DataSchema(new String[]{"strCol", "intCol", "count(*)", "sum(doubleCol)", "sum(doubleCol)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
         new InstanceResponseBlock(new GroupByResultsBlock(schema, Collections.emptyList()), queryContext));
     LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(resultsBlockList, schema);

@@ -202,7 +202,7 @@ public class QueryRunner {
     } catch (Exception e) {
       InstanceResponseBlock errorResponse = new InstanceResponseBlock();
       errorResponse.getExceptions().put(QueryException.QUERY_EXECUTION_ERROR_CODE,
-          QueryException.getTruncatedStackTrace(e));
+          e.getMessage() + QueryException.getTruncatedStackTrace(e));
       return errorResponse;
     }
   }
