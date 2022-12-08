@@ -41,7 +41,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.http.Header;
 import org.apache.http.HttpStatus;
@@ -460,25 +459,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addInvertedIndex();
     long tableSizeWithNewIndex = getTableSize(getTableName());
 
-    // Update table config to remove the new inverted index, and
-    // reload table to clean the new inverted indices physically.
+    // Update table config to remove the new inverted index, and check if the new inverted index is removed
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(getInvertedIndexColumns());
     updateTableConfig(tableConfig);
-    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
+    String removeInvertedIndexJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-        // Total docs should not change during reload, but num entries scanned
-        // gets back to total number of documents as the index is removed.
-        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
+        // Total docs should not change during reload
+        assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("totalDocs").asLong(), numTotalDocs);
+        return isReloadJobCompleted(removeInvertedIndexJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index");
-    validateReloadJobSuccess(reloadJobId);
-
+    assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
 
     // Add the inverted index back to test index removal via force download.
@@ -535,34 +530,29 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(getInvertedIndexColumns());
     updateTableConfig(tableConfig);
-    String reloadId = reloadOfflineTableAndValidateResponse(getTableName(), true);
+    String forceDownloadJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, true);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-        // Total docs should not change during reload, but num entries scanned
-        // gets back to total number of documents as the index is removed.
-        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-
-        long actualTotalDocs = queryResponse.get("numEntriesScannedInFilter").asLong();
-        return actualTotalDocs == numTotalDocs;
+        // Total docs should not change during reload
+        assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("totalDocs").asLong(), numTotalDocs);
+        return isReloadJobCompleted(forceDownloadJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index in table");
-    validateReloadJobSuccess(reloadJobId);
+    assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
     // With force download, the table size gets back to the initial value.
     assertEquals(getTableSize(getTableName()), DISK_SIZE_IN_BYTES);
   }
 
   private void addInvertedIndex()
-      throws IOException {
+      throws Exception {
     // Update table config to add inverted index on DivActualElapsedTime column, and
     // reload the table to get config change into effect and add the inverted index.
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
-    String reloadJobId =
-        reloadOfflineTableAndValidateResponse(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), false);
+    String reloadJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
 
     // It takes a while to reload multiple segments, thus we retry the query for some time.
     // After all segments are reloaded, the inverted index is added on DivActualElapsedTime.
@@ -571,15 +561,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     long numTotalDocs = getCountStarResult();
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         // Total docs should not change during reload
-        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse.get("numEntriesScannedInFilter").asLong() == 0L;
+        assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("totalDocs").asLong(), numTotalDocs);
+        return isReloadJobCompleted(reloadJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
-    validateReloadJobSuccess(reloadJobId);
+    assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
   }
 
   @Test
@@ -1030,38 +1019,33 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setRangeIndexColumns(UPDATED_RANGE_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
-    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
+    String addIndexJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
         // Total docs should not change during reload
-        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse.get("numEntriesScannedInFilter").asLong() < numTotalDocs;
+        assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("totalDocs").asLong(), numTotalDocs);
+        return isReloadJobCompleted(addIndexJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate range index");
-    validateReloadJobSuccess(reloadJobId);
+    assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
 
-    // Update table config to remove the new range index, and
-    // reload table to clean the new range index physically.
+    // Update table config to remove the new range index, and check if the new range index is removed
     tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setRangeIndexColumns(getRangeIndexColumns());
     updateTableConfig(tableConfig);
-    reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
+    String removeIndexJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
-        // Total docs should not change during reload, but num entries scanned
-        // gets back to total number of documents as the index is removed.
-        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse.get("numEntriesScannedInFilter").asLong() == numTotalDocs;
+        // Total docs should not change during reload
+        assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("totalDocs").asLong(), numTotalDocs);
+        return isReloadJobCompleted(removeIndexJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index");
-    validateReloadJobSuccess(reloadJobId);
-
+    assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
 
@@ -1075,37 +1059,34 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setBloomFilterColumns(UPDATED_BLOOM_FILTER_COLUMNS);
     updateTableConfig(tableConfig);
-    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
+    String addIndexJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
         // Total docs should not change during reload
-        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse.get("numSegmentsProcessed").asLong() == 0L;
+        assertEquals(postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY).get("totalDocs").asLong(), numTotalDocs);
+        return isReloadJobCompleted(addIndexJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate bloom filter");
-    validateReloadJobSuccess(reloadJobId);
+    assertEquals(postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY).get("numSegmentsProcessed").asLong(), 0L);
 
     // Update table config to remove the new bloom filter, and
     // reload table to clean the new bloom filter physically.
     tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setBloomFilterColumns(getBloomFilterColumns());
     updateTableConfig(tableConfig);
-    reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
+    String removeIndexJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
-        // Total docs should not change during reload, but num entries scanned
-        // gets back to total number of documents as bloom filter is removed.
-        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return queryResponse.get("numSegmentsProcessed").asLong() == NUM_SEGMENTS;
+        // Total docs should not change during reload
+        assertEquals(postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY).get("totalDocs").asLong(), numTotalDocs);
+        return isReloadJobCompleted(removeIndexJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index");
-    validateReloadJobSuccess(reloadJobId);
+    assertEquals(postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY).get("numSegmentsProcessed").asLong(), NUM_SEGMENTS);
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
 
@@ -1142,8 +1123,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     indexingConfig.setStarTreeIndexConfigs(Collections.singletonList(STAR_TREE_INDEX_CONFIG_1));
     indexingConfig.setEnableDynamicStarTreeCreation(true);
     updateTableConfig(tableConfig);
-    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
-
+    String addIndexJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
@@ -1151,16 +1131,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
         // Total docs should not change during reload
         assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        // With star-tree, 'numDocsScanned' should be the same as number of segments (1 per segment)
-        return queryResponse.get("numDocsScanned").asInt() == NUM_SEGMENTS;
+        return isReloadJobCompleted(addIndexJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to add first star-tree index");
-    validateReloadJobSuccess(reloadJobId);
+    // With star-tree, 'numDocsScanned' should be the same as number of segments (1 per segment)
+    assertEquals(postQuery(TEST_STAR_TREE_QUERY_1).get("numDocsScanned").asLong(), NUM_SEGMENTS);
 
     // Reload again should have no effect
-    reloadOfflineTableAndValidateResponse(getTableName(), false);
+    reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
     assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
     assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
@@ -1188,8 +1168,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Update table config with a different star-tree index config and trigger reload
     indexingConfig.setStarTreeIndexConfigs(Collections.singletonList(STAR_TREE_INDEX_CONFIG_2));
     updateTableConfig(tableConfig);
-    String reloadId = reloadOfflineTableAndValidateResponse(getTableName(), false);
-
+    String changeIndexJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_STAR_TREE_QUERY_2);
@@ -1197,20 +1176,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), secondQueryResult);
         // Total docs should not change during reload
         assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        // With star-tree, 'numDocsScanned' should be the same as number of segments (1 per segment)
-        return queryResponse.get("numDocsScanned").asInt() == NUM_SEGMENTS;
+        return isReloadJobCompleted(changeIndexJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to change to second star-tree index");
-    validateReloadJobSuccess(reloadJobId);
+    // With star-tree, 'numDocsScanned' should be the same as number of segments (1 per segment)
+    assertEquals(postQuery(TEST_STAR_TREE_QUERY_2).get("numDocsScanned").asLong(), NUM_SEGMENTS);
 
     // First query should not be able to use the star-tree
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
     assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
 
     // Reload again should have no effect
-    reloadOfflineTableAndValidateResponse(getTableName(), false);
+    reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
     assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
     assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
@@ -1235,8 +1214,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Remove the star-tree index config and trigger reload
     indexingConfig.setStarTreeIndexConfigs(null);
     updateTableConfig(tableConfig);
-    reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
-
+    String removeIndexJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_STAR_TREE_QUERY_2);
@@ -1244,13 +1222,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), secondQueryResult);
         // Total docs should not change during reload
         assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        // Without star-tree, 'numDocsScanned' should be the same as the 'COUNT(*)' result
-        return queryResponse.get("numDocsScanned").asInt() == secondQueryResult;
+        return isReloadJobCompleted(removeIndexJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to remove star-tree index");
-    validateReloadJobSuccess(reloadJobId);
+    // Without star-tree, 'numDocsScanned' should be the same as the 'COUNT(*)' result
+    assertEquals(postQuery(TEST_STAR_TREE_QUERY_2).get("numDocsScanned").asLong(), secondQueryResult);
     assertEquals(getTableSize(getTableName()), tableSizeWithDefaultIndex);
 
     // First query should not be able to use the star-tree
@@ -1258,7 +1236,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
 
     // Reload again should have no effect
-    reloadOfflineTableAndValidateResponse(getTableName(), false);
+    reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
     assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
     assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
@@ -1395,8 +1373,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
 
     // Trigger reload
-    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
-
+    String reloadJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_EXTRA_COLUMNS_QUERY);
@@ -1406,13 +1383,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         }
         // Total docs should not change during reload
         assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        long count = queryResponse.get("resultTable").get("rows").get(0).get(0).asLong();
-        return count == numTotalDocs;
+        return isReloadJobCompleted(reloadJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to add default columns");
-    validateReloadJobSuccess(reloadJobId);
+    assertEquals(postQuery(TEST_EXTRA_COLUMNS_QUERY).get("resultTable").get("rows").get(0).get(0).asLong(),
+        numTotalDocs);
   }
 
   private void reloadWithMissingColumns()
@@ -1434,27 +1411,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addSchema(schema);
 
     // Trigger reload
-    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
-
+    String reloadJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
         // Total docs should not change during reload
-        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), "*")));
-        assertEquals(segmentsMetadata.size(), 12);
-        for (JsonNode segmentMetadata : segmentsMetadata) {
-          if (segmentMetadata.get("columns").size() != 75) {
-            return false;
-          }
-        }
-        return true;
+        assertEquals(postQuery(SELECT_STAR_QUERY).get("totalDocs").asLong(), numTotalDocs);
+        return isReloadJobCompleted(reloadJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to skip missing columns");
-    validateReloadJobSuccess(reloadJobId);
+    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), "*")));
+    assertEquals(segmentsMetadata.size(), 12);
+    for (JsonNode segmentMetadata : segmentsMetadata) {
+      assertEquals(segmentMetadata.get("columns").size(), 75);
+    }
   }
 
   private void reloadWithRegularColumns()
@@ -1465,8 +1437,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addSchema(createSchema());
 
     // Trigger reload
-    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
-
+    String reloadJobId = reloadTableAndValidateResponse(getTableName(), TableType.OFFLINE, false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_REGULAR_COLUMNS_QUERY);
@@ -1476,13 +1447,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         }
         // Total docs should not change during reload
         assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        long count = queryResponse.get("resultTable").get("rows").get(0).get(0).asLong();
-        return count == numTotalDocs;
+        return isReloadJobCompleted(reloadJobId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to reload regular columns");
-    validateReloadJobSuccess(reloadJobId);
+    assertEquals(postQuery(TEST_REGULAR_COLUMNS_QUERY).get("resultTable").get("rows").get(0).get(0).asLong(),
+        numTotalDocs);
   }
 
   private void testNewAddedColumns()
@@ -2750,37 +2721,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Properties jdbcProps = new Properties();
     jdbcProps.put(PinotConnection.BROKER_LIST, "localhost:" + brokerPort);
     return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
-  }
-
-  private String reloadOfflineTableAndValidateResponse(String tableName, boolean forceDownload)
-      throws IOException {
-    String jobId = null;
-    String response =
-        sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE, forceDownload), null);
-    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    JsonNode tableLevelDetails =
-        JsonUtils.stringToJsonNode(StringEscapeUtils.unescapeJava(response.split(": ")[1])).get(tableNameWithType);
-    String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
-    assertEquals("SUCCESS", isZKWriteSuccess);
-    jobId = tableLevelDetails.get("reloadJobId").asText();
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(jobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
-
-    // Validate all fields are present
-    assertEquals(jobStatus.get("metadata").get("jobId").asText(), jobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
-    assertEquals(jobStatus.get("metadata").get("tableName").asText(), tableNameWithType);
-    return jobId;
-  }
-
-  private boolean validateReloadJobSuccess(String reloadJobId)
-      throws IOException {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(reloadJobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
-
-    assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
-    return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
   }
 
   @Test

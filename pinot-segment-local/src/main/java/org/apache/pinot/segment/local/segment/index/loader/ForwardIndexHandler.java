@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.loader;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -59,9 +60,11 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.CARDINALITY;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.HAS_DICTIONARY;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
@@ -287,7 +290,7 @@ public class ForwardIndexHandler implements IndexHandler {
     // dictionary will only be allowed if FST and inverted index are also disabled.
     if (_indexLoadingConfig.getInvertedIndexColumns().contains(column) || _indexLoadingConfig.getFSTIndexColumns()
         .contains(column)) {
-      LOGGER.warn("Cannot disabled dictionary as column={} has FST index or inverted index or both.", column);
+      LOGGER.warn("Cannot disable dictionary as column={} has FST index or inverted index or both.", column);
       return false;
     }
 
@@ -712,7 +715,10 @@ public class ForwardIndexHandler implements IndexHandler {
     }
 
     LOGGER.info("Creating a new dictionary for segment={} and column={}", segmentName, column);
-    SegmentDictionaryCreator dictionaryCreator = buildDictionary(column, existingColMetadata, segmentWriter);
+    AbstractColumnStatisticsCollector statsCollector =
+        getStatsCollector(column, existingColMetadata.getDataType().getStoredType());
+    SegmentDictionaryCreator dictionaryCreator =
+        buildDictionary(column, existingColMetadata, segmentWriter, statsCollector);
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
 
     LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
@@ -732,6 +738,10 @@ public class ForwardIndexHandler implements IndexHandler {
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(true));
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
         String.valueOf(dictionaryCreator.getNumBytesPerEntry()));
+    // If realtime segments were completed when the column was RAW, the cardinality value is populated as Integer
+    // .MIN_VALUE. When dictionary is enabled for this column later, cardinality value should be rightly populated so
+    // that the dictionary can be loaded.
+    metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(statsCollector.getCardinality()));
     updateMetadataProperties(indexDir, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
@@ -745,13 +755,11 @@ public class ForwardIndexHandler implements IndexHandler {
   }
 
   private SegmentDictionaryCreator buildDictionary(String column, ColumnMetadata existingColMetadata,
-      SegmentDirectory.Writer segmentWriter)
+      SegmentDirectory.Writer segmentWriter, AbstractColumnStatisticsCollector statsCollector)
       throws Exception {
     int numDocs = existingColMetadata.getTotalDocs();
 
     try (ForwardIndexReader reader = LoaderUtils.getForwardIndexReader(segmentWriter, existingColMetadata)) {
-      AbstractColumnStatisticsCollector statsCollector = getStatsCollector(column, reader.getStoredType());
-
       // Note: Special Null handling is not necessary here. This is because, the existing default null value in the
       // raw forwardIndex will be retained as such while created the dictionary and dict-based forward index. Also,
       // null value vectors maintain a bitmap of docIds. No handling is necessary there.
@@ -809,13 +817,17 @@ public class ForwardIndexHandler implements IndexHandler {
       throws Exception {
     File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, SegmentVersion.v3);
     File metadataFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-    PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
 
     for (Map.Entry<String, String> entry : metadataProperties.entrySet()) {
       properties.setProperty(entry.getKey(), entry.getValue());
     }
 
-    properties.save();
+    // Commons Configuration 1.10 does not support file path containing '%'.
+    // Explicitly providing the output stream for save bypasses the problem.
+    try (FileOutputStream fileOutputStream = new FileOutputStream(properties.getFile())) {
+      properties.save(fileOutputStream);
+    }
   }
 
   private void disableDictionaryAndCreateRawForwardIndex(String column, SegmentDirectory.Writer segmentWriter,
