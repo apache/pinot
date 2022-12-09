@@ -33,12 +33,12 @@
         "description": "all types should conform when directly selected out & transfer between stages",
         "sql": "SELECT * FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE a.boolCol = true AND b.boolCol = false"
       },
-      { "sql": "SELECT CAST(intCol AS BIGINT) * 2000000000, CAST(longCol AS DOUBLE) * 1e100, CAST(boolCol AS INT) FROM {tbl}" },
-      { "sql": "SELECT CAST(a.intCol AS BIGINT) * 2000000000, CAST(b.longCol AS FLOAT) * 1e20, CAST(a.boolCol AS INT) FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE a.boolCol = true" },
+      { "sql": "SELECT CAST(floatCol AS DOUBLE) * 1e100, CAST(intCol AS BIGINT) * 2000000000, CAST(longCol AS DOUBLE) * 1e100, CAST(boolCol AS INT) FROM {tbl}" },
+      { "sql": "SELECT CAST(a.floatCol AS DOUBLE) * 1e100, CAST(a.intCol AS BIGINT) * 2000000000, CAST(b.longCol AS FLOAT) * 1e20, CAST(a.boolCol AS INT) FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE a.boolCol = true" },
       {
         "ignored": true,
         "comments": "primitive cast not work: cast as DECIMAL doesn't work",
-        "sql": "SELECT CAST(floatCol AS DOUBLE) * 1e100, CAST(doubleCol AS DECIMAL) FROM {tbl} WHERE bigDecimalCol > 0 AND CAST(bytesCol AS VARCHAR) != '1000'"
+        "sql": "SELECT CAST(doubleCol AS DECIMAL) FROM {tbl} WHERE bigDecimalCol > 0 AND CAST(bytesCol AS VARCHAR) != '1000'"
       },
       {
         "ignored": true,
@@ -111,27 +111,27 @@
     },
     "queries": [
       {
-        "description": "test (1) Pinot ScalarFunction (md5); (2) Pinot ScalarFunction multiple argument (dateTrunc); (3) Pinot filter (regexpLike), (4) Pinot transform (dateTimeConvert) ",
-        "sql": "SELECT md5(bytesCol), dateTrunc('DAY', timestampCol), regexpExtract(stringCol, '([\\w]+).*') FROM {tbl} WHERE regexpLike(stringCol, '.*')",
+        "description": "test (1) Pinot ScalarFunction (md5); (2) Pinot ScalarFunction multiple argument (dateTrunc, substr); (3) Pinot filter (regexpLike), (4) Pinot transform (dateTimeConvert) ",
+        "sql": "SELECT md5(bytesCol), substr(stringCol, 5), regexpExtract(stringCol, '([\\w]+).*') FROM {tbl} WHERE regexpLike(stringCol, '.*')",
         "outputs": [
-          ["2f249230a8e7c2bf6005ccd2679259ec", 0, "lyons"],
-          ["a85a5fd494d9a538e22b696159931c1b", 915840000000, "onan"],
-          ["982569213f522d8fce898806d0a2c357", 915753600000, "rudvalis"],
-          ["ae04dbae988ab45ebfba84c0c3612a50", 119600841600000, "janko"],
-          ["d479436bd32066b25886f9920c7b7ccf", 1641081600000, "baby"],
-          ["93b885adfe0da089cdf634904fd59f71", -86400000, "monster"]
+          ["2f249230a8e7c2bf6005ccd2679259ec", "", "lyons"],
+          ["a85a5fd494d9a538e22b696159931c1b", "", "onan"],
+          ["982569213f522d8fce898806d0a2c357", "lis", "rudvalis"],
+          ["ae04dbae988ab45ebfba84c0c3612a50", "", "janko"],
+          ["d479436bd32066b25886f9920c7b7ccf", "", "baby"],
+          ["93b885adfe0da089cdf634904fd59f71", "er", "monster"]
         ]
       },
       {
         "description": "test Pinot function variances above, but also mixed in with intermediate stage transfer",
-        "sql": "SELECT md5(a.bytesCol), dateTrunc('DAY', b.timestampCol), regexpExtract(a.stringCol, '([\\w]+).*') FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE regexpLike(a.stringCol, b.stringCol)",
+        "sql": "SELECT md5(a.bytesCol), substr(b.stringCol, 5), regexpExtract(a.stringCol, '([\\w]+).*') FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE regexpLike(a.stringCol, b.stringCol)",
         "outputs": [
-          ["2f249230a8e7c2bf6005ccd2679259ec", 0, "lyons"],
-          ["a85a5fd494d9a538e22b696159931c1b", 915840000000, "onan"],
-          ["982569213f522d8fce898806d0a2c357", 915753600000, "rudvalis"],
-          ["ae04dbae988ab45ebfba84c0c3612a50", 119600841600000, "janko"],
-          ["d479436bd32066b25886f9920c7b7ccf", 1641081600000, "baby"],
-          ["93b885adfe0da089cdf634904fd59f71", -86400000, "monster"]
+          ["2f249230a8e7c2bf6005ccd2679259ec", "", "lyons"],
+          ["a85a5fd494d9a538e22b696159931c1b", "", "onan"],
+          ["982569213f522d8fce898806d0a2c357", "lis", "rudvalis"],
+          ["ae04dbae988ab45ebfba84c0c3612a50", "", "janko"],
+          ["d479436bd32066b25886f9920c7b7ccf", "", "baby"],
+          ["93b885adfe0da089cdf634904fd59f71", "er", "monster"]
         ]
       },
       {
@@ -146,6 +146,14 @@
         "ignored": true,
         "comment": "problematic round function not producing proper decimal results type",
         "sql": "SELECT ROUND(longCol, 2) FROM {tbl}",
+        "outputs": [
+          []
+        ]
+      },
+      {
+        "ignored": true,
+        "comment": "dateTrunc returns round up instead of round down results",
+        "sql": "SELECT dateTrunc('DAY', b.timestampCol) FROM {tbl}",
         "outputs": [
           []
         ]
