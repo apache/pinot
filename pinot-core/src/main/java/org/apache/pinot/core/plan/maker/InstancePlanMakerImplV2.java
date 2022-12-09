@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.plan.AcquireReleaseColumnsSegmentPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
@@ -55,7 +56,6 @@ import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
