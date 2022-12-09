@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.google.common.collect.Ordering;
+import com.google.common.primitives.Primitives;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -333,6 +334,53 @@ public class DataSchema {
       // All numbers are compatible with each other
       return this == anotherColumnDataType || (this.isNumber() && anotherColumnDataType.isNumber()) || (
           this.isNumberArray() && anotherColumnDataType.isNumberArray());
+    }
+
+    /**
+     * Similar to {@link #isCompatible(ColumnDataType)} but will allow
+     */
+    public boolean canAssignTo(Class<?> clazz) {
+      clazz = Primitives.wrap(clazz);
+      if (clazz == Object.class || clazz == String.class) {
+        // pinot supports casting anything to string
+        return true;
+      }
+
+      switch (this) {
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case BIG_DECIMAL:
+          // pinot allows casting from any number type to another
+          return Number.class.isAssignableFrom(clazz);
+        case BOOLEAN:
+          return clazz.isAssignableFrom(Boolean.class);
+        case TIMESTAMP:
+          return clazz == Long.class
+              || clazz == Timestamp.class;
+        case JSON:
+          // JSON only accepts Object.class
+          return false;
+        case BYTES:
+          return clazz == byte[].class;
+        case STRING:
+        case OBJECT:
+          // Pinot allows casting a string to anything else, so we
+          // always return true here for backwards compatibility
+          return true;
+        case INT_ARRAY:
+        case LONG_ARRAY:
+        case FLOAT_ARRAY:
+        case DOUBLE_ARRAY:
+        case BOOLEAN_ARRAY:
+        case TIMESTAMP_ARRAY:
+        case STRING_ARRAY:
+        case BYTES_ARRAY:
+          return clazz.isArray() && canAssignTo(clazz.getComponentType());
+        default:
+          throw new IllegalArgumentException("Unexpected type " + this);
+      }
     }
 
     /**

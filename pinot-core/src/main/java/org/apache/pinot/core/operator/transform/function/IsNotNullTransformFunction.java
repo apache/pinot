@@ -48,11 +48,14 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
           "Only column names are supported in IS_NOT_NULL. Support for functions is planned for future release");
     }
     String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
-    NullValueVectorReader nullValueVectorReader = dataSourceMap.get(columnName).getNullValueVector();
-    if (nullValueVectorReader != null) {
-      _nullValueVectorIterator = nullValueVectorReader.getNullBitmap().getIntIterator();
-    } else {
-      _nullValueVectorIterator = null;
+    DataSource dataSource = dataSourceMap.get(columnName);
+    if (dataSource != null) {
+      NullValueVectorReader nullValueVectorReader = dataSource.getNullValueVector();
+      if (nullValueVectorReader != null) {
+        _nullValueVectorIterator = nullValueVectorReader.getNullBitmap().getIntIterator();
+      } else {
+        _nullValueVectorIterator = null;
+      }
     }
   }
 

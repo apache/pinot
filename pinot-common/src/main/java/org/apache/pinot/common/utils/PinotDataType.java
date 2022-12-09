@@ -1483,4 +1483,47 @@ public enum PinotDataType {
         throw new IllegalStateException("Cannot convert ColumnDataType: " + columnDataType + " to PinotDataType");
     }
   }
+
+  public static ColumnDataType toColumnDataType(PinotDataType dataType) {
+    switch (dataType) {
+      case INTEGER:
+        return ColumnDataType.INT;
+      case LONG:
+        return ColumnDataType.LONG;
+      case FLOAT:
+        return ColumnDataType.FLOAT;
+      case DOUBLE:
+        return ColumnDataType.DOUBLE;
+      case BIG_DECIMAL:
+        return ColumnDataType.BIG_DECIMAL;
+      case BOOLEAN:
+        return ColumnDataType.BOOLEAN;
+      case TIMESTAMP:
+        return ColumnDataType.TIMESTAMP;
+      case STRING:
+        return ColumnDataType.STRING;
+      case JSON:
+        return ColumnDataType.JSON;
+      case BYTES:
+        return ColumnDataType.BYTES;
+      case PRIMITIVE_INT_ARRAY:
+      case INTEGER_ARRAY:
+        return ColumnDataType.INT_ARRAY;
+      case PRIMITIVE_LONG_ARRAY:
+      case LONG_ARRAY:
+        return ColumnDataType.LONG_ARRAY;
+      case PRIMITIVE_FLOAT_ARRAY:
+      case FLOAT_ARRAY:
+        return ColumnDataType.FLOAT_ARRAY;
+      case PRIMITIVE_DOUBLE_ARRAY:
+      case DOUBLE_ARRAY:
+        return ColumnDataType.DOUBLE_ARRAY;
+      case STRING_ARRAY:
+        return ColumnDataType.STRING_ARRAY;
+      case OBJECT:
+        return ColumnDataType.OBJECT;
+      default:
+        throw new IllegalArgumentException("Cannot convert PinotDataType " + dataType + " to ColumnDataType");
+    }
+  }
 }

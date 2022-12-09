@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -78,5 +80,10 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
         groupByResultHolder.setValueForKey(groupKey, sum);
       }
     }
+  }
+
+  @Override
+  public boolean validateInputTypes(List<DataSchema.ColumnDataType> inputs) {
+    return inputs.size() == 1 && inputs.get(0).isNumberArray();
   }
 }

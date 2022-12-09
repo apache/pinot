@@ -71,6 +71,9 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.utils.ExpressionTypeResolver;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -441,8 +444,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Validate the request
+    Schema schema = _tableCache.getSchema(rawTableName);
     try {
       validateRequest(serverPinotQuery, _queryResponseLimit);
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+      ExpressionTypeResolver validator = new ExpressionTypeResolver(schema, queryContext);
+      queryContext.getSelectExpressions().forEach(ec -> ec.visit(validator));
     } catch (Exception e) {
       LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
       requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
@@ -457,7 +464,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
     TimeBoundaryInfo timeBoundaryInfo = null;
-    Schema schema = _tableCache.getSchema(rawTableName);
     if (offlineTableName != null && realtimeTableName != null) {
       // Time boundary info might be null when there is no segment in the offline table, query real-time side only
       timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);

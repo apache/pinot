@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -287,6 +288,11 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   @Override
   public ColumnDataType getFinalResultColumnType() {
     return ColumnDataType.DOUBLE;
+  }
+
+  @Override
+  public boolean validateInputTypes(List<ColumnDataType> inputs) {
+    return inputs.size() == 1 && inputs.get(0).isNumber();
   }
 
   @Override

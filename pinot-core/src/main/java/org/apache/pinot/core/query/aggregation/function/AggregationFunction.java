@@ -124,6 +124,19 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   ColumnDataType getFinalResultColumnType();
 
   /**
+   * Validates that this function can operate on the given input types
+   *
+   * @param inputs the input types
+   * @return whether or not these types are valid
+   */
+  default boolean validateInputTypes(List<ColumnDataType> inputs) {
+    // TODO: in a follow-up PR we should go through and implement this for every
+    // aggregation function, for now we just return true so we can focus on the
+    // framework for validating input types
+    return true;
+  }
+
+  /**
    * Extracts the final result used in the broker response from the given intermediate result.
    * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */

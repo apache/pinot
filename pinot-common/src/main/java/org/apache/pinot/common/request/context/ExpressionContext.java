@@ -104,6 +104,19 @@ public class ExpressionContext {
     }
   }
 
+  public <T> T visit(ExpressionContextVisitor<T> visitor) {
+    switch (_type) {
+      case LITERAL:
+        return visitor.visitLiteral(_literal);
+      case IDENTIFIER:
+        return visitor.visitIdentifier(_identifier);
+      case FUNCTION:
+        return visitor.visitFunction(_function);
+      default:
+        throw new IllegalStateException("Unexpected _type " + _type);
+    }
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
