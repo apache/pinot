@@ -36,7 +36,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.apache.pinot.spi.utils.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
 /**

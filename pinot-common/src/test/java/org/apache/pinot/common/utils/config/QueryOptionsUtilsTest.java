@@ -17,10 +17,11 @@
  * under the License.
  */
 
-package org.apache.pinot.spi.utils;
+package org.apache.pinot.common.utils.config;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

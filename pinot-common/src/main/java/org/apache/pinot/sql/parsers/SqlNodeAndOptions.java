@@ -20,7 +20,7 @@ package org.apache.pinot.sql.parsers;
 
 import java.util.Map;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.pinot.spi.utils.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
 public class SqlNodeAndOptions {

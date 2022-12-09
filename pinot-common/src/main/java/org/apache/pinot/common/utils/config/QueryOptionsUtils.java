@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.utils;
+package org.apache.pinot.common.utils.config;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;

@@ -31,7 +31,7 @@ import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.core.util.SortedRangeIntersection;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
-import org.apache.pinot.spi.utils.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
