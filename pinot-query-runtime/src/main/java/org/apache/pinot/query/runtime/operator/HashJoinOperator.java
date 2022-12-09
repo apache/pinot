@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.clearspring.analytics.util.Preconditions;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,7 +37,8 @@ import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
+import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
+import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
 
 
 /**
@@ -61,7 +62,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
   private final int _resultRowSize;
-  private final List<FilterOperand> _joinClauseEvaluators;
+  private final List<TransformOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
   private TransferableBlock _upstreamErrorBlock;
   private KeySelector<Object[], Object[]> _leftKeySelector;
@@ -80,7 +81,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     _resultSchema = outputSchema;
     _joinClauseEvaluators = new ArrayList<>(joinClauses.size());
     for (RexExpression joinClause : joinClauses) {
-      _joinClauseEvaluators.add(FilterOperand.toFilterOperand(joinClause, _resultSchema));
+      _joinClauseEvaluators.add(TransformOperand.toTransformOperand(joinClause, _resultSchema));
     }
     _joinType = joinType;
     _resultRowSize = _resultSchema.size();
@@ -168,8 +169,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         for (Object[] rightRow : hashCollection) {
           // TODO: Optimize this to avoid unnecessary object copy.
           Object[] resultRow = joinRow(leftRow, rightRow);
-          if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream()
-              .allMatch(evaluator -> evaluator.apply(resultRow))) {
+          if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(evaluator ->
+              (Boolean) FunctionInvokeUtils.convert(evaluator.apply(resultRow), DataSchema.ColumnDataType.BOOLEAN))) {
             rows.add(resultRow);
           }
         }

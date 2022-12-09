@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.clearspring.analytics.util.Preconditions;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;

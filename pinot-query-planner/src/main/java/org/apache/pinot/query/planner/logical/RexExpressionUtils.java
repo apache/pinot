@@ -43,7 +43,8 @@ public class RexExpressionUtils {
   static RexExpression handleCase(RexCall rexCall) {
     List<RexExpression> operands =
         rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
-    return new RexExpression.FunctionCall(rexCall.getKind(), RexExpression.toDataType(rexCall.getType()),
+    return new RexExpression.FunctionCall(rexCall.getKind(),
+        RelToStageConverter.convertToFieldSpecDataType(rexCall.getType()),
         "caseWhen", operands);
   }
 
@@ -54,9 +55,10 @@ public class RexExpressionUtils {
         rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     Preconditions.checkState(operands.size() == 1, "CAST takes exactly 2 arguments");
     RelDataType castType = rexCall.getType();
-    operands.add(new RexExpression.Literal(FieldSpec.DataType.STRING, RexExpression.toPinotDataType(castType).name()));
-    return new RexExpression.FunctionCall(rexCall.getKind(), RexExpression.toDataType(castType), "CAST",
-        operands);
+    operands.add(new RexExpression.Literal(FieldSpec.DataType.STRING,
+        RelToStageConverter.convertToFieldSpecDataType(castType).name()));
+    return new RexExpression.FunctionCall(rexCall.getKind(), RelToStageConverter.convertToFieldSpecDataType(castType),
+        "CAST", operands);
   }
 
   // TODO: Add support for range filter expressions (e.g. a > 0 and a < 30)
@@ -64,7 +66,7 @@ public class RexExpressionUtils {
     List<RexNode> operands = rexCall.getOperands();
     RexInputRef rexInputRef = (RexInputRef) operands.get(0);
     RexLiteral rexLiteral = (RexLiteral) operands.get(1);
-    FieldSpec.DataType dataType = RexExpression.toDataType(rexLiteral.getType());
+    FieldSpec.DataType dataType = RelToStageConverter.convertToFieldSpecDataType(rexLiteral.getType());
     Sarg sarg = rexLiteral.getValueAs(Sarg.class);
     if (sarg.isPoints()) {
       return new RexExpression.FunctionCall(SqlKind.IN, dataType, SqlKind.IN.name(), toFunctionOperands(rexInputRef,
