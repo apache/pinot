@@ -57,10 +57,10 @@ public class QueryDispatcher {
   }
 
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
-      MailboxService<TransferableBlock> mailboxService, long timeoutMs)
+      MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
     // submit all the distributed stages.
-    int reduceStageId = submit(requestId, queryPlan, timeoutMs);
+    int reduceStageId = submit(requestId, queryPlan, timeoutMs, queryOptions);
     // run reduce stage and return result.
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
@@ -72,7 +72,7 @@ public class QueryDispatcher {
         queryPlan.getQueryStageMap().get(0).getDataSchema());
   }
 
-  public int submit(long requestId, QueryPlan queryPlan, long timeoutMs)
+  public int submit(long requestId, QueryPlan queryPlan, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
     int reduceStageId = -1;
     for (Map.Entry<Integer, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
@@ -89,7 +89,9 @@ public class QueryDispatcher {
           Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
                   QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
               .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
-              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs)).build());
+              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
+              .putAllMetadata(queryOptions).build());
+
           if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
             throw new RuntimeException(
                 String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", stageId,

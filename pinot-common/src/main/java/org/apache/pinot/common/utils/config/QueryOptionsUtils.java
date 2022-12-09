@@ -166,4 +166,17 @@ public class QueryOptionsUtils {
   public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
     return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
   }
+
+  public static int getMultiStageLeafLimit(Map<String, String> queryOptions) {
+    int result = 0;
+    try {
+      result = Integer.parseInt(queryOptions.getOrDefault(QueryOptionKey.MS_LEAF_LIMIT, "0"));
+    } catch (NumberFormatException e) {
+      result = 0;
+    }
+    if (result < 0) {
+      result = 0;
+    }
+    return result;
+  }
 }

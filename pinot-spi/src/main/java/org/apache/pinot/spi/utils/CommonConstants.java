@@ -295,6 +295,12 @@ public class CommonConstants {
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
+        // Number of rows limit to select in leaf stage.
+        // It has to be greater than 0.
+        // If it is invalid number format, or the number is smaller than or equal to zero, we use
+        // DEFAULT_LEAF_NODE_LIMIT.
+        public static final String MS_LEAF_LIMIT = "multiStageLeafLimit";
+
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
         public static final String PRESERVE_TYPE = "preserveType";
