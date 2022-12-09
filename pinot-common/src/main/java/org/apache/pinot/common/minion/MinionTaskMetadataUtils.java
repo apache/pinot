@@ -114,8 +114,8 @@ public final class MinionTaskMetadataUtils {
     return tableTaskLastUpdateTimeMsMap;
   }
 
-  private static void saveOrUpdateTaskMetadataLastUpdateTime(String tableNameWithType, String taskType, long newLastUpdateTimeMs,
-      Map<String, Map<String, Long>> tableTaskLastUpdateTimeMsMap) {
+  private static void saveOrUpdateTaskMetadataLastUpdateTime(String tableNameWithType, String taskType,
+      long newLastUpdateTimeMs, Map<String, Map<String, Long>> tableTaskLastUpdateTimeMsMap) {
     tableTaskLastUpdateTimeMsMap
         .computeIfAbsent(tableNameWithType, tnt -> new HashMap<>())
         .compute(taskType, (tt, lastUpdateTimeMs) -> {

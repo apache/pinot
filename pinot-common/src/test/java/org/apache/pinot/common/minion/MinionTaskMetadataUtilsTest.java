@@ -136,7 +136,6 @@ public class MinionTaskMetadataUtilsTest {
     assertEquals(taskTypeLastUpdateMsMap.size(), 1);
     lastUpdateTimeMs = taskTypeLastUpdateMsMap.get(TASK_TYPE);
     assertTrue(lastUpdateTimeMs >= tsAfterNewPathSet && lastUpdateTimeMs <= tsAfterOldPathSet);
-
   }
 
   @Test
