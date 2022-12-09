@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.routing;
 
-import com.clearspring.analytics.util.Preconditions;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collection;

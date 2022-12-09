@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
-import com.clearspring.analytics.util.Preconditions;
+
+import com.google.common.base.Preconditions;
+import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
@@ -44,19 +46,20 @@ public abstract class TransformOperand {
   @SuppressWarnings({"ConstantConditions", "rawtypes", "unchecked"})
   private static TransformOperand toTransformOperand(RexExpression.FunctionCall functionCall,
       DataSchema inputDataSchema) {
-    int operandSize = functionCall.getFunctionOperands().size();
+    final List<RexExpression> functionOperands = functionCall.getFunctionOperands();
+    int operandSize = functionOperands.size();
     switch (OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName())) {
       case "AND":
         Preconditions.checkState(operandSize >= 2, "AND takes >=2 argument, passed in argument size:" + operandSize);
-        return new FilterOperand.And(functionCall.getFunctionOperands(), inputDataSchema);
+        return new FilterOperand.And(functionOperands, inputDataSchema);
       case "OR":
         Preconditions.checkState(operandSize >= 2, "OR takes >=2 argument, passed in argument size:" + operandSize);
-        return new FilterOperand.Or(functionCall.getFunctionOperands(), inputDataSchema);
+        return new FilterOperand.Or(functionOperands, inputDataSchema);
       case "NOT":
         Preconditions.checkState(operandSize == 1, "NOT takes one argument, passed in argument size:" + operandSize);
-        return new FilterOperand.Not(toTransformOperand(functionCall.getFunctionOperands().get(0), inputDataSchema));
+        return new FilterOperand.Not(functionOperands.get(0), inputDataSchema);
       case "equals":
-        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
           @Override
           public Boolean apply(Object[] row) {
             if (_requireCasting) {
@@ -68,7 +71,7 @@ public abstract class TransformOperand {
           }
         };
       case "notEquals":
-        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
           @Override
           public Boolean apply(Object[] row) {
             if (_requireCasting) {
@@ -80,7 +83,7 @@ public abstract class TransformOperand {
           }
         };
       case "greaterThan":
-        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
           @Override
           public Boolean apply(Object[] row) {
             if (_requireCasting) {
@@ -92,7 +95,7 @@ public abstract class TransformOperand {
           }
         };
       case "greaterThanOrEqual":
-        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
           @Override
           public Boolean apply(Object[] row) {
             if (_requireCasting) {
@@ -104,7 +107,7 @@ public abstract class TransformOperand {
           }
         };
       case "lessThan":
-        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
           @Override
           public Boolean apply(Object[] row) {
             if (_requireCasting) {
@@ -116,7 +119,7 @@ public abstract class TransformOperand {
           }
         };
       case "lessThanOrEqual":
-        return new FilterOperand.Predicate(functionCall.getFunctionOperands(), inputDataSchema) {
+        return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
           @Override
           public Boolean apply(Object[] row) {
             if (_requireCasting) {

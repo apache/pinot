@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
-import com.clearspring.analytics.util.Preconditions;
+
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
@@ -75,8 +76,8 @@ public abstract class FilterOperand extends TransformOperand {
   public static class Not extends FilterOperand {
     TransformOperand _childOperand;
 
-    public Not(TransformOperand childOperand) {
-      _childOperand = childOperand;
+    public Not(RexExpression childExpr, DataSchema inputDataSchema) {
+      _childOperand = toTransformOperand(childExpr, inputDataSchema);
     }
 
     @Override

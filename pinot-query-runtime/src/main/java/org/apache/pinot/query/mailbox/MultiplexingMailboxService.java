@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import com.clearspring.analytics.util.Preconditions;
+import com.google.common.base.Preconditions;
 import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.env.PinotConfiguration;
