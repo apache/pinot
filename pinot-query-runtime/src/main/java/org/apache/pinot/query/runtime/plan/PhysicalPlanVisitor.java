@@ -58,7 +58,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
 
   public static OpChain build(StageNode node, PlanRequestContext context) {
     Operator<TransferableBlock> root = node.visit(INSTANCE, context);
-    return new OpChain(root, context.getReceivingMailboxes());
+    return new OpChain(root, context.getReceivingMailboxes(), context.getRequestId(), context.getStageId());
   }
 
   @Override

@@ -25,7 +25,6 @@ import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +61,8 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
 
   @Override
   protected void triggerShutdown() {
-    // this wil just notify all waiters that the scheduler is shutting down
+    LOGGER.info("Triggered shutdown on OpChainScheduler...");
+    // this will just notify all waiters that the scheduler is shutting down
     _monitor.enter();
     _monitor.leave();
   }
@@ -78,18 +78,19 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
         }
 
         OpChain operatorChain = _scheduler.next();
+        LOGGER.trace("({}): Scheduling", operatorChain);
         _workerPool.submit(new TraceRunnable() {
           @Override
           public void runJob() {
             try {
-              ThreadResourceUsageProvider timer = operatorChain.getAndStartTimer();
+              LOGGER.trace("({}): Executing", operatorChain);
+              operatorChain.getStats().executing();
 
               // so long as there's work to be done, keep getting the next block
               // when the operator chain returns a NOOP block, then yield the execution
               // of this to another worker
               TransferableBlock result = operatorChain.getRoot().nextBlock();
               while (!result.isNoOpBlock() && !result.isEndOfStreamBlock()) {
-                LOGGER.debug("Got block with {} rows.", result.getNumRows());
                 result = operatorChain.getRoot().nextBlock();
               }
 
@@ -97,10 +98,15 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                 // not complete, needs to re-register for scheduling
                 register(operatorChain, false);
               } else {
-                LOGGER.debug("Execution time: " + timer.getThreadTimeNs());
+                LOGGER.debug("({}): Completed {}",
+                    operatorChain,
+                    operatorChain.getStats());
               }
             } catch (Exception e) {
-              LOGGER.error("Failed to execute query!", e);
+              LOGGER.error("({}): Failed to execute operator chain! {}",
+                  operatorChain,
+                  operatorChain.getStats(),
+                  e);
             }
           }
         });
@@ -117,12 +123,26 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    */
   public final void register(OpChain operatorChain) {
     register(operatorChain, true);
+    LOGGER.debug("({}): Scheduler is now handling operator chain listening to mailboxes {}. "
+            + "There are a total of {} chains awaiting execution.",
+        operatorChain,
+        operatorChain.getReceivingMailbox(),
+        _scheduler.size());
+
+    // we want to track the time that it takes from registering
+    // an operator chain to when it completes, so make sure to
+    // start the timer here
+    operatorChain.getStats().startExecutionTimer();
   }
 
   public final void register(OpChain operatorChain, boolean isNew) {
     _monitor.enter();
     try {
+      LOGGER.trace("({}): Registered operator chain (new: {}). Total: {}",
+          operatorChain, isNew, _scheduler.size());
+
       _scheduler.register(operatorChain, isNew);
+      operatorChain.getStats().queued();
     } finally {
       _monitor.leave();
     }
@@ -138,6 +158,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   public final void onDataAvailable(MailboxIdentifier mailbox) {
     _monitor.enter();
     try {
+      LOGGER.trace("Notified onDataAvailable for mailbox {}", mailbox);
       _scheduler.onDataAvailable(mailbox);
     } finally {
       _monitor.leave();
