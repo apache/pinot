@@ -301,6 +301,15 @@ public class CommonConstants {
         // DEFAULT_LEAF_NODE_LIMIT.
         public static final String MS_LEAF_LIMIT = "multiStageLeafLimit";
 
+        // Override numGroupLimit used by v1 engine.
+        public static final String NUM_GROUP_LIMIT = "numGroupLimit";
+
+        // Override maxInitialResultCap used by v1 engine.
+        public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultCap";
+
+        // Override groupByTrimThreshold used by v1 engine.
+        public static final String GROUP_BY_TRIM_THRESHOLD = "groupByTrimThreshold";
+
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
         public static final String PRESERVE_TYPE = "preserveType";

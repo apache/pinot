@@ -167,15 +167,54 @@ public class QueryOptionsUtils {
     return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
   }
 
-  public static int getMultiStageLeafLimit(Map<String, String> queryOptions) {
+  public static int getMultiStageLeafLimit(Map<String, String> queryOptions, int defaultLeafLimit) {
     int result = 0;
     try {
       result = Integer.parseInt(queryOptions.getOrDefault(QueryOptionKey.MS_LEAF_LIMIT, "0"));
     } catch (NumberFormatException e) {
       result = 0;
     }
-    if (result < 0) {
+    if (result <= 0) {
+      result = defaultLeafLimit;
+    }
+    return result;
+  }
+
+  public static int getNumGroupLimit(Map<String, String> queryOptions, int defaultNumGroupLimit) {
+    int result = 0;
+    try {
+      result = Integer.parseInt(queryOptions.getOrDefault(QueryOptionKey.NUM_GROUP_LIMIT, "0"));
+    } catch (NumberFormatException e) {
       result = 0;
+    }
+    if (result <= 0) {
+      result = defaultNumGroupLimit;
+    }
+    return result;
+  }
+
+  public static int getMaxInitResultCap(Map<String, String> queryOptions, int defaultMaxInitResultCap) {
+    int result = 0;
+    try {
+      result = Integer.parseInt(queryOptions.getOrDefault(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, "0"));
+    } catch (NumberFormatException e) {
+      result = 0;
+    }
+    if (result <= 0) {
+      result = defaultMaxInitResultCap;
+    }
+    return result;
+  }
+
+  public static int getGroupByTrimThreshold(Map<String, String> queryOptions, int defaultGroupByTrimThreshold) {
+    int result = 0;
+    try {
+      result = Integer.parseInt(queryOptions.getOrDefault(QueryOptionKey.GROUP_BY_TRIM_THRESHOLD, "0"));
+    } catch (NumberFormatException e) {
+      result = 0;
+    }
+    if (result <= 0) {
+      result = defaultGroupByTrimThreshold;
     }
     return result;
   }

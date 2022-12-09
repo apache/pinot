@@ -94,10 +94,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     PinotQuery pinotQuery = new PinotQuery();
-    int leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadataMap);
-    if (leafNodeLimit == 0) {
-      leafNodeLimit = DEFAULT_LEAF_NODE_LIMIT;
-    }
+    int leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadataMap, DEFAULT_LEAF_NODE_LIMIT);
     pinotQuery.setLimit(leafNodeLimit);
     LOGGER.debug("QueryID" + requestId + " leafNodeLimit:" + leafNodeLimit);
     pinotQuery.setExplain(false);
