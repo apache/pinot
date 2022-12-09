@@ -325,7 +325,16 @@ public class DateTimeFunctions {
    */
   @ScalarFunction
   public static int timezoneHour(String timezoneId) {
-    return new DateTime(DateTimeZone.forID(timezoneId).getOffset(null), DateTimeZone.UTC).getHourOfDay();
+    return timezoneHour(timezoneId, 0);
+  }
+
+  /**
+   * Returns the hour of the time zone offset, for the UTC timestamp at {@code millis}. This will
+   * properly handle daylight savings time.
+   */
+  @ScalarFunction
+  public static int timezoneHour(String timezoneId, long millis) {
+    return (int) TimeUnit.MILLISECONDS.toHours(DateTimeZone.forID(timezoneId).getOffset(millis));
   }
 
   /**
@@ -333,7 +342,16 @@ public class DateTimeFunctions {
    */
   @ScalarFunction
   public static int timezoneMinute(String timezoneId) {
-    return new DateTime(DateTimeZone.forID(timezoneId).getOffset(null), DateTimeZone.UTC).getMinuteOfHour();
+    return timezoneMinute(timezoneId, 0);
+  }
+
+  /**
+   * Returns the minute of the time zone offset, for the UTC timestamp at {@code millis}. This will
+   * properly handle daylight savings time
+   */
+  @ScalarFunction
+  public static int timezoneMinute(String timezoneId, long millis) {
+    return (int) TimeUnit.MILLISECONDS.toMinutes(DateTimeZone.forID(timezoneId).getOffset(millis)) % 60;
   }
 
   /**
