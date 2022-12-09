@@ -38,6 +38,7 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,12 +68,11 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     MailboxIdentifier generate(ServerInstance server);
   }
 
-  public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
+  public MailboxSendOperator(PlanRequestContext context,
       Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
-      long jobId, int stageId) {
-    this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
-        server -> toMailboxId(server, jobId, stageId, hostName, port), BlockExchange::getExchange);
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, long jobId, int stageId) {
+    this(context, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
+        server -> toMailboxId(server, jobId, stageId, context.getHostName(), context.getPort()), BlockExchange::getExchange);
   }
 
   @VisibleForTesting
