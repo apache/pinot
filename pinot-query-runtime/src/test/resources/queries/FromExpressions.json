@@ -8,8 +8,11 @@
         ],
         "inputs": [
           [1, "a"],
+          [1, "b"],
+          [1, "xxx"],
           [2, "b"],
-          [3, "c"]
+          [3, "c"],
+          [3, "d"]
         ]
       },
       "tbl2" : {
@@ -19,8 +22,10 @@
         ],
         "inputs": [
           [1, "xxx"],
+          [1, "zzz"],
           [3, "yyy"],
-          [5, "zzz"]
+          [5, "zzz"],
+          [3, "c"]
         ]
       }
     },
@@ -65,6 +70,25 @@
         "psql": "7.2.1.1",
         "description": "RIGHT OUTER JOIN output rows in different order than join order",
         "sql": "SELECT {tbl2}.num, {tbl2}.value, {tbl1}.num, {tbl1}.name FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "RIGHT OUTER JOIN output rows in mixed table order",
+        "sql": "SELECT {tbl1}.num, {tbl2}.num, {tbl1}.name, {tbl2}.value FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "RIGHT OUTER JOIN with inequality condition",
+        "ignored": true,
+        "comment": "failed because we don't handle the comparison for null correctly",
+        "sql": "SELECT {tbl1}.num, {tbl2}.num, {tbl1}.name, {tbl2}.value FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num AND {tbl1}.name != {tbl2}.value"
+      },
+      {
+        "psql": "7.2.1.1",
+        "ignored": true,
+        "comment": "failed because we don't handle the comparison for null correctly",
+        "description": "RIGHT OUTER JOIN with inequality condition",
+        "sql": "SELECT {tbl1}.num, {tbl2}.num, {tbl1}.name, {tbl2}.value FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.name = {tbl2}.value AND {tbl1}.num > {tbl2}.num + 1"
       },
       {
         "psql": "7.2.1.1",
@@ -114,7 +138,7 @@
           [1, "a"],
           [2, "b"],
           [3, "c"],
-          [3, "d"],
+          [3, "yyy"],
           [4, "e"]
         ]
       },
@@ -157,7 +181,7 @@
           [1, "a", 1, "xxx"],
           [2, "b", null, null],
           [3, "c", 3, "yyy"],
-          [3, "d", 3, "yyy"],
+          [3, "yyy", 3, "yyy"],
           [4, "e", null, null],
           [null, null, 5, "zzz"]
         ]
@@ -182,6 +206,21 @@
           [null, null, null, 1, "xxx"],
           [null, null, null, 3, "yyy"],
           [null, null, null, 5, "zzz"]
+        ]
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "RIGHT OUTER JOIN with inequality condition",
+        "ignored": true,
+        "comment": "failed because we don't handle the case for null comparison",
+        "sql": "SELECT {tbl1}.num, {tbl2}.num, {tbl1}.name, {tbl2}.value FROM {tbl1} FULL OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num AND {tbl1}.name != {tbl2}.value",
+        "outputs": [
+          [1, 1, "a",  "xxx"],
+          [1, 1, "a", "xxx"],
+          [2, null,"b", null],
+          [3,  3,  "c", "yyy"],
+          [4, null, "e", null],
+          [null, 5, null, "zzz"]
         ]
       },
       {

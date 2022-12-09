@@ -419,12 +419,25 @@ public class HashJoinOperatorTest {
       result = joinOnNum.nextBlock();
     }
     List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{2, "BB", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"},
-        new Object[]{null, null, 3, "BB"});
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{2, "BB", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
-    Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
+    // Second block should be non-matched broadcast rows
+    result = joinOnNum.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = joinOnNum.nextBlock();
+    }
+    resultRows = result.getContainer();
+    expectedRows = ImmutableList.of(new Object[]{null, null, 3, "BB"});
+    Assert.assertEquals(resultRows.size(), expectedRows.size());
+    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
+    // Third block is EOS block.
+    result = joinOnNum.nextBlock();
+    while (result.isNoOpBlock()) {
+      result = joinOnNum.nextBlock();
+    }
+    Assert.assertTrue(result.isEOSBlock());
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*SEMI is not "
