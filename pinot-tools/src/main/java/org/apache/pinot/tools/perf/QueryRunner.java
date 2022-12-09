@@ -103,6 +103,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-verbose"}, required = false, description = "Enable verbose query logging (default: "
       + "false).")
   private boolean _verbose = false;
+  @CommandLine.Option(names = {"-useTLS"}, required = false, description = "Use default trust manager (default: "
+      + "false).")
+  private boolean _useTLS = false;
+
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
       + "this message.")
   private boolean _help;
@@ -161,10 +165,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       return false;
     }
 
-    SSLContext ctx = SSLContext.getInstance("TLS");
-    ctx.init(new KeyManager[0], new TrustManager[] {new DefaultTrustManager()}, new SecureRandom());
-    SSLContext.setDefault(ctx);
-
+    if (_useTLS) {
+      SSLContext ctx = SSLContext.getInstance("TLS");
+      ctx.init(new KeyManager[0], new TrustManager[]{new DefaultTrustManager()}, new SecureRandom());
+      SSLContext.setDefault(ctx);
+    }
 
     LOGGER.info("Start query runner targeting broker: {}:{}", _brokerHost, _brokerPort);
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
