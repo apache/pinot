@@ -24,9 +24,12 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class InMemoryMailboxService implements MailboxService<TransferableBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(InMemorySendingMailbox.class);
   // channel manager
   private final String _hostname;
   private final int _mailboxPort;
@@ -65,21 +68,25 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._sendingMailbox;
+    SendingMailbox<TransferableBlock> mailbox =
+        _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._sendingMailbox;
+    LOGGER.trace("InMemoryMailboxService sendingMailBox size:" + _mailboxStateMap.size());
+    return mailbox;
   }
 
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._receivingMailbox;
+    ReceivingMailbox<TransferableBlock> mailbox =
+        _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._receivingMailbox;
+    LOGGER.trace("InMemoryMailboxService _receivingMailbox size:" + _mailboxStateMap.size());
+    return mailbox;
   }
 
   InMemoryMailboxState newMailboxState(String mailboxId) {
     BlockingQueue<TransferableBlock> queue = createDefaultChannel();
-    return new InMemoryMailboxState(
-        new InMemorySendingMailbox(mailboxId, queue, _receivedMailContentCallback),
-        new InMemoryReceivingMailbox(mailboxId, queue),
-        queue);
+    return new InMemoryMailboxState(new InMemorySendingMailbox(mailboxId, queue, _receivedMailContentCallback),
+        new InMemoryReceivingMailbox(mailboxId, queue), queue);
   }
 
   private ArrayBlockingQueue<TransferableBlock> createDefaultChannel() {

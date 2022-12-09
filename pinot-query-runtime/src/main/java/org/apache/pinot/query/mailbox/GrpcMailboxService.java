@@ -24,6 +24,8 @@ import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,6 +46,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * </ul>
  */
 public class GrpcMailboxService implements MailboxService<TransferableBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(InMemorySendingMailbox.class);
   // channel manager
   private final ChannelManager _channelManager;
   private final String _hostname;
@@ -89,7 +92,10 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * @param mailboxId the id of the mailbox.
    */
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
-    return _sendingMailboxMap.computeIfAbsent(mailboxId.toString(), (mId) -> new GrpcSendingMailbox(mId, this));
+    SendingMailbox<TransferableBlock> mailbox =
+        _sendingMailboxMap.computeIfAbsent(mailboxId.toString(), (mId) -> new GrpcSendingMailbox(mId, this));
+    LOGGER.trace("GrpcMailboxService sendingMailBox size:" + _sendingMailboxMap.size());
+    return mailbox;
   }
 
   /**
@@ -97,12 +103,16 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * @param mailboxId the id of the mailbox.
    */
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
-    return _receivingMailboxMap.computeIfAbsent(
+    ReceivingMailbox<TransferableBlock> mailbox = _receivingMailboxMap.computeIfAbsent(
         mailboxId.toString(), (mId) -> new GrpcReceivingMailbox(mId, this, _gotMailCallback));
+    LOGGER.trace("GrpcMailboxService receiving size:" + _receivingMailboxMap.size());
+    return mailbox;
   }
 
   public ManagedChannel getChannel(String mailboxId) {
-    return _channelManager.getChannel(Utils.constructChannelId(mailboxId));
+    ManagedChannel channel = _channelManager.getChannel(Utils.constructChannelId(mailboxId));
+    LOGGER.trace("GrpcMailboxService channel manager size:" + _channelManager.size());
+    return channel;
   }
 
   @Override

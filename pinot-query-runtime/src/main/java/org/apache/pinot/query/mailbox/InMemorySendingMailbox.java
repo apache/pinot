@@ -22,9 +22,12 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(InMemorySendingMailbox.class);
   private final BlockingQueue<TransferableBlock> _queue;
   private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final String _mailboxId;
@@ -45,6 +48,8 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   public void send(TransferableBlock data)
       throws UnsupportedOperationException {
     try {
+      LOGGER.trace("({}): InMemoryMailbox" + _mailboxId + " QueueSize:",
+          _queue.size() + " remainingCapacity:" + _queue.remainingCapacity());
       if (!_queue.offer(
           data, InMemoryMailboxService.DEFAULT_CHANNEL_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
         throw new RuntimeException(String.format("Timed out when sending block in mailbox=%s", _mailboxId));

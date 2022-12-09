@@ -55,6 +55,10 @@ public class ChannelManager {
     _grpcMailboxServer.shutdown();
   }
 
+  public int size() {
+    return _channelMap.size();
+  }
+
   public ManagedChannel getChannel(String channelId) {
     return _channelMap.computeIfAbsent(channelId,
         (id) -> constructChannel(id.split(":")));
