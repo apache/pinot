@@ -524,7 +524,7 @@ public class TablesResource {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
           Map<String, ConsumerPartitionState> partitionStateMap =
-              realtimeSegmentDataManager.getConsumerPartitionState();
+              realtimeSegmentDataManager.getConsumerPartitionState(false);
           Map<String, String> recordsLagMap = new HashMap<>();
           Map<String, String> availabilityLagMsMap = new HashMap<>();
           realtimeSegmentDataManager.getPartitionToLagState(partitionStateMap).forEach((k, v) -> {

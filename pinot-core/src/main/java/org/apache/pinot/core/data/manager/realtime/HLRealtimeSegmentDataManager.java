@@ -427,6 +427,11 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
+  public Map<String, ConsumerPartitionState> getConsumerPartitionState(boolean skipOffsetLag) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public Map<String, ConsumerPartitionState> getConsumerPartitionState() {
     throw new UnsupportedOperationException();
   }

@@ -65,7 +65,11 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
    * @return Per-partition consumer's status, which typically includes last consumed message timestamp,
    * latest available upstream offset etc
    */
-  public abstract Map<String, ConsumerPartitionState> getConsumerPartitionState();
+  public abstract Map<String, ConsumerPartitionState> getConsumerPartitionState(boolean skipOffsetLag);
+
+  public Map<String, ConsumerPartitionState> getConsumerPartitionState() {
+    return getConsumerPartitionState(false);
+  }
 
   public abstract Map<String, PartitionLagState> getPartitionToLagState(
       Map<String, ConsumerPartitionState> consumerPartitionStateMap);

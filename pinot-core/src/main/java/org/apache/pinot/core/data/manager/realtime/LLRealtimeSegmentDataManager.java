@@ -620,22 +620,24 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private void updateConsumerLagMetrics() {
-    Map<String, PartitionLagState> lagStateMap = getPartitionToLagState(getConsumerPartitionState());
+    Map<String, PartitionLagState> lagStateMap = getPartitionToLagState(getConsumerPartitionState(true));
+    boolean emitRecordsLag = true;
+    boolean emitAvailabilityLag = true;
     for (Map.Entry<String, PartitionLagState> entry: lagStateMap.entrySet()) {
       String partitionId = entry.getKey();
       PartitionLagState lagState = entry.getValue();
-      if (!PartitionLagState.NOT_CALCULATED.equals(lagState.getRecordsLag())) {
+      if (emitRecordsLag && !PartitionLagState.NOT_CALCULATED.equals(lagState.getRecordsLag())) {
         try {
           _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, Integer.parseInt(partitionId),
-              ServerGauge.LLC_RECORDS_LAG, Long.parseLong(entry.getValue().getRecordsLag()));
+              ServerGauge.LLC_RECORDS_LAG, Long.parseLong(lagState.getRecordsLag()));
         } catch (NumberFormatException nfe) {
-          // do not do anything
           _segmentLogger.debug("Failed to parse the records lag {} returned from the consumer for partition {}",
               lagState.getRecordsLag(), partitionId);
+          emitRecordsLag = false;
         }
       }
 
-      if (!PartitionLagState.NOT_CALCULATED.equals(lagState.getAvailabilityLagMs())) {
+      if (emitAvailabilityLag && !PartitionLagState.NOT_CALCULATED.equals(lagState.getAvailabilityLagMs())) {
         try {
           _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, Integer.parseInt(partitionId),
               ServerGauge.LLC_AVAILABILITY_LAG_MS, Long.parseLong(entry.getValue().getAvailabilityLagMs()));
@@ -643,6 +645,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // do not do anything
           _segmentLogger.debug("Failed to parse the availability lag {} returned from the consumer for partition {}",
               lagState.getRecordsLag(), partitionId);
+          emitAvailabilityLag = false;
         }
       }
     }
@@ -858,10 +861,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
-  public Map<String, ConsumerPartitionState> getConsumerPartitionState() {
+  public Map<String, ConsumerPartitionState> getConsumerPartitionState(boolean skipOffsetLag) {
     String partitionGroupId = String.valueOf(_partitionGroupId);
+    StreamPartitionMsgOffset upstreamLatest = skipOffsetLag ? null : fetchLatestStreamOffset(5_000);
     return Collections.singletonMap(partitionGroupId, new ConsumerPartitionState(partitionGroupId, getCurrentOffset(),
-        getLastConsumedTimestamp(), fetchLatestStreamOffset(5_000), _lastRowMetadata));
+        getLastConsumedTimestamp(), upstreamLatest, _lastRowMetadata));
   }
 
   @Override
