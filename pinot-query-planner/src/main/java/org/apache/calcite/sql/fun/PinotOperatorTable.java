@@ -49,9 +49,6 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
   public static final SqlAggFunction BOOL_AND = new PinotBoolAndAggregateFunction();
   public static final SqlAggFunction BOOL_OR = new PinotBoolOrAggregateFunction();
 
-  // TODO: remove this once https://github.com/apache/pinot/issues/9900 is fixed
-  public static final SqlFunction REGEXP_REPLACE = new SqlRegexpReplaceFunction();
-
   // TODO: clean up lazy init by using Suppliers.memorized(this::computeInstance) and make getter wrapped around
   // supplier instance. this should replace all lazy init static objects in the codebase
   public static synchronized PinotOperatorTable instance() {

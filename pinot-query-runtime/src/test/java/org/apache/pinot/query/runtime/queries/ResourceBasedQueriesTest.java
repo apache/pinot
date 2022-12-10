@@ -28,6 +28,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -280,7 +281,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       if (testFileUrl != null && new File(testFileUrl.getFile()).exists()) {
         Map<String, QueryTestCase> testCases = MAPPER.readValue(new File(testFileUrl.getFile()),
             new TypeReference<Map<String, QueryTestCase>>() { });
-        // TODO: potential test case conflicts between files, address later by throwing during setUp if already exist.
+        {
+          HashSet<String> hashSet = new HashSet<>(testCaseMap.keySet());
+          hashSet.retainAll(testCases.keySet());
+          if (!hashSet.isEmpty()) {
+            throw new IllegalArgumentException("testCase already exist for the following names: " + hashSet);
+          }
+        }
         testCaseMap.putAll(testCases);
       }
     }
