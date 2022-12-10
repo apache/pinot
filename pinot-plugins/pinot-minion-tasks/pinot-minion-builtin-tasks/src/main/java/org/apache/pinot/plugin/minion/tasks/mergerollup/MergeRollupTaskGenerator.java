@@ -703,7 +703,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
                     ? _tableLowestLevelMaxValidBucketEndTimeMs.get(tableNameWithType)
                     : watermarkForTable.get(lowerMergeLevel),
                 bufferTimeMs, bucketTimeMs));
-        controllerMetrics.addCallbackGaugeIfNeeded(getMetricNameForTaskDelay(tableNameWithType, mergeLevel),
+        controllerMetrics.addOrUpdateGauge(getMetricNameForTaskDelay(tableNameWithType, mergeLevel),
             (() -> getMergeRollupTaskDelayInNumTimeBuckets(watermarkForTable.getOrDefault(k, -1L),
                 lowerMergeLevel == null ? _tableLowestLevelMaxValidBucketEndTimeMs.get(tableNameWithType)
                     : watermarkForTable.get(lowerMergeLevel), bufferTimeMs, bucketTimeMs)));

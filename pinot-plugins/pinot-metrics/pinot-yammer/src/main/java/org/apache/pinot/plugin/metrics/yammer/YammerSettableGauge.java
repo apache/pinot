@@ -18,45 +18,24 @@
  */
 package org.apache.pinot.plugin.metrics.yammer;
 
-import java.util.function.Function;
+import com.yammer.metrics.core.Gauge;
 import java.util.function.Supplier;
-import org.apache.pinot.spi.metrics.PinotGauge;
 
+/**
+ * YammerSettableGauge extends {@link Gauge}, allowing setting a value supplier to provide the gauge value
+ *
+ * @param <T> the type of the metric's value
+ */
+public abstract class YammerSettableGauge<T> extends Gauge<T> {
+  /**
+   * Sets the gauge value
+   * @param value the gauge value
+   */
+  abstract void setValue(T value);
 
-public class YammerGauge<T> implements PinotGauge<T> {
-
-  private final YammerSettableGauge<T> _settableGauge;
-
-  public YammerGauge(YammerSettableGauge<T> settableGauge) {
-    _settableGauge = settableGauge;
-  }
-
-  public YammerGauge(Function<Void, T> condition) {
-    this(new YammerSettableGaugeImpl<>(() -> condition.apply(null)));
-  }
-
-  @Override
-  public Object getGauge() {
-    return _settableGauge;
-  }
-
-  @Override
-  public Object getMetric() {
-    return _settableGauge;
-  }
-
-  @Override
-  public T value() {
-    return _settableGauge.value();
-  }
-
-  @Override
-  public void setValue(T value) {
-    _settableGauge.setValue(value);
-  }
-
-  @Override
-  public void setValueSupplier(Supplier<T> valueSupplier) {
-    _settableGauge.setValueSupplier(valueSupplier);
-  }
+  /**
+   * Sets a value supplier to provide the gauge value
+   * @param valueSupplier a value supplier to provide the gauge value
+   */
+  abstract void setValueSupplier(Supplier<T> valueSupplier);
 }

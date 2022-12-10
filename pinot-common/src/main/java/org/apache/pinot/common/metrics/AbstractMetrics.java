@@ -28,8 +28,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -479,6 +481,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   /**
    * Adds a new gauge whose values are retrieved from a callback function.
+   * Once added, the callback function cannot be updated.
    *
    * @param metricName The name of the metric
    * @param valueCallback The callback function used to retrieve the value of the gauge
@@ -495,6 +498,20 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
                 throw new AssertionError("Should not reach this");
               }
             }));
+  }
+
+  /**
+   * Adds or updates a gauge whose values are retrieved from the given supplier function.
+   * The supplier function can be updated by calling this method again.
+   *
+   * @param metricName The name of the metric
+   * @param valueSupplier The supplier function used to retrieve the value of the gauge
+   */
+  public void addOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) {
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+        PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.get()));
+    pinotGauge.setValueSupplier(valueSupplier);
   }
 
   /**

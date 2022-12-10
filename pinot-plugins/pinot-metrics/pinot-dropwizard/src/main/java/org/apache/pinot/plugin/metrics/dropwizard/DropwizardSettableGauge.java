@@ -18,44 +18,19 @@
  */
 package org.apache.pinot.plugin.metrics.dropwizard;
 
-import java.util.function.Function;
+import com.codahale.metrics.SettableGauge;
 import java.util.function.Supplier;
-import org.apache.pinot.spi.metrics.PinotGauge;
 
-public class DropwizardGauge<T> implements PinotGauge<T> {
 
-  private final DropwizardSettableGauge<T> _settableGauge;
-
-  public DropwizardGauge(DropwizardSettableGauge<T> settableGauge) {
-    _settableGauge = settableGauge;
-  }
-
-  public DropwizardGauge(Function<Void, T> condition) {
-    this(new DropwizardSettableGaugeImpl<>(() -> condition.apply(null)));
-  }
-
-  @Override
-  public Object getGauge() {
-    return _settableGauge;
-  }
-
-  @Override
-  public Object getMetric() {
-    return _settableGauge;
-  }
-
-  @Override
-  public T value() {
-    return _settableGauge.getValue();
-  }
-
-  @Override
-  public void setValue(T value) {
-    _settableGauge.setValue(value);
-  }
-
-  @Override
-  public void setValueSupplier(Supplier<T> valueSupplier) {
-    _settableGauge.setValueSupplier(valueSupplier);
-  }
+/**
+ * DropwizardSettableGauge extends {@link SettableGauge}, allowing setting a value supplier to provide the gauge value
+ *
+ * @param <T> the type of the metric's value
+ */
+public interface DropwizardSettableGauge<T> extends SettableGauge<T> {
+  /**
+   * Sets a value supplier to provide the gauge value
+   * @param valueSupplier a value supplier to provide the gauge value
+   */
+  void setValueSupplier(Supplier<T> valueSupplier);
 }
