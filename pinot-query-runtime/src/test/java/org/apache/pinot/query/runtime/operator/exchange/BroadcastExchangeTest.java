@@ -21,10 +21,10 @@ package org.apache.pinot.query.runtime.operator.exchange;
 import com.google.common.collect.ImmutableList;
 import java.util.Iterator;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -42,7 +42,7 @@ public class BroadcastExchangeTest {
   @Mock
   TransferableBlock _block;
   @Mock
-  MailboxService<TransferableBlock> _mailboxService;
+  PlanRequestContext _context;
 
   @BeforeMethod
   public void setUp() {
@@ -62,7 +62,7 @@ public class BroadcastExchangeTest {
 
     // When:
     Iterator<BlockExchange.RoutedBlock> route =
-        new BroadcastExchange(_mailboxService, destinations, TransferableBlockUtils::splitBlock)
+        new BroadcastExchange(_context, destinations, TransferableBlockUtils::splitBlock)
             .route(destinations, _block);
 
     // Then:

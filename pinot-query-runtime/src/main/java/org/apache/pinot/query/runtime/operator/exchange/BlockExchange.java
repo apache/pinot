@@ -23,7 +23,6 @@ import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
@@ -44,18 +43,18 @@ public abstract class BlockExchange {
   private final List<MailboxIdentifier> _destinations;
   private final BlockSplitter _splitter;
 
-  public static BlockExchange getExchange(MailboxService<TransferableBlock> mailboxService,
+  public static BlockExchange getExchange(PlanRequestContext context,
       List<MailboxIdentifier> destinations, RelDistribution.Type exchangeType,
       KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
     switch (exchangeType) {
       case SINGLETON:
-        return new SingletonExchange(mailboxService, destinations, splitter);
+        return new SingletonExchange(context, destinations, splitter);
       case HASH_DISTRIBUTED:
-        return new HashExchange(mailboxService, destinations, selector, splitter);
+        return new HashExchange(context, destinations, selector, splitter);
       case RANDOM_DISTRIBUTED:
-        return new RandomExchange(mailboxService, destinations, splitter);
+        return new RandomExchange(context, destinations, splitter);
       case BROADCAST_DISTRIBUTED:
-        return new BroadcastExchange(mailboxService, destinations, splitter);
+        return new BroadcastExchange(context, destinations, splitter);
       case ROUND_ROBIN_DISTRIBUTED:
       case RANGE_DISTRIBUTED:
       case ANY:
@@ -85,7 +84,7 @@ public abstract class BlockExchange {
   }
 
   private void sendBlock(MailboxIdentifier mailboxId, TransferableBlock block) {
-    SendingMailbox<TransferableBlock> sendingMailbox = _mailbox.getSendingMailbox(mailboxId);
+    SendingMailbox<TransferableBlock> sendingMailbox = _context.createSendingMailbox(mailboxId);
 
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);

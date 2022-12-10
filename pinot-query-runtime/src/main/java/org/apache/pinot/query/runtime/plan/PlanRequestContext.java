@@ -20,10 +20,12 @@ package org.apache.pinot.query.runtime.plan;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -38,6 +40,7 @@ public class PlanRequestContext {
   protected final Map<Integer, StageMetadata> _metadataMap;
   protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
 
+  protected final HashMap<MailboxIdentifier, SendingMailbox<TransferableBlock>> _sendingMailboxMap = new HashMap<>();
 
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
       long timeoutMs, String hostName, int port, Map<Integer, StageMetadata> metadataMap) {
@@ -84,5 +87,9 @@ public class PlanRequestContext {
 
   public List<MailboxIdentifier> getReceivingMailboxes() {
     return ImmutableList.copyOf(_receivingMailboxes);
+  }
+
+  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId) {
+    return _sendingMailboxMap.computeIfAbsent(mailboxId, mid -> _mailboxService.createSendingMailbox(mid));
   }
 }
