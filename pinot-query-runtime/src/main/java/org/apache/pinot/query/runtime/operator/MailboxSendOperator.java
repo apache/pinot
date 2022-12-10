@@ -76,7 +76,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   }
 
   @VisibleForTesting
-  MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
+  MailboxSendOperator(PlanRequestContext context,
       Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory) {
@@ -87,8 +87,8 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
       // TODO: this logic should be moved into SingletonExchange
       ServerInstance singletonInstance = null;
       for (ServerInstance serverInstance : receivingStageInstances) {
-        if (serverInstance.getHostname().equals(mailboxService.getHostname())
-            && serverInstance.getQueryMailboxPort() == mailboxService.getMailboxPort()) {
+        if (serverInstance.getHostname().equals(context.getMailboxService().getHostname())
+            && serverInstance.getQueryMailboxPort() == context.getMailboxService().getMailboxPort()) {
           Preconditions.checkState(singletonInstance == null, "multiple instance found for singleton exchange type!");
           singletonInstance = serverInstance;
         }
@@ -103,7 +103,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     }
 
     BlockSplitter splitter = TransferableBlockUtils::splitBlock;
-    _exchange = blockExchangeFactory.build(mailboxService, receivingMailboxes, exchangeType, keySelector, splitter);
+    _exchange = blockExchangeFactory.build(context.getMailboxService(), receivingMailboxes, exchangeType, keySelector, splitter);
 
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
         String.format("Exchange type '%s' is not supported yet", exchangeType));

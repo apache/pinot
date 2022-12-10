@@ -39,6 +39,7 @@ import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
@@ -144,6 +145,7 @@ public class QueryRunner {
 
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
+      PlanRequestContext context = new PlanRequestContext();
       MailboxSendOperator mailboxSendOperator =
           new MailboxSendOperator(_mailboxService,
               new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema()),
