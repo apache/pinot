@@ -28,6 +28,7 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 
 
 /**
@@ -39,7 +40,7 @@ public abstract class BlockExchange {
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
 
-  private final MailboxService<TransferableBlock> _mailbox;
+  private final PlanRequestContext _context;
   private final List<MailboxIdentifier> _destinations;
   private final BlockSplitter _splitter;
 
@@ -63,9 +64,9 @@ public abstract class BlockExchange {
     }
   }
 
-  protected BlockExchange(MailboxService<TransferableBlock> mailbox, List<MailboxIdentifier> destinations,
+  protected BlockExchange(PlanRequestContext context, List<MailboxIdentifier> destinations,
       BlockSplitter splitter) {
-    _mailbox = mailbox;
+    _context = context;
     _destinations = destinations;
     _splitter = splitter;
   }

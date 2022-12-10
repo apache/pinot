@@ -70,9 +70,10 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
   public MailboxSendOperator(PlanRequestContext context,
       Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, long jobId, int stageId) {
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector) {
     this(context, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
-        server -> toMailboxId(server, jobId, stageId, context.getHostName(), context.getPort()), BlockExchange::getExchange);
+        server -> toMailboxId(server, context.getRequestId(), context.getStageId(), context.getHostName(),
+            context.getPort()), BlockExchange::getExchange);
   }
 
   @VisibleForTesting

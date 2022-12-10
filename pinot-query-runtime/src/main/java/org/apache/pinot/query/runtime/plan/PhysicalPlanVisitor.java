@@ -77,8 +77,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
     Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
     StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
     return new MailboxSendOperator(context, nextOperator,
-        receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
-        node.getStageId());
+        receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector());
   }
 
   @Override
