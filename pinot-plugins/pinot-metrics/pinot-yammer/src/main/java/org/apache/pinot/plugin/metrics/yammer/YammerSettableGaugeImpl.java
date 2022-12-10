@@ -27,6 +27,10 @@ public class YammerSettableGaugeImpl<T> extends YammerSettableGauge<T> {
     _valueSupplier = valueSupplier;
   }
 
+  public YammerSettableGaugeImpl(T value) {
+    setValue(value);
+  }
+
   @Override
   void setValue(T value) {
     _valueSupplier = () -> value;

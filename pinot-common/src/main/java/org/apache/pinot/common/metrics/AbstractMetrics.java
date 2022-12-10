@@ -44,7 +44,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Common code for metrics implementations.
- *
+ * TODO: 1. With gauge updatable, we can remove _gaugeValues 2. Remove methods with callback in name since the callback
+ *   function can not be updated.
  */
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter,
     G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
@@ -532,9 +533,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param gaugeName gauge name
    */
   public void removeGauge(final String gaugeName) {
-    if (_gaugeValues.remove(gaugeName) != null) {
-      removeCallbackGauge(gaugeName);
-    }
+    _gaugeValues.remove(gaugeName);
+    removeCallbackGauge(gaugeName);
   }
 
   /**

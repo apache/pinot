@@ -16,33 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.dropwizard;
+package org.apache.pinot.plugin.metrics.yammer;
 
-import java.util.function.Supplier;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
-public class DropwizardSettableGaugeImpl<T> implements DropwizardSettableGauge<T> {
-  private Supplier<T> _valueSupplier;
 
-  public DropwizardSettableGaugeImpl(Supplier<T> valueSupplier) {
-    setValueSupplier(valueSupplier);
-  }
+public class YammerGaugeTest {
+  @Test
+  public void testUpdateGaugeValue() {
+    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGaugeImpl<>(1L);
+    YammerGauge<Long> yammerGauge = new YammerGauge<>(yammerSettableGauge);
 
-  public DropwizardSettableGaugeImpl(T value) {
-    setValue(value);
-  }
+    Assert.assertEquals(yammerGauge.getGauge(), yammerSettableGauge);
+    Assert.assertEquals(yammerGauge.value(), Long.valueOf(1L));
 
-  @Override
-  public void setValueSupplier(Supplier<T> valueSupplier) {
-    _valueSupplier = valueSupplier;
-  }
+    yammerGauge.setValue(2L);
+    Assert.assertEquals(yammerGauge.value(), Long.valueOf(2L));
 
-  @Override
-  public void setValue(T value) {
-    _valueSupplier = () -> value;
-  }
-
-  @Override
-  public T getValue() {
-    return _valueSupplier.get();
+    yammerGauge.setValueSupplier(() -> 3L);
+    Assert.assertEquals(yammerGauge.value(), Long.valueOf(3L));
   }
 }

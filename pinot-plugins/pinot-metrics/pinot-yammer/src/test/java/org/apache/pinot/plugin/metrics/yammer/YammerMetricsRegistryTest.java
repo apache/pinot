@@ -16,33 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.dropwizard;
+package org.apache.pinot.plugin.metrics.yammer;
 
-import java.util.function.Supplier;
+import com.yammer.metrics.core.MetricName;
+import org.apache.pinot.spi.metrics.PinotGauge;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
-public class DropwizardSettableGaugeImpl<T> implements DropwizardSettableGauge<T> {
-  private Supplier<T> _valueSupplier;
 
-  public DropwizardSettableGaugeImpl(Supplier<T> valueSupplier) {
-    setValueSupplier(valueSupplier);
-  }
-
-  public DropwizardSettableGaugeImpl(T value) {
-    setValue(value);
-  }
-
-  @Override
-  public void setValueSupplier(Supplier<T> valueSupplier) {
-    _valueSupplier = valueSupplier;
-  }
-
-  @Override
-  public void setValue(T value) {
-    _valueSupplier = () -> value;
-  }
-
-  @Override
-  public T getValue() {
-    return _valueSupplier.get();
+public class YammerMetricsRegistryTest {
+  @Test
+  public void testNewGaugeNoError() {
+    YammerMetricsRegistry yammerMetricsRegistry = new YammerMetricsRegistry();
+    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGaugeImpl<>(1L);
+    YammerGauge<Long> yammerGauge = new YammerGauge<>(yammerSettableGauge);
+    MetricName metricName = new MetricName(this.getClass(), "test");
+    PinotGauge<Long> pinotGauge = yammerMetricsRegistry.newGauge(new YammerMetricName(metricName), yammerGauge);
+    Assert.assertEquals(pinotGauge.value(), Long.valueOf(1L));
   }
 }

@@ -18,31 +18,23 @@
  */
 package org.apache.pinot.plugin.metrics.dropwizard;
 
-import java.util.function.Supplier;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
-public class DropwizardSettableGaugeImpl<T> implements DropwizardSettableGauge<T> {
-  private Supplier<T> _valueSupplier;
 
-  public DropwizardSettableGaugeImpl(Supplier<T> valueSupplier) {
-    setValueSupplier(valueSupplier);
-  }
+public class DropwizardGaugeTest {
+  @Test
+  public void testUpdateGaugeValue() {
+    DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGaugeImpl<>(1L);
+    DropwizardGauge<Long> dropwizardGauge = new DropwizardGauge<>(dropwizardSettableGauge);
 
-  public DropwizardSettableGaugeImpl(T value) {
-    setValue(value);
-  }
+    Assert.assertEquals(dropwizardGauge.getGauge(), dropwizardSettableGauge);
+    Assert.assertEquals(dropwizardGauge.value(), Long.valueOf(1L));
 
-  @Override
-  public void setValueSupplier(Supplier<T> valueSupplier) {
-    _valueSupplier = valueSupplier;
-  }
+    dropwizardGauge.setValue(2L);
+    Assert.assertEquals(dropwizardGauge.value(), Long.valueOf(2L));
 
-  @Override
-  public void setValue(T value) {
-    _valueSupplier = () -> value;
-  }
-
-  @Override
-  public T getValue() {
-    return _valueSupplier.get();
+    dropwizardGauge.setValueSupplier(() -> 3L);
+    Assert.assertEquals(dropwizardGauge.value(), Long.valueOf(3L));
   }
 }
