@@ -94,10 +94,16 @@ public class QueryRunner {
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
     _helixManager = helixManager;
     try {
-      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(),
+      long releaseTs = config.getProperty(
+          QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
+          QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
+
+      _scheduler = new OpChainSchedulerService(
+          new RoundRobinScheduler(releaseTs),
           Executors.newFixedThreadPool(
               ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
-              new NamedThreadFactory("query_worker_on_" + _port + "_port")));
+              new NamedThreadFactory("query_worker_on_" + _port + "_port")),
+          releaseTs);
       _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config, _scheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config, instanceDataManager, serverMetrics);

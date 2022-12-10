@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.executor;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.common.util.concurrent.Monitor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -44,6 +45,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
 
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
+  private final long _releaseTs;
 
   // anything that is guarded by this monitor should be non-blocking
   private final Monitor _monitor = new Monitor();
@@ -55,8 +57,13 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   };
 
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
+    this(scheduler, workerPool, TimeUnit.SECONDS.toMillis(10));
+  }
+
+  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long releaseTs) {
     _scheduler = scheduler;
     _workerPool = workerPool;
+    _releaseTs = releaseTs;
   }
 
   @Override
@@ -71,7 +78,10 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   protected void run()
       throws Exception {
     while (isRunning()) {
-      _monitor.enterWhen(_hasNextOrClosing);
+      if (!_monitor.enterWhen(_hasNextOrClosing, _releaseTs, TimeUnit.MILLISECONDS)) {
+        continue;
+      }
+
       try {
         if (!isRunning()) {
           return;
@@ -98,9 +108,12 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                 // not complete, needs to re-register for scheduling
                 register(operatorChain, false);
               } else {
-                LOGGER.debug("({}): Completed {}",
-                    operatorChain,
-                    operatorChain.getStats());
+                if (result.isErrorBlock()) {
+                  LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
+                      result.getDataBlock().getExceptions());
+                } else {
+                  LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
+                }
               }
             } catch (Exception e) {
               LOGGER.error("({}): Failed to execute operator chain! {}",

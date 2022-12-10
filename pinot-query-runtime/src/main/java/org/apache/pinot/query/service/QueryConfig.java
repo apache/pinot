@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.query.service;
 
+import java.util.concurrent.TimeUnit;
+
+
 /**
  * Configuration for setting up query runtime.
  */
@@ -58,6 +61,12 @@ public class QueryConfig {
    */
   public static final String KEY_OF_SERVER_RESPONSE_STATUS_ERROR = "ERROR";
   public static final String KEY_OF_SERVER_RESPONSE_STATUS_OK = "OK";
+
+  /**
+   * Configuration keys for managing the scheduler
+   */
+  public static final String KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS = "pinot.query.scheduler.release.timeout.ms";
+  public static final long DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS = TimeUnit.MINUTES.toSeconds(1);
 
   private QueryConfig() {
     // do not instantiate.
