@@ -72,7 +72,7 @@ public class HashExchangeTest {
 
     // When:
     Iterator<BlockExchange.RoutedBlock> route =
-        new HashExchange(_context, destinations, selector, TransferableBlockUtils::splitBlock)
+        new HashExchange(_context.getMailboxService(), destinations, selector, TransferableBlockUtils::splitBlock, 1000)
             .route(destinations, _block);
 
     // Then:

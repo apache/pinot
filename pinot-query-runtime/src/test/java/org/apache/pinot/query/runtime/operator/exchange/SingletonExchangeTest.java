@@ -61,7 +61,7 @@ public class SingletonExchangeTest {
 
     // When:
     Iterator<BlockExchange.RoutedBlock> route =
-        new SingletonExchange(_context, destinations, TransferableBlockUtils::splitBlock)
+        new SingletonExchange(_context.getMailboxService(), destinations, TransferableBlockUtils::splitBlock, 100)
             .route(destinations, _block);
 
     // Then:

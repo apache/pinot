@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
@@ -60,6 +62,10 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
           RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED);
 
   private final MailboxService<TransferableBlock> _mailboxService;
+
+  private final HashMap<MailboxIdentifier, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap =
+      new HashMap<>();
+
   private final RelDistribution.Type _exchangeType;
   private final List<MailboxIdentifier> _sendingMailbox;
   private final long _deadlineTimestampNano;
@@ -147,7 +153,13 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
       _serverIdx = (startingIdx + i) % _sendingMailbox.size();
       MailboxIdentifier mailboxId = _sendingMailbox.get(_serverIdx);
       try {
-        ReceivingMailbox<TransferableBlock> mailbox = _mailboxService.getReceivingMailbox(mailboxId);
+        ReceivingMailbox<TransferableBlock> mailbox = _receivingMailboxMap.getOrDefault(mailboxId, null);
+        if(mailbox == null){
+          mailbox = _mailboxService.getReceivingMailbox(mailboxId, _deadlineTimestampNano);
+          if(mailbox.isInitialized()){
+            _receivingMailboxMap.put(mailboxId, mailbox);
+          }
+        }
         if (!mailbox.isClosed()) {
           openMailboxCount++;
           TransferableBlock block = mailbox.receive();

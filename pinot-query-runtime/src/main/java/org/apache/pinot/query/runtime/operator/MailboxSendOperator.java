@@ -31,6 +31,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
@@ -58,8 +59,8 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
   @VisibleForTesting
   interface BlockExchangeFactory {
-    BlockExchange build(PlanRequestContext context, List<MailboxIdentifier> destinations,
-        RelDistribution.Type exchange, KeySelector<Object[], Object[]> selector, BlockSplitter splitter);
+    BlockExchange build(MailboxService service, List<MailboxIdentifier> destinations, RelDistribution.Type exchange,
+        KeySelector<Object[], Object[]> selector, BlockSplitter splitter, long deadlineNanos);
   }
 
   @VisibleForTesting
@@ -103,7 +104,10 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     }
 
     BlockSplitter splitter = TransferableBlockUtils::splitBlock;
-    _exchange = blockExchangeFactory.build(context, receivingMailboxes, exchangeType, keySelector, splitter);
+    // Convert context.getTimeoutMs() to nano seconds;
+    _exchange =
+        blockExchangeFactory.build(context.getMailboxService(), receivingMailboxes, exchangeType, keySelector, splitter,
+            context.getTimeoutMs());
 
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
         String.format("Exchange type '%s' is not supported yet", exchangeType));

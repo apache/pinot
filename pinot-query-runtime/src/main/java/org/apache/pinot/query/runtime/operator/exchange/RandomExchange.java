@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.function.IntFunction;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.PlanRequestContext;
@@ -39,15 +40,15 @@ class RandomExchange extends BlockExchange {
 
   private final IntFunction<Integer> _rand;
 
-  RandomExchange(PlanRequestContext context, List<MailboxIdentifier> destinations,
-      BlockSplitter splitter) {
-    this(context, destinations, RANDOM::nextInt, splitter);
+  RandomExchange(MailboxService service, List<MailboxIdentifier> destinations,
+      BlockSplitter splitter,  long deadlineInNanos) {
+    this(service, destinations, RANDOM::nextInt, splitter, deadlineInNanos);
   }
 
   @VisibleForTesting
-  RandomExchange(PlanRequestContext context, List<MailboxIdentifier> destinations,
-      IntFunction<Integer> rand, BlockSplitter splitter) {
-    super(context, destinations, splitter);
+  RandomExchange(MailboxService service, List<MailboxIdentifier> destinations,
+      IntFunction<Integer> rand, BlockSplitter splitter,  long deadlineInNanos) {
+    super(service, destinations, splitter, deadlineInNanos);
     _rand = rand;
   }
 

@@ -60,8 +60,8 @@ public class BlockExchangeTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_context.createSendingMailbox(MAILBOX_1)).thenReturn(_mailbox1);
-    Mockito.when(_context.createSendingMailbox(MAILBOX_2)).thenReturn(_mailbox2);
+    Mockito.when(_context.createSendingMailbox(MAILBOX_1, 100)).thenReturn(_mailbox1);
+    Mockito.when(_context.createSendingMailbox(MAILBOX_2, 100)).thenReturn(_mailbox2);
   }
 
   @AfterMethod
@@ -165,7 +165,7 @@ public class BlockExchangeTest {
 
     protected TestBlockExchange(PlanRequestContext context, List<MailboxIdentifier> destinations,
         BiFunction<List<MailboxIdentifier>, TransferableBlock, Iterator<RoutedBlock>> router, BlockSplitter splitter) {
-      super(context, destinations, splitter);
+      super(context.getMailboxService(), destinations, splitter, 100);
       _router = router;
     }
 

@@ -76,8 +76,8 @@ public class GrpcMailboxServiceTest {
     // Given:
     StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
         "happypath", "localhost", _mailboxService1.getMailboxPort(), "localhost", _mailboxService2.getMailboxPort());
-    SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.createSendingMailbox(mailboxId);
-    ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
+    SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.createSendingMailbox(mailboxId, 100);
+    ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId, 100);
     CountDownLatch gotData = new CountDownLatch(1);
     _mail2GotData.set(ignored -> gotData.countDown());
 
@@ -106,8 +106,8 @@ public class GrpcMailboxServiceTest {
     // Given:
     StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
         "exception", "localhost", _mailboxService1.getMailboxPort(), "localhost", _mailboxService2.getMailboxPort());
-    SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.createSendingMailbox(mailboxId);
-    ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
+    SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.createSendingMailbox(mailboxId, 100);
+    ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId, 100);
     CountDownLatch gotData = new CountDownLatch(1);
     _mail2GotData.set(ignored -> gotData.countDown());
     TransferableBlock testContent = getTooLargeTransferableBlock();

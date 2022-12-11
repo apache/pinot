@@ -25,14 +25,14 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock> {
-  private final BlockingQueue<TransferableBlock> _queue;
+  private final InMemoryReceivingMailbox _receivingMailbox;
   private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final String _mailboxId;
 
-  public InMemorySendingMailbox(String mailboxId, BlockingQueue<TransferableBlock> queue,
+  public InMemorySendingMailbox(String mailboxId, InMemoryReceivingMailbox receivingMailbox,
       Consumer<MailboxIdentifier> gotMailCallback) {
     _mailboxId = mailboxId;
-    _queue = queue;
+    _receivingMailbox = receivingMailbox;
     _gotMailCallback = gotMailCallback;
   }
 
@@ -45,10 +45,11 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   public void send(TransferableBlock data)
       throws UnsupportedOperationException {
     try {
-      if (!_queue.offer(
+      if (!_receivingMailbox.getQueue().offer(
           data, InMemoryMailboxService.DEFAULT_CHANNEL_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
         throw new RuntimeException(String.format("Timed out when sending block in mailbox=%s", _mailboxId));
       }
+      _receivingMailbox.initialize();
       _gotMailCallback.accept(new StringMailboxIdentifier(_mailboxId));
     } catch (InterruptedException e) {
       throw new RuntimeException("Interrupted trying to send data through the channel", e);

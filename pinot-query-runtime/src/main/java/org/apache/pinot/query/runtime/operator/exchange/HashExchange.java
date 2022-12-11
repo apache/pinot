@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -41,9 +42,9 @@ class HashExchange extends BlockExchange {
   // TODO: ensure that server instance list is sorted using same function in sender.
   private final KeySelector<Object[], Object[]> _keySelector;
 
-  HashExchange(PlanRequestContext context, List<MailboxIdentifier> destinations,
-      KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
-    super(context, destinations, splitter);
+  HashExchange(MailboxService service, List<MailboxIdentifier> destinations,
+      KeySelector<Object[], Object[]> selector, BlockSplitter splitter, long deadlineInNanos) {
+    super(service, destinations, splitter, deadlineInNanos);
     _keySelector = selector;
   }
 

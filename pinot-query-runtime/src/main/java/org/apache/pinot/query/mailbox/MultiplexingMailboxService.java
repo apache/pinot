@@ -64,19 +64,25 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
   }
 
   @Override
-  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
+  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId,  long deadlineNanos) {
     if (mailboxId.isLocal()) {
-      return _inMemoryMailboxService.getReceivingMailbox(mailboxId);
+      return _inMemoryMailboxService.getReceivingMailbox(mailboxId, deadlineNanos);
     }
-    return _grpcMailboxService.getReceivingMailbox(mailboxId);
+    return _grpcMailboxService.getReceivingMailbox(mailboxId, deadlineNanos);
   }
 
   @Override
-  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId) {
+  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId,long deadlineNanos) {
     if (mailboxId.isLocal()) {
-      return _inMemoryMailboxService.createSendingMailbox(mailboxId);
+      return _inMemoryMailboxService.createSendingMailbox(mailboxId, deadlineNanos);
     }
-    return _grpcMailboxService.createSendingMailbox(mailboxId);
+    return _grpcMailboxService.createSendingMailbox(mailboxId, deadlineNanos);
+  }
+
+  @Override
+  public void cleanup(){
+    _inMemoryMailboxService.cleanup();
+    _grpcMailboxService.cleanup();
   }
 
   public static MultiplexingMailboxService newInstance(String hostname, int port,

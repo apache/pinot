@@ -88,7 +88,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   public void onNext(Mailbox.MailboxContent mailboxContent) {
     _mailboxId = new StringMailboxIdentifier(mailboxContent.getMailboxId());
 
-    GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
+    GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId, 100);
     _gotMailCallback = receivingMailbox.init(this);
 
     if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {

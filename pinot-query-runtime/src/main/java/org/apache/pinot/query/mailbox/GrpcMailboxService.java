@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import io.grpc.ManagedChannel;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
@@ -86,17 +87,31 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * Register a mailbox, mailbox needs to be registered before use.
    * @param mailboxId the id of the mailbox.
    */
-  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId) {
+  @Override
+  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId, long deadlineTimestampNano) {
     return new GrpcSendingMailbox(mailboxId.toString(), this);
+  }
+
+  @Override
+  public void cleanup(){
+    for(Map.Entry<String,  ReceivingMailbox<TransferableBlock>> entry : _receivingMailboxMap.entrySet()){
+      if(entry.getValue().isExpired()){
+        _receivingMailboxMap.remove(entry.getKey());
+      }
+    }
   }
 
   /**
    * Register a mailbox, mailbox needs to be registered before use.
    * @param mailboxId the id of the mailbox.
    */
-  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
-    return _receivingMailboxMap.computeIfAbsent(
-        mailboxId.toString(), (mId) -> new GrpcReceivingMailbox(mId, this, _gotMailCallback));
+  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId, long deadlineNanos) {
+    ReceivingMailbox<TransferableBlock> mailbox = _receivingMailboxMap.computeIfAbsent(
+        mailboxId.toString(), (mId) -> new GrpcReceivingMailbox(mId, deadlineNanos, _gotMailCallback));
+    if(mailbox.isInitialized()){
+      _receivingMailboxMap.remove(mailbox);
+    }
+    return mailbox;
   }
 
   public ManagedChannel getChannel(String mailboxId) {

@@ -18,16 +18,17 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 
 
 /**
@@ -39,22 +40,26 @@ public abstract class BlockExchange {
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
 
-  private final PlanRequestContext _context;
+  protected final HashMap<MailboxIdentifier, SendingMailbox<TransferableBlock>> _sendingMailboxMap = new HashMap<>();
+
+  protected final MailboxService _mailboxService;
   private final List<MailboxIdentifier> _destinations;
   private final BlockSplitter _splitter;
 
-  public static BlockExchange getExchange(PlanRequestContext context,
+  private final long _deadlineNanos;
+
+  public static BlockExchange getExchange(MailboxService service,
       List<MailboxIdentifier> destinations, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
+      KeySelector<Object[], Object[]> selector, BlockSplitter splitter, long deadlineNanos) {
     switch (exchangeType) {
       case SINGLETON:
-        return new SingletonExchange(context, destinations, splitter);
+        return new SingletonExchange(service, destinations, splitter, deadlineNanos);
       case HASH_DISTRIBUTED:
-        return new HashExchange(context, destinations, selector, splitter);
+        return new HashExchange(service, destinations, selector, splitter, deadlineNanos);
       case RANDOM_DISTRIBUTED:
-        return new RandomExchange(context, destinations, splitter);
+        return new RandomExchange(service, destinations, splitter, deadlineNanos);
       case BROADCAST_DISTRIBUTED:
-        return new BroadcastExchange(context, destinations, splitter);
+        return new BroadcastExchange(service, destinations, splitter, deadlineNanos);
       case ROUND_ROBIN_DISTRIBUTED:
       case RANGE_DISTRIBUTED:
       case ANY:
@@ -63,11 +68,12 @@ public abstract class BlockExchange {
     }
   }
 
-  protected BlockExchange(PlanRequestContext context, List<MailboxIdentifier> destinations,
-      BlockSplitter splitter) {
-    _context = context;
+  protected BlockExchange(MailboxService service, List<MailboxIdentifier> destinations,
+      BlockSplitter splitter, long deadlineNanos) {
+    _mailboxService = service;
     _destinations = destinations;
     _splitter = splitter;
+    _deadlineNanos = deadlineNanos;
   }
 
   public void send(TransferableBlock block) {
@@ -84,7 +90,8 @@ public abstract class BlockExchange {
   }
 
   private void sendBlock(MailboxIdentifier mailboxId, TransferableBlock block) {
-    SendingMailbox<TransferableBlock> sendingMailbox = _context.createSendingMailbox(mailboxId);
+    SendingMailbox<TransferableBlock> sendingMailbox =
+        _sendingMailboxMap.computeIfAbsent(mailboxId, mid -> _mailboxService.createSendingMailbox(mid, _deadlineNanos));
 
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);

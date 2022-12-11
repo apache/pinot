@@ -19,9 +19,11 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -31,11 +33,12 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   private final String _hostname;
   private final int _mailboxPort;
   private final Consumer<MailboxIdentifier> _receivedMailContentCallback;
-  static final int DEFAULT_CHANNEL_CAPACITY = 5;
   // TODO: This should come from a config and should be consistent with the timeout for GrpcMailboxService
   static final int DEFAULT_CHANNEL_TIMEOUT_SECONDS = 1;
 
-  private final ConcurrentHashMap<String, InMemoryMailboxState> _mailboxStateMap = new ConcurrentHashMap<>();
+  static public final int DEFAULT_CHANNEL_CAPACITY = 5;
+
+  private final ConcurrentHashMap<String, InMemoryReceivingMailbox> _mailboxStateMap = new ConcurrentHashMap<>();
 
   public InMemoryMailboxService(String hostname, int mailboxPort,
       Consumer<MailboxIdentifier> receivedMailContentCallback) {
@@ -53,6 +56,14 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   }
 
   @Override
+  public void cleanup(){
+    for(Map.Entry<String, InMemoryReceivingMailbox> entry : _mailboxStateMap.entrySet()){
+      if(entry.getValue().isExpired()){
+        _mailboxStateMap.remove(entry.getKey());
+      }
+    }
+  }
+  @Override
   public String getHostname() {
     return _hostname;
   }
@@ -62,40 +73,24 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
     return _mailboxPort;
   }
 
-  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId) {
+
+  @Override
+  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId, long deadlineInNanos) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._sendingMailbox;
+    InMemoryReceivingMailbox receivingMailbox =
+        _mailboxStateMap.computeIfAbsent(mId, mid -> new InMemoryReceivingMailbox(mId, deadlineInNanos));
+    return new InMemorySendingMailbox(mId, receivingMailbox, _receivedMailContentCallback);
   }
 
-  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
+  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId, long deadlineInNanos) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._receivingMailbox;
-  }
-
-  InMemoryMailboxState newMailboxState(String mailboxId) {
-    BlockingQueue<TransferableBlock> queue = createDefaultChannel();
-    return new InMemoryMailboxState(
-        new InMemorySendingMailbox(mailboxId, queue, _receivedMailContentCallback),
-        new InMemoryReceivingMailbox(mailboxId, queue),
-        queue);
-  }
-
-  private ArrayBlockingQueue<TransferableBlock> createDefaultChannel() {
-    return new ArrayBlockingQueue<>(DEFAULT_CHANNEL_CAPACITY);
-  }
-
-  static class InMemoryMailboxState {
-    ReceivingMailbox<TransferableBlock> _receivingMailbox;
-    SendingMailbox<TransferableBlock> _sendingMailbox;
-    BlockingQueue<TransferableBlock> _queue;
-
-    InMemoryMailboxState(SendingMailbox<TransferableBlock> sendingMailbox,
-        ReceivingMailbox<TransferableBlock> receivingMailbox, BlockingQueue<TransferableBlock> queue) {
-      _receivingMailbox = receivingMailbox;
-      _sendingMailbox = sendingMailbox;
-      _queue = queue;
+    ReceivingMailbox<TransferableBlock> mailbox =
+        _mailboxStateMap.computeIfAbsent(mId, mid -> new InMemoryReceivingMailbox(mId, deadlineInNanos));
+    if (mailbox.isInitialized()) {
+      _mailboxStateMap.remove(mId);
     }
+    return mailbox;
   }
 }

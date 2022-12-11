@@ -20,6 +20,7 @@ package org.apache.pinot.query.mailbox;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -40,18 +41,17 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
  */
 public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
   private static final long DEFAULT_MAILBOX_INIT_TIMEOUT = 100L;
-  private final GrpcMailboxService _mailboxService;
   private final String _mailboxId;
   private Consumer<MailboxIdentifier> _gotMailCallback;
   private final CountDownLatch _initializationLatch;
   private final AtomicInteger _totalMsgReceived = new AtomicInteger(0);
 
+  private final long _deadlineNanos;
   private MailboxContentStreamObserver _contentStreamObserver;
 
-  public GrpcReceivingMailbox(String mailboxId, GrpcMailboxService mailboxService,
-      Consumer<MailboxIdentifier> gotMailCallback) {
-    _mailboxService = mailboxService;
+  public GrpcReceivingMailbox(String mailboxId, long deadlineNanos, Consumer<MailboxIdentifier> gotMailCallback) {
     _mailboxId = mailboxId;
+    _deadlineNanos = deadlineNanos;
     _gotMailCallback = gotMailCallback;
     _initializationLatch = new CountDownLatch(1);
   }
@@ -87,6 +87,11 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   @Override
   public boolean isInitialized() {
     return _initializationLatch.getCount() <= 0;
+  }
+
+  @Override
+  public boolean isExpired(){
+    return _deadlineNanos < System.nanoTime();
   }
 
   @Override
