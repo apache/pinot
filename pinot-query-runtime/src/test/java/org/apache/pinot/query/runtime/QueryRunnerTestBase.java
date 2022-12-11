@@ -62,13 +62,19 @@ import org.testng.Assert;
 
 public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected static final double DOUBLE_CMP_EPSILON = 0.0001d;
-
+  protected static final String SEGMENT_BREAKER_KEY = "__SEGMENT_BREAKER_KEY__";
+  protected static final String SEGMENT_BREAKER_STR = "------";
+  protected static final GenericRow SEGMENT_BREAKER_ROW = new GenericRow();
   protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
   protected QueryEnvironment _queryEnvironment;
   protected String _reducerHostname;
   protected int _reducerGrpcPort;
   protected Map<ServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
   protected GrpcMailboxService _mailboxService;
+
+  static {
+    SEGMENT_BREAKER_ROW.putValue(SEGMENT_BREAKER_KEY, SEGMENT_BREAKER_STR);
+  }
 
   // --------------------------------------------------------------------------
   // QUERY UTILS
@@ -327,6 +333,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public List<ColumnAndType> _schema;
       @JsonProperty("inputs")
       public List<List<Object>> _inputs;
+      @JsonProperty("partitionColumns")
+      public List<String> _partitionColumns;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

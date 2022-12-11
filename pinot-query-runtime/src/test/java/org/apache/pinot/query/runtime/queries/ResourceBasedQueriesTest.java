@@ -27,7 +27,6 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -69,14 +68,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void setUp()
       throws Exception {
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+
     // Setting up mock server factories.
+    // All test data are loaded upfront b/c the mock server and brokers needs to be in sync.
     MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1");
     MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2");
     // Setting up H2 for validation
     setH2Connection();
-
-    // TODO: all test data are loaded upfront b/c the mock server and brokers needs to be in sync.
-    // doing it dynamically should be our next step.
 
     // Scan through all the test cases.
     for (Map.Entry<String, QueryTestCase> testCaseEntry : getTestCases().entrySet()) {
@@ -98,17 +96,37 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         factory2.registerTable(pinotSchema, tableNameWithType);
         List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
         List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
-        List<GenericRow> rows = new ArrayList<>();
+
+        // generate segments and dump into server1 and server2
+        List<String> partitionColumns = tableEntry.getValue()._partitionColumns;
+
+        List<GenericRow> rows1 = new ArrayList<>();
+        List<GenericRow> rows2 = new ArrayList<>();
+
         for (GenericRow row : genericRows) {
-          if (RANDOM.nextBoolean()) {
-            // adding row to server1, but as a single segment.
-            rows.add(row);
+          if (row == SEGMENT_BREAKER_ROW) {
+            factory1.addSegment(tableNameWithType, rows1);
+            factory2.addSegment(tableNameWithType, rows2);
+            rows1 = new ArrayList<>();
+            rows2 = new ArrayList<>();
           } else {
-            // adding row to server2, but one row as one individual segment
-            factory2.addSegment(tableNameWithType, Collections.singletonList(row));
+            long partition = 0;
+            if (partitionColumns == null) {
+              partition = RANDOM.nextInt(2);
+            } else {
+              for (String field : partitionColumns) {
+                partition = (partition + ((GenericRow) row).getValue(field).hashCode()) % 42;
+              }
+            }
+            if (partition % 2 == 0) {
+              rows1.add(row);
+            } else {
+              rows2.add(row);
+            }
           }
         }
-        factory1.addSegment(tableNameWithType, rows);
+        factory1.addSegment(tableNameWithType, rows1);
+        factory2.addSegment(tableNameWithType, rows2);
       }
 
       boolean anyHaveOutput = testCase._queries.stream().anyMatch(q -> q._outputs != null && !q._outputs.isEmpty());
