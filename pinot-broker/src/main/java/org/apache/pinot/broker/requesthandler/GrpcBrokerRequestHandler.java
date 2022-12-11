@@ -59,10 +59,10 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final PinotStreamingQueryClient _streamingQueryClient;
 
   // TODO: Support TLS
-  public GrpcBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
+  public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
-    super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
     LOGGER.info("Using Grpc BrokerRequestHandler.");
     _grpcConfig = GrpcConfig.buildGrpcQueryConfig(config);
 

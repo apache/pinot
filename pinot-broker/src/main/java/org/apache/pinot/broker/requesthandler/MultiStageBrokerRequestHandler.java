@@ -72,15 +72,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
 
-  public MultiStageBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics) {
-    super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
+      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, BrokerMetrics brokerMetrics) {
+    super(config, brokerIdFromConfig, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        brokerMetrics);
     LOGGER.info("Using Multi-stage BrokerRequestHandler.");
     String reducerHostname = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (reducerHostname == null) {
       // use broker ID as host name, but remove the
-      String brokerId = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID);
+      String brokerId = brokerIdFromConfig;
       brokerId = brokerId.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) ? brokerId.substring(
           CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : brokerId;
       brokerId = StringUtils.split(brokerId, "_").length > 1 ? StringUtils.split(brokerId, "_")[0] : brokerId;
@@ -108,7 +109,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
-    requestContext.setBrokerId(_brokerId);
     requestContext.setRequestId(requestId);
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
