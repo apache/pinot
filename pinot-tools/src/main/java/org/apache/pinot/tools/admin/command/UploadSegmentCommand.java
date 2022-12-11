@@ -186,7 +186,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
         }
 
         LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
-        List<Header> headerList = makeAuthHeaders(_authProvider);
+        List<Header> headerList =
+            makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
 
         FileInputStream fileInputStream = new FileInputStream(segmentTarFile);
         fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
