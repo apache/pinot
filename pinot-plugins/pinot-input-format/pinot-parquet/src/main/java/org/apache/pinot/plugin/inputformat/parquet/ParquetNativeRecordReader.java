@@ -44,6 +44,8 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
  * Record reader for Native Parquet file.
  */
 public class ParquetNativeRecordReader implements RecordReader {
+  private static final String EXTENSION = "parquet";
+
   private Path _dataFilePath;
   private ParquetNativeRecordExtractor _recordExtractor;
   private MessageType _schema;
@@ -59,7 +61,7 @@ public class ParquetNativeRecordReader implements RecordReader {
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, "parquet");
+    File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, EXTENSION);
     _dataFilePath = new Path(parquetFile.getAbsolutePath());
     _hadoopConf = ParquetUtils.getParquetHadoopConfiguration();
     _recordExtractor = new ParquetNativeRecordExtractor();

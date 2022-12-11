@@ -184,6 +184,9 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
       return bytesValue;
     }
     if (value instanceof Number || value instanceof byte[]) {
+      if (value instanceof Short) {
+        return Integer.valueOf(value.toString());
+      }
       return value;
     }
     return value.toString();

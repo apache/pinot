@@ -21,7 +21,7 @@ package org.apache.pinot.plugin.inputformat.thrift;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.FileWriter;
-import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,108 +32,19 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 
 /**
  * Test {@code org.apache.pinot.plugin.inputformat.thrift.data.ThriftRecordReader} for a given sample thrift
  * data.
  */
-public class ThriftRecordReaderTest {
+public class ThriftRecordReaderTest extends AbstractRecordReaderTest {
   private static final String THRIFT_DATA = "_test_sample_thrift_data.thrift";
-
-  private File _tempFile;
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    FileUtils.deleteQuietly(_tempFile);
-
-    ThriftSampleData t1 = new ThriftSampleData();
-    t1.setActive(true);
-    t1.setCreated_at(1515541280L);
-    t1.setId(1);
-    t1.setName("name1");
-    List<Short> t1Groups = new ArrayList<>(2);
-    t1Groups.add((short) 1);
-    t1Groups.add((short) 4);
-    t1.setGroups(t1Groups);
-    Map<String, Long> mapValues = new HashMap<>();
-    mapValues.put("name1", 1L);
-    t1.setMap_values(mapValues);
-    Set<String> namesSet = new HashSet<>();
-    namesSet.add("name1");
-    t1.setSet_values(namesSet);
-
-    ThriftSampleData t2 = new ThriftSampleData();
-    t2.setActive(false);
-    t2.setCreated_at(1515541290L);
-    t2.setId(2);
-    t2.setName("name2");
-    List<Short> t2Groups = new ArrayList<>(2);
-    t2Groups.add((short) 2);
-    t2Groups.add((short) 3);
-    t2.setGroups(t2Groups);
-    List<ThriftSampleData> lists = new ArrayList<>(2);
-    lists.add(t1);
-    lists.add(t2);
-    TSerializer binarySerializer = new TSerializer(new TBinaryProtocol.Factory());
-    _tempFile = getSampleDataPath();
-    FileWriter writer = new FileWriter(_tempFile);
-    for (ThriftSampleData d : lists) {
-      IOUtils.write(binarySerializer.serialize(d), writer);
-    }
-    writer.close();
-  }
-
-  @Test
-  public void testReadData()
-      throws IOException {
-    ThriftRecordReader recordReader = new ThriftRecordReader();
-    recordReader.init(_tempFile, getSourceFields(), getThriftRecordReaderConfig());
-    List<GenericRow> genericRows = new ArrayList<>();
-    while (recordReader.hasNext()) {
-      genericRows.add(recordReader.next());
-    }
-    recordReader.close();
-    Assert.assertEquals(genericRows.size(), 2, "The number of rows return is incorrect");
-    int id = 1;
-    for (GenericRow outputRow : genericRows) {
-      Assert.assertEquals(outputRow.getValue("id"), id);
-      Assert.assertNull(outputRow.getValue("map_values"));
-      id++;
-    }
-  }
-
-  @Test
-  public void testRewind()
-      throws IOException {
-    ThriftRecordReader recordReader = new ThriftRecordReader();
-    recordReader.init(_tempFile, getSourceFields(), getThriftRecordReaderConfig());
-    List<GenericRow> genericRows = new ArrayList<>();
-    while (recordReader.hasNext()) {
-      genericRows.add(recordReader.next());
-    }
-
-    recordReader.rewind();
-
-    while (recordReader.hasNext()) {
-      genericRows.add(recordReader.next());
-    }
-    recordReader.close();
-    Assert.assertEquals(genericRows.size(), 4, "The number of rows return after the rewind is incorrect");
-  }
-
-  private File getSampleDataPath()
-      throws IOException {
-    return File.createTempFile(ThriftRecordReaderTest.class.getName(), THRIFT_DATA);
-  }
 
   private ThriftRecordReaderConfig getThriftRecordReaderConfig() {
     ThriftRecordReaderConfig config = new ThriftRecordReaderConfig();
@@ -141,7 +52,59 @@ public class ThriftRecordReaderTest {
     return config;
   }
 
-  private Schema getSchema() {
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    if (_tempDir.exists()) {
+      FileUtils.cleanDirectory(_tempDir);
+    }
+    FileUtils.forceMkdir(_tempDir);
+    // Generate Pinot schema
+    _pinotSchema = getPinotSchema();
+    _sourceFields = getSourceFields(_pinotSchema);
+    // Generate random records based on Pinot schema
+    _records = generateRandomRecords(_pinotSchema);
+    _primaryKeys = generatePrimaryKeys(_records, getPrimaryKeyColumns());
+    // Write generated random records to file
+    writeRecordsToFile(_records);
+    // Create and init RecordReader
+    _recordReader = createRecordReader();
+  }
+
+  protected static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
+    // TODO: instead of hardcoding some rows, change this to work with the AbstractRecordReader's random value generator
+    List<Map<String, Object>> records = new ArrayList<>();
+    Map<String, Object> record1 = new HashMap<>();
+    record1.put("active", "true");
+    record1.put("created_at", 1515541280L);
+    record1.put("id", 1);
+    List<Integer> groups1 = new ArrayList<>();
+    groups1.add(1);
+    groups1.add(4);
+    record1.put("groups", groups1);
+    Map<String, Long> mapValues1 = new HashMap<>();
+    mapValues1.put("name1", 1L);
+    record1.put("map_values", mapValues1);
+    List<String> setValues1 = new ArrayList<>();
+    setValues1.add("name1");
+    record1.put("set_values", setValues1);
+    records.add(record1);
+
+    Map<String, Object> record2 = new HashMap<>();
+    record2.put("active", "false");
+    record2.put("created_at", 1515541290L);
+    record2.put("id", 1);
+    List<Integer> groups2 = new ArrayList<>();
+    groups2.add(2);
+    groups2.add(3);
+    record2.put("groups", groups2);
+    records.add(record2);
+
+    return records;
+  }
+
+  @Override
+  protected org.apache.pinot.spi.data.Schema getPinotSchema() {
     return new Schema.SchemaBuilder().setSchemaName("ThriftSampleData")
         .addSingleValueDimension("id", FieldSpec.DataType.INT)
         .addSingleValueDimension("name", FieldSpec.DataType.STRING)
@@ -155,8 +118,54 @@ public class ThriftRecordReaderTest {
     return Sets.newHashSet("id", "name", "created_at", "active", "groups", "set_values");
   }
 
-  @AfterClass
-  public void tearDown() {
-    FileUtils.deleteQuietly(_tempFile);
+  @Override
+  protected RecordReader createRecordReader(File file)
+      throws Exception {
+    ThriftRecordReader recordReader = new ThriftRecordReader();
+    recordReader.init(file, getSourceFields(), getThriftRecordReaderConfig());
+    return recordReader;
+  }
+
+  @Override
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
+      throws Exception {
+    List<ThriftSampleData> dataList = new ArrayList<>(recordsToWrite.size());
+    for (Map<String, Object> record : recordsToWrite) {
+      ThriftSampleData data = new ThriftSampleData();
+      data.setActive(Boolean.parseBoolean(record.get("active").toString()));
+      data.setCreated_at(Math.abs(((Long) record.get("created_at")).longValue()));
+      int i = Math.abs(((Integer) record.get("id")).intValue());
+      data.setId(i);
+      data.setName((String) record.get("name"));
+      List<Integer> groupsList = (List<Integer>) record.get("groups");
+      if (groupsList != null) {
+        List<Short> groupsResult = new ArrayList<>(groupsList.size());
+        for (Integer num : groupsList) {
+          groupsResult.add(num.shortValue());
+        }
+        data.setGroups(groupsResult);
+      }
+      List<String> setValuesList = (List<String>) record.get("set_values");
+      if (setValuesList != null) {
+        Set<String> setValuesResult = new HashSet<>(setValuesList.size());
+        for (String s : setValuesList) {
+          setValuesResult.add(s);
+        }
+        data.setSet_values(setValuesResult);
+      }
+      dataList.add(data);
+    }
+
+    TSerializer binarySerializer = new TSerializer(new TBinaryProtocol.Factory());
+    FileWriter writer = new FileWriter(_dataFile);
+    for (ThriftSampleData d : dataList) {
+      IOUtils.write(binarySerializer.serialize(d), writer, Charset.defaultCharset());
+    }
+    writer.close();
+  }
+
+  @Override
+  protected String getDataFileName() {
+    return THRIFT_DATA;
   }
 }

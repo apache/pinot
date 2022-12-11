@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.inputformat.protobuf;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -35,7 +34,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -44,7 +42,7 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
   private final static Random RANDOM = new Random(System.currentTimeMillis());
   private static final String PROTO_DATA = "_test_sample_proto_data.data";
   private static final String DESCRIPTOR_FILE = "sample.desc";
-  private File _tempFile;
+  private File _dataFile;
   private RecordReader _recordReader;
   private final static int SAMPLE_RECORDS_SIZE = 10000;
 
@@ -57,7 +55,7 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
         .addMultiValueDimension("friends", FieldSpec.DataType.STRING).build();
   }
 
-  private static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
+  protected static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
     List<Map<String, Object>> records = new ArrayList<>();
 
     for (int i = 0; i < SAMPLE_RECORDS_SIZE; i++) {
@@ -115,13 +113,6 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
     _recordReader = createRecordReader();
   }
 
-  @AfterClass
-  @Override
-  public void tearDown()
-      throws Exception {
-    FileUtils.forceDelete(_tempFile);
-  }
-
   @Test
   public void testRecordReader()
       throws Exception {
@@ -131,11 +122,11 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(File file)
       throws Exception {
     RecordReader recordReader = new ProtoBufRecordReader();
     Set<String> sourceFields = getSourceFields(getPinotSchema());
-    recordReader.init(_tempFile, sourceFields, getProtoRecordReaderConfig());
+    recordReader.init(file.getAbsoluteFile(), sourceFields, getProtoRecordReaderConfig());
     return recordReader;
   }
 
@@ -151,17 +142,21 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
       lists.add(sampleRecord);
     }
 
-    _tempFile = getSampleDataPath();
-    try (FileOutputStream output = new FileOutputStream(_tempFile, true)) {
+    _dataFile = getSampleDataPath();
+    try (FileOutputStream output = new FileOutputStream(_dataFile, true)) {
       for (Sample.SampleRecord record : lists) {
         record.writeDelimitedTo(output);
       }
     }
   }
 
-  private File getSampleDataPath()
-      throws IOException {
-    return File.createTempFile(ProtoBufRecordReaderTest.class.getName(), PROTO_DATA);
+  @Override
+  protected String getDataFileName() {
+    return PROTO_DATA;
+  }
+
+  private File getSampleDataPath() {
+    return new File(_tempDir, PROTO_DATA);
   }
 
   private ProtoBufRecordReaderConfig getProtoRecordReaderConfig()
