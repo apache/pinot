@@ -63,7 +63,7 @@ public class ThriftRecordReaderTest extends AbstractRecordReaderTest {
     _pinotSchema = getPinotSchema();
     _sourceFields = getSourceFields(_pinotSchema);
     // Generate random records based on Pinot schema
-    _records = generateRandomRecords();
+    _records = generateRandomRecords(_pinotSchema);
     _primaryKeys = generatePrimaryKeys(_records, getPrimaryKeyColumns());
     // Write generated random records to file
     writeRecordsToFile(_records);
@@ -71,7 +71,7 @@ public class ThriftRecordReaderTest extends AbstractRecordReaderTest {
     _recordReader = createRecordReader();
   }
 
-  private List<Map<String, Object>> generateRandomRecords() {
+  protected static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
     // TODO: instead of hardcoding some rows, change this to work with the AbstractRecordReader's random value generator
     List<Map<String, Object>> records = new ArrayList<>();
     Map<String, Object> record1 = new HashMap<>();

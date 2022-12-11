@@ -227,6 +227,9 @@ public abstract class AbstractRecordReaderTest {
   }
 
   /**
+   * Create the record reader given a file
+   *
+   * @param file input file
    * @return an implementation of RecordReader of the given file
    * @throws Exception
    */
