@@ -120,13 +120,13 @@ public class SegmentPreProcessor implements AutoCloseable {
         }
       }
 
-      // Perform post-cleanup operations on the index handlers
+      // Create/modify/remove star-trees if required.
+      processStarTrees(indexDir);
+
+      // Perform post-cleanup operations on the index handlers. This should be called after processing the startrees
       for (IndexHandler handler : indexHandlers) {
         handler.postUpdateIndicesCleanup(segmentWriter);
       }
-
-      // Create/modify/remove star-trees if required.
-      processStarTrees(indexDir);
 
       // Add min/max value to column metadata according to the prune mode.
       // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.

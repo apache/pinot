@@ -62,16 +62,28 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     Preconditions.checkNotNull(fieldSpec);
     boolean isSingleValue = fieldSpec.isSingleValueField();
-    File forwardIndexFile;
+    boolean forwardIndexDisabled = !isSingleValue && isForwardIndexDisabled(column);
+    File forwardIndexFile = null;
+    File invertedIndexFile = null;
     if (isSingleValue) {
       forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       if (!forwardIndexFile.exists()) {
         forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
     } else {
-      forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+      if (forwardIndexDisabled) {
+        // An inverted index is created instead of forward index for multi-value columns with forward index disabled
+        invertedIndexFile = new File(_indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+      } else {
+        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+      }
     }
-    LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+    if (forwardIndexFile != null) {
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+    }
+    if (invertedIndexFile != null) {
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, invertedIndexFile, ColumnIndexType.INVERTED_INDEX);
+    }
     File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
     LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
 
