@@ -535,5 +535,55 @@
         "sql": "SELECT longCol / 1e20 FROM {numTbl}"
       }
     ]
+  },
+  "round": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0, 3, 0.123, 3.2],
+          [123, 321, 4.242, 3.03],
+          [-456, -2, 1.134, 7.722],
+          [123, -456, 3.634, 9.12]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test round on integer columns",
+        "ignored": true,
+        "comment": "we round the number up somehow",
+        "sql": "SELECT round(intCol, 2) FROM {numTbl}"
+      },
+      {
+        "description": "test round on long columns",
+        "ignored": true,
+        "comment": "we round the number up somehow",
+        "sql": "SELECT round(longCol, 2) FROM {numTbl}"
+      },
+      {
+        "description": "test round on double columns",
+        "ignored": true,
+        "comment": "double is rounded to 0",
+        "sql": "SELECT round(doubleCol, 2) FROM {numTbl}"
+      },
+      {
+        "description": "test ceil on float columns",
+        "ignored": true,
+        "comment": "float is rounded to 0",
+        "sql": "SELECT round(floatCol, 2) FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "Caught exception while initializing transform function: round",
+        "description": "test round on literal",
+        "sql": "SELECT round(2.0, 0) FROM {numTbl}"
+      }
+    ]
   }
 }

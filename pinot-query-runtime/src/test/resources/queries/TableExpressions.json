@@ -17,8 +17,10 @@
     },
     "queries": [
       { "sql": "SELECT * FROM {tbl} WHERE intCol > 5" },
+      { "sql": "SELECT * FROM {tbl} WHERE strCol = 'foo'" },
       { "sql": "SELECT * FROM {tbl} WHERE strCol IN ('foo', 'bar')" },
       { "sql": "SELECT * FROM {tbl} WHERE intCol IN (196883, 42)" },
+      { "sql": "SELECT * FROM {tbl} WHERE intCol IN (111, 222)" },
       { "sql": "SELECT * FROM {tbl} WHERE intCol NOT IN (196883, 42) AND strCol IN ('alice')" },
       { "sql": "SELECT * FROM {tbl} WHERE strCol IN (SELECT strCol FROM {tbl} WHERE intCol > 100)" },
       { "sql": "SELECT * FROM {tbl} WHERE intCol < (SELECT SUM(intCol) FROM {tbl} AS b WHERE strCol BETWEEN 'bar' AND 'foo')" },

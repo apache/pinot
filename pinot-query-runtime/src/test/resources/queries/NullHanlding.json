@@ -1,0 +1,40 @@
+{
+  "select_expression_test": {
+    "tables": {
+      "null_handling": {
+        "schema":[
+          {"name": "a", "type": "INT"},
+          {"name": "b", "type": "INT"},
+          {"name": "c", "type": "STRING"},
+          {"name": "d", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [0, 1, null, true],
+          [1, 2, "AAAA", false],
+          [2, null, "AAAA", true],
+          [3, 3, "BBBB", false],
+          [4, 3, null,  true],
+          [null, 3, "bbbb", false],
+          [6, 4, "cccc", null],
+          [null, null, null, null],
+          [null, 4, "CCCC", null],
+          [9, 4, "CCCC", true]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql":"SELECT is_null(a), is_null(b), is_null(c), is_null(d) FROM {null_handling};"
+      },
+      {
+        "sql":"SELECT is_not_null(a), is_not_null(b), is_not_null(c), is_not_null(d) FROM {null_handling};"
+      },
+      {
+        "sql":"SELECT is_null(null), is_not_null(null) FROM {null_handling};"
+      },
+      {
+        "sql":"SELECT is_null('a'), is_not_null('b') FROM {null_handling};"
+      }
+    ]
+  }
+}
