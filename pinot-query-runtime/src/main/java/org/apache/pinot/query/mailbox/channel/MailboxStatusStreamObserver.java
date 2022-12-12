@@ -37,7 +37,6 @@ import org.slf4j.LoggerFactory;
 public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.MailboxStatus> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxStatusStreamObserver.class);
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
-  private static final long DEFAULT_MAILBOX_POLL_TIMEOUT_MS = 1000L;
   private final AtomicInteger _bufferSize = new AtomicInteger(5);
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
 

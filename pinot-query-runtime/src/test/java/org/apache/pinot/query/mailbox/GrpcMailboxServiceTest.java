@@ -27,6 +27,7 @@ import java.util.function.Consumer;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.mailbox.channel.MailboxContentStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -48,6 +49,28 @@ public class GrpcMailboxServiceTest {
 
   private GrpcMailboxService _mailboxService1;
   private GrpcMailboxService _mailboxService2;
+
+  private TransferableBlock getTestTransferableBlock() {
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(createRow(0, "test_string"));
+    return new TransferableBlock(rows, TEST_DATA_SCHEMA, DataBlock.Type.ROW);
+  }
+
+  private TransferableBlock getTooLargeTransferableBlock() {
+    final int size = 1_000_000;
+    List<Object[]> rows = new ArrayList<>(size);
+    for (int i = 0; i < size; i++) {
+      rows.add(createRow(0, "test_string"));
+    }
+    return new TransferableBlock(rows, TEST_DATA_SCHEMA, DataBlock.Type.ROW);
+  }
+
+  private Object[] createRow(int intValue, String stringValue) {
+    Object[] row = new Object[2];
+    row[0] = intValue;
+    row[1] = stringValue;
+    return row;
+  }
 
   @BeforeClass
   public void setUp()
@@ -124,25 +147,30 @@ public class GrpcMailboxServiceTest {
     Assert.assertFalse(receivedDataBlock.getExceptions().isEmpty());
   }
 
-  private TransferableBlock getTestTransferableBlock() {
-    List<Object[]> rows = new ArrayList<>();
-    rows.add(createRow(0, "test_string"));
-    return new TransferableBlock(rows, TEST_DATA_SCHEMA, DataBlock.Type.ROW);
-  }
+  @Test(timeOut = 10_000L)
+  public void testReceivingBufferFull()
+      throws Exception {
+    MailboxContentStreamObserver.DEFAULT_MAILBOX_QUEUE_CAPACITY = 1;
 
-  private TransferableBlock getTooLargeTransferableBlock() {
-    final int size = 1_000_000;
-    List<Object[]> rows = new ArrayList<>(size);
-    for (int i = 0; i < size; i++) {
-      rows.add(createRow(0, "test_string"));
-    }
-    return new TransferableBlock(rows, TEST_DATA_SCHEMA, DataBlock.Type.ROW);
-  }
+    StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
+        "exception", "localhost", _mailboxService1.getMailboxPort(), "localhost", _mailboxService2.getMailboxPort());
 
-  private Object[] createRow(int intValue, String stringValue) {
-    Object[] row = new Object[2];
-    row[0] = intValue;
-    row[1] = stringValue;
-    return row;
+    SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId);
+    TransferableBlock testContent = getTestTransferableBlock();
+    sendingMailbox.send(testContent);
+    sendingMailbox.send(testContent);
+
+    ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
+    CountDownLatch gotData = new CountDownLatch(1);
+    _mail2GotData.set(ignored -> gotData.countDown());
+
+    // When:
+    gotData.await();
+    TransferableBlock receivedContent = receivingMailbox.receive();
+    // Then:
+    Assert.assertNotNull(receivedContent);
+    DataBlock receivedDataBlock = receivedContent.getDataBlock();
+    Assert.assertTrue(receivedDataBlock instanceof MetadataBlock);
+    Assert.assertFalse(receivedDataBlock.getExceptions().isEmpty());
   }
 }
