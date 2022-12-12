@@ -46,6 +46,7 @@ import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -81,11 +82,13 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private ZkClient _zkClient;
   private ControllerMetrics _controllerMetrics;
   private final LeadControllerManager _leadControllerManager;
+  private final ControllerConf _controllerConf;
 
   public PinotRealtimeSegmentManager(PinotHelixResourceManager pinotManager,
-      LeadControllerManager leadControllerManager) {
+      LeadControllerManager leadControllerManager, ControllerConf controllerConf) {
     _pinotHelixResourceManager = pinotManager;
     _leadControllerManager = leadControllerManager;
+    _controllerConf = controllerConf;
     String clusterName = _pinotHelixResourceManager.getHelixClusterName();
     _propertyStorePath = PropertyPathBuilder.propertyStore(clusterName);
     _tableConfigPath = _propertyStorePath + TABLE_CONFIG;
@@ -96,9 +99,19 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
 
     LOGGER.info("Starting realtime segments manager, adding a listener on the property store table configs path.");
     String zkUrl = _pinotHelixResourceManager.getHelixZkURL();
-    _zkClient = new ZkClient(zkUrl, ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT);
+    int zkClientSessionTimeoutMs =
+        _controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
+            CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS);
+    int zkClientConnectionTimeoutMs =
+        _controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG,
+            CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS);
+    _zkClient = new ZkClient.Builder()
+        .setZkServer(zkUrl)
+        .setSessionTimeout(zkClientSessionTimeoutMs)
+        .setConnectionTimeout(zkClientConnectionTimeoutMs)
+        .build();
     _zkClient.setZkSerializer(new ZNRecordSerializer());
-    _zkClient.waitUntilConnected(CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS);
+    _zkClient.waitUntilConnected(zkClientConnectionTimeoutMs, TimeUnit.MILLISECONDS);
 
     // Subscribe to any data/child changes to property
     _zkClient.subscribeChildChanges(_tableConfigPath, this);
