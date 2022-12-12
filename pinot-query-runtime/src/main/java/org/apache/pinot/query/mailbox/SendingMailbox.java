@@ -46,4 +46,6 @@ public interface SendingMailbox<T> {
    * Complete delivery of the current mailbox.
    */
   void complete();
+
+  void waitForComplete(long durationNanos);
 }

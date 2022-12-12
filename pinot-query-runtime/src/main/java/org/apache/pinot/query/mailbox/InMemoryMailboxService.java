@@ -19,11 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
-import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -56,12 +52,9 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   }
 
   @Override
-  public void cleanup(){
-    for(Map.Entry<String, InMemoryReceivingMailbox> entry : _mailboxStateMap.entrySet()){
-      if(entry.getValue().isExpired()){
-        _mailboxStateMap.remove(entry.getKey());
-      }
-    }
+  public void close(MailboxIdentifier mid){
+    // Notify the sender for mailbox closing.
+    _mailboxStateMap.remove(mid);
   }
   @Override
   public String getHostname() {

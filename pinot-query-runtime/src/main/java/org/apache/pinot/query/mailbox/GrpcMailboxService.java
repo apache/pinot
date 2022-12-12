@@ -93,11 +93,11 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
   }
 
   @Override
-  public void cleanup(){
-    for(Map.Entry<String,  ReceivingMailbox<TransferableBlock>> entry : _receivingMailboxMap.entrySet()){
-      if(entry.getValue().isExpired()){
-        _receivingMailboxMap.remove(entry.getKey());
-      }
+  public void close(MailboxIdentifier mid){
+    ReceivingMailbox mailbox = _receivingMailboxMap.getOrDefault(mid, null);
+    if(mailbox != null){
+      // close mailbox.
+      _receivingMailboxMap.remove(mid);
     }
   }
 

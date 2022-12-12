@@ -154,6 +154,12 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     return transferableBlock;
   }
 
+  @Override
+  public void close() {
+    _dataTableBlockBaseOperator.close();
+    _exchange.close();
+  }
+
   private static StringMailboxIdentifier toMailboxId(
       ServerInstance serverInstance, long jobId, int stageId, String serverHostName, int serverPort) {
     return new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHostName, serverPort,

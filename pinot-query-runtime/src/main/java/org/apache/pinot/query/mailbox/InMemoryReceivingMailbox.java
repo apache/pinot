@@ -28,7 +28,6 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
   private String _mailboxId;
 
   private final long _deadlineNanos;
-
   private BlockingQueue<TransferableBlock> _queue;
   private AtomicBoolean _isInitialized = new AtomicBoolean(false);
   private volatile boolean _closed;

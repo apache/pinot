@@ -68,6 +68,19 @@ public abstract class BlockExchange {
     }
   }
 
+  public void close(){
+    long durationNanos = _deadlineNanos - System.nanoTime();
+    if(durationNanos <= 0){
+      // TODO: put a default wait for complete.
+      durationNanos = 1000;
+    }
+    for(MailboxIdentifier mid: _destinations){
+      SendingMailbox<TransferableBlock> mailbox = _sendingMailboxMap.getOrDefault(mid, null);
+      if(mailbox != null){
+        mailbox.waitForComplete(durationNanos);
+      }
+    }
+  }
   protected BlockExchange(MailboxService service, List<MailboxIdentifier> destinations,
       BlockSplitter splitter, long deadlineNanos) {
     _mailboxService = service;

@@ -41,6 +41,8 @@ public interface Operator<T extends Block> {
    */
   T nextBlock();
 
+  void close();
+
   /** @return List of {@link Operator}s that this operator depends upon. */
   List<Operator> getChildOperators();
 

@@ -82,6 +82,11 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   }
 
   @Override
+  public void waitForComplete(long durationNanos) {
+
+  }
+
+  @Override
   public String getMailboxId() {
     return _mailboxId;
   }

@@ -80,9 +80,12 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
   }
 
   @Override
-  public void cleanup(){
-    _inMemoryMailboxService.cleanup();
-    _grpcMailboxService.cleanup();
+  public void close(MailboxIdentifier mid){
+    if(mid.isLocal()){
+      _inMemoryMailboxService.close(mid);
+    } else {
+      _grpcMailboxService.close(mid);
+    }
   }
 
   public static MultiplexingMailboxService newInstance(String hostname, int port,

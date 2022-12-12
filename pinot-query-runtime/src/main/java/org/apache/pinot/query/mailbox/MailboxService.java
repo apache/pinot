@@ -68,5 +68,5 @@ public interface MailboxService<T> {
    */
   SendingMailbox<T> createSendingMailbox(MailboxIdentifier mailboxId, long deadlineTimestampNano);
 
-  void cleanup();
+  void close(MailboxIdentifier mid);
 }

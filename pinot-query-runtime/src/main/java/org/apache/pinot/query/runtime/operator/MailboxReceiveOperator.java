@@ -122,6 +122,14 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   }
 
   @Override
+  public void close() {
+    for(MailboxIdentifier mid: _sendingMailbox){
+      ReceivingMailbox<TransferableBlock> mailbox = _receivingMailboxMap.getOrDefault(mid, null);
+      
+    }
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     // WorkerExecutor doesn't use getChildOperators, returns null here.
     return null;
