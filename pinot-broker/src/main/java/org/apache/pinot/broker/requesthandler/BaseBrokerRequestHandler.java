@@ -21,7 +21,6 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -129,9 +128,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final boolean _enableDistinctCountBitmapOverride;
   private final Map<Long, QueryServers> _queriesById;
 
-  public BaseBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
+  public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics) {
+    _brokerId = brokerId;
     _config = config;
     _routingManager = routingManager;
     _accessControlFactory = accessControlFactory;
@@ -146,7 +146,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _enableDistinctCountBitmapOverride =
         _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
 
-    _brokerId = config.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
@@ -158,15 +157,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps, "
             + "enabling query cancellation: {}", _brokerId, _brokerTimeoutMs, _queryResponseLimit,
         _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(), enableQueryCancellation);
-  }
-
-  private String getDefaultBrokerId() {
-    try {
-      return InetAddress.getLocalHost().getHostName();
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while getting default broker Id", e);
-      return "";
-    }
   }
 
   @Override
@@ -240,7 +230,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
-    requestContext.setBrokerId(_brokerId);
     requestContext.setRequestId(requestId);
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
