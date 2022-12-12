@@ -216,13 +216,17 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (int rowId = 0; rowId < value.size(); rowId++) {
       GenericRow row = new GenericRow();
       List<Object> rawRow = value.get(rowId);
-      int colId = 0;
-      for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
-        row.putValue(columnAndType._name, rawRow.get(colId++));
+      if (rawRow.size() == 1 && SEGMENT_BREAKER_STR.equals(rawRow.get(0))) {
+        result.add(SEGMENT_BREAKER_ROW);
+      } else {
+        int colId = 0;
+        for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
+          row.putValue(columnAndType._name, rawRow.get(colId++));
+        }
+        // TODO: ts is built-in, but we should allow user overwrite
+        row.putValue("ts", System.currentTimeMillis());
+        result.add(row);
       }
-      // TODO: ts is built-in, but we should allow user overwrite
-      row.putValue("ts", System.currentTimeMillis());
-      result.add(row);
     }
     return result;
   }
