@@ -93,7 +93,10 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
     if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {
       // when the receiving end receives a message put it in the mailbox queue.
-      _receivingBuffer.offer(mailboxContent);
+      if (!_receivingBuffer.offer(mailboxContent)) {
+        LOGGER.trace("({}): GrpcMailbox" + _mailboxId + " gets dropped. QueueSize:",
+            _receivingBuffer.size() + " remainingCapacity:" + _receivingBuffer.remainingCapacity());
+      }
       _gotMailCallback.accept(_mailboxId);
 
       if (_isEnabledFeedback) {
@@ -116,8 +119,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   @Override
   public void onError(Throwable e) {
     try {
-      _receivingBuffer.offer(Mailbox.MailboxContent.newBuilder()
-          .setPayload(ByteString.copyFrom(
+      _receivingBuffer.offer(Mailbox.MailboxContent.newBuilder().setPayload(ByteString.copyFrom(
               TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(e)).getDataBlock().toBytes()))
           .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build());
       _gotMailCallback.accept(_mailboxId);
