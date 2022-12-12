@@ -88,6 +88,10 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_childOperator);
   }

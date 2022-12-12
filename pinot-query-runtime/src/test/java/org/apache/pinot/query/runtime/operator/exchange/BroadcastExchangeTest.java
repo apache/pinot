@@ -62,7 +62,7 @@ public class BroadcastExchangeTest {
 
     // When:
     Iterator<BlockExchange.RoutedBlock> route =
-        new BroadcastExchange(_context.getMailboxService(), destinations, TransferableBlockUtils::splitBlock, 100)
+        new BroadcastExchange(_context.getMailboxService(), destinations, TransferableBlockUtils::splitBlock)
             .route(destinations, _block);
 
     // Then:

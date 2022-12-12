@@ -28,7 +28,6 @@ import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 
 
 /**
@@ -40,15 +39,14 @@ class RandomExchange extends BlockExchange {
 
   private final IntFunction<Integer> _rand;
 
-  RandomExchange(MailboxService service, List<MailboxIdentifier> destinations,
-      BlockSplitter splitter,  long deadlineInNanos) {
-    this(service, destinations, RANDOM::nextInt, splitter, deadlineInNanos);
+  RandomExchange(MailboxService service, List<MailboxIdentifier> destinations, BlockSplitter splitter) {
+    this(service, destinations, RANDOM::nextInt, splitter);
   }
 
   @VisibleForTesting
-  RandomExchange(MailboxService service, List<MailboxIdentifier> destinations,
-      IntFunction<Integer> rand, BlockSplitter splitter,  long deadlineInNanos) {
-    super(service, destinations, splitter, deadlineInNanos);
+  RandomExchange(MailboxService service, List<MailboxIdentifier> destinations, IntFunction<Integer> rand,
+      BlockSplitter splitter) {
+    super(service, destinations, splitter);
     _rand = rand;
   }
 

@@ -74,6 +74,11 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
   }
 
   @Override
+  public void close() {
+    _upstreamOperator.close();
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     // WorkerExecutor doesn't use getChildOperators, returns null here.
     return null;

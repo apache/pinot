@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
@@ -63,8 +62,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
 
   private final MailboxService<TransferableBlock> _mailboxService;
 
-  private final HashMap<MailboxIdentifier, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap =
-      new HashMap<>();
+  private final HashMap<MailboxIdentifier, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap = new HashMap<>();
 
   private final RelDistribution.Type _exchangeType;
   private final List<MailboxIdentifier> _sendingMailbox;
@@ -123,9 +121,13 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   public void close() {
-    for(MailboxIdentifier mid: _sendingMailbox){
+    for (MailboxIdentifier mid : _sendingMailbox) {
       ReceivingMailbox<TransferableBlock> mailbox = _receivingMailboxMap.getOrDefault(mid, null);
-      
+      if (mailbox == null) {
+        _mailboxService.close(mid);
+      } else {
+        // TODO: Pipe the error to upstream.
+      }
     }
   }
 
@@ -162,9 +164,9 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
       MailboxIdentifier mailboxId = _sendingMailbox.get(_serverIdx);
       try {
         ReceivingMailbox<TransferableBlock> mailbox = _receivingMailboxMap.getOrDefault(mailboxId, null);
-        if(mailbox == null){
-          mailbox = _mailboxService.getReceivingMailbox(mailboxId, _deadlineTimestampNano);
-          if(mailbox.isInitialized()){
+        if (mailbox == null) {
+          mailbox = _mailboxService.getReceivingMailbox(mailboxId);
+          if (mailbox.isInitialized()) {
             _receivingMailboxMap.put(mailboxId, mailbox);
           }
         }
@@ -198,7 +200,6 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     // returned an EOS block. in every other scenario, there are mailboxes that
     // are not yet exhausted and we should wait for more data to be available
     return openMailboxCount > 0 && openMailboxCount > eosMailboxCount
-        ? TransferableBlockUtils.getNoOpTransferableBlock()
-        : TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        ? TransferableBlockUtils.getNoOpTransferableBlock() : TransferableBlockUtils.getEndOfStreamTransferableBlock();
   }
 }

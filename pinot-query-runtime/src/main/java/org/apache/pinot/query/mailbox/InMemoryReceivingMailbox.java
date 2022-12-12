@@ -26,23 +26,21 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
   private String _mailboxId;
-
-  private final long _deadlineNanos;
   private BlockingQueue<TransferableBlock> _queue;
   private AtomicBoolean _isInitialized = new AtomicBoolean(false);
   private volatile boolean _closed;
 
-  public void initialize(){
+  public void initialize() {
     _isInitialized.compareAndSet(false, true);
   }
 
-  public InMemoryReceivingMailbox(String mailboxId, long deadlineNanos) {
+  public InMemoryReceivingMailbox(String mailboxId) {
     _mailboxId = mailboxId;
-    _deadlineNanos = deadlineNanos;
     _queue = new ArrayBlockingQueue<>(InMemoryMailboxService.DEFAULT_CHANNEL_CAPACITY);
     _closed = false;
   }
-  public BlockingQueue<TransferableBlock> getQueue(){
+
+  public BlockingQueue<TransferableBlock> getQueue() {
     return _queue;
   }
 
@@ -70,11 +68,6 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
   @Override
   public boolean isInitialized() {
     return _isInitialized.get();
-  }
-
-  @Override
-  public boolean isExpired(){
-    return _deadlineNanos < System.nanoTime();
   }
 
   @Override

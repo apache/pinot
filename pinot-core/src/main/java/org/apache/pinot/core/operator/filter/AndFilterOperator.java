@@ -77,6 +77,9 @@ public class AndFilterOperator extends BaseFilterOperator {
     return BufferFastAggregation.andCardinality(bitmaps);
   }
 
+  @Override
+  public void close() {
+  }
 
   @Override
   public List<Operator> getChildOperators() {

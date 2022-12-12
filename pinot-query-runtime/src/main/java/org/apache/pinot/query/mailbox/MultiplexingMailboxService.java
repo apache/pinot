@@ -33,8 +33,7 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
   // TODO: Add config to disable in memory mailbox.
   private final InMemoryMailboxService _inMemoryMailboxService;
 
-  MultiplexingMailboxService(GrpcMailboxService grpcMailboxService,
-      InMemoryMailboxService inMemoryReceivingMailbox) {
+  MultiplexingMailboxService(GrpcMailboxService grpcMailboxService, InMemoryMailboxService inMemoryReceivingMailbox) {
     Preconditions.checkState(grpcMailboxService.getHostname().equals(inMemoryReceivingMailbox.getHostname()));
     Preconditions.checkState(grpcMailboxService.getMailboxPort() == inMemoryReceivingMailbox.getMailboxPort());
     _grpcMailboxService = grpcMailboxService;
@@ -64,32 +63,32 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
   }
 
   @Override
-  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId,  long deadlineNanos) {
+  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     if (mailboxId.isLocal()) {
-      return _inMemoryMailboxService.getReceivingMailbox(mailboxId, deadlineNanos);
+      return _inMemoryMailboxService.getReceivingMailbox(mailboxId);
     }
-    return _grpcMailboxService.getReceivingMailbox(mailboxId, deadlineNanos);
+    return _grpcMailboxService.getReceivingMailbox(mailboxId);
   }
 
   @Override
-  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId,long deadlineNanos) {
+  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId) {
     if (mailboxId.isLocal()) {
-      return _inMemoryMailboxService.createSendingMailbox(mailboxId, deadlineNanos);
+      return _inMemoryMailboxService.createSendingMailbox(mailboxId);
     }
-    return _grpcMailboxService.createSendingMailbox(mailboxId, deadlineNanos);
+    return _grpcMailboxService.createSendingMailbox(mailboxId);
   }
 
   @Override
-  public void close(MailboxIdentifier mid){
-    if(mid.isLocal()){
+  public void close(MailboxIdentifier mid) {
+    if (mid.isLocal()) {
       _inMemoryMailboxService.close(mid);
     } else {
       _grpcMailboxService.close(mid);
     }
   }
 
-  public static MultiplexingMailboxService newInstance(String hostname, int port,
-      PinotConfiguration pinotConfiguration, Consumer<MailboxIdentifier> gotMailCallback) {
+  public static MultiplexingMailboxService newInstance(String hostname, int port, PinotConfiguration pinotConfiguration,
+      Consumer<MailboxIdentifier> gotMailCallback) {
     return new MultiplexingMailboxService(new GrpcMailboxService(hostname, port, pinotConfiguration, gotMailCallback),
         new InMemoryMailboxService(hostname, port, gotMailCallback));
   }

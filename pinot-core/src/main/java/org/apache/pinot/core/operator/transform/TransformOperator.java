@@ -139,6 +139,10 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_projectionOperator);
   }

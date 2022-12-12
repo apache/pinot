@@ -69,8 +69,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
       DataSchema outputSchema, JoinNode.JoinKeys joinKeys, List<RexExpression> joinClauses, JoinRelType joinType) {
-    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(joinType),
-        "Join type: " + joinType + " is not supported!");
+    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(joinType), "Join type: " + joinType + " is not supported!");
     _leftKeySelector = joinKeys.getLeftJoinKeySelector();
     _rightKeySelector = joinKeys.getRightJoinKeySelector();
     Preconditions.checkState(_leftKeySelector != null, "LeftKeySelector for join cannot be null");
@@ -87,6 +86,12 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     _isHashTableBuilt = false;
     _broadcastHashTable = new HashMap<>();
     _upstreamErrorBlock = null;
+  }
+
+  @Override
+  public void close() {
+    _leftTableOperator.close();
+    _rightTableOperator.close();
   }
 
   @Override
@@ -137,8 +142,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       List<Object[]> container = rightBlock.getContainer();
       // put all the rows into corresponding hash collections keyed by the key selector function.
       for (Object[] row : container) {
-        List<Object[]> hashCollection = _broadcastHashTable.computeIfAbsent(
-            new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>());
+        List<Object[]> hashCollection =
+            _broadcastHashTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>());
         hashCollection.add(row);
       }
 

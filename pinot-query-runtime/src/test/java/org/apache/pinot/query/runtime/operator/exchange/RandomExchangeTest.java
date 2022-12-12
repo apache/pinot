@@ -61,7 +61,7 @@ public class RandomExchangeTest {
 
     // When:
     Iterator<BlockExchange.RoutedBlock> route =
-        new RandomExchange(_context.getMailboxService(), destinations, size -> 1, TransferableBlockUtils::splitBlock, 1000)
+        new RandomExchange(_context.getMailboxService(), destinations, size -> 1, TransferableBlockUtils::splitBlock)
             .route(destinations, _block);
 
     // Then:

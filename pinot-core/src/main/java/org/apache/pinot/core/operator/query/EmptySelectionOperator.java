@@ -73,6 +73,10 @@ public class EmptySelectionOperator extends BaseOperator<SelectionResultsBlock> 
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_transformOperator);
   }

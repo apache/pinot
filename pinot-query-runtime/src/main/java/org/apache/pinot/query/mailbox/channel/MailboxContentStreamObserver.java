@@ -88,7 +88,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   public void onNext(Mailbox.MailboxContent mailboxContent) {
     _mailboxId = new StringMailboxIdentifier(mailboxContent.getMailboxId());
 
-    GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId, 100);
+    GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
     _gotMailCallback = receivingMailbox.init(this);
 
     if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {
@@ -116,8 +116,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   @Override
   public void onError(Throwable e) {
     try {
-      _receivingBuffer.offer(Mailbox.MailboxContent.newBuilder()
-          .setPayload(ByteString.copyFrom(
+      _receivingBuffer.offer(Mailbox.MailboxContent.newBuilder().setPayload(ByteString.copyFrom(
               TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(e)).getDataBlock().toBytes()))
           .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build());
       _gotMailCallback.accept(_mailboxId);

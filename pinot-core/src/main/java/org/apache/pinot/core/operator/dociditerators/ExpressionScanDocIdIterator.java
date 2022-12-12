@@ -297,6 +297,10 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     }
 
     @Override
+    public void close() {
+    }
+
+    @Override
     public List<Operator> getChildOperators() {
       return Collections.emptyList();
     }

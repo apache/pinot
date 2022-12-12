@@ -58,6 +58,10 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator<Selecti
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }

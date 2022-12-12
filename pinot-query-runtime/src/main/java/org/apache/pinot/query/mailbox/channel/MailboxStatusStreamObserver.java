@@ -21,8 +21,6 @@ package org.apache.pinot.query.mailbox.channel;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.proto.Mailbox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.MailboxStatus> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxStatusStreamObserver.class);
 
-  private final CountDownLatch finishLatch = new CountDownLatch(1);
+  private final CountDownLatch _finishLatch = new CountDownLatch(1);
 
   private StreamObserver<Mailbox.MailboxContent> _mailboxContentStreamObserver;
 
@@ -60,12 +58,11 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
 
   @Override
   public void onNext(Mailbox.MailboxStatus mailboxStatus) {
-
   }
 
   @Override
   public void onError(Throwable e) {
-    finishLatch.countDown();
+    _finishLatch.countDown();
     shutdown();
     throw new RuntimeException(e);
   }
@@ -75,12 +72,13 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
 
   @Override
   public void onCompleted() {
-    finishLatch.countDown();
+    _finishLatch.countDown();
     shutdown();
   }
+
   public void waitForComplete(long durationNanos)
       throws InterruptedException {
-    if(!finishLatch.await(durationNanos, TimeUnit.NANOSECONDS)){
+    if (!_finishLatch.await(durationNanos, TimeUnit.NANOSECONDS)) {
       LOGGER.error("MailboxSend cannot finish within " + durationNanos + " nanoseconds");
     }
   }

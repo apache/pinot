@@ -78,6 +78,10 @@ public class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();
   }

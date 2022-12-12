@@ -47,6 +47,10 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return Arrays.asList(_mainFilterOperator, _subFilterOperator);
   }

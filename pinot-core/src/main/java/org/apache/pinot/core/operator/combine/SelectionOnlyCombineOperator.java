@@ -53,6 +53,10 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator<SelectionR
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }

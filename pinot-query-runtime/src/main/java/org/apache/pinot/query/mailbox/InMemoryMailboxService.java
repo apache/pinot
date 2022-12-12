@@ -52,10 +52,11 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   }
 
   @Override
-  public void close(MailboxIdentifier mid){
+  public void close(MailboxIdentifier mid) {
     // Notify the sender for mailbox closing.
     _mailboxStateMap.remove(mid);
   }
+
   @Override
   public String getHostname() {
     return _hostname;
@@ -66,21 +67,20 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
     return _mailboxPort;
   }
 
-
   @Override
-  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId, long deadlineInNanos) {
+  public SendingMailbox<TransferableBlock> createSendingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
     InMemoryReceivingMailbox receivingMailbox =
-        _mailboxStateMap.computeIfAbsent(mId, mid -> new InMemoryReceivingMailbox(mId, deadlineInNanos));
+        _mailboxStateMap.computeIfAbsent(mId, mid -> new InMemoryReceivingMailbox(mId));
     return new InMemorySendingMailbox(mId, receivingMailbox, _receivedMailContentCallback);
   }
 
-  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId, long deadlineInNanos) {
+  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
     ReceivingMailbox<TransferableBlock> mailbox =
-        _mailboxStateMap.computeIfAbsent(mId, mid -> new InMemoryReceivingMailbox(mId, deadlineInNanos));
+        _mailboxStateMap.computeIfAbsent(mId, mid -> new InMemoryReceivingMailbox(mId));
     if (mailbox.isInitialized()) {
       _mailboxStateMap.remove(mId);
     }

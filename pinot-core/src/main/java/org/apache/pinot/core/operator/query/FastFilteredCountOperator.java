@@ -53,6 +53,10 @@ public class FastFilteredCountOperator extends BaseOperator<AggregationResultsBl
     return EXPLAIN_NAME;
   }
 
+  @Override
+  public void close() {
+  }
+
   @SuppressWarnings("rawtypes")
   @Override
   public List<Operator> getChildOperators() {

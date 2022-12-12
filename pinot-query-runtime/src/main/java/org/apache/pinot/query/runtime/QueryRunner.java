@@ -147,13 +147,12 @@ public class QueryRunner {
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
 
-      PlanRequestContext context = new PlanRequestContext(_mailboxService, requestId, sendNode.getStageId(),
-          timeoutMs, _hostname, _port, serverQueryRequests.get(0).getMetadataMap());
       MailboxSendOperator mailboxSendOperator =
-          new MailboxSendOperator(context,
+          new MailboxSendOperator(_mailboxService,
               new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema()),
               receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
-              sendNode.getPartitionKeySelector());
+              sendNode.getPartitionKeySelector(), _hostname, _port, serverQueryRequests.get(0).getRequestId(),
+              sendNode.getStageId());
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);

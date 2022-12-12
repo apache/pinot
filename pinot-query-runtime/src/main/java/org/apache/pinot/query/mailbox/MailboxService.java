@@ -58,7 +58,7 @@ public interface MailboxService<T> {
    * @param mailboxId mailbox identifier.
    * @return a receiving mailbox.
    */
-  ReceivingMailbox<T> getReceivingMailbox(MailboxIdentifier mailboxId, long deadlineTimestampNano);
+  ReceivingMailbox<T> getReceivingMailbox(MailboxIdentifier mailboxId);
 
   /**
    * Look up a sending mailbox by {@link MailboxIdentifier}.
@@ -66,7 +66,7 @@ public interface MailboxService<T> {
    * @param mailboxId mailbox identifier.
    * @return a sending mailbox.
    */
-  SendingMailbox<T> createSendingMailbox(MailboxIdentifier mailboxId, long deadlineTimestampNano);
+  SendingMailbox<T> createSendingMailbox(MailboxIdentifier mailboxId);
 
   void close(MailboxIdentifier mid);
 }

@@ -134,6 +134,10 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_combineOperator);
   }

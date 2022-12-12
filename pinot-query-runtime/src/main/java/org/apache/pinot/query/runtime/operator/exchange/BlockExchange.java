@@ -46,20 +46,17 @@ public abstract class BlockExchange {
   private final List<MailboxIdentifier> _destinations;
   private final BlockSplitter _splitter;
 
-  private final long _deadlineNanos;
-
-  public static BlockExchange getExchange(MailboxService service,
-      List<MailboxIdentifier> destinations, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object[]> selector, BlockSplitter splitter, long deadlineNanos) {
+  public static BlockExchange getExchange(MailboxService service, List<MailboxIdentifier> destinations,
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
     switch (exchangeType) {
       case SINGLETON:
-        return new SingletonExchange(service, destinations, splitter, deadlineNanos);
+        return new SingletonExchange(service, destinations, splitter);
       case HASH_DISTRIBUTED:
-        return new HashExchange(service, destinations, selector, splitter, deadlineNanos);
+        return new HashExchange(service, destinations, selector, splitter);
       case RANDOM_DISTRIBUTED:
-        return new RandomExchange(service, destinations, splitter, deadlineNanos);
+        return new RandomExchange(service, destinations, splitter);
       case BROADCAST_DISTRIBUTED:
-        return new BroadcastExchange(service, destinations, splitter, deadlineNanos);
+        return new BroadcastExchange(service, destinations, splitter);
       case ROUND_ROBIN_DISTRIBUTED:
       case RANGE_DISTRIBUTED:
       case ANY:
@@ -68,25 +65,23 @@ public abstract class BlockExchange {
     }
   }
 
-  public void close(){
-    long durationNanos = _deadlineNanos - System.nanoTime();
-    if(durationNanos <= 0){
-      // TODO: put a default wait for complete.
-      durationNanos = 1000;
-    }
-    for(MailboxIdentifier mid: _destinations){
+  public void close() {
+    for (MailboxIdentifier mid : _destinations) {
       SendingMailbox<TransferableBlock> mailbox = _sendingMailboxMap.getOrDefault(mid, null);
-      if(mailbox != null){
-        mailbox.waitForComplete(durationNanos);
+      if (mailbox != null) {
+        try {
+          // TODO: pass in the deadline duration or make this configurable.
+          mailbox.waitForComplete(1000);
+        } catch (InterruptedException e) { // TODO: figure out how to handle this exception.
+        }
       }
     }
   }
-  protected BlockExchange(MailboxService service, List<MailboxIdentifier> destinations,
-      BlockSplitter splitter, long deadlineNanos) {
+
+  protected BlockExchange(MailboxService service, List<MailboxIdentifier> destinations, BlockSplitter splitter) {
     _mailboxService = service;
     _destinations = destinations;
     _splitter = splitter;
-    _deadlineNanos = deadlineNanos;
   }
 
   public void send(TransferableBlock block) {
@@ -104,7 +99,7 @@ public abstract class BlockExchange {
 
   private void sendBlock(MailboxIdentifier mailboxId, TransferableBlock block) {
     SendingMailbox<TransferableBlock> sendingMailbox =
-        _sendingMailboxMap.computeIfAbsent(mailboxId, mid -> _mailboxService.createSendingMailbox(mid, _deadlineNanos));
+        _sendingMailboxMap.computeIfAbsent(mailboxId, mid -> _mailboxService.createSendingMailbox(mid));
 
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);

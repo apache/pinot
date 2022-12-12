@@ -120,6 +120,10 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }

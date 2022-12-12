@@ -37,6 +37,9 @@ public class NotFilterOperator extends BaseFilterOperator {
     _numDocs = numDocs;
   }
 
+  @Override
+  public void close() {
+  }
 
   @Override
   public List<Operator> getChildOperators() {

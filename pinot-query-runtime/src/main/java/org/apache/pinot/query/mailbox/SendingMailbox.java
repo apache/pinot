@@ -47,5 +47,6 @@ public interface SendingMailbox<T> {
    */
   void complete();
 
-  void waitForComplete(long durationNanos);
+  void waitForComplete(long durationNanos)
+      throws InterruptedException;
 }

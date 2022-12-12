@@ -39,6 +39,10 @@ public class AggregationCombineOperator extends BaseCombineOperator<AggregationR
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }

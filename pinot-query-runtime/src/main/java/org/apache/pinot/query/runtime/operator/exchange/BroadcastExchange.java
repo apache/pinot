@@ -24,7 +24,6 @@ import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 
 
 /**
@@ -32,9 +31,8 @@ import org.apache.pinot.query.runtime.plan.PlanRequestContext;
  */
 class BroadcastExchange extends BlockExchange {
 
-  protected BroadcastExchange(MailboxService service, List<MailboxIdentifier> destinations,
-      BlockSplitter splitter,  long deadlineInNanos) {
-    super(service, destinations, splitter, deadlineInNanos);
+  protected BroadcastExchange(MailboxService service, List<MailboxIdentifier> destinations, BlockSplitter splitter) {
+    super(service, destinations, splitter);
   }
 
   @Override

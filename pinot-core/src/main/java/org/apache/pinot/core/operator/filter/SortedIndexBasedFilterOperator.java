@@ -218,6 +218,9 @@ public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
     return new BitmapCollection(_numDocs, exclusive, bitmap);
   }
 
+  @Override
+  public void close() {
+  }
 
   @Override
   public List<Operator> getChildOperators() {

@@ -57,10 +57,8 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
     _statusStreamObserver = new MailboxStatusStreamObserver();
     _statusStreamObserver.init(stub.open(_statusStreamObserver));
     // send a begin-of-stream message.
-    _statusStreamObserver.send(MailboxContent.newBuilder()
-        .setMailboxId(_mailboxId)
-        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true")
-        .build());
+    _statusStreamObserver.send(MailboxContent.newBuilder().setMailboxId(_mailboxId)
+        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true").build());
     _initialized.set(true);
   }
 
@@ -82,8 +80,9 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   }
 
   @Override
-  public void waitForComplete(long durationNanos) {
-
+  public void waitForComplete(long durationNanos)
+      throws InterruptedException {
+    _statusStreamObserver.waitForComplete(durationNanos);
   }
 
   @Override

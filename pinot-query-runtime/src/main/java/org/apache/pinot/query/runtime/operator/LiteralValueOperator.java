@@ -44,6 +44,10 @@ public class LiteralValueOperator extends BaseOperator<TransferableBlock> {
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     // WorkerExecutor doesn't use getChildOperators, returns null here.
     return null;

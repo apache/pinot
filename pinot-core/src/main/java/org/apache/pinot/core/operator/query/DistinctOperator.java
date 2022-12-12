@@ -68,6 +68,10 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return Collections.singletonList(_transformOperator);
   }

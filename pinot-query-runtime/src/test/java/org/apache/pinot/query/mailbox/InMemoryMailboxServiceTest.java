@@ -36,12 +36,13 @@ public class InMemoryMailboxServiceTest {
   @Test
   public void testHappyPath()
       throws Exception {
-    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
-    final StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
-        "happyPathJob", "localhost", 0, "localhost", 0);
-    InMemoryReceivingMailbox receivingMailbox = (InMemoryReceivingMailbox) mailboxService.getReceivingMailbox(
-        mailboxId, 1000);
-    InMemorySendingMailbox sendingMailbox = (InMemorySendingMailbox) mailboxService.createSendingMailbox(mailboxId, 100);
+    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> {
+    });
+    final StringMailboxIdentifier mailboxId =
+        new StringMailboxIdentifier("happyPathJob", "localhost", 0, "localhost", 0);
+    InMemoryReceivingMailbox receivingMailbox =
+        (InMemoryReceivingMailbox) mailboxService.getReceivingMailbox(mailboxId);
+    InMemorySendingMailbox sendingMailbox = (InMemorySendingMailbox) mailboxService.createSendingMailbox(mailboxId);
 
     // Sends are non-blocking as long as channel capacity is not breached
     for (int i = 0; i < InMemoryMailboxService.DEFAULT_CHANNEL_CAPACITY; i++) {
@@ -72,13 +73,14 @@ public class InMemoryMailboxServiceTest {
    */
   @Test
   public void testNonLocalMailboxId() {
-    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
-    final StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
-        "happyPathJob", "localhost", 0, "localhost", 1);
+    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> {
+    });
+    final StringMailboxIdentifier mailboxId =
+        new StringMailboxIdentifier("happyPathJob", "localhost", 0, "localhost", 1);
 
     // Test getReceivingMailbox
     try {
-      mailboxService.getReceivingMailbox(mailboxId, 100);
+      mailboxService.getReceivingMailbox(mailboxId);
       Assert.fail("Method call above should have failed");
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("non-local transport"));
@@ -86,7 +88,7 @@ public class InMemoryMailboxServiceTest {
 
     // Test getSendingMailbox
     try {
-      mailboxService.createSendingMailbox(mailboxId, 100);
+      mailboxService.createSendingMailbox(mailboxId);
       Assert.fail("Method call above should have failed");
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("non-local transport"));

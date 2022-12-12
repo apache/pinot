@@ -41,6 +41,10 @@ public class DistinctCombineOperator extends BaseCombineOperator<DistinctResults
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }

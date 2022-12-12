@@ -81,16 +81,14 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   }
 
   @VisibleForTesting
-  AggregateOperator(Operator<TransferableBlock> inputOperator, DataSchema dataSchema,
-      List<RexExpression> aggCalls, List<RexExpression> groupSet, Map<String, Merger> mergers) {
+  AggregateOperator(Operator<TransferableBlock> inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
+      List<RexExpression> groupSet, Map<String, Merger> mergers) {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _upstreamErrorBlock = null;
 
     // we expect all agg calls to be aggregate function calls
-    _aggCalls = aggCalls.stream()
-        .map(RexExpression.FunctionCall.class::cast)
-        .collect(Collectors.toList());
+    _aggCalls = aggCalls.stream().map(RexExpression.FunctionCall.class::cast).collect(Collectors.toList());
 
     _accumulators = new Accumulator[_aggCalls.size()];
     for (int i = 0; i < _aggCalls.size(); i++) {
@@ -106,6 +104,11 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     _resultSchema = dataSchema;
     _readyToConstruct = false;
     _hasReturnedAggregateBlock = false;
+  }
+
+  @Override
+  public void close() {
+    _inputOperator.close();
   }
 
   @Override
@@ -180,8 +183,9 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       if (numRows > 0) {
         RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
         for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
-              dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
+          Object[] row =
+              DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId, dataBlock.getDataSchema().getColumnDataTypes(),
+                  nullBitmaps);
           Key key = extraRowKey(row, _groupSet);
           _groupByKeyHolder.put(key, key.getValues());
           for (int i = 0; i < _aggCalls.size(); i++) {
@@ -232,25 +236,16 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
 
   private static class Accumulator {
 
-    private static final Map<String, Merger> MERGERS = ImmutableMap
-        .<String, Merger>builder()
-        .put("SUM", AggregateOperator::mergeSum)
-        .put("$SUM", AggregateOperator::mergeSum)
-        .put("$SUM0", AggregateOperator::mergeSum)
-        .put("MIN", AggregateOperator::mergeMin)
-        .put("$MIN", AggregateOperator::mergeMin)
-        .put("$MIN0", AggregateOperator::mergeMin)
-        .put("MAX", AggregateOperator::mergeMax)
-        .put("$MAX", AggregateOperator::mergeMax)
-        .put("$MAX0", AggregateOperator::mergeMax)
-        .put("COUNT", AggregateOperator::mergeCount)
-        .put("BOOL_AND", AggregateOperator::mergeBoolAnd)
-        .put("$BOOL_AND", AggregateOperator::mergeBoolAnd)
-        .put("$BOOL_AND0", AggregateOperator::mergeBoolAnd)
-        .put("BOOL_OR", AggregateOperator::mergeBoolOr)
-        .put("$BOOL_OR", AggregateOperator::mergeBoolOr)
-        .put("$BOOL_OR0", AggregateOperator::mergeBoolOr)
-        .build();
+    private static final Map<String, Merger> MERGERS =
+        ImmutableMap.<String, Merger>builder().put("SUM", AggregateOperator::mergeSum)
+            .put("$SUM", AggregateOperator::mergeSum).put("$SUM0", AggregateOperator::mergeSum)
+            .put("MIN", AggregateOperator::mergeMin).put("$MIN", AggregateOperator::mergeMin)
+            .put("$MIN0", AggregateOperator::mergeMin).put("MAX", AggregateOperator::mergeMax)
+            .put("$MAX", AggregateOperator::mergeMax).put("$MAX0", AggregateOperator::mergeMax)
+            .put("COUNT", AggregateOperator::mergeCount).put("BOOL_AND", AggregateOperator::mergeBoolAnd)
+            .put("$BOOL_AND", AggregateOperator::mergeBoolAnd).put("$BOOL_AND0", AggregateOperator::mergeBoolAnd)
+            .put("BOOL_OR", AggregateOperator::mergeBoolOr).put("$BOOL_OR", AggregateOperator::mergeBoolOr)
+            .put("$BOOL_OR0", AggregateOperator::mergeBoolOr).build();
 
     final int _inputRef;
     final Object _literal;
@@ -288,8 +283,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     private RexExpression toAggregationFunctionOperand(RexExpression.FunctionCall rexExpression) {
       List<RexExpression> functionOperands = rexExpression.getFunctionOperands();
       Preconditions.checkState(functionOperands.size() < 2, "aggregate functions cannot have more than one operand");
-      return functionOperands.size() > 0
-          ? functionOperands.get(0)
+      return functionOperands.size() > 0 ? functionOperands.get(0)
           : new RexExpression.Literal(FieldSpec.DataType.INT, 1);
     }
   }

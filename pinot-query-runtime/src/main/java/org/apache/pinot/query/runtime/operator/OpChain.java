@@ -60,4 +60,9 @@ public class OpChain {
   public Set<MailboxIdentifier> getReceivingMailbox() {
     return _receivingMailbox;
   }
+
+  public void close() {
+    // TODO: clean up resources that belong to this opChain.
+    _root.close();
+  }
 }

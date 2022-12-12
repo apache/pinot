@@ -30,6 +30,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
 
+
 /*
    FilterOperator apply filter on rows from upstreamOperator.
    There are three types of filter operands
@@ -55,6 +56,11 @@ public class FilterOperator extends BaseOperator<TransferableBlock> {
     _dataSchema = dataSchema;
     _filterOperand = FilterOperand.toFilterOperand(filter, dataSchema);
     _upstreamErrorBlock = null;
+  }
+
+  @Override
+  public void close() {
+    _upstreamOperator.close();
   }
 
   @Override

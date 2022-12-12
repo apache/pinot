@@ -69,6 +69,9 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
     }
   }
 
+  @Override
+  public void close() {
+  }
 
   @Override
   public List<Operator> getChildOperators() {

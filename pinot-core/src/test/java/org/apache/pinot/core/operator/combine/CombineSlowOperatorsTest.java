@@ -279,6 +279,10 @@ public class CombineSlowOperatorsTest {
     }
 
     @Override
+    public void close() {
+    }
+
+    @Override
     public List<Operator> getChildOperators() {
       return Collections.emptyList();
     }

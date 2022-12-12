@@ -29,7 +29,6 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 
 
 /**
@@ -42,9 +41,9 @@ class HashExchange extends BlockExchange {
   // TODO: ensure that server instance list is sorted using same function in sender.
   private final KeySelector<Object[], Object[]> _keySelector;
 
-  HashExchange(MailboxService service, List<MailboxIdentifier> destinations,
-      KeySelector<Object[], Object[]> selector, BlockSplitter splitter, long deadlineInNanos) {
-    super(service, destinations, splitter, deadlineInNanos);
+  HashExchange(MailboxService service, List<MailboxIdentifier> destinations, KeySelector<Object[], Object[]> selector,
+      BlockSplitter splitter) {
+    super(service, destinations, splitter);
     _keySelector = selector;
   }
 
@@ -57,10 +56,8 @@ class HashExchange extends BlockExchange {
       destIdxToRows.computeIfAbsent(partition, k -> new ArrayList<>()).add(row);
     }
 
-    return Iterators.transform(
-        destIdxToRows.entrySet().iterator(),
-        partitionAndBlock -> new RoutedBlock(
-            destinations.get(partitionAndBlock.getKey()),
+    return Iterators.transform(destIdxToRows.entrySet().iterator(),
+        partitionAndBlock -> new RoutedBlock(destinations.get(partitionAndBlock.getKey()),
             new TransferableBlock(partitionAndBlock.getValue(), block.getDataSchema(), block.getType())));
   }
 }

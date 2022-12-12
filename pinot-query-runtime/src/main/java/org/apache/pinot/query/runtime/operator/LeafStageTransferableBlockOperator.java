@@ -63,6 +63,10 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
   }
 
   @Override
+  public void close() {
+  }
+
+  @Override
   public List<Operator> getChildOperators() {
     return null;
   }

@@ -27,12 +27,12 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
+import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -51,7 +51,7 @@ public class BlockExchangeTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private PlanRequestContext _context;
+  private MailboxService _mailboxService;
   @Mock
   private SendingMailbox<TransferableBlock> _mailbox1;
   @Mock
@@ -60,8 +60,8 @@ public class BlockExchangeTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_context.createSendingMailbox(MAILBOX_1, 100)).thenReturn(_mailbox1);
-    Mockito.when(_context.createSendingMailbox(MAILBOX_2, 100)).thenReturn(_mailbox2);
+    Mockito.when(_mailboxService.createSendingMailbox(MAILBOX_1)).thenReturn(_mailbox1);
+    Mockito.when(_mailboxService.createSendingMailbox(MAILBOX_2)).thenReturn(_mailbox2);
   }
 
   @AfterMethod
@@ -75,7 +75,7 @@ public class BlockExchangeTest {
     // Given:
     List<MailboxIdentifier> destinations = ImmutableList.of(MAILBOX_1, MAILBOX_2);
     BlockExchange exchange = new TestBlockExchange(
-        _context,
+        _mailboxService,
         destinations,
         (dest, block) -> Iterators.singletonIterator(new BlockExchange.RoutedBlock(MAILBOX_1, block))
     );
@@ -100,7 +100,7 @@ public class BlockExchangeTest {
     // Given:
     List<MailboxIdentifier> destinations = ImmutableList.of(MAILBOX_1, MAILBOX_2);
     BlockExchange exchange = new TestBlockExchange(
-        _context,
+        _mailboxService,
         destinations,
         (dest, block) -> Iterators.singletonIterator(new BlockExchange.RoutedBlock(MAILBOX_1, block))
     );
@@ -135,7 +135,7 @@ public class BlockExchangeTest {
         ImmutableList.of(new Object[]{"two"}), schema, DataBlock.Type.ROW);
 
     BlockExchange exchange = new TestBlockExchange(
-        _context,
+        _mailboxService,
         destinations,
         (dest, block) -> Iterators.singletonIterator(new BlockExchange.RoutedBlock(MAILBOX_1, block)),
         (block, type, maxSize) -> ImmutableList.of(outBlockOne, outBlockTwo).iterator()
@@ -158,14 +158,14 @@ public class BlockExchangeTest {
 
     private final BiFunction<List<MailboxIdentifier>, TransferableBlock, Iterator<RoutedBlock>> _router;
 
-    protected TestBlockExchange(PlanRequestContext context, List<MailboxIdentifier> destinations,
+    protected TestBlockExchange(MailboxService mailboxService, List<MailboxIdentifier> destinations,
         BiFunction<List<MailboxIdentifier>, TransferableBlock, Iterator<RoutedBlock>> router) {
-      this(context, destinations, router, (block, type, size) -> Iterators.singletonIterator(block));
+      this(mailboxService, destinations, router, (block, type, size) -> Iterators.singletonIterator(block));
     }
 
-    protected TestBlockExchange(PlanRequestContext context, List<MailboxIdentifier> destinations,
+    protected TestBlockExchange(MailboxService mailboxService, List<MailboxIdentifier> destinations,
         BiFunction<List<MailboxIdentifier>, TransferableBlock, Iterator<RoutedBlock>> router, BlockSplitter splitter) {
-      super(context.getMailboxService(), destinations, splitter, 100);
+      super(mailboxService, destinations, splitter);
       _router = router;
     }
 

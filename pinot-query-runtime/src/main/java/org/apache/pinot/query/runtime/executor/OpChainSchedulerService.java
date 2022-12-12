@@ -97,10 +97,12 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                 // not complete, needs to re-register for scheduling
                 register(operatorChain, false);
               } else {
+                operatorChain.close();
                 LOGGER.debug("Execution time: " + timer.getThreadTimeNs());
               }
             } catch (Exception e) {
               LOGGER.error("Failed to execute query!", e);
+              operatorChain.close();
             }
           }
         });

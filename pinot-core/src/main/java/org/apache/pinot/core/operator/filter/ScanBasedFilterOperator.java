@@ -59,6 +59,9 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     }
   }
 
+  @Override
+  public void close() {
+  }
 
   @Override
   public List<Operator> getChildOperators() {
