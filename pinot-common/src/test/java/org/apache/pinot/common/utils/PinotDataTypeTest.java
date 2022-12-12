@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.gson.JsonParser;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
@@ -230,11 +231,11 @@ public class PinotDataTypeTest {
     assertEquals(OBJECT.toTimestamp(new NumberObject("123")).getTime(), 123L);
     assertEquals(OBJECT.toString(new NumberObject("123")), "123");
 
-    // check if a well formed JSON string string can be converted to JSON.
-    assertEquals(OBJECT.toJson(getGenericTestObject()),
-        "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},"
-            + "\"timestamp\":1620324238610}");
-
+    // check if a well formed JSON string can be converted to JSON.
+    JsonParser parser = new JsonParser();
+    assertEquals(parser.parse(OBJECT.toJson(getGenericTestObject())),
+            parser.parse("{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\""
+            + "array\":[-5.4,4,\"2\"]},\"timestamp\":1620324238610}"));
     // check if a Java string (which does not represent JSON) can be converted into JSON.
     assertEquals(OBJECT.toJson("test"), "\"test\"");
     assertEquals(OBJECT_ARRAY.getSingleValueType(), OBJECT);
