@@ -19,13 +19,13 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -43,7 +43,7 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
  * Note: Function transform only runs functions from v1 engine scalar function factory, which only does argument count
  * and canonicalized function name matching (lower case).
  */
-public class TransformOperator extends BaseOperator<TransferableBlock> {
+public class TransformOperator extends V2Operator {
   private static final String EXPLAIN_NAME = "TRANSFORM";
   private final Operator<TransferableBlock> _upstreamOperator;
   private final List<TransformOperand> _transformOperandsList;
@@ -68,8 +68,7 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+    return ImmutableList.of(_upstreamOperator);
   }
 
   @Nullable

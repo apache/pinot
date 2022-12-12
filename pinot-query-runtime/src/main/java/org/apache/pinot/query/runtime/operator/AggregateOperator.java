@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,7 +34,6 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Key;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -55,7 +55,7 @@ import org.roaringbitmap.RoaringBitmap;
  * Note: This class performs aggregation over the double value of input.
  * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  */
-public class AggregateOperator extends BaseOperator<TransferableBlock> {
+public class AggregateOperator extends V2Operator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
 
   private final Operator<TransferableBlock> _inputOperator;
@@ -110,8 +110,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+    return ImmutableList.of(_inputOperator);
   }
 
   @Nullable

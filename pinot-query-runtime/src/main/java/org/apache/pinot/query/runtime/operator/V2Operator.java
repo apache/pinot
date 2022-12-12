@@ -16,46 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
-/**
- * An {@code OpChain} represents a chain of operators that are separated
- * by send/receive stages.
- */
-public class OpChain {
-
-  private final V2Operator _root;
-  private final Set<MailboxIdentifier> _receivingMailbox;
-  private final OpChainStats _stats;
-  private final String _id;
-
-  public OpChain(V2Operator root, List<MailboxIdentifier> receivingMailboxes, long requestId, int stageId) {
-    _root = root;
-    _receivingMailbox = new HashSet<>(receivingMailboxes);
-    _id = String.format("%s_%s", requestId, stageId);
-    _stats = new OpChainStats(_id);
-  }
-
-  public V2Operator getRoot() {
-    return _root;
-  }
-
-  public Set<MailboxIdentifier> getReceivingMailbox() {
-    return _receivingMailbox;
-  }
-
-  public OpChainStats getStats() {
-    return _stats;
-  }
+public abstract class V2Operator extends BaseOperator<TransferableBlock> implements ScheduledOperator {
 
   @Override
-  public String toString() {
-    return "OpChain{ " + _id + "}";
+  public ScheduleResult shouldSchedule(Set<MailboxIdentifier> availableMail) {
+    List<Operator> children = getChildOperators();
+
+    if (children.size() != 1) {
+      throw new UnsupportedOperationException(this.getClass() + " must implement shouldSchedule()");
+    } else if (!(children.get(0) instanceof V2Operator)) {
+      throw new IllegalStateException("V2 Operators must only rely on other V2 operators. Got: "
+          + children.get(0).getClass());
+    }
+
+    return ((V2Operator) children.get(0)).shouldSchedule(availableMail);
   }
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.List;
@@ -28,7 +29,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This {@code MailboxSendOperator} is created to send {@link TransferableBlock}s to the receiving end.
  */
-public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
+public class MailboxSendOperator extends V2Operator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
 
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
@@ -111,8 +111,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+    return ImmutableList.of(_dataTableBlockBaseOperator);
   }
 
   @Nullable

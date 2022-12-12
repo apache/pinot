@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.plan;
 
 import java.util.List;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.AggregateNode;
@@ -33,7 +32,6 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
@@ -43,6 +41,7 @@ import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
+import org.apache.pinot.query.runtime.operator.V2Operator;
 
 
 /**
@@ -52,17 +51,17 @@ import org.apache.pinot.query.runtime.operator.TransformOperator;
  *
  * <p>This class should be used statically via {@link #build(StageNode, PlanRequestContext)}
  */
-public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<TransferableBlock>, PlanRequestContext> {
+public class PhysicalPlanVisitor implements StageNodeVisitor<V2Operator, PlanRequestContext> {
 
   private static final PhysicalPlanVisitor INSTANCE = new PhysicalPlanVisitor();
 
   public static OpChain build(StageNode node, PlanRequestContext context) {
-    Operator<TransferableBlock> root = node.visit(INSTANCE, context);
+    V2Operator root = node.visit(INSTANCE, context);
     return new OpChain(root, context.getReceivingMailboxes(), context.getRequestId(), context.getStageId());
   }
 
   @Override
-  public Operator<TransferableBlock> visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
+  public V2Operator visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
     List<ServerInstance> sendingInstances = context.getMetadataMap().get(node.getSenderStageId()).getServerInstances();
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(context.getMailboxService(), sendingInstances,
@@ -73,8 +72,8 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
   }
 
   @Override
-  public Operator<TransferableBlock> visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
-    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
+  public V2Operator visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
+    V2Operator nextOperator = node.getInputs().get(0).visit(this, context);
     StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
     return new MailboxSendOperator(context.getMailboxService(), nextOperator,
         receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
@@ -82,51 +81,51 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
   }
 
   @Override
-  public Operator<TransferableBlock> visitAggregate(AggregateNode node, PlanRequestContext context) {
-    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
+  public V2Operator visitAggregate(AggregateNode node, PlanRequestContext context) {
+    V2Operator nextOperator = node.getInputs().get(0).visit(this, context);
     return new AggregateOperator(nextOperator, node.getDataSchema(), node.getAggCalls(),
         node.getGroupSet());
   }
 
   @Override
-  public Operator<TransferableBlock> visitFilter(FilterNode node, PlanRequestContext context) {
-    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
+  public V2Operator visitFilter(FilterNode node, PlanRequestContext context) {
+    V2Operator nextOperator = node.getInputs().get(0).visit(this, context);
     return new FilterOperator(nextOperator, node.getDataSchema(), node.getCondition());
   }
 
   @Override
-  public Operator<TransferableBlock> visitJoin(JoinNode node, PlanRequestContext context) {
+  public V2Operator visitJoin(JoinNode node, PlanRequestContext context) {
     StageNode left = node.getInputs().get(0);
     StageNode right = node.getInputs().get(1);
 
-    Operator<TransferableBlock> leftOperator = left.visit(this, context);
-    Operator<TransferableBlock> rightOperator = right.visit(this, context);
+    V2Operator leftOperator = left.visit(this, context);
+    V2Operator rightOperator = right.visit(this, context);
 
     return new HashJoinOperator(leftOperator, rightOperator, node.getDataSchema(), node.getJoinKeys(),
         node.getJoinClauses(), node.getJoinRelType());
   }
 
   @Override
-  public Operator<TransferableBlock> visitProject(ProjectNode node, PlanRequestContext context) {
-    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
+  public V2Operator visitProject(ProjectNode node, PlanRequestContext context) {
+    V2Operator nextOperator = node.getInputs().get(0).visit(this, context);
     return new TransformOperator(nextOperator, node.getDataSchema(), node.getProjects(),
         node.getInputs().get(0).getDataSchema());
   }
 
   @Override
-  public Operator<TransferableBlock> visitSort(SortNode node, PlanRequestContext context) {
-    Operator<TransferableBlock> nextOperator = node.getInputs().get(0).visit(this, context);
+  public V2Operator visitSort(SortNode node, PlanRequestContext context) {
+    V2Operator nextOperator = node.getInputs().get(0).visit(this, context);
     return new SortOperator(nextOperator, node.getCollationKeys(), node.getCollationDirections(),
         node.getFetch(), node.getOffset(), node.getDataSchema());
   }
 
   @Override
-  public Operator<TransferableBlock> visitTableScan(TableScanNode node, PlanRequestContext context) {
+  public V2Operator visitTableScan(TableScanNode node, PlanRequestContext context) {
     throw new UnsupportedOperationException("Stage node of type TableScanNode is not supported!");
   }
 
   @Override
-  public Operator<TransferableBlock> visitValue(ValueNode node, PlanRequestContext context) {
+  public V2Operator visitValue(ValueNode node, PlanRequestContext context) {
     return new LiteralValueOperator(node.getDataSchema(), node.getLiteralRows());
   }
 }

@@ -18,19 +18,21 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 
 
-public class LiteralValueOperator extends BaseOperator<TransferableBlock> {
+public class LiteralValueOperator extends V2Operator {
   private static final String EXPLAIN_NAME = "LITERAL_VALUE_PROVIDER";
 
   private final DataSchema _dataSchema;
@@ -45,8 +47,12 @@ public class LiteralValueOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+    return ImmutableList.of();
+  }
+
+  @Override
+  public ScheduleResult shouldSchedule(Set<MailboxIdentifier> availableMail) {
+    return new ScheduleResult(true);
   }
 
   @Nullable

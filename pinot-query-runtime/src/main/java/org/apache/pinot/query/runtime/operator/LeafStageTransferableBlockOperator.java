@@ -19,12 +19,14 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -32,7 +34,6 @@ import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -40,6 +41,7 @@ import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
@@ -56,7 +58,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  *       thus requires canonicalization.</li>
  * </ul>
  */
-public class LeafStageTransferableBlockOperator extends BaseOperator<TransferableBlock> {
+public class LeafStageTransferableBlockOperator extends V2Operator {
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
 
   private final InstanceResponseBlock _errorBlock;
@@ -73,7 +75,7 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
 
   @Override
   public List<Operator> getChildOperators() {
-    return null;
+    return ImmutableList.of();
   }
 
   @Nullable
@@ -103,6 +105,11 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
         return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
       }
     }
+  }
+
+  @Override
+  public ScheduleResult shouldSchedule(Set<MailboxIdentifier> availableMail) {
+    return new ScheduleResult(true);
   }
 
   /**

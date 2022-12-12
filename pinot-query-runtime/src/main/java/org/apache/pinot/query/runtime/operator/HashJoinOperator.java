@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,7 +32,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Key;
-import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
@@ -53,7 +54,7 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
  * The output is in the format of [left_row, right_row]
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
-public class HashJoinOperator extends BaseOperator<TransferableBlock> {
+public class HashJoinOperator extends V2Operator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES = ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT);
   private final HashMap<Key, List<Object[]>> _broadcastHashTable;
@@ -92,8 +93,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+    return ImmutableList.of(_leftTableOperator, _rightTableOperator);
   }
 
   @Nullable
@@ -118,6 +118,15 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       return buildJoinedDataBlock(_leftTableOperator.nextBlock());
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
+    }
+  }
+
+  @Override
+  public ScheduleResult shouldSchedule(Set<MailboxIdentifier> availableMail) {
+    if (!_isHashTableBuilt) {
+      return ((V2Operator) _rightTableOperator).shouldSchedule(availableMail);
+    } else {
+      return ((V2Operator) _leftTableOperator).shouldSchedule(availableMail);
     }
   }
 

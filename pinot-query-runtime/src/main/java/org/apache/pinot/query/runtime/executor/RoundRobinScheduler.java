@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.executor;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Sets;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -27,6 +26,7 @@ import java.util.Queue;
 import java.util.Set;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.ScheduledOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,13 +118,10 @@ public class RoundRobinScheduler implements OpChainScheduler {
     // mail available to it will have been consumed).
     while (availableChains.hasNext()) {
       OpChain chain = availableChains.next();
-      Sets.SetView<MailboxIdentifier> intersect = Sets.intersection(chain.getReceivingMailbox(), _seenMail);
+      ScheduledOperator.ScheduleResult result = chain.getRoot().shouldSchedule(_seenMail);
 
-      if (!intersect.isEmpty()) {
-        // use an immutable copy because set views use the underlying sets
-        // directly, which would cause a concurrent modification exception
-        // when removing data from _seenMail
-        _seenMail.removeAll(intersect.immutableCopy());
+      if (result._shouldSchedule) {
+        _seenMail.removeAll(result._mailboxes);
         _ready.add(chain);
         availableChains.remove();
       }

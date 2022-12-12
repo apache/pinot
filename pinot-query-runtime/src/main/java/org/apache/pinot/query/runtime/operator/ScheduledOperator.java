@@ -16,46 +16,39 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.HashSet;
-import java.util.List;
+import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 
 
 /**
- * An {@code OpChain} represents a chain of operators that are separated
- * by send/receive stages.
+ * {@code ScheduledOperator}s are operators that expose additional information
+ * to help scheduling logic.
  */
-public class OpChain {
+public interface ScheduledOperator {
 
-  private final V2Operator _root;
-  private final Set<MailboxIdentifier> _receivingMailbox;
-  private final OpChainStats _stats;
-  private final String _id;
+  /**
+   * @param availableMail the mail available to be consumed
+   * @return the mailboxes that this operator would read from if scheduled - an
+   * empty set indicates that this operator should not be scheduled
+   */
+  ScheduleResult shouldSchedule(Set<MailboxIdentifier> availableMail);
 
-  public OpChain(V2Operator root, List<MailboxIdentifier> receivingMailboxes, long requestId, int stageId) {
-    _root = root;
-    _receivingMailbox = new HashSet<>(receivingMailboxes);
-    _id = String.format("%s_%s", requestId, stageId);
-    _stats = new OpChainStats(_id);
-  }
+  class ScheduleResult {
+    public final boolean _shouldSchedule;
+    public final Set<MailboxIdentifier> _mailboxes;
 
-  public V2Operator getRoot() {
-    return _root;
-  }
+    public ScheduleResult(Set<MailboxIdentifier> mailboxes) {
+      _shouldSchedule = !mailboxes.isEmpty();
+      _mailboxes = mailboxes;
+    }
 
-  public Set<MailboxIdentifier> getReceivingMailbox() {
-    return _receivingMailbox;
-  }
-
-  public OpChainStats getStats() {
-    return _stats;
-  }
-
-  @Override
-  public String toString() {
-    return "OpChain{ " + _id + "}";
+    public ScheduleResult(boolean shouldSchedule) {
+      _shouldSchedule = shouldSchedule;
+      _mailboxes = ImmutableSet.of();
+    }
   }
 }

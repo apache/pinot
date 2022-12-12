@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -29,7 +30,6 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -37,7 +37,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class SortOperator extends BaseOperator<TransferableBlock> {
+public class SortOperator extends V2Operator {
   private static final String EXPLAIN_NAME = "SORT";
   private final Operator<TransferableBlock> _upstreamOperator;
   private final int _fetch;
@@ -75,8 +75,7 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+    return ImmutableList.of(_upstreamOperator);
   }
 
   @Nullable

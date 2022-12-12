@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,7 +51,7 @@ import org.slf4j.LoggerFactory;
  *  When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
  *  When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
-public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
+public class MailboxReceiveOperator extends V2Operator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
 
@@ -117,8 +118,18 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+    return ImmutableList.of();
+  }
+
+  @Override
+  public ScheduleResult shouldSchedule(Set<MailboxIdentifier> availableMail) {
+    ImmutableSet.Builder<MailboxIdentifier> builder = ImmutableSet.builder();
+    for (MailboxIdentifier id : _sendingMailbox) {
+      if (availableMail.contains(id)) {
+        builder.add(id);
+      }
+    }
+    return new ScheduleResult(builder.build());
   }
 
   @Nullable
