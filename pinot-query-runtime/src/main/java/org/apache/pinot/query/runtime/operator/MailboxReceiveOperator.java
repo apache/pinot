@@ -36,6 +36,7 @@ import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,8 +57,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
 
   // TODO: Unify SUPPORTED_EXCHANGE_TYPES with MailboxSendOperator.
   private static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
-      ImmutableSet.of(RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED,
-          RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED);
+      ImmutableSet.of(RelDistribution.Type.HASH_DISTRIBUTED, RelDistribution.Type.RANDOM_DISTRIBUTED);
 
   private final MailboxService<TransferableBlock> _mailboxService;
   private final RelDistribution.Type _exchangeType;
@@ -76,9 +76,9 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService,
       List<ServerInstance> sendingStageInstances, RelDistribution.Type exchangeType, String receiveHostName,
       int receivePort, long jobId, int stageId, Long timeoutMs) {
-    _mailboxService = mailboxService;
-    Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
+    Preconditions.checkState(OperatorUtils.isExchangeSupported(exchangeType),
         "Exchange/Distribution type: " + exchangeType + " is not supported!");
+    _mailboxService = mailboxService;
     long timeoutNano = (timeoutMs != null ? timeoutMs : QueryConfig.DEFAULT_MAILBOX_TIMEOUT_MS) * 1_000_000L;
     _deadlineTimestampNano = timeoutNano + System.nanoTime();
 

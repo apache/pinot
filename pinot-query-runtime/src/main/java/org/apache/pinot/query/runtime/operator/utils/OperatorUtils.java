@@ -19,13 +19,18 @@
 package org.apache.pinot.query.runtime.operator.utils;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.lang.StringUtils;
 
 
 public class OperatorUtils {
 
   private static final Map<String, String> OPERATOR_TOKEN_MAPPING = new HashMap<>();
+
+  private static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPE = new HashSet<>();
 
   static {
     OPERATOR_TOKEN_MAPPING.put("=", "equals");
@@ -40,6 +45,8 @@ public class OperatorUtils {
     OPERATOR_TOKEN_MAPPING.put("*", "times");
     OPERATOR_TOKEN_MAPPING.put("/", "divide");
     OPERATOR_TOKEN_MAPPING.put("||", "concat");
+    SUPPORTED_EXCHANGE_TYPE.add(RelDistribution.Type.RANDOM_DISTRIBUTED);
+    SUPPORTED_EXCHANGE_TYPE.add(RelDistribution.Type.HASH_DISTRIBUTED);
   }
 
   private OperatorUtils() {
@@ -55,5 +62,9 @@ public class OperatorUtils {
     functionName = StringUtils.remove(functionName, " ");
     functionName = OPERATOR_TOKEN_MAPPING.getOrDefault(functionName, functionName);
     return functionName;
+  }
+
+  public static boolean isExchangeSupported(RelDistribution.Type type) {
+    return SUPPORTED_EXCHANGE_TYPE.contains(type);
   }
 }

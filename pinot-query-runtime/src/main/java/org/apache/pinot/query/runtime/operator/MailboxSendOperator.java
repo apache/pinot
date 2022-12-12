@@ -20,10 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
@@ -38,6 +35,7 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,9 +47,6 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
 
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
-  private static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPE =
-      ImmutableSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
-          RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED);
 
   private final Operator<TransferableBlock> _dataTableBlockBaseOperator;
   private final BlockExchange _exchange;
@@ -80,33 +75,15 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
       Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory) {
+    Preconditions.checkState(OperatorUtils.isExchangeSupported(exchangeType),
+        String.format("Exchange type '%s' is not supported yet", exchangeType));
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
 
-    List<MailboxIdentifier> receivingMailboxes;
-    if (exchangeType == RelDistribution.Type.SINGLETON) {
-      // TODO: this logic should be moved into SingletonExchange
-      ServerInstance singletonInstance = null;
-      for (ServerInstance serverInstance : receivingStageInstances) {
-        if (serverInstance.getHostname().equals(mailboxService.getHostname())
-            && serverInstance.getQueryMailboxPort() == mailboxService.getMailboxPort()) {
-          Preconditions.checkState(singletonInstance == null, "multiple instance found for singleton exchange type!");
-          singletonInstance = serverInstance;
-        }
-      }
-      Preconditions.checkNotNull(singletonInstance, "Unable to find receiving instance for singleton exchange");
-      receivingMailboxes = Collections.singletonList(mailboxIdGenerator.generate(singletonInstance));
-    } else {
-      receivingMailboxes = receivingStageInstances
-          .stream()
-          .map(mailboxIdGenerator::generate)
-          .collect(Collectors.toList());
-    }
+    List<MailboxIdentifier> receivingMailboxes =
+        receivingStageInstances.stream().map(mailboxIdGenerator::generate).collect(Collectors.toList());
 
     BlockSplitter splitter = TransferableBlockUtils::splitBlock;
     _exchange = blockExchangeFactory.build(mailboxService, receivingMailboxes, exchangeType, keySelector, splitter);
-
-    Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
-        String.format("Exchange type '%s' is not supported yet", exchangeType));
   }
 
   @Override

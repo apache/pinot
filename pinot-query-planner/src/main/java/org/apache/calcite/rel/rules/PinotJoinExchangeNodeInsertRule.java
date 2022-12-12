@@ -59,19 +59,11 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     RelNode leftInput = join.getInput(0);
     RelNode rightInput = join.getInput(1);
 
-    RelNode leftExchange;
-    RelNode rightExchange;
     JoinInfo joinInfo = join.analyzeCondition();
 
-    if (joinInfo.leftKeys.isEmpty()) {
-      // when there's no JOIN key, use broadcast.
-      leftExchange = LogicalExchange.create(leftInput, RelDistributions.SINGLETON);
-      rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
-    } else {
-      // when join key exists, use hash distribution.
-      leftExchange = LogicalExchange.create(leftInput, RelDistributions.hash(joinInfo.leftKeys));
-      rightExchange = LogicalExchange.create(rightInput, RelDistributions.hash(joinInfo.rightKeys));
-    }
+    // Empty leftKeys or rightKeys will always return hashCode 0 and be hashed to first server.
+    RelNode leftExchange = LogicalExchange.create(leftInput, RelDistributions.hash(joinInfo.leftKeys));
+    RelNode rightExchange = LogicalExchange.create(rightInput, RelDistributions.hash(joinInfo.rightKeys));
 
     RelNode newJoinNode =
         new LogicalJoin(join.getCluster(), join.getTraitSet(), leftExchange, rightExchange, join.getCondition(),
