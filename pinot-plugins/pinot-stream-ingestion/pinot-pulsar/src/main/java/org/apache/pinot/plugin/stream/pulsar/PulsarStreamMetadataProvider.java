@@ -100,8 +100,8 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
       }
       return new MessageIdStreamOffset(offset);
     } catch (PulsarClientException e) {
-      LOGGER.error("Cannot fetch offsets for partition " + _partition + " and topic " + _topic
-          + " and offsetCriteria " + offsetCriteria, e);
+      LOGGER.error("Cannot fetch offsets for partition " + _partition + " and topic " + _topic + " and offsetCriteria "
+          + offsetCriteria, e);
       return null;
     }
   }

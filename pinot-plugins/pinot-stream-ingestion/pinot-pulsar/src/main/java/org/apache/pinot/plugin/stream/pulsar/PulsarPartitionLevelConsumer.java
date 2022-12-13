@@ -136,6 +136,7 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   @Override
   public void close()
       throws IOException {
+    _reader.close();
     super.close();
     shutdownAndAwaitTermination();
   }
