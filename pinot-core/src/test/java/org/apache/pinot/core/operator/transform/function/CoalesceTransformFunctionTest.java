@@ -429,6 +429,30 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
     });
   }
 
+  // Test the Coalesce on two Int columns (where one or the other or both can be null) and litrals.
+  @Test
+  public void testCoalesceIntColumnsAndLiterals()
+      throws Exception {
+    ExpressionContext coalesceExpr =
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s,%s)", INT_SV_COLUMN1, INT_SV_COLUMN2, 314));
+    TransformFunction coalesceTransformFunction = TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
+    Assert.assertEquals(coalesceTransformFunction.getName(), "coalesce");
+    int[] expectedResults = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isColumn1Null(i) && isColumn2Null(i)) {
+        expectedResults[i] = 314;
+      } else if (isColumn1Null(i)) {
+        expectedResults[i] = _intSVValues[i] + INT_VALUE_SHIFT;
+      } else if (isColumn2Null(i)) {
+        expectedResults[i] = _intSVValues[i];
+      } else {
+        expectedResults[i] = _intSVValues[i];
+      }
+    }
+    testIntTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock, _enableNullDataSourceMap);
+    testIntTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
+  }
+
   // Test that all arguments have to be same type.
   @Test
   public void testDifferentArgumentType()
