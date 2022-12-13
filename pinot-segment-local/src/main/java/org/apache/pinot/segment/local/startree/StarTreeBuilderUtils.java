@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.startree;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -32,13 +31,12 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
-import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -261,19 +259,13 @@ public class StarTreeBuilderUtils {
    */
   public static void removeStarTrees(File indexDir)
       throws Exception {
-    File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
-
     // Remove the star-tree metadata
-    PropertiesConfiguration metadataProperties =
-        CommonsConfigurationUtils.fromFile(new File(segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     metadataProperties.subset(StarTreeV2Constants.MetadataKey.STAR_TREE_SUBSET).clear();
-    // Commons Configuration 1.10 does not support file path containing '%'.
-    // Explicitly providing the output stream for the file bypasses the problem.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(metadataProperties.getFile())) {
-      metadataProperties.save(fileOutputStream);
-    }
+    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties);
 
     // Remove the index file and index map file
+    File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME));
     FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
   }

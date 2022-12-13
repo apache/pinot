@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.loader;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -31,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
@@ -60,10 +58,9 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -763,7 +760,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // .MIN_VALUE. When dictionary is enabled for this column later, cardinality value should be rightly populated so
     // that the dictionary can be loaded.
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(statsCollector.getCardinality()));
-    updateMetadataProperties(indexDir, metadataProperties);
+    SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
     // handler will take care of recreating the index.
@@ -832,23 +829,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     DICTIONARY_BASED_INDEXES_TO_REWRITE.forEach((index) -> segmentWriter.removeIndex(column, index));
   }
 
-  static void updateMetadataProperties(File indexDir, Map<String, String> metadataProperties)
-      throws Exception {
-    File v3Dir = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, SegmentVersion.v3);
-    File metadataFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
-
-    for (Map.Entry<String, String> entry : metadataProperties.entrySet()) {
-      properties.setProperty(entry.getKey(), entry.getValue());
-    }
-
-    // Commons Configuration 1.10 does not support file path containing '%'.
-    // Explicitly providing the output stream for save bypasses the problem.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(properties.getFile())) {
-      properties.save(fileOutputStream);
-    }
-  }
-
   private void disableDictionaryAndCreateRawForwardIndex(String column, SegmentDirectory.Writer segmentWriter,
       IndexCreatorProvider indexCreatorProvider)
       throws Exception {
@@ -885,7 +865,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
-    updateMetadataProperties(indexDir, metadataProperties);
+    SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties);
 
     // Remove range index, inverted index and FST index.
     removeDictRelatedIndexes(column, segmentWriter);

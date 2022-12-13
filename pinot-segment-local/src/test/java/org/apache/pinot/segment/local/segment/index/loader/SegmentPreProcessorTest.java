@@ -55,6 +55,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -1820,9 +1821,8 @@ public class SegmentPreProcessorTest {
     return driver.getOutputDirectory();
   }
 
-  private static void removeMinMaxValuesFromMetadataFile(File indexDir)
-      throws Exception {
-    PropertiesConfiguration configuration = SegmentMetadataImpl.getPropertiesConfiguration(indexDir);
+  private static void removeMinMaxValuesFromMetadataFile(File indexDir) {
+    PropertiesConfiguration configuration = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     Iterator<String> keys = configuration.getKeys();
     while (keys.hasNext()) {
       String key = keys.next();
@@ -1832,7 +1832,7 @@ public class SegmentPreProcessorTest {
         configuration.clearProperty(key);
       }
     }
-    configuration.save();
+    SegmentMetadataUtils.savePropertiesConfiguration(configuration);
   }
 
   private static Map<String, Consumer<IndexLoadingConfig>> createConfigPrepFunctions() {
