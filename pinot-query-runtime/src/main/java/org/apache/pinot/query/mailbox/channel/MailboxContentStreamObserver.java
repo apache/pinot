@@ -23,6 +23,8 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
@@ -58,7 +60,9 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
   private final ArrayBlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
-  private Mailbox.MailboxContent _errorContent = null;
+
+  ReadWriteLock _errorLock = new ReentrantReadWriteLock();
+  private Mailbox.MailboxContent _errorContent = null; // Guarded by _errorLock.
   private StringMailboxIdentifier _mailboxId;
   private Consumer<MailboxIdentifier> _gotMailCallback;
 
@@ -82,8 +86,13 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
    * to indicate when to call this method.
    */
   public Mailbox.MailboxContent poll() {
-    if (_errorContent != null) {
-      return _errorContent;
+    try {
+      _errorLock.readLock().lock();
+      if (_errorContent != null) {
+        return _errorContent;
+      }
+    } finally {
+      _errorLock.readLock().unlock();
     }
     if (isCompleted()) {
       return null;
@@ -111,11 +120,14 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
         RuntimeException e = new RuntimeException("Mailbox receivingBuffer is full:" + _mailboxId);
         LOGGER.error(e.getMessage());
         try {
+          _errorLock.writeLock().lock();
           _errorContent = createErrorContent(e);
         } catch (IOException ioe) {
           e = new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
           LOGGER.error(e.getMessage());
           throw e;
+        } finally {
+          _errorLock.writeLock().unlock();
         }
       }
       _gotMailCallback.accept(_mailboxId);
@@ -140,12 +152,15 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   @Override
   public void onError(Throwable e) {
     try {
+      _errorLock.writeLock().lock();
       _errorContent = createErrorContent(e);
       _gotMailCallback.accept(_mailboxId);
       // TODO: close the stream.
       throw new RuntimeException(e);
     } catch (IOException ioe) {
       throw new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
+    } finally {
+      _errorLock.writeLock().unlock();
     }
   }
 
