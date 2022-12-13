@@ -77,6 +77,7 @@ public abstract class IngestionBasedConsumptionStatusChecker {
         LLRealtimeSegmentDataManager rtSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
         if (isSegmentCaughtUp(segName, rtSegmentDataManager)) {
           _caughtUpSegments.add(segName);
+          rtSegmentDataManager.handleConsumptionStatus(true);
         }
       } finally {
         if (segmentDataManager != null) {

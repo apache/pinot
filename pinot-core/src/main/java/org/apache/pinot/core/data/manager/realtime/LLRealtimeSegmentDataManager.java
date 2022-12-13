@@ -255,6 +255,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private StreamPartitionMsgOffset _finalOffset; // Used when we want to catch up to this one
   private volatile boolean _shouldStop = false;
 
+  /** This variable will be set by the configured {@literal IngestionBasedConsumptionStatusChecker} when the segment is
+   * caughtup.
+   */
+  private volatile boolean _caughtUpWithUpstream = false;
+
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
   // For now, we let 31s pass for this state transition.
   private static final int MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS = 31;
@@ -601,7 +606,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       streamMessageCount++;
     }
     updateCurrentDocumentCountMetrics();
-    updateConsumerLagMetrics(_currentOffset.compareTo(_latestStreamOffsetAtStartupTime) > 0);
+    updateConsumerLagMetrics();
 
     if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
       _hasMessagesFetched = true;
@@ -619,11 +624,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return prematureExit;
   }
 
-  private void updateConsumerLagMetrics(boolean caughtup) {
-    Map<String, PartitionLagState> lagStateMap = getPartitionToLagState(getConsumerPartitionState(true));
+  private void updateConsumerLagMetrics() {
     boolean emitRecordsLag = true;
     boolean emitAvailabilityLag = true;
-    if (!caughtup) {
+    if (_caughtUpWithUpstream) {
+      Map<String, PartitionLagState> lagStateMap = getPartitionToLagState(getConsumerPartitionState(true));
       for (Map.Entry<String, PartitionLagState> entry : lagStateMap.entrySet()) {
         String partitionId = entry.getKey();
         PartitionLagState lagState = entry.getValue();
@@ -1632,5 +1637,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   public void forceCommit() {
     _forceCommitMessageReceived = true;
+  }
+
+  @Override
+  public void handleConsumptionStatus(boolean caughtUpWithUpstream) {
+    if (caughtUpWithUpstream) {
+      _caughtUpWithUpstream = caughtUpWithUpstream;
+    }
   }
 }

@@ -45,6 +45,7 @@ public class OffsetBasedConsumptionStatusChecker extends IngestionBasedConsumpti
     if (latestStreamOffset == null || latestIngestedOffset == null) {
       _logger.info("Null offset found for segment {} - latest stream offset: {}, latest ingested offset: {}. "
           + "Will check consumption status later", segmentName, latestStreamOffset, latestIngestedOffset);
+
       return false;
     }
     if (latestIngestedOffset.compareTo(latestStreamOffset) < 0) {

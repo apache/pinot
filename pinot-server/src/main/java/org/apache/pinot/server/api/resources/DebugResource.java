@@ -167,7 +167,8 @@ public class DebugResource {
     SegmentConsumerInfo segmentConsumerInfo = null;
     if (tableType == TableType.REALTIME) {
       RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-      Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState(false);
+      Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager
+          .getConsumerPartitionState(false);
       Map<String, String> currentOffsets = realtimeSegmentDataManager.getPartitionToCurrentOffset();
       Map<String, String> upstreamLatest = partitionStateMap.entrySet().stream().collect(
           Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString()));
