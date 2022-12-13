@@ -136,6 +136,11 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _resizeTimeMs = resizeTimeMs;
   }
 
+  @Override
+  public long getNumRecords() {
+    return _table == null ? 0 : _table.size();
+  }
+
   @Nullable
   @Override
   public DataSchema getDataSchema(QueryContext queryContext) {

@@ -262,4 +262,70 @@ public class LeafStageTransferableBlockOperatorTest {
     // Then:
     Assert.assertFalse(resultBlock.isErrorBlock());
   }
+
+  @Test
+  public void shouldNotErrorOutWhenIncorrectDataSchemaProvidedWithEmptyRowsSelection() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
+    DataSchema resultSchema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+    DataSchema desiredSchema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+
+    // When:
+    List<InstanceResponseBlock> responseBlockList = Collections.singletonList(
+        new InstanceResponseBlock(new SelectionResultsBlock(resultSchema, Collections.emptyList()), queryContext));
+    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(responseBlockList,
+        desiredSchema);
+    TransferableBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    Assert.assertEquals(resultBlock.getContainer().size(), 0);
+    Assert.assertEquals(resultBlock.getDataSchema(), desiredSchema);
+  }
+
+  @Test
+  public void shouldNotErrorOutWhenIncorrectDataSchemaProvidedWithEmptyRowsDistinct() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT strCol, intCol FROM tbl GROUP BY strCol, intCol");
+    DataSchema resultSchema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+    DataSchema desiredSchema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+
+    // When:
+    List<InstanceResponseBlock> responseBlockList = Collections.singletonList(
+        new InstanceResponseBlock(new DistinctResultsBlock(mock(DistinctAggregationFunction.class),
+            new DistinctTable(resultSchema, Collections.emptyList())), queryContext));
+    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(responseBlockList,
+        desiredSchema);
+    TransferableBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    Assert.assertEquals(resultBlock.getContainer().size(), 0);
+    Assert.assertEquals(resultBlock.getDataSchema(), desiredSchema);
+  }
+
+  @Test
+  public void shouldNotErrorOutWhenIncorrectDataSchemaProvidedWithEmptyRowsGroupBy() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT strCol, SUM(intCol) FROM tbl GROUP BY strCol");
+    DataSchema resultSchema = new DataSchema(new String[]{"strCol", "SUM(intCol)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+    DataSchema desiredSchema = new DataSchema(new String[]{"strCol", "SUM(intCol)"},
+      new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+
+    // When:
+    List<InstanceResponseBlock> responseBlockList = Collections.singletonList(
+        new InstanceResponseBlock(new GroupByResultsBlock(resultSchema, Collections.emptyList()), queryContext));
+    LeafStageTransferableBlockOperator operator = new LeafStageTransferableBlockOperator(responseBlockList,
+        desiredSchema);
+    TransferableBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    Assert.assertEquals(resultBlock.getContainer().size(), 0);
+    Assert.assertEquals(resultBlock.getDataSchema(), desiredSchema);
+  }
 }

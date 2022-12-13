@@ -63,6 +63,11 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   }
 
   @Override
+  public long getNumRecords() {
+    return _rows.size();
+  }
+
+  @Override
   public DataSchema getDataSchema(QueryContext queryContext) {
     return _dataSchema;
   }

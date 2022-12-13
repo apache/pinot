@@ -38,6 +38,11 @@ public class ExceptionResultsBlock extends BaseResultsBlock {
     this(QueryException.QUERY_EXECUTION_ERROR, t);
   }
 
+  @Override
+  public long getNumRecords() {
+    return 0;
+  }
+
   @Nullable
   @Override
   public DataSchema getDataSchema(QueryContext queryContext) {

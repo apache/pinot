@@ -57,6 +57,11 @@ public class AggregationResultsBlock extends BaseResultsBlock {
   }
 
   @Override
+  public long getNumRecords() {
+    return 1;
+  }
+
+  @Override
   public DataSchema getDataSchema(QueryContext queryContext) {
     boolean returnFinalResult = queryContext.isServerReturnFinalResult();
     int numColumns = _aggregationFunctions.length;

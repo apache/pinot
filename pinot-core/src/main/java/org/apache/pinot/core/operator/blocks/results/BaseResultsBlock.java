@@ -159,6 +159,11 @@ public abstract class BaseResultsBlock implements Block {
   }
 
   /**
+   * Indicate the size of the result.
+   */
+  public abstract long getNumRecords();
+
+  /**
    * Returns the data schema for the results. Return {@code null} when the block only contains metadata.
    */
   @Nullable
