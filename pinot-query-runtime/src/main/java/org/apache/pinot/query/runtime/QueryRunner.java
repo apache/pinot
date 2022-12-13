@@ -73,6 +73,8 @@ import org.slf4j.LoggerFactory;
  */
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
+  private static final String PINOT_V1_SERVER_QUERY_CONFIG_PREFIX = "pinot.server.query.executor";
+
   // This is a temporary before merging the 2 type of executor.
   private ServerQueryExecutorV1Impl _serverExecutor;
   private HelixManager _helixManager;
@@ -100,7 +102,7 @@ public class QueryRunner {
               new NamedThreadFactory("query_worker_on_" + _port + "_port")));
       _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config, _scheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
-      _serverExecutor.init(config, instanceDataManager, serverMetrics);
+      _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
