@@ -103,8 +103,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     CHANGE_RAW_INDEX_COMPRESSION_TYPE,
   }
 
-  public ForwardIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig, Schema schema) {
-    super(segmentMetadata, indexLoadingConfig);
+  public ForwardIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig, Schema schema,
+      SegmentDirectory segmentDirectory) {
+    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
     _schema = schema;
   }
 
@@ -769,6 +770,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
 
+    reloadSegmentMetadata(indexDir, column);
+
     LOGGER.info("Created dictionary based forward index for segment: {}, column: {}", segmentName, column);
   }
 
@@ -872,6 +875,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     // Delete marker file.
     FileUtils.deleteQuietly(inProgress);
+
+    reloadSegmentMetadata(indexDir, column);
 
     LOGGER.info("Created raw based forward index for segment: {}, column: {}", segmentName, column);
   }

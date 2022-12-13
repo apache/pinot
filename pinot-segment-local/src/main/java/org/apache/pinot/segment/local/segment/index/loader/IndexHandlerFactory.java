@@ -52,24 +52,24 @@ public class IndexHandlerFactory {
   };
 
   public static IndexHandler getIndexHandler(ColumnIndexType type, SegmentMetadataImpl segmentMetadata,
-      IndexLoadingConfig indexLoadingConfig, Schema schema) {
+      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory segmentDirectory) {
     switch (type) {
       case INVERTED_INDEX:
-        return new InvertedIndexHandler(segmentMetadata, indexLoadingConfig);
+        return new InvertedIndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
       case RANGE_INDEX:
-        return new RangeIndexHandler(segmentMetadata, indexLoadingConfig);
+        return new RangeIndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
       case TEXT_INDEX:
-        return new TextIndexHandler(segmentMetadata, indexLoadingConfig);
+        return new TextIndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
       case FST_INDEX:
-        return new FSTIndexHandler(segmentMetadata, indexLoadingConfig);
+        return new FSTIndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
       case JSON_INDEX:
-        return new JsonIndexHandler(segmentMetadata, indexLoadingConfig);
+        return new JsonIndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
       case H3_INDEX:
-        return new H3IndexHandler(segmentMetadata, indexLoadingConfig);
+        return new H3IndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
       case BLOOM_FILTER:
-        return new BloomFilterHandler(segmentMetadata, indexLoadingConfig);
+        return new BloomFilterHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
       case FORWARD_INDEX:
-        return new ForwardIndexHandler(segmentMetadata, indexLoadingConfig, schema);
+        return new ForwardIndexHandler(segmentMetadata, indexLoadingConfig, schema, segmentDirectory);
       default:
         return NO_OP_HANDLER;
     }

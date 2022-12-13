@@ -218,20 +218,23 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
     LoaderUtils.writeIndexToV3Format(_segmentWriter, _columnName, _forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
 
-    if (!_isTemporaryForwardIndex) {
-      // Only update the metadata and cleanup other indexes if the forward index to be created is permanent. If the
-      // forward index is temporary, it is meant to be used only for construction of other indexes and will be deleted
-      // once all the IndexHandlers have completed.
-      try {
-        LOGGER.info("Created forward index from inverted index and dictionary. Updating metadata properties for "
-            + "segment: {}, column: {}, property list: {}", segmentName, _columnName, metadataProperties);
-        SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties);
-      } catch (Exception e) {
-        throw new IOException(
-            String.format("Failed to update metadata properties for segment: %s, column: %s", segmentName, _columnName),
-            e);
-      }
+    try {
+      // Update the metadata even for temporary forward index as other IndexHandlers may rely on the updated metadata
+      // to construct their indexes based on the forward index.
+      LOGGER.info("Created forward index from inverted index and dictionary. Updating metadata properties for "
+          + "segment: {}, column: {}, property list: {}, is temporary: {}", segmentName, _columnName,
+          metadataProperties, _isTemporaryForwardIndex);
+      SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties);
+    } catch (Exception e) {
+      throw new IOException(
+          String.format("Failed to update metadata properties for segment: %s, column: %s", segmentName, _columnName),
+          e);
+    }
 
+    if (!_isTemporaryForwardIndex) {
+      // Only cleanup the other indexes if the forward index to be created is permanent. If the forward index is
+      // temporary, it is meant to be used only for construction of other indexes and will be deleted once all the
+      // IndexHandlers have completed.
       if (!_dictionaryEnabled) {
         LOGGER.info("Clean up indexes no longer needed or which need to be rewritten for segment: {}, column: {}",
             segmentName, _columnName);

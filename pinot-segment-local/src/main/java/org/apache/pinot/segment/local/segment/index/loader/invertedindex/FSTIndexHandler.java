@@ -70,8 +70,9 @@ public class FSTIndexHandler extends BaseIndexHandler {
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
 
-  public FSTIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentMetadata, indexLoadingConfig);
+  public FSTIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory segmentDirectory) {
+    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
     _fstType = indexLoadingConfig.getFSTIndexType();
     _columnsToAddIdx = indexLoadingConfig.getFSTIndexColumns();
   }

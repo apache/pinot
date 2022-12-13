@@ -90,8 +90,9 @@ public class TextIndexHandler extends BaseIndexHandler {
   private final FSTType _fstType;
   private final Map<String, Map<String, String>> _columnProperties;
 
-  public TextIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentMetadata, indexLoadingConfig);
+  public TextIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory segmentDirectory) {
+    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
     _fstType = indexLoadingConfig.getFSTIndexType();
     _columnsToAddIdx = indexLoadingConfig.getTextIndexColumns();
     _columnProperties = indexLoadingConfig.getColumnProperties();

@@ -60,8 +60,9 @@ public class BloomFilterHandler extends BaseIndexHandler {
 
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
-  public BloomFilterHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentMetadata, indexLoadingConfig);
+  public BloomFilterHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory segmentDirectory) {
+    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
   }
 

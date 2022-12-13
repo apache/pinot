@@ -53,8 +53,9 @@ public class JsonIndexHandler extends BaseIndexHandler {
 
   private final Map<String, JsonIndexConfig> _jsonIndexConfigs;
 
-  public JsonIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentMetadata, indexLoadingConfig);
+  public JsonIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory segmentDirectory) {
+    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
     _jsonIndexConfigs = indexLoadingConfig.getJsonIndexConfigs();
   }
 

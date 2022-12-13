@@ -19,12 +19,14 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.slf4j.Logger;
@@ -41,14 +43,19 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseIndexHandler.class);
 
-  protected final SegmentMetadata _segmentMetadata;
   protected final IndexLoadingConfig _indexLoadingConfig;
   protected final Set<String> _tmpForwardIndexColumns;
+  protected final SegmentDirectory _segmentDirectory;
 
-  public BaseIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
+  // The segmentMetadata may need to be updated after creating the forward index
+  protected SegmentMetadata _segmentMetadata;
+
+  public BaseIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory segmentDirectory) {
     _segmentMetadata = segmentMetadata;
     _indexLoadingConfig = indexLoadingConfig;
     _tmpForwardIndexColumns = new HashSet<>();
+    _segmentDirectory = segmentDirectory;
   }
 
   @Override
@@ -93,6 +100,24 @@ public abstract class BaseIndexHandler implements IndexHandler {
       _tmpForwardIndexColumns.add(columnName);
     }
 
+    // Update the segmentMetadata
+    File indexDir = _segmentMetadata.getIndexDir();
+    reloadSegmentMetadata(indexDir, columnName);
+
     LOGGER.info("Rebuilt the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
+  }
+
+  protected void reloadSegmentMetadata(File indexDir, String columnName)
+      throws IOException {
+    // Need to setup the segmentMetadata to have the latest changes so that the remainder of the updateIndices code
+    // can access the latest segmentMetadata to build their respective indexes off of. This only modifies the
+    // `_segmentMetadata` for this object, and will not be reflected outside of this IndexHandler.
+    _segmentMetadata = new SegmentMetadataImpl(indexDir);
+    try {
+      _segmentDirectory.reloadMetadata();
+    } catch (Exception e) {
+      throw new IOException(
+          String.format("Caught exception while trying to reload segmentMetadata for column: %s", columnName), e);
+    }
   }
 }

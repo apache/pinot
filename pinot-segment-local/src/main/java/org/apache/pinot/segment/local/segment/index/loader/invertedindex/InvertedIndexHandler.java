@@ -48,8 +48,9 @@ public class InvertedIndexHandler extends BaseIndexHandler {
 
   private final Set<String> _columnsToAddIdx;
 
-  public InvertedIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentMetadata, indexLoadingConfig);
+  public InvertedIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory segmentDirectory) {
+    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
     _columnsToAddIdx = indexLoadingConfig.getInvertedIndexColumns();
   }
 

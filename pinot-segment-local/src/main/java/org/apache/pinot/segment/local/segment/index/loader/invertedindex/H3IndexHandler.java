@@ -54,8 +54,9 @@ public class H3IndexHandler extends BaseIndexHandler {
 
   private final Map<String, H3IndexConfig> _h3Configs;
 
-  public H3IndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentMetadata, indexLoadingConfig);
+  public H3IndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory segmentDirectory) {
+    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
     _h3Configs = indexLoadingConfig.getH3IndexConfigs();
   }
 

@@ -49,8 +49,9 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private final Set<String> _columnsToAddIdx;
   private final int _rangeIndexVersion;
 
-  public RangeIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentMetadata, indexLoadingConfig);
+  public RangeIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
+      SegmentDirectory segmentDirectory) {
+    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
     _columnsToAddIdx = indexLoadingConfig.getRangeIndexColumns();
     _rangeIndexVersion = indexLoadingConfig.getRangeIndexVersion();
   }
