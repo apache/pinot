@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue;
 
 import com.google.common.base.Preconditions;
-import java.io.FileOutputStream;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -31,28 +30,29 @@ import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.Schema;
 
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ColumnMinMaxValueGenerator {
-  private final SegmentMetadataImpl _segmentMetadata;
+  private final SegmentMetadata _segmentMetadata;
   private final PropertiesConfiguration _segmentProperties;
   private final SegmentDirectory.Writer _segmentWriter;
   private final ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode;
 
   private boolean _minMaxValueAdded;
 
-  public ColumnMinMaxValueGenerator(SegmentMetadataImpl segmentMetadata, SegmentDirectory.Writer segmentWriter,
+  public ColumnMinMaxValueGenerator(SegmentMetadata segmentMetadata, SegmentDirectory.Writer segmentWriter,
       ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode) {
     _segmentMetadata = segmentMetadata;
+    _segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(segmentMetadata);
     _segmentWriter = segmentWriter;
-    _segmentProperties = segmentMetadata.getPropertiesConfiguration();
     _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
   }
 
@@ -71,7 +71,9 @@ public class ColumnMinMaxValueGenerator {
     for (String column : getColumnsToAddMinMaxValue()) {
       addColumnMinMaxValueForColumn(column);
     }
-    saveMetadata();
+    if (_minMaxValueAdded) {
+      SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties);
+    }
   }
 
   private Set<String> getColumnsToAddMinMaxValue() {
@@ -163,16 +165,5 @@ public class ColumnMinMaxValueGenerator {
     }
 
     _minMaxValueAdded = true;
-  }
-
-  private void saveMetadata()
-      throws Exception {
-    if (_minMaxValueAdded) {
-      // Commons Configuration 1.10 does not support file path containing '%'.
-      // Explicitly providing the output stream for the file bypasses the problem.
-      try (FileOutputStream fileOutputStream = new FileOutputStream(_segmentProperties.getFile())) {
-        _segmentProperties.save(fileOutputStream);
-      }
-    }
   }
 }

@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -45,11 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.HAS_DICTIONARY;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMENTS;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES;
-import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.getKeyFor;
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 
 
 /**
@@ -228,7 +225,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       try {
         LOGGER.info("Created forward index from inverted index and dictionary. Updating metadata properties for "
             + "segment: {}, column: {}, property list: {}", segmentName, _columnName, metadataProperties);
-        ForwardIndexHandler.updateMetadataProperties(_segmentMetadata.getIndexDir(), metadataProperties);
+        SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties);
       } catch (Exception e) {
         throw new IOException(
             String.format("Failed to update metadata properties for segment: %s, column: %s", segmentName, _columnName),
