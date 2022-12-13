@@ -137,7 +137,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public long getNumRecords() {
+  public int getNumRows() {
     return _table == null ? 0 : _table.size();
   }
 

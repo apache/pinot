@@ -63,7 +63,7 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public long getNumRecords() {
+  public int getNumRows() {
     return _rows.size();
   }
 

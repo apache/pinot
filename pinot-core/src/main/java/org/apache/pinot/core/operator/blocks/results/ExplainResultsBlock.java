@@ -47,7 +47,7 @@ public class ExplainResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public long getNumRecords() {
+  public int getNumRows() {
     return _entries.size();
   }
 

@@ -52,7 +52,7 @@ public class DistinctResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public long getNumRecords() {
+  public int getNumRows() {
     return _distinctTable.size();
   }
 

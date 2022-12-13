@@ -39,7 +39,7 @@ public class ExceptionResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public long getNumRecords() {
+  public int getNumRows() {
     return 0;
   }
 

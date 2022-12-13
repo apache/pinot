@@ -57,7 +57,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public long getNumRecords() {
+  public int getNumRows() {
     return 1;
   }
 

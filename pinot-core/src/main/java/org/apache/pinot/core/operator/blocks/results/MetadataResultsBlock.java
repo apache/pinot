@@ -29,7 +29,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 public class MetadataResultsBlock extends BaseResultsBlock {
 
   @Override
-  public long getNumRecords() {
+  public int getNumRows() {
     return 0;
   }
 
