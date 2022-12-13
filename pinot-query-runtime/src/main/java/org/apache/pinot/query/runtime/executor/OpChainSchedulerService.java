@@ -45,7 +45,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
 
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
-  private final long _releaseTs;
+  private final long _pollIntervalMs;
 
   // anything that is guarded by this monitor should be non-blocking
   private final Monitor _monitor = new Monitor();
@@ -57,13 +57,13 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   };
 
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
-    this(scheduler, workerPool, TimeUnit.SECONDS.toMillis(10));
+    this(scheduler, workerPool, -1);
   }
 
-  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long releaseTs) {
+  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long pollIntervalMs) {
     _scheduler = scheduler;
     _workerPool = workerPool;
-    _releaseTs = releaseTs;
+    _pollIntervalMs = pollIntervalMs;
   }
 
   @Override
@@ -78,54 +78,59 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   protected void run()
       throws Exception {
     while (isRunning()) {
-      if (!_monitor.enterWhen(_hasNextOrClosing, _releaseTs, TimeUnit.MILLISECONDS)) {
-        continue;
-      }
-
-      try {
-        if (!isRunning()) {
-          return;
-        }
-
-        OpChain operatorChain = _scheduler.next();
-        LOGGER.trace("({}): Scheduling", operatorChain);
-        _workerPool.submit(new TraceRunnable() {
-          @Override
-          public void runJob() {
-            try {
-              LOGGER.trace("({}): Executing", operatorChain);
-              operatorChain.getStats().executing();
-
-              // so long as there's work to be done, keep getting the next block
-              // when the operator chain returns a NOOP block, then yield the execution
-              // of this to another worker
-              TransferableBlock result = operatorChain.getRoot().nextBlock();
-              while (!result.isNoOpBlock() && !result.isEndOfStreamBlock()) {
-                result = operatorChain.getRoot().nextBlock();
-              }
-
-              if (!result.isEndOfStreamBlock()) {
-                // not complete, needs to re-register for scheduling
-                register(operatorChain, false);
-              } else {
-                if (result.isErrorBlock()) {
-                  LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
-                      result.getDataBlock().getExceptions());
-                } else {
-                  LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
-                }
-              }
-            } catch (Exception e) {
-              LOGGER.error("({}): Failed to execute operator chain! {}",
-                  operatorChain,
-                  operatorChain.getStats(),
-                  e);
-            }
+      if (enterMonitor()) {
+        try {
+          if (!isRunning()) {
+            return;
           }
-        });
-      } finally {
-        _monitor.leave();
+
+          OpChain operatorChain = _scheduler.next();
+          LOGGER.trace("({}): Scheduling", operatorChain);
+          _workerPool.submit(new TraceRunnable() {
+            @Override
+            public void runJob() {
+              try {
+                LOGGER.trace("({}): Executing", operatorChain);
+                operatorChain.getStats().executing();
+
+                // so long as there's work to be done, keep getting the next block
+                // when the operator chain returns a NOOP block, then yield the execution
+                // of this to another worker
+                TransferableBlock result = operatorChain.getRoot().nextBlock();
+                while (!result.isNoOpBlock() && !result.isEndOfStreamBlock()) {
+                  result = operatorChain.getRoot().nextBlock();
+                }
+
+                if (!result.isEndOfStreamBlock()) {
+                  // not complete, needs to re-register for scheduling
+                  register(operatorChain, false);
+                } else {
+                  if (result.isErrorBlock()) {
+                    LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
+                        result.getDataBlock().getExceptions());
+                  } else {
+                    LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
+                  }
+                }
+              } catch (Exception e) {
+                LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
+              }
+            }
+          });
+        } finally {
+          _monitor.leave();
+        }
       }
+    }
+  }
+
+  private boolean enterMonitor()
+      throws InterruptedException {
+    if (_pollIntervalMs >= 0) {
+      return _monitor.enterWhen(_hasNextOrClosing, _pollIntervalMs, TimeUnit.MILLISECONDS);
+    } else {
+      _monitor.enterWhen(_hasNextOrClosing);
+      return true;
     }
   }
 

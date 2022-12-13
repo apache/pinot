@@ -85,7 +85,8 @@ public class RoundRobinScheduler implements OpChainScheduler {
     if (isNew) {
       _ready.add(operatorChain);
     } else {
-      _available.add(new AvailableEntry(operatorChain, _ticker.get() + _releaseTimeout));
+      long releaseTs = _releaseTimeout < 0 ? Long.MAX_VALUE : _ticker.get() + _releaseTimeout;
+      _available.add(new AvailableEntry(operatorChain, releaseTs));
     }
     trace("registered " + operatorChain);
   }
