@@ -124,7 +124,8 @@ public class KafkaPartitionLevelConsumerTest {
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     // test default value
-    KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
+    KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig,
+        0, null); // TODO: fix to make it non-null in tests
     kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), new LongMsgOffset(23456L), 10000);
 
     Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
@@ -142,7 +143,8 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.buffer.size", "100");
     streamConfigMap.put("stream.kafka.socket.timeout", "1000");
     streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
-    kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
+    // TODO: Fix to make this non-null in tests
+    kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0, null);
     kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), new LongMsgOffset(23456L), 10000);
     Assert.assertEquals(100, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
     Assert.assertEquals(1000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaSocketTimeout());
@@ -202,7 +204,8 @@ public class KafkaPartitionLevelConsumerTest {
 
     int partition = 0;
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
-        new KafkaPartitionLevelConsumer(clientId, streamConfig, partition);
+        // TODO: Fix to make this non-null in tests
+        new KafkaPartitionLevelConsumer(clientId, streamConfig, partition, null);
     kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), new LongMsgOffset(23456L), 10000);
   }
 

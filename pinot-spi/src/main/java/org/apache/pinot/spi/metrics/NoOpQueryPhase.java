@@ -16,33 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.spi.metrics;
 
-import org.apache.pinot.spi.metrics.AbstractMetrics;
-import org.apache.pinot.spi.utils.CommonUtils;
-
-
-public enum MinionTimer implements AbstractMetrics.Timer {
-  // Remove below checkstyle comment filter when first enum is created.
-  // CHECKSTYLE:OFF: checkstyle:coding
-  ;
-  // CHECKSTYLE:OFF: checkstyle:coding
-
-  private final String _timerName;
-  private final boolean _global;
-
-  MinionTimer(boolean global) {
-    _timerName = CommonUtils.toCamelCase(name().toLowerCase());
-    _global = global;
-  }
-
+public class NoOpQueryPhase implements AbstractMetrics.QueryPhase {
   @Override
-  public String getTimerName() {
-    return _timerName;
-  }
-
-  @Override
-  public boolean isGlobal() {
-    return _global;
+  public String getQueryPhaseName() {
+    return "NO_OP";
   }
 }

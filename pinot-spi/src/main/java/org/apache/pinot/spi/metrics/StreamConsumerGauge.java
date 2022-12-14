@@ -16,29 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.spi.metrics;
 
-import org.apache.pinot.spi.metrics.AbstractMetrics;
 import org.apache.pinot.spi.utils.CommonUtils;
 
 
-public enum MinionTimer implements AbstractMetrics.Timer {
-  // Remove below checkstyle comment filter when first enum is created.
-  // CHECKSTYLE:OFF: checkstyle:coding
-  ;
-  // CHECKSTYLE:OFF: checkstyle:coding
+public enum StreamConsumerGauge implements AbstractMetrics.Gauge {
+  PARITTION_RECORDS_LAG("count", false),
+  RECEIVED_RECORDS("count", false);
 
-  private final String _timerName;
+  private final String _gaugeName;
+  private final String _unit;
   private final boolean _global;
 
-  MinionTimer(boolean global) {
-    _timerName = CommonUtils.toCamelCase(name().toLowerCase());
+  StreamConsumerGauge(String unit, boolean global) {
+    _unit = unit;
     _global = global;
+    _gaugeName = CommonUtils.toCamelCase(name().toLowerCase());
   }
 
   @Override
-  public String getTimerName() {
-    return _timerName;
+  public String getGaugeName() {
+    return _gaugeName;
+  }
+
+  @Override
+  public String getUnit() {
+    return _unit;
   }
 
   @Override

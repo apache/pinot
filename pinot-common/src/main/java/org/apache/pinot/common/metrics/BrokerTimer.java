@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.common.metrics;
 
-import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.AbstractMetrics;
+import org.apache.pinot.spi.utils.CommonUtils;
 
 
 /**
@@ -58,7 +59,7 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
 
   BrokerTimer(boolean global) {
     _global = global;
-    _timerName = Utils.toCamelCase(name().toLowerCase());
+    _timerName = CommonUtils.toCamelCase(name().toLowerCase());
   }
 
   @Override

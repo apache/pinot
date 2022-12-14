@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.common.metrics;
 
-import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.AbstractMetrics;
+import org.apache.pinot.spi.utils.CommonUtils;
 
 
 /**
@@ -97,7 +98,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   ServerMeter(String unit, boolean global) {
     _unit = unit;
     _global = global;
-    _meterName = Utils.toCamelCase(name().toLowerCase());
+    _meterName = CommonUtils.toCamelCase(name().toLowerCase());
   }
 
   @Override

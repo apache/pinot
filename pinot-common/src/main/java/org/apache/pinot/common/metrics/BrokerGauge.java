@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.common.metrics;
 
-import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.AbstractMetrics;
+import org.apache.pinot.spi.utils.CommonUtils;
 
 
 /**
@@ -43,7 +44,7 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   BrokerGauge(String unit, boolean global) {
     _unit = unit;
     _global = global;
-    _brokerGaugeName = Utils.toCamelCase(name().toLowerCase());
+    _brokerGaugeName = CommonUtils.toCamelCase(name().toLowerCase());
   }
 
   @Override

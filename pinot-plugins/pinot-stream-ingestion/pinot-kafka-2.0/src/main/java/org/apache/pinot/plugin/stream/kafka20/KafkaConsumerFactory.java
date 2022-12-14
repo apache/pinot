@@ -29,7 +29,7 @@ public class KafkaConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    return new KafkaPartitionLevelConsumer(clientId, _streamConfig, partition);
+    return new KafkaPartitionLevelConsumer(clientId, _streamConfig, partition, _streamConsumerMetrics);
   }
 
   @Override

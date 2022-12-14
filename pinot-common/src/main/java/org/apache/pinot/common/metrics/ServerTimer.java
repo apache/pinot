@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.common.metrics;
 
-import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.AbstractMetrics;
+import org.apache.pinot.spi.utils.CommonUtils;
 
 
 /**
@@ -50,7 +51,7 @@ public enum ServerTimer implements AbstractMetrics.Timer {
 
   ServerTimer(String unit, boolean global) {
     _global = global;
-    _timerName = Utils.toCamelCase(name().toLowerCase());
+    _timerName = CommonUtils.toCamelCase(name().toLowerCase());
   }
 
   @Override

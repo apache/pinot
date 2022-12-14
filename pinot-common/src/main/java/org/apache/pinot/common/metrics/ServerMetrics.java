@@ -21,6 +21,7 @@ package org.apache.pinot.common.metrics;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.spi.metrics.AbstractMetrics;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
