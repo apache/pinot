@@ -62,13 +62,19 @@ import org.testng.Assert;
 
 public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected static final double DOUBLE_CMP_EPSILON = 0.0001d;
-
+  protected static final String SEGMENT_BREAKER_KEY = "__SEGMENT_BREAKER_KEY__";
+  protected static final String SEGMENT_BREAKER_STR = "------";
+  protected static final GenericRow SEGMENT_BREAKER_ROW = new GenericRow();
   protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
   protected QueryEnvironment _queryEnvironment;
   protected String _reducerHostname;
   protected int _reducerGrpcPort;
   protected Map<ServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
   protected GrpcMailboxService _mailboxService;
+
+  static {
+    SEGMENT_BREAKER_ROW.putValue(SEGMENT_BREAKER_KEY, SEGMENT_BREAKER_STR);
+  }
 
   // --------------------------------------------------------------------------
   // QUERY UTILS
@@ -210,13 +216,17 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (int rowId = 0; rowId < value.size(); rowId++) {
       GenericRow row = new GenericRow();
       List<Object> rawRow = value.get(rowId);
-      int colId = 0;
-      for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
-        row.putValue(columnAndType._name, rawRow.get(colId++));
+      if (rawRow.size() == 1 && SEGMENT_BREAKER_STR.equals(rawRow.get(0))) {
+        result.add(SEGMENT_BREAKER_ROW);
+      } else {
+        int colId = 0;
+        for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
+          row.putValue(columnAndType._name, rawRow.get(colId++));
+        }
+        // TODO: ts is built-in, but we should allow user overwrite
+        row.putValue("ts", System.currentTimeMillis());
+        result.add(row);
       }
-      // TODO: ts is built-in, but we should allow user overwrite
-      row.putValue("ts", System.currentTimeMillis());
-      result.add(row);
     }
     return result;
   }
@@ -327,6 +337,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public List<ColumnAndType> _schema;
       @JsonProperty("inputs")
       public List<List<Object>> _inputs;
+      @JsonProperty("partitionColumns")
+      public List<String> _partitionColumns;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
