@@ -22,15 +22,12 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.clearspring.analytics.util.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -69,11 +66,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   // Used to track matched right rows.
   // Only used for right join and full join to output non-matched right rows.
+  // TODO: Replace hashset with rolling bit map.
   private final HashMap<Key, HashSet<Integer>> _matchedRightRows;
-
-  // Used to track unmatched left rows.
-  // Only used for left join and full join to output non-matched left rows.
-  private final HashMap<Key, List<Object[]>> _unmatchedLeftRows;
 
   private final Operator<TransferableBlock> _leftTableOperator;
   private final Operator<TransferableBlock> _rightTableOperator;
@@ -91,18 +85,6 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private TransferableBlock _upstreamErrorBlock;
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
-
-  private boolean needUnmatchedRightRows() {
-    return _joinType == JoinRelType.RIGHT || _joinType == JoinRelType.FULL;
-  }
-
-  private boolean needUnmatchedLeftRows() {
-    return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL;
-  }
-
-  private boolean needUnmatchedRows() {
-    return _joinType != JoinRelType.INNER;
-  }
 
   public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
       DataSchema leftSchema, JoinNode node) {
@@ -131,11 +113,6 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       _matchedRightRows = new HashMap<>();
     } else {
       _matchedRightRows = null;
-    }
-    if (needUnmatchedLeftRows()) {
-      _unmatchedLeftRows = new HashMap<>();
-    } else {
-      _unmatchedLeftRows = null;
     }
     _upstreamErrorBlock = null;
   }
@@ -203,29 +180,22 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       _upstreamErrorBlock = leftBlock;
       return _upstreamErrorBlock;
     }
-    if (leftBlock.isNoOpBlock() || (leftBlock.isSuccessfulEndOfStreamBlock() && !needUnmatchedRows())) {
+    if (leftBlock.isNoOpBlock() || (leftBlock.isSuccessfulEndOfStreamBlock() && !needUnmatchedRightRows())) {
       return leftBlock;
     }
-    if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+    // TODO: Moved to a different function.
+    if (leftBlock.isSuccessfulEndOfStreamBlock() && needUnmatchedRightRows()) {
       // Return remaining non-matched rows for non-inner join.
       List<Object[]> returnRows = new ArrayList<>();
-      if (needUnmatchedRightRows()) {
-        for (Map.Entry<Key, List<Object[]>> entry : _broadcastRightTable.entrySet()) {
-          Set<Integer> matchedIdx = _matchedRightRows.getOrDefault(entry.getKey(), new HashSet<>());
-          int rowSize = entry.getValue().size();
-          Set<Integer> allIdx = IntStream.range(0, rowSize).boxed().collect(Collectors.toSet());
-          Set<Integer> unmatchedIdx = Sets.difference(allIdx, matchedIdx);
-          for (int unmatchedRow : unmatchedIdx) {
-            Object[] resultRow = joinRow(null, entry.getValue().get(unmatchedRow));
-            returnRows.add(resultRow);
-          }
+      for (Map.Entry<Key, List<Object[]>> entry : _broadcastRightTable.entrySet()) {
+        Set<Integer> matchedIdx = _matchedRightRows.getOrDefault(entry.getKey(), new HashSet<>());
+        List<Object[]> rightRows = entry.getValue();
+        if (rightRows.size() == matchedIdx.size()) {
+          continue;
         }
-      }
-      if (needUnmatchedLeftRows()) {
-        for (Map.Entry<Key, List<Object[]>> entry : _unmatchedLeftRows.entrySet()) {
-          for (Object[] unmatchedLeftRow : entry.getValue()) {
-            Object[] resultRow = joinRow(unmatchedLeftRow, null);
-            returnRows.add(resultRow);
+        for (int i = 0; i < rightRows.size(); i++) {
+          if (!matchedIdx.contains(i)) {
+            returnRows.add(joinRow(null, rightRows.get(i)));
           }
         }
       }
@@ -260,9 +230,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
           }
         }
       }
-      if (_unmatchedLeftRows != null && !hasMatchForLeftRow) {
-        List<Object[]> unmatchedCollection = _unmatchedLeftRows.computeIfAbsent(key, k -> new ArrayList<>());
-        unmatchedCollection.add(leftRow);
+      if (!hasMatchForLeftRow && needUnmatchedLeftRows()) {
+        rows.add(joinRow(leftRow, null));
       }
     }
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
@@ -284,5 +253,13 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       }
     }
     return resultRow;
+  }
+
+  private boolean needUnmatchedRightRows() {
+    return _joinType == JoinRelType.RIGHT || _joinType == JoinRelType.FULL;
+  }
+
+  private boolean needUnmatchedLeftRows() {
+    return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL;
   }
 }
