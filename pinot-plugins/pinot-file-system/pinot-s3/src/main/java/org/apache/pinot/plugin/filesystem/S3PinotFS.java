@@ -175,10 +175,6 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  private void setAwsKmsProperties(String ssekmsKeyId, String ssekmsEncryptionContext) {
-
-  }
-
   boolean isNullOrEmpty(String target) {
     return target == null || target.isEmpty();
   }
