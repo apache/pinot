@@ -229,15 +229,14 @@ public class HashJoinOperatorTest {
             OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    List<RexExpression> joinClauses = new ArrayList<>();
     DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
         new DataSchema.ColumnDataType[]{
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.STRING
         });
-
+    List<RexExpression> joinClauses = new ArrayList<>();
     JoinNode node =
-        new JoinNode(1, resultSchema, JoinRelType.LEFT, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+        new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
     HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
@@ -437,7 +436,7 @@ public class HashJoinOperatorTest {
     while (result.isNoOpBlock()) {
       result = joinOnNum.nextBlock();
     }
-    Assert.assertTrue(result.isEOSBlock());
+    Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*SEMI is not "
@@ -514,7 +513,7 @@ public class HashJoinOperatorTest {
     while (result.isNoOpBlock()) {
       result = join.nextBlock();
     }
-    Assert.assertTrue(result.isEOSBlock());
+    Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*ANTI is not supported.*")
@@ -616,9 +615,9 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.block(rightSchema, new Object[]{2, "BB"}))
+    Mockito.when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{2, "BB"}))
         .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
-        .thenReturn(OperatorTestUtil.block(rightSchema, new Object[]{2, "CC"}))
+        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{2, "CC"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     Mockito.when(_rightOperator.nextBlock()).thenReturn(OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}))
         .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
@@ -639,7 +638,7 @@ public class HashJoinOperatorTest {
     Assert.assertTrue(result.isNoOpBlock());
     result = join.nextBlock(); // second no-op consumes no-op right block.
     Assert.assertTrue(result.isNoOpBlock());
-    result = join.nextBlock(); // third -op consumes two right data blocks and builds result
+    result = join.nextBlock(); // third no-op consumes two right data blocks and builds result
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = ImmutableList.of(new Object[]{2, "BB", 2, "Aa"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
@@ -655,3 +654,4 @@ public class HashJoinOperatorTest {
     Assert.assertTrue(result.isEndOfStreamBlock());
   }
 }
+// TODO: Add more inequi join tests.

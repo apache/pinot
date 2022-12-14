@@ -8,11 +8,19 @@
         ],
         "inputs": [
           [1, "a"],
+          [1, "a"],
           [1, "b"],
           [1, "xxx"],
           [2, "b"],
           [3, "c"],
-          [3, "d"]
+          [3, "d"],
+          [4, "d"],
+          [6, "e"],
+          [7, "a"],
+          [7, "a"],
+          [7, "c"],
+          [8, "a"],
+          [8, "b"]
         ]
       },
       "tbl2" : {
@@ -24,8 +32,15 @@
           [1, "xxx"],
           [1, "zzz"],
           [3, "yyy"],
+          [3, "c"],
+          [4, "d"],
           [5, "zzz"],
-          [3, "c"]
+          [7, "a"],
+          [7, "a"],
+          [7, "c"],
+          [8, "a"],
+          [8, "a"],
+          [8, "c"]
         ]
       }
     },
@@ -145,7 +160,12 @@
           [2, "b"],
           [3, "c"],
           [3, "yyy"],
-          [4, "e"]
+          [4, "e"],
+          [4, "e"],
+          [6, "e"],
+          [7, "d"],
+          [7, "f"],
+          [8, "z"]
         ]
       },
       "tbl2" : {
@@ -157,7 +177,11 @@
           [1, "xxx"],
           [1, "xxx"],
           [3, "yyy"],
-          [5, "zzz"]
+          [3, "zzz"],
+          [5, "zzz"],
+          [6, "e"],
+          [7, "d"],
+          [8, "z"]
         ]
       },
       "tbl_empty" : {
@@ -187,9 +211,16 @@
           [1, "a", 1, "xxx"],
           [2, "b", null, null],
           [3, "c", 3, "yyy"],
+          [3, "c", 3, "zzz"],
           [3, "yyy", 3, "yyy"],
+          [3, "yyy", 3, "zzz"],
           [4, "e", null, null],
-          [null, null, 5, "zzz"]
+          [4, "e", null, null],
+          [null, null, 5, "zzz"],
+          [6, "e", 6, "e"],
+          [7, "d", 7, "d"],
+          [7, "f", 7, "d"],
+          [8, "z", 8, "z"]
         ]
       },
       {
@@ -200,7 +231,11 @@
           [null, null, null, 1, "xxx"],
           [null, null, null, 1, "xxx"],
           [null, null, null, 3, "yyy"],
-          [null, null, null, 5, "zzz"]
+          [null, null, null, 3, "zzz"],
+          [null, null, null, 5, "zzz"],
+          [null, null, null, 6, "e"],
+          [null, null, null, 7, "d"],
+          [null, null, null, 8, "z"]
         ]
       },
       {
@@ -211,21 +246,32 @@
           [null, null, null, 1, "xxx"],
           [null, null, null, 1, "xxx"],
           [null, null, null, 3, "yyy"],
-          [null, null, null, 5, "zzz"]
+          [null, null, null, 3, "zzz"],
+          [null, null, null, 5, "zzz"],
+          [null, null, null, 6, "e"],
+          [null, null, null, 7, "d"],
+          [null, null, null, 8, "z"]
         ]
       },
       {
         "psql": "7.2.1.1",
-        "description": "RIGHT OUTER JOIN with inequality condition",
-        "ignored": true,
-        "comment": "failed because we don't handle the case for null comparison",
+        "description": "FULL OUTER JOIN with inequality condition",
         "sql": "SELECT {tbl1}.num, {tbl2}.num, {tbl1}.name, {tbl2}.value FROM {tbl1} FULL OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num AND {tbl1}.name != {tbl2}.value",
         "outputs": [
-          [1, 1, "a",  "xxx"],
-          [1, 1, "a", "xxx"],
-          [2, null,"b", null],
-          [3,  3,  "c", "yyy"],
+          [1,  1, "a", "xxx"],
+          [1,  1, "a", "xxx"],
+          [2,  null, "b", null],
+          [3, 3, "c", "zzz"],
+          [3, 3, "c", "yyy"],
+          [3, 3, "yyy", "zzz"],
           [4, null, "e", null],
+          [4, null, "e", null],
+          [6, null, "e", null],
+          [7, null, "d", null],
+          [7, 7, "f", "d"],
+          [8, null, "z", null],
+          [null, 8, null, "z"],
+          [null, 6, null, "e"],
           [null, 5, null, "zzz"]
         ]
       },

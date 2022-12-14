@@ -154,7 +154,7 @@ public class TransferableBlock implements Block {
   /**
    * @return true when the block is a real end of stream block instead of error block.
    */
-  public boolean isEOSBlock() {
+  public boolean isSuccessfulEndOfStreamBlock() {
     return isType(MetadataBlock.MetadataBlockType.EOS);
   }
 
