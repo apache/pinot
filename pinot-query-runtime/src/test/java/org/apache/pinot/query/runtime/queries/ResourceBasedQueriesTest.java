@@ -98,12 +98,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         factory1.addSegment(tableNameWithType, toRow(columnAndTypes, tableEntry.getValue()._inputs));
       }
 
-      boolean anyHaveOutput =
-          testCase._queries.stream().anyMatch(q -> q._outputs != null);
+      boolean anyHaveOutput = testCase._queries.stream().anyMatch(q -> q._outputs != null);
 
       if (anyHaveOutput) {
-        boolean allHaveOutput =
-            testCase._queries.stream().allMatch(q -> q._outputs != null);
+        boolean allHaveOutput = testCase._queries.stream().allMatch(q -> q._outputs != null);
         if (!allHaveOutput) {
           throw new IllegalArgumentException("Cannot support one test where some queries require H2 and others don't");
         }
@@ -281,7 +279,6 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       URL testFileUrl = classLoader.getResource(testCaseFile);
       // This test only supports local resource loading (e.g. must be a file), not support JAR test loading.
       if (testFileUrl != null && new File(testFileUrl.getFile()).exists()) {
-<<<<<<< HEAD
         Map<String, QueryTestCase> testCases = MAPPER.readValue(new File(testFileUrl.getFile()),
             new TypeReference<Map<String, QueryTestCase>>() { });
         {
@@ -291,12 +288,6 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             throw new IllegalArgumentException("testCase already exist for the following names: " + hashSet);
           }
         }
-=======
-        Map<String, QueryTestCase> testCases =
-            MAPPER.readValue(new File(testFileUrl.getFile()), new TypeReference<Map<String, QueryTestCase>>() {
-            });
-        // TODO: potential test case conflicts between files, address later by throwing during setUp if already exist.
->>>>>>> e2ce23f86c (full join)
         testCaseMap.putAll(testCases);
       }
     }

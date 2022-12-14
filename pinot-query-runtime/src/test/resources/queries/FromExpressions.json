@@ -57,6 +57,16 @@
       },
       {
         "psql": "7.2.1.1",
+        "description": "LEFT OUTER JOIN with inequality condition",
+        "sql": "SELECT {tbl1}.num, {tbl2}.num, {tbl1}.name, {tbl2}.value FROM {tbl2} LEFT OUTER JOIN {tbl1} ON {tbl1}.num = {tbl2}.num AND {tbl1}.name != {tbl2}.value"
+      },
+      {
+        "psql": "7.2.1.1",
+        "description": "LEFT OUTER JOIN with inequality condition",
+        "sql": "SELECT {tbl1}.num, {tbl2}.num, {tbl1}.name, {tbl2}.value FROM {tbl2} LEFT OUTER JOIN {tbl1} ON {tbl1}.name = {tbl2}.value AND {tbl1}.num > {tbl2}.num + 1"
+      },
+      {
+        "psql": "7.2.1.1",
         "description": "CROSS JOIN",
         "sql": "SELECT * FROM {tbl1} CROSS JOIN {tbl2}"
       },
@@ -79,14 +89,10 @@
       {
         "psql": "7.2.1.1",
         "description": "RIGHT OUTER JOIN with inequality condition",
-        "ignored": true,
-        "comment": "failed because we don't handle the comparison for null correctly",
         "sql": "SELECT {tbl1}.num, {tbl2}.num, {tbl1}.name, {tbl2}.value FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.num = {tbl2}.num AND {tbl1}.name != {tbl2}.value"
       },
       {
         "psql": "7.2.1.1",
-        "ignored": true,
-        "comment": "failed because we don't handle the comparison for null correctly",
         "description": "RIGHT OUTER JOIN with inequality condition",
         "sql": "SELECT {tbl1}.num, {tbl2}.num, {tbl1}.name, {tbl2}.value FROM {tbl1} RIGHT OUTER JOIN {tbl2} ON {tbl1}.name = {tbl2}.value AND {tbl1}.num > {tbl2}.num + 1"
       },

@@ -25,7 +25,9 @@ import com.clearspring.analytics.util.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
@@ -39,7 +41,8 @@ import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
+import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
+import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
 
 
 /**
@@ -56,27 +59,29 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 public class HashJoinOperator extends BaseOperator<TransferableBlock> {
-  private class BroadcastRows {
-    public BroadcastRows(List<Object[]> rows, boolean hasMatch) {
-      _rows = rows;
-      _hasMatch = hasMatch;
-    }
-
-    public List<Object[]> _rows;
-    public boolean _hasMatch = false;
-  };
-
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES =
       ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL);
-  private final HashMap<Key, BroadcastRows> _broadcastHashTable;
+
+  private final HashMap<Key, List<Object[]>> _broadcastRightTable;
+
+  // Used to track matched right keys.
+  // Only used for right join and full join to output non-matched rows.
+  private final HashSet<Key> _matchedRightKeys;
+
+  // Used to track matched right keys.
+  // Only used for right join and full join to output non-matched rows.
+  private final HashSet<Key> _matchedLeftKeys;
+
+  private final HashMap<Key, List<Object[]>> _unmatchedLeftRows;
+
   private final Operator<TransferableBlock> _leftTableOperator;
   private final Operator<TransferableBlock> _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
   private final int _leftRowSize;
   private final int _resultRowSize;
-  private final List<FilterOperand> _joinClauseEvaluators;
+  private final List<TransformOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
 
   // Used only by full join.
@@ -86,6 +91,18 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private TransferableBlock _upstreamErrorBlock;
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
+
+  private boolean needUnmatchedRightRows(){
+    return _joinType == JoinRelType.RIGHT || _joinType == JoinRelType.FULL;
+  }
+
+  private boolean needUnmatchedLeftRows(){
+    return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL;
+  }
+
+  private boolean needUnmatchedRows(){
+    return _joinType != JoinRelType.INNER;
+  }
 
   public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
       DataSchema leftSchema, JoinNode node) {
@@ -106,10 +123,22 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     _rightTableOperator = rightTableOperator;
     _joinClauseEvaluators = new ArrayList<>(node.getJoinClauses().size());
     for (RexExpression joinClause : node.getJoinClauses()) {
-      _joinClauseEvaluators.add(FilterOperand.toFilterOperand(joinClause, _resultSchema));
+      _joinClauseEvaluators.add(TransformOperand.toTransformOperand(joinClause, _resultSchema));
     }
     _isHashTableBuilt = false;
-    _broadcastHashTable = new HashMap<>();
+    _broadcastRightTable = new HashMap<>();
+    if(needUnmatchedRightRows()) {
+      _matchedRightKeys = new HashSet<>();
+    } else {
+      _matchedRightKeys = null;
+    }
+    if(needUnmatchedLeftRows()){
+      _matchedLeftKeys = null;
+      _unmatchedLeftRows = null;
+    } else {
+      _matchedLeftKeys = null;
+      _unmatchedLeftRows = null;
+    }
     _upstreamErrorBlock = null;
   }
 
@@ -164,9 +193,9 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     List<Object[]> container = rightBlock.getContainer();
     // put all the rows into corresponding hash collections keyed by the key selector function.
     for (Object[] row : container) {
-      BroadcastRows hashCollection = _broadcastHashTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)),
-          k -> new BroadcastRows(new ArrayList<>(), false));
-      hashCollection._rows.add(row);
+      Key rightKey = new Key(_rightKeySelector.getKey(row));
+      List<Object[]> hashCollection = _broadcastRightTable.computeIfAbsent(rightKey, k -> new ArrayList<>());
+      hashCollection.add(row);
     }
   }
 
@@ -176,21 +205,31 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       _upstreamErrorBlock = leftBlock;
       return _upstreamErrorBlock;
     }
-    if (leftBlock.isNoOpBlock() || (leftBlock.isEOSBlock() && (_joinType != JoinRelType.FULL
-        && _joinType != JoinRelType.RIGHT))) {
+    if (leftBlock.isNoOpBlock() || (leftBlock.isEOSBlock() && !needUnmatchedRows())) {
       return leftBlock;
     }
     if (leftBlock.isEOSBlock()) {
-      // Return remaining non-matched rows for full join in broadcast table
+      // Return remaining non-matched rows for full join and right join in broadcast table
       List<Object[]> returnRows = new ArrayList<>();
-      for (BroadcastRows rows : _broadcastHashTable.values()) {
-        if (!rows._hasMatch) {
-          for (Object[] notMatchedRow : rows._rows) {
-            Object[] resultRow = joinRow(null, notMatchedRow);
-            if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream()
-                .allMatch(evaluator -> evaluator.apply(resultRow))) {
-              returnRows.add(resultRow);
-            }
+      if(needUnmatchedRightRows()) {
+        for (Map.Entry<Key, List<Object[]>> entry : _broadcastRightTable.entrySet()) {
+          if (_matchedRightKeys.contains(entry.getKey())) {
+            continue;
+          }
+          for (Object[] unmatchedRightRow : entry.getValue()) {
+            Object[] resultRow = joinRow(null, unmatchedRightRow);
+            returnRows.add(resultRow);
+          }
+        }
+      }
+      if(needUnmatchedLeftRows() && _unmatchedLeftRows != null ){
+        for (Map.Entry<Key, List<Object[]>> entry : _unmatchedLeftRows.entrySet()) {
+          if(_matchedLeftKeys.contains(entry.getKey())){
+            continue;
+          }
+          for (Object[] unmatchedLeftRow : entry.getValue()) {
+            Object[] resultRow = joinRow(unmatchedLeftRow, null);
+            returnRows.add(resultRow);
           }
         }
       }
@@ -200,32 +239,42 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     List<Object[]> rows = new ArrayList<>();
     List<Object[]> container = leftBlock.isEndOfStreamBlock() ? new ArrayList<>() : leftBlock.getContainer();
     for (Object[] leftRow : container) {
+      Key key = new Key(_leftKeySelector.getKey(leftRow));
       // NOTE: Empty key selector will always give same hash code.
-      BroadcastRows broadcastRows = _broadcastHashTable.getOrDefault(new Key(_leftKeySelector.getKey(leftRow)), null);
-      if (broadcastRows == null) {
-        switch (_joinType) {
-          case LEFT:
-            // intentional fall through
-          case FULL:
-            rows.add(joinRow(leftRow, null));
-            break;
-          case RIGHT:
-            // intentional fall through
-          case INNER:
-            break;
-          default:
-            Preconditions.checkState(false, "Join type shouldn't be supported:" + _joinType);
-            break;
+      List<Object[]> matchedRightRows = _broadcastRightTable.getOrDefault(key, null);
+      if (matchedRightRows == null) {
+        if(needUnmatchedLeftRows()) {
+          rows.add(joinRow(leftRow, null));
         }
         continue;
       }
-      broadcastRows._hasMatch = true;
-      for (Object[] rightRow : broadcastRows._rows) {
+      for (Object[] rightRow : matchedRightRows) {
         // TODO: Optimize this to avoid unnecessary object copy.
         Object[] resultRow = joinRow(leftRow, rightRow);
-        if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream()
-            .allMatch(evaluator -> evaluator.apply(resultRow))) {
+        if (_joinClauseEvaluators.isEmpty()) {
           rows.add(resultRow);
+          if(_matchedRightKeys != null) {
+            _matchedRightKeys.add(key);
+          }
+          if(_matchedLeftKeys != null){
+            _matchedLeftKeys.add(key);
+          }
+        } else {
+          if (_joinClauseEvaluators.stream().allMatch(
+              evaluator -> (Boolean) FunctionInvokeUtils.convert(evaluator.apply(resultRow), DataSchema.ColumnDataType.BOOLEAN))) {
+            rows.add(resultRow);
+            if(_matchedRightKeys != null) {
+              _matchedRightKeys.add(key);
+            }
+            if(_matchedLeftKeys != null){
+              _matchedLeftKeys.add(key);
+            }
+          } else {
+            if(_unmatchedLeftRows != null){
+              List<Object[]> unmatchedCollection = _broadcastRightTable.computeIfAbsent(key, k -> new ArrayList<>());
+              unmatchedCollection.add(resultRow);
+            }
+          }
         }
       }
     }
