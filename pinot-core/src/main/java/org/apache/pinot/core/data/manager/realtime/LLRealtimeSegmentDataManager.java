@@ -625,24 +625,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private void updateConsumerLagMetrics() {
-    boolean emitRecordsLag = true;
     boolean emitAvailabilityLag = true;
     if (_caughtUpWithUpstream) {
       Map<String, PartitionLagState> lagStateMap = getPartitionToLagState(getConsumerPartitionState(true));
       for (Map.Entry<String, PartitionLagState> entry : lagStateMap.entrySet()) {
         String partitionId = entry.getKey();
         PartitionLagState lagState = entry.getValue();
-        if (emitRecordsLag && !PartitionLagState.NOT_CALCULATED.equals(lagState.getRecordsLag())) {
-          try {
-            _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, Integer.parseInt(partitionId),
-                ServerGauge.LLC_RECORDS_LAG, Long.parseLong(lagState.getRecordsLag()));
-          } catch (NumberFormatException nfe) {
-            _segmentLogger.debug("Failed to parse the records lag {} returned from the consumer for partition {}",
-                lagState.getRecordsLag(), partitionId);
-            emitRecordsLag = false;
-          }
-        }
-
         if (emitAvailabilityLag && !PartitionLagState.NOT_CALCULATED.equals(lagState.getAvailabilityLagMs())) {
           try {
             _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, Integer.parseInt(partitionId),
@@ -1113,7 +1101,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    */
   private void cleanupMetrics() {
     _serverMetrics.removeTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING);
-    _serverMetrics.removePartitionGauge(_tableNameWithType, _partitionGroupId, ServerGauge.LLC_RECORDS_LAG);
     _serverMetrics.removePartitionGauge(_tableNameWithType, _partitionGroupId, ServerGauge.LLC_AVAILABILITY_LAG_MS);
   }
 

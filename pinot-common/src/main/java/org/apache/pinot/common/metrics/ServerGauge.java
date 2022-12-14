@@ -47,7 +47,6 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   CONSUMPTION_QUOTA_UTILIZATION("ratio", false),
   JVM_HEAP_USED_BYTES("bytes", true),
   // Consumer lag metrics
-  LLC_RECORDS_LAG("recordCount", false),
   LLC_AVAILABILITY_LAG_MS("availabilityLagMs", false);
 
   private final String _gaugeName;
