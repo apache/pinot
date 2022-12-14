@@ -75,7 +75,6 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private static final String FORWARD_INDEX_MAX_SIZE_BUFFER_SUFFIX = ".fwd.idx.maxsize.buf";
 
   private final String _columnName;
-  private final SegmentMetadata _segmentMetadata;
   private final IndexLoadingConfig _indexLoadingConfig;
   private final SegmentDirectory.Writer _segmentWriter;
   private final IndexCreatorProvider _indexCreatorProvider;
@@ -98,6 +97,9 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private final File _forwardIndexValueBufferFile;
   private final File _forwardIndexLengthBufferFile;
   private final File _forwardIndexMaxSizeBufferFile;
+
+  // SegmentMetadata may need to be updated
+  private SegmentMetadata _segmentMetadata;
 
   // Forward index buffers (to store the dictId at the correct docId)
   private PinotDataBuffer _forwardIndexValueBuffer;
@@ -224,7 +226,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       LOGGER.info("Created forward index from inverted index and dictionary. Updating metadata properties for "
           + "segment: {}, column: {}, property list: {}, is temporary: {}", segmentName, _columnName,
           metadataProperties, _isTemporaryForwardIndex);
-      SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties);
+      _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties, indexDir,
+          _segmentWriter.toSegmentDirectory());
     } catch (Exception e) {
       throw new IOException(
           String.format("Failed to update metadata properties for segment: %s, column: %s", segmentName, _columnName),

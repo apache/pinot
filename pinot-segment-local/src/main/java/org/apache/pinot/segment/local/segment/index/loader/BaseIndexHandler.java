@@ -90,6 +90,10 @@ public abstract class BaseIndexHandler implements IndexHandler {
             segmentWriter, indexCreatorProvider, isTemporaryForwardIndex);
     invertedIndexAndDictionaryBasedForwardIndexCreator.regenerateForwardIndex();
 
+    // Update the segmentMetadata
+    File indexDir = _segmentMetadata.getIndexDir();
+    _segmentMetadata = new SegmentMetadataImpl(indexDir);
+
     // Validate that the forward index is created.
     if (!segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)) {
       throw new IOException(String.format("Forward index was not created for column: %s, is temporary: %s", columnName,
@@ -100,24 +104,6 @@ public abstract class BaseIndexHandler implements IndexHandler {
       _tmpForwardIndexColumns.add(columnName);
     }
 
-    // Update the segmentMetadata
-    File indexDir = _segmentMetadata.getIndexDir();
-    reloadSegmentMetadata(indexDir, columnName);
-
     LOGGER.info("Rebuilt the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
-  }
-
-  protected void reloadSegmentMetadata(File indexDir, String columnName)
-      throws IOException {
-    // Need to setup the segmentMetadata to have the latest changes so that the remainder of the updateIndices code
-    // can access the latest segmentMetadata to build their respective indexes off of. This only modifies the
-    // `_segmentMetadata` for this object, and will not be reflected outside of this IndexHandler.
-    _segmentMetadata = new SegmentMetadataImpl(indexDir);
-    try {
-      _segmentDirectory.reloadMetadata();
-    } catch (Exception e) {
-      throw new IOException(
-          String.format("Caught exception while trying to reload segmentMetadata for column: %s", columnName), e);
-    }
   }
 }

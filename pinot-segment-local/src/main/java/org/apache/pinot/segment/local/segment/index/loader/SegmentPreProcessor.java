@@ -120,7 +120,6 @@ public class SegmentPreProcessor implements AutoCloseable {
         // code since modifying the `_segmentMetadata` within the IndexHandler doesn't modify this object directly but
         // creates a new one for use within the IndexHandler.
         _segmentMetadata = new SegmentMetadataImpl(indexDir);
-        _segmentDirectory.reloadMetadata();
       }
 
       // Create/modify/remove star-trees if required.

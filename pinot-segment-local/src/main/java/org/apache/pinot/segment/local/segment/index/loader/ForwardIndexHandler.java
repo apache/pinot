@@ -761,7 +761,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // .MIN_VALUE. When dictionary is enabled for this column later, cardinality value should be rightly populated so
     // that the dictionary can be loaded.
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(statsCollector.getCardinality()));
-    SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties);
+    _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties, indexDir,
+        _segmentDirectory);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
     // handler will take care of recreating the index.
@@ -769,8 +770,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
-
-    reloadSegmentMetadata(indexDir, column);
 
     LOGGER.info("Created dictionary based forward index for segment: {}, column: {}", segmentName, column);
   }
@@ -868,15 +867,14 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
-    SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties);
+    _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties, indexDir,
+        _segmentDirectory);
 
     // Remove range index, inverted index and FST index.
     removeDictRelatedIndexes(column, segmentWriter);
 
     // Delete marker file.
     FileUtils.deleteQuietly(inProgress);
-
-    reloadSegmentMetadata(indexDir, column);
 
     LOGGER.info("Created raw based forward index for segment: {}, column: {}", segmentName, column);
   }
