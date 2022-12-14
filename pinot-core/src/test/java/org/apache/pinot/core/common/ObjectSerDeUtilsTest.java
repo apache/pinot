@@ -189,9 +189,8 @@ public class ObjectSerDeUtilsTest {
   @Test
   public void testStringValueTimePair() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      ValueLongPair<String> expected = new StringLongPair(String.valueOf(RANDOM.nextDouble()), RANDOM.nextLong());
+      ValueLongPair<String> expected = new StringLongPair(RandomStringUtils.random(10), RANDOM.nextLong());
 
-      String temp = new String(expected.getValue().getBytes());
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       ValueLongPair<String> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.StringLongPair);
 
