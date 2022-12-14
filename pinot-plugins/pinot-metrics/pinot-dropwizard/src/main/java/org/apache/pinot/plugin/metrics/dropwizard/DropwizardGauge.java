@@ -31,7 +31,7 @@ public class DropwizardGauge<T> implements PinotGauge<T> {
   }
 
   public DropwizardGauge(Function<Void, T> condition) {
-    this(new DropwizardSettableGaugeImpl<>(() -> condition.apply(null)));
+    this(new DropwizardSettableGauge<>(() -> condition.apply(null)));
   }
 
   @Override

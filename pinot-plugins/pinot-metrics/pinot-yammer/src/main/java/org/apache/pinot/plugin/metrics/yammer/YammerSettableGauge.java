@@ -20,22 +20,37 @@ package org.apache.pinot.plugin.metrics.yammer;
 
 import com.yammer.metrics.core.Gauge;
 import java.util.function.Supplier;
+import org.apache.pinot.spi.metrics.SettableValue;
 
 /**
- * YammerSettableGauge extends {@link Gauge}, allowing setting a value supplier to provide the gauge value
+ * YammerSettableGauge extends {@link Gauge} and implements {@link SettableValue}, allowing setting a value or a value
+ * supplier to provide the gauge value.
  *
  * @param <T> the type of the metric's value
  */
-public abstract class YammerSettableGauge<T> extends Gauge<T> {
-  /**
-   * Sets the gauge value
-   * @param value the gauge value
-   */
-  abstract void setValue(T value);
+public class YammerSettableGauge<T> extends Gauge<T> implements SettableValue<T> {
+  private Supplier<T> _valueSupplier;
 
-  /**
-   * Sets a value supplier to provide the gauge value
-   * @param valueSupplier a value supplier to provide the gauge value
-   */
-  abstract void setValueSupplier(Supplier<T> valueSupplier);
+  public YammerSettableGauge(Supplier<T> valueSupplier) {
+    _valueSupplier = valueSupplier;
+  }
+
+  public YammerSettableGauge(T value) {
+    setValue(value);
+  }
+
+  @Override
+  public void setValue(T value) {
+    _valueSupplier = () -> value;
+  }
+
+  @Override
+  public void setValueSupplier(Supplier<T> valueSupplier) {
+    _valueSupplier = valueSupplier;
+  }
+
+  @Override
+  public T value() {
+    return _valueSupplier.get();
+  }
 }

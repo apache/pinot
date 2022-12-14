@@ -22,16 +22,16 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class YammerSettableGaugeImplTest {
+public class YammerSettableGaugeTest {
   @Test
   public void testCreateDropwizardSettableGaugeImplWithValue() {
-    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGaugeImpl<>(1L);
+    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGauge<>(1L);
     setAngCheck(yammerSettableGauge);
   }
 
   @Test
   public void testCreateDropwizardSettableGaugeImplWithValueSupplier() {
-    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGaugeImpl<>(() -> 1L);
+    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGauge<>(() -> 1L);
     setAngCheck(yammerSettableGauge);
   }
 

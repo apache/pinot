@@ -32,7 +32,7 @@ public class YammerGauge<T> implements PinotGauge<T> {
   }
 
   public YammerGauge(Function<Void, T> condition) {
-    this(new YammerSettableGaugeImpl<>(() -> condition.apply(null)));
+    this(new YammerSettableGauge<>(() -> condition.apply(null)));
   }
 
   @Override

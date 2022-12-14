@@ -27,7 +27,7 @@ public class DropwizardMetricsRegistryTest {
   @Test
   public void testNewGauge() {
     DropwizardMetricsRegistry dropwizardMetricsRegistry = new DropwizardMetricsRegistry();
-    DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGaugeImpl<>(1L);
+    DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGauge<>(1L);
     DropwizardGauge<Long> dropwizardGauge = new DropwizardGauge<>(dropwizardSettableGauge);
     PinotGauge<Long> pinotGauge = dropwizardMetricsRegistry.newGauge(new DropwizardMetricName("test"), dropwizardGauge);
     Assert.assertEquals(pinotGauge.value(), Long.valueOf(1L));

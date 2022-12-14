@@ -20,17 +20,37 @@ package org.apache.pinot.plugin.metrics.dropwizard;
 
 import com.codahale.metrics.SettableGauge;
 import java.util.function.Supplier;
-
+import org.apache.pinot.spi.metrics.SettableValue;
 
 /**
- * DropwizardSettableGauge extends {@link SettableGauge}, allowing setting a value supplier to provide the gauge value
+ * DropwizardSettableGauge extends {@link SettableGauge} and implements {@link SettableValue}, allowing setting a value
+ * or a value supplier to provide the gauge value
  *
  * @param <T> the type of the metric's value
  */
-public interface DropwizardSettableGauge<T> extends SettableGauge<T> {
-  /**
-   * Sets a value supplier to provide the gauge value
-   * @param valueSupplier a value supplier to provide the gauge value
-   */
-  void setValueSupplier(Supplier<T> valueSupplier);
+public class DropwizardSettableGauge<T> implements SettableGauge<T>, SettableValue<T> {
+  private Supplier<T> _valueSupplier;
+
+  public DropwizardSettableGauge(Supplier<T> valueSupplier) {
+    setValueSupplier(valueSupplier);
+  }
+
+  public DropwizardSettableGauge(T value) {
+    setValue(value);
+  }
+
+  @Override
+  public void setValueSupplier(Supplier<T> valueSupplier) {
+    _valueSupplier = valueSupplier;
+  }
+
+  @Override
+  public void setValue(T value) {
+    _valueSupplier = () -> value;
+  }
+
+  @Override
+  public T getValue() {
+    return _valueSupplier.get();
+  }
 }

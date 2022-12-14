@@ -34,22 +34,16 @@ import java.util.function.Supplier;
  *
  * @param <T> the type of the metric's value
  */
-public interface PinotGauge<T> extends PinotMetric {
+public interface PinotGauge<T> extends PinotMetric, SettableValue<T> {
 
   Object getGauge();
 
-  /**
-   * Sets the gauge value.
-   * @param value the gauge value to set.
-   */
+  @Override
   default void setValue(T value) {
     throw new RuntimeException("setValue is not implemented");
   }
 
-  /**
-   * Sets the gauge value supplier.
-   * @param valueSupplier the gauge value supplier to set.
-   */
+  @Override
   default void setValueSupplier(Supplier<T> valueSupplier) {
     throw new RuntimeException("setValueSupplier is not implemented");
   }

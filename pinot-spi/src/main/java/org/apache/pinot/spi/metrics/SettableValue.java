@@ -16,33 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.dropwizard;
+package org.apache.pinot.spi.metrics;
 
 import java.util.function.Supplier;
 
-public class DropwizardSettableGaugeImpl<T> implements DropwizardSettableGauge<T> {
-  private Supplier<T> _valueSupplier;
 
-  public DropwizardSettableGaugeImpl(Supplier<T> valueSupplier) {
-    setValueSupplier(valueSupplier);
-  }
+/**
+ * SettableValue allows the value to be set to a value or provided by a value supplier.
+ * @param <T> the type of the value to be set.
+ */
+public interface SettableValue<T> {
+  /**
+   * Sets the value.
+   * @param value the value to set.
+   */
+  void setValue(T value);
 
-  public DropwizardSettableGaugeImpl(T value) {
-    setValue(value);
-  }
-
-  @Override
-  public void setValueSupplier(Supplier<T> valueSupplier) {
-    _valueSupplier = valueSupplier;
-  }
-
-  @Override
-  public void setValue(T value) {
-    _valueSupplier = () -> value;
-  }
-
-  @Override
-  public T getValue() {
-    return _valueSupplier.get();
-  }
+  /**
+   * Sets the value supplier.
+   * @param valueSupplier the value supplier to set.
+   */
+  void setValueSupplier(Supplier<T> valueSupplier);
 }

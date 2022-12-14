@@ -25,7 +25,7 @@ import org.testng.annotations.Test;
 public class YammerGaugeTest {
   @Test
   public void testUpdateGaugeValue() {
-    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGaugeImpl<>(1L);
+    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGauge<>(1L);
     YammerGauge<Long> yammerGauge = new YammerGauge<>(yammerSettableGauge);
 
     Assert.assertEquals(yammerGauge.getGauge(), yammerSettableGauge);

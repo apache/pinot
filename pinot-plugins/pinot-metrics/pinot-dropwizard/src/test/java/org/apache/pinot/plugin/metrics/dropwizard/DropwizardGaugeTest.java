@@ -25,7 +25,7 @@ import org.testng.annotations.Test;
 public class DropwizardGaugeTest {
   @Test
   public void testUpdateGaugeValue() {
-    DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGaugeImpl<>(1L);
+    DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGauge<>(1L);
     DropwizardGauge<Long> dropwizardGauge = new DropwizardGauge<>(dropwizardSettableGauge);
 
     Assert.assertEquals(dropwizardGauge.getGauge(), dropwizardSettableGauge);

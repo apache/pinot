@@ -22,16 +22,16 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class DropwizardSettableGaugeImplTest {
+public class DropwizardSettableGaugeTest {
   @Test
   public void testCreateDropwizardSettableGaugeImplWithValue() {
-    DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGaugeImpl<>(1L);
+    DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGauge<>(1L);
     setAngCheck(dropwizardSettableGauge);
   }
 
   @Test
   public void testCreateDropwizardSettableGaugeImplWithValueSupplier() {
-    DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGaugeImpl<>(() -> 1L);
+    DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGauge<>(() -> 1L);
     setAngCheck(dropwizardSettableGauge);
   }
 

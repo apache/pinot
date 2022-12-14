@@ -28,7 +28,7 @@ public class YammerMetricsRegistryTest {
   @Test
   public void testNewGaugeNoError() {
     YammerMetricsRegistry yammerMetricsRegistry = new YammerMetricsRegistry();
-    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGaugeImpl<>(1L);
+    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGauge<>(1L);
     YammerGauge<Long> yammerGauge = new YammerGauge<>(yammerSettableGauge);
     MetricName metricName = new MetricName(this.getClass(), "test");
     PinotGauge<Long> pinotGauge = yammerMetricsRegistry.newGauge(new YammerMetricName(metricName), yammerGauge);
