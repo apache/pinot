@@ -28,6 +28,11 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 
 public class MetadataResultsBlock extends BaseResultsBlock {
 
+  @Override
+  public int getNumRows() {
+    return 0;
+  }
+
   @Nullable
   @Override
   public DataSchema getDataSchema(QueryContext queryContext) {
