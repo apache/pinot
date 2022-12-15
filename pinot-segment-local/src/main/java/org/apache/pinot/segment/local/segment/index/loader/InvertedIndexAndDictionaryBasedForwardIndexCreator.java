@@ -232,8 +232,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       LOGGER.info("Created forward index from inverted index and dictionary. Updating metadata properties for "
           + "segment: {}, column: {}, property list: {}, is temporary: {}", segmentName, _columnName,
           metadataProperties, _isTemporaryForwardIndex);
-      _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties,
-          _segmentDirectory);
+      _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
     } catch (Exception e) {
       throw new IOException(
           String.format("Failed to update metadata properties for segment: %s, column: %s", segmentName, _columnName),

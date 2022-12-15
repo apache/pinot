@@ -51,9 +51,10 @@ public class SegmentMetadataUtils {
     CommonsConfigurationUtils.saveToFile(propertiesConfiguration, metadataFile);
   }
 
-  public static SegmentMetadata updateMetadataProperties(SegmentMetadata segmentMetadata, Map<String,
-      String> metadataProperties, SegmentDirectory segmentDirectory)
+  public static SegmentMetadata updateMetadataProperties(SegmentDirectory segmentDirectory,
+      Map<String, String> metadataProperties)
       throws Exception {
+    SegmentMetadata segmentMetadata = segmentDirectory.getSegmentMetadata();
     PropertiesConfiguration propertiesConfiguration = SegmentMetadataUtils.getPropertiesConfiguration(segmentMetadata);
     for (Map.Entry<String, String> entry : metadataProperties.entrySet()) {
       propertiesConfiguration.setProperty(entry.getKey(), entry.getValue());

@@ -759,8 +759,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // .MIN_VALUE. When dictionary is enabled for this column later, cardinality value should be rightly populated so
     // that the dictionary can be loaded.
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(statsCollector.getCardinality()));
-    _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties,
-        _segmentDirectory);
+    _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
     // handler will take care of recreating the index.
@@ -865,8 +864,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
-    _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties,
-        _segmentDirectory);
+    _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // Remove range index, inverted index and FST index.
     removeDictRelatedIndexes(column, segmentWriter);
