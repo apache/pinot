@@ -16,47 +16,41 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.yammer;
+package org.apache.pinot.plugin.metrics.dropwizard;
 
-import java.util.function.Function;
+import com.codahale.metrics.SettableGauge;
 import java.util.function.Supplier;
-import org.apache.pinot.spi.metrics.PinotGauge;
+import org.apache.pinot.spi.metrics.SettableValue;
 
+/**
+ * DropwizardSettableGauge extends {@link SettableGauge} and implements {@link SettableValue}, allowing setting a value
+ * or a value supplier to provide the gauge value
+ *
+ * @param <T> the type of the metric's value
+ */
+public class DropwizardSettableGauge<T> implements SettableGauge<T>, SettableValue<T> {
+  private Supplier<T> _valueSupplier;
 
-public class YammerGauge<T> implements PinotGauge<T> {
-
-  private final YammerSettableGauge<T> _settableGauge;
-
-  public YammerGauge(YammerSettableGauge<T> settableGauge) {
-    _settableGauge = settableGauge;
+  public DropwizardSettableGauge(Supplier<T> valueSupplier) {
+    setValueSupplier(valueSupplier);
   }
 
-  public YammerGauge(Function<Void, T> condition) {
-    this(new YammerSettableGauge<>(() -> condition.apply(null)));
-  }
-
-  @Override
-  public Object getGauge() {
-    return _settableGauge;
-  }
-
-  @Override
-  public Object getMetric() {
-    return _settableGauge;
-  }
-
-  @Override
-  public T value() {
-    return _settableGauge.value();
-  }
-
-  @Override
-  public void setValue(T value) {
-    _settableGauge.setValue(value);
+  public DropwizardSettableGauge(T value) {
+    setValue(value);
   }
 
   @Override
   public void setValueSupplier(Supplier<T> valueSupplier) {
-    _settableGauge.setValueSupplier(valueSupplier);
+    _valueSupplier = valueSupplier;
+  }
+
+  @Override
+  public void setValue(T value) {
+    _valueSupplier = () -> value;
+  }
+
+  @Override
+  public T getValue() {
+    return _valueSupplier.get();
   }
 }

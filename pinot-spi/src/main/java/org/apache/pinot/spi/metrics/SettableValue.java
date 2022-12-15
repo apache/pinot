@@ -20,38 +20,21 @@ package org.apache.pinot.spi.metrics;
 
 import java.util.function.Supplier;
 
+
 /**
- * A gauge metric is an instantaneous reading of a particular value. To instrument a queue's depth,
- * for example:<br>
- * <pre><code>
- * final Queue&lt;String&gt; queue = new ConcurrentLinkedQueue&lt;String&gt;();
- * final Gauge&lt;Integer&gt; queueDepth = new Gauge&lt;Integer&gt;() {
- *     public Integer value() {
- *         return queue.size();
- *     }
- * };
- * </code></pre>
- *
- * @param <T> the type of the metric's value
+ * SettableValue allows the value to be set to a value or provided by a value supplier.
+ * @param <T> the type of the value to be set.
  */
-public interface PinotGauge<T> extends PinotMetric, SettableValue<T> {
-
-  Object getGauge();
-
-  @Override
-  default void setValue(T value) {
-    throw new RuntimeException("setValue is not implemented");
-  }
-
-  @Override
-  default void setValueSupplier(Supplier<T> valueSupplier) {
-    throw new RuntimeException("setValueSupplier is not implemented");
-  }
+public interface SettableValue<T> {
+  /**
+   * Sets the value.
+   * @param value the value to set.
+   */
+  void setValue(T value);
 
   /**
-   * Returns the metric's current value.
-   *
-   * @return the metric's current value
+   * Sets the value supplier.
+   * @param valueSupplier the value supplier to set.
    */
-  T value();
+  void setValueSupplier(Supplier<T> valueSupplier);
 }

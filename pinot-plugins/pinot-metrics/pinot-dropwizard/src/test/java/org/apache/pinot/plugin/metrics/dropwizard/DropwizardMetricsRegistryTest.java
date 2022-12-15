@@ -18,44 +18,20 @@
  */
 package org.apache.pinot.plugin.metrics.dropwizard;
 
-import java.util.function.Function;
-import java.util.function.Supplier;
 import org.apache.pinot.spi.metrics.PinotGauge;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
-public class DropwizardGauge<T> implements PinotGauge<T> {
 
-  private final DropwizardSettableGauge<T> _settableGauge;
-
-  public DropwizardGauge(DropwizardSettableGauge<T> settableGauge) {
-    _settableGauge = settableGauge;
-  }
-
-  public DropwizardGauge(Function<Void, T> condition) {
-    this(new DropwizardSettableGauge<>(() -> condition.apply(null)));
-  }
-
-  @Override
-  public Object getGauge() {
-    return _settableGauge;
-  }
-
-  @Override
-  public Object getMetric() {
-    return _settableGauge;
-  }
-
-  @Override
-  public T value() {
-    return _settableGauge.getValue();
-  }
-
-  @Override
-  public void setValue(T value) {
-    _settableGauge.setValue(value);
-  }
-
-  @Override
-  public void setValueSupplier(Supplier<T> valueSupplier) {
-    _settableGauge.setValueSupplier(valueSupplier);
+public class DropwizardMetricsRegistryTest {
+  @Test
+  public void testNewGauge() {
+    DropwizardMetricsRegistry dropwizardMetricsRegistry = new DropwizardMetricsRegistry();
+    DropwizardSettableGauge<Long> dropwizardSettableGauge = new DropwizardSettableGauge<>(1L);
+    DropwizardGauge<Long> dropwizardGauge = new DropwizardGauge<>(dropwizardSettableGauge);
+    PinotGauge<Long> pinotGauge = dropwizardMetricsRegistry.newGauge(new DropwizardMetricName("test"), dropwizardGauge);
+    Assert.assertEquals(pinotGauge.value(), Long.valueOf(1L));
+    pinotGauge = dropwizardMetricsRegistry.newGauge(new DropwizardMetricName("test"), null);
+    Assert.assertEquals(pinotGauge.value(), Long.valueOf(1L));
   }
 }

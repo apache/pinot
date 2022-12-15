@@ -18,45 +18,20 @@
  */
 package org.apache.pinot.plugin.metrics.yammer;
 
-import java.util.function.Function;
-import java.util.function.Supplier;
+import com.yammer.metrics.core.MetricName;
 import org.apache.pinot.spi.metrics.PinotGauge;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
-public class YammerGauge<T> implements PinotGauge<T> {
-
-  private final YammerSettableGauge<T> _settableGauge;
-
-  public YammerGauge(YammerSettableGauge<T> settableGauge) {
-    _settableGauge = settableGauge;
-  }
-
-  public YammerGauge(Function<Void, T> condition) {
-    this(new YammerSettableGauge<>(() -> condition.apply(null)));
-  }
-
-  @Override
-  public Object getGauge() {
-    return _settableGauge;
-  }
-
-  @Override
-  public Object getMetric() {
-    return _settableGauge;
-  }
-
-  @Override
-  public T value() {
-    return _settableGauge.value();
-  }
-
-  @Override
-  public void setValue(T value) {
-    _settableGauge.setValue(value);
-  }
-
-  @Override
-  public void setValueSupplier(Supplier<T> valueSupplier) {
-    _settableGauge.setValueSupplier(valueSupplier);
+public class YammerMetricsRegistryTest {
+  @Test
+  public void testNewGaugeNoError() {
+    YammerMetricsRegistry yammerMetricsRegistry = new YammerMetricsRegistry();
+    YammerSettableGauge<Long> yammerSettableGauge = new YammerSettableGauge<>(1L);
+    YammerGauge<Long> yammerGauge = new YammerGauge<>(yammerSettableGauge);
+    MetricName metricName = new MetricName(this.getClass(), "test");
+    PinotGauge<Long> pinotGauge = yammerMetricsRegistry.newGauge(new YammerMetricName(metricName), yammerGauge);
+    Assert.assertEquals(pinotGauge.value(), Long.valueOf(1L));
   }
 }

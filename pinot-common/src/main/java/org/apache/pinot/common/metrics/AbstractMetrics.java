@@ -28,8 +28,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -42,7 +44,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Common code for metrics implementations.
- *
+ * TODO: 1. With gauge updatable, we can remove _gaugeValues 2. Remove methods with callback in name since the callback
+ *   function can not be updated.
  */
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter,
     G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
@@ -479,6 +482,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   /**
    * Adds a new gauge whose values are retrieved from a callback function.
+   * Once added, the callback function cannot be updated.
    *
    * @param metricName The name of the metric
    * @param valueCallback The callback function used to retrieve the value of the gauge
@@ -495,6 +499,20 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
                 throw new AssertionError("Should not reach this");
               }
             }));
+  }
+
+  /**
+   * Adds or updates a gauge whose values are retrieved from the given supplier function.
+   * The supplier function can be updated by calling this method again.
+   *
+   * @param metricName The name of the metric
+   * @param valueSupplier The supplier function used to retrieve the value of the gauge
+   */
+  public void addOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) {
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+        PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.get()));
+    pinotGauge.setValueSupplier(valueSupplier);
   }
 
   /**
@@ -515,9 +533,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param gaugeName gauge name
    */
   public void removeGauge(final String gaugeName) {
-    if (_gaugeValues.remove(gaugeName) != null) {
-      removeCallbackGauge(gaugeName);
-    }
+    _gaugeValues.remove(gaugeName);
+    removeCallbackGauge(gaugeName);
   }
 
   /**
