@@ -6,6 +6,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -33,13 +36,17 @@ public class BenchmarkHashMap {
   private int _numThreads;
   private static final Random RANDOM = new Random();
 
-  private class Value {
-    public String _uuid;
-    public String _category;
-    public int _num;
-  };
+  private final Key[] _keys = new Key[NUM_VALUES];
 
-  private final Value[] _values = new Value[NUM_VALUES];
+  private final Key[] _copyKeys = new Key[NUM_VALUES];
+
+  private double _rangeMin = 100;
+  private double _rangeMax = 600;
+
+  private SumAggregationFunction _sumAgg = new SumAggregationFunction(null, false);
+
+  private final Record[] _records = new Record[NUM_VALUES];
+
   private ExecutorService _executorService;
 
   public int _uuidCardinality = 4752537;
@@ -96,11 +103,17 @@ public class BenchmarkHashMap {
     String[] UUIDSet = generateUUIDSet();
 
     for (int i = 0; i < NUM_VALUES; i++) {
-      Value value = new Value();
-      value._uuid = getRandomUUID(UUIDSet);
-      value._category = getRandomCategory();
-      value._num = getRandomNum();
-      _values[i] = value;
+      Object[] values = new Object[3];
+      values[0] = getRandomUUID(UUIDSet);
+      values[1] = getRandomCategory();
+      values[2] = getRandomNum();
+      _keys[i] = new Key(values);
+      Object[] copyValues = new Object[3];
+      copyValues[0] = new String(getRandomUUID(UUIDSet));
+      copyValues[1] = new String(getRandomCategory());
+      copyValues[2] = new Integer(getRandomNum());
+      _copyKeys[i] = new Key(copyValues);
+      _records[i] = new Record(new Double[]{(_rangeMax - _rangeMin) *  RANDOM.nextDouble()});
     }
     _executorService = Executors.newFixedThreadPool(_numThreads);
   }
@@ -112,16 +125,49 @@ public class BenchmarkHashMap {
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
-  public void concurrentHashMapPut()
+  public void concurrentHashMapSharedStringPool()
       throws Exception {
-    ConcurrentHashMap<Value, Integer> mp = new ConcurrentHashMap<Value, Integer>();
+    ConcurrentHashMap<Key, Record> mp = new ConcurrentHashMap<Key, Record>();
     CountDownLatch operatorLatch = new CountDownLatch(_numThreads);
-    int threadValSize = _values.length / _numThreads + 1;
+
+    int threadValSize = NUM_VALUES/ _numThreads + 1;
     for (int i = 0; i < _numThreads; i++) {
       int finalI = i;
       _executorService.submit(() -> {
-        for(int j = finalI * threadValSize; j < (finalI + 1) * threadValSize && j < _values.length; ++j){
-          mp.put(_values[finalI], 1);
+        for(int j = finalI * threadValSize; j < (finalI + 1) * threadValSize && j < NUM_VALUES; ++j){
+          int finalJ = j;
+          mp.computeIfPresent(_keys[j], (k, v) -> {
+            Double[] existingValues = (Double[]) v.getValues();
+            Double[] newValues = (Double[]) _records[finalJ].getValues();
+            existingValues[0] = _sumAgg.merge(existingValues[0], newValues[0]);
+            return v;
+          });
+        }
+        operatorLatch.countDown();
+      });
+    }
+    operatorLatch.await();
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  public void concurrentHashMapStringCopy()
+      throws Exception {
+    ConcurrentHashMap<Key, Record> mp = new ConcurrentHashMap<Key, Record>();
+    CountDownLatch operatorLatch = new CountDownLatch(_numThreads);
+
+    int threadValSize = NUM_VALUES/ _numThreads + 1;
+    for (int i = 0; i < _numThreads; i++) {
+      int finalI = i;
+      _executorService.submit(() -> {
+        for(int j = finalI * threadValSize; j < (finalI + 1) * threadValSize && j < NUM_VALUES; ++j){
+          int finalJ = j;
+          mp.computeIfPresent(_copyKeys[j], (k, v) -> {
+            Double[] existingValues = (Double[]) v.getValues();
+            Double[] newValues = (Double[]) _records[finalJ].getValues();
+            existingValues[0] = _sumAgg.merge(existingValues[0], newValues[0]);
+            return v;
+          });
         }
         operatorLatch.countDown();
       });
