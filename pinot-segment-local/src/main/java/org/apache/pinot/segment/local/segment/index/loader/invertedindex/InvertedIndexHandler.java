@@ -27,7 +27,6 @@ import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
@@ -48,9 +47,8 @@ public class InvertedIndexHandler extends BaseIndexHandler {
 
   private final Set<String> _columnsToAddIdx;
 
-  public InvertedIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory segmentDirectory) {
-    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
+  public InvertedIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+    super(segmentDirectory, indexLoadingConfig);
     _columnsToAddIdx = indexLoadingConfig.getInvertedIndexColumns();
   }
 

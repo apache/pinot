@@ -19,14 +19,12 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.slf4j.Logger;
@@ -50,12 +48,11 @@ public abstract class BaseIndexHandler implements IndexHandler {
   // The segmentMetadata may need to be updated after creating the forward index
   protected SegmentMetadata _segmentMetadata;
 
-  public BaseIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory segmentDirectory) {
-    _segmentMetadata = segmentMetadata;
-    _indexLoadingConfig = indexLoadingConfig;
-    _tmpForwardIndexColumns = new HashSet<>();
+  public BaseIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
     _segmentDirectory = segmentDirectory;
+    _indexLoadingConfig = indexLoadingConfig;
+    _segmentMetadata = segmentDirectory.getSegmentMetadata();
+    _tmpForwardIndexColumns = new HashSet<>();
   }
 
   @Override
@@ -86,13 +83,10 @@ public abstract class BaseIndexHandler implements IndexHandler {
 
     LOGGER.info("Rebuilding the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
     InvertedIndexAndDictionaryBasedForwardIndexCreator invertedIndexAndDictionaryBasedForwardIndexCreator =
-        new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentMetadata, _indexLoadingConfig,
+        new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, _indexLoadingConfig,
             segmentWriter, indexCreatorProvider, isTemporaryForwardIndex);
     invertedIndexAndDictionaryBasedForwardIndexCreator.regenerateForwardIndex();
-
-    // Update the segmentMetadata
-    File indexDir = _segmentMetadata.getIndexDir();
-    _segmentMetadata = new SegmentMetadataImpl(indexDir);
+    _segmentMetadata = _segmentDirectory.getSegmentMetadata();
 
     // Validate that the forward index is created.
     if (!segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)) {

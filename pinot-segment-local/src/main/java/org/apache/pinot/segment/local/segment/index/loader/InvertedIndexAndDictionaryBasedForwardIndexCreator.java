@@ -81,6 +81,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private final boolean _isTemporaryForwardIndex;
 
   // Metadata
+  private final SegmentDirectory _segmentDirectory;
   private final ColumnMetadata _columnMetadata;
   private final boolean _singleValue;
   private final int _cardinality;
@@ -109,18 +110,19 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   // For multi-valued column only to track max row size
   private PinotDataBuffer _forwardIndexMaxSizeBuffer;
 
-  public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentMetadata segmentMetadata,
+  public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentDirectory segmentDirectory,
       IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter,
       IndexCreatorProvider indexCreatorProvider, boolean isTemporaryForwardIndex)
       throws IOException {
     _columnName = columnName;
-    _segmentMetadata = segmentMetadata;
+    _segmentDirectory = segmentDirectory;
+    _segmentMetadata = segmentDirectory.getSegmentMetadata();
     _indexLoadingConfig = indexLoadingConfig;
     _segmentWriter = segmentWriter;
     _indexCreatorProvider = indexCreatorProvider;
     _isTemporaryForwardIndex = isTemporaryForwardIndex;
 
-    _columnMetadata = segmentMetadata.getColumnMetadataFor(columnName);
+    _columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
     _singleValue = _columnMetadata.isSingleValue();
     _cardinality = _columnMetadata.getCardinality();
     _numDocs = _columnMetadata.getTotalDocs();
@@ -134,7 +136,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
     // Sorted columns should never need recreation of the forward index as the forwardIndexDisabled flag is treated as
     // a no-op for sorted columns
-    File indexDir = segmentMetadata.getIndexDir();
+    File indexDir = _segmentMetadata.getIndexDir();
     String fileExtension;
     if (_dictionaryEnabled) {
       fileExtension = _singleValue ? V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION
@@ -222,12 +224,16 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
     try {
       // Update the metadata even for temporary forward index as other IndexHandlers may rely on the updated metadata
-      // to construct their indexes based on the forward index.
+      // to construct their indexes based on the forward index. For temporary forward index, this metadata will not
+      // be reset on forward index deletion for two reasons: a) for SV columns only dictionary related metadata is
+      // modified and for temporary forward index scenarios dictionary must be present and cannot be changed, b) for
+      // MV columns, in addition to dictionary related metadata, MAX_MULTI_VALUE_ELEMENTS and TOTAL_NUMBER_OF_ENTRIES
+      // may be modified which can be left behind in the modified state even on forward index deletion.
       LOGGER.info("Created forward index from inverted index and dictionary. Updating metadata properties for "
           + "segment: {}, column: {}, property list: {}, is temporary: {}", segmentName, _columnName,
           metadataProperties, _isTemporaryForwardIndex);
-      _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties, indexDir,
-          _segmentWriter.toSegmentDirectory());
+      _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties,
+          _segmentDirectory);
     } catch (Exception e) {
       throw new IOException(
           String.format("Failed to update metadata properties for segment: %s, column: %s", segmentName, _columnName),

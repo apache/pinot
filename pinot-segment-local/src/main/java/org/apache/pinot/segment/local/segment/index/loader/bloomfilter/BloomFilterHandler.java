@@ -35,7 +35,6 @@ import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.BloomFilterCreatorProvider;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -60,9 +59,8 @@ public class BloomFilterHandler extends BaseIndexHandler {
 
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
-  public BloomFilterHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory segmentDirectory) {
-    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
+  public BloomFilterHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+    super(segmentDirectory, indexLoadingConfig);
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
   }
 

@@ -45,7 +45,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIn
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -103,9 +102,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     CHANGE_RAW_INDEX_COMPRESSION_TYPE,
   }
 
-  public ForwardIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig, Schema schema,
-      SegmentDirectory segmentDirectory) {
-    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
+  public ForwardIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig, Schema schema) {
+    super(segmentDirectory, indexLoadingConfig);
     _schema = schema;
   }
 
@@ -761,7 +759,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // .MIN_VALUE. When dictionary is enabled for this column later, cardinality value should be rightly populated so
     // that the dictionary can be loaded.
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(statsCollector.getCardinality()));
-    _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties, indexDir,
+    _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties,
         _segmentDirectory);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
@@ -867,7 +865,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
-    _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties, indexDir,
+    _segmentMetadata = SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties,
         _segmentDirectory);
 
     // Remove range index, inverted index and FST index.

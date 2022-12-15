@@ -26,7 +26,6 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.JsonInd
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.Schema;
@@ -51,25 +50,25 @@ public class IndexHandlerFactory {
     }
   };
 
-  public static IndexHandler getIndexHandler(ColumnIndexType type, SegmentMetadataImpl segmentMetadata,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory segmentDirectory) {
+  public static IndexHandler getIndexHandler(ColumnIndexType type, SegmentDirectory segmentDirectory,
+      IndexLoadingConfig indexLoadingConfig, Schema schema) {
     switch (type) {
       case INVERTED_INDEX:
-        return new InvertedIndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
+        return new InvertedIndexHandler(segmentDirectory, indexLoadingConfig);
       case RANGE_INDEX:
-        return new RangeIndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
+        return new RangeIndexHandler(segmentDirectory, indexLoadingConfig);
       case TEXT_INDEX:
-        return new TextIndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
+        return new TextIndexHandler(segmentDirectory, indexLoadingConfig);
       case FST_INDEX:
-        return new FSTIndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
+        return new FSTIndexHandler(segmentDirectory, indexLoadingConfig);
       case JSON_INDEX:
-        return new JsonIndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
+        return new JsonIndexHandler(segmentDirectory, indexLoadingConfig);
       case H3_INDEX:
-        return new H3IndexHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
+        return new H3IndexHandler(segmentDirectory, indexLoadingConfig);
       case BLOOM_FILTER:
-        return new BloomFilterHandler(segmentMetadata, indexLoadingConfig, segmentDirectory);
+        return new BloomFilterHandler(segmentDirectory, indexLoadingConfig);
       case FORWARD_INDEX:
-        return new ForwardIndexHandler(segmentMetadata, indexLoadingConfig, schema, segmentDirectory);
+        return new ForwardIndexHandler(segmentDirectory, indexLoadingConfig, schema);
       default:
         return NO_OP_HANDLER;
     }

@@ -23,7 +23,6 @@ import java.io.File;
 import java.util.Map;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -53,17 +52,14 @@ public class SegmentMetadataUtils {
   }
 
   public static SegmentMetadata updateMetadataProperties(SegmentMetadata segmentMetadata, Map<String,
-      String> metadataProperties, File indexDir, SegmentDirectory segmentDirectory)
+      String> metadataProperties, SegmentDirectory segmentDirectory)
       throws Exception {
     PropertiesConfiguration propertiesConfiguration = SegmentMetadataUtils.getPropertiesConfiguration(segmentMetadata);
     for (Map.Entry<String, String> entry : metadataProperties.entrySet()) {
       propertiesConfiguration.setProperty(entry.getKey(), entry.getValue());
     }
     SegmentMetadataUtils.savePropertiesConfiguration(propertiesConfiguration);
-
-    segmentMetadata = new SegmentMetadataImpl(indexDir);
     segmentDirectory.reloadMetadata();
-
-    return segmentMetadata;
+    return segmentDirectory.getSegmentMetadata();
   }
 }

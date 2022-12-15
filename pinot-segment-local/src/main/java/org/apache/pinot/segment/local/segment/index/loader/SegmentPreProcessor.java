@@ -107,8 +107,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       List<IndexHandler> indexHandlers = new ArrayList<>();
       for (ColumnIndexType type : ColumnIndexType.values()) {
         IndexHandler handler =
-            IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig, _schema,
-                _segmentDirectory);
+            IndexHandlerFactory.getIndexHandler(type, _segmentDirectory, _indexLoadingConfig, _schema);
         indexHandlers.add(handler);
         // TODO: Find a way to ensure ForwardIndexHandler is always executed before other handlers instead of
         // relying on enum ordering.
@@ -116,10 +115,8 @@ public class SegmentPreProcessor implements AutoCloseable {
         // ForwardIndexHandler may modify the segment metadata while rewriting forward index to create / remove a
         // dictionary. Other IndexHandler classes may modify the segment metadata while creating a temporary forward
         // index to generate their respective indexes from if the forward index was disabled. This new metadata is
-        // needed to construct other indexes like RangeIndex. This also needs to be done outside of the IndexHandler
-        // code since modifying the `_segmentMetadata` within the IndexHandler doesn't modify this object directly but
-        // creates a new one for use within the IndexHandler.
-        _segmentMetadata = new SegmentMetadataImpl(indexDir);
+        // needed to construct other indexes like RangeIndex.
+        _segmentMetadata = _segmentDirectory.getSegmentMetadata();
       }
 
       // Create/modify/remove star-trees if required.
@@ -168,7 +165,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
       for (ColumnIndexType type : ColumnIndexType.values()) {
-        if (IndexHandlerFactory.getIndexHandler(type, _segmentMetadata, _indexLoadingConfig, _schema, _segmentDirectory)
+        if (IndexHandlerFactory.getIndexHandler(type, _segmentDirectory, _indexLoadingConfig, _schema)
             .needUpdateIndices(segmentReader)) {
           LOGGER.info("Found index type: {} needs updates", type);
           return true;

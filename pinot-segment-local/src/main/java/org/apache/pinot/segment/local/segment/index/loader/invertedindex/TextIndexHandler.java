@@ -47,7 +47,6 @@ import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.TextIndexCreatorProvider;
@@ -90,9 +89,8 @@ public class TextIndexHandler extends BaseIndexHandler {
   private final FSTType _fstType;
   private final Map<String, Map<String, String>> _columnProperties;
 
-  public TextIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig,
-      SegmentDirectory segmentDirectory) {
-    super(segmentMetadata, indexLoadingConfig, segmentDirectory);
+  public TextIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+    super(segmentDirectory, indexLoadingConfig);
     _fstType = indexLoadingConfig.getFSTIndexType();
     _columnsToAddIdx = indexLoadingConfig.getTextIndexColumns();
     _columnProperties = indexLoadingConfig.getColumnProperties();
