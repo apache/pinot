@@ -568,4 +568,32 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
             InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD));
     assertTrue(brokerResponse.isNumGroupsLimitReached());
   }
+
+  @Test
+  public void testDistinctSum() {
+    String query = "select DISTINCTSUM(column1) as v1, DISTINCTSUM(column3) as v2 from testTable";
+
+    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    ResultTable expectedResultTable =
+        new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{7074556592262.0, 23553878404013.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 0L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{2062916453604.0,
+        2334011146274.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + GROUP_BY);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{3745055692019.0,
+        12836683389098.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{1397706323624.0,
+        1686328722268.0}));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 73548L, 120000L, expectedResultTable);
+  }
 }

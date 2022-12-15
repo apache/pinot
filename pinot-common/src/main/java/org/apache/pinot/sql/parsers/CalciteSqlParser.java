@@ -780,6 +780,8 @@ public class CalciteSqlParser {
             functionNode.getFunctionQuantifier().toString()))) {
           if (canonicalName.equals("count")) {
             canonicalName = "distinctcount";
+          } else if (canonicalName.equals("sum")) {
+            canonicalName = "distinctsum";
           } else if (AggregationFunctionType.isAggregationFunction(canonicalName)) {
             // Aggregation function(other than COUNT) on DISTINCT is not supported, e.g. SUM(DISTINCT colA).
             throw new SqlCompilationException("Function '" + functionName + "' on DISTINCT is not supported.");
