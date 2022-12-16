@@ -125,7 +125,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
     }
 
     // Create a temporary forward index if it is disabled and does not exist
-    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, indexCreatorProvider, true);
 
     // Create new range index for the column.
     LOGGER.info("Creating new range index for segment: {}, column: {}", segmentName, columnName);

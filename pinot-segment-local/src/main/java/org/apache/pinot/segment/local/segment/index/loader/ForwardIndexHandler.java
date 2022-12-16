@@ -148,8 +148,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           break;
         }
         case ENABLE_FORWARD_INDEX_FOR_DICT_COLUMN: {
-          createForwardIndexIfNeeded(segmentWriter, _segmentMetadata.getColumnMetadataFor(column), indexCreatorProvider,
-              false);
+          createForwardIndexIfNeeded(segmentWriter, column, indexCreatorProvider, false);
           if (!segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
             throw new IOException(
                 String.format("Dictionary should still exist after rebuilding forward index for dictionary column: %s",
@@ -158,8 +157,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           break;
         }
         case ENABLE_FORWARD_INDEX_FOR_RAW_COLUMN: {
-          createForwardIndexIfNeeded(segmentWriter, _segmentMetadata.getColumnMetadataFor(column), indexCreatorProvider,
-              false);
+          createForwardIndexIfNeeded(segmentWriter, column, indexCreatorProvider, false);
           if (segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
             throw new IOException(
                 String.format("Dictionary should not exist after rebuilding forward index for raw column: %s", column));

@@ -1642,7 +1642,7 @@ public class ForwardIndexHandlerTest {
   }
 
   @Test
-  public void testOtherIndexAddForForwardIndexDisabledColumn()
+  public void testAddOtherIndexForForwardIndexDisabledColumn()
       throws Exception {
     SegmentMetadataImpl existingSegmentMetadata = new SegmentMetadataImpl(_segmentDirectory);
     SegmentDirectory segmentLocalFSDirectory =

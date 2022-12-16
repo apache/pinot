@@ -67,12 +67,11 @@ public abstract class BaseIndexHandler implements IndexHandler {
   }
 
   protected ColumnMetadata createForwardIndexIfNeeded(SegmentDirectory.Writer segmentWriter,
-      ColumnMetadata columnMetadata, IndexCreatorProvider indexCreatorProvider, boolean isTemporaryForwardIndex)
+      String columnName, IndexCreatorProvider indexCreatorProvider, boolean isTemporaryForwardIndex)
       throws IOException {
-    String columnName = columnMetadata.getColumnName();
     if (segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)) {
       LOGGER.info("Forward index already exists for column: {}, skip trying to create it", columnName);
-      return columnMetadata;
+      return _segmentMetadata.getColumnMetadataFor(columnName);
     }
 
     // If forward index is disabled it means that it has to be dictionary based and the inverted index must exist.
