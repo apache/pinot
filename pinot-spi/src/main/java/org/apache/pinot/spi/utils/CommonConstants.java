@@ -295,20 +295,10 @@ public class CommonConstants {
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
-        // Number of rows limit to select in leaf stage.
-        // It has to be greater than 0.
-        // If it is invalid number format, or the number is smaller than or equal to zero, we use
-        // DEFAULT_LEAF_NODE_LIMIT.
-        public static final String MS_LEAF_LIMIT = "multiStageLeafLimit";
-
-        // Override numGroupLimit used by v1 engine.
-        public static final String NUM_GROUP_LIMIT = "numGroupLimit";
-
-        // Override maxInitialResultCap used by v1 engine.
-        public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultCap";
-
-        // Override groupByTrimThreshold used by v1 engine.
-        public static final String GROUP_BY_TRIM_THRESHOLD = "groupByTrimThreshold";
+        public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
+        public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
+        public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
+        public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated

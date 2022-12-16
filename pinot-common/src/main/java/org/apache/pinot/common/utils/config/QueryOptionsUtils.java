@@ -167,55 +167,25 @@ public class QueryOptionsUtils {
     return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
   }
 
-  public static int getMultiStageLeafLimit(Map<String, String> queryOptions, int defaultLeafLimit) {
-    int result = 0;
-    try {
-      result = Integer.parseInt(queryOptions.getOrDefault(QueryOptionKey.MS_LEAF_LIMIT, "0"));
-    } catch (NumberFormatException e) {
-      result = 0;
-    }
-    if (result <= 0) {
-      result = defaultLeafLimit;
-    }
-    return result;
+  @Nullable
+  public static Integer getMultiStageLeafLimit(Map<String, String> queryOptions) {
+    String maxLeafLimitStr = queryOptions.get(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT);
+    return maxLeafLimitStr != null ? Integer.parseInt(maxLeafLimitStr) : null;
   }
 
-  public static int getNumGroupLimit(Map<String, String> queryOptions, int defaultNumGroupLimit) {
-    int result = 0;
-    try {
-      result = Integer.parseInt(queryOptions.getOrDefault(QueryOptionKey.NUM_GROUP_LIMIT, "0"));
-    } catch (NumberFormatException e) {
-      result = 0;
-    }
-    if (result <= 0) {
-      result = defaultNumGroupLimit;
-    }
-    return result;
+  @Nullable
+  public static Integer getNumGroupLimit(Map<String, String> queryOptions) {
+    String maxNumGroupLimit = queryOptions.get(QueryOptionKey.NUM_GROUPS_LIMIT);
+    return maxNumGroupLimit != null ? Integer.parseInt(maxNumGroupLimit): null;
   }
 
-  public static int getMaxInitResultCap(Map<String, String> queryOptions, int defaultMaxInitResultCap) {
-    int result = 0;
-    try {
-      result = Integer.parseInt(queryOptions.getOrDefault(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, "0"));
-    } catch (NumberFormatException e) {
-      result = 0;
-    }
-    if (result <= 0) {
-      result = defaultMaxInitResultCap;
-    }
-    return result;
+  public static int getMaxInitResultCap(Map<String, String> queryOptions) {
+    String maxInitResultCap = queryOptions.get(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    return maxInitResultCap != null? Integer.parseInt(maxInitResultCap) : null;
   }
 
-  public static int getGroupByTrimThreshold(Map<String, String> queryOptions, int defaultGroupByTrimThreshold) {
-    int result = 0;
-    try {
-      result = Integer.parseInt(queryOptions.getOrDefault(QueryOptionKey.GROUP_BY_TRIM_THRESHOLD, "0"));
-    } catch (NumberFormatException e) {
-      result = 0;
-    }
-    if (result <= 0) {
-      result = defaultGroupByTrimThreshold;
-    }
-    return result;
+  public static int getGroupByTrimThreshold(Map<String, String> queryOptions) {
+    String groupByTrimThreshold =  queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
+    return groupByTrimThreshold != null? Integer.parseInt(groupByTrimThreshold) :null;
   }
 }
