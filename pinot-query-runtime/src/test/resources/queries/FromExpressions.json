@@ -114,7 +114,9 @@
         ],
         "inputs": [
           ["foo", "alice", 1],
-          ["bar", "bob", 2]
+          ["bar", "bob", 2],
+          ["bar", "bob", 3],
+          ["bar", "bob", 4]
         ]
       },
       "tbl2" : {
@@ -126,7 +128,10 @@
         ],
         "inputs": [
           ["bar", "charlie", 2, 2.0],
+          ["foo", "charlie", 1, 1.0],
           ["foo", "bob", 3, 3.1416],
+          ["bar", "bob", 3, 3.0],
+          ["bar", "bob", 4, 4.0],
           ["alice", "alice", 4, 2.7183]
         ]
       }
