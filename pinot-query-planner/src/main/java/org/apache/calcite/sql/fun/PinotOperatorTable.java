@@ -40,6 +40,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
  *   <li>Still maintain minimum customization and benefit from Calcite's original operator table setting.</li>
  * </ul>
  */
+@SuppressWarnings("unused") // unused fields are accessed by reflection
 public class PinotOperatorTable extends SqlStdOperatorTable {
 
   private static @MonotonicNonNull PinotOperatorTable _instance;

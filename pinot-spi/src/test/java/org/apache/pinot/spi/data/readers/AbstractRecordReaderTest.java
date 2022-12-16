@@ -20,12 +20,17 @@ package org.apache.pinot.spi.data.readers;
 
 import com.google.common.collect.Sets;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.zip.GZIPOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -42,13 +47,14 @@ public abstract class AbstractRecordReaderTest {
   protected final static int SAMPLE_RECORDS_SIZE = 10000;
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordReaderTest");
+  protected final File _dataFile = new File(_tempDir, getDataFileName());
   protected List<Map<String, Object>> _records;
   protected List<Object[]> _primaryKeys;
   protected org.apache.pinot.spi.data.Schema _pinotSchema;
   protected Set<String> _sourceFields;
-  private RecordReader _recordReader;
+  protected RecordReader _recordReader;
 
-  private static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
+  protected static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
     List<Map<String, Object>> records = new ArrayList<>();
 
     for (int i = 0; i < SAMPLE_RECORDS_SIZE; i++) {
@@ -99,6 +105,8 @@ public abstract class AbstractRecordReaderTest {
         return RANDOM.nextDouble();
       case STRING:
         return RandomStringUtils.randomAscii(RANDOM.nextInt(50) + 1);
+      case BOOLEAN:
+        return RANDOM.nextBoolean();
       default:
         throw new RuntimeException("Not supported fieldSpec - " + fieldSpec);
     }
@@ -117,9 +125,11 @@ public abstract class AbstractRecordReaderTest {
         } else {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
-          Assert.assertEquals(actualRecords.length, expectedRecords.size());
-          for (int j = 0; j < actualRecords.length; j++) {
-            Assert.assertEquals(actualRecords[j], expectedRecords.get(j));
+          if (expectedRecords != null) {
+            Assert.assertEquals(actualRecords.length, expectedRecords.size());
+            for (int j = 0; j < actualRecords.length; j++) {
+              Assert.assertEquals(actualRecords[j], expectedRecords.get(j));
+            }
           }
         }
       }
@@ -155,6 +165,14 @@ public abstract class AbstractRecordReaderTest {
     return sourceFields;
   }
 
+  protected File compressFileWithGzip(String sourcePath, String targetPath)
+      throws IOException {
+    try (GZIPOutputStream gos = new GZIPOutputStream(new FileOutputStream(Paths.get(targetPath).toFile()))) {
+      Files.copy(Paths.get(sourcePath), gos);
+      return new File(targetPath);
+    }
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -188,12 +206,44 @@ public abstract class AbstractRecordReaderTest {
     checkValue(_recordReader, _records, _primaryKeys);
   }
 
+  @Test
+  public void testGzipRecordReader()
+      throws Exception {
+    // Test Gzipped Avro file that ends with ".gz"
+    File gzipDataFile = new File(_tempDir, _dataFile.getName() + ".gz");
+    compressFileWithGzip(_dataFile.getAbsolutePath(), gzipDataFile.getAbsolutePath());
+    RecordReader recordReader = createRecordReader(gzipDataFile);
+    checkValue(recordReader, _records, _primaryKeys);
+    recordReader.rewind();
+    checkValue(recordReader, _records, _primaryKeys);
+
+    // Test Gzipped Avro file that doesn't end with '.gz'.
+    File gzipDataFile2 = new File(_tempDir, _dataFile.getName() + ".test");
+    compressFileWithGzip(_dataFile.getAbsolutePath(), gzipDataFile2.getAbsolutePath());
+    recordReader = createRecordReader(gzipDataFile2);
+    checkValue(recordReader, _records, _primaryKeys);
+    recordReader.rewind();
+    checkValue(recordReader, _records, _primaryKeys);
+  }
+
+  /**
+   * Create the record reader given a file
+   *
+   * @param file input file
+   * @return an implementation of RecordReader of the given file
+   * @throws Exception
+   */
+  protected abstract RecordReader createRecordReader(File file)
+      throws Exception;
+
   /**
    * @return an implementation of RecordReader
    * @throws Exception
    */
-  protected abstract RecordReader createRecordReader()
-      throws Exception;
+  protected RecordReader createRecordReader()
+      throws Exception {
+    return createRecordReader(_dataFile);
+  }
 
   /**
    * Write records into a file
@@ -201,4 +251,10 @@ public abstract class AbstractRecordReaderTest {
    */
   protected abstract void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
       throws Exception;
+
+  /**
+   * Get data file name
+   * @throws Exception
+   */
+  protected abstract String getDataFileName();
 }

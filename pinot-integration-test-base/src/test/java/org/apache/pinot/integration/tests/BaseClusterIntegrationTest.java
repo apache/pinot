@@ -607,13 +607,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError) {
+    waitForDocsLoaded(timeoutMs, raiseError, getTableName());
+  }
+
+  protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     final long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          return getCurrentCountStarResult() == countStarResult;
+          return getCurrentCountStarResult(tableName) == countStarResult;
         } catch (Exception e) {
           return null;
         }

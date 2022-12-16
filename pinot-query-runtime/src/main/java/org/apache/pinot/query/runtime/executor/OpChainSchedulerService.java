@@ -21,11 +21,11 @@ package org.apache.pinot.query.runtime.executor;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.common.util.concurrent.Monitor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +45,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
 
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
+  private final long _pollIntervalMs;
 
   // anything that is guarded by this monitor should be non-blocking
   private final Monitor _monitor = new Monitor();
@@ -56,13 +57,19 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   };
 
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
+    this(scheduler, workerPool, -1);
+  }
+
+  public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool, long pollIntervalMs) {
     _scheduler = scheduler;
     _workerPool = workerPool;
+    _pollIntervalMs = pollIntervalMs;
   }
 
   @Override
   protected void triggerShutdown() {
-    // this wil just notify all waiters that the scheduler is shutting down
+    LOGGER.info("Triggered shutdown on OpChainScheduler...");
+    // this will just notify all waiters that the scheduler is shutting down
     _monitor.enter();
     _monitor.leave();
   }
@@ -71,42 +78,59 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   protected void run()
       throws Exception {
     while (isRunning()) {
-      _monitor.enterWhen(_hasNextOrClosing);
-      try {
-        if (!isRunning()) {
-          return;
-        }
-
-        OpChain operatorChain = _scheduler.next();
-        _workerPool.submit(new TraceRunnable() {
-          @Override
-          public void runJob() {
-            try {
-              ThreadResourceUsageProvider timer = operatorChain.getAndStartTimer();
-
-              // so long as there's work to be done, keep getting the next block
-              // when the operator chain returns a NOOP block, then yield the execution
-              // of this to another worker
-              TransferableBlock result = operatorChain.getRoot().nextBlock();
-              while (!result.isNoOpBlock() && !result.isEndOfStreamBlock()) {
-                LOGGER.debug("Got block with {} rows.", result.getNumRows());
-                result = operatorChain.getRoot().nextBlock();
-              }
-
-              if (!result.isEndOfStreamBlock()) {
-                // not complete, needs to re-register for scheduling
-                register(operatorChain);
-              } else {
-                LOGGER.info("Execution time: " + timer.getThreadTimeNs());
-              }
-            } catch (Exception e) {
-              LOGGER.error("Failed to execute query!", e);
-            }
+      if (enterMonitor()) {
+        try {
+          if (!isRunning()) {
+            return;
           }
-        });
-      } finally {
-        _monitor.leave();
+
+          OpChain operatorChain = _scheduler.next();
+          LOGGER.trace("({}): Scheduling", operatorChain);
+          _workerPool.submit(new TraceRunnable() {
+            @Override
+            public void runJob() {
+              try {
+                LOGGER.trace("({}): Executing", operatorChain);
+                operatorChain.getStats().executing();
+
+                // so long as there's work to be done, keep getting the next block
+                // when the operator chain returns a NOOP block, then yield the execution
+                // of this to another worker
+                TransferableBlock result = operatorChain.getRoot().nextBlock();
+                while (!result.isNoOpBlock() && !result.isEndOfStreamBlock()) {
+                  result = operatorChain.getRoot().nextBlock();
+                }
+
+                if (!result.isEndOfStreamBlock()) {
+                  // not complete, needs to re-register for scheduling
+                  register(operatorChain, false);
+                } else {
+                  if (result.isErrorBlock()) {
+                    LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
+                        result.getDataBlock().getExceptions());
+                  } else {
+                    LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
+                  }
+                }
+              } catch (Exception e) {
+                LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
+              }
+            }
+          });
+        } finally {
+          _monitor.leave();
+        }
       }
+    }
+  }
+
+  private boolean enterMonitor()
+      throws InterruptedException {
+    if (_pollIntervalMs >= 0) {
+      return _monitor.enterWhen(_hasNextOrClosing, _pollIntervalMs, TimeUnit.MILLISECONDS);
+    } else {
+      _monitor.enterWhen(_hasNextOrClosing);
+      return true;
     }
   }
 
@@ -116,9 +140,27 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
    * @param operatorChain the chain to register
    */
   public final void register(OpChain operatorChain) {
+    register(operatorChain, true);
+    LOGGER.debug("({}): Scheduler is now handling operator chain listening to mailboxes {}. "
+            + "There are a total of {} chains awaiting execution.",
+        operatorChain,
+        operatorChain.getReceivingMailbox(),
+        _scheduler.size());
+
+    // we want to track the time that it takes from registering
+    // an operator chain to when it completes, so make sure to
+    // start the timer here
+    operatorChain.getStats().startExecutionTimer();
+  }
+
+  public final void register(OpChain operatorChain, boolean isNew) {
     _monitor.enter();
     try {
-      _scheduler.register(operatorChain);
+      LOGGER.trace("({}): Registered operator chain (new: {}). Total: {}",
+          operatorChain, isNew, _scheduler.size());
+
+      _scheduler.register(operatorChain, isNew);
+      operatorChain.getStats().queued();
     } finally {
       _monitor.leave();
     }
@@ -134,6 +176,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   public final void onDataAvailable(MailboxIdentifier mailbox) {
     _monitor.enter();
     try {
+      LOGGER.trace("Notified onDataAvailable for mailbox {}", mailbox);
       _scheduler.onDataAvailable(mailbox);
     } finally {
       _monitor.leave();

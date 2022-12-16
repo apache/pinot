@@ -34,13 +34,12 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 
 
 public class ParquetNativeRecordReaderTest extends AbstractRecordReaderTest {
-  private final File _dataFile = new File(_tempDir, "data.parquet");
 
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(File file)
       throws Exception {
     ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader();
-    recordReader.init(_dataFile, _sourceFields, null);
+    recordReader.init(file, _sourceFields, null);
     return recordReader;
   }
 
@@ -56,11 +55,16 @@ public class ParquetNativeRecordReaderTest extends AbstractRecordReaderTest {
       }
       records.add(record);
     }
-    try (ParquetWriter<GenericRecord> writer = ParquetUtils
-        .getParquetAvroWriter(new Path(_dataFile.getAbsolutePath()), schema)) {
+    try (ParquetWriter<GenericRecord> writer = ParquetUtils.getParquetAvroWriter(new Path(_dataFile.getAbsolutePath()),
+        schema)) {
       for (GenericRecord record : records) {
         writer.write(record);
       }
     }
+  }
+
+  @Override
+  protected String getDataFileName() {
+    return "data.parquet";
   }
 }

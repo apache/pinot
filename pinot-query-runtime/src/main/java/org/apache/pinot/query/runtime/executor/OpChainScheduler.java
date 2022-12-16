@@ -32,8 +32,9 @@ public interface OpChainScheduler {
 
   /**
    * @param operatorChain the operator chain to register
+   * @param isNew         whether or not this is the first time the operator is scheduled
    */
-  void register(OpChain operatorChain);
+  void register(OpChain operatorChain, boolean isNew);
 
   /**
    * This method is called whenever {@code mailbox} has new data available to consume,
@@ -54,4 +55,9 @@ public interface OpChainScheduler {
    *         prior to this call
    */
   OpChain next();
+
+  /**
+   * @return the number of operator chains that are awaiting execution
+   */
+  int size();
 }

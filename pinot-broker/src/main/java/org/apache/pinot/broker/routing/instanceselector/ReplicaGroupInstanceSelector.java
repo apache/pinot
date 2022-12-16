@@ -29,7 +29,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.util.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
 /**

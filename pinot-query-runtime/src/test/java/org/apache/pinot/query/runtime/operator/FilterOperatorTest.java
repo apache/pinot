@@ -130,7 +130,7 @@ public class FilterOperatorTest {
     Assert.assertTrue(result.isEmpty());
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*boolean literal.*")
+  @Test
   public void shouldThrowOnNonBooleanTypeBooleanLiteral() {
     RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.STRING, "false");
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{
@@ -139,10 +139,13 @@ public class FilterOperatorTest {
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
     FilterOperator op = new FilterOperator(_upstreamOperator, inputSchema, booleanLiteral);
+    TransferableBlock errorBlock = op.getNextBlock();
+    Assert.assertTrue(errorBlock.isErrorBlock());
+    DataBlock data = errorBlock.getDataBlock();
+    Assert.assertTrue(data.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("cast"));
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Input has to be "
-      + "boolean type.*")
+  @Test
   public void shouldThrowOnNonBooleanTypeInputRef() {
     RexExpression ref0 = new RexExpression.InputRef(0);
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{
@@ -151,6 +154,10 @@ public class FilterOperatorTest {
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
     FilterOperator op = new FilterOperator(_upstreamOperator, inputSchema, ref0);
+    TransferableBlock errorBlock = op.getNextBlock();
+    Assert.assertTrue(errorBlock.isErrorBlock());
+    DataBlock data = errorBlock.getDataBlock();
+    Assert.assertTrue(data.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("cast"));
   }
 
   @Test

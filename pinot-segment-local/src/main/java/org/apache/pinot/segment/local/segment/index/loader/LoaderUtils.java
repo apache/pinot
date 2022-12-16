@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDiction
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -63,6 +64,17 @@ public class LoaderUtils {
       throws IOException {
     PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
     return PhysicalColumnIndexContainer.loadDictionary(dataBuffer, columnMetadata, false);
+  }
+
+  /**
+   * Returns the inverted index reader for the given column.
+   */
+  public static InvertedIndexReader<?> getInvertedIndexReader(SegmentDirectory.Reader segmentReader,
+      ColumnMetadata columnMetadata)
+      throws IOException {
+    PinotDataBuffer dataBuffer =
+        segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.INVERTED_INDEX);
+    return IndexingOverrides.getIndexReaderProvider().newInvertedIndexReader(dataBuffer, columnMetadata);
   }
 
   /**

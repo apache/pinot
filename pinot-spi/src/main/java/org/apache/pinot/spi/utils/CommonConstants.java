@@ -120,10 +120,13 @@ public class CommonConstants {
     }
 
     public static class ZkClient {
-      public static final long DEFAULT_CONNECT_TIMEOUT_SEC = 60L;
+      public static final int DEFAULT_CONNECT_TIMEOUT_MS = 60_000;
+      public static final int DEFAULT_SESSION_TIMEOUT_MS = 30_000;
       // Retry interval and count for ZK operations where we would rather fail than get an empty (wrong) result back
       public static final int RETRY_INTERVAL_MS = 50;
       public static final int RETRY_COUNT = 2;
+      public static final String ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG = "zk.client.connection.timeout.ms";
+      public static final String ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG = "zk.client.session.timeout.ms";
     }
 
     public static class DataSource {

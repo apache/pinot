@@ -174,6 +174,7 @@ public class QueryException {
     return copiedProcessingException;
   }
 
+  // TODO: getTruncatedStackTrace(Throwable) always precede by t.getMessage();
   public static String getTruncatedStackTrace(Throwable t) {
     StringWriter stringWriter = new StringWriter();
     t.printStackTrace(new PrintWriter(stringWriter));

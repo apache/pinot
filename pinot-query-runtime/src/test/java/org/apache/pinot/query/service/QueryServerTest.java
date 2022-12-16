@@ -37,7 +37,6 @@ import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -47,8 +46,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.mockito.ArgumentMatchers.any;
 
 
 public class QueryServerTest extends QueryTestSet {
@@ -123,7 +120,7 @@ public class QueryServerTest extends QueryTestSet {
               StageNode stageNode = queryPlan.getQueryStageMap().get(stageId);
               return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot())
                   && isMetadataMapsEqual(stageMetadata, distributedStagePlan.getMetadataMap().get(stageId));
-            }), any(OpChainSchedulerService.class), Mockito.argThat(requestMetadataMap ->
+            }), Mockito.argThat(requestMetadataMap ->
                 requestIdStr.equals(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID))));
             return true;
           } catch (Throwable t) {

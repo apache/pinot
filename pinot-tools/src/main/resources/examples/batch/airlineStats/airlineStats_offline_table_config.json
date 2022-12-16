@@ -13,7 +13,9 @@
     {
       "name": "ts",
       "encodingType": "DICTIONARY",
-      "indexTypes": ["TIMESTAMP"],
+      "indexTypes": [
+        "TIMESTAMP"
+      ],
       "timestampConfig": {
         "granularities": [
           "DAY",
@@ -24,6 +26,36 @@
     }
   ],
   "tableIndexConfig": {
+    "starTreeIndexConfigs": [
+      {
+        "dimensionsSplitOrder": [
+          "AirlineID",
+          "Origin",
+          "Dest"
+        ],
+        "skipStarNodeCreationForDimensions": [],
+        "functionColumnPairs": [
+          "COUNT__*",
+          "MAX__ArrDelay"
+        ],
+        "maxLeafRecords": 10
+      },
+      {
+        "dimensionsSplitOrder": [
+          "Carrier",
+          "CancellationCode",
+          "Origin",
+          "Dest"
+        ],
+        "skipStarNodeCreationForDimensions": [],
+        "functionColumnPairs": [
+          "MAX__CarrierDelay",
+          "AVG__CarrierDelay"
+        ],
+        "maxLeafRecords": 10
+      }
+    ],
+    "enableDynamicStarTreeCreation": true,
     "loadMode": "MMAP"
   },
   "metadata": {
@@ -40,5 +72,21 @@
         "transformFunction": "fromEpochDays(DaysSinceEpoch)"
       }
     ]
-  }
+  },
+  "tierConfigs": [
+    {
+      "name": "hotTier",
+      "segmentSelectorType": "time",
+      "segmentAge": "3130d",
+      "storageType": "pinot_server",
+      "serverTag": "DefaultTenant_OFFLINE"
+    },
+    {
+      "name": "coldTier",
+      "segmentSelectorType": "time",
+      "segmentAge": "3140d",
+      "storageType": "pinot_server",
+      "serverTag": "DefaultTenant_OFFLINE"
+    }
+  ]
 }

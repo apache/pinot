@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import com.clearspring.analytics.util.Preconditions;
+import com.google.common.base.Preconditions;
+import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -79,8 +80,8 @@ public class MultiplexingMailboxService implements MailboxService<TransferableBl
   }
 
   public static MultiplexingMailboxService newInstance(String hostname, int port,
-      PinotConfiguration pinotConfiguration) {
-    return new MultiplexingMailboxService(new GrpcMailboxService(hostname, port, pinotConfiguration),
-        new InMemoryMailboxService(hostname, port));
+      PinotConfiguration pinotConfiguration, Consumer<MailboxIdentifier> gotMailCallback) {
+    return new MultiplexingMailboxService(new GrpcMailboxService(hostname, port, pinotConfiguration, gotMailCallback),
+        new InMemoryMailboxService(hostname, port, gotMailCallback));
   }
 }

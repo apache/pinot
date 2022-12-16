@@ -193,7 +193,6 @@ public class SegmentDeletionManager {
       long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
       LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
       deleteSegmentsWithDelay(tableName, segmentsToRetryLater, deletedSegmentsRetentionMs, effectiveDeletionDelay);
-      return;
     }
   }
 

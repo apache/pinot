@@ -18,26 +18,145 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
+import com.google.common.collect.ImmutableList;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.query.mailbox.MailboxIdentifier;
+import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.mockito.Mockito;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class RoundRobinSchedulerTest {
 
+  private static final MailboxIdentifier MAILBOX_1 = new StringMailboxIdentifier("1_1:foo:2:bar:3");
+  private static final MailboxIdentifier MAILBOX_2 = new StringMailboxIdentifier("1_2:foo:2:bar:3");
+
+  @Mock
+  private Operator<TransferableBlock> _operator;
+
+  private AutoCloseable _mocks;
+
+  @BeforeClass
+  public void beforeClass() {
+    _mocks = MockitoAnnotations.openMocks(this);
+  }
+
+  @AfterClass
+  public void afterClass()
+      throws Exception {
+    _mocks.close();
+  }
+
   @Test
-  public void shouldPollOperators() {
+  public void shouldScheduleNewOpChainsImmediately() {
     // Given:
-    OpChain opChain = Mockito.mock(OpChain.class);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
-    scheduler.register(opChain);
+    scheduler.register(chain, true);
 
     // Then:
-    Assert.assertTrue(scheduler.hasNext(), "expected next");
-    Assert.assertEquals(scheduler.next(), opChain);
-    Assert.assertFalse(scheduler.hasNext(), "should no longer have next after polling");
+    Assert.assertTrue(scheduler.hasNext());
+    Assert.assertEquals(scheduler.next(), chain);
+  }
+
+  @Test
+  public void shouldNotScheduleRescheduledOpChainsImmediately() {
+    // Given:
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    RoundRobinScheduler scheduler = new RoundRobinScheduler();
+
+    // When:
+    scheduler.register(chain, false);
+
+    // Then:
+    Assert.assertFalse(scheduler.hasNext());
+  }
+
+  @Test
+  public void shouldScheduleRescheduledOpChainOnDataAvailable() {
+    // Given:
+    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain2 = new OpChain(_operator, ImmutableList.of(MAILBOX_2), 123, 1);
+    RoundRobinScheduler scheduler = new RoundRobinScheduler();
+
+    // When:
+    scheduler.register(chain1, false);
+    scheduler.register(chain2, false);
+    scheduler.onDataAvailable(MAILBOX_1);
+
+    // Then:
+    Assert.assertTrue(scheduler.hasNext());
+    Assert.assertEquals(scheduler.next(), chain1);
+    Assert.assertFalse(scheduler.hasNext());
+  }
+
+  @Test
+  public void shouldScheduleRescheduledOpChainAfterTimeout() {
+    // Given:
+    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    AtomicLong ticker = new AtomicLong(0);
+    RoundRobinScheduler scheduler = new RoundRobinScheduler(100, ticker::get);
+
+    // When:
+    scheduler.register(chain1, false);
+    ticker.set(101);
+
+    // Then:
+    Assert.assertTrue(scheduler.hasNext());
+    Assert.assertEquals(scheduler.next(), chain1);
+  }
+
+  @Test
+  public void shouldScheduleRescheduledOpChainOnDataAvailableBeforeRegister() {
+    // Given:
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    RoundRobinScheduler scheduler = new RoundRobinScheduler();
+
+    // When:
+    scheduler.onDataAvailable(MAILBOX_1);
+    scheduler.register(chain, false);
+
+    // Then:
+    Assert.assertTrue(scheduler.hasNext());
+    Assert.assertEquals(scheduler.next(), chain);
+  }
+
+  @Test
+  public void shouldNotScheduleRescheduledOpChainOnDataAvailableForDifferentMailbox() {
+    // Given:
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    RoundRobinScheduler scheduler = new RoundRobinScheduler();
+
+    // When:
+    scheduler.register(chain, false);
+    scheduler.onDataAvailable(MAILBOX_2);
+
+    // Then:
+    Assert.assertFalse(scheduler.hasNext());
+  }
+
+  @Test
+  public void shouldScheduleRescheduledOpChainOnDataAvailableForAnyMailbox() {
+    // Given:
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1, MAILBOX_2), 123, 1);
+    RoundRobinScheduler scheduler = new RoundRobinScheduler();
+
+    // When:
+    scheduler.register(chain, false);
+    scheduler.onDataAvailable(MAILBOX_2);
+
+    // Then:
+    Assert.assertTrue(scheduler.hasNext());
+    Assert.assertEquals(scheduler.next(), chain);
+    Assert.assertEquals(scheduler._seenMail.size(), 0);
   }
 }

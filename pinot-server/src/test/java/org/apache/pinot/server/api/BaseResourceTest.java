@@ -49,7 +49,6 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -84,8 +83,8 @@ public abstract class BaseResourceTest {
   private final Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
   protected final List<ImmutableSegment> _realtimeIndexSegments = new ArrayList<>();
   protected final List<ImmutableSegment> _offlineIndexSegments = new ArrayList<>();
-  private File _avroFile;
-  private AdminApiApplication _adminApiApplication;
+  protected File _avroFile;
+  protected AdminApiApplication _adminApiApplication;
   protected WebTarget _webTarget;
   protected String _instanceId;
 

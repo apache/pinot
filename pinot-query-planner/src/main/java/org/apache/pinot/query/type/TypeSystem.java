@@ -25,6 +25,8 @@ import org.apache.calcite.rel.type.RelDataTypeSystemImpl;
  * The {@code TypeSystem} overwrites Calcite type system with Pinot specific logics.
  */
 public class TypeSystem extends RelDataTypeSystemImpl {
+  private static final int MAX_DECIMAL_SCALE_DIGIT = 1000;
+  private static final int MAX_DECIMAL_PRECISION_DIGIT = 1000;
 
   @Override
   public boolean shouldConvertRaggedUnionTypesToVarying() {
@@ -37,5 +39,15 @@ public class TypeSystem extends RelDataTypeSystemImpl {
     // spaces at the end (e.g. 'No' -> 'No '), which ultimately causes incorrect
     // behavior. This calcite flag will cause this to be cast to VARCHAR instead
     return true;
+  }
+
+  @Override
+  public int getMaxNumericScale() {
+    return MAX_DECIMAL_SCALE_DIGIT;
+  }
+
+  @Override
+  public int getMaxNumericPrecision() {
+    return MAX_DECIMAL_PRECISION_DIGIT;
   }
 }

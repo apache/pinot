@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.store;
 import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -54,6 +55,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class SingleFileIndexDirectoryTest {
@@ -82,6 +84,7 @@ public class SingleFileIndexDirectoryTest {
   void writeMetadata() {
     SegmentMetadataImpl meta = Mockito.mock(SegmentMetadataImpl.class);
     Mockito.when(meta.getVersion()).thenReturn(SegmentVersion.v3);
+    Mockito.when(meta.getStarTreeV2MetadataList()).thenReturn(null);
     _segmentMetadata = meta;
   }
 
@@ -389,6 +392,16 @@ public class SingleFileIndexDirectoryTest {
       assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.H3_INDEX), new HashSet<>(Collections.emptySet()));
       assertEquals(sfd.getColumnsWithIndex(ColumnIndexType.TEXT_INDEX),
           new HashSet<>(Collections.singletonList("bar")));
+    }
+  }
+
+  @Test(expectedExceptions = FileNotFoundException.class, expectedExceptionsMessageRegExp = ".*star_tree_index.*")
+  public void testLoadStarTreeIndex()
+      throws Exception {
+    Mockito.when(_segmentMetadata.getStarTreeV2MetadataList()).thenReturn(Collections.emptyList());
+    try (SingleFileIndexDirectory ignore = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      // Trying to load startree index but not able to find the file.
+      fail();
     }
   }
 }

@@ -37,13 +37,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class ORCRecordReaderTest extends AbstractRecordReaderTest {
-  private final File _dataFile = new File(_tempDir, "data.orc");
 
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(File file)
       throws Exception {
     ORCRecordReader orcRecordReader = new ORCRecordReader();
-    orcRecordReader.init(_dataFile, _sourceFields, null);
+    orcRecordReader.init(file, _sourceFields, null);
     return orcRecordReader;
   }
 
@@ -142,5 +141,10 @@ public class ORCRecordReaderTest extends AbstractRecordReaderTest {
       rowBatch.reset();
     }
     writer.close();
+  }
+
+  @Override
+  protected String getDataFileName() {
+    return "data.orc";
   }
 }

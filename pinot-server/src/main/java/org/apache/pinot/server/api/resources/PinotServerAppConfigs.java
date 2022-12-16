@@ -31,7 +31,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.common.utils.PinotAppConfigs;
-import org.apache.pinot.server.starter.helix.AdminApiApplication;
+import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;

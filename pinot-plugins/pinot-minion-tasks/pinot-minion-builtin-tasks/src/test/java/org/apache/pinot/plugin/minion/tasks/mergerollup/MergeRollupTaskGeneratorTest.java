@@ -40,12 +40,16 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -57,6 +61,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -67,13 +72,53 @@ import static org.testng.Assert.assertTrue;
 public class MergeRollupTaskGeneratorTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
+  private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
   private static final String DAILY = "daily";
   private static final String MONTHLY = "monthly";
 
-  private TableConfig getOfflineTableConfig(Map<String, Map<String, String>> taskConfigsMap) {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+  private TableConfig getTableConfig(TableType tableType, Map<String, Map<String, String>> taskConfigsMap) {
+    return new TableConfigBuilder(tableType).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
         .setTaskConfig(new TableTaskConfig(taskConfigsMap)).build();
+  }
+
+  @Test
+  public void testValidateIfMergeRollupCanBeEnabledOrNot() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+      .setTableName(RAW_TABLE_NAME)
+      .setTimeColumnName(TIME_COLUMN_NAME)
+      .build();
+    assertTrue(MergeRollupTaskGenerator.validate(tableConfig, MinionConstants.MergeRollupTask.TASK_TYPE));
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(
+            new BatchIngestionConfig(Collections.emptyList(), "REFRESH", "daily"));
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    assertFalse(MergeRollupTaskGenerator.validate(tableConfig, MinionConstants.MergeRollupTask.TASK_TYPE));
+
+    tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME)
+        .build();
+    assertTrue(MergeRollupTaskGenerator.validate(tableConfig, MinionConstants.MergeRollupTask.TASK_TYPE));
+
+    tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .build();
+    assertFalse(MergeRollupTaskGenerator.validate(tableConfig, MinionConstants.MergeRollupTask.TASK_TYPE));
+
+    tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME)
+        .setDedupConfig(new DedupConfig(true, HashFunction.MD5))
+        .build();
+    assertFalse(MergeRollupTaskGenerator.validate(tableConfig, MinionConstants.MergeRollupTask.TASK_TYPE));
   }
 
   /**
@@ -84,21 +129,37 @@ public class MergeRollupTaskGeneratorTest {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
 
     when(mockClusterInfoProvide.getTaskStates(MinionConstants.MergeRollupTask.TASK_TYPE)).thenReturn(new HashMap<>());
-    SegmentZKMetadata metadata1 = getSegmentZKMetadata("testTable__0", 5000, 50_000, TimeUnit.MILLISECONDS, null);
-    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(Lists.newArrayList(metadata1));
+    // the two following segments will be skipped when generating tasks
+    SegmentZKMetadata realtimeTableSegmentMetadata1 =
+        getSegmentZKMetadata("testTable__0__0__0", 5000, 50_000, TimeUnit.MILLISECONDS, null);
+    realtimeTableSegmentMetadata1.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    SegmentZKMetadata realtimeTableSegmentMetadata2 =
+        getSegmentZKMetadata("testTable__1__0__0", 5000, 50_000, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
+        .thenReturn(Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2));
+
+    SegmentZKMetadata offlineTableSegmentMetadata =
+        getSegmentZKMetadata("testTable__0", 5000, 50_000, TimeUnit.MILLISECONDS, null);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME))
+        .thenReturn(Lists.newArrayList(offlineTableSegmentMetadata));
 
     MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
     generator.init(mockClusterInfoProvide);
 
-    // Skip task generation, if realtime table
-    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).build();
-    List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    // Skip task generation, if the table is a realtime table and all segments are skipped
+    // We don't test realtime REFRESH table because this combination does not make sense
+    assertTrue(MergeRollupTaskGenerator.filterSegmentsBasedOnStatus(TableType.REALTIME,
+        Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2)).isEmpty());
+    TableConfig realtimeTableConfig = getTableConfig(TableType.REALTIME, new HashMap<>());
+    List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
 
-    // Skip task generation, if REFRESH table
+    // Skip task generation, if the table is an offline REFRESH table
+    assertFalse(MergeRollupTaskGenerator.filterSegmentsBasedOnStatus(TableType.OFFLINE,
+        Lists.newArrayList(offlineTableSegmentMetadata)).isEmpty());
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", null));
-    offlineTableConfig = getOfflineTableConfig(new HashMap<>());
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, new HashMap<>());
     offlineTableConfig.setIngestionConfig(ingestionConfig);
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
@@ -165,7 +226,7 @@ public class MergeRollupTaskGeneratorTest {
     tableTaskConfigs.put("daily.bucketTimePeriod", "1d");
     tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
     taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
-    TableConfig offlineTableConfig = getOfflineTableConfig(taskConfigsMap);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME))
         .thenReturn(Lists.newArrayList(Collections.emptyList()));
@@ -191,7 +252,7 @@ public class MergeRollupTaskGeneratorTest {
     tableTaskConfigs.put("daily.bucketTimePeriod", "1d");
     tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
     taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
-    TableConfig offlineTableConfig = getOfflineTableConfig(taskConfigsMap);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
 
     String segmentName1 = "testTable__1";
@@ -221,7 +282,7 @@ public class MergeRollupTaskGeneratorTest {
     tableTaskConfigs.put("daily.bucketTimePeriod", "1d");
     tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
     taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
-    TableConfig offlineTableConfig = getOfflineTableConfig(taskConfigsMap);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
 
     String segmentName1 = "testTable__1";
@@ -249,7 +310,7 @@ public class MergeRollupTaskGeneratorTest {
     tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
     tableTaskConfigs.put("daily.maxNumRecordsPerTask", "5000000");
     taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
-    TableConfig offlineTableConfig = getOfflineTableConfig(taskConfigsMap);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
 
     String segmentName1 = "testTable__1";
@@ -299,7 +360,7 @@ public class MergeRollupTaskGeneratorTest {
     tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
     tableTaskConfigs.put("daily.maxNumParallelBuckets", "3");
     taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
-    TableConfig offlineTableConfig = getOfflineTableConfig(taskConfigsMap);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
 
     String segmentName1 = "testTable__1";
@@ -504,7 +565,7 @@ public class MergeRollupTaskGeneratorTest {
     tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
     tableTaskConfigs.put("daily.maxNumRecordsPerTask", "5000000");
     taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
-    TableConfig offlineTableConfig = getOfflineTableConfig(taskConfigsMap);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
 
     String segmentName1 = "testTable__1";
     String segmentName2 = "testTable__2";
@@ -565,7 +626,7 @@ public class MergeRollupTaskGeneratorTest {
     tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
     tableTaskConfigs.put("daily.maxNumRecordsPerTask", "5000000");
     taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
-    TableConfig offlineTableConfig = getOfflineTableConfig(taskConfigsMap);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
 
     String segmentName1 = "testTable__1";
     String segmentName2 = "testTable__2";
@@ -649,7 +710,7 @@ public class MergeRollupTaskGeneratorTest {
     tableTaskConfigs.put("monthly.maxNumRecordsPerTask", "5000000");
 
     taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
-    TableConfig offlineTableConfig = getOfflineTableConfig(taskConfigsMap);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
 
     String segmentName1 = "testTable__1";
     String segmentName2 = "testTable__2";

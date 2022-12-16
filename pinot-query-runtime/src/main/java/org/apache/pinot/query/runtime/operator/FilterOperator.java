@@ -28,7 +28,9 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
+import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
+import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+
 
 /*
    FilterOperator apply filter on rows from upstreamOperator.
@@ -46,14 +48,14 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
 public class FilterOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "FILTER";
   private final Operator<TransferableBlock> _upstreamOperator;
-  private final FilterOperand _filterOperand;
+  private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
   public FilterOperator(Operator<TransferableBlock> upstreamOperator, DataSchema dataSchema, RexExpression filter) {
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
-    _filterOperand = FilterOperand.toFilterOperand(filter, dataSchema);
+    _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);
     _upstreamErrorBlock = null;
   }
 
@@ -78,6 +80,7 @@ public class FilterOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   private TransferableBlock transform(TransferableBlock block)
       throws Exception {
     if (_upstreamErrorBlock != null) {
@@ -92,7 +95,7 @@ public class FilterOperator extends BaseOperator<TransferableBlock> {
     List<Object[]> resultRows = new ArrayList<>();
     List<Object[]> container = block.getContainer();
     for (Object[] row : container) {
-      if (_filterOperand.apply(row)) {
+      if ((Boolean) FunctionInvokeUtils.convert(_filterOperand.apply(row), DataSchema.ColumnDataType.BOOLEAN)) {
         resultRows.add(row);
       }
     }

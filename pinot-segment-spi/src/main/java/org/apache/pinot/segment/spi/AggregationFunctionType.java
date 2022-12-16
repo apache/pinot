@@ -59,6 +59,10 @@ public enum AggregationFunctionType {
   HISTOGRAM("histogram"),
   COVARPOP("covarPop"),
   COVARSAMP("covarSamp"),
+  VARPOP("varPop"),
+  VARSAMP("varSamp"),
+  STDDEVPOP("stdDevPop"),
+  STDDEVSAMP("stdDevSamp"),
 
   // Geo aggregation functions
   STUNION("STUnion"),

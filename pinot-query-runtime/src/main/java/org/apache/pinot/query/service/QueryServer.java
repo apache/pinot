@@ -25,15 +25,12 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.slf4j.Logger;
@@ -43,20 +40,14 @@ import org.slf4j.LoggerFactory;
 /**
  * {@link QueryServer} is the GRPC server that accepts query plan requests sent from {@link QueryDispatcher}.
  */
-@SuppressWarnings("UnstableApiUsage")
 public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryServer.class);
 
   private final Server _server;
   private final QueryRunner _queryRunner;
-  private final OpChainSchedulerService _scheduler;
 
   public QueryServer(int port, QueryRunner queryRunner) {
     _server = ServerBuilder.forPort(port).addService(this).build();
-    _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(),
-        Executors.newFixedThreadPool(
-            ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
-            new NamedThreadFactory("query_worker_on_" + port + "_port")));
     _queryRunner = queryRunner;
 
     LOGGER.info("Initialized QueryWorker on port: {} with numWorkerThreads: {}", port,
@@ -66,24 +57,20 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public void start() {
     LOGGER.info("Starting QueryWorker");
     try {
-      _scheduler.startAsync().awaitRunning();
       _queryRunner.start();
       _server.start();
-    } catch (IOException e) {
+    } catch (IOException | TimeoutException e) {
       throw new RuntimeException(e);
     }
   }
 
   public void shutdown() {
     LOGGER.info("Shutting down QueryWorker");
-    _queryRunner.shutDown();
-    _scheduler.stopAsync();
-    _server.shutdown();
-
     try {
-      _scheduler.awaitTerminated();
+      _queryRunner.shutDown();
+      _server.shutdown();
       _server.awaitTermination();
-    } catch (InterruptedException e) {
+    } catch (InterruptedException | TimeoutException e) {
       throw new RuntimeException(e);
     }
   }
@@ -116,7 +103,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       // Process the query
       try {
         // TODO: break this into parsing and execution, so that responseObserver can return upon parsing complete.
-        _queryRunner.processQuery(distributedStagePlan, _scheduler, requestMetadataMap);
+        _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing request", e);
         throw new RuntimeException(e);

@@ -59,6 +59,19 @@ public class QueryConfig {
   public static final String KEY_OF_SERVER_RESPONSE_STATUS_ERROR = "ERROR";
   public static final String KEY_OF_SERVER_RESPONSE_STATUS_OK = "OK";
 
+  /**
+   * Configuration keys for managing the scheduler
+   */
+
+  /**
+   * The maximum time that a operator chain will be held in the queue without being scheduled for execution.
+   * This is intended as a defensive measure for situations where we notice that an operator is not being
+   * scheduled when it otherwise should be. The default value, -1, indicates that we should never release
+   * an operator chain despite any amount of time elapsed.
+   */
+  public static final String KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS = "pinot.query.scheduler.release.timeout.ms";
+  public static final long DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS = -1;
+
   private QueryConfig() {
     // do not instantiate.
   }

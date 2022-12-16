@@ -183,6 +183,11 @@ public interface TableDataManager {
   File getTableDataDir();
 
   /**
+   * Returns the config for the table data manager.
+   */
+  TableDataManagerConfig getTableDataManagerConfig();
+
+  /**
    * Add error related to segment, if any. The implementation
    * is expected to cache last 'N' errors for the table, related to
    * segment transitions.

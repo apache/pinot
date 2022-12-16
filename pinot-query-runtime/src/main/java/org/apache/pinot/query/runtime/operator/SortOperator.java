@@ -26,7 +26,6 @@ import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -34,7 +33,6 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public class SortOperator extends BaseOperator<TransferableBlock> {
@@ -122,26 +120,22 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
   private void consumeInputBlocks() {
     if (!_isSortedBlockConstructed) {
       TransferableBlock block = _upstreamOperator.nextBlock();
-      // setting upstream error block
-      if (block.isErrorBlock()) {
-        _upstreamErrorBlock = block;
-        return;
-      } else if (TransferableBlockUtils.isEndOfStream(block)) {
-        _readyToConstruct = true;
-        return;
-      } else if (TransferableBlockUtils.isNoOpBlock(block)) {
-        return;
-      }
+      while (!block.isNoOpBlock()) {
+        // setting upstream error block
+        if (block.isErrorBlock()) {
+          _upstreamErrorBlock = block;
+          return;
+        } else if (TransferableBlockUtils.isEndOfStream(block)) {
+          _readyToConstruct = true;
+          return;
+        }
 
-      DataBlock dataBlock = block.getDataBlock();
-      int numRows = dataBlock.getNumberOfRows();
-      if (numRows > 0) {
-        RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
-              dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
+        List<Object[]> container = block.getContainer();
+        for (Object[] row : container) {
           SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
         }
+
+        block = _upstreamOperator.nextBlock();
       }
     }
   }

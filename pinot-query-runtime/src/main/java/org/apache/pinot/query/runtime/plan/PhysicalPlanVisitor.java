@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.plan;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -35,7 +34,6 @@ import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
@@ -53,8 +51,6 @@ import org.apache.pinot.query.runtime.operator.TransformOperator;
  * v1 operators at this point in time.
  *
  * <p>This class should be used statically via {@link #build(StageNode, PlanRequestContext)}
- *
- * @see org.apache.pinot.query.runtime.QueryRunner#processQuery(DistributedStagePlan, OpChainSchedulerService, Map)
  */
 public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<TransferableBlock>, PlanRequestContext> {
 
@@ -62,15 +58,18 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<Operator<Transferab
 
   public static OpChain build(StageNode node, PlanRequestContext context) {
     Operator<TransferableBlock> root = node.visit(INSTANCE, context);
-    return new OpChain(root);
+    return new OpChain(root, context.getReceivingMailboxes(), context.getRequestId(), context.getStageId());
   }
 
   @Override
   public Operator<TransferableBlock> visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
     List<ServerInstance> sendingInstances = context.getMetadataMap().get(node.getSenderStageId()).getServerInstances();
-    return new MailboxReceiveOperator(context.getMailboxService(), sendingInstances,
-        node.getExchangeType(), context.getHostName(), context.getPort(),
-        context.getRequestId(), node.getSenderStageId(), context.getTimeoutMs());
+    MailboxReceiveOperator mailboxReceiveOperator =
+        new MailboxReceiveOperator(context.getMailboxService(), sendingInstances,
+            node.getExchangeType(), context.getHostName(), context.getPort(),
+            context.getRequestId(), node.getSenderStageId(), context.getTimeoutMs());
+    context.addReceivingMailboxes(mailboxReceiveOperator.getSendingMailbox());
+    return mailboxReceiveOperator;
   }
 
   @Override

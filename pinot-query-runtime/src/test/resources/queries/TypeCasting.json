@@ -1,0 +1,163 @@
+{
+  "explicit_cast": {
+    "comment": "explicit type casting for operations",
+    "tables": {
+      "tbl": {
+        "schema":[
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "bigDecimalCol", "type": "BIG_DECIMAL"},
+          {"name": "boolCol", "type": "BOOLEAN"},
+          {"name": "timestampCol", "type": "TIMESTAMP"},
+          {"name": "stringCol", "type": "STRING"},
+          {"name": "bytesCol", "type": "BYTES"}
+        ],
+        "inputs": [
+          [1, 14, 3.0, 5.176518e16, "1e505", true, "1970-01-01 01:02:03.456", "lyons", "DEADBEEF"],
+          [2, 21, 4.0, 4.608155e11, "1e350", true, "1999-01-08 22:05:46", "onan", "DE12BEEF"],
+          [3, 14, 5.0, 1.249261e11, "1e505", false, "1999-01-08 04:05:06.001", "rudvalis", "A000"],
+          [4, 21, 5.0, 8.677557e19, "1e404", false, "5760-01-01 04:05:06", "janko", "FEEE"],
+          [1, 41, 2.0, 4.154786e33, "1e505", true, "2022-01-02 03:45:00", "baby", "1000"],
+          [2, 46, 1.0, 8.080171e53, "1e401", false, "1969-12-31 23:59:59", "monster", "00"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "all types should conform when directly selected out",
+        "sql": "SELECT * FROM {tbl}"
+      },
+      {
+        "description": "all types should conform when directly selected out & transfer between stages",
+        "sql": "SELECT * FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE a.boolCol = true AND b.boolCol = false"
+      },
+      { "sql": "SELECT CAST(floatCol AS DOUBLE) * 1e100, CAST(intCol AS BIGINT) * 2000000000, CAST(longCol AS DOUBLE) * 1e100, CAST(boolCol AS INT) FROM {tbl}" },
+      { "sql": "SELECT CAST(a.floatCol AS DOUBLE) * 1e100, CAST(a.intCol AS BIGINT) * 2000000000, CAST(b.longCol AS FLOAT) * 1e20, CAST(a.boolCol AS INT) FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE a.boolCol = true" },
+      {
+        "ignored": true,
+        "comments": "primitive cast not work: cast as DECIMAL doesn't work",
+        "sql": "SELECT CAST(doubleCol AS DECIMAL) FROM {tbl} WHERE bigDecimalCol > 0 AND CAST(bytesCol AS VARCHAR) != '1000'"
+      },
+      {
+        "ignored": true,
+        "comments": "special cast not work: timestamp cast not supported, varchar cast not supported",
+        "sql": "SELECT CAST(b.timestampCol AS BIGINT), CAST(stringCol AS VARBINARY) FROM {tbl}"
+      }
+    ]
+  },
+  "function_operand_casting": {
+    "comment": "built-in function from SqlStdOperatorTable with implicit/explicit casting",
+    "tables": {
+      "tbl": {
+        "schema":[
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "bigDecimalCol", "type": "BIG_DECIMAL"},
+          {"name": "boolCol", "type": "BOOLEAN"},
+          {"name": "timestampCol", "type": "TIMESTAMP"},
+          {"name": "stringCol", "type": "STRING"},
+          {"name": "bytesCol", "type": "BYTES"}
+        ],
+        "inputs": [
+          [1, 14, 3.0, 5.176518e16, "1e505", true, "1970-01-01 01:02:03.456", "lyons", "DEADBEEF"],
+          [2, 21, 4.0, 4.608155e11, "1e350", true, "1999-01-08 22:05:46", "onan", "DE12BEEF"],
+          [3, 14, 5.0, 1.249261e11, "1e505", false, "1999-01-08 04:05:06.001", "rudvalis", "A000"],
+          [4, 21, 5.0, 8.677557e19, "1e404", false, "5760-01-01 04:05:06", "janko", "FEEE"],
+          [1, 41, 2.0, 4.154786e33, "1e505", true, "2022-01-02 03:45:00", "baby", "1000"],
+          [2, 46, 1.0, 8.080171e53, "1e401", false, "1969-12-31 23:59:59", "monster", "00"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test (1) SqlStdOperator with Pinot ScalarFunction (UPPER, SQRT); (2) SqlStdOperator with Pinot ScalarFunction multiple argument (POWER); (3) SqlStdOperator with Pinot Filter (AND, =), (4) SqlStdOperator with Pinot operator (+) ",
+        "sql": "SELECT UPPER(stringCol), POWER(intCol, 2), SQRT(longCol), boolCol AND (intCol = 1), floatCol + 10 FROM {tbl}"
+      },
+      {
+        "description": "test SqlStdOperator with 4 Pinot variances above, but also mixed in with intermediate stage transfer",
+        "sql": "SELECT LOWER(a.stringCol), POWER(a.longCol, 3), SQRT(b.intCol), a.boolCol AND (b.intCol = 1), a.floatCol + b.doubleCol FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol"
+      }
+    ]
+  },
+  "udf_argument_casting": {
+    "comment": "user-defined (or @ScalarFunction annotated) function with implicit/explicit casting",
+    "tables": {
+      "tbl": {
+        "schema":[
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "bigDecimalCol", "type": "BIG_DECIMAL"},
+          {"name": "boolCol", "type": "BOOLEAN"},
+          {"name": "timestampCol", "type": "TIMESTAMP"},
+          {"name": "timestampStringCol", "type": "TIMESTAMP"},
+          {"name": "stringCol", "type": "STRING"},
+          {"name": "bytesCol", "type": "BYTES"}
+        ],
+        "inputs": [
+          [1, 14, 3.0, 5.176518e16, "1e505", true, "1970-01-01 01:02:03.456", "123", "lyons", "DEADBEEF"],
+          [2, 21, 4.0, 4.608155e11, "1e350", true, "1999-01-08 22:05:46", "123", "onan", "DE12BEEF"],
+          [3, 14, 5.0, 1.249261e11, "1e505", false, "1999-01-08 04:05:06.001", "123", "rudvalis", "A000"],
+          [4, 21, 5.0, 8.677557e19, "1e404", false, "5760-01-01 04:05:06", "123", "janko", "FEEE"],
+          [1, 41, 2.0, 4.154786e33, "1e505", true, "2022-01-02 03:45:00", "123", "baby", "1000"],
+          [2, 46, 1.0, 8.080171e53, "1e401", false, "1969-12-31 23:59:59", "123", "monster", "00"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test (1) Pinot ScalarFunction (md5); (2) Pinot ScalarFunction multiple argument (dateTrunc, substr); (3) Pinot filter (regexpLike), (4) Pinot transform (dateTimeConvert) ",
+        "sql": "SELECT md5(bytesCol), substr(stringCol, 5), regexpExtract(stringCol, '([\\w]+).*') FROM {tbl} WHERE regexpLike(stringCol, '.*')",
+        "outputs": [
+          ["2f249230a8e7c2bf6005ccd2679259ec", "", "lyons"],
+          ["a85a5fd494d9a538e22b696159931c1b", "", "onan"],
+          ["982569213f522d8fce898806d0a2c357", "lis", "rudvalis"],
+          ["ae04dbae988ab45ebfba84c0c3612a50", "", "janko"],
+          ["d479436bd32066b25886f9920c7b7ccf", "", "baby"],
+          ["93b885adfe0da089cdf634904fd59f71", "er", "monster"]
+        ]
+      },
+      {
+        "description": "test Pinot function variances above, but also mixed in with intermediate stage transfer",
+        "sql": "SELECT md5(a.bytesCol), substr(b.stringCol, 5), regexpExtract(a.stringCol, '([\\w]+).*') FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE regexpLike(a.stringCol, b.stringCol)",
+        "outputs": [
+          ["2f249230a8e7c2bf6005ccd2679259ec", "", "lyons"],
+          ["a85a5fd494d9a538e22b696159931c1b", "", "onan"],
+          ["982569213f522d8fce898806d0a2c357", "lis", "rudvalis"],
+          ["ae04dbae988ab45ebfba84c0c3612a50", "", "janko"],
+          ["d479436bd32066b25886f9920c7b7ccf", "", "baby"],
+          ["93b885adfe0da089cdf634904fd59f71", "er", "monster"]
+        ]
+      },
+      {
+        "ignored": true,
+        "comment": "problematic dateTimeConvert with weird exception on leaf stage",
+        "sql": "SELECT dateTimeConvert(timestampStringCol, '1:MILLISECONDS:EPOCH', '1:MINUTES:EPOCH', '30:MINUTES') FROM {tbl}",
+        "outputs": [
+          []
+        ]
+      },
+      {
+        "ignored": true,
+        "comment": "problematic round function not producing proper decimal results type",
+        "sql": "SELECT ROUND(longCol, 2) FROM {tbl}",
+        "outputs": [
+          []
+        ]
+      },
+      {
+        "ignored": true,
+        "comment": "dateTrunc returns round up instead of round down results",
+        "sql": "SELECT dateTrunc('DAY', b.timestampCol) FROM {tbl}",
+        "outputs": [
+          []
+        ]
+      }
+    ]
+  }
+}

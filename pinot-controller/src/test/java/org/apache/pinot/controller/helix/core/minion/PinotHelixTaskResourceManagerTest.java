@@ -83,7 +83,7 @@ public class PinotHelixTaskResourceManagerTest {
     when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt())).thenReturn(httpResp);
     // Three workers to run 3 subtasks but got no progress status from workers.
     httpResp._failedResponseCount = 3;
-    String[] workers = new String[]{"worker01", "worker02", "worker03"};
+    String[] workers = new String[]{"worker0", "worker1", "worker2"};
     Map<String, String> workerEndpoints = new HashMap<>();
     for (String worker : workers) {
       workerEndpoints.put(worker, "http://" + worker + ":9000");
@@ -122,7 +122,7 @@ public class PinotHelixTaskResourceManagerTest {
     CompletionServiceHelper.CompletionServiceResponse httpResp =
         new CompletionServiceHelper.CompletionServiceResponse();
     when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt())).thenReturn(httpResp);
-    String[] workers = new String[]{"worker01", "worker02", "worker03"};
+    String[] workers = new String[]{"worker0", "worker1", "worker2"};
     Map<String, String> workerEndpoints = new HashMap<>();
     for (String worker : workers) {
       workerEndpoints.put(worker, "http://" + worker + ":9000");
@@ -149,5 +149,48 @@ public class PinotHelixTaskResourceManagerTest {
       String taskProgress = (String) progress.get(subtaskNames[i]);
       assertEquals(taskProgress, "running on worker: " + i);
     }
+  }
+
+  @Test
+  public void testGetSubtaskProgressPending()
+      throws Exception {
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(anyString())).thenReturn(jobContext);
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    CompletionServiceHelper httpHelper = mock(CompletionServiceHelper.class);
+    CompletionServiceHelper.CompletionServiceResponse httpResp =
+        new CompletionServiceHelper.CompletionServiceResponse();
+    when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt())).thenReturn(httpResp);
+    String[] workers = new String[]{"worker0", "worker1", "worker2"};
+    Map<String, String> workerEndpoints = new HashMap<>();
+    for (String worker : workers) {
+      workerEndpoints.put(worker, "http://" + worker + ":9000");
+    }
+    String taskName = "Task_SegmentGenerationAndPushTask_someone";
+    String[] subtaskNames = new String[3];
+    Set<Integer> subtaskIds = new HashSet<>();
+    for (int i = 0; i < 3; i++) {
+      subtaskIds.add(i);
+      subtaskNames[i] = taskName + "_" + i;
+    }
+    // Some subtasks are pending to be run.
+    TaskPartitionState[] helixStates = new TaskPartitionState[]{TaskPartitionState.RUNNING, null, null};
+    httpResp._httpResponses.put(workers[0],
+        JsonUtils.objectToString(Collections.singletonMap(subtaskNames[0], "running on worker: 0")));
+    when(jobContext.getTaskIdForPartition(anyInt())).thenReturn(subtaskNames[0], subtaskNames[1], subtaskNames[2]);
+    when(jobContext.getAssignedParticipant(anyInt())).thenReturn(workers[0], null, null);
+    when(jobContext.getPartitionState(anyInt())).thenReturn(helixStates[0], null, null);
+    when(jobContext.getPartitionSet()).thenReturn(subtaskIds);
+    Map<String, Object> progress =
+        mgr.getSubtaskProgress(taskName, StringUtils.join(subtaskNames, ','), httpHelper, workerEndpoints,
+            Collections.emptyMap(), 1000);
+    String taskProgress = (String) progress.get(subtaskNames[0]);
+    assertEquals(taskProgress, "running on worker: 0");
+    taskProgress = (String) progress.get(subtaskNames[1]);
+    assertEquals(taskProgress, "No worker has run this subtask");
+    taskProgress = (String) progress.get(subtaskNames[2]);
+    assertEquals(taskProgress, "No worker has run this subtask");
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -27,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.I0Itec.zkclient.exception.ZkException;
 import org.apache.commons.lang3.StringUtils;
@@ -46,11 +48,13 @@ import org.apache.pinot.core.common.MinionConstants.MergeRollupTask;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -61,13 +65,26 @@ import org.slf4j.LoggerFactory;
 /**
  * A {@link PinotTaskGenerator} implementation for generating tasks of type {@link MergeRollupTask}
  *
- * TODO: Add the support for realtime table
+ * Assumptions:
+ *  - When the MergeRollupTask starts the first time, records older than the min(now ms, max end time ms of all ready to
+ *    process segments) - bufferTimeMs have already been ingested. If not, newly ingested records older than that time
+ *    may not be properly merged (Due to the latest watermarks advanced too far before records are ingested).
+ *  - If it is needed, there are backfill protocols to ingest and replace records older than the latest watermarks.
+ *    Those protocols can handle time alignment (according to merge levels configurations) correctly.
+ *  - If it is needed, there are reconcile protocols to merge & rollup newly ingested segments that are (1) older than
+ *    the latest watermarks, and (2) not time aligned according to merge levels configurations
+ *    - For realtime tables, those protocols are needed if streaming records arrive late (older thant the latest
+ *      watermarks)
+ *    - For offline tables, those protocols are needed if there are non-time-aligned segments ingested accidentally.
+ *
  *
  * Steps:
- *
  *  - Pre-select segments:
  *    - Fetch all segments, select segments based on segment lineage (removing segmentsFrom for COMPLETED lineage
  *      entry and segmentsTo for IN_PROGRESS lineage entry)
+ *    - For realtime tables, remove
+ *      - in-progress segments (Segment.Realtime.Status.IN_PROGRESS), and
+ *      - sealed segments with start time later than the earliest start time of all in progress segments
  *    - Remove empty segments
  *    - Sort segments based on startTime and endTime in ascending order
  *
@@ -131,22 +148,25 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       if (!validate(tableConfig, taskType)) {
         continue;
       }
-      String offlineTableName = tableConfig.getTableName();
-      LOGGER.info("Start generating task configs for table: {} for task: {}", offlineTableName, taskType);
+      String tableNameWithType = tableConfig.getTableName();
+      LOGGER.info("Start generating task configs for table: {} for task: {}", tableNameWithType, taskType);
 
       // Get all segment metadata
-      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(offlineTableName);
+      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+      // Filter segments based on status
+      List<SegmentZKMetadata> preSelectedSegmentsBasedOnStatus
+          = filterSegmentsBasedOnStatus(tableConfig.getTableType(), allSegments);
 
       // Select current segment snapshot based on lineage, filter out empty segments
-      SegmentLineage segmentLineage = _clusterInfoAccessor.getSegmentLineage(offlineTableName);
+      SegmentLineage segmentLineage = _clusterInfoAccessor.getSegmentLineage(tableNameWithType);
       Set<String> preSelectedSegmentsBasedOnLineage = new HashSet<>();
-      for (SegmentZKMetadata segment : allSegments) {
+      for (SegmentZKMetadata segment : preSelectedSegmentsBasedOnStatus) {
         preSelectedSegmentsBasedOnLineage.add(segment.getSegmentName());
       }
       SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(preSelectedSegmentsBasedOnLineage, segmentLineage);
 
       List<SegmentZKMetadata> preSelectedSegments = new ArrayList<>();
-      for (SegmentZKMetadata segment : allSegments) {
+      for (SegmentZKMetadata segment : preSelectedSegmentsBasedOnStatus) {
         if (preSelectedSegmentsBasedOnLineage.contains(segment.getSegmentName()) && segment.getTotalDocs() > 0
             && MergeTaskUtils.allowMerge(segment)) {
           preSelectedSegments.add(segment);
@@ -156,8 +176,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       if (preSelectedSegments.isEmpty()) {
         // Reset the watermark time if no segment found. This covers the case where the table is newly created or
         // all segments for the existing table got deleted.
-        resetDelayMetrics(offlineTableName);
-        LOGGER.info("Skip generating task: {} for table: {}, no segment is found.", taskType, offlineTableName);
+        resetDelayMetrics(tableNameWithType);
+        LOGGER.info("Skip generating task: {} for table: {}, no segment is found.", taskType, tableNameWithType);
         continue;
       }
 
@@ -184,7 +204,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
 
       // Get incomplete merge levels
       Set<String> inCompleteMergeLevels = new HashSet<>();
-      for (Map.Entry<String, TaskState> entry : TaskGeneratorUtils.getIncompleteTasks(taskType, offlineTableName,
+      for (Map.Entry<String, TaskState> entry : TaskGeneratorUtils.getIncompleteTasks(taskType, tableNameWithType,
           _clusterInfoAccessor).entrySet()) {
         for (PinotTaskConfig taskConfig : _clusterInfoAccessor.getTaskConfigs(entry.getKey())) {
           inCompleteMergeLevels.add(taskConfig.getConfigs().get(MergeRollupTask.MERGE_LEVEL_KEY));
@@ -192,11 +212,11 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       }
 
       ZNRecord mergeRollupTaskZNRecord = _clusterInfoAccessor
-          .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, offlineTableName);
+          .getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE, tableNameWithType);
       int expectedVersion = mergeRollupTaskZNRecord != null ? mergeRollupTaskZNRecord.getVersion() : -1;
       MergeRollupTaskMetadata mergeRollupTaskMetadata =
           mergeRollupTaskZNRecord != null ? MergeRollupTaskMetadata.fromZNRecord(mergeRollupTaskZNRecord)
-              : new MergeRollupTaskMetadata(offlineTableName, new TreeMap<>());
+              : new MergeRollupTaskMetadata(tableNameWithType, new TreeMap<>());
       List<PinotTaskConfig> pinotTaskConfigsForTable = new ArrayList<>();
 
       // Schedule tasks from lowest to highest merge level (e.g. Hourly -> Daily -> Monthly -> Yearly)
@@ -209,7 +229,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         // Skip scheduling if there's incomplete task for current mergeLevel
         if (inCompleteMergeLevels.contains(mergeLevel)) {
           LOGGER.info("Found incomplete task of merge level: {} for the same table: {}, Skipping task generation: {}",
-              mergeLevel, offlineTableName, taskType);
+              mergeLevel, tableNameWithType, taskType);
           continue;
         }
 
@@ -218,14 +238,14 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         long bucketMs = TimeUtils.convertPeriodToMillis(bucketPeriod);
         if (bucketMs <= 0) {
           LOGGER.error("Bucket time period: {} (table : {}, mergeLevel : {}) must be larger than 0", bucketPeriod,
-              offlineTableName, mergeLevel);
+              tableNameWithType, mergeLevel);
           continue;
         }
         String bufferPeriod = mergeConfigs.get(MergeTask.BUFFER_TIME_PERIOD_KEY);
         long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
         if (bufferMs < 0) {
           LOGGER.error("Buffer time period: {} (table : {}, mergeLevel : {}) must be larger or equal to 0",
-              bufferPeriod, offlineTableName, mergeLevel);
+              bufferPeriod, tableNameWithType, mergeLevel);
           continue;
         }
         String maxNumParallelBucketsStr = mergeConfigs.get(MergeTask.MAX_NUM_PARALLEL_BUCKETS);
@@ -233,7 +253,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             : DEFAULT_NUM_PARALLEL_BUCKETS;
         if (maxNumParallelBuckets <= 0) {
           LOGGER.error("Maximum number of parallel buckets: {} (table : {}, mergeLevel : {}) must be larger than 0",
-              maxNumParallelBuckets, offlineTableName, mergeLevel);
+              maxNumParallelBuckets, tableNameWithType, mergeLevel);
           continue;
         }
 
@@ -253,14 +273,14 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             lowestLevelMaxValidBucketEndTimeMs =
                 Math.max(lowestLevelMaxValidBucketEndTimeMs, currentValidBucketEndTimeMs);
           }
-          _tableLowestLevelMaxValidBucketEndTimeMs.put(offlineTableName, lowestLevelMaxValidBucketEndTimeMs);
+          _tableLowestLevelMaxValidBucketEndTimeMs.put(tableNameWithType, lowestLevelMaxValidBucketEndTimeMs);
         }
         // Create delay metrics even if there's no task scheduled, this helps the case that the controller is restarted
         // but the metrics are not available until the controller schedules a valid task
-        createOrUpdateDelayMetrics(offlineTableName, mergeLevel, null, watermarkMs, bufferMs, bucketMs);
+        createOrUpdateDelayMetrics(tableNameWithType, mergeLevel, null, watermarkMs, bufferMs, bucketMs);
         if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata)) {
           LOGGER.info("Bucket with start: {} and end: {} (table : {}, mergeLevel : {}) cannot be merged yet",
-              bucketStartMs, bucketEndMs, offlineTableName, mergeLevel);
+              bucketStartMs, bucketEndMs, tableNameWithType, mergeLevel);
           continue;
         }
 
@@ -334,18 +354,18 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         }
 
         if (selectedSegmentsForAllBuckets.isEmpty()) {
-          LOGGER.info("No unmerged segment found for table: {}, mergeLevel: {}", offlineTableName, mergeLevel);
+          LOGGER.info("No unmerged segment found for table: {}, mergeLevel: {}", tableNameWithType, mergeLevel);
           continue;
         }
 
         // Bump up watermark to the earliest start time of selected segments truncated to the closest bucket boundary
         long newWatermarkMs = selectedSegmentsForAllBuckets.get(0).get(0).getStartTimeMs() / bucketMs * bucketMs;
         mergeRollupTaskMetadata.getWatermarkMap().put(mergeLevel, newWatermarkMs);
-        LOGGER.info("Update watermark for table: {}, mergeLevel: {} from: {} to: {}", offlineTableName, mergeLevel,
+        LOGGER.info("Update watermark for table: {}, mergeLevel: {} from: {} to: {}", tableNameWithType, mergeLevel,
             watermarkMs, newWatermarkMs);
 
         // Update the delay metrics
-        createOrUpdateDelayMetrics(offlineTableName, mergeLevel, lowerMergeLevel, newWatermarkMs, bufferMs, bucketMs);
+        createOrUpdateDelayMetrics(tableNameWithType, mergeLevel, lowerMergeLevel, newWatermarkMs, bufferMs, bucketMs);
 
         // Create task configs
         int maxNumRecordsPerTask =
@@ -355,7 +375,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         if (segmentPartitionConfig == null) {
           for (List<SegmentZKMetadata> selectedSegmentsPerBucket : selectedSegmentsForAllBuckets) {
             pinotTaskConfigsForTable.addAll(
-                createPinotTaskConfigs(selectedSegmentsPerBucket, offlineTableName, maxNumRecordsPerTask, mergeLevel,
+                createPinotTaskConfigs(selectedSegmentsPerBucket, tableNameWithType, maxNumRecordsPerTask, mergeLevel,
                     null, mergeConfigs, taskConfigs));
           }
         } else {
@@ -394,13 +414,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
               List<Integer> partition = entry.getKey();
               List<SegmentZKMetadata> partitionedSegments = entry.getValue();
               pinotTaskConfigsForTable.addAll(
-                  createPinotTaskConfigs(partitionedSegments, offlineTableName, maxNumRecordsPerTask, mergeLevel,
+                  createPinotTaskConfigs(partitionedSegments, tableNameWithType, maxNumRecordsPerTask, mergeLevel,
                       partition, mergeConfigs, taskConfigs));
             }
 
             if (!outlierSegments.isEmpty()) {
               pinotTaskConfigsForTable.addAll(
-                  createPinotTaskConfigs(outlierSegments, offlineTableName, maxNumRecordsPerTask, mergeLevel,
+                  createPinotTaskConfigs(outlierSegments, tableNameWithType, maxNumRecordsPerTask, mergeLevel,
                       null, mergeConfigs, taskConfigs));
             }
           }
@@ -414,11 +434,11 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       } catch (ZkException e) {
         LOGGER.error(
             "Version changed while updating merge/rollup task metadata for table: {}, skip scheduling. There are "
-                + "multiple task schedulers for the same table, need to investigate!", offlineTableName);
+                + "multiple task schedulers for the same table, need to investigate!", tableNameWithType);
         continue;
       }
       pinotTaskConfigs.addAll(pinotTaskConfigsForTable);
-      LOGGER.info("Finished generating task configs for table: {} for task: {}, numTasks: {}", offlineTableName,
+      LOGGER.info("Finished generating task configs for table: {} for task: {}, numTasks: {}", tableNameWithType,
           taskType, pinotTaskConfigsForTable.size());
     }
 
@@ -428,21 +448,69 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
+  @VisibleForTesting
+  static List<SegmentZKMetadata> filterSegmentsBasedOnStatus(TableType tableType, List<SegmentZKMetadata> allSegments) {
+    if (tableType == TableType.REALTIME) {
+      // For realtime table, don't process
+      // 1. in-progress segments (Segment.Realtime.Status.IN_PROGRESS)
+      // 2. sealed segments with start time later than the earliest start time of all in progress segments
+      // This prevents those in-progress segments from not being merged.
+      //
+      // Note that we make the following two assumptions here:
+      // 1. streaming data consumer lags are negligible
+      // 2. streaming data records are ingested mostly in chronological order (no records are ingested with delay larger
+      //    than bufferTimeMS)
+      //
+      // We don't handle the following cases intentionally because it will be either overkill or too complex
+      // 1. New partition added. If new partitions are not picked up timely, the MergeRollupTask will move watermarks
+      //    forward, and may not be able to merge some lately-created segments for those new partitions -- users should
+      //    configure pinot properly to discover new partitions timely, or they should restart pinot servers manually
+      //    for new partitions to be picked up
+      // 2. (1) no new in-progress segments are created for some partitions (2) new in-progress segments are created for
+      //    partitions, but there is no record consumed (i.e, empty in-progress segments). In those two cases,
+      //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
+      //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
+      //    records correctly.
+      long earliestStartTimeMsOfInProgressSegments = Long.MAX_VALUE;
+      for (SegmentZKMetadata segmentZKMetadata : allSegments) {
+        if (!segmentZKMetadata.getStatus().isCompleted()
+            && segmentZKMetadata.getTotalDocs() > 0
+            && segmentZKMetadata.getStartTimeMs() < earliestStartTimeMsOfInProgressSegments) {
+          earliestStartTimeMsOfInProgressSegments = segmentZKMetadata.getStartTimeMs();
+        }
+      }
+      final long finalEarliestStartTimeMsOfInProgressSegments = earliestStartTimeMsOfInProgressSegments;
+      return allSegments.stream()
+              .filter(segmentZKMetadata -> segmentZKMetadata.getStatus().isCompleted()
+                  && segmentZKMetadata.getStartTimeMs() < finalEarliestStartTimeMsOfInProgressSegments)
+              .collect(Collectors.toList());
+    } else {
+      return allSegments;
+    }
+  }
+
   /**
    * Validate table config for merge/rollup task
    */
-  private boolean validate(TableConfig tableConfig, String taskType) {
-    String offlineTableName = tableConfig.getTableName();
-    if (tableConfig.getTableType() != TableType.OFFLINE) {
-      LOGGER.warn("Skip generating task: {} for non-OFFLINE table: {}, REALTIME table is not supported yet", taskType,
-          offlineTableName);
-      return false;
-    }
-
+  @VisibleForTesting
+  static boolean validate(TableConfig tableConfig, String taskType) {
+    String tableNameWithType = tableConfig.getTableName();
     if (REFRESH.equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig))) {
       LOGGER.warn("Skip generating task: {} for non-APPEND table: {}, REFRESH table is not supported", taskType,
-          offlineTableName);
+          tableNameWithType);
       return false;
+    }
+    if (tableConfig.getTableType() == TableType.REALTIME) {
+      if (tableConfig.isUpsertEnabled()) {
+        LOGGER.warn("Skip generating task: {} for table: {}, table with upsert enabled is not supported", taskType,
+            tableNameWithType);
+        return false;
+      }
+      if (tableConfig.isDedupEnabled()) {
+        LOGGER.warn("Skip generating task: {} for table: {}, table with dedup enabled is not supported", taskType,
+            tableNameWithType);
+        return false;
+      }
     }
     return true;
   }
@@ -525,7 +593,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
    * Create pinot task configs with selected segments and configs
    */
   private List<PinotTaskConfig> createPinotTaskConfigs(List<SegmentZKMetadata> selectedSegments,
-      String offlineTableName, int maxNumRecordsPerTask, String mergeLevel, List<Integer> partition,
+      String tableNameWithType, int maxNumRecordsPerTask, String mergeLevel, List<Integer> partition,
       Map<String, String> mergeConfigs, Map<String, String> taskConfigs) {
     int numRecordsPerTask = 0;
     List<List<String>> segmentNamesList = new ArrayList<>();
@@ -558,12 +626,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     String partitionSuffix = partitionSuffixBuilder.toString();
 
     for (int i = 0; i < segmentNamesList.size(); i++) {
-      Map<String, String> configs = new HashMap<>();
-      configs.put(MinionConstants.TABLE_NAME_KEY, offlineTableName);
+      String downloadURL = StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR);
+      Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs,
+          _clusterInfoAccessor);
+      configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
       configs.put(MinionConstants.SEGMENT_NAME_KEY,
           StringUtils.join(segmentNamesList.get(i), MinionConstants.SEGMENT_NAME_SEPARATOR));
-      configs.put(MinionConstants.DOWNLOAD_URL_KEY,
-          StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR));
+      configs.put(MinionConstants.DOWNLOAD_URL_KEY, downloadURL);
       configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
       configs.put(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY, "true");
 
@@ -573,6 +642,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         }
       }
 
+      configs.put(BatchConfigProperties.OVERWRITE_OUTPUT,
+          taskConfigs.getOrDefault(BatchConfigProperties.OVERWRITE_OUTPUT, "false"));
       configs.put(MergeRollupTask.MERGE_TYPE_KEY, mergeConfigs.get(MergeTask.MERGE_TYPE_KEY));
       configs.put(MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
       configs.put(MergeTask.PARTITION_BUCKET_TIME_PERIOD_KEY, mergeConfigs.get(MergeTask.BUCKET_TIME_PERIOD_KEY));
@@ -586,7 +657,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       configs.put(MergeRollupTask.SEGMENT_NAME_PREFIX_KEY,
           MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + DELIMITER_IN_SEGMENT_NAME
               + System.currentTimeMillis() + partitionSuffix + DELIMITER_IN_SEGMENT_NAME + i
-              + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(offlineTableName));
+              + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(tableNameWithType));
       pinotTaskConfigs.add(new PinotTaskConfig(MergeRollupTask.TASK_TYPE, configs));
     }
 

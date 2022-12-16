@@ -334,7 +334,7 @@ public class HashJoinOperatorTest {
     }
     Assert.assertTrue(result.isErrorBlock());
     MetadataBlock errorBlock = (MetadataBlock) result.getDataBlock();
-    Assert.assertTrue(errorBlock.getExceptions().get(1000).matches(".*notEquals.*"));
+    Assert.assertTrue(errorBlock.getExceptions().get(1000).contains("notEquals"));
   }
 
   @Test
@@ -501,7 +501,7 @@ public class HashJoinOperatorTest {
     }
     Assert.assertTrue(result.isErrorBlock());
     Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
-        .matches("testInnerJoinRightError"));
+        .contains("testInnerJoinRightError"));
   }
 
   @Test
@@ -529,8 +529,8 @@ public class HashJoinOperatorTest {
       result = join.nextBlock();
     }
     Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(
-        result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).matches("testInnerJoinLeftError"));
+    Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
+        .contains("testInnerJoinLeftError"));
   }
 
   @Test
@@ -560,11 +560,7 @@ public class HashJoinOperatorTest {
     Assert.assertTrue(result.isNoOpBlock());
     result = join.nextBlock(); // second no-op consumes no-op right block.
     Assert.assertTrue(result.isNoOpBlock());
-    result = join.nextBlock(); // third no-op consumes another right data block.
-    Assert.assertTrue(result.isNoOpBlock());
-    result = join.nextBlock(); // forth no-op consumes another right data block.
-    Assert.assertTrue(result.isNoOpBlock());
-    result = join.nextBlock();   // build result using the first left block
+    result = join.nextBlock(); // third -op consumes two right data blocks and builds result
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = ImmutableList.of(new Object[]{2, "BB", 2, "Aa"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());

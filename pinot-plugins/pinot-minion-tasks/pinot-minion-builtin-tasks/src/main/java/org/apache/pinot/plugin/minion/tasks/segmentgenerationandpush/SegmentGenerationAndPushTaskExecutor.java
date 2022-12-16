@@ -36,6 +36,7 @@ import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutor;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -176,10 +177,10 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     if (taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     }
-    try (PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
+    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
       switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
         case TAR:
-          try (PinotFS pinotFS = SegmentGenerationAndPushTaskUtils.getLocalPinotFs()) {
+          try (PinotFS pinotFS = MinionTaskUtils.getLocalPinotFs()) {
             SegmentPushUtils.pushSegments(spec, pinotFS, Arrays.asList(outputSegmentTarURI.toString()));
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
@@ -237,7 +238,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       return localSegmentTarFile.toURI();
     }
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    try (PinotFS outputFileFS = SegmentGenerationAndPushTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
+    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
       URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
       if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
           outputSegmentDirURI)) {
@@ -269,7 +270,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     SegmentGenerationTaskSpec taskSpec = new SegmentGenerationTaskSpec();
     URI inputFileURI = URI.create(taskConfigs.get(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY));
 
-    try (PinotFS inputFileFS = SegmentGenerationAndPushTaskUtils.getInputPinotFS(taskConfigs, inputFileURI)) {
+    try (PinotFS inputFileFS = MinionTaskUtils.getInputPinotFS(taskConfigs, inputFileURI)) {
       File localInputTempDir = new File(localTempDir, "input");
       FileUtils.forceMkdir(localInputTempDir);
       File localOutputTempDir = new File(localTempDir, "output");

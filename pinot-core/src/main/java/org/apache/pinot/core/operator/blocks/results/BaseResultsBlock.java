@@ -159,6 +159,13 @@ public abstract class BaseResultsBlock implements Block {
   }
 
   /**
+   * Returns the total size (number of rows) in this result block, without having to materialize the rows.
+   *
+   * @see BaseResultsBlock#getRows(QueryContext)
+   */
+  public abstract int getNumRows();
+
+  /**
    * Returns the data schema for the results. Return {@code null} when the block only contains metadata.
    */
   @Nullable

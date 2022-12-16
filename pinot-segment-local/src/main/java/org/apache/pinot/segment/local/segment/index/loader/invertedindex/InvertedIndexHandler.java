@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -43,14 +43,13 @@ import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class InvertedIndexHandler implements IndexHandler {
+public class InvertedIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(InvertedIndexHandler.class);
 
-  private final SegmentMetadata _segmentMetadata;
   private final Set<String> _columnsToAddIdx;
 
   public InvertedIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    _segmentMetadata = segmentMetadata;
+    super(segmentMetadata, indexLoadingConfig);
     _columnsToAddIdx = indexLoadingConfig.getInvertedIndexColumns();
   }
 
@@ -99,6 +98,11 @@ public class InvertedIndexHandler implements IndexHandler {
         createInvertedIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
     }
+  }
+
+  @Override
+  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
+      throws Exception {
   }
 
   private boolean shouldCreateInvertedIndex(ColumnMetadata columnMetadata) {

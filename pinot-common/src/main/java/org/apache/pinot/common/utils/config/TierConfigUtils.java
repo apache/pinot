@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils.config;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -34,12 +35,15 @@ import org.apache.pinot.common.tier.TimeBasedTierSegmentSelector;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Util methods for TierConfig
  */
 public final class TierConfigUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TierConfigUtils.class);
 
   private TierConfigUtils() {
   }
@@ -56,23 +60,47 @@ public final class TierConfigUtils {
   }
 
   public static String getDataDirForTier(TableConfig tableConfig, String tierName) {
+    return getDataDirForTier(tableConfig, tierName, Collections.emptyMap());
+  }
+
+  public static String getDataDirForTier(TableConfig tableConfig, String tierName,
+      Map<String, Map<String, String>> instanceTierConfigs) {
     String tableNameWithType = tableConfig.getTableName();
+    String dataDir = null;
     List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
-    Preconditions.checkState(CollectionUtils.isNotEmpty(tierCfgs), "No tierConfigs for table: %s", tableNameWithType);
-    TierConfig tierCfg = null;
-    for (TierConfig tc : tierCfgs) {
-      if (tierName.equals(tc.getName())) {
-        tierCfg = tc;
-        break;
+    if (CollectionUtils.isNotEmpty(tierCfgs)) {
+      TierConfig tierCfg = null;
+      for (TierConfig tc : tierCfgs) {
+        if (tierName.equals(tc.getName())) {
+          tierCfg = tc;
+          break;
+        }
+      }
+      if (tierCfg != null) {
+        Map<String, String> backendProps = tierCfg.getTierBackendProperties();
+        if (backendProps != null) {
+          dataDir = backendProps.get(CommonConstants.Tier.BACKEND_PROP_DATA_DIR);
+        } else {
+          LOGGER.debug("No backend props for tier: {} in TableConfig of table: {}", tierName, tableNameWithType);
+        }
+        if (StringUtils.isNotEmpty(dataDir)) {
+          LOGGER.debug("Got dataDir: {} for tier: {} in TableConfig of table: {}", dataDir, tierName,
+              tableNameWithType);
+          return dataDir;
+        } else {
+          LOGGER.debug("No dataDir for tier: {} in TableConfig of table: {}", tierName, tableNameWithType);
+        }
       }
     }
-    Preconditions.checkNotNull(tierCfg, "No configs for tier: %s on table: %s", tierName, tableNameWithType);
-    // TODO: check if the tier configs are predefined in ClusterConfigs.
-    Map<String, String> backendProps = tierCfg.getTierBackendProperties();
-    Preconditions
-        .checkNotNull(backendProps, "No backend properties for tier: %s on table: %s", tierName, tableNameWithType);
-    String dataDir = backendProps.get(CommonConstants.Tier.BACKEND_PROP_DATA_DIR);
-    Preconditions.checkState(StringUtils.isNotEmpty(dataDir), "No dataDir for tier: %s on table: %s", tierName,
+    // Check if there is data path defined in instance tier configs.
+    Map<String, String> instanceCfgs = instanceTierConfigs.get(tierName);
+    if (instanceCfgs != null) {
+      // All instance config names are lower cased while being passed down here.
+      dataDir = instanceCfgs.get(CommonConstants.Tier.BACKEND_PROP_DATA_DIR.toLowerCase());
+    }
+    Preconditions.checkState(StringUtils.isNotEmpty(dataDir), "No dataDir for tier: %s for table: %s", tierName,
+        tableNameWithType);
+    LOGGER.debug("Got dataDir: {} for tier: {} for table: {} in instance configs", dataDir, tierName,
         tableNameWithType);
     return dataDir;
   }

@@ -41,10 +41,11 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class RealtimeSegmentConverterTest {
@@ -74,15 +75,14 @@ public class RealtimeSegmentConverterTest {
             new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "col2")).build();
     String segmentName = "segment1";
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
-    Assert.assertEquals(schema.getColumnNames().size(), 5);
+    assertEquals(schema.getColumnNames().size(), 5);
     Schema newSchema = RealtimeSegmentConverter.getUpdatedSchema(schema);
-    Assert.assertEquals(newSchema.getColumnNames().size(), 2);
+    assertEquals(newSchema.getColumnNames().size(), 2);
   }
 
   @Test
   public void testNoRecordsIndexed()
       throws Exception {
-
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
@@ -129,18 +129,17 @@ public class RealtimeSegmentConverterTest {
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
             tableNameWithType, tableConfig, segmentName, cdc, false);
-
     converter.build(SegmentVersion.v3, null);
-    SegmentMetadataImpl metadata = new SegmentMetadataImpl(new File(outputDir, segmentName));
-    Assert.assertEquals(metadata.getTotalDocs(), 0);
-    Assert.assertEquals(metadata.getTimeColumn(), DATE_TIME_COLUMN);
-    Assert.assertEquals(metadata.getTimeUnit(), TimeUnit.MILLISECONDS);
-    Assert.assertEquals(metadata.getStartTime(), metadata.getEndTime());
-    Assert.assertTrue(metadata.getAllColumns().containsAll(schema.getColumnNames()));
-    Assert.assertEquals(
-        metadata.getPropertiesConfiguration().getProperty(CommonConstants.Segment.Realtime.START_OFFSET), "1");
-    Assert.assertEquals(metadata.getPropertiesConfiguration().getProperty(CommonConstants.Segment.Realtime.END_OFFSET),
-        "100");
+
+    File indexDir = new File(outputDir, segmentName);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    assertEquals(segmentMetadata.getTotalDocs(), 0);
+    assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
+    assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+    assertEquals(segmentMetadata.getStartTime(), segmentMetadata.getEndTime());
+    assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
+    assertEquals(segmentMetadata.getStartOffset(), "1");
+    assertEquals(segmentMetadata.getEndOffset(), "100");
   }
 
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName) {

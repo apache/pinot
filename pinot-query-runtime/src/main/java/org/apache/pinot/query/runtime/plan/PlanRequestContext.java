@@ -18,7 +18,11 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -32,6 +36,7 @@ public class PlanRequestContext {
   protected final String _hostName;
   protected final int _port;
   protected final Map<Integer, StageMetadata> _metadataMap;
+  protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
 
 
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
@@ -71,5 +76,13 @@ public class PlanRequestContext {
 
   public MailboxService<TransferableBlock> getMailboxService() {
     return _mailboxService;
+  }
+
+  public void addReceivingMailboxes(List<MailboxIdentifier> ids) {
+    _receivingMailboxes.addAll(ids);
+  }
+
+  public List<MailboxIdentifier> getReceivingMailboxes() {
+    return ImmutableList.copyOf(_receivingMailboxes);
   }
 }

@@ -115,6 +115,7 @@ public class ImmutableSegmentLoader {
             .setSchema(schema).setInstanceId(indexLoadingConfig.getInstanceId())
             .setTableDataDir(indexLoadingConfig.getTableDataDir()).setSegmentName(segmentName)
             .setSegmentCrc(segmentMetadata.getCrc()).setSegmentTier(indexLoadingConfig.getSegmentTier())
+            .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
             .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs()).build();
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
@@ -197,13 +198,10 @@ public class ImmutableSegmentLoader {
       }
     }
 
-    // FIXME: star tree only works with local SegmentDirectory
     // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
-    if (segmentMetadata.getStarTreeV2MetadataList() != null && localIndexDir != null) {
-      starTreeIndexContainer =
-          new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(localIndexDir), segmentMetadata,
-              indexContainerMap, indexLoadingConfig.getReadMode());
+    if (segmentMetadata.getStarTreeV2MetadataList() != null) {
+      starTreeIndexContainer = new StarTreeIndexContainer(segmentReader, segmentMetadata, indexContainerMap);
     }
 
     ImmutableSegmentImpl segment =

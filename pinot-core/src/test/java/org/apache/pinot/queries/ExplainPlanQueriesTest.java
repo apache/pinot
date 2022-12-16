@@ -71,6 +71,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -86,6 +87,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
 
   private static final String RAW_TABLE_NAME = "testTable";
+  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String SEGMENT_NAME_1 = "testSegment1";
   private static final String SEGMENT_NAME_2 = "testSegment2";
   private static final String SEGMENT_NAME_3 = "testSegment3";
@@ -197,7 +199,6 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<String> textIndexColumns = Arrays.asList(COL1_TEXT_INDEX);
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
-    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(segmentName);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
 
@@ -266,8 +267,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     // Mock the instance data manager
     _serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
-    when(tableDataManagerConfig.getTableDataManagerType()).thenReturn("OFFLINE");
-    when(tableDataManagerConfig.getTableName()).thenReturn(RAW_TABLE_NAME);
+    when(tableDataManagerConfig.getTableName()).thenReturn(OFFLINE_TABLE_NAME);
+    when(tableDataManagerConfig.getTableType()).thenReturn(TableType.OFFLINE);
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getMaxParallelSegmentBuilds()).thenReturn(4);
@@ -284,7 +285,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       tableDataManager.addSegment((ImmutableSegment) indexSegment);
     }
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
-    when(instanceDataManager.getTableDataManager(RAW_TABLE_NAME)).thenReturn(tableDataManager);
+    when(instanceDataManager.getTableDataManager(OFFLINE_TABLE_NAME)).thenReturn(tableDataManager);
 
     // Set up the query executor
     URL resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
@@ -315,10 +316,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       }
     }
 
+    // Target OFFLINE table on the server side
+    brokerRequest.getPinotQuery().getDataSource().setTableName(OFFLINE_TABLE_NAME);
     InstanceRequest instanceRequest1 = new InstanceRequest(0L, brokerRequest);
     instanceRequest1.setSearchSegments(indexSegmentsForServer1);
     InstanceResponseBlock instanceResponse1 = _queryExecutor.execute(getQueryRequest(instanceRequest1), QUERY_RUNNERS);
-
     InstanceRequest instanceRequest2 = new InstanceRequest(0L, brokerRequest);
     instanceRequest2.setSearchSegments(indexSegmentsForServer2);
     InstanceResponseBlock instanceResponse2 = _queryExecutor.execute(getQueryRequest(instanceRequest2), QUERY_RUNNERS);
@@ -340,6 +342,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       throw new RuntimeException(e);
     }
 
+    // Target raw table on the broker side
+    brokerRequest.getPinotQuery().getDataSource().setTableName(RAW_TABLE_NAME);
     BrokerResponseNative brokerResponse =
         _brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap,
             CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);

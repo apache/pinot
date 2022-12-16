@@ -57,6 +57,7 @@ public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String READ_MODE_KEY = "readMode";
 
+  private InstanceDataManagerConfig _instanceDataManagerConfig = null;
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
@@ -98,6 +99,7 @@ public class IndexLoadingConfig {
   private String _segmentTier;
 
   private String _instanceId;
+  private Map<String, Map<String, String>> _instanceTierConfigs;
 
   /**
    * NOTE: This step might modify the passed in table config and schema.
@@ -105,7 +107,7 @@ public class IndexLoadingConfig {
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig,
       @Nullable Schema schema) {
     extractFromInstanceConfig(instanceDataManagerConfig);
-    updateTableConfigAndSchema(tableConfig, schema);
+    extractFromTableConfigAndSchema(tableConfig, schema);
   }
 
   @VisibleForTesting
@@ -117,7 +119,11 @@ public class IndexLoadingConfig {
   public IndexLoadingConfig() {
   }
 
-  public void updateTableConfigAndSchema(TableConfig tableConfig, @Nullable Schema schema) {
+  public InstanceDataManagerConfig getInstanceDataManagerConfig() {
+    return _instanceDataManagerConfig;
+  }
+
+  private void extractFromTableConfigAndSchema(TableConfig tableConfig, @Nullable Schema schema) {
     if (schema != null) {
       TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     }
@@ -297,6 +303,8 @@ public class IndexLoadingConfig {
     if (instanceDataManagerConfig == null) {
       return;
     }
+
+    _instanceDataManagerConfig = instanceDataManagerConfig;
     _instanceId = instanceDataManagerConfig.getInstanceId();
 
     ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
@@ -655,5 +663,13 @@ public class IndexLoadingConfig {
 
   public String getSegmentTier() {
     return _segmentTier;
+  }
+
+  public void setInstanceTierConfigs(Map<String, Map<String, String>> tierConfigs) {
+    _instanceTierConfigs = tierConfigs;
+  }
+
+  public Map<String, Map<String, String>> getInstanceTierConfigs() {
+    return _instanceTierConfigs;
   }
 }

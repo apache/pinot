@@ -1,5 +1,5 @@
 {
-  "select_expression_test": {
+  "select_having_expression_test": {
     "tables": {
       "test_having": {
         "schema":[

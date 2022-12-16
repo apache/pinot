@@ -52,6 +52,11 @@ public class DistinctResultsBlock extends BaseResultsBlock {
   }
 
   @Override
+  public int getNumRows() {
+    return _distinctTable.size();
+  }
+
+  @Override
   public DataSchema getDataSchema(QueryContext queryContext) {
     return _distinctTable.getDataSchema();
   }

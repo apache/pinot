@@ -3,19 +3,19 @@
     "tables": {
       "tbl": {
         "schema": [
-          { "name": "int_col", "type": "INT" },
-          { "name": "double_col", "type": "DOUBLE" },
-          { "name": "string_col", "type": "STRING" },
-          { "name": "bool_col", "type": "BOOLEAN" }
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
         ],
         "inputs": [
-          [ 2, 300, "a", true ],
-          [ 2, 400, "a", true ],
-          [ 3, 100, "b", false ],
-          [ 100, 1, "b", false ],
-          [ 101, 1.01, "c", false ],
-          [ 150, 1.5, "c", false ],
-          [ 175, 1.75, "c", true ]
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [100, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [175, 1.75, "c", true]
         ]
       }
     },
@@ -147,21 +147,21 @@
     "tables": {
       "tbl": {
         "schema": [
-          { "name": "int_col", "type": "INT" },
-          { "name": "double_col", "type": "DOUBLE" },
-          { "name": "string_col", "type": "STRING" },
-          { "name": "bool_col", "type": "BOOLEAN" }
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
         ],
         "inputs": [
-          [ 2, 300, "a", false ],
-          [ 2, 400, "a", true ],
-          [ 3, 100, "b", true ],
-          [ 0.001, 1, "b", false ],
-          [ 101, 1.01, "c", false ],
-          [ 150, 1.5, "c", true ],
-          [ 175, 1.75, "c", true ],
-          [ -10000, 1.75, "c", false ],
-          [ -2, 0.5, "c", false ]
+          [2, 300, "a", false],
+          [2, 400, "a", true],
+          [3, 100, "b", true],
+          [0.001, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", true],
+          [175, 1.75, "c", true],
+          [-10000, 1.75, "c", false],
+          [-2, 0.5, "c", false]
         ]
       }
     },
@@ -210,6 +210,54 @@
         "ignored": true,
         "sql": "select string_col, count(int_col) from {tbl} a group by string_col order by string_col having (select count(*) from {tbl} b where count(int_col) = b.int_col) > 0;"
       }
+    ]
+  },
+  "additional_aggregate": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", false],
+          [2, 400, "a", true],
+          [3, 100, "b", true],
+          [0.001, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", true],
+          [175, 1.75, "c", true],
+          [-10000, 1.75, "c", false],
+          [-2, 0.5, "c", false]
+        ]
+      }
+    },
+    "queries": [
+      { "sql": "SELECT min(int_col), min(int_col) FROM {tbl} WHERE int_col < 100" },
+      { "sql": "SELECT min(int_col), count(int_col), count(*) FROM {tbl}" },
+      { "sql": "SELECT string_col, min(int_col), count(int_col), count(*) FROM {tbl} GROUP BY string_col" },
+      { "sql": "SELECT string_col, bool_col, min(int_col), count(int_col), count(*) FROM {tbl} GROUP BY string_col, bool_col" },
+      { "sql": "SELECT string_col, bool_col, min(int_col), count(int_col), count(*) FROM {tbl} GROUP BY bool_col, string_col" },
+      { "sql": "SELECT string_col, string_col AS alias, count(int_col), count(*) FROM {tbl} GROUP BY bool_col, string_col" },
+      { "sql": "SELECT string_col, bool_col, bool_col AS alias, sum(int_col), count(int_col), count(*) FROM {tbl} GROUP BY bool_col, string_col" },
+      { "sql": "SELECT sum(int_col), count(int_col) FROM {tbl} GROUP BY string_col" },
+      { "sql": "SELECT string_col, min(int_col), count(int_col), count(*) FROM {tbl} GROUP BY string_col ORDER BY string_col" },
+      { "sql": "SELECT string_col, bool_col, min(int_col), count(int_col), count(*) FROM {tbl} GROUP BY string_col, bool_col ORDER BY string_col" },
+      { "sql": "SELECT string_col, bool_col, min(int_col), count(int_col), count(*) FROM {tbl} GROUP BY string_col, bool_col ORDER BY bool_col, string_col" },
+      { "sql": "SELECT string_col, bool_col, min(int_col), count(int_col), count(*) FROM {tbl} GROUP BY bool_col, string_col ORDER BY bool_col, string_col" },
+      { "sql": "SELECT string_col, string_col AS alias, count(int_col), count(*) FROM {tbl} GROUP BY bool_col, string_col ORDER BY string_col" },
+      { "sql": "SELECT string_col, string_col AS alias, count(int_col), count(*) FROM {tbl} GROUP BY bool_col, string_col ORDER BY bool_col, alias"},
+      { "sql": "SELECT string_col, bool_col, bool_col AS alias, sum(int_col), count(int_col), count(*) FROM {tbl} GROUP BY bool_col, string_col ORDER BY alias" },
+      { "sql": "SELECT sum(int_col), count(int_col) FROM {tbl} GROUP BY string_col ORDER BY string_col" },
+      { "sql": "SELECT CASE WHEN bool_col THEN int_col ELSE int_col - 5 END, count(int_col) FROM {tbl} GROUP BY CASE WHEN bool_col THEN int_col ELSE int_col - 5 END ORDER BY CASE WHEN bool_col THEN int_col ELSE int_col - 5 END" },
+      { "sql": "SELECT upper(string_col), count(int_col) FROM {tbl} GROUP BY upper(string_col) ORDER BY upper(string_col)" },
+      { "sql": "SELECT upper(string_col), count(int_col) FROM {tbl} GROUP BY upper(string_col) ORDER BY count(int_col)" },
+      { "sql": "SELECT * FROM (SELECT string_col, bool_col, min(int_col) AS m, count(int_col), count(*) AS c FROM {tbl} GROUP BY string_col, bool_col ORDER BY string_col) WHERE c < m" },
+      { "sql": "SELECT * FROM (SELECT string_col, bool_col, min(int_col) AS m, count(int_col), count(*) AS c FROM {tbl} GROUP BY string_col, bool_col ORDER BY bool_col, string_col) WHERE c < m" },
+      { "sql": "SELECT upper(string_col), count(int_col) FROM {tbl} GROUP BY upper(string_col) HAVING sum(int_col) > 0 ORDER BY upper(string_col)" },
+      { "sql": "SELECT upper(string_col), count(int_col) FROM {tbl} GROUP BY upper(string_col) HAVING sum(int_col) >= 0 AND count(int_col) >= 0 ORDER BY count(int_col)" }
     ]
   }
 }

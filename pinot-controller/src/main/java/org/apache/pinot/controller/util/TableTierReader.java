@@ -69,6 +69,12 @@ public class TableTierReader {
    */
   public TableTierDetails getTableTierDetails(String tableNameWithType, @Nullable String segmentName, int timeoutMs)
       throws InvalidConfigException {
+    return getTableTierDetails(tableNameWithType, segmentName, timeoutMs, false);
+  }
+
+  public TableTierDetails getTableTierDetails(String tableNameWithType, @Nullable String segmentName, int timeoutMs,
+      boolean skipErrors)
+      throws InvalidConfigException {
     Map<String, List<String>> serverToSegmentsMap = new HashMap<>();
     if (segmentName == null) {
       serverToSegmentsMap.putAll(_helixResourceManager.getServerToSegmentsMap(tableNameWithType));
@@ -89,8 +95,11 @@ public class TableTierReader {
       List<String> expectedSegmentsOnServer = entry.getValue();
       TableTierInfo tableTierInfo = serverToTableTierInfoMap.get(server);
       for (String expectedSegment : expectedSegmentsOnServer) {
-        tableTierDetails._segmentCurrentTiers.computeIfAbsent(expectedSegment, (k) -> new HashMap<>()).put(server,
-            (tableTierInfo == null) ? ERROR_RESP_NO_RESPONSE : getSegmentTier(expectedSegment, tableTierInfo));
+        String tier = tableTierInfo == null ? ERROR_RESP_NO_RESPONSE : getSegmentTier(expectedSegment, tableTierInfo);
+        if (!skipErrors || !hasError(tier)) {
+          tableTierDetails._segmentCurrentTiers.computeIfAbsent(expectedSegment, (k) -> new HashMap<>())
+              .put(server, tier);
+        }
       }
     }
     if (segmentName == null) {
@@ -104,6 +113,11 @@ public class TableTierReader {
       tableTierDetails._segmentTargetTiers.put(segmentName, segmentZKMetadata.getTier());
     }
     return tableTierDetails;
+  }
+
+  private static boolean hasError(String tier) {
+    return ERROR_RESP_MISSING_SEGMENT.equals(tier) || ERROR_RESP_NO_RESPONSE.equals(tier)
+        || ERROR_RESP_NOT_IMMUTABLE.equals(tier);
   }
 
   private static String getSegmentTier(String expectedSegment, TableTierInfo tableTierInfo) {

@@ -39,9 +39,9 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -72,15 +72,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
 
-  public MultiStageBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics) {
-    super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
+      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, BrokerMetrics brokerMetrics) {
+    super(config, brokerIdFromConfig, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        brokerMetrics);
     LOGGER.info("Using Multi-stage BrokerRequestHandler.");
     String reducerHostname = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (reducerHostname == null) {
       // use broker ID as host name, but remove the
-      String brokerId = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID);
+      String brokerId = brokerIdFromConfig;
       brokerId = brokerId.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) ? brokerId.substring(
           CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : brokerId;
       brokerId = StringUtils.split(brokerId, "_").length > 1 ? StringUtils.split(brokerId, "_")[0] : brokerId;
@@ -94,7 +95,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager(_reducerHostname, _reducerPort, routingManager));
     _queryDispatcher = new QueryDispatcher();
-    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config);
+
+    // it is OK to ignore the onDataAvailable callback because the broker top-level operators
+    // always run in-line (they don't have any scheduler)
+    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config, ignored -> { });
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
@@ -105,7 +109,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
-    requestContext.setBrokerId(_brokerId);
     requestContext.setRequestId(requestId);
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 

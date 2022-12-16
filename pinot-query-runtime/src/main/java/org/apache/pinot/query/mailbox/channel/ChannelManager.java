@@ -43,7 +43,8 @@ public class ChannelManager {
 
   public ChannelManager(GrpcMailboxService mailboxService, PinotConfiguration extraConfig) {
     _mailboxService = mailboxService;
-    _grpcMailboxServer = new GrpcMailboxServer(_mailboxService, _mailboxService.getMailboxPort(), extraConfig);
+    _grpcMailboxServer = new GrpcMailboxServer(
+        _mailboxService, _mailboxService.getMailboxPort(), extraConfig);
   }
 
   public void init() {

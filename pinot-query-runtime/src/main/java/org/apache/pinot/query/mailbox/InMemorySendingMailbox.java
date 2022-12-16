@@ -20,16 +20,20 @@ package org.apache.pinot.query.mailbox;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock> {
   private final BlockingQueue<TransferableBlock> _queue;
+  private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final String _mailboxId;
 
-  public InMemorySendingMailbox(String mailboxId, BlockingQueue<TransferableBlock> queue) {
+  public InMemorySendingMailbox(String mailboxId, BlockingQueue<TransferableBlock> queue,
+      Consumer<MailboxIdentifier> gotMailCallback) {
     _mailboxId = mailboxId;
     _queue = queue;
+    _gotMailCallback = gotMailCallback;
   }
 
   @Override
@@ -45,6 +49,7 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
           data, InMemoryMailboxService.DEFAULT_CHANNEL_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
         throw new RuntimeException(String.format("Timed out when sending block in mailbox=%s", _mailboxId));
       }
+      _gotMailCallback.accept(new StringMailboxIdentifier(_mailboxId));
     } catch (InterruptedException e) {
       throw new RuntimeException("Interrupted trying to send data through the channel", e);
     }

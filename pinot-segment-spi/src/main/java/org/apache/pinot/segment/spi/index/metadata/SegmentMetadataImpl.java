@@ -53,6 +53,7 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -92,11 +93,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private String _startOffset;
   private String _endOffset;
 
-  // TODO: No need to cache this. We cannot modify the metadata if it is from a input stream
-  // Caching properties around can be costly when the number of segments is high according to the
-  // finding in PR #2996. So for now, caching is used only when initializing from input streams.
-  private PropertiesConfiguration _segmentMetadataPropertiesConfiguration = null;
-
   @Deprecated
   private String _rawTableName;
 
@@ -109,13 +105,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _columnMetadataMap = new HashMap<>();
     _schema = new Schema();
 
-    // Caching properties when initializing from input streams.
-    _segmentMetadataPropertiesConfiguration = CommonsConfigurationUtils.fromInputStream(metadataPropertiesInputStream);
-    init(_segmentMetadataPropertiesConfiguration);
-    loadCreationMeta(creationMetaInputStream);
+    PropertiesConfiguration segmentMetadataPropertiesConfiguration =
+        CommonsConfigurationUtils.fromInputStream(metadataPropertiesInputStream);
+    init(segmentMetadataPropertiesConfiguration);
+    setTimeInfo(segmentMetadataPropertiesConfiguration);
+    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_TOTAL_DOCS);
 
-    setTimeInfo(_segmentMetadataPropertiesConfiguration);
-    _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_TOTAL_DOCS);
+    loadCreationMeta(creationMetaInputStream);
   }
 
   /**
@@ -127,17 +123,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       throws IOException {
     _indexDir = indexDir;
     _columnMetadataMap = new HashMap<>();
-    PropertiesConfiguration segmentMetadataPropertiesConfiguration = getPropertiesConfiguration(indexDir);
     _schema = new Schema();
 
+    PropertiesConfiguration segmentMetadataPropertiesConfiguration =
+        SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     init(segmentMetadataPropertiesConfiguration);
+    setTimeInfo(segmentMetadataPropertiesConfiguration);
+    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_TOTAL_DOCS);
+
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
     if (creationMetaFile != null) {
       loadCreationMeta(creationMetaFile);
     }
-
-    setTimeInfo(segmentMetadataPropertiesConfiguration);
-    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_TOTAL_DOCS);
   }
 
   /**
@@ -150,18 +147,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _segmentName = segmentName;
     _schema = schema;
     _creationTime = creationTime;
-  }
-
-  public PropertiesConfiguration getPropertiesConfiguration() {
-    return (_segmentMetadataPropertiesConfiguration != null) ? _segmentMetadataPropertiesConfiguration
-        : SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);
-  }
-
-  public static PropertiesConfiguration getPropertiesConfiguration(File indexDir) {
-    File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
-    Preconditions.checkNotNull(metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
-
-    return CommonsConfigurationUtils.fromFile(metadataFile);
   }
 
   /**

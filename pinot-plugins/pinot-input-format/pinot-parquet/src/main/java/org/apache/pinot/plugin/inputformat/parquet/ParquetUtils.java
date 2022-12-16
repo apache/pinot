@@ -59,8 +59,8 @@ public class ParquetUtils {
    */
   public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
       throws IOException {
-    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema)
-        .withConf(getParquetHadoopConfiguration()).build();
+    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema).withConf(getParquetHadoopConfiguration())
+        .build();
   }
 
   /**
@@ -85,7 +85,8 @@ public class ParquetUtils {
     }
   }
 
-  public static boolean hasAvroSchemaInFileMetadata(Path path) throws IOException {
+  public static boolean hasAvroSchemaInFileMetadata(Path path)
+      throws IOException {
     ParquetMetadata footer =
         ParquetFileReader.readFooter(getParquetHadoopConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
     Map<String, String> metaData = footer.getFileMetaData().getKeyValueMetaData();

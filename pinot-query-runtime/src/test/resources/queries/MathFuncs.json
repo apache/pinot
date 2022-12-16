@@ -1,0 +1,539 @@
+{
+  "addition": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0, 0, 0.1, 3.2],
+          [123, 321, 4.2, 3.0],
+          [-456, -2, 1.1, 7.7],
+          [123, -456, 3.6, 9.1]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test addition on integer columns",
+        "sql": "SELECT intCol + longCol FROM {numTbl}"
+      },
+      {
+        "description": "test addition on int literal with columns",
+        "sql": "SELECT intCol + 10 FROM {numTbl}"
+      },
+      {
+        "description": "test addition on double literal with columns",
+        "sql": "SELECT intCol + 1.2 FROM {numTbl}"
+      },
+      {
+        "description": "test addition on literals",
+        "sql": "SELECT 3 + 2.4 FROM {numTbl}"
+      },
+      {
+        "description": "test addition on literals",
+        "sql": "SELECT 3 + 2 FROM {numTbl}"
+      },
+      {
+        "description": "test addition on floating point",
+        "sql": "SELECT doubleCol + floatCol FROM {numTbl}"
+      },
+      {
+        "description": "test addition on floating point with literal",
+        "sql": "SELECT doubleCol + 2 FROM {numTbl}"
+      },
+      {
+        "description": "test addition on zero",
+        "sql": "SELECT doubleCol + 0 FROM {numTbl}"
+      },
+      {
+        "description": "test addition on doubleCol with intCol",
+        "sql": "SELECT doubleCol + intCol FROM {numTbl}"
+      }
+    ]
+  },
+  "subtraction": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0, 0, 0.1, 3.2],
+          [123, 321, 4.2, 3.0],
+          [-456, -2, 1.1, 7.7],
+          [123, -456, 3.6, 9.1]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test subtraction on integer columns",
+        "sql": "SELECT intCol - longCol FROM {numTbl}"
+      },
+      {
+        "description": "test subtraction on int literal with columns",
+        "sql": "SELECT intCol - 10 FROM {numTbl}"
+      },
+      {
+        "description": "test subtraction on double literal with columns",
+        "sql": "SELECT intCol - 1.2 FROM {numTbl}"
+      },
+      {
+        "description": "test subtraction on literals",
+        "sql": "SELECT 3 - 5 FROM {numTbl}"
+      },
+      {
+        "description": "test subtraction on literals",
+        "sql": "SELECT 3 - 2.4 FROM {numTbl}"
+      },
+      {
+        "description": "test subtraction on floating point",
+        "sql": "SELECT doubleCol - floatCol FROM {numTbl}"
+      },
+      {
+        "description": "test subtraction on floating point with literal",
+        "sql": "SELECT doubleCol - 2 FROM {numTbl}"
+      },
+      {
+        "description": "test subtraction on zero",
+        "sql": "SELECT doubleCol - 0 FROM {numTbl}"
+      },
+      {
+        "description": "test subtraction on doubleCol with intCol",
+        "sql": "SELECT doubleCol - intCol FROM {numTbl}"
+      }
+    ]
+  },
+  "multiply": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0, 0, 0.1, 3.2],
+          [123, 321, 4.2, 3.0],
+          [-456, -2, 1.1, 7.7],
+          [123, -456, 3.6, 9.1]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test multiply on integer columns",
+        "sql": "SELECT intCol * longCol FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on int literal with columns",
+        "sql": "SELECT intCol * 10 FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on double literal with columns",
+        "sql": "SELECT intCol * 1.2 FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on literals",
+        "sql": "SELECT 3 * 5 FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on literals",
+        "sql": "SELECT 3 * 2.4 FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on floating point",
+        "sql": "SELECT doubleCol * floatCol FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on floating point with literal",
+        "sql": "SELECT doubleCol * 2 FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on zero",
+        "sql": "SELECT doubleCol * 0 FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on doubleCol with intCol",
+        "sql": "SELECT doubleCol * intCol FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comments": "calcite doesn't support up-cast automatically",
+        "description": "test multiply on overflow",
+        "sql": "SELECT intCol * 1073741824 FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on overflow",
+        "sql": "SELECT intCol * CAST(1073741824 AS BIGINT) FROM {numTbl}"
+      },
+      {
+        "description": "test multiply on overflow",
+        "sql": "SELECT intCol * 10737418e2 FROM {numTbl}"
+      }
+    ]
+  },
+  "division": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0, 3, 0.1, 3.2],
+          [123, 321, 4.2, 3.0],
+          [-456, -2, 1.1, 7.7],
+          [123, -456, 3.6, 9.1]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "ignored": true,
+        "comment": "should round on the integer but we return a floating point",
+        "description": "test divide on integer columns",
+        "sql": "SELECT intCol / longCol FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "should round on the integer but we return a floating point",
+        "description": "test divide on int literal with columns",
+        "sql": "SELECT intCol / 10 FROM {numTbl}"
+      },
+      {
+        "description": "test divide on double literal with columns",
+        "sql": "SELECT intCol / 1.2 FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "should round on the integer but we return a floating point",
+        "description": "test divide on literals",
+        "sql": "SELECT 3 / 5 FROM {numTbl}"
+      },
+      {
+        "description": "test divide on literals",
+        "sql": "SELECT 3 / 2.4 FROM {numTbl}"
+      },
+      {
+        "description": "test divide on floating point",
+        "sql": "SELECT doubleCol / floatCol FROM {numTbl}"
+      },
+      {
+        "description": "test divide on floating point with literal",
+        "sql": "SELECT doubleCol / 2 FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "should return infinity but we throw an exception",
+        "description": "test divide by zero",
+        "sql": "SELECT doubleCol / 0 FROM {numTbl}"
+      },
+      {
+        "description": "test divide on doubleCol with intCol",
+        "sql": "SELECT intCol / doubleCol FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "description": "test divide on overflow",
+        "comment": "somehow there is value diff",
+        "sql": "SELECT floatCol / 1e-15 FROM {numTbl}"
+      }
+    ]
+  },
+  "mod": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0, 3, 0.1, 3.2],
+          [123, 321, 4.2, 3.0],
+          [-456, -2, 1.1, 7.7],
+          [123, -456, 3.6, 9.1]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "ignored": true,
+        "comment": "we are returning -0.0 for some reason",
+        "description": "test mod on integer columns",
+        "sql": "SELECT intCol % longCol FROM {numTbl}"
+      },
+      {
+        "description": "test mod on int literal with columns",
+        "sql": "SELECT intCol %  10 FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "should return 0 for 0 value but we are not",
+        "description": "test mod on floating point literal with columns",
+        "sql": "SELECT intCol %  1.2 FROM {numTbl}"
+      },
+      {
+        "description": "test mod on literals",
+        "sql": "SELECT 3 %  5 FROM {numTbl}"
+      },
+      {
+        "description": "test mod on literals",
+        "sql": "SELECT 3 % 2.4 FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "Conversion to relational algebra failed to preserve datatypes:",
+        "description": "test mode on floating point",
+        "sql": "SELECT doubleCol % floatCol FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "description": "test divide on floating point with literal",
+        "comment": "Conversion mode relational algebra failed to preserve datatypes:",
+        "sql": "SELECT doubleCol % 2 FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "Conversion to relational algebra failed to preserve datatypes:",
+        "description": "test mode by zero",
+        "expectedException": ".*Division by zero.*",
+        "sql": "SELECT doubleCol % 0 FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "Conversion to relational algebra failed to preserve datatypes:",
+        "description": "test mod on doubleCol with intCol",
+        "sql": "SELECT doubleCol % intCol FROM {numTbl}"
+      }
+    ]
+  },
+  "exp": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0, 3, 0.1, 3.2],
+          [123, 321, 4.2, 3.0],
+          [-456, -2, 1.1, 7.7],
+          [123, -456, 3.6, 9.1]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test exp on integer columns",
+        "sql": "SELECT exp(intCol) FROM {numTbl}"
+      },
+      {
+        "description": "test exp on long columns",
+        "sql": "SELECT exp(longCol) FROM {numTbl}"
+      },
+      {
+        "description": "test exp on double columns",
+        "sql": "SELECT exp(doubleCol) FROM {numTbl}"
+      },
+      {
+        "description": "test exp on float columns",
+        "sql": "SELECT exp(floatCol) FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "Argument cannot be literal for transform function: exp:",
+        "description": "test exp on literal",
+        "sql": "SELECT exp(2.0) FROM {numTbl}"
+      }
+    ]
+  },
+  "floor": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0, 3, 0.1, 3.2],
+          [123, 321, 4.2, 3.0],
+          [-456, -2, 1.1, 7.7],
+          [123, -456, 3.6, 9.1]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test floor on integer columns",
+        "sql": "SELECT floor(intCol) FROM {numTbl}"
+      },
+      {
+        "description": "test floor on long columns",
+        "sql": "SELECT floor(longCol) FROM {numTbl}"
+      },
+      {
+        "description": "test floor on double columns",
+        "sql": "SELECT floor(doubleCol) FROM {numTbl}"
+      },
+      {
+        "description": "test floor on float columns",
+        "sql": "SELECT floor(floatCol) FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "Caught exception while initializing transform function: floor",
+        "description": "test exp on literal",
+        "sql": "SELECT floor(2.0) FROM {numTbl}"
+      }
+    ]
+  },
+  "ceil": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0, 3, 0.1, 3.2],
+          [123, 321, 4.2, 3.0],
+          [-456, -2, 1.1, 7.7],
+          [123, -456, 3.6, 9.1]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test ceil on integer columns",
+        "sql": "SELECT ceil(intCol) FROM {numTbl}"
+      },
+      {
+        "description": "test ceil on long columns",
+        "sql": "SELECT ceil(longCol) FROM {numTbl}"
+      },
+      {
+        "description": "test ceil on double columns",
+        "sql": "SELECT ceil(doubleCol) FROM {numTbl}"
+      },
+      {
+        "description": "test ceil on float columns",
+        "sql": "SELECT ceil(floatCol) FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "Caught exception while initializing transform function: ceil",
+        "description": "test exp on literal",
+        "sql": "SELECT ceil(2.0) FROM {numTbl}"
+      }
+    ]
+  },
+  "decimal_type_conversion": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"}
+        ],
+        "inputs": [
+          [0, 0, 0.1, 3.2],
+          [123, 321, 4.2, 3.0],
+          [-456, -2, 1.1, 7.7],
+          [123, -456, 3.6, 9.1]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "test addition on doubleCol plus large decimal DOES NOT convert to BigDecimal",
+        "sql": "SELECT doubleCol + 1e250 FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comments": "Pinot hoist type to double but H2 doesn't",
+        "description": "test addition on floatCol plus large decimal to convert to double",
+        "sql": "SELECT floatCol + 1e50 FROM {numTbl}"
+      },
+      {
+        "description": "test addition on intCol plus large decimal to convert to long",
+        "sql": "SELECT intCol + 1e40 FROM {numTbl}"
+      },
+      {
+        "description": "test addition on longCol plus large decimal to convert to float/double",
+        "sql": "SELECT longCol + 1e20 FROM {numTbl}"
+      },
+      {
+        "description": "test on doubleCol plus large decimal DOES NOT convert to BigDecimal",
+        "sql": "SELECT doubleCol - 1e250 FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comments": "Pinot hoist type to double but H2 doesn't",
+        "description": "test on floatCol plus large decimal to convert to double",
+        "sql": "SELECT floatCol - 1e50 FROM {numTbl}"
+      },
+      {
+        "description": "test on intCol plus large decimal to convert to long",
+        "sql": "SELECT intCol - 1e40 FROM {numTbl}"
+      },
+      {
+        "description": "test on longCol plus large decimal to convert to float/double",
+        "sql": "SELECT longCol - 1e20 FROM {numTbl}"
+      },
+      {
+        "description": "test on doubleCol plus large decimal to convert to bigDecimal",
+        "sql": "SELECT doubleCol * 1e50 FROM {numTbl}"
+      },
+      {
+        "ignored": true,
+        "comments": "Pinot hoist type to double but H2 doesn't",
+        "description": "test on floatCol plus large decimal to convert to double",
+        "sql": "SELECT floatCol * 1e50 FROM {numTbl}"
+      },
+      {
+        "description": "test on intCol plus large decimal to convert to long",
+        "sql": "SELECT intCol * 1e10 FROM {numTbl}"
+      },
+      {
+        "description": "test on longCol plus large decimal to convert to float/double",
+        "sql": "SELECT longCol * 1e20 FROM {numTbl}"
+      },
+      {
+        "description": "test on doubleCol plus large decimal to convert to bigDecimal",
+        "sql": "SELECT doubleCol / 1e50 FROM {numTbl}"
+      },
+      {
+        "description": "test on floatCol plus large decimal to convert to double",
+        "sql": "SELECT floatCol / 1e50 FROM {numTbl}"
+      },
+      {
+        "description": "test on intCol plus large decimal DOES NOT convert to floating point",
+        "sql": "SELECT intCol / 1e10 FROM {numTbl}"
+      },
+      {
+        "description": "test on longCol plus large decimal DOES NOT convert to floating point",
+        "sql": "SELECT longCol / 1e20 FROM {numTbl}"
+      }
+    ]
+  }
+}

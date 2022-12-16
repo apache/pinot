@@ -47,6 +47,11 @@ public class ExplainResultsBlock extends BaseResultsBlock {
   }
 
   @Override
+  public int getNumRows() {
+    return _entries.size();
+  }
+
+  @Override
   public Collection<Object[]> getRows(QueryContext queryContext) {
     List<Object[]> rows = new ArrayList<>(_entries.size());
     for (ExplainEntry entry : _entries) {

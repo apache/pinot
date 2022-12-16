@@ -20,10 +20,12 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
@@ -604,6 +606,36 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       }
       return true;
     }, 30_000L, "Failed to wait for all segments come back online");
+  }
+
+  public String reloadTableAndValidateResponse(String tableName, TableType tableType, boolean forceDownload)
+      throws IOException {
+    String response =
+        sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload), null);
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+    JsonNode tableLevelDetails =
+        JsonUtils.stringToJsonNode(StringEscapeUtils.unescapeJava(response.split(": ")[1])).get(tableNameWithType);
+    String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
+    assertEquals(isZKWriteSuccess, "SUCCESS");
+    String jobId = tableLevelDetails.get("reloadJobId").asText();
+    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(jobId));
+    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
+
+    // Validate all fields are present
+    assertEquals(jobStatus.get("metadata").get("jobId").asText(), jobId);
+    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
+    assertEquals(jobStatus.get("metadata").get("tableName").asText(), tableNameWithType);
+    return jobId;
+  }
+
+  public boolean isReloadJobCompleted(String reloadJobId)
+      throws Exception {
+    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(reloadJobId));
+    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
+
+    assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
+    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
+    return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
   }
 
   /**

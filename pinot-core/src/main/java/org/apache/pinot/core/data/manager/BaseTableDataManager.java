@@ -325,6 +325,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
+  public TableDataManagerConfig getTableDataManagerConfig() {
+    return _tableDataManagerConfig;
+  }
+
+  @Override
   public void addSegmentError(String segmentName, SegmentErrorInfo segmentErrorInfo) {
     _errorCache.put(Pair.of(_tableNameWithType, segmentName), segmentErrorInfo);
   }
@@ -347,6 +352,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentTier = getSegmentCurrentTier(segmentName);
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
+    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     try {
       // Create backup directory to handle failure of segment reloading.
@@ -415,6 +421,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentTier = zkMetadata.getTier();
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
+    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
     if (localMetadata == null && tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata)) {
       return;
     }
@@ -639,7 +646,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return getSegmentDataDir(segmentName);
     }
     try {
-      String tierDataDir = TierConfigUtils.getDataDirForTier(tableConfig, segmentTier);
+      String tierDataDir =
+          TierConfigUtils.getDataDirForTier(tableConfig, segmentTier, _tableDataManagerConfig.getInstanceTierConfigs());
       File tierTableDataDir = new File(tierDataDir, _tableNameWithType);
       return new File(tierTableDataDir, segmentName);
     } catch (Exception e) {
@@ -793,6 +801,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
             .setSchema(indexLoadingConfig.getSchema()).setInstanceId(indexLoadingConfig.getInstanceId())
             .setTableDataDir(indexLoadingConfig.getTableDataDir()).setSegmentName(segmentName).setSegmentCrc(segmentCrc)
             .setSegmentTier(indexLoadingConfig.getSegmentTier())
+            .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
             .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs()).build();
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
