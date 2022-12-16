@@ -27,20 +27,17 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
+import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
-import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -130,6 +127,7 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
   @Override
   protected void processSegments() {
     int operatorId;
+    IndexedTable indexedTable = null;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator operator = _operators.get(operatorId);
       try {
@@ -137,23 +135,10 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
-        if (_indexedTable == null) {
-          synchronized (this) {
-            if (_indexedTable == null) {
-              DataSchema dataSchema = resultsBlock.getDataSchema();
-              // NOTE: Use trimSize as resultSize on server size.
-              if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
-                // special case of trim threshold where it is set to max value.
-                // there won't be any trimming during upsert in this case.
-                // thus we can avoid the overhead of read-lock and write-lock
-                // in the upsert method.
-                _indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, _trimSize);
-              } else {
-                _indexedTable =
-                    new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
-              }
-            }
-          }
+        if (indexedTable == null) {
+          DataSchema dataSchema = resultsBlock.getDataSchema();
+          indexedTable =
+              new SimpleIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
         }
 
         // Merge processing exceptions.
@@ -167,44 +152,16 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
           _numGroupsLimitReached = true;
         }
 
-        // Merge aggregation group-by result.
-        // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-        Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
-        // Count the number of merged keys
-        int mergedKeys = 0;
-        // For now, only GroupBy OrderBy query has pre-constructed intermediate records
-        if (intermediateRecords == null) {
-          // Merge aggregation group-by result.
-          AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-          if (aggregationGroupByResult != null) {
-            // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-            Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-            while (dicGroupKeyIterator.hasNext()) {
-              GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
-              Object[] keys = groupKey._keys;
-              Object[] values = Arrays.copyOf(keys, _numColumns);
-              int groupId = groupKey._groupId;
-              for (int i = 0; i < _numAggregationFunctions; i++) {
-                values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
-              }
-              _indexedTable.upsert(new Key(keys), new Record(values));
-              mergedKeys++;
-              LoopUtils.checkMergePhaseInterruption(mergedKeys);
-            }
-          }
-        } else {
-          for (IntermediateRecord intermediateResult : intermediateRecords) {
-            //TODO: change upsert api so that it accepts intermediateRecord directly
-            _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
-            mergedKeys++;
-            LoopUtils.checkMergePhaseInterruption(mergedKeys);
-          }
-        }
+        mergeResultsBlockIntoIndexedTable(indexedTable, resultsBlock);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
+    }
+    if (indexedTable != null) {
+      indexedTable.finish(false, false);
+      _blockingQueue.offer(new GroupByResultsBlock(indexedTable));
     }
   }
 
@@ -234,18 +191,35 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
   @Override
   protected BaseResultsBlock mergeResults()
       throws Exception {
-    long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
-    boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
-    if (!opCompleted) {
-      // If this happens, the broker side should already timed out, just log the error and return
-      String errorMessage =
-          String.format("Timed out while combining group-by order-by results after %dms, queryContext = %s", timeoutMs,
-              _queryContext);
-      LOGGER.error(errorMessage);
-      return new ExceptionResultsBlock(new TimeoutException(errorMessage));
+    IndexedTable indexedTable = null;
+    int numBlocksMerged = 0;
+    long endTimeMs = _queryContext.getEndTimeMs();
+    while (numBlocksMerged < _numTasks) {
+      // Timeout has reached, shouldn't continue to process. `_blockingQueue.poll` will continue to return blocks even
+      // if negative timeout is provided; therefore an extra check is needed
+      long waitTimeMs = endTimeMs - System.currentTimeMillis();
+      if (waitTimeMs <= 0) {
+        return getTimeoutResultsBlock(numBlocksMerged);
+      }
+      BaseResultsBlock blockToMerge = _blockingQueue.poll(waitTimeMs, TimeUnit.MILLISECONDS);
+      if (blockToMerge == null) {
+        return getTimeoutResultsBlock(numBlocksMerged);
+      }
+      if (blockToMerge.getProcessingExceptions() != null) {
+        // Caught exception while processing segment, skip merging the remaining results blocks and directly return the
+        // exception
+        return blockToMerge;
+      }
+      if (indexedTable == null) {
+        indexedTable = new SimpleIndexedTable(blockToMerge.getDataSchema(_queryContext), _queryContext, _trimSize,
+            _trimSize, _trimThreshold);
+      }
+      mergeResultsBlockIntoIndexedTable(indexedTable, (GroupByResultsBlock) blockToMerge);
+      numBlocksMerged++;
     }
-
-    IndexedTable indexedTable = _indexedTable;
+    if (indexedTable == null) {
+      return getTimeoutResultsBlock(numBlocksMerged);
+    }
     if (!_queryContext.isServerReturnFinalResult()) {
       indexedTable.finish(false);
     } else {
@@ -255,16 +229,53 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
-
     // Set the processing exceptions.
     if (!_mergedProcessingExceptions.isEmpty()) {
       mergedBlock.setProcessingExceptions(new ArrayList<>(_mergedProcessingExceptions));
     }
-
     return mergedBlock;
   }
 
   @Override
   protected void mergeResultsBlocks(GroupByResultsBlock mergedBlock, GroupByResultsBlock blockToMerge) {
+    mergeResultsBlockIntoIndexedTable((IndexedTable) mergedBlock.getTable(), blockToMerge);
+  }
+
+  private void mergeResultsBlockIntoIndexedTable(IndexedTable indexedTable, GroupByResultsBlock resultsBlock) {
+    // Merge aggregation group-by result.
+    // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+    Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
+    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    IndexedTable indexedTableToMerge = (IndexedTable) resultsBlock.getTable();
+    // Count the number of merged keys
+    int mergedKeys = 0;
+    // For now, only GroupBy OrderBy query has pre-constructed intermediate records
+    if (intermediateRecords != null) {
+      for (IntermediateRecord intermediateResult : intermediateRecords) {
+        //TODO: change upsert api so that it accepts intermediateRecord directly
+        indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+        mergedKeys++;
+        LoopUtils.checkMergePhaseInterruption(mergedKeys);
+      }
+    } else if (aggregationGroupByResult != null) {
+      // Merge aggregation group-by result.
+      // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+      Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+      while (dicGroupKeyIterator.hasNext()) {
+        GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
+        Object[] keys = groupKey._keys;
+        Object[] values = Arrays.copyOf(keys, _numColumns);
+        int groupId = groupKey._groupId;
+        for (int i = 0; i < _numAggregationFunctions; i++) {
+          values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+        }
+        indexedTable.upsert(new Key(keys), new Record(values));
+        mergedKeys++;
+        LoopUtils.checkMergePhaseInterruption(mergedKeys);
+      }
+    } else {
+      // Merge indexed table
+      indexedTable.merge(indexedTableToMerge);
+    }
   }
 }

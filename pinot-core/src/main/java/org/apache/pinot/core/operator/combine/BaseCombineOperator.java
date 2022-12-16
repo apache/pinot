@@ -248,7 +248,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     return mergedBlock;
   }
 
-  private ExceptionResultsBlock getTimeoutResultsBlock(int numBlocksMerged) {
+  protected ExceptionResultsBlock getTimeoutResultsBlock(int numBlocksMerged) {
     LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
         _queryContext);
     return new ExceptionResultsBlock(QueryException.EXECUTION_TIMEOUT_ERROR,
