@@ -96,6 +96,8 @@ public final class MinionTaskMetadataUtils {
       }
       // the new path is MINION_TASK_METADATA/${tableNameWthType}/${taskType}
       // the old path is MINION_TASK_METADATA/${taskType}/${tableNameWthType}
+      // The variable tableNameWithTypeOrTaskType stores the first level child name of MINION_TASK_METADATA, that's why
+      // when it ends with OFFLINE or REALTIME, it is a new path.
       boolean isNewPath =
           tableNameWithTypeOrTaskType.endsWith(TableType.OFFLINE.toString()) || tableNameWithTypeOrTaskType.endsWith(
               TableType.REALTIME.toString());

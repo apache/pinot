@@ -101,8 +101,8 @@ rules:
   labels:
     taskType: "$1"
     status: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.minionTaskMetadataLastUpdateTimeMs.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_minionTaskMetadataLastUpdateTimeMs_$4"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastMinionTaskMetadataUpdate.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_timeMsSinceLastMinionTaskMetadataUpdate_$4"
   cache: true
   labels:
     table: "$1"
