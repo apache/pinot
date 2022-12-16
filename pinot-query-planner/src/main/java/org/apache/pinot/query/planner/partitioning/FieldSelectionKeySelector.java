@@ -21,7 +21,6 @@ package org.apache.pinot.query.planner.partitioning;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -67,10 +66,20 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]
 
   @Override
   public int computeHash(Object[] input) {
-    HashCodeBuilder hashCodeBuilder = new HashCodeBuilder();
+    // use a hashing algorithm that is agnostic to the ordering of the columns.
+    // For example, computeHash(input) will be identical for both of the following
+    // values of _columnIndices:
+    // - [1, 2, 4]
+    // - [4, 1, 2]
+    // this is necessary because calcite always sorts _columnIndices for a hash
+    // broadcast, which may reorder the columns differently for different sides
+    // of a join
+    int hashCode = 0;
     for (int columnIndex : _columnIndices) {
-      hashCodeBuilder.append(input[columnIndex]);
+      hashCode += input[columnIndex].hashCode();
     }
-    return Math.abs(hashCodeBuilder.toHashCode());
+
+    // return a positive number because this is used directly to modulo-index
+    return Math.abs(hashCode);
   }
 }
