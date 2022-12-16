@@ -72,8 +72,8 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
     taskMetadataLastUpdateTime.forEach((tableNameWithType, taskTypeLastUpdateTime) ->
         taskTypeLastUpdateTime.forEach((taskType, lastUpdateTimeMs) ->
             _controllerMetrics.addOrUpdateGauge(
-                ControllerGauge.TIME_MS_SINCE_LAST_MINION_TASK_METADATA_UPDATE.getGaugeName() +
-                "." + tableNameWithType + "." + taskType, () -> System.currentTimeMillis() - lastUpdateTimeMs)));
+                ControllerGauge.TIME_MS_SINCE_LAST_MINION_TASK_METADATA_UPDATE.getGaugeName() + "."
+                    + tableNameWithType + "." + taskType, () -> System.currentTimeMillis() - lastUpdateTimeMs)));
 
     // The call to get task types can take time if there are a lot of tasks.
     // Potential optimization is to call it every (say) 30m if we detect a barrage of
