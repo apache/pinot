@@ -128,7 +128,7 @@ public class H3IndexHandler extends BaseIndexHandler {
     }
 
     // Create a temporary forward index if it is disabled and does not exist
-    createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
 
     // Create new H3 index for the column.
     LOGGER.info("Creating new H3 index for segment: {}, column: {}", segmentName, columnName);

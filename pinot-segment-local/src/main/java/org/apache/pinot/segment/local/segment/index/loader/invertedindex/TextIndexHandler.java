@@ -172,7 +172,7 @@ public class TextIndexHandler extends BaseIndexHandler {
     boolean hasDictionary = columnMetadata.hasDictionary();
 
     // Create a temporary forward index if it is disabled and does not exist
-    createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
 
     LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", columnName, segmentName,
         hasDictionary);

@@ -66,13 +66,13 @@ public abstract class BaseIndexHandler implements IndexHandler {
     }
   }
 
-  protected void createForwardIndexIfNeeded(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      IndexCreatorProvider indexCreatorProvider, boolean isTemporaryForwardIndex)
+  protected ColumnMetadata createForwardIndexIfNeeded(SegmentDirectory.Writer segmentWriter,
+      ColumnMetadata columnMetadata, IndexCreatorProvider indexCreatorProvider, boolean isTemporaryForwardIndex)
       throws IOException {
     String columnName = columnMetadata.getColumnName();
     if (segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)) {
       LOGGER.info("Forward index already exists for column: {}, skip trying to create it", columnName);
-      return;
+      return columnMetadata;
     }
 
     // If forward index is disabled it means that it has to be dictionary based and the inverted index must exist.
@@ -99,5 +99,7 @@ public abstract class BaseIndexHandler implements IndexHandler {
     }
 
     LOGGER.info("Rebuilt the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
+
+    return _segmentMetadata.getColumnMetadataFor(columnName);
   }
 }

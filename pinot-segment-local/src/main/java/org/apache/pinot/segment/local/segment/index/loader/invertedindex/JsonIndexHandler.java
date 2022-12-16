@@ -127,7 +127,7 @@ public class JsonIndexHandler extends BaseIndexHandler {
     }
 
     // Create a temporary forward index if it is disabled and does not exist
-    createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
 
     // Create new json index for the column.
     LOGGER.info("Creating new json index for segment: {}, column: {}", segmentName, columnName);

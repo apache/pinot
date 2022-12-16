@@ -264,7 +264,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
 
     if (!columnMetadata.hasDictionary()) {
       // Create a temporary forward index if it is disabled and does not exist
-      createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+      columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
     }
 
     // Create new bloom filter for the column.
