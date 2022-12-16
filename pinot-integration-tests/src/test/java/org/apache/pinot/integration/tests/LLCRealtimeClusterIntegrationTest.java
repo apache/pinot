@@ -19,11 +19,13 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -34,14 +36,18 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -226,6 +232,75 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
             getRealtimeSegmentFlushSize() / getNumKafkaPartitions());
       }
     }
+  }
+
+  @Test
+  public void testAvailabilityLagIsEmitted() {
+    String tableName = "laggingTable";
+    Map<String, String> laggingTable = new HashMap<>();
+    laggingTable.put("realtime.segment.flush.threshold.rows", "50000");
+    laggingTable.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.integration.tests.ClusterTest$AvroFileSchemaKafkaAvroMessageDecoder");
+    laggingTable.put("streamType", "kafka");
+    laggingTable.put("stream.kafka.consumer.type", "LOWLEVEL");
+    laggingTable.put("stream.kafka.broker.list", "localhost:19092");
+    laggingTable.put("stream.kafka.consumer.factory.class.name",
+        "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
+    laggingTable.put("stream.kafka.consumer.prop.auto.offset.reset", "smallest");
+    laggingTable.put("stream.kafka.topic.name", "LLCRealtimeClusterIntegrationTest");
+    laggingTable.put("topic.consumption.rate.limit", "50"); // controlled slow consumption to see non-zero lag
+    TableConfigBuilder builder = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(tableName)
+        .setSchemaName(getSchemaName())
+        .setTimeColumnName(getTimeColumnName())
+        .setStreamConfigs(laggingTable)
+        .setNumReplicas(1)
+        .setLLC(true);
+    TableConfig config = builder.build();
+    try {
+      addTableConfig(config);
+      // sleep so the table starts consuming
+      Thread.sleep(60_000);
+
+      // verify fetch consuming segment info exposes both lags
+      JsonNode response = getConsumingSegmentsInfo(tableName);
+      assertNotNull(response);
+
+      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap infoMap =
+          new ObjectMapper().convertValue(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
+      assertEquals(infoMap._segmentToConsumingInfoMap.size(), 2); // verify there are only 2 consuming segments
+      for (List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> list : infoMap._segmentToConsumingInfoMap.values()) {
+         ConsumingSegmentInfoReader.ConsumingSegmentInfo segmentInfo = list.get(0);
+         segmentInfo._partitionOffsetInfo._availabilityLagMap.forEach((k, v) -> {
+           if (v != null) {
+             assertTrue(Long.parseLong(v) > 0);
+           }
+         });
+        segmentInfo._partitionOffsetInfo._recordsLagMap.forEach((k, v) -> {
+          if (v != null) {
+            assertTrue(Long.parseLong(v) > 0);
+          }
+        });
+       }
+    } catch (IOException | InterruptedException e) {
+      e.printStackTrace();
+    }
+
+    // verify metrics exposes the availability lag
+    ServerMetrics metrics = _serverStarters.get(0).getServerInstance().getServerMetrics();
+    long value = metrics.getValueOfPartitionGauge(tableName + "_REALTIME", 0,
+        ServerGauge.LLC_AVAILABILITY_LAG_MS);
+    assertTrue(value > 0);
+    value = metrics.getValueOfPartitionGauge(tableName + "_REALTIME", 1,
+        ServerGauge.LLC_AVAILABILITY_LAG_MS);
+    assertTrue(value > 0);
+  }
+
+  private JsonNode getConsumingSegmentsInfo(String tableName)
+      throws IOException {
+    String url = getControllerRequestURLBuilder().forConsumingSegmentsInfo(tableName);
+    String responseJson = sendGetRequest(url);
+    return JsonUtils.stringToJsonNode(responseJson);
   }
 
   @Test(expectedExceptions = IOException.class)

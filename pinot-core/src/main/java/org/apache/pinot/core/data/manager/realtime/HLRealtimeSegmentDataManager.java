@@ -443,7 +443,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
-  public void handleConsumptionStatus(boolean caughtUp) {
+  public void notifyConsumptionCaughtUp(boolean caughtUp) {
     // no-op
   }
 

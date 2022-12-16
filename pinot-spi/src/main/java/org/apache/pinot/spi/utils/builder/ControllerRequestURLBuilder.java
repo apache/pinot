@@ -354,6 +354,10 @@ public class ControllerRequestURLBuilder {
     return url;
   }
 
+  public String forConsumingSegmentsInfo(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "consumingSegmentsInfo");
+  }
+
   public String forSegmentMetadata(String tableName, String segmentName) {
     return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName), "metadata");
   }

@@ -81,5 +81,5 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
    * @param caughtUpWithUpstream Boolean indicating if the partiton has caught up with upstream source or not based on
    *                            the strategy used in the {@literal IngestionBasedConsumptionStatusChecker}
    */
-  public abstract void handleConsumptionStatus(boolean caughtUpWithUpstream);
+  public abstract void notifyConsumptionCaughtUp(boolean caughtUpWithUpstream);
 }

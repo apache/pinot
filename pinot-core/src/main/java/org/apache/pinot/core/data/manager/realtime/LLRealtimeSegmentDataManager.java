@@ -258,7 +258,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   /** This variable will be set by the configured {@literal IngestionBasedConsumptionStatusChecker} when the segment is
    * caughtup.
    */
-  private volatile boolean _caughtUpWithUpstream = false;
+  private volatile boolean _catchingUpPhase = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
   // For now, we let 31s pass for this state transition.
@@ -286,7 +286,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final PartitionLevelStreamConfig _partitionLevelStreamConfig;
 
   private RowMetadata _lastRowMetadata;
-  private long _lastConsumedTimestampMs = -1;
+  private long _lastIndexedTimestamp = -1;
 
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
@@ -586,7 +586,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             indexedMessageCount++;
             _lastRowMetadata = msgMetadata;
-            _lastConsumedTimestampMs = System.currentTimeMillis();
+            _lastIndexedTimestamp = System.currentTimeMillis();
             realtimeRowsConsumedMeter =
                 _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
                     realtimeRowsConsumedMeter);
@@ -625,13 +625,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private void updateConsumerLagMetrics() {
-    boolean emitAvailabilityLag = true;
-    if (_caughtUpWithUpstream) {
+    if (!_catchingUpPhase) {
       Map<String, PartitionLagState> lagStateMap = getPartitionToLagState(getConsumerPartitionState(true));
       for (Map.Entry<String, PartitionLagState> entry : lagStateMap.entrySet()) {
         String partitionId = entry.getKey();
         PartitionLagState lagState = entry.getValue();
-        if (emitAvailabilityLag && !PartitionLagState.NOT_CALCULATED.equals(lagState.getAvailabilityLagMs())) {
+        if (!PartitionLagState.NOT_CALCULATED.equals(lagState.getAvailabilityLagMs())) {
           try {
             _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, Integer.parseInt(partitionId),
                 ServerGauge.LLC_AVAILABILITY_LAG_MS, Long.parseLong(entry.getValue().getAvailabilityLagMs()));
@@ -639,7 +638,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             // do not do anything
             _segmentLogger.debug("Failed to parse the availability lag {} returned from the consumer for partition {}",
                 lagState.getRecordsLag(), partitionId);
-            emitAvailabilityLag = false;
+           break;
           }
         }
       }
@@ -852,7 +851,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   @Override
   public long getLastConsumedTimestamp() {
-    return _lastConsumedTimestampMs;
+    return _lastIndexedTimestamp;
   }
 
   @Override
@@ -1627,9 +1626,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
-  public void handleConsumptionStatus(boolean caughtUpWithUpstream) {
-    if (caughtUpWithUpstream) {
-      _caughtUpWithUpstream = caughtUpWithUpstream;
-    }
+  public void notifyConsumptionCaughtUp(boolean catchingUpPhase) {
+    _catchingUpPhase = catchingUpPhase;
   }
 }
