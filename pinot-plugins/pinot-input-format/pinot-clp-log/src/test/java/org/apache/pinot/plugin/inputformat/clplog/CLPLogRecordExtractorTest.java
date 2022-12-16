@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.clplog;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yscope.clp.compressorfrontend.MessageDecoder;
 import java.io.IOException;
 import java.util.Arrays;
@@ -38,9 +36,8 @@ import static org.testng.Assert.fail;
 
 public class CLPLogRecordExtractorTest {
   @Test
-  void testCLPEncoding() {
-    // Setup decoder
-    CLPLogMessageDecoder messageDecoder = new CLPLogMessageDecoder();
+  public void testCLPEncoding() {
+    // Setup extractor
     Map<String, String> props = new HashMap<>();
     Set<String> fieldsToRead = new HashSet<>();
     // Add two fields for CLP encoding
@@ -53,11 +50,10 @@ public class CLPLogRecordExtractorTest {
     fieldsToRead.add("message2_dictionaryVars");
     // Add an unencoded field
     fieldsToRead.add("timestamp");
-    try {
-      messageDecoder.init(props, fieldsToRead, null);
-    } catch (Exception e) {
-      fail(e.toString());
-    }
+    CLPLogRecordExtractorConfig extractorConfig = new CLPLogRecordExtractorConfig();
+    CLPLogRecordExtractor extractor = new CLPLogRecordExtractor();
+    extractorConfig.init(props);
+    extractor.init(fieldsToRead, extractorConfig);
 
     // Assemble record
     Map<String, Object> record = new HashMap<>();
@@ -66,16 +62,10 @@ public class CLPLogRecordExtractorTest {
     record.put("message1", message1);
     String message2 = "Stopped job_123 on node-987: 3 cores, 6 threads and 22.0% memory used.";
     record.put("message2", message2);
-    byte[] recordBytes = null;
-    try {
-      recordBytes = new ObjectMapper().writeValueAsBytes(record);
-    } catch (JsonProcessingException e) {
-      fail(e.toString());
-    }
 
     // Test decode
     GenericRow row = new GenericRow();
-    messageDecoder.decode(recordBytes, row);
+    extractor.extract(record, row);
     assertEquals(row.getValue("timestamp"), 10);
     try {
       // Validate message1 field

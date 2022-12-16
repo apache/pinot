@@ -42,51 +42,14 @@
       <groupId>com.yscope.clp</groupId>
       <artifactId>clp-ffi</artifactId>
       <version>0.1</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.testng</groupId>
-      <artifactId>testng</artifactId>
-      <scope>test</scope>
+      <exclusions>
+        <!-- Exclude junit due to mitigate a bug in clp-ffi where junit is not marked as a test
+        dependency -->
+        <exclusion>
+          <groupId>org.junit.jupiter</groupId>
+          <artifactId>junit-jupiter-engine</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
-
-  <build>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.22.2</version>
-        </plugin>
-      </plugins>
-    </pluginManagement>
-  </build>
-
-  <profiles>
-    <profile>
-      <id>build-shaded-jar</id>
-      <activation>
-        <property>
-          <name>skipShade</name>
-          <value>!true</value>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-shade-plugin</artifactId>
-            <executions>
-              <execution>
-                <phase>${phase.prop}</phase>
-                <goals>
-                  <goal>shade</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
 </project>
