@@ -74,6 +74,14 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]
     // this is necessary because calcite always sorts _columnIndices for a hash
     // broadcast, which may reorder the columns differently for different sides
     // of a join
+    //
+    // the result of hashcode sums will follow the Irwin-Hall distribution, which
+    // is notably not a normal distribution although likely acceptable in the case
+    // when there are either many inputs or not many partitions
+    // also see: https://en.wikipedia.org/wiki/Irwin–Hall_distribution
+    // also see: https://github.com/apache/pinot/issues/9998
+    //
+    // TODO: consider better hashing algorithms than hashCode sum, such as XOR'ing
     int hashCode = 0;
     for (int columnIndex : _columnIndices) {
       hashCode += input[columnIndex].hashCode();
