@@ -732,7 +732,6 @@ public class PinotTableRestletResource {
     try {
       tableType = TableType.valueOf(tableTypeStr.toUpperCase());
     } catch (Exception e) {
-
       throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
           Response.Status.BAD_REQUEST);
     }

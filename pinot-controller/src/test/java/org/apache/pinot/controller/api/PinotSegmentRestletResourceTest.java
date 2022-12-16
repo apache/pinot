@@ -35,6 +35,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.JsonUtils.stringToObject;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
@@ -45,6 +46,9 @@ public class PinotSegmentRestletResourceTest {
   private static final String TABLE_NAME = "pinotSegmentRestletResourceTestTable";
   private static final String TABLE_NAME_OFFLINE = TABLE_NAME + "_OFFLINE";
 
+  public static final String SERVER_INSTANCE_ID_PREFIX = "Local_Server_";
+
+  private static final String SEGMENT_NAME_PREFIX = "segment_";
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -151,13 +155,13 @@ public class PinotSegmentRestletResourceTest {
         (Map.Entry<String, SegmentMetadata>) segmentMetadataTable.entrySet().toArray()[0];
     String resp = ControllerTest.sendGetRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(TABLE_NAME, entry.getKey()));
-    Map<String, String> fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
+    Map<String, String> fetchedMetadata = stringToObject(resp, Map.class);
     assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // use table name with table type
     resp = ControllerTest.sendGetRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(TABLE_NAME + "_OFFLINE", entry.getKey()));
-    fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
+    fetchedMetadata = stringToObject(resp, Map.class);
     assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // Add more segments
@@ -186,7 +190,7 @@ public class PinotSegmentRestletResourceTest {
       throws Exception {
     String crcMapStr = ControllerTest.sendGetRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
-    Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
+    Map<String, String> crcMap = stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);
       assertTrue(metadata != null);
@@ -198,27 +202,48 @@ public class PinotSegmentRestletResourceTest {
   @Test
   public void checkTableSegmentMismatch()
       throws Exception {
-    String tableName = "testTable1";
-    String createTableUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate();
-    TableConfigBuilder offlineBuilder = new TableConfigBuilder(TableType.OFFLINE);
 
-    TableConfig testTableConfig = offlineBuilder.setTableName(tableName).build();
+    int numServers = 3;
+    for (int i = 0; i < numServers; i++) {
+      TEST_INSTANCE.addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i,
+          true);
+    }
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(3).build();;
 
     // Create the table
-    ControllerTest.sendPostRequest(createTableUrl, testTableConfig.toJsonString());
+    TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
 
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
+    // Add the segments
+    int numSegments = 10;
+    for (int i = 0; i < numSegments; i++) {
+      TEST_INSTANCE.getHelixResourceManager().addNewSegment(tableNameWithType,
+          SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME, SEGMENT_NAME_PREFIX + i),
+          null);
+    }
+
+    // Add 3 more servers
+    int numServersToAdd = 3;
+    for (int i = 0; i < numServersToAdd; i++) {
+      TEST_INSTANCE.addFakeServerInstanceToAutoJoinHelixCluster((SERVER_INSTANCE_ID_PREFIX + (numServers + i)),
+          true);
+    }
     // Rebalance table
     ControllerTest.sendPostRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(tableName,
-            TableType.OFFLINE.toString()),
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTableRebalance(TABLE_NAME,
+            TableType.OFFLINE.toString(), true, true, false, false,
+            3),
         null);
 
-    // Check rebalance status
+    // Check segment mismatch
     String response = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMismatch(tableName,
-            TableType.OFFLINE.toString()),
-        null);
-    assertEquals(response, "{\"segments\":\"{}\"}");
+        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMismatch(TABLE_NAME, TableType.OFFLINE.toString()),
+         null);
+    Map<String, Map<String, Map<String, String>>> segmentState = JsonUtils.stringToObject(response, Map.class);
+
+    assertEquals(segmentState.get(SEGMENT_NAME_PREFIX + 0), segmentState.get(SEGMENT_NAME_PREFIX + 1));
+    TEST_INSTANCE.getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
   }
 
   @AfterClass

@@ -421,8 +421,8 @@ public class TableRebalancer {
     if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
       if (reassignInstances) {
         String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-        boolean hasPreConfiguredInstancePartitions =
-            TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
+        boolean hasPreConfiguredInstancePartitions = TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
+            instancePartitionsType);
         if (hasPreConfiguredInstancePartitions) {
           String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
           InstancePartitions instancePartitions =

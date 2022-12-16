@@ -20,11 +20,9 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
-import com.google.common.collect.MapDifference;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -1078,29 +1076,28 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("/segments/{tableName}/externalViewMismatch")
-  @ApiOperation(value = "Table segment mismatch after rebalance", notes = "Get segments without the same state in EV "
+  @Produces(MediaType.APPLICATION_JSON)
+
+  @ApiOperation(value = "Table segment mismatch", notes = "Get segments without the same state in EV "
       + "and IS ")
-  public String getExternalViewSegementMismatch(
+  public Map<String, Map<String, Map<String, String>>> getExternalViewSegementMismatch(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
     try {
       TableType tableType = Constants.validateTableType(tableTypeStr);
-
       if (tableType == null) {
-        throw new ControllerApplicationException(LOGGER, "Table type must not be null", Status.BAD_REQUEST);
+        throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+            Response.Status.BAD_REQUEST);
       }
-      String tableNameWithType = TableNameBuilder.forType(TableType.valueOf(tableTypeStr)).tableNameWithType(tableName);
+      String tableNameWithType =
+          ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
 
       if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
         throw new TableNotFoundException(String.format("Table=%s not found", tableName));
       }
 
-      Map<String, MapDifference.ValueDifference<Map<String, String>>> view =
-          _pinotHelixResourceManager.getExternalViewSegementMismatch(tableNameWithType);
-      ObjectNode data = JsonUtils.newObjectNode();
-      data.put("segments", view.toString());
-
-      return data.toString();
+      return _pinotHelixResourceManager
+          .getExternalViewSegementMismatch(tableNameWithType);
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }

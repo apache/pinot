@@ -25,8 +25,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.common.collect.MapDifference;
-import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -3082,7 +3080,7 @@ public class PinotHelixResourceManager {
     return new TableRebalancer(_helixZkManager).rebalance(tableConfig, rebalanceConfig);
   }
 
-  public Map<String, MapDifference.ValueDifference<Map<String, String>>> getExternalViewSegementMismatch(
+  public Map<String, Map<String, Map<String, String>>> getExternalViewSegementMismatch(
       String tableNameWithType) {
     IdealState idealState = getHelixAdmin().getResourceIdealState(getHelixClusterName(), tableNameWithType);
     ExternalView externalView = getHelixAdmin().getResourceExternalView(getHelixClusterName(), tableNameWithType);
@@ -3094,10 +3092,16 @@ public class PinotHelixResourceManager {
     if (externalView == null) {
       return Collections.emptyMap();
     }
-    Map<String, Map<String, String>> ideal = idealState.getRecord().getMapFields();
-    Map<String, Map<String, String>> extView = externalView.getRecord().getMapFields();
+    Map<String, Map<String, Map<String, String>>> segmentMismatch = new HashMap<>();
+    Map<String, Map<String, String>> segmentInstance = new HashMap<>();
 
-    return Maps.difference(ideal, extView).entriesDiffering();
+    List<String> segments = getSegmentsFor(tableNameWithType, true);
+    for (int i = 0; i < segments.size(); i++) {
+      segmentInstance.put("IdealState", idealState.getInstanceStateMap(segments.get(i)));
+      segmentInstance.put("externalView", externalView.getStateMap(segments.get(i)));
+      segmentMismatch.put(segments.get(i), segmentInstance);
+    }
+    return segmentMismatch;
   }
 
   /**
