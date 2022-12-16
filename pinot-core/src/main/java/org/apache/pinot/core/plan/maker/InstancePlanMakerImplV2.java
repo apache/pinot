@@ -210,22 +210,22 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set group-by query options
     if (QueryContextUtils.isAggregationQuery(queryContext) && queryContext.getGroupByExpressions() != null) {
       // Set maxInitialResultHolderCapacity
-      Integer initResultCap =  QueryOptionsUtils.getMaxInitResultCap(queryOptions);
-      if(initResultCap != null){
+      Integer initResultCap = QueryOptionsUtils.getMaxInitResultCap(queryOptions);
+      if (initResultCap != null) {
         queryContext.setMaxInitialResultHolderCapacity(initResultCap);
       } else {
         queryContext.setMaxInitialResultHolderCapacity(_maxInitialResultHolderCapacity);
       }
       // Set numGroupsLimit
       Integer numGroupsLimit = QueryOptionsUtils.getNumGroupLimit(queryOptions);
-      if(numGroupsLimit != null){
+      if (numGroupsLimit != null) {
         queryContext.setNumGroupsLimit(numGroupsLimit);
       } else {
         queryContext.setNumGroupsLimit(_numGroupsLimit);
       }
       // Set minSegmentGroupTrimSize
       Integer minSegmentGroupTrimSizeFromQuery = QueryOptionsUtils.getMinSegmentGroupTrimSize(queryOptions);
-      if(minSegmentGroupTrimSizeFromQuery != null){
+      if (minSegmentGroupTrimSizeFromQuery != null) {
         queryContext.setMinSegmentGroupTrimSize(minSegmentGroupTrimSizeFromQuery);
       } else {
         queryContext.setMinSegmentGroupTrimSize(_minSegmentGroupTrimSize);
@@ -236,8 +236,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
           minServerGroupTrimSizeFromQuery != null ? minServerGroupTrimSizeFromQuery : _minServerGroupTrimSize;
       queryContext.setMinServerGroupTrimSize(minServerGroupTrimSize);
       // Set groupTrimThreshold
-      Integer groupTrimThreshold =  QueryOptionsUtils.getGroupByTrimThreshold(queryOptions);
-      if(groupTrimThreshold != null){
+      Integer groupTrimThreshold = QueryOptionsUtils.getGroupByTrimThreshold(queryOptions);
+      if (groupTrimThreshold != null) {
         queryContext.setGroupTrimThreshold(groupTrimThreshold);
       } else {
         queryContext.setGroupTrimThreshold(_groupByTrimThreshold);

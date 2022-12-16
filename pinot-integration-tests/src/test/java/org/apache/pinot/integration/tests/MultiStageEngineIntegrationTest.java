@@ -102,7 +102,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testQueryOptions()
       throws Exception {
-    String pinotQuery = "SELECT * FROM mytable OPTION(multiStageLeafLimit=1)";
+    String pinotQuery = "SET multistageLeafLimit = 1; SELECT * FROM mytable;";
     String h2Query = "SELECT * FROM mytable";
     testQuery(pinotQuery, h2Query);
   }

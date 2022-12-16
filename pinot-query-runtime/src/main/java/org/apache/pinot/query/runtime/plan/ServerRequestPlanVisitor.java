@@ -95,7 +95,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     PinotQuery pinotQuery = new PinotQuery();
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadataMap);
-    if(leafNodeLimit != null){
+    if (leafNodeLimit != null) {
       pinotQuery.setLimit(leafNodeLimit);
     } else {
       pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
