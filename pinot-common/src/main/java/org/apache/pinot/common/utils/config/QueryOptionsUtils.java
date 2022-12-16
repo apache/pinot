@@ -179,12 +179,14 @@ public class QueryOptionsUtils {
     return maxNumGroupLimit != null ? Integer.parseInt(maxNumGroupLimit): null;
   }
 
-  public static int getMaxInitResultCap(Map<String, String> queryOptions) {
+  @Nullable
+  public static Integer getMaxInitResultCap(Map<String, String> queryOptions) {
     String maxInitResultCap = queryOptions.get(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     return maxInitResultCap != null? Integer.parseInt(maxInitResultCap) : null;
   }
 
-  public static int getGroupByTrimThreshold(Map<String, String> queryOptions) {
+  @Nullable
+  public static Integer getGroupByTrimThreshold(Map<String, String> queryOptions) {
     String groupByTrimThreshold =  queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
     return groupByTrimThreshold != null? Integer.parseInt(groupByTrimThreshold) :null;
   }
