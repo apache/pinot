@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Collection;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -79,8 +78,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param groupByExpressions Array of group-by expressions
    * @param transformOperator Transform operator
    */
-  public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
-        TransformOperator transformOperator, GroupKeyGenerator groupKeyGenerator) {
+  public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
+      ExpressionContext[] groupByExpressions, TransformOperator transformOperator,
+      GroupKeyGenerator groupKeyGenerator) {
     _aggregationFunctions = aggregationFunctions;
     assert _aggregationFunctions != null;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();

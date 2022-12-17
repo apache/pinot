@@ -18,21 +18,15 @@
  */
 package org.apache.pinot.core.plan;
 
-import com.google.common.base.MoreObjects;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
-import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
@@ -50,9 +44,6 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
-import static org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.buildFilterOperator;
-import static org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.buildFilteredAggTranformPairs;
-import static org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.buildTransformOperatorForFilteredAggregates;
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
 
@@ -91,13 +82,15 @@ public class AggregationPlanNode implements PlanNode {
   private FilteredAggregationOperator buildFilteredAggOperator() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     // Build the operator chain for the main predicate
-    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair = buildFilterOperator(_indexSegment, _queryContext);
+    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair =
+        AggregationFunctionUtils.buildFilterOperator(_indexSegment, _queryContext);
     TransformOperator transformOperator =
-        buildTransformOperatorForFilteredAggregates(_indexSegment, _queryContext, filterOperatorPair.getRight(), null);
+        AggregationFunctionUtils.buildTransformOperatorForFilteredAggregates(_indexSegment, _queryContext,
+            filterOperatorPair.getRight(), null);
 
     List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
-        buildFilteredAggTranformPairs(_indexSegment, _queryContext, filterOperatorPair.getRight(), transformOperator,
-            null);
+        AggregationFunctionUtils.buildFilteredAggTranformPairs(_indexSegment, _queryContext,
+            filterOperatorPair.getRight(), transformOperator, null);
     return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList, numTotalDocs);
   }
 

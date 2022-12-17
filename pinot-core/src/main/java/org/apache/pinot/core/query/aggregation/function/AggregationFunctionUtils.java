@@ -37,7 +37,6 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
-import org.apache.pinot.core.operator.query.FilteredGroupByOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.FilterPlanNode;
@@ -83,8 +82,8 @@ public class AggregationFunctionUtils {
    * <p>NOTE: We don't need to consider order-by columns here as the ordering is only allowed for aggregation functions
    *          or group-by expressions.
    */
-  public static Set<ExpressionContext> collectExpressionsToTransform(@Nullable AggregationFunction[] aggregationFunctions,
-      @Nullable ExpressionContext[] groupByExpressions) {
+  public static Set<ExpressionContext> collectExpressionsToTransform(
+      @Nullable AggregationFunction[] aggregationFunctions, @Nullable ExpressionContext[] groupByExpressions) {
     Set<ExpressionContext> expressions = new HashSet<>();
     if (aggregationFunctions != null) {
       for (AggregationFunction aggregationFunction : aggregationFunctions) {
@@ -261,5 +260,4 @@ public class AggregationFunctionUtils {
 
     return aggToTransformOpList;
   }
-
 }

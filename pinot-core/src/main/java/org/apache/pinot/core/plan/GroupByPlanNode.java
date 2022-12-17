@@ -18,20 +18,14 @@
  */
 package org.apache.pinot.core.plan;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
-import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
-import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.FilteredGroupByOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
@@ -44,10 +38,6 @@ import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
-
-import static org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.buildFilterOperator;
-import static org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.buildFilteredAggTranformPairs;
-import static org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.buildTransformOperatorForFilteredAggregates;
 
 
 /**
@@ -78,15 +68,16 @@ public class GroupByPlanNode implements PlanNode {
   private FilteredGroupByOperator filteredGroupByPlan() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     // Build the operator chain for the main predicate so the filter plan can be run only one time
-    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair = buildFilterOperator(_indexSegment, _queryContext);
+    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair =
+        AggregationFunctionUtils.buildFilterOperator(_indexSegment, _queryContext);
     ExpressionContext[] groupByExpressions = _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
     TransformOperator transformOperator =
-        buildTransformOperatorForFilteredAggregates(_indexSegment, _queryContext, filterOperatorPair.getRight(),
-            groupByExpressions);
+        AggregationFunctionUtils.buildTransformOperatorForFilteredAggregates(_indexSegment, _queryContext,
+            filterOperatorPair.getRight(), groupByExpressions);
 
     List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
-        buildFilteredAggTranformPairs(_indexSegment, _queryContext, filterOperatorPair.getRight(), transformOperator,
-            groupByExpressions);
+        AggregationFunctionUtils.buildFilteredAggTranformPairs(_indexSegment, _queryContext,
+            filterOperatorPair.getRight(), transformOperator, groupByExpressions);
     return new FilteredGroupByOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList,
         _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]), numTotalDocs, _queryContext);
   }
