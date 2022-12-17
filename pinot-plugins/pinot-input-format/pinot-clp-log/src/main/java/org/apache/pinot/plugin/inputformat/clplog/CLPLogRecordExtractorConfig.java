@@ -37,10 +37,11 @@ import org.slf4j.LoggerFactory;
  * {@code stream.kafka.decoder.prop.[configurationKeyName]} to {@code streamConfigs}.
  */
 public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
+  public static final String FIELDS_FOR_CLP_ENCODING_CONFIG_KEY = "fieldsForClpEncoding";
+  public static final String FIELDS_FOR_CLP_ENCODING_SEPARATOR = ",";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogRecordExtractorConfig.class);
 
-  private static final String FIELDS_FOR_CLP_ENCODING_CONFIG_KEY = "fieldsForClpEncoding";
-  private static final String FIELDS_FOR_CLP_ENCODING_SEPARATOR = ",";
   private final Set<String> _fieldsForClpEncoding = new HashSet<>();
 
   @Override

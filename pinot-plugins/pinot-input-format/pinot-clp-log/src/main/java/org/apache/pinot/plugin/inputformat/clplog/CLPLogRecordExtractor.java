@@ -51,16 +51,25 @@ import org.slf4j.LoggerFactory;
  *   <li>message_dictionaryVars</li>
  *   <li>message_encodedVars</li>
  * </ul>
+ * All remaining fields are processed in the same way as they are in
+ * {@link org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor}. Specifically:
+ * <ul>
+ *   <li>If the caller passed a set of fields to {@code init}, then only those fields are extracted from each
+ *   record and any remaining fields are dropped.</li>
+ *   <li>Otherwise, all fields are extracted from each record.</li>
+ * </ul>
  * This class' implementation is based on {@link org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor}.
  */
 public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
+  public static final String LOGTYPE_COLUMN_SUFFIX = "_logtype";
+  public static final String DICTIONARY_VARS_COLUMN_SUFFIX = "_dictionaryVars";
+  public static final String ENCODED_VARS_COLUMN_SUFFIX = "_encodedVars";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogRecordExtractor.class);
 
-  private static final String LOGTYPE_COLUMN_SUFFIX = "_logtype";
-  private static final String DICTIONARY_VARS_COLUMN_SUFFIX = "_dictionaryVars";
-  private static final String ENCODED_VARS_COLUMN_SUFFIX = "_encodedVars";
-
   private Set<String> _fields;
+  // Used to indicate whether the caller wants us to extract all fields. See
+  // org.apache.pinot.spi.data.readers.RecordExtractor.init for details.
   private boolean _extractAll = false;
   private CLPLogRecordExtractorConfig _config;
 
@@ -101,21 +110,22 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
           to.putValue(recordKey, recordValue);
         }
       }
-    } else {
-      // Handle un-encoded fields
-      for (String fieldName : _fields) {
-        Object value = from.get(fieldName);
-        if (null != value) {
-          value = convert(value);
-        }
-        to.putValue(fieldName, value);
-      }
+      return to;
+    }
 
-      // Handle encoded fields
-      for (String fieldName : _config.getFieldsForClpEncoding()) {
-        Object value = from.get(fieldName);
-        encodeFieldWithClp(fieldName, value, to);
+    // Handle un-encoded fields
+    for (String fieldName : _fields) {
+      Object value = from.get(fieldName);
+      if (null != value) {
+        value = convert(value);
       }
+      to.putValue(fieldName, value);
+    }
+
+    // Handle encoded fields
+    for (String fieldName : _config.getFieldsForClpEncoding()) {
+      Object value = from.get(fieldName);
+      encodeFieldWithClp(fieldName, value, to);
     }
     return to;
   }
