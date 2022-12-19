@@ -119,7 +119,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
     int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
     int numAggregationFunctions = _aggregationFunctions.length;
-    // TODO(egalpin): study use of groupByResultHolders and their index relation to aggregationFunctions
     _groupByResultHolders = new GroupByResultHolder[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       _groupByResultHolders[i] = _aggregationFunctions[i].createGroupByResultHolder(initialCapacity, maxNumResults);
@@ -159,8 +158,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     AggregationFunction aggregationFunction = _aggregationFunctions[functionIndex];
     Map<ExpressionContext, BlockValSet> blockValSetMap =
         AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, transformBlock);
-    // TODO(egalpin): Each groupByResultHolder is a column, so there is one for each Agg function. If we can create the
-    //  array of result holders externally and share it between loop iterations, we'll be good here
     GroupByResultHolder groupByResultHolder = _groupByResultHolders[functionIndex];
     if (_hasMVGroupByExpression) {
       aggregationFunction.aggregateGroupByMV(length, _mvGroupKeys, groupByResultHolder, blockValSetMap);

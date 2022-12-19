@@ -90,7 +90,6 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       ExpressionContext groupByExpression = groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
       columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(
-          // TODO(egalpin): is this actually correct?
           aggFunctionsWithTransformOperator.get(i).getRight().getResultMetadata(groupByExpression).getDataType());
     }
 
