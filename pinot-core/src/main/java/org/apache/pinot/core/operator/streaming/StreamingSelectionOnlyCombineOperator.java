@@ -21,7 +21,9 @@ package org.apache.pinot.core.operator.streaming;
 import io.grpc.stub.StreamObserver;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -54,6 +56,8 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
   // Special results block to indicate that this is the last results block for an operator
   private static final MetadataResultsBlock LAST_RESULTS_BLOCK = new MetadataResultsBlock();
 
+  // Use a BlockingQueue to store the intermediate results blocks
+  private final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   private final StreamObserver<Server.ServerResponse> _streamObserver;
   private final int _limit;
   private final AtomicLong _numRowsCollected = new AtomicLong();
@@ -71,7 +75,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
   }
 
   @Override
-  protected void processSegments() {
+  public void processSegments() {
     int operatorId;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator operator = _operators.get(operatorId);
@@ -99,7 +103,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
   }
 
   @Override
-  protected BaseResultsBlock mergeResults()
+  public BaseResultsBlock mergeResults()
       throws Exception {
     long numRowsCollected = 0;
     int numOperatorsFinished = 0;
@@ -136,6 +140,11 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator<S
   }
 
   @Override
-  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
+  public void onException(Throwable t) {
+    _blockingQueue.offer(new ExceptionResultsBlock(t));
+  }
+
+  @Override
+  public void onFinish() {
   }
 }

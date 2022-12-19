@@ -23,7 +23,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -65,6 +67,9 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   private static final BaseResultsBlock EMPTY_RESULTS_BLOCK =
       new SelectionResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
           Collections.emptyList());
+
+  // Use a BlockingQueue to store the intermediate results blocks
+  private final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
 
   // Use an AtomicInteger to track the end operator id, beyond which no operator needs to be processed
   private final AtomicInteger _endOperatorId;
@@ -130,7 +135,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
    * documents to fulfill the LIMIT and OFFSET requirement.
    */
   @Override
-  protected void processSegments() {
+  public void processSegments() {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
     int numOrderByExpressions = orderByExpressions.size();
@@ -259,7 +264,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
    * </ul>
    */
   @Override
-  protected BaseResultsBlock mergeResults()
+  public BaseResultsBlock mergeResults()
       throws Exception {
     SelectionResultsBlock mergedBlock = null;
     int numBlocksMerged = 0;
@@ -301,6 +306,14 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   }
 
   @Override
+  public void onException(Throwable t) {
+    _blockingQueue.offer(new ExceptionResultsBlock(t));
+  }
+
+  @Override
+  public void onFinish() {
+  }
+
   protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
     DataSchema mergedDataSchema = mergedBlock.getDataSchema();
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
@@ -322,7 +335,6 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
   }
 
-  @Override
   protected SelectionResultsBlock convertToMergeableBlock(SelectionResultsBlock resultsBlock) {
     // This may create a copy or return the same instance. Anyway, this operator is the owner of the
     // value now, so it can mutate it.

@@ -128,7 +128,7 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
    * Executes query on one segment in a worker thread and merges the results into the indexed table.
    */
   @Override
-  protected void processSegments() {
+  public void processSegments() {
     int operatorId;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator operator = _operators.get(operatorId);
@@ -209,12 +209,12 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
   }
 
   @Override
-  protected void onException(Throwable t) {
+  public void onException(Throwable t) {
     _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, t));
   }
 
   @Override
-  protected void onFinish() {
+  public void onFinish() {
     _operatorLatch.countDown();
   }
 
@@ -232,7 +232,7 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
    * </ul>
    */
   @Override
-  protected BaseResultsBlock mergeResults()
+  public BaseResultsBlock mergeResults()
       throws Exception {
     long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
@@ -262,9 +262,5 @@ public class GroupByCombineOperator extends BaseCombineOperator<GroupByResultsBl
     }
 
     return mergedBlock;
-  }
-
-  @Override
-  protected void mergeResultsBlocks(GroupByResultsBlock mergedBlock, GroupByResultsBlock blockToMerge) {
   }
 }
