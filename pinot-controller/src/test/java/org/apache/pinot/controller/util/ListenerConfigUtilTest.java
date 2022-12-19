@@ -56,6 +56,8 @@ public class ListenerConfigUtilTest {
   public void testThreadPoolConfig() {
     ControllerConf controllerConf = new ControllerConf();
 
+    controllerConf.setProperty("controller.port", "9000");
+
     // When server thread pool config is not set, default configs should be used
     List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
     Assert.assertEquals(listenerConfigs.size(), 1);
