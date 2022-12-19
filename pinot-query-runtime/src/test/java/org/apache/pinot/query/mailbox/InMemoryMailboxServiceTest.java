@@ -32,6 +32,7 @@ public class InMemoryMailboxServiceTest {
 
   private static final DataSchema TEST_DATA_SCHEMA = new DataSchema(new String[]{"foo", "bar"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+  private static final int NUM_ENTRIES = 5;
 
   @Test
   public void testHappyPath()
@@ -44,13 +45,13 @@ public class InMemoryMailboxServiceTest {
     InMemorySendingMailbox sendingMailbox = (InMemorySendingMailbox) mailboxService.getSendingMailbox(mailboxId);
 
     // Sends are non-blocking as long as channel capacity is not breached
-    for (int i = 0; i < InMemoryMailboxService.DEFAULT_CHANNEL_CAPACITY; i++) {
-      sendingMailbox.send(getTestTransferableBlock(i, i + 1 == InMemoryMailboxService.DEFAULT_CHANNEL_CAPACITY));
+    for (int i = 0; i < NUM_ENTRIES; i++) {
+      sendingMailbox.send(getTestTransferableBlock(i, i + 1 == NUM_ENTRIES));
     }
     sendingMailbox.complete();
 
     // Iterate 1 less time than the loop above
-    for (int i = 0; i + 1 < InMemoryMailboxService.DEFAULT_CHANNEL_CAPACITY; i++) {
+    for (int i = 0; i + 1 < NUM_ENTRIES; i++) {
       TransferableBlock receivedBlock = receivingMailbox.receive();
       List<Object[]> receivedContainer = receivedBlock.getContainer();
       Assert.assertEquals(receivedContainer.size(), 1);
