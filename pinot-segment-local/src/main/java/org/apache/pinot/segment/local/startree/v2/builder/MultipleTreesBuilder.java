@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +40,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -144,11 +144,7 @@ public class MultipleTreesBuilder implements Closeable {
       }
 
       // Save the metadata and index maps to the disk
-      // Commons Configuration 1.10 does not support file path containing '%'.
-      // Explicitly providing the output stream for the file bypasses the problem.
-      try (FileOutputStream fileOutputStream = new FileOutputStream(_metadataProperties.getFile())) {
-        _metadataProperties.save(fileOutputStream);
-      }
+      SegmentMetadataUtils.savePropertiesConfiguration(_metadataProperties);
       StarTreeIndexMapUtils
           .storeToFile(indexMaps, new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
       FileUtils.forceDelete(starTreeIndexDir);

@@ -73,6 +73,8 @@ import org.slf4j.LoggerFactory;
  */
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
+  private static final String PINOT_V1_SERVER_QUERY_CONFIG_PREFIX = "pinot.server.query.executor";
+
   // This is a temporary before merging the 2 type of executor.
   private ServerQueryExecutorV1Impl _serverExecutor;
   private HelixManager _helixManager;
@@ -94,13 +96,19 @@ public class QueryRunner {
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
     _helixManager = helixManager;
     try {
-      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(),
+      long releaseMs = config.getProperty(
+          QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
+          QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
+
+      _scheduler = new OpChainSchedulerService(
+          new RoundRobinScheduler(releaseMs),
           Executors.newFixedThreadPool(
               ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
-              new NamedThreadFactory("query_worker_on_" + _port + "_port")));
+              new NamedThreadFactory("query_worker_on_" + _port + "_port")),
+          releaseMs);
       _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config, _scheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
-      _serverExecutor.init(config, instanceDataManager, serverMetrics);
+      _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

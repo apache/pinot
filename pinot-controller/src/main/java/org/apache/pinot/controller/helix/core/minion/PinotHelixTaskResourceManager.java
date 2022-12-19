@@ -517,27 +517,41 @@ public class PinotHelixTaskResourceManager {
     for (int partition : jobContext.getPartitionSet()) {
       String subtaskName = jobContext.getTaskIdForPartition(partition);
       String worker = jobContext.getAssignedParticipant(partition);
-      allSubtasks.put(subtaskName, new String[]{worker, jobContext.getPartitionState(partition).name()});
+      TaskPartitionState partitionState = jobContext.getPartitionState(partition);
+      String taskState = partitionState == null ? null : partitionState.name();
+      allSubtasks.put(subtaskName, new String[]{worker, taskState});
+      LOGGER.debug("Subtask: {} is assigned to worker: {} with state: {} in Helix", subtaskName, worker, taskState);
+      if (worker == null) {
+        continue;
+      }
       if (selectedSubtasks.isEmpty() || selectedSubtasks.contains(subtaskName)) {
         workerSelectedSubtasksMap.computeIfAbsent(worker, k -> new HashSet<>()).add(subtaskName);
       }
     }
     LOGGER.debug("Found subtasks on workers: {}", workerSelectedSubtasksMap);
     List<String> workerUrls = new ArrayList<>();
-    workerSelectedSubtasksMap.forEach((workerId, subtasksOnWorker) -> workerUrls.add(String
-        .format("%s/tasks/subtask/progress?subtaskNames=%s", workerEndpoints.get(workerId),
+    workerSelectedSubtasksMap.forEach((workerId, subtasksOnWorker) -> workerUrls.add(
+        String.format("%s/tasks/subtask/progress?subtaskNames=%s", workerEndpoints.get(workerId),
             StringUtils.join(subtasksOnWorker, CommonConstants.Minion.TASK_LIST_SEPARATOR))));
     LOGGER.debug("Getting task progress with workerUrls: {}", workerUrls);
     // Scatter and gather progress from multiple workers.
     Map<String, Object> subtaskProgressMap = new HashMap<>();
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs);
-    for (Map.Entry<String, String> entry : serviceResponse._httpResponses.entrySet()) {
-      String worker = entry.getKey();
-      String resp = entry.getValue();
-      LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
-      if (StringUtils.isNotEmpty(resp)) {
-        subtaskProgressMap.putAll(JsonUtils.stringToObject(resp, Map.class));
+    if (!workerUrls.isEmpty()) {
+      CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+          completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs);
+      for (Map.Entry<String, String> entry : serviceResponse._httpResponses.entrySet()) {
+        String worker = entry.getKey();
+        String resp = entry.getValue();
+        LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
+        if (StringUtils.isNotEmpty(resp)) {
+          subtaskProgressMap.putAll(JsonUtils.stringToObject(resp, Map.class));
+        }
+      }
+      if (serviceResponse._failedResponseCount > 0) {
+        // Instead of aborting, subtasks without worker side progress return the task status tracked by Helix.
+        // The detailed worker failure response is logged as error by CompletionServiceResponse for debugging.
+        LOGGER.warn("There were {} workers failed to report task progress. Got partial progress info: {}",
+            serviceResponse._failedResponseCount, subtaskProgressMap);
       }
     }
     // Check if any subtask missed their progress from the worker.
@@ -549,8 +563,9 @@ public class PinotHelixTaskResourceManager {
       if (subtaskProgressMap.containsKey(subtaskName)) {
         continue;
       }
+      // Return the task progress status tracked by Helix.
       String[] taskWorkerAndHelixState = allSubtasks.get(subtaskName);
-      if (taskWorkerAndHelixState == null) {
+      if (taskWorkerAndHelixState == null || taskWorkerAndHelixState[0] == null) {
         subtaskProgressMap.put(subtaskName, "No worker has run this subtask");
       } else {
         String taskWorker = taskWorkerAndHelixState[0];
@@ -558,12 +573,6 @@ public class PinotHelixTaskResourceManager {
         subtaskProgressMap.put(subtaskName,
             String.format("No status from worker: %s. Got status: %s from Helix", taskWorker, helixState));
       }
-    }
-    if (serviceResponse._failedResponseCount > 0) {
-      // Subtasks without worker side progress are filled with status tracked by Helix so return them back.
-      // The detailed worker failure response is logged as error by CompletionServiceResponse for debugging.
-      LOGGER.warn("There were {} workers failed to report task progress. Got partial progress info: {}",
-          serviceResponse._failedResponseCount, subtaskProgressMap);
     }
     return subtaskProgressMap;
   }

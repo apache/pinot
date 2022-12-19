@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
@@ -55,14 +55,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class BloomFilterHandler implements IndexHandler {
+public class BloomFilterHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
-  private final SegmentMetadata _segmentMetadata;
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
   public BloomFilterHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    _segmentMetadata = segmentMetadata;
+    super(segmentMetadata, indexLoadingConfig);
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
   }
 
@@ -106,7 +105,7 @@ public class BloomFilterHandler implements IndexHandler {
     for (String column : columnsToAddBF) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateBloomFilter(columnMetadata)) {
-        createBloomFilterForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+        createBloomFilterForColumn(segmentWriter, columnMetadata, indexCreatorProvider, indexCreatorProvider);
       }
     }
   }
@@ -246,7 +245,7 @@ public class BloomFilterHandler implements IndexHandler {
   }
 
   private void createBloomFilterForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      BloomFilterCreatorProvider indexCreatorProvider)
+      BloomFilterCreatorProvider bloomFilterCreatorProvider, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
     File indexDir = _segmentMetadata.getIndexDir();
     String segmentName = _segmentMetadata.getName();
@@ -264,16 +263,21 @@ public class BloomFilterHandler implements IndexHandler {
       FileUtils.deleteQuietly(bloomFilterFile);
     }
 
+    if (!columnMetadata.hasDictionary()) {
+      // Create a temporary forward index if it is disabled and does not exist
+      createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+    }
+
     // Create new bloom filter for the column.
     BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(columnName);
     LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", segmentName, columnName,
         bloomFilterConfig);
     if (columnMetadata.hasDictionary()) {
-      createAndSealBloomFilterForDictionaryColumn(indexCreatorProvider, indexDir, columnMetadata, bloomFilterConfig,
-          segmentWriter);
+      createAndSealBloomFilterForDictionaryColumn(bloomFilterCreatorProvider, indexDir, columnMetadata,
+          bloomFilterConfig, segmentWriter);
     } else {
-      createAndSealBloomFilterForNonDictionaryColumn(indexCreatorProvider, indexDir, columnMetadata, bloomFilterConfig,
-          segmentWriter);
+      createAndSealBloomFilterForNonDictionaryColumn(bloomFilterCreatorProvider, indexDir, columnMetadata,
+          bloomFilterConfig, segmentWriter);
     }
 
     // For v3, write the generated bloom filter file into the single file and remove it.

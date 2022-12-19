@@ -25,7 +25,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
@@ -49,14 +49,13 @@ import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class H3IndexHandler implements IndexHandler {
+public class H3IndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(H3IndexHandler.class);
 
-  private final SegmentMetadata _segmentMetadata;
   private final Map<String, H3IndexConfig> _h3Configs;
 
   public H3IndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    _segmentMetadata = segmentMetadata;
+    super(segmentMetadata, indexLoadingConfig);
     _h3Configs = indexLoadingConfig.getH3IndexConfigs();
   }
 
@@ -100,7 +99,7 @@ public class H3IndexHandler implements IndexHandler {
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateH3Index(columnMetadata)) {
-        createH3IndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+        createH3IndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider, indexCreatorProvider);
       }
     }
   }
@@ -110,7 +109,7 @@ public class H3IndexHandler implements IndexHandler {
   }
 
   private void createH3IndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      GeoSpatialIndexCreatorProvider indexCreatorProvider)
+      GeoSpatialIndexCreatorProvider geoSpatialIndexCreatorProvider, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
     File indexDir = _segmentMetadata.getIndexDir();
     String segmentName = _segmentMetadata.getName();
@@ -129,14 +128,17 @@ public class H3IndexHandler implements IndexHandler {
       FileUtils.deleteQuietly(h3IndexFile);
     }
 
+    // Create a temporary forward index if it is disabled and does not exist
+    createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+
     // Create new H3 index for the column.
     LOGGER.info("Creating new H3 index for segment: {}, column: {}", segmentName, columnName);
     Preconditions
         .checkState(columnMetadata.getDataType() == DataType.BYTES, "H3 index can only be applied to BYTES columns");
     if (columnMetadata.hasDictionary()) {
-      handleDictionaryBasedColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+      handleDictionaryBasedColumn(segmentWriter, columnMetadata, geoSpatialIndexCreatorProvider);
     } else {
-      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata, geoSpatialIndexCreatorProvider);
     }
 
     // For v3, write the generated H3 index file into the single file and remove it.

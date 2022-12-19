@@ -25,6 +25,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.slf4j.Logger;
@@ -39,12 +41,16 @@ import org.slf4j.LoggerFactory;
  */
 public class RoundRobinScheduler implements OpChainScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoundRobinScheduler.class);
+  private static final long DEFAULT_RELEASE_TIMEOUT = TimeUnit.MINUTES.toMillis(1);
+
+  private final long _releaseTimeout;
+  private final Supplier<Long> _ticker;
 
   // the _available queue contains operator chains that are available
   // to this scheduler but do not have any data available to schedule
   // while the _ready queue contains the operator chains that are ready
   // to be scheduled (have data, or are first-time scheduled)
-  private final Queue<OpChain> _available = new LinkedList<>();
+  private final Queue<AvailableEntry> _available = new LinkedList<>();
   private final Queue<OpChain> _ready = new LinkedList<>();
 
   // using a Set here is acceptable because calling hasNext() and
@@ -58,12 +64,30 @@ public class RoundRobinScheduler implements OpChainScheduler {
   @VisibleForTesting
   final Set<MailboxIdentifier> _seenMail = new HashSet<>();
 
+  public RoundRobinScheduler() {
+    this(DEFAULT_RELEASE_TIMEOUT);
+  }
+
+  public RoundRobinScheduler(long releaseTimeout) {
+    this(releaseTimeout, System::currentTimeMillis);
+  }
+
+  public RoundRobinScheduler(long releaseTimeoutMs, Supplier<Long> ticker) {
+    _releaseTimeout = releaseTimeoutMs;
+    _ticker = ticker;
+  }
+
   @Override
   public void register(OpChain operatorChain, boolean isNew) {
     // the first time an operator chain is scheduled, it should
     // immediately be considered ready in case it does not need
     // read from any mailbox (e.g. with a LiteralValueOperator)
-    (isNew ? _ready : _available).add(operatorChain);
+    if (isNew) {
+      _ready.add(operatorChain);
+    } else {
+      long releaseTs = _releaseTimeout < 0 ? Long.MAX_VALUE : _ticker.get() + _releaseTimeout;
+      _available.add(new AvailableEntry(operatorChain, releaseTs));
+    }
     trace("registered " + operatorChain);
   }
 
@@ -108,7 +132,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
   }
 
   private void computeReady() {
-    Iterator<OpChain> availableChains = _available.iterator();
+    Iterator<AvailableEntry> availableChains = _available.iterator();
 
     // the algorithm here iterates through all available chains and checks
     // to see whether or not any of the available chains have seen mail for
@@ -117,15 +141,20 @@ public class RoundRobinScheduler implements OpChainScheduler {
     // mailboxes that it would consume from (after it is scheduled, all
     // mail available to it will have been consumed).
     while (availableChains.hasNext()) {
-      OpChain chain = availableChains.next();
-      Sets.SetView<MailboxIdentifier> intersect = Sets.intersection(chain.getReceivingMailbox(), _seenMail);
+      AvailableEntry chain = availableChains.next();
+      Sets.SetView<MailboxIdentifier> intersect = Sets.intersection(chain._opChain.getReceivingMailbox(), _seenMail);
 
       if (!intersect.isEmpty()) {
         // use an immutable copy because set views use the underlying sets
         // directly, which would cause a concurrent modification exception
         // when removing data from _seenMail
         _seenMail.removeAll(intersect.immutableCopy());
-        _ready.add(chain);
+        _ready.add(chain._opChain);
+        availableChains.remove();
+      } else if (_ticker.get() > chain._releaseTs) {
+        LOGGER.warn("({}) Scheduling operator chain reading from {} after timeout. Ready: {}, Available: {}, Mail: {}.",
+            chain._opChain, chain._opChain.getReceivingMailbox(), _ready, _available, _seenMail);
+        _ready.add(chain._opChain);
         availableChains.remove();
       }
     }
@@ -134,5 +163,21 @@ public class RoundRobinScheduler implements OpChainScheduler {
   private void trace(String operation) {
     LOGGER.trace("({}) Ready: {}, Available: {}, Mail: {}",
         operation, _ready, _available, _seenMail);
+  }
+
+  private static class AvailableEntry {
+
+    final OpChain _opChain;
+    final long _releaseTs;
+
+    private AvailableEntry(OpChain opChain, long releaseTs) {
+      _opChain = opChain;
+      _releaseTs = releaseTs;
+    }
+
+    @Override
+    public String toString() {
+      return _opChain.toString();
+    }
   }
 }

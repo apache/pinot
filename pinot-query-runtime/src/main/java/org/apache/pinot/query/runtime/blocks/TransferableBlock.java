@@ -146,8 +146,16 @@ public class TransferableBlock implements Block {
    *
    * @return whether this block is the end of stream.
    */
+  // TODO: Update the name to isTerminateBlock.
   public boolean isEndOfStreamBlock() {
     return isType(MetadataBlock.MetadataBlockType.ERROR) || isType(MetadataBlock.MetadataBlockType.EOS);
+  }
+
+  /**
+   * @return true when the block is a real end of stream block instead of error block.
+   */
+  public boolean isSuccessfulEndOfStreamBlock() {
+    return isType(MetadataBlock.MetadataBlockType.EOS);
   }
 
   /**

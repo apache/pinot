@@ -29,7 +29,6 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Key;
@@ -38,7 +37,6 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -175,18 +173,12 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         return true;
       }
 
-      DataBlock dataBlock = block.getDataBlock();
-      int numRows = dataBlock.getNumberOfRows();
-      if (numRows > 0) {
-        RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
-              dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
-          Key key = extraRowKey(row, _groupSet);
-          _groupByKeyHolder.put(key, key.getValues());
-          for (int i = 0; i < _aggCalls.size(); i++) {
-            _accumulators[i].accumulate(key, row);
-          }
+      List<Object[]> container = block.getContainer();
+      for (Object[] row : container) {
+        Key key = extraRowKey(row, _groupSet);
+        _groupByKeyHolder.put(key, key.getValues());
+        for (int i = 0; i < _aggCalls.size(); i++) {
+          _accumulators[i].accumulate(key, row);
         }
       }
       block = _inputOperator.nextBlock();

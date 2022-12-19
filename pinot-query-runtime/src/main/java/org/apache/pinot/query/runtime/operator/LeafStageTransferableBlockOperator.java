@@ -93,7 +93,7 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
     } else {
       if (_currentIndex < _baseResultBlock.size()) {
         InstanceResponseBlock responseBlock = _baseResultBlock.get(_currentIndex++);
-        if (responseBlock.getResultsBlock() != null) {
+        if (responseBlock.getResultsBlock() != null && responseBlock.getResultsBlock().getNumRows() > 0) {
           return composeTransferableBlock(responseBlock, _desiredDataSchema);
         } else {
           return new TransferableBlock(Collections.emptyList(), _desiredDataSchema, DataBlock.Type.ROW);

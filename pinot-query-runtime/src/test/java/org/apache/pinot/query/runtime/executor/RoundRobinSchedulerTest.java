@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.executor;
 
 import com.google.common.collect.ImmutableList;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
@@ -96,6 +97,22 @@ public class RoundRobinSchedulerTest {
     Assert.assertTrue(scheduler.hasNext());
     Assert.assertEquals(scheduler.next(), chain1);
     Assert.assertFalse(scheduler.hasNext());
+  }
+
+  @Test
+  public void shouldScheduleRescheduledOpChainAfterTimeout() {
+    // Given:
+    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    AtomicLong ticker = new AtomicLong(0);
+    RoundRobinScheduler scheduler = new RoundRobinScheduler(100, ticker::get);
+
+    // When:
+    scheduler.register(chain1, false);
+    ticker.set(101);
+
+    // Then:
+    Assert.assertTrue(scheduler.hasNext());
+    Assert.assertEquals(scheduler.next(), chain1);
   }
 
   @Test

@@ -59,6 +59,6 @@ public class OpChain {
 
   @Override
   public String toString() {
-    return "OpChain{ " + _id + "}";
+    return "OpChain{" + _id + "}";
   }
 }

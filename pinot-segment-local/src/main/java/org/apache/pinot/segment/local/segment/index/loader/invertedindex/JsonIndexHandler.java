@@ -25,7 +25,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.loader.IndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -48,14 +48,13 @@ import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class JsonIndexHandler implements IndexHandler {
+public class JsonIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonIndexHandler.class);
 
-  private final SegmentMetadata _segmentMetadata;
   private final Map<String, JsonIndexConfig> _jsonIndexConfigs;
 
   public JsonIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    _segmentMetadata = segmentMetadata;
+    super(segmentMetadata, indexLoadingConfig);
     _jsonIndexConfigs = indexLoadingConfig.getJsonIndexConfigs();
   }
 
@@ -99,7 +98,7 @@ public class JsonIndexHandler implements IndexHandler {
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateJsonIndex(columnMetadata)) {
-        createJsonIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+        createJsonIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider, indexCreatorProvider);
       }
     }
   }
@@ -109,7 +108,7 @@ public class JsonIndexHandler implements IndexHandler {
   }
 
   private void createJsonIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      JsonIndexCreatorProvider indexCreatorProvider)
+      JsonIndexCreatorProvider jsonIndexCreatorProvider, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
     File indexDir = _segmentMetadata.getIndexDir();
     String segmentName = _segmentMetadata.getName();
@@ -128,15 +127,18 @@ public class JsonIndexHandler implements IndexHandler {
       FileUtils.deleteQuietly(jsonIndexFile);
     }
 
+    // Create a temporary forward index if it is disabled and does not exist
+    createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+
     // Create new json index for the column.
     LOGGER.info("Creating new json index for segment: {}, column: {}", segmentName, columnName);
     Preconditions.checkState(columnMetadata.isSingleValue() && (columnMetadata.getDataType() == DataType.STRING
             || columnMetadata.getDataType() == DataType.JSON),
         "Json index can only be applied to single-value STRING or JSON columns");
     if (columnMetadata.hasDictionary()) {
-      handleDictionaryBasedColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+      handleDictionaryBasedColumn(segmentWriter, columnMetadata, jsonIndexCreatorProvider);
     } else {
-      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata, indexCreatorProvider);
+      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata, jsonIndexCreatorProvider);
     }
 
     // For v3, write the generated json index file into the single file and remove it.

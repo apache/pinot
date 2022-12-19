@@ -19,26 +19,40 @@
 
 package org.apache.pinot.plugin.filesystem;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class HadoopPinotFSTest {
-  private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
+  private static final String TMP_DIR = System.getProperty("java.io.tmpdir") + "/HadoopPinotFSTest";
+
+  @BeforeMethod
+  public void setUp() {
+    FileUtils.deleteQuietly(new File(TMP_DIR));
+  }
+
+  @AfterMethod
+  public void tearDown() {
+    FileUtils.deleteQuietly(new File(TMP_DIR));
+  }
 
   @Test
   public void testCopy()
       throws IOException {
-    URI baseURI = URI.create(TMP_DIR + "/HadoopPinotFSTest");
+    URI baseURI = URI.create(TMP_DIR + "/testCopy");
     try (HadoopPinotFS hadoopFS = new HadoopPinotFS()) {
       hadoopFS.init(new PinotConfiguration());
       hadoopFS.mkdir(new Path(baseURI.getPath(), "src").toUri());
@@ -59,9 +73,33 @@ public class HadoopPinotFSTest {
   }
 
   @Test
+  public void testCopyFromLocalFile()
+      throws Exception {
+    String baseDir = TMP_DIR + "/testCopyFromLocalFile";
+    URI baseURI = URI.create(baseDir);
+    try (HadoopPinotFS hadoopFS = new HadoopPinotFS()) {
+      new File(baseDir + "/src").mkdirs();
+      new File(baseDir + "/src/dir").mkdirs();
+      new File(baseDir + "/src/dir/1").createNewFile();
+      new File(baseDir + "/src/dir/2").createNewFile();
+      hadoopFS.init(new PinotConfiguration());
+      String[] srcFiles = hadoopFS.listFiles(new Path(baseURI.getPath(), "src").toUri(), true);
+      Assert.assertEquals(srcFiles.length, 3);
+      hadoopFS.copyFromLocalDir(new File(baseDir + "/src"), new Path(baseURI.getPath(), "dest").toUri());
+      Assert.assertTrue(hadoopFS.exists(new Path(baseURI.getPath(), "dest").toUri()));
+      Assert.assertTrue(hadoopFS.exists(new Path(baseURI.getPath(), "dest/dir").toUri()));
+      Assert.assertTrue(hadoopFS.exists(new Path(baseURI.getPath(), "dest/dir/1").toUri()));
+      Assert.assertTrue(hadoopFS.exists(new Path(baseURI.getPath(), "dest/dir/2").toUri()));
+      String[] destFiles = hadoopFS.listFiles(new Path(baseURI.getPath(), "dest").toUri(), true);
+      Assert.assertEquals(destFiles.length, 3);
+      hadoopFS.delete(baseURI, true);
+    }
+  }
+
+  @Test
   public void testListFilesWithMetadata()
       throws IOException {
-    URI baseURI = URI.create(TMP_DIR + "/HadoopPinotFSTestListFiles");
+    URI baseURI = URI.create(TMP_DIR + "/testListFilesWithMetadata");
     try (HadoopPinotFS hadoopFS = new HadoopPinotFS()) {
       hadoopFS.init(new PinotConfiguration());
 
@@ -102,16 +140,14 @@ public class HadoopPinotFSTest {
       Assert.assertEquals(fileMetadata.size(), count + 2);
       Assert.assertEquals(fileMetadata.stream().filter(FileMetadata::isDirectory).count(), count + 1);
       Assert.assertEquals(fileMetadata.stream().filter(f -> !f.isDirectory()).count(), 1);
-      Assert.assertTrue(expectedNonRecursive
-              .containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
-          fileMetadata.toString());
+      Assert.assertTrue(expectedNonRecursive.containsAll(
+          fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())), fileMetadata.toString());
       fileMetadata = hadoopFS.listFilesWithMetadata(baseURI, true);
       Assert.assertEquals(fileMetadata.size(), count * 2 + 2);
       Assert.assertEquals(fileMetadata.stream().filter(FileMetadata::isDirectory).count(), count + 1);
       Assert.assertEquals(fileMetadata.stream().filter(f -> !f.isDirectory()).count(), count + 1);
-      Assert.assertTrue(expectedRecursive
-              .containsAll(fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())),
-          fileMetadata.toString());
+      Assert.assertTrue(expectedRecursive.containsAll(
+          fileMetadata.stream().map(FileMetadata::getFilePath).collect(Collectors.toSet())), fileMetadata.toString());
     }
   }
 }

@@ -373,7 +373,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // Set up Pinot cluster in Helix if needed
     HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode,
-        _config.getLeadControllerResourceRebalanceStrategy());
+        _config);
 
     // Start all components
     initPinotFSFactory();
@@ -422,7 +422,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     if (_config.getHLCTablesAllowed()) {
       LOGGER.info("Realtime tables with High Level consumers will be supported");
-      _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager, _leadControllerManager);
+      _realtimeSegmentsManager =
+          new PinotRealtimeSegmentManager(_helixResourceManager, _leadControllerManager, _config);
       _realtimeSegmentsManager.start(_controllerMetrics);
     } else {
       LOGGER.info("Realtime tables with High Level consumers will NOT be supported");

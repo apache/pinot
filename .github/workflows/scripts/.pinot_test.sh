@@ -42,6 +42,8 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   fi
 else
   # Unit Tests
+  #   - TEST_SET#1 runs install and test together so the module list must ensure no additional modules were tested
+  #     due to the -am flag (include dependency modules)
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn clean install -am -B \
         -pl 'pinot-spi' \
@@ -49,6 +51,8 @@ else
         -pl 'pinot-common' \
         -pl 'pinot-segment-local' \
         -pl 'pinot-core' \
+        -pl 'pinot-query-planner' \
+        -pl 'pinot-query-runtime' \
         -pl 'pinot-server' \
         -pl ':pinot-yammer' \
         -pl ':pinot-avro-base' \
@@ -66,6 +70,8 @@ else
         -pl '!pinot-common' \
         -pl '!pinot-segment-local' \
         -pl '!pinot-core' \
+        -pl '!pinot-query-planner' \
+        -pl '!pinot-query-runtime' \
         -pl '!pinot-server' \
         -pl '!:pinot-yammer' \
         -pl '!:pinot-avro-base' \

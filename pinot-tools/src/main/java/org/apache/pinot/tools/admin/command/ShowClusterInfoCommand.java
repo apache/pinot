@@ -103,7 +103,7 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
     ZkClient zkClient = new ZkClient(_zkAddress);
     zkClient.setZkSerializer(new ZNRecordStreamingSerializer());
     LOGGER.info("Connecting to Zookeeper at: {}", _zkAddress);
-    zkClient.waitUntilConnected(CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS);
+    zkClient.waitUntilConnected(CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
     ZkBaseDataAccessor<ZNRecord> baseDataAccessor = new ZkBaseDataAccessor<>(zkClient);
     ZKHelixDataAccessor zkHelixDataAccessor = new ZKHelixDataAccessor(_clusterName, baseDataAccessor);
     PropertyKey property = zkHelixDataAccessor.keyBuilder().liveInstances();

@@ -68,9 +68,14 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     RoaringBitmap[] roaringBitmaps = new RoaringBitmap[transformFunctions.length];
     for (int i = 0; i < roaringBitmaps.length; i++) {
       TransformFunction func = transformFunctions[i];
-      String columnName = ((IdentifierTransformFunction) func).getColumnName();
-      RoaringBitmap nullBitmap = projectionBlock.getBlockValueSet(columnName).getNullBitmap();
-      roaringBitmaps[i] = nullBitmap;
+      if (func instanceof IdentifierTransformFunction) {
+        String columnName = ((IdentifierTransformFunction) func).getColumnName();
+        RoaringBitmap nullBitmap = projectionBlock.getBlockValueSet(columnName).getNullBitmap();
+        roaringBitmaps[i] = nullBitmap;
+      } else {
+        // Consider literal as not null.
+        roaringBitmaps[i] = new RoaringBitmap();
+      }
     }
     return roaringBitmaps;
   }
@@ -297,8 +302,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     _transformFunctions = new TransformFunction[argSize];
     for (int i = 0; i < argSize; i++) {
       TransformFunction func = arguments.get(i);
-      Preconditions.checkArgument(func instanceof IdentifierTransformFunction,
-          "Only column names are supported in COALESCE.");
+      Preconditions.checkArgument(
+          func instanceof IdentifierTransformFunction || func instanceof LiteralTransformFunction,
+          "Only column names and literals are supported in COALESCE.");
       DataType dataType = func.getResultMetadata().getDataType();
       if (_dataType == null) {
         _dataType = dataType;

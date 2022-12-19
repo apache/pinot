@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -47,6 +48,7 @@ import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
@@ -60,19 +62,19 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern TABLE_NAME_REPLACE_PATTERN = Pattern.compile("\\{([\\w\\d]+)\\}");
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
+  private static final Random RANDOM = new Random(42);
 
   @BeforeClass
   public void setUp()
       throws Exception {
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+
     // Setting up mock server factories.
+    // All test data are loaded upfront b/c the mock server and brokers needs to be in sync.
     MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1");
     MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2");
     // Setting up H2 for validation
     setH2Connection();
-
-    // TODO: all test data are loaded upfront b/c the mock server and brokers needs to be in sync.
-    // doing it dynamically should be our next step.
 
     // Scan through all the test cases.
     for (Map.Entry<String, QueryTestCase> testCaseEntry : getTestCases().entrySet()) {
@@ -86,22 +88,51 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       Map<String, Schema> schemaMap = new HashMap<>();
       for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
         String tableName = testCaseName + "_" + tableEntry.getKey();
-        // TODO: able to choose table type, now default to OFFLINE
+        // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
         org.apache.pinot.spi.data.Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
         schemaMap.put(tableName, pinotSchema);
         factory1.registerTable(pinotSchema, tableNameWithType);
         factory2.registerTable(pinotSchema, tableNameWithType);
         List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
-        // TODO: able to select add rows to server1 or server2 (now default server1)
-        // TODO: able to select add rows to existing segment or create new one (now default create one segment)
-        factory1.addSegment(tableNameWithType, toRow(columnAndTypes, tableEntry.getValue()._inputs));
+        List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
+
+        // generate segments and dump into server1 and server2
+        List<String> partitionColumns = tableEntry.getValue()._partitionColumns;
+
+        List<GenericRow> rows1 = new ArrayList<>();
+        List<GenericRow> rows2 = new ArrayList<>();
+
+        for (GenericRow row : genericRows) {
+          if (row == SEGMENT_BREAKER_ROW) {
+            factory1.addSegment(tableNameWithType, rows1);
+            factory2.addSegment(tableNameWithType, rows2);
+            rows1 = new ArrayList<>();
+            rows2 = new ArrayList<>();
+          } else {
+            long partition = 0;
+            if (partitionColumns == null) {
+              partition = RANDOM.nextInt(2);
+            } else {
+              for (String field : partitionColumns) {
+                partition = (partition + ((GenericRow) row).getValue(field).hashCode()) % 42;
+              }
+            }
+            if (partition % 2 == 0) {
+              rows1.add(row);
+            } else {
+              rows2.add(row);
+            }
+          }
+        }
+        factory1.addSegment(tableNameWithType, rows1);
+        factory2.addSegment(tableNameWithType, rows2);
       }
 
-      boolean anyHaveOutput = testCase._queries.stream().anyMatch(q -> q._outputs != null && !q._outputs.isEmpty());
+      boolean anyHaveOutput = testCase._queries.stream().anyMatch(q -> q._outputs != null);
 
       if (anyHaveOutput) {
-        boolean allHaveOutput = testCase._queries.stream().allMatch(q -> q._outputs != null && !q._outputs.isEmpty());
+        boolean allHaveOutput = testCase._queries.stream().allMatch(q -> q._outputs != null);
         if (!allHaveOutput) {
           throw new IllegalArgumentException("Cannot support one test where some queries require H2 and others don't");
         }
@@ -130,9 +161,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         ignored -> { });
     _mailboxService.start();
 
-    _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
-        server2.getPort(), factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(),
-        factory2.buildTableSegmentNameMap());
+    _queryEnvironment =
+        QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
+            factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap());
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
@@ -178,8 +209,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       List<Object[]> resultRows = queryRunner(sql);
 
       Assert.assertNull(except,
-        "Expected error with message '" + except + "'. But instead rows were returned: "
-            + resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")));
+          "Expected error with message '" + except + "'. But instead rows were returned: " + resultRows.stream()
+              .map(Arrays::toString).collect(Collectors.joining(",\n")));
 
       return Optional.of(resultRows);
     } catch (Exception e) {
@@ -188,8 +219,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       } else {
         Pattern pattern = Pattern.compile(except);
         Assert.assertTrue(pattern.matcher(e.getMessage()).matches(),
-            String.format("Caught exception '%s', but it did not match the expected pattern '%s'.",
-                e.getMessage(), except));
+            String.format("Caught exception '%s', but it did not match the expected pattern '%s'.", e.getMessage(),
+                except));
       }
     }
 
@@ -213,7 +244,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           continue;
         }
 
-        if (queryCase._outputs != null && !queryCase._outputs.isEmpty()) {
+        if (queryCase._outputs != null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           List<List<Object>> orgRows = queryCase._outputs;
           List<Object[]> expectedRows = new ArrayList<>(orgRows.size());
@@ -244,7 +275,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         if (queryCase._ignored) {
           continue;
         }
-        if (queryCase._outputs == null || queryCase._outputs.isEmpty()) {
+        if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           Object[] testEntry = new Object[]{testCaseName, sql, queryCase._expectedException};
           providerContent.add(testEntry);
