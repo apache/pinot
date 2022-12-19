@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.ServerThreadPoolConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
@@ -49,6 +50,28 @@ public class ListenerConfigUtilTest {
     assertLegacyListener(listenerConfigs.get(0));
 
     ListenerConfigUtil.buildControllerConfigs(new ControllerConf());
+  }
+
+  @Test
+  public void testThreadPoolConfig() {
+    ControllerConf controllerConf = new ControllerConf();
+
+    // When server thread pool config is not set, default configs should be used
+    List<ListenerConfig> listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    Assert.assertEquals(ServerThreadPoolConfig.defaultInstance().getCorePoolSize(),
+        listenerConfigs.get(0).getThreadPoolConfig().getCorePoolSize());
+    Assert.assertEquals(ServerThreadPoolConfig.defaultInstance().getMaxPoolSize(),
+        listenerConfigs.get(0).getThreadPoolConfig().getMaxPoolSize());
+
+    // Set server thread pool configs and assert that they are set
+    controllerConf.setProperty("controller.thread.pool.corePoolSize", 7);
+    controllerConf.setProperty("controller.thread.pool.maxPoolSize", 9);
+
+    listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
+    Assert.assertEquals(listenerConfigs.size(), 1);
+    Assert.assertEquals(7, listenerConfigs.get(0).getThreadPoolConfig().getCorePoolSize());
+    Assert.assertEquals(9, listenerConfigs.get(0).getThreadPoolConfig().getMaxPoolSize());
   }
 
   /**
@@ -176,21 +199,30 @@ public class ListenerConfigUtilTest {
 
   @Test
   public void testFindLastTlsPort() {
-    List<ListenerConfig> configs = ImmutableList.of(new ListenerConfig("conf1", "host1", 9000, "http", null),
-        new ListenerConfig("conf2", "host2", 9001, "https", null),
-        new ListenerConfig("conf3", "host3", 9002, "http", null),
-        new ListenerConfig("conf4", "host4", 9003, "https", null),
-        new ListenerConfig("conf5", "host5", 9004, "http", null));
+    List<ListenerConfig> configs = ImmutableList.of(new ListenerConfig("conf1", "host1", 9000, "http", null,
+            ServerThreadPoolConfig.defaultInstance()),
+        new ListenerConfig("conf2", "host2", 9001, "https", null,
+            ServerThreadPoolConfig.defaultInstance()),
+        new ListenerConfig("conf3", "host3", 9002, "http", null,
+            ServerThreadPoolConfig.defaultInstance()),
+        new ListenerConfig("conf4", "host4", 9003, "https", null,
+            ServerThreadPoolConfig.defaultInstance()),
+        new ListenerConfig("conf5", "host5", 9004, "http", null,
+            ServerThreadPoolConfig.defaultInstance()));
     int tlsPort = ListenerConfigUtil.findLastTlsPort(configs, -1);
     Assert.assertEquals(tlsPort, 9003);
   }
 
   @Test
   public void testFindLastTlsPortMissing() {
-    List<ListenerConfig> configs = ImmutableList.of(new ListenerConfig("conf1", "host1", 9000, "http", null),
-        new ListenerConfig("conf2", "host2", 9001, "http", null),
-        new ListenerConfig("conf3", "host3", 9002, "http", null),
-        new ListenerConfig("conf4", "host4", 9004, "http", null));
+    List<ListenerConfig> configs = ImmutableList.of(new ListenerConfig("conf1", "host1", 9000, "http", null,
+            ServerThreadPoolConfig.defaultInstance()),
+        new ListenerConfig("conf2", "host2", 9001, "http", null,
+            ServerThreadPoolConfig.defaultInstance()),
+        new ListenerConfig("conf3", "host3", 9002, "http", null,
+            ServerThreadPoolConfig.defaultInstance()),
+        new ListenerConfig("conf4", "host4", 9004, "http", null,
+            ServerThreadPoolConfig.defaultInstance()));
     int tlsPort = ListenerConfigUtil.findLastTlsPort(configs, -1);
     Assert.assertEquals(tlsPort, -1);
   }
