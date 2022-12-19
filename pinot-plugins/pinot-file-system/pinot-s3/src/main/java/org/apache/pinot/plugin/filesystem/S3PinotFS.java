@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.FileMetadata;
@@ -68,56 +69,68 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
+import software.amazon.awssdk.services.sts.StsClient;
+import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider;
+import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 
 
 /**
  * Implementation of PinotFS for AWS S3 file system
  */
 public class S3PinotFS extends BasePinotFS {
-  public static final String ACCESS_KEY = "accessKey";
-  public static final String SECRET_KEY = "secretKey";
-  public static final String REGION = "region";
-  public static final String ENDPOINT = "endpoint";
-  public static final String DISABLE_ACL_CONFIG_KEY = "disableAcl";
-  public static final String SERVER_SIDE_ENCRYPTION_CONFIG_KEY = "serverSideEncryption";
-  public static final String SSE_KMS_KEY_ID_CONFIG_KEY = "ssekmsKeyId";
-  public static final String SSE_KMS_ENCRYPTION_CONTEXT_CONFIG_KEY = "ssekmsEncryptionContext";
-
   private static final Logger LOGGER = LoggerFactory.getLogger(S3PinotFS.class);
+
   private static final String DELIMITER = "/";
   public static final String S3_SCHEME = "s3://";
-  private static final boolean DEFAULT_DISABLE_ACL = true;
   private S3Client _s3Client;
-  private boolean _disableAcl = DEFAULT_DISABLE_ACL;
+  private boolean _disableAcl;
   private ServerSideEncryption _serverSideEncryption = null;
   private String _ssekmsKeyId;
   private String _ssekmsEncryptionContext;
 
   @Override
   public void init(PinotConfiguration config) {
-    Preconditions.checkArgument(!isNullOrEmpty(config.getProperty(REGION)), "Region can't be null or empty");
-    String region = config.getProperty(REGION);
-    _disableAcl = config.getProperty(DISABLE_ACL_CONFIG_KEY, DEFAULT_DISABLE_ACL);
-    String serverSideEncryption = config.getProperty(SERVER_SIDE_ENCRYPTION_CONFIG_KEY);
-    setServerSideEncryption(serverSideEncryption, config);
+    S3Config s3Config = new S3Config(config);
+    Preconditions.checkArgument(StringUtils.isNotEmpty(s3Config.getRegion()), "Region can't be null or empty");
+
+    _disableAcl = s3Config.getDisableAcl();
+    setServerSideEncryption(s3Config.getServerSideEncryption(), s3Config);
 
     AwsCredentialsProvider awsCredentialsProvider;
     try {
-      if (!isNullOrEmpty(config.getProperty(ACCESS_KEY)) && !isNullOrEmpty(config.getProperty(SECRET_KEY))) {
-        String accessKey = config.getProperty(ACCESS_KEY);
-        String secretKey = config.getProperty(SECRET_KEY);
+      if (StringUtils.isNotEmpty(s3Config.getAccessKey()) && StringUtils.isNotEmpty(s3Config.getSecretKey())) {
+        String accessKey = s3Config.getAccessKey();
+        String secretKey = s3Config.getSecretKey();
         AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(accessKey, secretKey);
         awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
       } else {
         awsCredentialsProvider = DefaultCredentialsProvider.create();
       }
 
+      // IAM Role based access
+      if (s3Config.isIamRoleBasedAccess()) {
+        AssumeRoleRequest.Builder assumeRoleRequestBuilder =
+            AssumeRoleRequest.builder().roleArn(s3Config.getRoleArn()).roleSessionName(s3Config.getRoleSessionName())
+                .durationSeconds(s3Config.getSessionDurationSeconds());
+        AssumeRoleRequest assumeRoleRequest;
+        if (StringUtils.isNotEmpty(s3Config.getExternalId())) {
+          assumeRoleRequest = assumeRoleRequestBuilder.externalId(s3Config.getExternalId()).build();
+        } else {
+          assumeRoleRequest = assumeRoleRequestBuilder.build();
+        }
+        StsClient stsClient =
+            StsClient.builder().region(Region.of(s3Config.getRegion())).credentialsProvider(awsCredentialsProvider)
+                .build();
+        awsCredentialsProvider =
+            StsAssumeRoleCredentialsProvider.builder().stsClient(stsClient).refreshRequest(assumeRoleRequest)
+                .asyncCredentialUpdateEnabled(s3Config.isAsyncSessionUpdateEnabled()).build();
+      }
+
       S3ClientBuilder s3ClientBuilder =
-          S3Client.builder().region(Region.of(region)).credentialsProvider(awsCredentialsProvider);
-      if (!isNullOrEmpty(config.getProperty(ENDPOINT))) {
-        String endpoint = config.getProperty(ENDPOINT);
+          S3Client.builder().region(Region.of(s3Config.getRegion())).credentialsProvider(awsCredentialsProvider);
+      if (StringUtils.isNotEmpty(s3Config.getEndpoint())) {
         try {
-          s3ClientBuilder.endpointOverride(new URI(endpoint));
+          s3ClientBuilder.endpointOverride(new URI(s3Config.getEndpoint()));
         } catch (URISyntaxException e) {
           throw new RuntimeException(e);
         }
@@ -145,11 +158,11 @@ public class S3PinotFS extends BasePinotFS {
    */
   public void init(S3Client s3Client, String serverSideEncryption, PinotConfiguration serverSideEncryptionConfig) {
     _s3Client = s3Client;
-    setServerSideEncryption(serverSideEncryption, serverSideEncryptionConfig);
+    setServerSideEncryption(serverSideEncryption, new S3Config(serverSideEncryptionConfig));
   }
 
   private void setServerSideEncryption(@Nullable String serverSideEncryption,
-      PinotConfiguration serverSideEncryptionConfig) {
+      S3Config s3Config) {
     if (serverSideEncryption != null) {
       try {
         _serverSideEncryption = ServerSideEncryption.valueOf(serverSideEncryption);
@@ -160,12 +173,12 @@ public class S3PinotFS extends BasePinotFS {
       }
       switch (_serverSideEncryption) {
         case AWS_KMS:
-          _ssekmsKeyId = serverSideEncryptionConfig.getProperty(SSE_KMS_KEY_ID_CONFIG_KEY);
+          _ssekmsKeyId = s3Config.getSseKmsKeyId();
           if (_ssekmsKeyId == null) {
             throw new UnsupportedOperationException(
                 "Missing required config: 'sseKmsKeyId' when AWS_KMS is used for server side encryption");
           }
-          _ssekmsEncryptionContext = serverSideEncryptionConfig.getProperty(SSE_KMS_ENCRYPTION_CONTEXT_CONFIG_KEY);
+          _ssekmsEncryptionContext = s3Config.getSsekmsEncryptionContext();
           break;
         case AES256:
           // Todo: Support AES256.
@@ -173,10 +186,6 @@ public class S3PinotFS extends BasePinotFS {
           throw new UnsupportedOperationException("Unsupported server side encryption: " + _serverSideEncryption);
       }
     }
-  }
-
-  boolean isNullOrEmpty(String target) {
-    return target == null || target.isEmpty();
   }
 
   private HeadObjectResponse getS3ObjectMetadata(URI uri)
