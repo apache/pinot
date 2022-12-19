@@ -335,10 +335,13 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     testQuery(filterQuery, nonFilterQuery);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class)
+  @Test
   public void testGroupBySupport() {
-    String filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 2), MAX(INT_COL) FILTER(WHERE INT_COL > 2) "
-        + "FROM MyTable WHERE INT_COL < 1000 GROUP BY INT_COL";
-    getBrokerResponse(filterQuery);
+    String filterQuery =
+        "SELECT SUM(INT_COL), SUM(INT_COL) FILTER(WHERE INT_COL > 25000) AS total_sum FROM MyTable GROUP BY INT_COL";
+    String nonFilterQuery =
+        "SELECT SUM(INT_COL), SUM(CASE WHEN INT_COL > 25000 THEN INT_COL ELSE 0 END) AS total_sum FROM MyTable GROUP "
+            + "BY INT_COL";
+    testQuery(filterQuery, nonFilterQuery);
   }
 }
