@@ -32,6 +32,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.utils.StatisticalAggregationFunctionUtils;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
 /**
@@ -55,6 +56,9 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
   protected final boolean _isSample;
 
   public CovarianceAggregationFunction(List<ExpressionContext> arguments, boolean isSample) {
+    if (arguments.size() != 2) {
+      throw new BadQueryRequestException("Atleast two expressions need to be provided to calculate covariance");
+    }
     _expression1 = arguments.get(0);
     _expression2 = arguments.get(1);
     _isSample = isSample;
