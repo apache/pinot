@@ -99,9 +99,8 @@ public class S3PinotFS extends BasePinotFS {
     AwsCredentialsProvider awsCredentialsProvider;
     try {
       if (StringUtils.isNotEmpty(s3Config.getAccessKey()) && StringUtils.isNotEmpty(s3Config.getSecretKey())) {
-        String accessKey = s3Config.getAccessKey();
-        String secretKey = s3Config.getSecretKey();
-        AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(accessKey, secretKey);
+        AwsBasicCredentials awsBasicCredentials =
+            AwsBasicCredentials.create(s3Config.getAccessKey(), s3Config.getSecretKey());
         awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
       } else {
         awsCredentialsProvider = DefaultCredentialsProvider.create();
@@ -161,8 +160,7 @@ public class S3PinotFS extends BasePinotFS {
     setServerSideEncryption(serverSideEncryption, new S3Config(serverSideEncryptionConfig));
   }
 
-  private void setServerSideEncryption(@Nullable String serverSideEncryption,
-      S3Config s3Config) {
+  private void setServerSideEncryption(@Nullable String serverSideEncryption, S3Config s3Config) {
     if (serverSideEncryption != null) {
       try {
         _serverSideEncryption = ServerSideEncryption.valueOf(serverSideEncryption);

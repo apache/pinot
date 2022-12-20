@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.plugin.filesystem;
 
 import com.google.common.base.Joiner;
@@ -94,7 +93,7 @@ public class S3Config {
         pinotConfig.getProperty(ASYNC_SESSION_UPDATED_ENABLED, DEFAULT_ASYNC_SESSION_UPDATED_ENABLED));
 
     if (_iamRoleBasedAccess) {
-      Preconditions.checkNotNull(_roleArn, "Must provide 'roleArn' for table %s if iamRoleBasedAccess is enabled");
+      Preconditions.checkNotNull(_roleArn, "Must provide 'roleArn' if iamRoleBasedAccess is enabled");
     }
   }
 
