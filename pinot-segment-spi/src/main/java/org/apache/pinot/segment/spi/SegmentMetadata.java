@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -122,5 +123,9 @@ public interface SegmentMetadata {
 
   default boolean isMutableSegment() {
     return false;
+  }
+
+  default PropertiesConfiguration getPropertiesConfiguration() {
+    return null;
   }
 }

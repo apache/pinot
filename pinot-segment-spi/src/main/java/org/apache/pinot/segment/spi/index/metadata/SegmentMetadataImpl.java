@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -93,25 +94,23 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private String _startOffset;
   private String _endOffset;
 
+  // This is for users that need to access the raw metadata properties, like BaseDefaultColumnHandler. But instead of
+  // always caching the properties by this object, the supplier can decide how to obtain the properties.
+  private final Supplier<PropertiesConfiguration> _segmentMetadataPropConfigSupplier;
   @Deprecated
   private String _rawTableName;
 
   /**
    * For segments that can only provide the inputstream to the metadata
+   * TODO: Deprecate this one, as it always caches segmentMetadataPropertiesConfiguration and can be costly when the
+   *       number of segments is high. Instead, one can use the new constructor that takes in a
+   *       Supplier<PropertiesConfiguration> to control how segmentMetadataPropertiesConfiguration is obtained, like
+   *       whether to cache the config.
    */
+  @Deprecated
   public SegmentMetadataImpl(InputStream metadataPropertiesInputStream, InputStream creationMetaInputStream)
       throws IOException {
-    _indexDir = null;
-    _columnMetadataMap = new HashMap<>();
-    _schema = new Schema();
-
-    PropertiesConfiguration segmentMetadataPropertiesConfiguration =
-        CommonsConfigurationUtils.fromInputStream(metadataPropertiesInputStream);
-    init(segmentMetadataPropertiesConfiguration);
-    setTimeInfo(segmentMetadataPropertiesConfiguration);
-    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_TOTAL_DOCS);
-
-    loadCreationMeta(creationMetaInputStream);
+    this(null, createSegmentMetadataPropConfigSupplier(metadataPropertiesInputStream), creationMetaInputStream);
   }
 
   /**
@@ -121,19 +120,24 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    */
   public SegmentMetadataImpl(File indexDir)
       throws IOException {
+    this(indexDir, () -> SegmentMetadataUtils.getPropertiesConfiguration(indexDir),
+        getCreationMetaInputStream(indexDir));
+  }
+
+  public SegmentMetadataImpl(@Nullable File indexDir,
+      Supplier<PropertiesConfiguration> segmentMetadataPropConfigSupplier,
+      @Nullable InputStream creationMetaInputStream)
+      throws IOException {
     _indexDir = indexDir;
     _columnMetadataMap = new HashMap<>();
     _schema = new Schema();
-
-    PropertiesConfiguration segmentMetadataPropertiesConfiguration =
-        SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
+    _segmentMetadataPropConfigSupplier = segmentMetadataPropConfigSupplier;
+    PropertiesConfiguration segmentMetadataPropertiesConfiguration = segmentMetadataPropConfigSupplier.get();
     init(segmentMetadataPropertiesConfiguration);
     setTimeInfo(segmentMetadataPropertiesConfiguration);
     _totalDocs = segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_TOTAL_DOCS);
-
-    File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
-    if (creationMetaFile != null) {
-      loadCreationMeta(creationMetaFile);
+    if (creationMetaInputStream != null) {
+      loadCreationMeta(creationMetaInputStream);
     }
   }
 
@@ -147,6 +151,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _segmentName = segmentName;
     _schema = schema;
     _creationTime = creationTime;
+    _segmentMetadataPropConfigSupplier = null;
+  }
+
+  public PropertiesConfiguration getPropertiesConfiguration() {
+    return _segmentMetadataPropConfigSupplier == null ? null : _segmentMetadataPropConfigSupplier.get();
   }
 
   /**
@@ -179,19 +188,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  private void loadCreationMeta(File crcFile)
+  private void loadCreationMeta(InputStream creationMetaInputStream)
       throws IOException {
-    if (crcFile.exists()) {
-      final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
-      _crc = ds.readLong();
-      _creationTime = ds.readLong();
-      ds.close();
-    }
-  }
-
-  private void loadCreationMeta(InputStream crcFileInputStream)
-      throws IOException {
-    try (DataInputStream ds = new DataInputStream(crcFileInputStream)) {
+    try (DataInputStream ds = new DataInputStream(creationMetaInputStream)) {
       _crc = ds.readLong();
       _creationTime = ds.readLong();
     }
@@ -472,5 +471,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public String toString() {
     return toJson(null).toString();
+  }
+
+  private static InputStream getCreationMetaInputStream(File indexDir)
+      throws IOException {
+    File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
+    return creationMetaFile != null && creationMetaFile.exists() ? new FileInputStream(creationMetaFile) : null;
+  }
+
+  private static Supplier<PropertiesConfiguration> createSegmentMetadataPropConfigSupplier(
+      InputStream metadataPropertiesInputStream) {
+    PropertiesConfiguration segmentMetadataPropertiesConfiguration =
+        CommonsConfigurationUtils.fromInputStream(metadataPropertiesInputStream);
+    return () -> segmentMetadataPropertiesConfiguration;
   }
 }

@@ -38,6 +38,10 @@ public class SegmentMetadataUtils {
   }
 
   public static PropertiesConfiguration getPropertiesConfiguration(SegmentMetadata segmentMetadata) {
+    PropertiesConfiguration segmentMetadataPropConfig = segmentMetadata.getPropertiesConfiguration();
+    if (segmentMetadataPropConfig != null) {
+      return segmentMetadataPropConfig;
+    }
     File indexDir = segmentMetadata.getIndexDir();
     Preconditions.checkState(indexDir != null, "Cannot get PropertiesConfiguration from in-memory segment: %s",
         segmentMetadata.getName());
