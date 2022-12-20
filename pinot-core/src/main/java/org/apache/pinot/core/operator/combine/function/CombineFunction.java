@@ -27,7 +27,7 @@ public interface CombineFunction<T extends BaseResultsBlock> {
    * Merges a results block into the main mergeable results block.
    *
    * <p>NOTE: {@code blockToMerge} should contain the result for a segment without any exception. The errored segment
-   * result handling are done in {@link org.apache.pinot.core.operator.combine.CombineOperator#onException(Throwable)}.
+   * results are handled by {@link org.apache.pinot.core.operator.combine.CombineOperator}.
    *
    * @param mergedBlock The block that accumulates previous results. It should be modified to add the information of the
    *                    other block.

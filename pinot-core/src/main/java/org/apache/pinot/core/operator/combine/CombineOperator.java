@@ -25,16 +25,20 @@ public interface CombineOperator {
 
   void processSegments();
 
-  BaseResultsBlock mergeResults()
-      throws Exception;
-
   /**
    * Invoked when {@link #processSegments()} throws exception/error.
    */
-  void onException(Throwable t);
+  void onProcessSegmentsException(Throwable t);
 
   /**
    * Invoked when {@link #processSegments()} is finished (called in the finally block).
    */
-  void onFinish();
+  void onProcessSegmentsFinish();
+
+  /**
+   * Invoke a final step to reduce result into a single {@link BaseResultsBlock}. This is useful for
+   * {@link CombineOperator} that returns a single reduced block.
+   */
+  BaseResultsBlock mergeResults()
+      throws Exception;
 }

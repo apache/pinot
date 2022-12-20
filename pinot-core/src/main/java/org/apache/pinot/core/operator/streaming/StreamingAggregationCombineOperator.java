@@ -21,25 +21,30 @@ package org.apache.pinot.core.operator.streaming;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.combine.function.SelectionOnlyCombineFunction;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.combine.function.AggregateCombineFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
- * Combine operator for selection queries with streaming response..
+ * Combine operator for aggregation queries with streaming response.
  */
 @SuppressWarnings("rawtypes")
-public class StreamingSelectionOnlyCombineOperator extends BaseStreamBlockCombineOperator<SelectionResultsBlock> {
-  private static final String EXPLAIN_NAME = "SELECT_STREAMING_COMBINE";
+public class StreamingAggregationCombineOperator extends BaseStreamBlockCombineOperator<AggregationResultsBlock> {
+  private static final String EXPLAIN_NAME = "AGGREGATE_STREAMING_COMBINE";
 
-  public StreamingSelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
+  public StreamingAggregationCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(new SelectionOnlyCombineFunction(queryContext), operators, queryContext, executorService);
+    super(new AggregateCombineFunction(queryContext), operators, queryContext, executorService);
   }
 
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected boolean shouldFinishStream(AggregationResultsBlock resultsBlock) {
+    return true;
   }
 }

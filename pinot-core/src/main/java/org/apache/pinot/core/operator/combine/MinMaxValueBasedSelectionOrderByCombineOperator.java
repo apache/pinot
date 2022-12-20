@@ -23,9 +23,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -57,7 +55,8 @@ import org.slf4j.LoggerFactory;
  * </ul>
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombineOperator<SelectionResultsBlock> {
+public class MinMaxValueBasedSelectionOrderByCombineOperator
+    extends BaseSingleBlockCombineOperator<SelectionResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinMaxValueBasedSelectionOrderByCombineOperator.class);
 
   private static final String EXPLAIN_NAME = "COMBINE_SELECT_ORDERBY_MINMAX";
@@ -68,9 +67,6 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       new SelectionResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
           Collections.emptyList());
 
-  // Use a BlockingQueue to store the intermediate results blocks
-  private final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
-
   // Use an AtomicInteger to track the end operator id, beyond which no operator needs to be processed
   private final AtomicInteger _endOperatorId;
   private final int _numRowsToKeep;
@@ -79,7 +75,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
 
   public MinMaxValueBasedSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(operators, queryContext, executorService);
+    super(null, operators, queryContext, executorService);
     _endOperatorId = new AtomicInteger(_numOperators);
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
 
@@ -306,12 +302,12 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   }
 
   @Override
-  public void onException(Throwable t) {
+  public void onProcessSegmentsException(Throwable t) {
     _blockingQueue.offer(new ExceptionResultsBlock(t));
   }
 
   @Override
-  public void onFinish() {
+  public void onProcessSegmentsFinish() {
   }
 
   protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {

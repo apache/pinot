@@ -25,12 +25,20 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.combine.function.CombineFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,17 +50,49 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
     extends BaseCombineOperator<BaseResultsBlock> {
-  protected final CombineFunction<T> _combineOperator;
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleBlockCombineOperator.class);
+
+  protected final CombineFunction<T> _combineFunction;
   // Use an AtomicInteger to track the next operator to execute
   protected final AtomicInteger _nextOperatorId = new AtomicInteger();
   // Use a BlockingQueue to store the intermediate results blocks
   protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
-  protected BaseSingleBlockCombineOperator(CombineFunction<T> combineOperator, List<Operator> operators,
+  protected BaseSingleBlockCombineOperator(CombineFunction<T> combineFunction, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
     super(operators, queryContext, executorService);
-    _combineOperator = combineOperator;
+    _combineFunction = combineFunction;
+  }
+
+  @Override
+  protected BaseResultsBlock getNextBlock() {
+    BaseResultsBlock mergedBlock;
+    startProcess();
+    try {
+      mergedBlock = mergeResults();
+    } catch (InterruptedException | EarlyTerminationException e) {
+      Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
+      throw new QueryCancelledException(
+          "Cancelled while merging results blocks"
+              + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg), e);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
+      mergedBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+    } finally {
+      stopProcess();
+    }
+    /*
+     * _numTasks are number of async tasks submitted to the _executorService, but it does not mean Pinot server
+     * use those number of threads to concurrently process segments. Instead, if _executorService thread pool has
+     * less number of threads than _numTasks, the number of threads that used to concurrently process segments equals
+     * to the pool size.
+     * TODO: Get the actual number of query worker threads instead of using the default value.
+     */
+    int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
+        numServerThreads);
+    return mergedBlock;
   }
 
   /**
@@ -75,7 +115,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
         }
       }
 
-      if (_combineOperator.isQuerySatisfied(resultsBlock)) {
+      if (_combineFunction.isQuerySatisfied(resultsBlock)) {
         // Query is satisfied, skip processing the remaining segments
         _blockingQueue.offer(resultsBlock);
         return;
@@ -88,14 +128,14 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   /**
    * Invoked when {@link #processSegments()} throws exception/error.
    */
-  public void onException(Throwable t) {
+  public void onProcessSegmentsException(Throwable t) {
     _blockingQueue.offer(new ExceptionResultsBlock(t));
   }
 
   /**
    * Invoked when {@link #processSegments()} is finished (called in the finally block).
    */
-  public void onFinish() {
+  public void onProcessSegmentsFinish() {
   }
 
   /**
@@ -124,12 +164,12 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = _combineOperator.convertToMergeableBlock((T) blockToMerge);
+        mergedBlock = _combineFunction.convertToMergeableBlock((T) blockToMerge);
       } else {
-        _combineOperator.mergeResultsBlocks(mergedBlock, (T) blockToMerge);
+        _combineFunction.mergeResultsBlocks(mergedBlock, (T) blockToMerge);
       }
       numBlocksMerged++;
-      if (_combineOperator.isQuerySatisfied(mergedBlock)) {
+      if (_combineFunction.isQuerySatisfied(mergedBlock)) {
         // Query is satisfied, skip merging the remaining results blocks
         return mergedBlock;
       }

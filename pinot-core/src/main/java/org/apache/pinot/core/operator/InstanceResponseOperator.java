@@ -34,11 +34,11 @@ import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
   private static final String EXPLAIN_NAME = "INSTANCE_RESPONSE";
 
-  private final BaseCombineOperator<?> _combineOperator;
-  private final List<IndexSegment> _indexSegments;
-  private final List<FetchContext> _fetchContexts;
-  private final int _fetchContextSize;
-  private final QueryContext _queryContext;
+  protected final BaseCombineOperator<?> _combineOperator;
+  protected final List<IndexSegment> _indexSegments;
+  protected final List<FetchContext> _fetchContexts;
+  protected final int _fetchContextSize;
+  protected final QueryContext _queryContext;
 
   public InstanceResponseOperator(BaseCombineOperator<?> combineOperator, List<IndexSegment> indexSegments,
       List<FetchContext> fetchContexts, QueryContext queryContext) {
@@ -107,7 +107,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
-  private BaseResultsBlock getCombinedResults() {
+  protected BaseResultsBlock getCombinedResults() {
     try {
       prefetchAll();
       return _combineOperator.nextBlock();
@@ -116,13 +116,13 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
-  private void prefetchAll() {
+  protected void prefetchAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
       _indexSegments.get(i).prefetch(_fetchContexts.get(i));
     }
   }
 
-  private void releaseAll() {
+  protected void releaseAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
       _indexSegments.get(i).release(_fetchContexts.get(i));
     }

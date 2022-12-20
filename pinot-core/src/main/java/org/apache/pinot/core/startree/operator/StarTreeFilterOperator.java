@@ -120,7 +120,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public FilterBlock getNextBlock() {
+  protected FilterBlock getNextBlock() {
     if (_resultEmpty) {
       return EmptyFilterBlock.getInstance();
     }

@@ -22,24 +22,29 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.combine.function.SelectionOnlyCombineFunction;
+import org.apache.pinot.core.operator.combine.function.SelectionOrderByCombineFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
- * Combine operator for selection queries with streaming response..
+ * Combine operator for selection queries with order-by, with streaming response.
  */
 @SuppressWarnings("rawtypes")
-public class StreamingSelectionOnlyCombineOperator extends BaseStreamBlockCombineOperator<SelectionResultsBlock> {
-  private static final String EXPLAIN_NAME = "SELECT_STREAMING_COMBINE";
+public class StreamingSelectionOrderByCombineOperator extends BaseStreamBlockCombineOperator<SelectionResultsBlock> {
+  private static final String EXPLAIN_NAME = "SELECT_ORDERBY_STREAMING_COMBINE";
 
-  public StreamingSelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
+  public StreamingSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(new SelectionOnlyCombineFunction(queryContext), operators, queryContext, executorService);
+    super(new SelectionOrderByCombineFunction(queryContext), operators, queryContext, executorService);
   }
 
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected boolean shouldFinishStream(SelectionResultsBlock resultsBlock) {
+    return true;
   }
 }

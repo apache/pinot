@@ -25,19 +25,16 @@ import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +56,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   protected final QueryContext _queryContext;
   protected final ExecutorService _executorService;
   protected final int _numTasks;
+  protected final Phaser _phaser;
   protected final Future[] _futures;
   // Use an AtomicInteger to track the next operator to execute
   protected final AtomicInteger _nextOperatorId = new AtomicInteger();
@@ -75,16 +73,16 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     //       (>=1) segments. These tasks are assigned to multiple execution threads so that they can run in parallel.
     //       The parallelism is bounded by the task count.
     _numTasks = CombineOperatorUtils.getNumTasksForQuery(operators.size(), queryContext.getMaxExecutionThreads());
-    _futures = new Future[_numTasks];
-  }
 
-  @Override
-  protected BaseResultsBlock getNextBlock() {
     // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
     // returns. We need to ensure this because the main thread holds the reference to the segments. If a segment is
     // deleted/refreshed, the segment will be released after the main thread returns, which would lead to undefined
     // behavior (even JVM crash) when processing queries against it.
-    Phaser phaser = new Phaser(1);
+    _phaser = new Phaser(1);
+    _futures = new Future[_numTasks];
+  }
+
+  protected void startProcess() {
     Tracing.activeRecording().setNumTasks(_numTasks);
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     for (int i = 0; i < _numTasks; i++) {
@@ -100,7 +98,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
           //       the query execution has finished, and the main thread has deregistered itself and returned the
           //       result. Directly return as no execution result will be taken.
-          if (phaser.register() < 0) {
+          if (_phaser.register() < 0) {
             Tracing.ThreadAccountantOps.clear();
             return;
           }
@@ -118,10 +116,10 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             } else {
               LOGGER.error("Caught serious error while processing query: " + _queryContext, t);
             }
-            onException(t);
+            onProcessSegmentsException(t);
           } finally {
-            onFinish();
-            phaser.arriveAndDeregister();
+            onProcessSegmentsFinish();
+            _phaser.arriveAndDeregister();
             Tracing.ThreadAccountantOps.clear();
           }
 
@@ -129,39 +127,17 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         }
       });
     }
+  }
 
-    BaseResultsBlock mergedBlock;
-    try {
-      mergedBlock = mergeResults();
-    } catch (InterruptedException | EarlyTerminationException e) {
-      Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
-      throw new QueryCancelledException(
-          "Cancelled while merging results blocks"
-              + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg), e);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
-      mergedBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
-    } finally {
-      // Cancel all ongoing jobs
-      for (Future future : _futures) {
-        if (!future.isDone()) {
-          future.cancel(true);
-        }
+  protected void stopProcess() {
+    // Cancel all ongoing jobs
+    for (Future future : _futures) {
+      if (!future.isDone()) {
+        future.cancel(true);
       }
-      // Deregister the main thread and wait for all threads done
-      phaser.awaitAdvance(phaser.arriveAndDeregister());
     }
-    /*
-     * _numTasks are number of async tasks submitted to the _executorService, but it does not mean Pinot server
-     * use those number of threads to concurrently process segments. Instead, if _executorService thread pool has
-     * less number of threads than _numTasks, the number of threads that used to concurrently process segments equals
-     * to the pool size.
-     * TODO: Get the actual number of query worker threads instead of using the default value.
-     */
-    int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
-    CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
-        numServerThreads);
-    return mergedBlock;
+    // Deregister the main thread and wait for all threads done
+    _phaser.awaitAdvance(_phaser.arriveAndDeregister());
   }
 
   protected ExceptionResultsBlock getTimeoutResultsBlock(int numBlocksMerged) {

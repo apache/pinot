@@ -37,6 +37,12 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
+/**
+ * Streaming only selection operator returns one block at a time not one block per-segment.
+ * This is for efficient streaming of data return on a selection-only situation.
+ *
+ * This optimization doesn't apply to any other combine/merge required operators.
+ */
 public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
 
   private static final String EXPLAIN_NAME = "SELECT_STREAMING";
