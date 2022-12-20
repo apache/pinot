@@ -39,7 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.transport.ListenerConfig;
-import org.apache.pinot.core.transport.ServerThreadPoolConfig;
+import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.HttpServer;
@@ -280,10 +280,10 @@ public final class ListenerConfigUtil {
         .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[]{"TLSv1.2"});
   }
 
-  private static ServerThreadPoolConfig buildServerThreadPoolConfig(PinotConfiguration config, String namespace) {
+  private static HttpServerThreadPoolConfig buildServerThreadPoolConfig(PinotConfiguration config, String namespace) {
     String threadPoolNamespace = namespace + DOT_ACCESS_THREAD_POOL;
 
-    ServerThreadPoolConfig threadPoolConfig = ServerThreadPoolConfig.defaultInstance();
+    HttpServerThreadPoolConfig threadPoolConfig = HttpServerThreadPoolConfig.defaultInstance();
     int corePoolSize = config.getProperty(threadPoolNamespace + "." + "corePoolSize", -1);
     int maxPoolSize = config.getProperty(threadPoolNamespace + "." + "maxPoolSize", -1);
     if (corePoolSize > 0) {

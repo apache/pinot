@@ -31,10 +31,10 @@ public class ListenerConfig {
   private final int _port;
   private final String _protocol;
   private final TlsConfig _tlsConfig;
-  private final ServerThreadPoolConfig _threadPoolConfig;
+  private final HttpServerThreadPoolConfig _threadPoolConfig;
 
   public ListenerConfig(String name, String host, int port, String protocol, TlsConfig tlsConfig,
-      ServerThreadPoolConfig threadPoolConfig) {
+      HttpServerThreadPoolConfig threadPoolConfig) {
     _name = name;
     _host = host;
     _port = port;
@@ -63,7 +63,7 @@ public class ListenerConfig {
     return _tlsConfig;
   }
 
-  public ServerThreadPoolConfig getThreadPoolConfig() {
+  public HttpServerThreadPoolConfig getThreadPoolConfig() {
     return _threadPoolConfig;
   }
 }

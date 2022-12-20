@@ -18,19 +18,22 @@
  */
 package org.apache.pinot.core.transport;
 
-public class ServerThreadPoolConfig {
-  private static final ServerThreadPoolConfig DEFAULT =
-      new ServerThreadPoolConfig(Runtime.getRuntime().availableProcessors() * 2,
+/**
+ * This configures the thread pool configs for the Http servers in Pinot server, controller, broker and minion.
+ */
+public class HttpServerThreadPoolConfig {
+  private static final HttpServerThreadPoolConfig DEFAULT =
+      new HttpServerThreadPoolConfig(Runtime.getRuntime().availableProcessors() * 2,
           Runtime.getRuntime().availableProcessors() * 2);
   private int _maxPoolSize;
   private int _corePoolSize;
 
-  public ServerThreadPoolConfig(int corePoolSize, int maxPoolSize) {
+  public HttpServerThreadPoolConfig(int corePoolSize, int maxPoolSize) {
     _maxPoolSize = maxPoolSize;
     _corePoolSize = corePoolSize;
   }
 
-  public static ServerThreadPoolConfig defaultInstance() {
+  public static HttpServerThreadPoolConfig defaultInstance() {
     return DEFAULT.copy();
   }
 
@@ -50,7 +53,7 @@ public class ServerThreadPoolConfig {
     _corePoolSize = corePoolSize;
   }
 
-  public ServerThreadPoolConfig copy() {
-    return new ServerThreadPoolConfig(_corePoolSize, _maxPoolSize);
+  public HttpServerThreadPoolConfig copy() {
+    return new HttpServerThreadPoolConfig(_corePoolSize, _maxPoolSize);
   }
 }
