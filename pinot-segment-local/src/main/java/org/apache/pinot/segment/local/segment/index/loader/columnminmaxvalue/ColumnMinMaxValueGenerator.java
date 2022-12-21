@@ -42,16 +42,18 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class ColumnMinMaxValueGenerator {
   private final SegmentMetadata _segmentMetadata;
-  private final PropertiesConfiguration _segmentProperties;
   private final SegmentDirectory.Writer _segmentWriter;
   private final ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode;
+
+  // NOTE: _segmentProperties shouldn't be used when checking whether min/max value need to be generated because at that
+  //       time _segmentMetadata might not be loaded from a local file
+  private PropertiesConfiguration _segmentProperties;
 
   private boolean _minMaxValueAdded;
 
   public ColumnMinMaxValueGenerator(SegmentMetadata segmentMetadata, SegmentDirectory.Writer segmentWriter,
       ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode) {
     _segmentMetadata = segmentMetadata;
-    _segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(segmentMetadata);
     _segmentWriter = segmentWriter;
     _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
   }
@@ -68,6 +70,7 @@ public class ColumnMinMaxValueGenerator {
   public void addColumnMinMaxValue()
       throws Exception {
     Preconditions.checkState(_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE);
+    _segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(_segmentMetadata);
     for (String column : getColumnsToAddMinMaxValue()) {
       addColumnMinMaxValueForColumn(column);
     }
