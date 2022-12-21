@@ -348,7 +348,7 @@ public class DataSchema {
         return NUMERIC_TYPE_ORDERING.max(this, subTypeCandidate) == this;
       } else if (subTypeCandidate == BOOLEAN) {
         // BOOLEAN type is sub-type of any number type, checking whether it is equal to 1.
-        return this.isNumber();
+        return this == subTypeCandidate || (this.isNumber() && this != BIG_DECIMAL);
       } else {
         return this == subTypeCandidate;
       }

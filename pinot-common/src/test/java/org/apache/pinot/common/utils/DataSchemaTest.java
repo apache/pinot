@@ -113,6 +113,12 @@ public class DataSchemaTest {
         Assert.assertFalse(numberTypeToTest.get(idx).isSuperTypeOf(numberTypeToTest.get(subTypeIdx)));
       }
     }
+
+    // Boolean can be converted by any number type, but not the other way around
+    for (int idx = 0; idx < numberTypeToTest.size(); idx++) {
+      Assert.assertTrue(numberTypeToTest.get(idx).isSuperTypeOf(BOOLEAN));
+      Assert.assertFalse(BOOLEAN.isSuperTypeOf(numberTypeToTest.get(idx)));
+    }
   }
 
   @Test
