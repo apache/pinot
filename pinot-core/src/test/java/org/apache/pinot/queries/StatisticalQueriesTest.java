@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.math3.stat.correlation.Covariance;
+import org.apache.commons.math3.stat.descriptive.moment.Kurtosis;
+import org.apache.commons.math3.stat.descriptive.moment.Skewness;
 import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.apache.commons.math3.stat.descriptive.moment.Variance;
 import org.apache.commons.math3.util.Precision;
@@ -39,6 +41,7 @@ import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
+import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -705,6 +708,172 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     }
   }
 
+  @Test
+  public void testSkewAggregationOnly() {
+    // Compute the expected values
+    Skewness[] expectedSkew = new Skewness[4];
+    for (int i = 0; i < 4; i++) {
+      expectedSkew[i] = new Skewness();
+    }
+
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      expectedSkew[0].increment(_intColX[i]);
+      expectedSkew[1].increment(_longCol[i]);
+      expectedSkew[2].increment(_floatCol[i]);
+      expectedSkew[3].increment(_doubleColX[i]);
+    }
+
+    // Compute the query
+    String query =
+        "SELECT SKEW_POP(intColumnX), SKEW_POP(longColumn), SKEW_POP(floatColumn), SKEW_POP(doubleColumnX) "
+            + "FROM testTable";
+    AggregationOperator aggregationOperator = getOperator(query);
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS * 4, NUM_RECORDS);
+    List<Object> aggregationResult = resultsBlock.getResults();
+
+    // Validate the aggregation results
+    checkWithPrecisionForSkew((PinotFourthMoment) aggregationResult.get(0), NUM_RECORDS, expectedSkew[0].getResult());
+    checkWithPrecisionForSkew((PinotFourthMoment) aggregationResult.get(1), NUM_RECORDS, expectedSkew[1].getResult());
+    checkWithPrecisionForSkew((PinotFourthMoment) aggregationResult.get(2), NUM_RECORDS, expectedSkew[2].getResult());
+    checkWithPrecisionForSkew((PinotFourthMoment) aggregationResult.get(3), NUM_RECORDS, expectedSkew[3].getResult());
+
+    // Validate the response
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    brokerResponse.getResultTable();
+    Object[] results = brokerResponse.getResultTable().getRows().get(0);
+    assertTrue(
+        Precision.equalsWithRelativeTolerance((double) results[0], expectedSkew[0].getResult(), RELATIVE_EPSILON));
+    assertTrue(
+        Precision.equalsWithRelativeTolerance((double) results[1], expectedSkew[1].getResult(), RELATIVE_EPSILON));
+    assertTrue(
+        Precision.equalsWithRelativeTolerance((double) results[2], expectedSkew[2].getResult(), RELATIVE_EPSILON));
+    assertTrue(
+        Precision.equalsWithRelativeTolerance((double) results[3], expectedSkew[3].getResult(), RELATIVE_EPSILON));
+
+    // Validate the response for a query with a filter
+    query = "SELECT SKEW_POP(intColumnX) from testTable" + getFilter();
+    brokerResponse = getBrokerResponse(query);
+    brokerResponse.getResultTable();
+    results = brokerResponse.getResultTable().getRows().get(0);
+    Skewness filterExpectedSkew = new Skewness();
+    for (int i = 0; i < NUM_RECORDS / 2; i++) {
+      filterExpectedSkew.increment(_intColX[i]);
+    }
+    assertTrue(
+        Precision.equalsWithRelativeTolerance((double) results[0], filterExpectedSkew.getResult(), RELATIVE_EPSILON));
+  }
+
+  @Test
+  public void testSkewAggregationGroupBy() {
+    // Compute expected group results
+    Skewness[] expectedGroupByResult = new Skewness[NUM_GROUPS];
+
+    for (int i = 0; i < NUM_GROUPS; i++) {
+      expectedGroupByResult[i] = new Skewness();
+    }
+    for (int j = 0; j < NUM_RECORDS; j++) {
+      int pos = j / (NUM_RECORDS / NUM_GROUPS);
+      expectedGroupByResult[pos].increment(_intColX[j]);
+    }
+
+    String query = "SELECT SKEW_POP(intColumnX) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
+    GroupByOperator groupByOperator = getOperator(query);
+    GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS * 2, NUM_RECORDS);
+    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    assertNotNull(aggregationGroupByResult);
+    for (int i = 0; i < NUM_GROUPS; i++) {
+      PinotFourthMoment actual = (PinotFourthMoment) aggregationGroupByResult.getResultForGroupId(0, i);
+      checkWithPrecisionForSkew(actual, NUM_RECORDS / NUM_GROUPS, expectedGroupByResult[i].getResult());
+    }
+  }
+
+  @Test
+  public void testKurtosisAggregationOnly() {
+    // Compute the expected values
+    Kurtosis[] expectedKurt = new Kurtosis[4];
+    for (int i = 0; i < 4; i++) {
+      expectedKurt[i] = new Kurtosis();
+    }
+
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      expectedKurt[0].increment(_intColX[i]);
+      expectedKurt[1].increment(_longCol[i]);
+      expectedKurt[2].increment(_floatCol[i]);
+      expectedKurt[3].increment(_doubleColX[i]);
+    }
+
+    // Compute the query
+    String query =
+        "SELECT KURTOSIS_POP(intColumnX), KURTOSIS_POP(longColumn), KURTOSIS_POP(floatColumn), "
+            + "KURTOSIS_POP(doubleColumnX) FROM testTable";
+    AggregationOperator aggregationOperator = getOperator(query);
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS * 4, NUM_RECORDS);
+    List<Object> aggregationResult = resultsBlock.getResults();
+
+    // Validate the aggregation results
+    checkWithPrecisionForKurt((PinotFourthMoment) aggregationResult.get(0), NUM_RECORDS, expectedKurt[0].getResult());
+    checkWithPrecisionForKurt((PinotFourthMoment) aggregationResult.get(1), NUM_RECORDS, expectedKurt[1].getResult());
+    checkWithPrecisionForKurt((PinotFourthMoment) aggregationResult.get(2), NUM_RECORDS, expectedKurt[2].getResult());
+    checkWithPrecisionForKurt((PinotFourthMoment) aggregationResult.get(3), NUM_RECORDS, expectedKurt[3].getResult());
+
+    // Validate the response
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    brokerResponse.getResultTable();
+    Object[] results = brokerResponse.getResultTable().getRows().get(0);
+    assertTrue(
+        Precision.equalsWithRelativeTolerance((double) results[0], expectedKurt[0].getResult(), RELATIVE_EPSILON));
+    assertTrue(
+        Precision.equalsWithRelativeTolerance((double) results[1], expectedKurt[1].getResult(), RELATIVE_EPSILON));
+    assertTrue(
+        Precision.equalsWithRelativeTolerance((double) results[2], expectedKurt[2].getResult(), RELATIVE_EPSILON));
+    assertTrue(
+        Precision.equalsWithRelativeTolerance((double) results[3], expectedKurt[3].getResult(), RELATIVE_EPSILON));
+
+    // Validate the response for a query with a filter
+    query = "SELECT KURTOSIS_POP(intColumnX) from testTable" + getFilter();
+    brokerResponse = getBrokerResponse(query);
+    brokerResponse.getResultTable();
+    results = brokerResponse.getResultTable().getRows().get(0);
+    Kurtosis filterExpectedKurt = new Kurtosis();
+    for (int i = 0; i < NUM_RECORDS / 2; i++) {
+      filterExpectedKurt.increment(_intColX[i]);
+    }
+    assertTrue(
+        Precision.equalsWithRelativeTolerance((double) results[0], filterExpectedKurt.getResult(), RELATIVE_EPSILON));
+  }
+
+  @Test
+  public void testKurtosisAggregationGroupBy() {
+    // Compute expected group results
+    Kurtosis[] expectedGroupByResult = new Kurtosis[NUM_GROUPS];
+
+    for (int i = 0; i < NUM_GROUPS; i++) {
+      expectedGroupByResult[i] = new Kurtosis();
+    }
+    for (int j = 0; j < NUM_RECORDS; j++) {
+      int pos = j / (NUM_RECORDS / NUM_GROUPS);
+      expectedGroupByResult[pos].increment(_intColX[j]);
+    }
+
+    String query = "SELECT KURTOSIS_POP(intColumnX) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
+    GroupByOperator groupByOperator = getOperator(query);
+    GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS * 2, NUM_RECORDS);
+    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    assertNotNull(aggregationGroupByResult);
+    for (int i = 0; i < NUM_GROUPS; i++) {
+      PinotFourthMoment actual = (PinotFourthMoment) aggregationGroupByResult.getResultForGroupId(0, i);
+      checkWithPrecisionForKurt(actual, NUM_RECORDS / NUM_GROUPS, expectedGroupByResult[i].getResult());
+    }
+  }
+
   private void checkWithPrecisionForCovariance(CovarianceTuple tuple, double sumX, double sumY, double sumXY,
       int count) {
     assertEquals(tuple.getCount(), count);
@@ -764,6 +933,16 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
           Precision.equalsWithRelativeTolerance(tuple.getM2(), expectedStdDev * expectedStdDev * (expectedCount - 1),
               RELATIVE_EPSILON));
     }
+  }
+
+  private void checkWithPrecisionForSkew(PinotFourthMoment m4, int expectedCount, double expectedSkew) {
+    assertEquals(m4.getN(), expectedCount);
+    assertTrue(Precision.equalsWithRelativeTolerance(m4.skew(), expectedSkew, RELATIVE_EPSILON));
+  }
+
+  private void checkWithPrecisionForKurt(PinotFourthMoment m4, int expectedCount, double expectedSkew) {
+    assertEquals(m4.getN(), expectedCount);
+    assertTrue(Precision.equalsWithRelativeTolerance(m4.kurtosis(), expectedSkew, RELATIVE_EPSILON));
   }
 
   private double computeVariancePop(VarianceTuple varianceTuple) {

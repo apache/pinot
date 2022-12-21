@@ -458,6 +458,20 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.BOOLOR);
     assertEquals(aggregationFunction.getColumnName(), "boolOr_column");
     assertEquals(aggregationFunction.getResultColumnName(), "boolor(column)");
+
+    function = getFunction("skew_pop");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof FourthMomentAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.SKEWPOP);
+    assertEquals(aggregationFunction.getColumnName(), "skewPop_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "skewpop(column)");
+
+    function = getFunction("kurtosis_pop");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof FourthMomentAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.KURTOSISPOP);
+    assertEquals(aggregationFunction.getColumnName(), "kurtosisPop_column");
+    assertEquals(aggregationFunction.getResultColumnName(), "kurtosispop(column)");
   }
 
   private FunctionContext getFunction(String functionName) {

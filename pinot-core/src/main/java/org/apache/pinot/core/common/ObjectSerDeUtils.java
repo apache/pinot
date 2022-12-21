@@ -70,6 +70,7 @@ import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.IntLongPair;
 import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
+import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
@@ -125,7 +126,8 @@ public class ObjectSerDeUtils {
     DoubleLongPair(30),
     StringLongPair(31),
     CovarianceTuple(32),
-    VarianceTuple(33);
+    VarianceTuple(33),
+    PinotFourthMoment(34);
 
     private final int _value;
 
@@ -209,6 +211,8 @@ public class ObjectSerDeUtils {
         return ObjectType.CovarianceTuple;
       } else if (value instanceof VarianceTuple) {
         return ObjectType.VarianceTuple;
+      } else if (value instanceof PinotFourthMoment) {
+        return ObjectType.PinotFourthMoment;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -480,6 +484,23 @@ public class ObjectSerDeUtils {
     @Override
     public VarianceTuple deserialize(ByteBuffer byteBuffer) {
       return VarianceTuple.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<PinotFourthMoment> PINOT_FOURTH_MOMENT_OBJECT_SER_DE = new ObjectSerDe<>() {
+    @Override
+    public byte[] serialize(PinotFourthMoment value) {
+      return value.serialize();
+    }
+
+    @Override
+    public PinotFourthMoment deserialize(byte[] bytes) {
+      return PinotFourthMoment.fromBytes(bytes);
+    }
+
+    @Override
+    public PinotFourthMoment deserialize(ByteBuffer byteBuffer) {
+      return PinotFourthMoment.fromBytes(byteBuffer);
     }
   };
 
@@ -1213,7 +1234,8 @@ public class ObjectSerDeUtils {
       DOUBLE_LONG_PAIR_SER_DE,
       STRING_LONG_PAIR_SER_DE,
       COVARIANCE_TUPLE_OBJECT_SER_DE,
-      VARIANCE_TUPLE_OBJECT_SER_DE
+      VARIANCE_TUPLE_OBJECT_SER_DE,
+      PINOT_FOURTH_MOMENT_OBJECT_SER_DE
   };
   //@formatter:on
 
