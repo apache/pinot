@@ -836,6 +836,16 @@ public class PinotHelixTaskResourceManager {
     MinionTaskMetadataUtils.deleteTaskMetadata(propertyStore, taskType, tableNameWithType);
   }
 
+  /**
+   * Gets the last update time (in ms) of all minion task metadata.
+   * @return a map storing the last update time (in ms) of all minion task metadata: (tableNameWithType -> taskType
+   *         -> last update time in ms)
+   */
+  public Map<String, Map<String, Long>> getTaskMetadataLastUpdateTimeMs() {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
+    return MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
+  }
+
   @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "finishTime", "subtaskInfos"})
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class TaskDebugInfo {
