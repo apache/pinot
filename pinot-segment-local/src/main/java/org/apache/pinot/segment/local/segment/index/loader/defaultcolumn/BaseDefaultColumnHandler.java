@@ -120,7 +120,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   protected final Schema _schema;
   protected final SegmentDirectory.Writer _segmentWriter;
 
-  private final PropertiesConfiguration _segmentProperties;
+  // NOTE: _segmentProperties shouldn't be used when checking whether default column need to be created because at that
+  //       time _segmentMetadata might not be loaded from a local file
+  private PropertiesConfiguration _segmentProperties;
 
   protected BaseDefaultColumnHandler(File indexDir, SegmentMetadata segmentMetadata,
       IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
@@ -129,7 +131,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _segmentWriter = segmentWriter;
-    _segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(segmentMetadata);
   }
 
   @Override
@@ -151,6 +152,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     }
 
     // Update each default column based on the default column action.
+    _segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(_segmentMetadata);
     Iterator<Map.Entry<String, DefaultColumnAction>> entryIterator = defaultColumnActionMap.entrySet().iterator();
     while (entryIterator.hasNext()) {
       Map.Entry<String, DefaultColumnAction> entry = entryIterator.next();
