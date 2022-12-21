@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -271,41 +270,13 @@ public abstract class BaseDataTable implements DataTable {
   public String toString() {
     if (_dataSchema == null) {
       return _metadata.toString();
+    } else {
+      StringBuilder stringBuilder = new StringBuilder();
+      stringBuilder.append("resultSchema:").append('\n');
+      stringBuilder.append(_dataSchema).append('\n');
+      stringBuilder.append("numRows: ").append(_numRows).append('\n');
+      stringBuilder.append("metadata: ").append(_metadata.toString()).append('\n');
+      return stringBuilder.toString();
     }
-
-    StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append(_dataSchema).append('\n');
-    stringBuilder.append("numRows: ").append(_numRows).append('\n');
-
-    ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
-    _fixedSizeData.position(0);
-    for (int rowId = 0; rowId < _numRows; rowId++) {
-      for (int colId = 0; colId < _numColumns; colId++) {
-        switch (storedColumnDataTypes[colId]) {
-          case INT:
-            stringBuilder.append(_fixedSizeData.getInt());
-            break;
-          case LONG:
-            stringBuilder.append(_fixedSizeData.getLong());
-            break;
-          case FLOAT:
-            stringBuilder.append(_fixedSizeData.getFloat());
-            break;
-          case DOUBLE:
-            stringBuilder.append(_fixedSizeData.getDouble());
-            break;
-          case STRING:
-            stringBuilder.append(_fixedSizeData.getInt());
-            break;
-          // Object and array.
-          default:
-            stringBuilder.append(String.format("(%s:%s)", _fixedSizeData.getInt(), _fixedSizeData.getInt()));
-            break;
-        }
-        stringBuilder.append("\t");
-      }
-      stringBuilder.append("\n");
-    }
-    return stringBuilder.toString();
   }
 }
