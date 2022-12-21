@@ -22,9 +22,8 @@ import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
@@ -32,6 +31,7 @@ import org.apache.pinot.query.mailbox.GrpcReceivingMailbox;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,29 +54,30 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   }
 
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
+
   private final GrpcMailboxService _mailboxService;
   private final StreamObserver<Mailbox.MailboxStatus> _responseObserver;
   private final boolean _isEnabledFeedback;
+  private final long _timeoutMs;
 
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
   private final ArrayBlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
 
-  ReadWriteLock _errorLock = new ReentrantReadWriteLock();
-  private Mailbox.MailboxContent _errorContent = null; // Guarded by _errorLock.
   private StringMailboxIdentifier _mailboxId;
   private Consumer<MailboxIdentifier> _gotMailCallback;
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
       StreamObserver<Mailbox.MailboxStatus> responseObserver) {
-    this(mailboxService, responseObserver, false);
+    this(mailboxService, responseObserver, false, QueryConfig.DEFAULT_MAILBOX_TIMEOUT_MS);
   }
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
-      StreamObserver<Mailbox.MailboxStatus> responseObserver, boolean isEnabledFeedback) {
+      StreamObserver<Mailbox.MailboxStatus> responseObserver, boolean isEnabledFeedback, long timeoutMs) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
     _receivingBuffer = new ArrayBlockingQueue<>(DEFAULT_MAILBOX_QUEUE_CAPACITY);
     _isEnabledFeedback = isEnabledFeedback;
+    _timeoutMs = timeoutMs;
   }
 
   /**
@@ -86,18 +87,9 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
    * to indicate when to call this method.
    */
   public Mailbox.MailboxContent poll() {
-    try {
-      _errorLock.readLock().lock();
-      if (_errorContent != null) {
-        return _errorContent;
-      }
-    } finally {
-      _errorLock.readLock().unlock();
-    }
     if (isCompleted()) {
       return null;
     }
-
     return _receivingBuffer.poll();
   }
 
@@ -113,22 +105,15 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     _gotMailCallback = receivingMailbox.init(this);
 
     if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {
-      // when the receiving end receives a message put it in the mailbox queue.
-      // TODO: pass a timeout to _receivingBuffer.
-      if (!_receivingBuffer.offer(mailboxContent)) {
-        // TODO: close the stream.
-        RuntimeException e = new RuntimeException("Mailbox receivingBuffer is full:" + _mailboxId);
-        LOGGER.error(e.getMessage());
-        try {
-          _errorLock.writeLock().lock();
-          _errorContent = createErrorContent(e);
-        } catch (IOException ioe) {
-          e = new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
-          LOGGER.error(e.getMessage());
-          throw e;
-        } finally {
-          _errorLock.writeLock().unlock();
+      try {
+        // when the receiving end receives a message put it in the mailbox queue.
+        if (!_receivingBuffer.offer(mailboxContent, _timeoutMs, TimeUnit.MILLISECONDS)) {
+          // TODO: default behavior only logs dropped message, emit stats for reporting. But not stop processing.
+          // TODO: add QueryOption to stop processing and throw when incorrect processing results might occur.
+          LOGGER.error("Mailbox receivingBuffer is full for: " + _mailboxId);
         }
+      } catch (Exception e) {
+        LOGGER.error("Exception occurred while inserting received mail into mailbox: " + _mailboxId, e);
       }
       _gotMailCallback.accept(_mailboxId);
 
@@ -150,17 +135,19 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   }
 
   @Override
-  public void onError(Throwable e) {
+  public void onError(Throwable t) {
     try {
-      _errorLock.writeLock().lock();
-      _errorContent = createErrorContent(e);
+      // Insert the error into the receivingBuffer.
+      _receivingBuffer.offer(Mailbox.MailboxContent.newBuilder()
+          .setPayload(ByteString.copyFrom(TransferableBlockUtils.getErrorTransferableBlock(
+              new RuntimeException(t)).getDataBlock().toBytes()))
+          .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true")
+          .build(), _timeoutMs, TimeUnit.MILLISECONDS);
       _gotMailCallback.accept(_mailboxId);
-      // TODO: close the stream.
-      throw new RuntimeException(e);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
-    } finally {
-      _errorLock.writeLock().unlock();
+      _responseObserver.onError(t);
+      throw new RuntimeException(t);
+    } catch (IOException | InterruptedException e) {
+      throw new RuntimeException("Unable to report exception for cascade reporting: " + t, e);
     }
   }
 
