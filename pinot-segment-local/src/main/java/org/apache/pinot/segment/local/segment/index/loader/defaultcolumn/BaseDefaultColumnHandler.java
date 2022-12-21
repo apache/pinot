@@ -129,7 +129,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _segmentWriter = segmentWriter;
-    _segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(segmentMetadata);
+    _segmentProperties = (_segmentMetadata.getIndexDir() == null) ? null
+        : SegmentMetadataUtils.getPropertiesConfiguration(_segmentMetadata);
   }
 
   @Override
