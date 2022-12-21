@@ -21,7 +21,6 @@ package org.apache.pinot.common.minion;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.HelixPropertyStore;
@@ -74,9 +73,8 @@ public final class MinionTaskMetadataUtils {
    * @return a map storing the last update time (in ms) of all minion task metadata: (tableNameWithType -> taskType
    *         -> last update time in ms)
    */
-  @Nonnull
   public static Map<String, Map<String, Long>> getAllTaskMetadataLastUpdateTimeMs(
-      @Nonnull HelixPropertyStore<ZNRecord> propertyStore) {
+      HelixPropertyStore<ZNRecord> propertyStore) {
     Map<String, Map<String, Long>> tableTaskLastUpdateTimeMsMap = new HashMap<>();
     String propertyStorePathForMinionTaskMetadataPrefix =
         ZKMetadataProvider.getPropertyStorePathForMinionTaskMetadataPrefix();
