@@ -55,9 +55,15 @@ public abstract class TransformOperand {
       case "OR":
         Preconditions.checkState(operandSize >= 2, "OR takes >=2 argument, passed in argument size:" + operandSize);
         return new FilterOperand.Or(functionOperands, inputDataSchema);
+      case "ISNOTTRUE":
       case "NOT":
-        Preconditions.checkState(operandSize == 1, "NOT takes one argument, passed in argument size:" + operandSize);
+        Preconditions.checkState(operandSize == 1,
+            "NOT / IS_NOT_TRUE takes one argument, passed in argument size:" + operandSize);
         return new FilterOperand.Not(functionOperands.get(0), inputDataSchema);
+      case "ISTRUE":
+        Preconditions.checkState(operandSize == 1,
+            "BOOL / IS_TRUE takes one argument, passed in argument size:" + operandSize);
+        return new FilterOperand.True(functionOperands.get(0), inputDataSchema);
       case "equals":
         return new FilterOperand.Predicate(functionOperands, inputDataSchema) {
           @Override

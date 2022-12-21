@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 public abstract class FilterOperand extends TransformOperand {
@@ -44,7 +45,7 @@ public abstract class FilterOperand extends TransformOperand {
     @Override
     public Boolean apply(Object[] row) {
       for (TransformOperand child : _childOperands) {
-        if (!(Boolean) child.apply(row)) {
+        if (!BooleanUtils.toBoolean(child.apply(row))) {
           return false;
         }
       }
@@ -65,7 +66,7 @@ public abstract class FilterOperand extends TransformOperand {
     @Override
     public Boolean apply(Object[] row) {
       for (TransformOperand child : _childOperands) {
-        if ((Boolean) child.apply(row)) {
+        if (BooleanUtils.toBoolean(child.apply(row))) {
           return true;
         }
       }
@@ -82,7 +83,20 @@ public abstract class FilterOperand extends TransformOperand {
 
     @Override
     public Boolean apply(Object[] row) {
-      return !(Boolean) _childOperand.apply(row);
+      return !BooleanUtils.toBoolean(_childOperand.apply(row));
+    }
+  }
+
+  public static class True extends FilterOperand {
+    TransformOperand _childOperand;
+
+    public True(RexExpression childExpr, DataSchema inputDataSchema) {
+      _childOperand = toTransformOperand(childExpr, inputDataSchema);
+    }
+
+    @Override
+    public Boolean apply(Object[] row) {
+      return BooleanUtils.toBoolean(_childOperand.apply(row));
     }
   }
 
