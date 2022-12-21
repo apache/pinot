@@ -386,7 +386,7 @@ public class ForwardIndexHandlerTest {
 
       // Populate data for the MV columns with forward index disabled to have unique entries per row.
       // Avoid creating empty arrays.
-      int numMVElements = random.nextInt(maxNumberOfMVEntries - 1) + 1;
+      int numMVElements = random.nextInt(maxNumberOfMVEntries) + 1;
       for (int j = 0; j < numMVElements; j++) {
         String str = "n" + i + j;
         tempMVIntRowsForwardIndexDisabled[i][j] = j;
