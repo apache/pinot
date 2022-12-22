@@ -67,8 +67,8 @@ public class ListenerConfigUtilTest {
         listenerConfigs.get(0).getThreadPoolConfig().getMaxPoolSize());
 
     // Set server thread pool configs and assert that they are set
-    controllerConf.setProperty("controller.thread.pool.corePoolSize", 7);
-    controllerConf.setProperty("controller.thread.pool.maxPoolSize", 9);
+    controllerConf.setProperty("controller.http.server.thread.pool.corePoolSize", 7);
+    controllerConf.setProperty("controller.http.server.thread.pool.maxPoolSize", 9);
 
     listenerConfigs = ListenerConfigUtil.buildControllerConfigs(controllerConf);
     Assert.assertEquals(listenerConfigs.size(), 1);

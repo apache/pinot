@@ -61,7 +61,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.HTTPS_PROTOCOL;
 public final class ListenerConfigUtil {
   private static final String DEFAULT_HOST = "0.0.0.0";
   private static final String DOT_ACCESS_PROTOCOLS = ".access.protocols";
-  private static final String DOT_ACCESS_THREAD_POOL = ".thread.pool";
+  private static final String DOT_ACCESS_THREAD_POOL = ".http.server.thread.pool";
 
   private ListenerConfigUtil() {
     // left blank
