@@ -51,7 +51,7 @@ public class PinotHelixTaskResourceManagerTest {
     CompletionServiceHelper httpHelper = mock(CompletionServiceHelper.class);
     CompletionServiceHelper.CompletionServiceResponse httpResp =
         new CompletionServiceHelper.CompletionServiceResponse();
-    when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt())).thenReturn(httpResp);
+    when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt(), any())).thenReturn(httpResp);
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
     // No worker to run subtasks.
@@ -80,7 +80,7 @@ public class PinotHelixTaskResourceManagerTest {
     CompletionServiceHelper httpHelper = mock(CompletionServiceHelper.class);
     CompletionServiceHelper.CompletionServiceResponse httpResp =
         new CompletionServiceHelper.CompletionServiceResponse();
-    when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt())).thenReturn(httpResp);
+    when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt(), any())).thenReturn(httpResp);
     // Three workers to run 3 subtasks but got no progress status from workers.
     httpResp._failedResponseCount = 3;
     String[] workers = new String[]{"worker0", "worker1", "worker2"};
@@ -121,7 +121,7 @@ public class PinotHelixTaskResourceManagerTest {
     CompletionServiceHelper httpHelper = mock(CompletionServiceHelper.class);
     CompletionServiceHelper.CompletionServiceResponse httpResp =
         new CompletionServiceHelper.CompletionServiceResponse();
-    when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt())).thenReturn(httpResp);
+    when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt(), any())).thenReturn(httpResp);
     String[] workers = new String[]{"worker0", "worker1", "worker2"};
     Map<String, String> workerEndpoints = new HashMap<>();
     for (String worker : workers) {
@@ -162,7 +162,7 @@ public class PinotHelixTaskResourceManagerTest {
     CompletionServiceHelper httpHelper = mock(CompletionServiceHelper.class);
     CompletionServiceHelper.CompletionServiceResponse httpResp =
         new CompletionServiceHelper.CompletionServiceResponse();
-    when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt())).thenReturn(httpResp);
+    when(httpHelper.doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt(), any())).thenReturn(httpResp);
     String[] workers = new String[]{"worker0", "worker1", "worker2"};
     Map<String, String> workerEndpoints = new HashMap<>();
     for (String worker : workers) {

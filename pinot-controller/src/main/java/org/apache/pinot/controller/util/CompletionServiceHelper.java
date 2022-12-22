@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
@@ -41,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * The helper also records number of failed responses so that the caller knows if any of the calls
  * failed to respond. The failed instance is logged for debugging.
  */
-public class CompletionServiceHelper {
+public class CompletionServiceHelper<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompletionServiceHelper.class);
 
   private final Executor _executor;
@@ -55,9 +56,9 @@ public class CompletionServiceHelper {
     _endpointsToServers = endpointsToServers;
   }
 
-  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, int timeoutMs) {
-    return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs);
+  public CompletionServiceResponse<T> doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
+      boolean multiRequestPerServer, int timeoutMs, Function<GetMethod, ObjectOrParseException<T>> function) {
+    return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs, function);
   }
 
   /**
@@ -73,9 +74,10 @@ public class CompletionServiceHelper {
    * @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
    * multiRequestPerServer is true) to the response from that endpoint.
    */
-  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs) {
-    CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
+  public CompletionServiceResponse<T> doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
+      boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs,
+      Function<GetMethod, ObjectOrParseException<T>> function) {
+    CompletionServiceResponse<T> completionServiceResponse = new CompletionServiceResponse<T>();
 
     // TODO: use some service other than completion service so that we know which server encounters the error
     CompletionService<GetMethod> completionService =
@@ -92,8 +94,8 @@ public class CompletionServiceHelper {
           completionServiceResponse._failedResponseCount++;
           continue;
         }
-        completionServiceResponse._httpResponses
-            .put(multiRequestPerServer ? uri.toString() : instance, getMethod.getResponseBodyAsString());
+        completionServiceResponse._httpResponses.put(multiRequestPerServer ? uri.toString() : instance,
+            function.apply(getMethod));
       } catch (Exception e) {
         LOGGER.error("Connection error", e);
         completionServiceResponse._failedResponseCount++;
@@ -114,12 +116,30 @@ public class CompletionServiceHelper {
     return completionServiceResponse;
   }
 
+  static public class ObjectOrParseException<T> {
+    private final T _object;
+    private final Exception _parseException;
+
+    public ObjectOrParseException(T object, Exception parseException) {
+      _object = object;
+      _parseException = parseException;
+    }
+
+    public T getObject()
+        throws Exception {
+      if (_parseException != null) {
+        throw _parseException;
+      }
+      return _object;
+    }
+  }
+
   /**
    * Helper class to maintain the completion service response to be sent back to the caller.
    */
-  static public class CompletionServiceResponse {
+  static public class CompletionServiceResponse<T> {
     // Map of the server instance to the response from that server
-    public Map<String, String> _httpResponses;
+    public Map<String, ObjectOrParseException<T>> _httpResponses;
     // Number of failures encountered when requesting
     public int _failedResponseCount;
 

@@ -112,19 +112,27 @@ public class ConsumingSegmentInfoReader {
       serverUrls.add(consumingSegmentInfoURI);
     }
 
-    CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
+    CompletionServiceHelper<List<SegmentConsumerInfo>> completionServiceHelper =
+        new CompletionServiceHelper<List<SegmentConsumerInfo>>(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse<List<SegmentConsumerInfo>> serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs, resp -> {
+          try {
+            return new CompletionServiceHelper.ObjectOrParseException<>(
+                JsonUtils.inputStreamToObjectTypeRef(resp.getResponseBodyAsStream(),
+                    new TypeReference<List<SegmentConsumerInfo>>() {
+                    }), null);
+          } catch (IOException e) {
+            return new CompletionServiceHelper.ObjectOrParseException<>(null, null);
+          }
+        });
     Map<String, List<SegmentConsumerInfo>> serverToConsumingSegmentInfoList = new HashMap<>();
     int failedParses = 0;
-    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+    for (Map.Entry<String, CompletionServiceHelper.ObjectOrParseException<List<SegmentConsumerInfo>>> streamResponse
+        : serviceResponse._httpResponses.entrySet()) {
       try {
-        List<SegmentConsumerInfo> segmentConsumerInfos =
-            JsonUtils.stringToObject(streamResponse.getValue(), new TypeReference<List<SegmentConsumerInfo>>() {
-            });
+        List<SegmentConsumerInfo> segmentConsumerInfos = streamResponse.getValue().getObject();
         serverToConsumingSegmentInfoList.put(streamResponse.getKey(), segmentConsumerInfos);
-      } catch (IOException e) {
+      } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }

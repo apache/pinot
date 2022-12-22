@@ -235,7 +235,7 @@ public class DebugResource {
   }
 
   private TableDebugInfo.SegmentDebugInfo debugSegment(String tableNameWithType, String segmentName)
-      throws IOException {
+      throws Exception {
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
     if (idealState == null) {
       return null;
@@ -263,15 +263,23 @@ public class DebugResource {
       serverUrls.add(segmentDebugInfoURI);
     }
 
-    CompletionServiceHelper completionServiceHelper =
+    CompletionServiceHelper<SegmentServerDebugInfo> completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, serverRequestTimeoutMs);
+    CompletionServiceHelper.CompletionServiceResponse<SegmentServerDebugInfo> serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, serverRequestTimeoutMs,
+            resp -> {
+              try {
+                return new CompletionServiceHelper.ObjectOrParseException<>(
+                    JsonUtils.inputStreamToObject(resp.getResponseBodyAsStream(), SegmentServerDebugInfo.class), null);
+              } catch (IOException e) {
+                return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
+              }
+            });
 
     Map<String, SegmentServerDebugInfo> serverToSegmentDebugInfo = new HashMap<>();
-    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-      SegmentServerDebugInfo segmentDebugInfo =
-          JsonUtils.stringToObject(streamResponse.getValue(), SegmentServerDebugInfo.class);
+    for (Map.Entry<String, CompletionServiceHelper.ObjectOrParseException<SegmentServerDebugInfo>> streamResponse
+        : serviceResponse._httpResponses.entrySet()) {
+      SegmentServerDebugInfo segmentDebugInfo = streamResponse.getValue().getObject();
       serverToSegmentDebugInfo.put(streamResponse.getKey(), segmentDebugInfo);
     }
 
@@ -466,23 +474,31 @@ public class DebugResource {
       serverUrls.add(segmentDebugInfoURI);
     }
 
-    CompletionServiceHelper completionServiceHelper =
+    CompletionServiceHelper<List<SegmentServerDebugInfo>> completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
+    CompletionServiceHelper.CompletionServiceResponse<List<SegmentServerDebugInfo>> serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs, resp -> {
+          try {
+            return new CompletionServiceHelper.ObjectOrParseException<List<SegmentServerDebugInfo>>(
+                JsonUtils.inputStreamToObjectTypeRef(resp.getResponseBodyAsStream(),
+                    new TypeReference<List<SegmentServerDebugInfo>>() {
+                    }), null);
+          } catch (IOException e) {
+            return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
+          }
+        });
 
     // Map from InstanceName -> <Segment -> DebugInfo>
     Map<String, Map<String, SegmentServerDebugInfo>> serverToSegmentDebugInfoMap = new HashMap<>();
     int failedParses = 0;
-    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+    for (Map.Entry<String, CompletionServiceHelper.ObjectOrParseException<List<SegmentServerDebugInfo>>> streamResponse
+        : serviceResponse._httpResponses.entrySet()) {
       try {
-        List<SegmentServerDebugInfo> segmentDebugInfos =
-            JsonUtils.stringToObject(streamResponse.getValue(), new TypeReference<List<SegmentServerDebugInfo>>() {
-            });
+        List<SegmentServerDebugInfo> segmentDebugInfos = streamResponse.getValue().getObject();
         Map<String, SegmentServerDebugInfo> segmentsMap = segmentDebugInfos.stream()
             .collect(Collectors.toMap(SegmentServerDebugInfo::getSegmentName, Function.identity()));
         serverToSegmentDebugInfoMap.put(streamResponse.getKey(), segmentsMap);
-      } catch (IOException e) {
+      } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -931,12 +930,12 @@ public class PinotTableRestletResource {
   }
 
   private long validateSegmentStateForTable(String offlineTableName)
-      throws InvalidConfigException, JsonProcessingException {
+      throws Exception {
     // Call all servers to validate offline table state
     Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(offlineTableName);
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
-    CompletionServiceHelper completionServiceHelper =
+    CompletionServiceHelper<TableSegmentValidationInfo> completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
@@ -945,8 +944,15 @@ public class PinotTableRestletResource {
       serverUrls.add(reloadTaskStatusEndpoint);
     }
 
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
+    CompletionServiceHelper.CompletionServiceResponse<TableSegmentValidationInfo> serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000, resp -> {
+          try {
+            return new CompletionServiceHelper.ObjectOrParseException<>(
+                JsonUtils.inputStreamToObject(resp.getResponseBodyAsStream(), TableSegmentValidationInfo.class), null);
+          } catch (IOException e) {
+            return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
+          }
+        });
 
     if (serviceResponse._failedResponseCount > 0) {
       throw new ControllerApplicationException(LOGGER, "Could not validate table segment status",
@@ -955,9 +961,9 @@ public class PinotTableRestletResource {
 
     long timeBoundaryMs = -1;
     // Validate all responses
-    for (String response : serviceResponse._httpResponses.values()) {
-      TableSegmentValidationInfo tableSegmentValidationInfo =
-          JsonUtils.stringToObject(response, TableSegmentValidationInfo.class);
+    for (CompletionServiceHelper.ObjectOrParseException<TableSegmentValidationInfo> response
+        : serviceResponse._httpResponses.values()) {
+      TableSegmentValidationInfo tableSegmentValidationInfo = response.getObject();
       if (!tableSegmentValidationInfo.isValid()) {
         throw new ControllerApplicationException(LOGGER, "Table segment validation failed",
             Response.Status.PRECONDITION_FAILED);

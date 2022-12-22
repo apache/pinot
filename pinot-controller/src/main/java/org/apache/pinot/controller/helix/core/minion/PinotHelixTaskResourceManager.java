@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.Uninterruptibles;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -493,13 +494,13 @@ public class PinotHelixTaskResourceManager {
       Map<String, String> requestHeaders, int timeoutMs)
       throws Exception {
     return getSubtaskProgress(taskName, subtaskNames,
-        new CompletionServiceHelper(executor, connMgr, HashBiMap.create(0)), workerEndpoints, requestHeaders,
+        new CompletionServiceHelper<Map>(executor, connMgr, HashBiMap.create(0)), workerEndpoints, requestHeaders,
         timeoutMs);
   }
 
   @VisibleForTesting
   Map<String, Object> getSubtaskProgress(String taskName, @Nullable String subtaskNames,
-      CompletionServiceHelper completionServiceHelper, Map<String, String> workerEndpoints,
+      CompletionServiceHelper<Map> completionServiceHelper, Map<String, String> workerEndpoints,
       Map<String, String> requestHeaders, int timeoutMs)
       throws Exception {
     String helixJobName = getHelixJobName(taskName);
@@ -537,14 +538,24 @@ public class PinotHelixTaskResourceManager {
     // Scatter and gather progress from multiple workers.
     Map<String, Object> subtaskProgressMap = new HashMap<>();
     if (!workerUrls.isEmpty()) {
-      CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-          completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs);
-      for (Map.Entry<String, String> entry : serviceResponse._httpResponses.entrySet()) {
+      CompletionServiceHelper.CompletionServiceResponse<Map> serviceResponse =
+          completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs, resp -> {
+            try {
+              return new CompletionServiceHelper.ObjectOrParseException<>(
+                  JsonUtils.inputStreamToObject(resp.getResponseBodyAsStream(), Map.class), null);
+            } catch (IOException e) {
+              return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
+            }
+          });
+      for (Map.Entry<String, CompletionServiceHelper.ObjectOrParseException<Map>> entry
+          : serviceResponse._httpResponses.entrySet()) {
         String worker = entry.getKey();
-        String resp = entry.getValue();
-        LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
-        if (StringUtils.isNotEmpty(resp)) {
-          subtaskProgressMap.putAll(JsonUtils.stringToObject(resp, Map.class));
+        try {
+          Map resp = entry.getValue().getObject();
+          subtaskProgressMap.putAll(resp);
+          LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
+        } catch (Exception e) {
+          LOGGER.error("Could not parse response ", e);
         }
       }
       if (serviceResponse._failedResponseCount > 0) {

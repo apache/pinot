@@ -65,17 +65,25 @@ public class ServerTableTierReader {
       serverUrls.add(tierUri);
     }
     LOGGER.debug("Getting table tier info with serverUrls: {}", serverUrls);
-    CompletionServiceHelper completionServiceHelper =
+    CompletionServiceHelper<TableTierInfo> completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
+    CompletionServiceHelper.CompletionServiceResponse<TableTierInfo> serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs, resp -> {
+          try {
+            return new CompletionServiceHelper.ObjectOrParseException<>(
+                JsonUtils.inputStreamToObject(resp.getResponseBodyAsStream(), TableTierInfo.class), null);
+          } catch (IOException e) {
+            return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
+          }
+        });
     Map<String, TableTierInfo> serverToTableTierInfoMap = new HashMap<>();
     int failedParses = 0;
-    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+    for (Map.Entry<String, CompletionServiceHelper.ObjectOrParseException<TableTierInfo>> streamResponse
+        : serviceResponse._httpResponses.entrySet()) {
       try {
-        TableTierInfo tableTierInfo = JsonUtils.stringToObject(streamResponse.getValue(), TableTierInfo.class);
+        TableTierInfo tableTierInfo = streamResponse.getValue().getObject();
         serverToTableTierInfoMap.put(streamResponse.getKey(), tableTierInfo);
-      } catch (IOException e) {
+      } catch (Exception e) {
         failedParses++;
         LOGGER.error("Failed to parse server {} response", streamResponse.getKey(), e);
       }

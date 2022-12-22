@@ -141,6 +141,11 @@ public class JsonUtils {
     return Stream.of(entry);
   }
 
+  public static <T> T inputStreamToObjectTypeRef(InputStream jsonInputStream, TypeReference<T> valueTypeRef)
+      throws IOException {
+    return DEFAULT_READER.forType(valueTypeRef).readValue(jsonInputStream);
+  }
+
   public static <T> T stringToObject(String jsonString, TypeReference<T> valueTypeRef)
       throws IOException {
     return DEFAULT_READER.forType(valueTypeRef).readValue(jsonString);

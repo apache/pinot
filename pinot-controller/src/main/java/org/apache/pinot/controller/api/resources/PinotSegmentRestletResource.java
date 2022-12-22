@@ -645,7 +645,7 @@ public class PinotSegmentRestletResource {
 
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
-    CompletionServiceHelper completionServiceHelper =
+    CompletionServiceHelper<ServerReloadControllerJobStatusResponse> completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
 
     List<String> serverUrls = new ArrayList<>();
@@ -660,32 +660,38 @@ public class PinotSegmentRestletResource {
       serverUrls.add(reloadTaskStatusEndpoint);
     }
 
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
+    CompletionServiceHelper.CompletionServiceResponse<ServerReloadControllerJobStatusResponse> serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000, resp -> {
+          try {
+            return new CompletionServiceHelper.ObjectOrParseException<>(
+                JsonUtils.inputStreamToObject(resp.getResponseBodyAsStream(),
+                    ServerReloadControllerJobStatusResponse.class), null);
+          } catch (IOException e) {
+            return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
+          }
+        });
 
     ServerReloadControllerJobStatusResponse serverReloadControllerJobStatusResponse =
         new ServerReloadControllerJobStatusResponse();
     serverReloadControllerJobStatusResponse.setSuccessCount(0);
 
     int totalSegments = 0;
-    for (Map.Entry<String, List<String>> entry: serverToSegments.entrySet()) {
+    for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
       totalSegments += entry.getValue().size();
     }
     serverReloadControllerJobStatusResponse.setTotalSegmentCount(totalSegments);
     serverReloadControllerJobStatusResponse.setTotalServersQueried(serverUrls.size());
     serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(serviceResponse._failedResponseCount);
 
-    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-      String responseString = streamResponse.getValue();
+    for (Map.Entry<String, CompletionServiceHelper.ObjectOrParseException<ServerReloadControllerJobStatusResponse>>
+        streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        ServerReloadControllerJobStatusResponse response =
-            JsonUtils.stringToObject(responseString, ServerReloadControllerJobStatusResponse.class);
+        ServerReloadControllerJobStatusResponse response = streamResponse.getValue().getObject();
         serverReloadControllerJobStatusResponse.setSuccessCount(
             serverReloadControllerJobStatusResponse.getSuccessCount() + response.getSuccessCount());
       } catch (Exception e) {
         serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(
-            serverReloadControllerJobStatusResponse.getTotalServerCallsFailed() + 1
-        );
+            serverReloadControllerJobStatusResponse.getTotalServerCallsFailed() + 1);
       }
     }
 

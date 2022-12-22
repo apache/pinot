@@ -76,10 +76,17 @@ public class ServerSegmentMetadataReader {
     }
 
     // Helper service to run a http get call to the server
-    CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
+    CompletionServiceHelper<TableMetadataInfo> completionServiceHelper =
+        new CompletionServiceHelper<TableMetadataInfo>(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse<TableMetadataInfo> serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs, resp -> {
+          try {
+            return new CompletionServiceHelper.ObjectOrParseException<>(
+                JsonUtils.inputStreamToObject(resp.getResponseBodyAsStream(), TableMetadataInfo.class), null);
+          } catch (IOException e) {
+            return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
+          }
+        });
 
     long totalDiskSizeInBytes = 0;
     int totalNumSegments = 0;
@@ -89,10 +96,10 @@ public class ServerSegmentMetadataReader {
     final Map<String, Double> columnCardinalityMap = new HashMap<>();
     final Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     final Map<String, Map<String, Double>> columnIndexSizeMap = new HashMap<>();
-    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+    for (Map.Entry<String, CompletionServiceHelper.ObjectOrParseException<TableMetadataInfo>> streamResponse
+        : serviceResponse._httpResponses.entrySet()) {
       try {
-        TableMetadataInfo tableMetadataInfo =
-            JsonUtils.stringToObject(streamResponse.getValue(), TableMetadataInfo.class);
+        TableMetadataInfo tableMetadataInfo = streamResponse.getValue().getObject();
         totalDiskSizeInBytes += tableMetadataInfo.getDiskSizeInBytes();
         totalNumRows += tableMetadataInfo.getNumRows();
         totalNumSegments += tableMetadataInfo.getNumSegments();
@@ -100,12 +107,12 @@ public class ServerSegmentMetadataReader {
         tableMetadataInfo.getColumnCardinalityMap().forEach((k, v) -> columnCardinalityMap.merge(k, v, Double::sum));
         tableMetadataInfo.getMaxNumMultiValuesMap().forEach((k, v) -> maxNumMultiValuesMap.merge(k, v, Double::sum));
         tableMetadataInfo.getColumnIndexSizeMap().forEach((k, v) -> columnIndexSizeMap.merge(k, v, (l, r) -> {
-            for (Map.Entry<String, Double> e : r.entrySet()) {
-              l.put(e.getKey(), l.getOrDefault(e.getKey(), 0d) + e.getValue());
-            }
-            return l;
-          }));
-      } catch (IOException e) {
+          for (Map.Entry<String, Double> e : r.entrySet()) {
+            l.put(e.getKey(), l.getOrDefault(e.getKey(), 0d) + e.getValue());
+          }
+          return l;
+        }));
+      } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
@@ -156,16 +163,23 @@ public class ServerSegmentMetadataReader {
       }
     }
     BiMap<String, String> endpointsToServers = endpoints.inverse();
-    CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
+    CompletionServiceHelper<String> completionServiceHelper =
+        new CompletionServiceHelper<String>(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse<String> serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs, resp -> {
+          try {
+            return new CompletionServiceHelper.ObjectOrParseException<>(resp.getResponseBodyAsString(), null);
+          } catch (IOException e) {
+            return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
+          }
+        });
     List<String> segmentsMetadata = new ArrayList<>();
 
     int failedParses = 0;
-    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+    for (Map.Entry<String, CompletionServiceHelper.ObjectOrParseException<String>> streamResponse
+        : serviceResponse._httpResponses.entrySet()) {
       try {
-        String segmentMetadata = streamResponse.getValue();
+        String segmentMetadata = streamResponse.getValue().getObject();
         segmentsMetadata.add(segmentMetadata);
       } catch (Exception e) {
         failedParses++;

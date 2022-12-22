@@ -296,21 +296,27 @@ public class PinotTaskRestletResource {
         .format("%s://%s:%d/tasks/generator/%s/%s/debug?localOnly=true", scheme, controller.getHostName(),
             Integer.parseInt(controller.getPort()), tableNameWithType, taskType)).collect(Collectors.toList());
 
-    CompletionServiceHelper completionServiceHelper =
+    CompletionServiceHelper<JsonNode> completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, HashBiMap.create(0));
     Map<String, String> requestHeaders = new HashMap<>();
     httpHeaders.getRequestHeaders().keySet().forEach(header -> {
       requestHeaders.put(header, httpHeaders.getHeaderString(header));
     });
     LOGGER.debug("Getting task generation info with controllerUrls: {}", controllerUrls);
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(controllerUrls, null, true, requestHeaders, 10000);
+    CompletionServiceHelper.CompletionServiceResponse<JsonNode> serviceResponse =
+        completionServiceHelper.doMultiGetRequest(controllerUrls, null, true, requestHeaders, 10000, is -> {
+          try {
+            return new CompletionServiceHelper.ObjectOrParseException<>(JsonUtils.inputStreamToJsonNode(is), null);
+          } catch (IOException e) {
+            return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
+          }
+        });
 
     List<JsonNode> result = new ArrayList<>();
     serviceResponse._httpResponses.values().forEach(resp -> {
       try {
-        result.add(JsonUtils.stringToJsonNode(resp));
-      } catch (IOException e) {
+        result.add(resp.getObject());
+      } catch (Exception e) {
         LOGGER.error("Failed to parse controller response {}", resp, e);
       }
     });

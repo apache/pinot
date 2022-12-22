@@ -63,17 +63,25 @@ public class ServerTableSizeReader {
     }
 
     // Helper service to run a httpget call to the server
-    CompletionServiceHelper completionServiceHelper =
+    CompletionServiceHelper<TableSizeInfo> completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
+    CompletionServiceHelper.CompletionServiceResponse<TableSizeInfo> serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs, resp -> {
+          try {
+            return new CompletionServiceHelper.ObjectOrParseException<>(
+                JsonUtils.inputStreamToObject(resp.getResponseBodyAsStream(), TableSizeInfo.class), null);
+          } catch (IOException e) {
+            return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
+          }
+        });
     Map<String, List<SegmentSizeInfo>> serverToSegmentSizeInfoListMap = new HashMap<>();
     int failedParses = 0;
-    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+    for (Map.Entry<String, CompletionServiceHelper.ObjectOrParseException<TableSizeInfo>> streamResponse
+        : serviceResponse._httpResponses.entrySet()) {
       try {
-        TableSizeInfo tableSizeInfo = JsonUtils.stringToObject(streamResponse.getValue(), TableSizeInfo.class);
+        TableSizeInfo tableSizeInfo = streamResponse.getValue().getObject();
         serverToSegmentSizeInfoListMap.put(streamResponse.getKey(), tableSizeInfo.getSegments());
-      } catch (IOException e) {
+      } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
