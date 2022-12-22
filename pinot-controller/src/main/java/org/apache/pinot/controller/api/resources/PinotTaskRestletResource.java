@@ -304,9 +304,10 @@ public class PinotTaskRestletResource {
     });
     LOGGER.debug("Getting task generation info with controllerUrls: {}", controllerUrls);
     CompletionServiceHelper.CompletionServiceResponse<JsonNode> serviceResponse =
-        completionServiceHelper.doMultiGetRequest(controllerUrls, null, true, requestHeaders, 10000, is -> {
+        completionServiceHelper.doMultiGetRequest(controllerUrls, null, true, requestHeaders, 10000, resp -> {
           try {
-            return new CompletionServiceHelper.ObjectOrParseException<>(JsonUtils.inputStreamToJsonNode(is), null);
+            return new CompletionServiceHelper.ObjectOrParseException<>(
+                JsonUtils.inputStreamToJsonNode(resp.getResponseBodyAsStream()), null);
           } catch (IOException e) {
             return new CompletionServiceHelper.ObjectOrParseException<>(null, e);
           }
