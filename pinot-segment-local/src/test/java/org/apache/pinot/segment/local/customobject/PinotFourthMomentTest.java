@@ -21,8 +21,6 @@ package org.apache.pinot.segment.local.customobject;
 
 import java.util.Random;
 import java.util.stream.IntStream;
-import org.apache.commons.math.stat.descriptive.moment.Kurtosis;
-import org.apache.commons.math.stat.descriptive.moment.Skewness;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -51,7 +49,54 @@ public class PinotFourthMomentTest {
     b.combine(c);
 
     // Then:
-    assertEquals(new Skewness(b).getResult(), new Skewness(a).getResult(), .01);
-    assertEquals(new Kurtosis(b).getResult(), new Kurtosis(a).getResult(), .01);
+    assertEquals(b.skew(), a.skew(), .01);
+    assertEquals(b.kurtosis(), a.kurtosis(), .01);
+  }
+
+  @Test
+  public void shouldCombineLeftEmptyMoments() {
+    // Given:
+    Random r = new Random();
+    double[] xs = IntStream.generate(r::nextInt)
+        .limit(100)
+        .mapToDouble(i -> (double) i)
+        .toArray();
+
+    PinotFourthMoment a = new PinotFourthMoment();
+    PinotFourthMoment b = new PinotFourthMoment();
+
+    // When:
+    for (double x : xs) {
+      a.increment(x);
+    }
+
+    b.combine(a);
+
+    // Then:
+    assertEquals(b.kurtosis(), a.kurtosis(), .01);
+  }
+
+  @Test
+  public void shouldCombineRightEmptyMoments() {
+    // Given:
+    Random r = new Random();
+    double[] xs = IntStream.generate(r::nextInt)
+        .limit(100)
+        .mapToDouble(i -> (double) i)
+        .toArray();
+
+    PinotFourthMoment a = new PinotFourthMoment();
+    PinotFourthMoment b = new PinotFourthMoment();
+
+    // When:
+    for (double x : xs) {
+      a.increment(x);
+    }
+
+    double kurtosisBeforeCombine = a.kurtosis();
+    a.combine(b);
+
+    // Then:
+    assertEquals(a.kurtosis(), kurtosisBeforeCombine, .01);
   }
 }

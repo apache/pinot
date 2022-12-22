@@ -725,7 +725,7 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
 
     // Compute the query
     String query =
-        "SELECT SKEW_POP(intColumnX), SKEW_POP(longColumn), SKEW_POP(floatColumn), SKEW_POP(doubleColumnX) "
+        "SELECT SKEWNESS(intColumnX), SKEWNESS(longColumn), SKEWNESS(floatColumn), SKEWNESS(doubleColumnX) "
             + "FROM testTable";
     AggregationOperator aggregationOperator = getOperator(query);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
@@ -753,7 +753,7 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
         Precision.equalsWithRelativeTolerance((double) results[3], expectedSkew[3].getResult(), RELATIVE_EPSILON));
 
     // Validate the response for a query with a filter
-    query = "SELECT SKEW_POP(intColumnX) from testTable" + getFilter();
+    query = "SELECT SKEWNESS(intColumnX) from testTable" + getFilter();
     brokerResponse = getBrokerResponse(query);
     brokerResponse.getResultTable();
     results = brokerResponse.getResultTable().getRows().get(0);
@@ -778,7 +778,7 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
       expectedGroupByResult[pos].increment(_intColX[j]);
     }
 
-    String query = "SELECT SKEW_POP(intColumnX) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
+    String query = "SELECT SKEWNESS(intColumnX) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
     GroupByOperator groupByOperator = getOperator(query);
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
@@ -808,8 +808,8 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
 
     // Compute the query
     String query =
-        "SELECT KURTOSIS_POP(intColumnX), KURTOSIS_POP(longColumn), KURTOSIS_POP(floatColumn), "
-            + "KURTOSIS_POP(doubleColumnX) FROM testTable";
+        "SELECT KURTOSIS(intColumnX), KURTOSIS(longColumn), KURTOSIS(floatColumn), "
+            + "KURTOSIS(doubleColumnX) FROM testTable";
     AggregationOperator aggregationOperator = getOperator(query);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
@@ -836,7 +836,7 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
         Precision.equalsWithRelativeTolerance((double) results[3], expectedKurt[3].getResult(), RELATIVE_EPSILON));
 
     // Validate the response for a query with a filter
-    query = "SELECT KURTOSIS_POP(intColumnX) from testTable" + getFilter();
+    query = "SELECT KURTOSIS(intColumnX) from testTable" + getFilter();
     brokerResponse = getBrokerResponse(query);
     brokerResponse.getResultTable();
     results = brokerResponse.getResultTable().getRows().get(0);
@@ -861,7 +861,7 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
       expectedGroupByResult[pos].increment(_intColX[j]);
     }
 
-    String query = "SELECT KURTOSIS_POP(intColumnX) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
+    String query = "SELECT KURTOSIS(intColumnX) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
     GroupByOperator groupByOperator = getOperator(query);
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,

@@ -37,8 +37,7 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
   private final Type _type;
 
   enum Type {
-    KURTOSIS,
-    SKEW
+    KURTOSIS, SKEWNESS
   }
 
   public FourthMomentAggregationFunction(ExpressionContext expression, Type type) {
@@ -50,9 +49,9 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
   public AggregationFunctionType getType() {
     switch (_type) {
       case KURTOSIS:
-        return AggregationFunctionType.KURTOSISPOP;
-      case SKEW:
-        return AggregationFunctionType.SKEWPOP;
+        return AggregationFunctionType.KURTOSIS;
+      case SKEWNESS:
+        return AggregationFunctionType.SKEWNESS;
       default:
         throw new IllegalArgumentException("Unexpected type " + _type);
     }
@@ -159,7 +158,7 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
     switch (_type) {
       case KURTOSIS:
         return m4.kurtosis();
-      case SKEW:
+      case SKEWNESS:
         return m4.skew();
       default:
         throw new IllegalStateException("Unexpected value: " + _type);
