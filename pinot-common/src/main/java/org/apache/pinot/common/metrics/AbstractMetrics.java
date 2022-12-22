@@ -254,7 +254,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String gaugeName = gauge.getGaugeName();
     fullGaugeName = gaugeName + "." + getTableName(tableName);
 
-    if (!_gaugeValues.containsKey(fullGaugeName)) {
+    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
+    if (gaugeValue == null) {
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(fullGaugeName)) {
           _gaugeValues.put(fullGaugeName, new AtomicLong(unitCount));
@@ -270,7 +271,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         }
       }
     } else {
-      _gaugeValues.get(fullGaugeName).addAndGet(unitCount);
+      gaugeValue.addAndGet(unitCount);
     }
   }
 
@@ -333,7 +334,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   private void setValueOfGauge(long value, String gaugeName) {
-    if (!_gaugeValues.containsKey(gaugeName)) {
+    AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
+    if (gaugeValue == null) {
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(value));
@@ -343,7 +345,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         }
       }
     } else {
-      _gaugeValues.get(gaugeName).set(value);
+      gaugeValue.set(value);
     }
   }
 
@@ -356,7 +358,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void addValueToGlobalGauge(final G gauge, final long unitCount) {
     String gaugeName = gauge.getGaugeName();
 
-    if (!_gaugeValues.containsKey(gaugeName)) {
+    AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
+    if (gaugeValue == null) {
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(unitCount));
@@ -372,28 +375,22 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         }
       }
     } else {
-      _gaugeValues.get(gaugeName).addAndGet(unitCount);
+      gaugeValue.addAndGet(unitCount);
     }
   }
 
   @VisibleForTesting
   public long getValueOfGlobalGauge(final G gauge) {
     String gaugeName = gauge.getGaugeName();
-    if (!_gaugeValues.containsKey(gaugeName)) {
-      return 0;
-    } else {
-      return _gaugeValues.get(gaugeName).get();
-    }
+    AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
+    return gaugeValue == null ? 0 : gaugeValue.get();
   }
 
   @VisibleForTesting
   public long getValueOfGlobalGauge(final G gauge, String suffix) {
     String fullGaugeName = gauge.getGaugeName() + "." + suffix;
-    if (!_gaugeValues.containsKey(fullGaugeName)) {
-      return 0;
-    } else {
-      return _gaugeValues.get(fullGaugeName).get();
-    }
+    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
+    return gaugeValue == null ? 0 : gaugeValue.get();
   }
 
   /**
@@ -407,11 +404,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String gaugeName = gauge.getGaugeName();
     fullGaugeName = gaugeName + "." + getTableName(tableName);
 
-    if (!_gaugeValues.containsKey(fullGaugeName)) {
-      return 0;
-    } else {
-      return _gaugeValues.get(fullGaugeName).get();
-    }
+    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
+    return gaugeValue == null ? 0 : gaugeValue.get();
   }
 
   /**
@@ -426,11 +420,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String gaugeName = gauge.getGaugeName();
     fullGaugeName = gaugeName + "." + getTableName(tableName) + "." + partitionId;
 
-    if (!_gaugeValues.containsKey(fullGaugeName)) {
-      return -1;
-    } else {
-      return _gaugeValues.get(fullGaugeName).get();
-    }
+    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
+    return gaugeValue == null ? -1 : gaugeValue.get();
   }
 
   /**
