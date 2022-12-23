@@ -55,15 +55,16 @@ import org.slf4j.LoggerFactory;
  *
  *     (CONSUMING -> ONLINE state change)
  *             |
- *      markPartition(partitionId)      |<-recordPinotConsumptionDelay()-{LLRealtimeSegmentDataManager(Partition 0}}
+ *      markPartitionForConfirmation(partitionId)
+ *            |                         |<-storeConsumptionDelay()-{LLRealtimeSegmentDataManager(Partition 0}}
  *            |                         |
  * ___________V_________________________V_
- * |           (Table X)                |<-recordPinotConsumptionDelay()-{LLRealtimeSegmentDataManager(Partition 1}}
- * | ConsumptionDelayTracker|           ...
- * |____________________________________|<-recordPinotConsumptionDelay()-{LLRealtimeSegmentDataManager (Partition n}}
+ * |           (Table X)                |<-storeConsumptionDelay()-{LLRealtimeSegmentDataManager(Partition 1}}
+ * | ConsumptionDelayTracker            |           ...
+ * |____________________________________|<-storeConsumptionDelay()-{LLRealtimeSegmentDataManager (Partition n}}
  *              ^                      ^
  *              |                       \
- *   timeoutInactivePartitions()    stopTrackingPinotConsumptionDelay(partitionId)
+ *   timeoutInactivePartitions()    stopTrackingPartitionConsumptionDelay(partitionId)
  *    _________|__________                \
  *   | TimerTrackingTask |          (CONSUMING -> DROPPED state change)
  *   |___________________|
@@ -77,7 +78,7 @@ public class ConsumptionDelayTracker {
   // Once a partition is marked for verification, we wait 10 minutes to pull its ideal state.
   private static final int PARTITION_TIMEOUT_MS = 600000;          // 10 minutes timeouts
   // Delay Timer thread for this time after starting timer
-  private static final int INITIAL_TIMER_THREAD_DELAY_MS = 1000;
+  private static final int INITIAL_TIMER_THREAD_DELAY_MS = 100;
 
   /*
    * Class to keep a Pinot Consumption Delay measure and the time when the sample was taken (i.e. sample time)
@@ -120,7 +121,6 @@ public class ConsumptionDelayTracker {
   private ConcurrentHashMap<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
   // Mutable versions of timer constants so we can test with smaller delays
   final int _timerThreadTickIntervalMs;
-  final int _initialTimeThreadDelayMs;
   // Timer task to check partitions that are inactive against ideal state.
   final private Timer _timer;
 
@@ -166,21 +166,20 @@ public class ConsumptionDelayTracker {
 
   // Custom Constructor
   public ConsumptionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-      RealtimeTableDataManager realtimeTableDataManager, int initialTimeThreadDelayMs, int timerThreadTickIntervalMs)
+      RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs)
       throws RuntimeException {
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + getClass().getSimpleName());
     _serverMetrics = serverMetrics;
     _tableNameWithType = tableNameWithType;
     _realTimeTableDataManager = realtimeTableDataManager;
     // Handle negative timer values
-    if ((initialTimeThreadDelayMs < 0) || (timerThreadTickIntervalMs <= 0)) {
-      throw new RuntimeException("Illegal timer arguments");
+    if (timerThreadTickIntervalMs <= 0) {
+      throw new RuntimeException("Illegal timer timeout argument, expected > 0, got=" + timerThreadTickIntervalMs);
     }
     _enableAging = true;
-    _initialTimeThreadDelayMs = initialTimeThreadDelayMs;
     _timerThreadTickIntervalMs = timerThreadTickIntervalMs;
     _timer = new Timer("ConsumptionDelayTimerThread" + tableNameWithType);
-    _timer.schedule(new TrackingTimerTask(this), _initialTimeThreadDelayMs, _timerThreadTickIntervalMs);
+    _timer.schedule(new TrackingTimerTask(this), INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
     // Install callback metric
     _serverMetrics.addCallbackTableGaugeIfNeeded(_tableNameWithType, ServerGauge.MAX_PINOT_CONSUMPTION_DELAY_MS,
         () -> (long) getMaxPinotConsumptionDelay());
@@ -189,8 +188,7 @@ public class ConsumptionDelayTracker {
   // Constructor that uses default timeout
   public ConsumptionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager tableDataManager) {
-    this(serverMetrics, tableNameWithType, tableDataManager, INITIAL_TIMER_THREAD_DELAY_MS,
-        TIMER_THREAD_TICK_INTERVAL_MS);
+    this(serverMetrics, tableNameWithType, tableDataManager, TIMER_THREAD_TICK_INTERVAL_MS);
   }
 
   /**
