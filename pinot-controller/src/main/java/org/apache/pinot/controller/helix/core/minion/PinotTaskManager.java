@@ -541,16 +541,16 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         generateTasks() return a list of TaskGeneratorMostRecentRunInfo for each table
        */
       pinotTaskConfigs = taskGenerator.generateTasks(enabledTableConfigs);
-      long successRunTs = System.currentTimeMillis();
+      long successRunTimestamp = System.currentTimeMillis();
       for (TableConfig tableConfig : enabledTableConfigs) {
         _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
-            taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(successRunTs));
+            taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(successRunTimestamp));
         // before the first task schedule, the follow two gauge metrics will be empty
         // TODO: find a better way to report task generation information
         _controllerMetrics.addOrUpdateGauge(
             ControllerGauge.TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION.getGaugeName() + "."
                 + tableConfig.getTableName() + "." + taskGenerator.getTaskType(),
-            () -> System.currentTimeMillis() - successRunTs);
+            () -> System.currentTimeMillis() - successRunTimestamp);
         _controllerMetrics.addOrUpdateGauge(
             ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR.getGaugeName() + "."
                 + tableConfig.getTableName() + "." + taskGenerator.getTaskType(), () -> 0L);
@@ -560,11 +560,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       try (PrintWriter pw = new PrintWriter(errors)) {
         e.printStackTrace(pw);
       }
-      long successRunTs = System.currentTimeMillis();
+      long successRunTimestamp = System.currentTimeMillis();
       for (TableConfig tableConfig : enabledTableConfigs) {
         _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
             taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addErrorRunMessage(
-                successRunTs, errors.toString()));
+                successRunTimestamp, errors.toString()));
         // before the first task schedule, the follow gauge metric will be empty
         // TODO: find a better way to report task generation information
         _controllerMetrics.addOrUpdateGauge(
