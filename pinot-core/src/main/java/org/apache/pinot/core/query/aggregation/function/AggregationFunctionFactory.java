@@ -285,6 +285,10 @@ public class AggregationFunctionFactory {
             return new VarianceAggregationFunction(firstArgument, false, true);
           case STDDEVSAMP:
             return new VarianceAggregationFunction(firstArgument, true, true);
+          case SKEWNESS:
+            return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.SKEWNESS);
+          case KURTOSIS:
+            return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
           default:
             throw new IllegalArgumentException();
         }
