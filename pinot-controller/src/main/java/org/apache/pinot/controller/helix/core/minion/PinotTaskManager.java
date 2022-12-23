@@ -541,20 +541,35 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         generateTasks() return a list of TaskGeneratorMostRecentRunInfo for each table
        */
       pinotTaskConfigs = taskGenerator.generateTasks(enabledTableConfigs);
+      long successRunTs = System.currentTimeMillis();
       for (TableConfig tableConfig : enabledTableConfigs) {
         _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
-            taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(
-                System.currentTimeMillis()));
+            taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(successRunTs));
+        // before the first task schedule, the follow two gauge metrics will be empty
+        // TODO: find a better way to report task generation information
+        _controllerMetrics.addOrUpdateGauge(
+            ControllerGauge.TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION.getGaugeName() + "."
+                + tableConfig.getTableName() + "." + taskGenerator.getTaskType(),
+            () -> System.currentTimeMillis() - successRunTs);
+        _controllerMetrics.addOrUpdateGauge(
+            ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR.getGaugeName() + "."
+                + tableConfig.getTableName() + "." + taskGenerator.getTaskType(), () -> 0L);
       }
     } catch (Exception e) {
       StringWriter errors = new StringWriter();
       try (PrintWriter pw = new PrintWriter(errors)) {
         e.printStackTrace(pw);
       }
+      long successRunTs = System.currentTimeMillis();
       for (TableConfig tableConfig : enabledTableConfigs) {
         _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
             taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addErrorRunMessage(
-                System.currentTimeMillis(), errors.toString()));
+                successRunTs, errors.toString()));
+        // before the first task schedule, the follow gauge metric will be empty
+        // TODO: find a better way to report task generation information
+        _controllerMetrics.addOrUpdateGauge(
+            ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR.getGaugeName() + "."
+                + tableConfig.getTableName() + "." + taskGenerator.getTaskType(), () -> 1L);
       }
       throw e;
     }
