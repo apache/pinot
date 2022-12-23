@@ -76,7 +76,7 @@ import org.apache.pinot.controller.api.resources.InvalidControllerConfigExceptio
 import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.minion.MinionInstancesCleanupTask;
+import org.apache.pinot.controller.helix.core.cleanup.StaleInstancesCleanupTask;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
@@ -164,7 +164,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected SegmentCompletionManager _segmentCompletionManager;
   protected LeadControllerManager _leadControllerManager;
   protected List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbackList;
-  protected MinionInstancesCleanupTask _minionInstancesCleanupTask;
+  protected StaleInstancesCleanupTask _staleInstancesCleanupTask;
   protected TaskMetricsEmitter _taskMetricsEmitter;
   protected MultiThreadedHttpConnectionManager _connectionManager;
 
@@ -295,8 +295,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return _taskManager;
   }
 
-  public MinionInstancesCleanupTask getMinionInstancesCleanupTask() {
-    return _minionInstancesCleanupTask;
+  public StaleInstancesCleanupTask getStaleInstancesCleanupTask() {
+    return _staleInstancesCleanupTask;
   }
 
   @Override
@@ -687,9 +687,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         _executorService, _connectionManager);
     periodicTasks.add(_segmentRelocator);
-    _minionInstancesCleanupTask =
-        new MinionInstancesCleanupTask(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
-    periodicTasks.add(_minionInstancesCleanupTask);
+    _staleInstancesCleanupTask =
+        new StaleInstancesCleanupTask(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+    periodicTasks.add(_staleInstancesCleanupTask);
     _taskMetricsEmitter =
         new TaskMetricsEmitter(_helixResourceManager, _helixTaskResourceManager, _leadControllerManager, _config,
             _controllerMetrics);

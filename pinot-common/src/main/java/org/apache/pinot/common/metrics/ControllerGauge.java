@@ -101,8 +101,14 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Number of Tasks Status
   TASK_STATUS("taskStatus", false),
 
-  // Number of dropped minion instances
+  // Number of dropped stale minion instances
   DROPPED_MINION_INSTANCES("droppedMinionInstances", true),
+
+  // Number of dropped stale broker instances
+  DROPPED_BROKER_INSTANCES("droppedBrokerInstances", true),
+
+  // Number of dropped stale server instances
+  DROPPED_SERVER_INSTANCES("droppedServerInstances", true),
 
   // Number of online minion instances
   ONLINE_MINION_INSTANCES("onlineMinionInstances", true),
