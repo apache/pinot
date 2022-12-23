@@ -487,7 +487,8 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<PinotFourthMoment> PINOT_FOURTH_MOMENT_OBJECT_SER_DE = new ObjectSerDe<>() {
+  public static final ObjectSerDe<PinotFourthMoment> PINOT_FOURTH_MOMENT_OBJECT_SER_DE
+      = new ObjectSerDe<PinotFourthMoment>() {
     @Override
     public byte[] serialize(PinotFourthMoment value) {
       return value.serialize();

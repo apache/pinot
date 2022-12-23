@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.customobject;
 
 import java.nio.ByteBuffer;
@@ -27,7 +26,18 @@ import org.apache.commons.math.stat.descriptive.moment.Skewness;
 
 
 /**
- * A {@link Comparable} implementation of
+ * A {@link Comparable} implementation of the <a href=https://en.wikipedia.org/wiki/Moment_(mathematics)>
+ * Fourth Statistical Moment</a> that uses the apache commons algorithm for computing it in
+ * one pass. It additionally supports serialization and deserialization methods, which is helpful
+ * for combining moments across servers.
+ *
+ * <p>The commons implementation does not support parallel-computation, support for which is added
+ * in the {@link #combine(PinotFourthMoment)} method inspired by Presto's implementation.
+ *
+ * <pre>
+ * Also See: <a href="https://github.com/prestodb/presto/blob/master/presto-main/src/main/java/com/facebook
+ * /presto/operator/aggregation/AggregationUtils.java#L188">Presto's Implementation</a>
+ * </pre>
  */
 public class PinotFourthMoment extends FourthMoment implements Comparable<PinotFourthMoment> {
 
