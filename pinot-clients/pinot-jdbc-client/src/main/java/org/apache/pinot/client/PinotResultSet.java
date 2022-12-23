@@ -359,7 +359,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     try {
       String value = getString(columnIndex);
-      return DateTimeUtils.getTimeFromString(value, cal);
+      return wasNull() ? null : DateTimeUtils.getTimeFromString(value, cal);
     } catch (Exception e) {
       throw new SQLException("Unable to fetch date", e);
     }
@@ -370,7 +370,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     try {
       String value = getString(columnIndex);
-      return DateTimeUtils.getTimestampFromString(value, cal);
+      return wasNull() ? null : DateTimeUtils.getTimestampFromString(value, cal);
     } catch (Exception e) {
       throw new SQLException("Unable to fetch date", e);
     }
