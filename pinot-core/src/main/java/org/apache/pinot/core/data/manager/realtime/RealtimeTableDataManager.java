@@ -221,8 +221,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (_consumptionDelayTracker != null) {
       _consumptionDelayTracker.shutdown();
     }
-    // Now that segments can't report metric destroy metric for this table
-    _serverMetrics.removeTableGauge(_tableNameWithType, ServerGauge.MAX_PINOT_CONSUMPTION_DELAY_MS);
   }
 
   /*

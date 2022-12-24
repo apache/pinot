@@ -149,6 +149,21 @@ public class ConsumptionDelayTracker {
     return newMax;
   }
 
+  /*
+   * Helper function to age a delay measure. Aging means adding the time elapsed since the measure was
+   * taken till the measure is being reported.
+   */
+  private long getAgedDelay(DelayMeasure currentDelay) {
+    if (currentDelay == null) {
+      return 0; // return 0 when not initialized
+    }
+    // Add age of measure to the reported value
+    long measureAgeInMs = _enableAging ? (System.currentTimeMillis() - currentDelay._sampleTime) : 0;
+    // Correct to zero for any time shifts due to NTP or time reset.
+    measureAgeInMs = Math.max(measureAgeInMs, 0);
+    return currentDelay._delayMilliseconds + measureAgeInMs;
+  }
+
   private List<Integer> getPartitionsHostedByThisServerPerIdealState() {
     return _realTimeTableDataManager.getHostedPartitionsGroupIds();
   }
@@ -162,6 +177,13 @@ public class ConsumptionDelayTracker {
     _partitionToDelaySampleMap.remove(partitionGroupId);
     // If we are removing a partition we should stop reading its ideal state.
     _partitionsMarkedForVerification.remove(partitionGroupId);
+    _serverMetrics.removeTableGauge(getPerPartitionMetricName(partitionGroupId),
+        ServerGauge.PER_PARTITION_CONSUMPTION_DELAY_MS);
+  }
+
+  /* Helper function to generate a per partition metric name */
+  private String getPerPartitionMetricName(int partionGroupId) {
+    return _tableNameWithType + partionGroupId;
   }
 
   // Custom Constructor
@@ -181,8 +203,8 @@ public class ConsumptionDelayTracker {
     _timer = new Timer("ConsumptionDelayTimerThread" + tableNameWithType);
     _timer.schedule(new TrackingTimerTask(this), INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
     // Install callback metric
-    _serverMetrics.addCallbackTableGaugeIfNeeded(_tableNameWithType, ServerGauge.MAX_PINOT_CONSUMPTION_DELAY_MS,
-        () -> (long) getMaxPinotConsumptionDelay());
+    _serverMetrics.addCallbackTableGaugeIfNeeded(_tableNameWithType, ServerGauge.MAX_CONSUMPTION_DELAY_MS,
+        () -> (long) getMaxConsumptionDelay());
   }
 
   // Constructor that uses default timeout
@@ -191,6 +213,12 @@ public class ConsumptionDelayTracker {
     this(serverMetrics, tableNameWithType, tableDataManager, TIMER_THREAD_TICK_INTERVAL_MS);
   }
 
+  // Constructor that takes a prefix to name the metric so we can keep multiple trackers for the same table
+  public ConsumptionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType, String metricNamePrefix,
+      RealtimeTableDataManager tableDataManager) {
+    this(serverMetrics, metricNamePrefix + tableNameWithType, tableDataManager,
+        TIMER_THREAD_TICK_INTERVAL_MS);
+  }
   /**
    * Use to set or rest the aging of reported values.
    * @param enableAging true if we want maximum to be aged as per sample time or false if we do not want to age
@@ -213,7 +241,14 @@ public class ConsumptionDelayTracker {
    */
   public void storeConsumptionDelay(long delayInMilliseconds, long sampleTime, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
-    _partitionToDelaySampleMap.put(partitionGroupId, new DelayMeasure(sampleTime, delayInMilliseconds));
+    DelayMeasure previousMeasure = _partitionToDelaySampleMap.put(partitionGroupId,
+        new DelayMeasure(sampleTime, delayInMilliseconds));
+    if (previousMeasure == null) {
+      // First time we start tracking a partition we should start tracking it via metric
+      _serverMetrics.addCallbackTableGaugeIfNeeded(getPerPartitionMetricName(partitionGroupId),
+          ServerGauge.PER_PARTITION_CONSUMPTION_DELAY_MS,
+          () -> (long) getPartitionConsumptionDelay(partitionGroupId));
+    }
     // If we are consuming we do not need to track this partition for removal.
     _partitionsMarkedForVerification.remove(partitionGroupId);
   }
@@ -269,17 +304,24 @@ public class ConsumptionDelayTracker {
    * It reports the maximum Pinot Consumption delay for all partitions of this table being served
    * by current server; it adds the time elapsed since the sample was taken to the measure.
    * If no measures have been taken, then the reported value is zero.
+   *
+   * @return max consumption delay in milliseconds.
    */
-  public long getMaxPinotConsumptionDelay() {
+  public long getMaxConsumptionDelay() {
     DelayMeasure currentMaxDelay = getMaximumDelay();
-    if (currentMaxDelay == null) {
-      return 0; // return 0 when not initialized
-    }
-    // Add age of measure to the reported value
-    long measureAgeInMs = _enableAging ? (System.currentTimeMillis() - currentMaxDelay._sampleTime) : 0;
-    // Correct to zero for any time shifts due to NTP or time reset.
-    measureAgeInMs = Math.max(measureAgeInMs, 0);
-    return currentMaxDelay._delayMilliseconds + measureAgeInMs;
+    return getAgedDelay(currentMaxDelay);
+  }
+
+  /*
+   * Method to get consumption delay for a given partition.
+   *
+   * @param partitionGroupId partition for which we are retrieving the delay
+   *
+   * @return consumption delay in milliseconds
+   */
+  public long getPartitionConsumptionDelay(int partitionGroupId) {
+    DelayMeasure currentMeasure = _partitionToDelaySampleMap.get(partitionGroupId);
+    return getAgedDelay(currentMeasure);
   }
 
   /*
@@ -289,6 +331,10 @@ public class ConsumptionDelayTracker {
   public void shutdown() {
     // Now that segments can't report metric, destroy metric for this table
     _timer.cancel();
-    _serverMetrics.removeTableGauge(_tableNameWithType, ServerGauge.MAX_PINOT_CONSUMPTION_DELAY_MS);
+    _serverMetrics.removeTableGauge(_tableNameWithType, ServerGauge.MAX_CONSUMPTION_DELAY_MS);
+    // Remove partitions so their related metrics get uninstalled.
+    for (int partitionGroupId : _partitionToDelaySampleMap.keySet()) {
+      removePartitionId(partitionGroupId);
+    }
   }
 }
