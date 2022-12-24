@@ -304,12 +304,33 @@ public class TableRebalancer {
     LOGGER.info("Rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, bestEfforts: {}",
         tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts);
     int expectedVersion = currentIdealState.getRecord().getVersion();
-    while (true) {
-      IdealState idealState =
-          _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
-      if (idealState.getRecord().getVersion() != expectedVersion) {
+
+    do {
+      Map<String, Map<String, String>> nextAssignment =
+          getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup);
+      LOGGER.info("Got the next assignment for table: {} with number of segments to be moved to each instance: {}",
+          tableNameWithType,
+          SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, nextAssignment));
+
+      Set<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, nextAssignment);
+      int versionPostConvergence;
+      try {
+        versionPostConvergence = waitForExternalViewToConverge(tableNameWithType, bestEfforts, segmentsToMove);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while waiting for ExternalView to converge for table: {}, aborting the rebalance",
+            tableNameWithType, e);
+        return new RebalanceResult(RebalanceResult.Status.FAILED,
+            "Caught exception while waiting for ExternalView to converge: " + e, instancePartitionsMap,
+            targetAssignment);
+      }
+
+      if (versionPostConvergence != expectedVersion) {
+        // Version changed during convergence
         LOGGER.info(
-            "IdealState version changed {}, re-calculating the target assignment", tableNameWithType);
+            "IdealState version changed while waiting for ExternalView to converge for table: {}, re-calculating the "
+                + "target assignment", tableNameWithType);
+        IdealState idealState =
+            _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
         try {
           currentIdealState = idealState;
           currentAssignment = currentIdealState.getRecord().getMapFields();
@@ -327,37 +348,20 @@ public class TableRebalancer {
               "Caught exception while re-calculating the target assignment: " + e, instancePartitionsMap,
               targetAssignment);
         }
+
+        if (currentAssignment.equals(targetAssignment)) {
+          LOGGER.info(
+              "Finished rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, bestEfforts:"
+                  + " {} in {}ms.", tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts,
+              System.currentTimeMillis() - startTimeMs);
+          return new RebalanceResult(RebalanceResult.Status.DONE,
+              "Success with minAvailableReplicas: " + minAvailableReplicas
+                  + " (both IdealState and ExternalView should reach the target segment assignment)",
+              instancePartitionsMap, targetAssignment);
+        }
+        continue;
       }
 
-      if (currentAssignment.equals(targetAssignment)) {
-        LOGGER.info(
-            "Finished rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, bestEfforts:"
-                + " {} in {}ms.", tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts,
-            System.currentTimeMillis() - startTimeMs);
-        return new RebalanceResult(RebalanceResult.Status.DONE,
-            "Success with minAvailableReplicas: " + minAvailableReplicas
-                + " (both IdealState and ExternalView should reach the target segment assignment)",
-            instancePartitionsMap, targetAssignment);
-      }
-
-      Map<String, Map<String, String>> nextAssignment =
-          getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup);
-      LOGGER.info("Got the next assignment for table: {} with number of segments to be moved to each instance: {}",
-          tableNameWithType,
-          SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, nextAssignment));
-
-      Set<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, nextAssignment);
-      try {
-        waitForExternalViewToConverge(tableNameWithType, bestEfforts, segmentsToMove);
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while waiting for ExternalView to converge for table: {}, aborting the rebalance",
-            tableNameWithType, e);
-        return new RebalanceResult(RebalanceResult.Status.FAILED,
-            "Caught exception while waiting for ExternalView to converge: " + e, instancePartitionsMap,
-            targetAssignment);
-      }
-
-      // Reuse current IdealState to update the IdealState in cluster
       ZNRecord idealStateRecord = currentIdealState.getRecord();
       idealStateRecord.setMapFields(nextAssignment);
       currentIdealState.setNumPartitions(nextAssignment.size());
@@ -379,7 +383,7 @@ public class TableRebalancer {
         return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while updating IdealState: " + e,
             instancePartitionsMap, targetAssignment);
       }
-    }
+    } while (true);
   }
 
   private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap(TableConfig tableConfig,
@@ -514,7 +518,7 @@ public class TableRebalancer {
         tier.getName(), storage.getServerTag());
   }
 
-  private void waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts,
+  private int waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts,
       Set<String> segmentsToMonitor)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_STABILIZATION_MAX_WAIT_MS;
@@ -532,7 +536,7 @@ public class TableRebalancer {
         if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
             idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)) {
           LOGGER.info("ExternalView converged for table: {}", tableNameWithType);
-          return;
+          return idealState.getRecord().getVersion();
         }
       }
 
@@ -542,7 +546,7 @@ public class TableRebalancer {
     if (bestEfforts) {
       LOGGER.warn("ExternalView has not converged within: {}ms for table: {}, continuing the rebalance (best-efforts)",
           EXTERNAL_VIEW_STABILIZATION_MAX_WAIT_MS, tableNameWithType);
-      return;
+      return idealState.getRecord().getVersion();
     } else {
       throw new TimeoutException("Timeout while waiting for ExternalView to converge");
     }
