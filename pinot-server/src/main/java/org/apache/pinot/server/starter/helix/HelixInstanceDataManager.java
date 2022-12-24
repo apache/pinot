@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -38,6 +39,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -64,8 +66,11 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -174,9 +179,45 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", realtimeTableName);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", realtimeTableName);
+    SegmentZKMetadata zkMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, realtimeTableName, segmentName);
+    Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s", segmentName,
+        realtimeTableName);
+    setDefaultTimeValueIfInvalid(tableConfig, schema, zkMetadata);
     _tableDataManagerMap.computeIfAbsent(realtimeTableName, k -> createTableDataManager(k, tableConfig))
-        .addSegment(segmentName, tableConfig, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema));
+        .addSegment(segmentName, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema), zkMetadata);
     LOGGER.info("Added segment: {} to table: {}", segmentName, realtimeTableName);
+  }
+
+  /**
+   * Sets the default time value in the schema as the segment creation time if it is invalid. Time column is used to
+   * manage the segments, so its values have to be within the valid range.
+   */
+  @VisibleForTesting
+  static void setDefaultTimeValueIfInvalid(TableConfig tableConfig, Schema schema, SegmentZKMetadata zkMetadata) {
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    if (StringUtils.isEmpty(timeColumnName)) {
+      return;
+    }
+    DateTimeFieldSpec timeColumnSpec = schema.getSpecForTimeColumn(timeColumnName);
+    Preconditions.checkState(timeColumnSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName,
+        schema.getSchemaName());
+    String defaultTimeString = timeColumnSpec.getDefaultNullValueString();
+    DateTimeFormatSpec dateTimeFormatSpec = timeColumnSpec.getFormatSpec();
+    try {
+      long defaultTimeMs = dateTimeFormatSpec.fromFormatToMillis(defaultTimeString);
+      if (TimeUtils.timeValueInValidRange(defaultTimeMs)) {
+        return;
+      }
+    } catch (Exception e) {
+      // Ignore
+    }
+    String creationTimeString = dateTimeFormatSpec.fromMillisToFormat(zkMetadata.getCreationTime());
+    Object creationTime = timeColumnSpec.getDataType().convert(creationTimeString);
+    timeColumnSpec.setDefaultNullValue(creationTime);
+    LOGGER.info(
+        "Default time: {} does not comply with format: {}, using creation time: {} as the default time for table: {}",
+        defaultTimeString, timeColumnSpec.getFormat(), creationTime, tableConfig.getTableName());
   }
 
   private TableDataManager createTableDataManager(String tableNameWithType, TableConfig tableConfig) {
@@ -428,6 +469,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
     Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s", segmentName,
         tableNameWithType);
+    if (schema != null) {
+      setDefaultTimeValueIfInvalid(tableConfig, schema, zkMetadata);
+    }
 
     // This method might modify the file on disk. Use segment lock to prevent race condition
     Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);

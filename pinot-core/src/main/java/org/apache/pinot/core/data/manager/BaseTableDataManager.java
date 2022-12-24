@@ -223,7 +223,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void addSegment(String segmentName, TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig)
+  public void addSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata)
       throws Exception {
     throw new UnsupportedOperationException();
   }
