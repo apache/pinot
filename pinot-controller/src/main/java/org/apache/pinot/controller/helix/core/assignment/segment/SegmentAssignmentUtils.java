@@ -272,6 +272,7 @@ public class SegmentAssignmentUtils {
     return instanceStateMap;
   }
 
+
   /**
    * Returns a map from instance name to number of segments to be moved to it.
    */
@@ -290,6 +291,21 @@ public class SegmentAssignmentUtils {
       }
     }
     return numSegmentsToBeMovedPerInstance;
+  }
+
+  public static Set<String> getSegmentsToMove(Map<String, Map<String, String>> oldAssignment,
+      Map<String, Map<String, String>> newAssignment) {
+    Set<String> result = new HashSet<>();
+    for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Set<String> newInstancesAssigned = entry.getValue().keySet();
+      Set<String> oldInstancesAssigned = oldAssignment.get(segmentName).keySet();
+      if (!newInstancesAssigned.containsAll(oldInstancesAssigned) || !oldInstancesAssigned.containsAll(
+          newInstancesAssigned)) {
+        result.add(segmentName);
+      }
+    }
+    return result;
   }
 
   /**

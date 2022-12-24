@@ -194,7 +194,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // ExternalView should match the new segment assignment
     assertTrue(TableRebalancer.isExternalViewConverged(OFFLINE_TABLE_NAME,
         _helixResourceManager.getTableExternalView(OFFLINE_TABLE_NAME).getRecord().getMapFields(), newSegmentAssignment,
-        false));
+        false, null));
 
     // Update the table config to use replica-group based assignment
     InstanceTagPoolConfig tagPoolConfig =
@@ -250,7 +250,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // ExternalView should match the segment assignment
     assertTrue(TableRebalancer.isExternalViewConverged(OFFLINE_TABLE_NAME,
         _helixResourceManager.getTableExternalView(OFFLINE_TABLE_NAME).getRecord().getMapFields(), newSegmentAssignment,
-        false));
+        false, null));
 
     // Update the table config to use non-replica-group based assignment
     tableConfig.setInstanceAssignmentConfigMap(null);
