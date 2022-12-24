@@ -46,7 +46,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class ProtoBufConfluentSchemaTest {
+public class ProtobufConfluentSchemaTest {
   public static final String TOPIC_PROTO = "test_topic_proto";
   SchemaRegistryStarter.KafkaSchemaRegistryInstance _schemaRegistry;
   private Producer<byte[], Message> _protoProducer;
@@ -94,8 +94,8 @@ public class ProtoBufConfluentSchemaTest {
     ConsumerRecords<byte[], byte[]> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(1000));
     Iterator<ConsumerRecord<byte[], byte[]>> iter = consumerRecords.iterator();
 
-    KafkaConfluentSchemaRegistryProtoBufMessageDecoder decoder =
-        new KafkaConfluentSchemaRegistryProtoBufMessageDecoder();
+    KafkaConfluentSchemaRegistryProtobufMessageDecoder decoder =
+        new KafkaConfluentSchemaRegistryProtobufMessageDecoder();
     Map<String, String> decoderProps = new HashMap<>();
     decoderProps.put("schema.registry.rest.url", _schemaRegistry.getUrl());
     decoder.init(decoderProps, null, TOPIC_PROTO);

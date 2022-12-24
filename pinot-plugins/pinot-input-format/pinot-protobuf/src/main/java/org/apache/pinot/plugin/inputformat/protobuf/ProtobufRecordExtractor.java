@@ -38,7 +38,7 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 /**
  * Extractor for ProtoBuf records
  */
-public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
+public class ProtobufRecordExtractor extends BaseRecordExtractor<Message> {
 
   private Set<String> _fields;
   private boolean _extractAll = false;
@@ -60,7 +60,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
       for (Descriptors.FieldDescriptor fieldDescriptor : descriptor.getFields()) {
         Object fieldValue = from.getField(fieldDescriptor);
         if (fieldValue != null) {
-          fieldValue = convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor));
+          fieldValue = convert(new ProtobufFieldInfo(fieldValue, fieldDescriptor));
         }
         to.putValue(fieldDescriptor.getName(), fieldValue);
       }
@@ -69,7 +69,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
         Descriptors.FieldDescriptor fieldDescriptor = descriptor.findFieldByName(fieldName);
         Object fieldValue = fieldDescriptor != null ? from.getField(fieldDescriptor) : null;
         if (fieldValue != null) {
-          fieldValue = convert(new ProtoBufFieldInfo(fieldValue, descriptor.findFieldByName(fieldName)));
+          fieldValue = convert(new ProtobufFieldInfo(fieldValue, descriptor.findFieldByName(fieldName)));
         }
         to.putValue(fieldName, fieldValue);
       }
@@ -82,7 +82,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    */
   @Override
   protected boolean isRecord(Object value) {
-    return ((ProtoBufFieldInfo) value).getFieldValue() instanceof Message;
+    return ((ProtobufFieldInfo) value).getFieldValue() instanceof Message;
   }
 
   /**
@@ -90,8 +90,8 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    */
   @Override
   protected boolean isMultiValue(Object value) {
-    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
-    return protoBufFieldInfo.getFieldValue() instanceof Collection && !protoBufFieldInfo.getFieldDescriptor()
+    ProtobufFieldInfo protobufFieldInfo = (ProtobufFieldInfo) value;
+    return protobufFieldInfo.getFieldValue() instanceof Collection && !protobufFieldInfo.getFieldDescriptor()
         .isMapField();
   }
 
@@ -100,8 +100,8 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    */
   @Override
   protected boolean isMap(Object value) {
-    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
-    return protoBufFieldInfo.getFieldValue() instanceof Collection && protoBufFieldInfo.getFieldDescriptor()
+    ProtobufFieldInfo protobufFieldInfo = (ProtobufFieldInfo) value;
+    return protobufFieldInfo.getFieldValue() instanceof Collection && protobufFieldInfo.getFieldDescriptor()
         .isMapField();
   }
 
@@ -114,14 +114,14 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   @Override
   @Nullable
   protected Object convertMap(Object value) {
-    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
-    Collection<Message> messages = (Collection<Message>) protoBufFieldInfo.getFieldValue();
+    ProtobufFieldInfo protobufFieldInfo = (ProtobufFieldInfo) value;
+    Collection<Message> messages = (Collection<Message>) protobufFieldInfo.getFieldValue();
     if (messages.isEmpty()) {
       return null;
     }
 
     List<Descriptors.FieldDescriptor> fieldDescriptors =
-        protoBufFieldInfo.getFieldDescriptor().getMessageType().getFields();
+        protobufFieldInfo.getFieldDescriptor().getMessageType().getFields();
     Descriptors.FieldDescriptor keyFieldDescriptor = fieldDescriptors.get(0);
     Descriptors.FieldDescriptor valueFieldDescriptor = fieldDescriptors.get(1);
     Map<Object, Object> convertedMap = new HashMap<>();
@@ -131,12 +131,12 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
       if (fieldKey != null) {
         Object convertedFieldValue = null;
         if (fieldValue != null) {
-          convertedFieldValue = convert(new ProtoBufFieldInfo(fieldValue, valueFieldDescriptor));
+          convertedFieldValue = convert(new ProtobufFieldInfo(fieldValue, valueFieldDescriptor));
         }
 
         if (convertedFieldValue != null) {
           convertedMap
-              .put(convertSingleValue(new ProtoBufFieldInfo(fieldKey, keyFieldDescriptor)), convertedFieldValue);
+              .put(convertSingleValue(new ProtobufFieldInfo(fieldKey, keyFieldDescriptor)), convertedFieldValue);
         }
       }
     }
@@ -152,8 +152,8 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   @Override
   @Nullable
   protected Object convertMultiValue(Object value) {
-    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
-    Collection<Object> fieldValues = (Collection<Object>) protoBufFieldInfo.getFieldValue();
+    ProtobufFieldInfo protobufFieldInfo = (ProtobufFieldInfo) value;
+    Collection<Object> fieldValues = (Collection<Object>) protobufFieldInfo.getFieldValue();
 
     if (fieldValues.isEmpty()) {
       return null;
@@ -165,7 +165,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     for (Object fieldValue : fieldValues) {
       Object convertedValue = null;
       if (fieldValue != null) {
-        convertedValue = convert(new ProtoBufFieldInfo(fieldValue, protoBufFieldInfo.getFieldDescriptor()));
+        convertedValue = convert(new ProtobufFieldInfo(fieldValue, protobufFieldInfo.getFieldDescriptor()));
       }
       if (convertedValue != null) {
         array[index++] = convertedValue;
@@ -186,7 +186,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    */
   @Override
   protected Object convertSingleValue(Object value) {
-    Object fieldValue = ((ProtoBufFieldInfo) value).getFieldValue();
+    Object fieldValue = ((ProtobufFieldInfo) value).getFieldValue();
 
     if (fieldValue instanceof ByteString) {
       return ((ByteString) fieldValue).toByteArray();
@@ -205,7 +205,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   @Override
   @Nullable
   protected Object convertRecord(Object value) {
-    ProtoBufFieldInfo record = (ProtoBufFieldInfo) value;
+    ProtobufFieldInfo record = (ProtobufFieldInfo) value;
     Map<Descriptors.FieldDescriptor, Object> fields = ((Message) record.getFieldValue()).getAllFields();
     if (fields.isEmpty()) {
       return null;
@@ -216,7 +216,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
       Descriptors.FieldDescriptor fieldDescriptor = entry.getKey();
       Object fieldValue = entry.getValue();
       if (fieldValue != null) {
-        fieldValue = convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor));
+        fieldValue = convert(new ProtobufFieldInfo(fieldValue, fieldDescriptor));
       }
       convertedMap.put(fieldDescriptor.getName(), fieldValue);
     }

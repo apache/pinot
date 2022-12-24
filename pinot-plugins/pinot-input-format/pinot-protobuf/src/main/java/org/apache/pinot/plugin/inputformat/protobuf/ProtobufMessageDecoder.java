@@ -18,17 +18,13 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
-import com.github.os72.protobuf.dynamic.DynamicSchema;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Message;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.slf4j.Logger;
@@ -36,45 +32,29 @@ import org.slf4j.LoggerFactory;
 
 
 //TODO: Add support for Schema Registry
-public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufMessageDecoder.class);
+public class ProtobufMessageDecoder implements StreamMessageDecoder<byte[]> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ProtobufMessageDecoder.class);
 
   public static final String DESCRIPTOR_FILE_PATH = "descriptorFile";
   public static final String PROTO_CLASS_NAME = "protoClassName";
 
-  private ProtoBufRecordExtractor _recordExtractor;
+  private ProtobufRecordExtractor _recordExtractor;
   private String _protoClassName;
   private Message.Builder _builder;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
-    Preconditions.checkState(props.containsKey(DESCRIPTOR_FILE_PATH),
-        "Protocol Buffer schema descriptor file must be provided");
+    Preconditions.checkState(props.containsKey(PROTO_CLASS_NAME),
+        "Protocol Buffer schema class name must be provided");
 
     _protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
-    InputStream descriptorFileInputStream = ProtoBufUtils.getDescriptorFileInputStream(
-        props.get(DESCRIPTOR_FILE_PATH));
-    Descriptors.Descriptor descriptor = buildProtoBufDescriptor(descriptorFileInputStream);
-    _recordExtractor = new ProtoBufRecordExtractor();
+    Descriptors.Descriptor descriptor = ProtobufUtils.buildDescriptor(_protoClassName,
+            props.get(DESCRIPTOR_FILE_PATH));
+    _recordExtractor = new ProtobufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
     DynamicMessage dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
     _builder = dynamicMessage.newBuilderForType();
-  }
-
-  private Descriptors.Descriptor buildProtoBufDescriptor(InputStream fin)
-      throws IOException {
-    try {
-      DynamicSchema dynamicSchema = DynamicSchema.parseFrom(fin);
-
-      if (!StringUtils.isEmpty(_protoClassName)) {
-        return dynamicSchema.getMessageDescriptor(_protoClassName);
-      } else {
-        return dynamicSchema.getMessageDescriptor(dynamicSchema.getMessageTypes().toArray(new String[]{})[0]);
-      }
-    } catch (Descriptors.DescriptorValidationException e) {
-      throw new IOException("Descriptor file validation failed", e);
-    }
   }
 
   @Override

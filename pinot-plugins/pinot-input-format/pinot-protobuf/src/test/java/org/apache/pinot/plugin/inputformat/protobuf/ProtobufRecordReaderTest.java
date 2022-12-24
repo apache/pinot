@@ -38,7 +38,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
+public class ProtobufRecordReaderTest extends AbstractRecordReaderTest {
   private final static Random RANDOM = new Random(System.currentTimeMillis());
   private static final String PROTO_DATA = "_test_sample_proto_data.data";
   private static final String DESCRIPTOR_FILE = "sample.desc";
@@ -124,7 +124,7 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
   @Override
   protected RecordReader createRecordReader(File file)
       throws Exception {
-    RecordReader recordReader = new ProtoBufRecordReader();
+    RecordReader recordReader = new ProtobufRecordReader();
     Set<String> sourceFields = getSourceFields(getPinotSchema());
     recordReader.init(file.getAbsoluteFile(), sourceFields, getProtoRecordReaderConfig());
     return recordReader;
@@ -159,9 +159,9 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
     return new File(_tempDir, PROTO_DATA);
   }
 
-  private ProtoBufRecordReaderConfig getProtoRecordReaderConfig()
+  private ProtobufRecordReaderConfig getProtoRecordReaderConfig()
       throws URISyntaxException {
-    ProtoBufRecordReaderConfig config = new ProtoBufRecordReaderConfig();
+    ProtobufRecordReaderConfig config = new ProtobufRecordReaderConfig();
     URL descriptorFile = getClass().getClassLoader().getResource(DESCRIPTOR_FILE);
     config.setDescriptorFile(descriptorFile.toURI());
     return config;

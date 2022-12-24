@@ -37,9 +37,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Tests for the {@link ProtoBufRecordExtractor}
+ * Tests for the {@link ProtobufRecordExtractor}
  */
-public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
+public class ProtobufRecordExtractorTest extends AbstractRecordExtractorTest {
 
   private final File _dataFile = new File(_tempDir, "test_complex_proto.data");
 
@@ -78,7 +78,7 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
-    ProtoBufRecordReader protoBufRecordReader = new ProtoBufRecordReader();
+    ProtobufRecordReader protoBufRecordReader = new ProtobufRecordReader();
     protoBufRecordReader.init(_dataFile, fieldsToRead, getProtoRecordReaderConfig());
     return protoBufRecordReader;
   }
@@ -121,8 +121,8 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     }
   }
 
-  private ComplexTypes.TestMessage.NestedMessage createNestedMessage(Map<String, Object> nestedMessageFields) {
-    ComplexTypes.TestMessage.NestedMessage.Builder nestedMessage = ComplexTypes.TestMessage.NestedMessage.newBuilder();
+  private ComplexTypes.NestedMessage createNestedMessage(Map<String, Object> nestedMessageFields) {
+    ComplexTypes.NestedMessage.Builder nestedMessage = ComplexTypes.NestedMessage.newBuilder();
     return nestedMessage.setNestedIntField((Integer) nestedMessageFields.get(NESTED_INT_FIELD))
         .setNestedStringField((String) nestedMessageFields.get(NESTED_STRING_FIELD)).build();
   }
@@ -178,9 +178,9 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     return nestedMap;
   }
 
-  private ProtoBufRecordReaderConfig getProtoRecordReaderConfig()
+  private ProtobufRecordReaderConfig getProtoRecordReaderConfig()
       throws IOException {
-    ProtoBufRecordReaderConfig config = new ProtoBufRecordReaderConfig();
+    ProtobufRecordReaderConfig config = new ProtobufRecordReaderConfig();
     URI descriptorFile;
     try {
       descriptorFile = getClass().getClassLoader().getResource(DESCRIPTOR_FILE).toURI();

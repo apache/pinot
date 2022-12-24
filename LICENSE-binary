@@ -541,7 +541,7 @@ com.google.api:gax:1.58.2
 com.google.auth:google-auth-library-credentials:0.21.1
 com.google.auth:google-auth-library-oauth2-http:0.21.1
 com.google.protobuf:protobuf-java-util:3.13.0
-com.google.protobuf:protobuf-java:3.19.2
+com.google.protobuf:protobuf-java:3.21.7
 com.google.protobuf:protobuf-lite:3.0.1
 com.jcabi:jcabi-aspects:0.22
 com.jcabi:jcabi-log:0.17.1
