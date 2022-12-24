@@ -71,14 +71,20 @@ public class ConsumptionDelayTrackerTest {
     // Test constructor with timer arguments
     consumptionDelayTracker =
         new ConsumptionDelayTracker(serverMetrics, "dummyTable_RT",
-            realtimeTableDataManager, TIMER_THREAD_TICK_INTERVAL_MS);
+            realtimeTableDataManager, TIMER_THREAD_TICK_INTERVAL_MS, "", true, true);
     Assert.assertEquals(consumptionDelayTracker.getMaxConsumptionDelay(), 0);
+    // Test we can start a different tracker with different name
+    ConsumptionDelayTracker prefixedConsumptionDelayTracker =
+        new ConsumptionDelayTracker(serverMetrics, "dummyTable_RT",
+            realtimeTableDataManager, TIMER_THREAD_TICK_INTERVAL_MS, "dummyPrefix", true, true);
+    Assert.assertEquals(prefixedConsumptionDelayTracker.getMaxConsumptionDelay(), 0);
+    prefixedConsumptionDelayTracker.shutdown();
     consumptionDelayTracker.shutdown();
     // Test bad timer args to the constructor
     try {
       consumptionDelayTracker =
           new ConsumptionDelayTracker(serverMetrics, "dummyTable_RT",
-              realtimeTableDataManager, 0);
+              realtimeTableDataManager, 0, "", true, true);
       Assert.assertTrue(false); // Constructor must assert
     } catch (Exception e) {
       Assert.assertTrue(e instanceof RuntimeException);

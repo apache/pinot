@@ -128,6 +128,8 @@ public class ConsumptionDelayTracker {
   final private String _tableNameWithType;
 
   private boolean _enableAging;
+  private boolean _enablePerPartitionMetric = true;
+  private boolean _enableAggregateMetric = true;
   final private Logger _logger;
 
   final private RealtimeTableDataManager _realTimeTableDataManager;
@@ -177,48 +179,65 @@ public class ConsumptionDelayTracker {
     _partitionToDelaySampleMap.remove(partitionGroupId);
     // If we are removing a partition we should stop reading its ideal state.
     _partitionsMarkedForVerification.remove(partitionGroupId);
-    _serverMetrics.removeTableGauge(getPerPartitionMetricName(partitionGroupId),
-        ServerGauge.PER_PARTITION_CONSUMPTION_DELAY_MS);
+    if (_enablePerPartitionMetric) {
+      _serverMetrics.removeTableGauge(getPerPartitionMetricName(partitionGroupId),
+          ServerGauge.PER_PARTITION_CONSUMPTION_DELAY_MS);
+    }
   }
 
-  /* Helper function to generate a per partition metric name */
-  private String getPerPartitionMetricName(int partionGroupId) {
-    return _tableNameWithType + partionGroupId;
+  /*
+   * Helper function to generate a per partition metric name.
+   *
+   * @param partitionGroupId the partition group id to be appended to the table name so we
+   *        can differentiate between metrics for various partitions.
+   *
+   * @return a metric name with the following structure: tableNameWithType + partitionGroupId
+   */
+  private String getPerPartitionMetricName(int partitionGroupId) {
+    return _tableNameWithType + partitionGroupId;
   }
 
   // Custom Constructor
   public ConsumptionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-      RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs)
+      RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, String metricNamePrefix,
+      boolean enableAggregateMetric, boolean enablePerPartitionMetric)
       throws RuntimeException {
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + getClass().getSimpleName());
     _serverMetrics = serverMetrics;
-    _tableNameWithType = tableNameWithType;
+    _tableNameWithType = metricNamePrefix + tableNameWithType;
     _realTimeTableDataManager = realtimeTableDataManager;
     // Handle negative timer values
     if (timerThreadTickIntervalMs <= 0) {
       throw new RuntimeException("Illegal timer timeout argument, expected > 0, got=" + timerThreadTickIntervalMs);
     }
     _enableAging = true;
+    _enablePerPartitionMetric = enablePerPartitionMetric;
+    _enableAggregateMetric = enableAggregateMetric;
     _timerThreadTickIntervalMs = timerThreadTickIntervalMs;
     _timer = new Timer("ConsumptionDelayTimerThread" + tableNameWithType);
     _timer.schedule(new TrackingTimerTask(this), INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
     // Install callback metric
-    _serverMetrics.addCallbackTableGaugeIfNeeded(_tableNameWithType, ServerGauge.MAX_CONSUMPTION_DELAY_MS,
-        () -> (long) getMaxConsumptionDelay());
+    if (_enableAggregateMetric) {
+      _serverMetrics.addCallbackTableGaugeIfNeeded(_tableNameWithType, ServerGauge.MAX_CONSUMPTION_DELAY_MS,
+          () -> (long) getMaxConsumptionDelay());
+    }
   }
 
-  // Constructor that uses default timeout
+  // Constructor that uses defaults
   public ConsumptionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager tableDataManager) {
-    this(serverMetrics, tableNameWithType, tableDataManager, TIMER_THREAD_TICK_INTERVAL_MS);
+    this(serverMetrics, tableNameWithType, tableDataManager, TIMER_THREAD_TICK_INTERVAL_MS,
+        "", true, true);
   }
 
-  // Constructor that takes a prefix to name the metric so we can keep multiple trackers for the same table
+  // Constructor that takes a prefix to name the metric, so we can keep multiple trackers for the same table
   public ConsumptionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType, String metricNamePrefix,
       RealtimeTableDataManager tableDataManager) {
     this(serverMetrics, metricNamePrefix + tableNameWithType, tableDataManager,
-        TIMER_THREAD_TICK_INTERVAL_MS);
+        TIMER_THREAD_TICK_INTERVAL_MS, metricNamePrefix, true, true);
   }
+
+
   /**
    * Use to set or rest the aging of reported values.
    * @param enableAging true if we want maximum to be aged as per sample time or false if we do not want to age
@@ -243,7 +262,7 @@ public class ConsumptionDelayTracker {
     // Store new measure and wipe old one for this partition
     DelayMeasure previousMeasure = _partitionToDelaySampleMap.put(partitionGroupId,
         new DelayMeasure(sampleTime, delayInMilliseconds));
-    if (previousMeasure == null) {
+    if ((previousMeasure == null) && _enablePerPartitionMetric) {
       // First time we start tracking a partition we should start tracking it via metric
       _serverMetrics.addCallbackTableGaugeIfNeeded(getPerPartitionMetricName(partitionGroupId),
           ServerGauge.PER_PARTITION_CONSUMPTION_DELAY_MS,
@@ -331,7 +350,9 @@ public class ConsumptionDelayTracker {
   public void shutdown() {
     // Now that segments can't report metric, destroy metric for this table
     _timer.cancel();
-    _serverMetrics.removeTableGauge(_tableNameWithType, ServerGauge.MAX_CONSUMPTION_DELAY_MS);
+    if (_enableAggregateMetric) {
+      _serverMetrics.removeTableGauge(_tableNameWithType, ServerGauge.MAX_CONSUMPTION_DELAY_MS);
+    }
     // Remove partitions so their related metrics get uninstalled.
     for (int partitionGroupId : _partitionToDelaySampleMap.keySet()) {
       removePartitionId(partitionGroupId);
