@@ -20,7 +20,9 @@ package org.apache.pinot.plugin.filesystem;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import java.util.Optional;
 import java.util.UUID;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -41,6 +43,8 @@ public class S3Config {
   public static final String SERVER_SIDE_ENCRYPTION_CONFIG_KEY = "serverSideEncryption";
   public static final String SSE_KMS_KEY_ID_CONFIG_KEY = "ssekmsKeyId";
   public static final String SSE_KMS_ENCRYPTION_CONTEXT_CONFIG_KEY = "ssekmsEncryptionContext";
+  public static final String SSE_CUSTOMER_ENCRYPTION_KEY_CONFIG_KEY = "sseCustomerKey";
+  public static final String SSE_CUSTOMER_ENCRYPTION_KEY_MD5_CONFIG_KEY = "sseCustomerKeyMD5";
 
   // IAM Role related configurations
   public static final String IAM_ROLE_BASED_ACCESS_ENABLED = "iamRoleBasedAccessEnabled";
@@ -62,6 +66,8 @@ public class S3Config {
   private final String _serverSideEncryption;
   private String _ssekmsKeyId;
   private String _ssekmsEncryptionContext;
+  private String _sseCustomerKey;
+  private String _sseCustomerKeyMD5;
 
   private boolean _iamRoleBasedAccess;
   private String _roleArn;
@@ -80,6 +86,9 @@ public class S3Config {
     _serverSideEncryption = pinotConfig.getProperty(SERVER_SIDE_ENCRYPTION_CONFIG_KEY);
     _ssekmsKeyId = pinotConfig.getProperty(SSE_KMS_KEY_ID_CONFIG_KEY);
     _ssekmsEncryptionContext = pinotConfig.getProperty(SSE_KMS_ENCRYPTION_CONTEXT_CONFIG_KEY);
+    _sseCustomerKey = pinotConfig.getProperty(SSE_CUSTOMER_ENCRYPTION_KEY_CONFIG_KEY);
+    _sseCustomerKeyMD5 = Optional.ofNullable(pinotConfig.getProperty(SSE_CUSTOMER_ENCRYPTION_KEY_MD5_CONFIG_KEY))
+        .orElseGet(() -> DigestUtils.md5Hex(_sseCustomerKey));
 
     _iamRoleBasedAccess = Boolean.parseBoolean(
         pinotConfig.getProperty(IAM_ROLE_BASED_ACCESS_ENABLED, DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED));
@@ -127,6 +136,14 @@ public class S3Config {
 
   public String getSsekmsEncryptionContext() {
     return _ssekmsEncryptionContext;
+  }
+
+  public String getSseCustomerKey() {
+    return _sseCustomerKey;
+  }
+
+  public String getSseCustomerKeyMD5() {
+    return _sseCustomerKeyMD5;
   }
 
   public boolean isIamRoleBasedAccess() {

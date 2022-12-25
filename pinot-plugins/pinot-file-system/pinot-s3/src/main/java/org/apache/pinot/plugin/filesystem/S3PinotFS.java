@@ -87,6 +87,9 @@ public class S3PinotFS extends BasePinotFS {
   private ServerSideEncryption _serverSideEncryption = null;
   private String _ssekmsKeyId;
   private String _ssekmsEncryptionContext;
+  private String _sseCustomerKey;
+  private String _sseCustomerKeyMD5;
+  private String _sseCustomerAlgorithm;
 
   @Override
   public void init(PinotConfiguration config) {
@@ -179,7 +182,10 @@ public class S3PinotFS extends BasePinotFS {
           _ssekmsEncryptionContext = s3Config.getSsekmsEncryptionContext();
           break;
         case AES256:
-          // Todo: Support AES256.
+          _sseCustomerAlgorithm = serverSideEncryption;
+          _sseCustomerKey = s3Config.getSseCustomerKey();
+          _sseCustomerKeyMD5 = s3Config.getSseCustomerKeyMD5();
+          break;
         default:
           throw new UnsupportedOperationException("Unsupported server side encryption: " + _serverSideEncryption);
       }
@@ -623,6 +629,12 @@ public class S3PinotFS extends BasePinotFS {
       if (_ssekmsEncryptionContext != null) {
         putReqBuilder.ssekmsEncryptionContext(_ssekmsEncryptionContext);
       }
+      if (_sseCustomerKey != null) {
+        putReqBuilder
+            .sseCustomerAlgorithm(_sseCustomerAlgorithm)
+            .sseCustomerKey(_sseCustomerKey)
+            .sseCustomerKeyMD5(_sseCustomerKeyMD5);
+      }
     }
     return putReqBuilder.build();
   }
@@ -641,6 +653,12 @@ public class S3PinotFS extends BasePinotFS {
       copyReqBuilder.serverSideEncryption(_serverSideEncryption).ssekmsKeyId(_ssekmsKeyId);
       if (_ssekmsEncryptionContext != null) {
         copyReqBuilder.ssekmsEncryptionContext(_ssekmsEncryptionContext);
+      }
+      if (_sseCustomerKey != null) {
+        copyReqBuilder
+            .sseCustomerAlgorithm(_sseCustomerAlgorithm)
+            .sseCustomerKey(_sseCustomerKey)
+            .sseCustomerKeyMD5(_sseCustomerKeyMD5);
       }
     }
     return copyReqBuilder.build();
