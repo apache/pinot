@@ -196,7 +196,7 @@ public class S3PinotFS extends BasePinotFS {
       throws IOException {
     URI base = getBase(uri);
     String path = sanitizePath(base.relativize(uri).getPath());
-    HeadObjectRequest headObjectRequest = HeadObjectRequest.builder().bucket(uri.getHost()).key(path).build();
+    HeadObjectRequest headObjectRequest = generateHeadObjectRequest(uri, path);
 
     return _s3Client.headObject(headObjectRequest);
   }
@@ -255,7 +255,7 @@ public class S3PinotFS extends BasePinotFS {
     try {
       URI base = getBase(uri);
       String path = sanitizePath(base.relativize(uri).getPath());
-      HeadObjectRequest headObjectRequest = HeadObjectRequest.builder().bucket(uri.getHost()).key(path).build();
+      HeadObjectRequest headObjectRequest = generateHeadObjectRequest(uri, path);
 
       _s3Client.headObject(headObjectRequest);
       return true;
@@ -615,6 +615,17 @@ public class S3PinotFS extends BasePinotFS {
     } catch (S3Exception e) {
       throw new IOException(e);
     }
+  }
+
+  private HeadObjectRequest generateHeadObjectRequest(URI uri, String path) {
+    HeadObjectRequest.Builder headReqBuilder = HeadObjectRequest.builder().bucket(uri.getHost()).key(path);
+
+    if (_serverSideEncryption != null && _sseCustomerKey != null) {
+      headReqBuilder.sseCustomerKey(_sseCustomerKey).sseCustomerKeyMD5(_sseCustomerKeyMD5)
+          .sseCustomerAlgorithm(_sseCustomerAlgorithm);
+    }
+
+    return headReqBuilder.build();
   }
 
   private GetObjectRequest generateGetObjectRequest(URI uri, String key) {
