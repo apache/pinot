@@ -244,6 +244,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     taskSpec.setInputFilePath(localInputDataFile.getAbsolutePath());
     taskSpec.setSequenceId(seqId);
     taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
+    taskSpec.setCreateMetadataTarGz(_spec.isCreateMetadataTarGz());
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
 
     // If there's already been a failure, log and skip this file. Do this check right before the
