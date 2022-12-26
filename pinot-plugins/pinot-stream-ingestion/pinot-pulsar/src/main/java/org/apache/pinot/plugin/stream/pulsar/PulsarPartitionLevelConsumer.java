@@ -35,6 +35,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.Reader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,11 +47,18 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConsumer.class);
   private final ExecutorService _executorService;
+  private final Reader _reader;
   private boolean _enableKeyValueStitch = false;
 
   public PulsarPartitionLevelConsumer(String clientId, StreamConfig streamConfig,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
-    super(clientId, streamConfig, partitionGroupConsumptionStatus.getPartitionGroupId());
+    super(clientId, streamConfig);
+    PulsarConfig config = new PulsarConfig(streamConfig, clientId);
+    _reader = createReaderForPartition(config.getPulsarTopicName(),
+        partitionGroupConsumptionStatus.getPartitionGroupId(),
+        config.getInitialMessageId());
+    LOGGER.info("Created pulsar reader with id {} for topic {} partition {}", _reader, _config.getPulsarTopicName(),
+        partitionGroupConsumptionStatus.getPartitionGroupId());
     _executorService = Executors.newSingleThreadExecutor();
     _enableKeyValueStitch = _config.getEnableKeyValueStitch();
   }
@@ -128,6 +136,7 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   @Override
   public void close()
       throws IOException {
+    _reader.close();
     super.close();
     shutdownAndAwaitTermination();
   }

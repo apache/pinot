@@ -63,6 +63,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final Pattern TABLE_NAME_REPLACE_PATTERN = Pattern.compile("\\{([\\w\\d]+)\\}");
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
   private static final Random RANDOM = new Random(42);
+  private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
 
   @BeforeClass
   public void setUp()
@@ -304,8 +305,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         testFilenames.add(resource);
       }
     }
+
+    // get filter if set
+    String property = System.getProperty(FILE_FILTER_PROPERTY);
+
     // Load each test file.
     for (String testCaseName : testFilenames) {
+      if (property != null && !testCaseName.toLowerCase().contains(property.toLowerCase())) {
+        continue;
+      }
+
       String testCaseFile = QUERY_TEST_RESOURCE_FOLDER + File.separator + testCaseName;
       URL testFileUrl = classLoader.getResource(testCaseFile);
       // This test only supports local resource loading (e.g. must be a file), not support JAR test loading.

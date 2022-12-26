@@ -273,7 +273,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    *   to start consuming or download the segment.
    */
   @Override
-  public void addSegment(String segmentName, TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig)
+  public void addSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata segmentZKMetadata)
       throws Exception {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
@@ -282,18 +282,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       return;
     }
 
-    SegmentZKMetadata segmentZKMetadata =
-        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
-    Preconditions.checkNotNull(segmentZKMetadata);
-    Schema schema = indexLoadingConfig.getSchema();
-    Preconditions.checkNotNull(schema);
-
     File segmentDir = new File(_indexDir, segmentName);
     // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
     // segment backup directory existed), need to first try to recover from reload failure before checking the existence
     // of the index directory and loading segment from it
     LoaderUtils.reloadFailureRecovery(segmentDir);
 
+    TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+    Schema schema = indexLoadingConfig.getSchema();
+    assert schema != null;
     boolean isHLCSegment = SegmentName.isHighLevelConsumerSegmentName(segmentName);
     if (segmentZKMetadata.getStatus().isCompleted()) {
       if (isHLCSegment && !segmentDir.exists()) {

@@ -63,6 +63,8 @@ public enum AggregationFunctionType {
   VARSAMP("varSamp"),
   STDDEVPOP("stdDevPop"),
   STDDEVSAMP("stdDevSamp"),
+  SKEWNESS("skewness"),
+  KURTOSIS("kurtosis"),
 
   // Geo aggregation functions
   STUNION("STUnion"),

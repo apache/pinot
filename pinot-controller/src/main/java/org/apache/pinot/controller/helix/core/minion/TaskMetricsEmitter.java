@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -65,6 +66,14 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
     if (!_leadControllerManager.isLeaderForTable(TASK_NAME)) {
       return;
     }
+
+    Map<String, Map<String, Long>> taskMetadataLastUpdateTime =
+        _helixTaskResourceManager.getTaskMetadataLastUpdateTimeMs();
+    taskMetadataLastUpdateTime.forEach((tableNameWithType, taskTypeLastUpdateTime) ->
+        taskTypeLastUpdateTime.forEach((taskType, lastUpdateTimeMs) ->
+            _controllerMetrics.addOrUpdateGauge(
+                ControllerGauge.TIME_MS_SINCE_LAST_MINION_TASK_METADATA_UPDATE.getGaugeName() + "."
+                    + tableNameWithType + "." + taskType, () -> System.currentTimeMillis() - lastUpdateTimeMs)));
 
     // The call to get task types can take time if there are a lot of tasks.
     // Potential optimization is to call it every (say) 30m if we detect a barrage of

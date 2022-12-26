@@ -101,6 +101,27 @@ rules:
   labels:
     taskType: "$1"
     status: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastMinionTaskMetadataUpdate.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_timeMsSinceLastMinionTaskMetadataUpdate_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    taskType: "$3"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastSuccessfulMinionTaskGeneration.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_timeMsSinceLastSuccessfulMinionTaskGeneration_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    taskType: "$3"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.lastMinionTaskGenerationEncountersError.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_lastMinionTaskGenerationEncountersError_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    taskType: "$3"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.pinotLeadControllerResourceEnabled\"><>(\\w+)"
   name: "pinot_controller_pinotLeadControllerResourceEnabled_$1"
   cache: true

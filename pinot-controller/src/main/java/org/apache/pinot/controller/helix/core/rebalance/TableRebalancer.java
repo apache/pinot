@@ -31,7 +31,6 @@ import java.util.TreeSet;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
-import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.tuple.Pair;
@@ -43,6 +42,7 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -306,9 +306,10 @@ public class TableRebalancer {
     int expectedVersion = currentIdealState.getRecord().getVersion();
     while (true) {
       // Wait for ExternalView to converge before updating the next IdealState
+      Set<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
       IdealState idealState;
       try {
-        idealState = waitForExternalViewToConverge(tableNameWithType, bestEfforts);
+        idealState = waitForExternalViewToConverge(tableNameWithType, bestEfforts, segmentsToMove);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while waiting for ExternalView to converge for table: {}, aborting the rebalance",
             tableNameWithType, e);
@@ -515,7 +516,8 @@ public class TableRebalancer {
         tier.getName(), storage.getServerTag());
   }
 
-  private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts)
+  private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts,
+      Set<String> segmentsToMonitor)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_STABILIZATION_MAX_WAIT_MS;
 
@@ -530,7 +532,7 @@ public class TableRebalancer {
       // ExternalView might be null when table is just created, skipping check for this iteration
       if (externalView != null) {
         if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
-            idealState.getRecord().getMapFields(), bestEfforts)) {
+            idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)) {
           LOGGER.info("ExternalView converged for table: {}", tableNameWithType);
           return idealState;
         }
@@ -557,9 +559,13 @@ public class TableRebalancer {
   @VisibleForTesting
   static boolean isExternalViewConverged(String tableNameWithType,
       Map<String, Map<String, String>> externalViewSegmentStates,
-      Map<String, Map<String, String>> idealStateSegmentStates, boolean bestEfforts) {
+      Map<String, Map<String, String>> idealStateSegmentStates, boolean bestEfforts,
+      @Nullable Set<String> segmentsToMonitor) {
     for (Map.Entry<String, Map<String, String>> entry : idealStateSegmentStates.entrySet()) {
       String segmentName = entry.getKey();
+      if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
+        continue;
+      }
       Map<String, String> externalViewInstanceStateMap = externalViewSegmentStates.get(segmentName);
       Map<String, String> idealStateInstanceStateMap = entry.getValue();
 

@@ -31,6 +31,7 @@ import org.apache.zookeeper.data.Stat;
 
 public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
   private Map<String, ZNRecord> _contents = new HashMap<>();
+  private Map<String, Stat> _statMap = new HashMap<>();
   private IZkDataListener _listener = null;
 
   public FakePropertyStore() {
@@ -40,6 +41,11 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
   @Override
   public ZNRecord get(String path, Stat stat, int options) {
     return _contents.get(path);
+  }
+
+  @Override
+  public Stat getStat(String path, int options) {
+    return _statMap.get(path);
   }
 
   @Override
@@ -62,9 +68,9 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
   }
 
   @Override
-  public boolean set(String path, ZNRecord stat, int expectedVersion, int options) {
+  public boolean set(String path, ZNRecord record, int expectedVersion, int options) {
     try {
-      setContents(path, stat);
+      setContentAndStat(path, record);
       return true;
     } catch (Exception e) {
       return false;
@@ -72,9 +78,9 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
   }
 
   @Override
-  public boolean set(String path, ZNRecord stat, int options) {
+  public boolean set(String path, ZNRecord record, int options) {
     try {
-      setContents(path, stat);
+      setContentAndStat(path, record);
       return true;
     } catch (Exception e) {
       return false;
@@ -88,11 +94,14 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
     return true;
   }
 
-  public void setContents(String path, ZNRecord contents)
+  public void setContentAndStat(String path, ZNRecord record)
       throws Exception {
-    _contents.put(path, contents);
+    _contents.put(path, record);
+    Stat stat = new Stat();
+    stat.setMtime(System.currentTimeMillis());
+    _statMap.put(path, stat);
     if (_listener != null) {
-      _listener.handleDataChange(path, contents);
+      _listener.handleDataChange(path, record);
     }
   }
 

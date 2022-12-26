@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.minion;
 
+import java.util.Map;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -74,6 +75,67 @@ public class MinionTaskMetadataUtilsTest {
     propertyStore.set(NEW_MINION_METADATA_PATH, NEW_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
     assertEquals(MinionTaskMetadataUtils.fetchTaskMetadata(propertyStore, TASK_TYPE, TABLE_NAME_WITH_TYPE),
         NEW_TASK_METADATA.toZNRecord());
+  }
+
+  @Test
+  public void testGetAllTaskMetadataLastUpdateTimeMs() {
+    // no task metadata exists
+    HelixPropertyStore<ZNRecord> propertyStore = new FakePropertyStore();
+    assertTrue(MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore).isEmpty());
+
+    // only the old metadata path exists
+    propertyStore = new FakePropertyStore();
+    long tsBeforeSet = System.currentTimeMillis();
+    propertyStore.set(OLD_MINION_METADATA_PATH, OLD_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
+    long tsAfterSet = System.currentTimeMillis();
+    Map<String, Map<String, Long>> allTaskMetadataLastUpdateTimeMs =
+        MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
+    assertEquals(allTaskMetadataLastUpdateTimeMs.size(), 1);
+    Map<String, Long> taskTypeLastUpdateMsMap = allTaskMetadataLastUpdateTimeMs.get(TABLE_NAME_WITH_TYPE);
+    assertEquals(taskTypeLastUpdateMsMap.size(), 1);
+    long lastUpdateTimeMs = taskTypeLastUpdateMsMap.get(TASK_TYPE);
+    assertTrue(lastUpdateTimeMs >= tsBeforeSet && lastUpdateTimeMs <= tsAfterSet);
+
+    // only the new metadata path exists
+    propertyStore = new FakePropertyStore();
+    tsBeforeSet = System.currentTimeMillis();
+    propertyStore.set(NEW_MINION_METADATA_PATH, NEW_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
+    tsAfterSet = System.currentTimeMillis();
+    allTaskMetadataLastUpdateTimeMs =
+        MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
+    assertEquals(allTaskMetadataLastUpdateTimeMs.size(), 1);
+    taskTypeLastUpdateMsMap = allTaskMetadataLastUpdateTimeMs.get(TABLE_NAME_WITH_TYPE);
+    assertEquals(taskTypeLastUpdateMsMap.size(), 1);
+    lastUpdateTimeMs = taskTypeLastUpdateMsMap.get(TASK_TYPE);
+    assertTrue(lastUpdateTimeMs >= tsBeforeSet && lastUpdateTimeMs <= tsAfterSet);
+
+    // if two metadata paths exist at the same time, the newly updated one will be used.
+    // the new metadata path is updated later
+    propertyStore = new FakePropertyStore();
+    propertyStore.set(OLD_MINION_METADATA_PATH, OLD_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
+    long tsAfterOldPathSet = System.currentTimeMillis();
+    propertyStore.set(NEW_MINION_METADATA_PATH, NEW_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
+    long tsAfterNewPathSet = System.currentTimeMillis();
+    allTaskMetadataLastUpdateTimeMs =
+        MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
+    assertEquals(allTaskMetadataLastUpdateTimeMs.size(), 1);
+    taskTypeLastUpdateMsMap = allTaskMetadataLastUpdateTimeMs.get(TABLE_NAME_WITH_TYPE);
+    assertEquals(taskTypeLastUpdateMsMap.size(), 1);
+    lastUpdateTimeMs = taskTypeLastUpdateMsMap.get(TASK_TYPE);
+    assertTrue(lastUpdateTimeMs >= tsAfterOldPathSet && lastUpdateTimeMs <= tsAfterNewPathSet);
+    // the old metadata path is updated later
+    propertyStore = new FakePropertyStore();
+    propertyStore.set(NEW_MINION_METADATA_PATH, NEW_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
+    tsAfterNewPathSet = System.currentTimeMillis();
+    propertyStore.set(OLD_MINION_METADATA_PATH, OLD_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
+    tsAfterOldPathSet = System.currentTimeMillis();
+    allTaskMetadataLastUpdateTimeMs =
+        MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
+    assertEquals(allTaskMetadataLastUpdateTimeMs.size(), 1);
+    taskTypeLastUpdateMsMap = allTaskMetadataLastUpdateTimeMs.get(TABLE_NAME_WITH_TYPE);
+    assertEquals(taskTypeLastUpdateMsMap.size(), 1);
+    lastUpdateTimeMs = taskTypeLastUpdateMsMap.get(TASK_TYPE);
+    assertTrue(lastUpdateTimeMs >= tsAfterNewPathSet && lastUpdateTimeMs <= tsAfterOldPathSet);
   }
 
   @Test
