@@ -223,8 +223,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           if (currentRecordLocation != null) {
             // Existing primary key
 
-            // Update the record location when the new comparison value is greater than or equal to the current value.
-            // Update the record location when there is a tie to keep the newer record.
+            // Mark doc as invalid when the new comparison value is greater than or equal to the current value.
+            // Ignore the delete request otherwise
             if (recordInfo.getComparisonValue().compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
               IndexSegment currentSegment = currentRecordLocation.getSegment();
               int currentDocId = currentRecordLocation.getDocId();
@@ -234,9 +234,14 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               return currentRecordLocation;
             }
           } else {
+            _logger.warn("Cannot find upsert metadata for primary key: {}", recordInfo.getPrimaryKey().toString());
             return null;
           }
         });
+
+    // Update metrics
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        _primaryKeyToRecordLocationMap.size());
   }
 
   @Override

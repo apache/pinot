@@ -307,22 +307,19 @@ public final class IngestionUtils {
    * 2. The ingestion config in the table config. The ingestion config (e.g. filter, complexType) can have fields which
    * are not in the schema.
    */
-  public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
-    Set<String> fieldsForRecordExtractor = new HashSet<>();
-    extractFieldsFromIngestionConfig(ingestionConfig, fieldsForRecordExtractor);
-    extractFieldsFromSchema(schema, fieldsForRecordExtractor);
-    fieldsForRecordExtractor = getFieldsToReadWithComplexType(fieldsForRecordExtractor, ingestionConfig);
-    return fieldsForRecordExtractor;
-  }
-
-  //TODO: Combine this method with the previous method
-  public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, @Nullable UpsertConfig upsertConfig, Schema schema) {
+  public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig,
+      @Nullable UpsertConfig upsertConfig, Schema schema) {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
     extractFieldsFromIngestionConfig(ingestionConfig, fieldsForRecordExtractor);
     extractFieldsFromSchema(schema, fieldsForRecordExtractor);
     extractFieldsFromUpsertConfig(upsertConfig, fieldsForRecordExtractor);
     fieldsForRecordExtractor = getFieldsToReadWithComplexType(fieldsForRecordExtractor, ingestionConfig);
     return fieldsForRecordExtractor;
+  }
+
+  //TODO: Remove this method
+  public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
+    return getFieldsForRecordExtractor(ingestionConfig, null, schema);
   }
 
   /**
@@ -363,8 +360,10 @@ public final class IngestionUtils {
   }
 
   private static void extractFieldsFromUpsertConfig(@Nullable UpsertConfig upsertConfig, Set<String> fields) {
-    if (upsertConfig == null) return;
-    if (upsertConfig.isEnableDeletes() && StringUtils.isNotEmpty(upsertConfig.getDeleteRecordKey())) {
+    if (upsertConfig == null) {
+      return;
+    }
+    if (StringUtils.isNotEmpty(upsertConfig.getDeleteRecordKey())) {
       fields.add(upsertConfig.getDeleteRecordKey());
     }
   }

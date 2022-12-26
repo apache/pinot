@@ -54,7 +54,6 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.jetbrains.annotations.Nullable;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 

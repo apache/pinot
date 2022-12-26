@@ -95,7 +95,6 @@ public class MutableSegmentImplTestUtils {
     when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
 
-    UpsertConfig.Mode upsertMode = upsertConfig == null ? UpsertConfig.Mode.NONE : upsertConfig.getMode();
     String comparisonColumn = upsertConfig == null ? null : upsertConfig.getComparisonColumn();
     RealtimeSegmentConfig realtimeSegmentConfig =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(TABLE_NAME_WITH_TYPE).setSegmentName(SEGMENT_NAME)
@@ -104,8 +103,8 @@ public class MutableSegmentImplTestUtils {
             .setVarLengthDictionaryColumns(varLengthDictionaryColumns).setInvertedIndexColumns(invertedIndexColumns)
             .setSegmentZKMetadata(new SegmentZKMetadata(SEGMENT_NAME))
             .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
-            .setAggregateMetrics(aggregateMetrics).setNullHandlingEnabled(nullHandlingEnabled).setUpsertConfig(upsertConfig)
-            .setUpsertComparisonColumn(comparisonColumn)
+            .setAggregateMetrics(aggregateMetrics).setNullHandlingEnabled(nullHandlingEnabled)
+            .setUpsertConfig(upsertConfig).setUpsertComparisonColumn(comparisonColumn)
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setIngestionAggregationConfigs(aggregationConfigs).build();

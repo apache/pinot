@@ -163,7 +163,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
 
   private final UpsertConfig.Mode _upsertMode;
-  private final boolean _enableDeleteInUpsert;
   private final String _upsertDeleteKey;
   private final String _upsertComparisonColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
@@ -402,8 +401,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     // init upsert-related data structure
-    _upsertMode = config.getUpsertConfig().getMode() ==  null ? UpsertConfig.Mode.NONE : config.getUpsertConfig().getMode();
-    _enableDeleteInUpsert = config.getUpsertConfig().isEnableDeletes();
+    _upsertMode = config.getUpsertConfig().getMode() == null
+        ? UpsertConfig.Mode.NONE : config.getUpsertConfig().getMode();
     _upsertDeleteKey = config.getUpsertConfig().getDeleteRecordKey();
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
 
@@ -514,12 +513,11 @@ public class MutableSegmentImpl implements MutableSegment {
 
     if (isUpsertEnabled()) {
 
-      if (_enableDeleteInUpsert) {
-        if (StringUtils.isNotEmpty(_upsertDeleteKey) && row.getValue(_upsertDeleteKey) != null) {
-          _partitionUpsertMetadataManager.removeRecord(recordInfo);
-          return true;
-        }
+      if (StringUtils.isNotEmpty(_upsertDeleteKey) && row.getValue(_upsertDeleteKey) != null) {
+        _partitionUpsertMetadataManager.removeRecord(recordInfo);
+        return true;
       }
+
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
       updateDictionary(updatedRow);
       addNewRow(numDocsIndexed, updatedRow);
