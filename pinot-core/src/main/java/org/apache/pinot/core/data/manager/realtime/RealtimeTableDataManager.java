@@ -254,7 +254,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param currentTimeMillis Timestamp of the measure being provided, i.e. when this delay was computed.
    * @param partitionGroupId Partition ID for which delay is being updated.
    */
-  public void updatePinotIngestionDelay(long ingestionDelayMillis, long currenTimeMillis, int partitionGroupId) {
+  public void updateIngestionDelay(long ingestionDelayMillis, long currenTimeMillis, int partitionGroupId) {
     if (_consumptionDelayTracker != null) {
       _consumptionDelayTracker.storeConsumptionDelay(ingestionDelayMillis, currenTimeMillis, partitionGroupId);
     }
