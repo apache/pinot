@@ -26,6 +26,11 @@ public class QueryConfig {
    * Configuration for mailbox data block size
    */
   public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
+
+  public static final String ENABLE_GRPC_FLOW_CONTROL = "pinot.query.runner.flowcontrol";
+
+  public static final boolean DEFAULT_GRPC_FLOW_CONTROL = true;
+
   public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
 
   public static final String KEY_OF_MAILBOX_TIMEOUT_MS = "pinot.query.runner.mailbox.timeout.ms";

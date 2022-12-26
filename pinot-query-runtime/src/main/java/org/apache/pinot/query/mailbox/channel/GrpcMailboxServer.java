@@ -20,6 +20,7 @@ package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -45,14 +46,16 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final GrpcMailboxService _mailboxService;
   private final Server _server;
 
+  private final boolean _enableFlowControl;
+
   public GrpcMailboxServer(GrpcMailboxService mailboxService, int port, PinotConfiguration extraConfig) {
     _mailboxService = mailboxService;
-    _server = ServerBuilder.forPort(port)
-        .addService(this)
-        .maxInboundMessageSize(extraConfig.getProperty(QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-            QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES))
-        .build();
+    _server = ServerBuilder.forPort(port).addService(this).maxInboundMessageSize(
+        extraConfig.getProperty(QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+            QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
     LOGGER.info("Initialized GrpcMailboxServer on port: {}", port);
+    _enableFlowControl =
+        extraConfig.getProperty(QueryConfig.ENABLE_GRPC_FLOW_CONTROL, QueryConfig.DEFAULT_GRPC_FLOW_CONTROL);
   }
 
   public void start() {
@@ -73,6 +76,15 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
 
   @Override
   public StreamObserver<Mailbox.MailboxContent> open(StreamObserver<Mailbox.MailboxStatus> responseObserver) {
-    return new MailboxContentStreamObserver(_mailboxService, responseObserver);
+    if (_enableFlowControl) {
+      final ServerCallStreamObserver<Mailbox.MailboxStatus> serverCallStreamObserver =
+          (ServerCallStreamObserver<Mailbox.MailboxStatus>) responseObserver;
+      serverCallStreamObserver.disableAutoRequest();
+      final OnReadyHandler onReadyHandler = new OnReadyHandler(serverCallStreamObserver);
+      serverCallStreamObserver.setOnReadyHandler(onReadyHandler);
+      return new MailboxContentStreamObserver(_mailboxService, responseObserver, serverCallStreamObserver,
+          onReadyHandler);
+    }
+    return new MailboxContentStreamObserver(_mailboxService, responseObserver, null, null);
   }
 }

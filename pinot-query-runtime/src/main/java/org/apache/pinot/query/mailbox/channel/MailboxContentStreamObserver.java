@@ -19,9 +19,12 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import com.google.protobuf.ByteString;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -53,13 +56,15 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
         .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build();
   }
 
-  private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
+  private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 1;
   private final GrpcMailboxService _mailboxService;
   private final StreamObserver<Mailbox.MailboxStatus> _responseObserver;
+  private ServerCallStreamObserver<Mailbox.MailboxStatus> _serverCallStreamObserver;
+  private OnReadyHandler _onReadyHandler;
   private final boolean _isEnabledFeedback;
 
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
-  private final ArrayBlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
+  private final BlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
 
   ReadWriteLock _errorLock = new ReentrantReadWriteLock();
   private Mailbox.MailboxContent _errorContent = null; // Guarded by _errorLock.
@@ -67,15 +72,28 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private Consumer<MailboxIdentifier> _gotMailCallback;
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
-      StreamObserver<Mailbox.MailboxStatus> responseObserver) {
-    this(mailboxService, responseObserver, false);
+      StreamObserver<Mailbox.MailboxStatus> responseObserver,
+      ServerCallStreamObserver<Mailbox.MailboxStatus> serverCallStreamObserver,
+      OnReadyHandler readyHandler) {
+    this(mailboxService, responseObserver, serverCallStreamObserver, readyHandler, false);
   }
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
-      StreamObserver<Mailbox.MailboxStatus> responseObserver, boolean isEnabledFeedback) {
+      StreamObserver<Mailbox.MailboxStatus> responseObserver,
+      ServerCallStreamObserver<Mailbox.MailboxStatus> serverCallStreamObserver,
+      OnReadyHandler readyHandler,
+      boolean isEnabledFeedback) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
-    _receivingBuffer = new ArrayBlockingQueue<>(DEFAULT_MAILBOX_QUEUE_CAPACITY);
+    if(serverCallStreamObserver == null){
+      _receivingBuffer = new ArrayBlockingQueue<>(DEFAULT_MAILBOX_QUEUE_CAPACITY);
+    } else {
+      // Unbounded queue.
+      // However, it is bounded by grpc handling.
+      _receivingBuffer = new LinkedBlockingQueue<>();
+    }
+    _serverCallStreamObserver = serverCallStreamObserver;
+    _onReadyHandler = readyHandler;
     _isEnabledFeedback = isEnabledFeedback;
   }
 
@@ -117,7 +135,8 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
       // TODO: pass a timeout to _receivingBuffer.
       if (!_receivingBuffer.offer(mailboxContent)) {
         // TODO: close the stream.
-        RuntimeException e = new RuntimeException("Mailbox receivingBuffer is full:" + _mailboxId);
+        RuntimeException e =
+            new RuntimeException("Mailbox receivingBuffer size: " + _receivingBuffer.size() + " is full:" + _mailboxId);
         LOGGER.error(e.getMessage());
         try {
           _errorLock.writeLock().lock();
@@ -145,6 +164,14 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
         Mailbox.MailboxStatus status = builder.build();
         // returns the buffer available size to sender for rate controller / throttling.
         _responseObserver.onNext(status);
+      }
+    }
+    if(_serverCallStreamObserver != null) {
+      if (_serverCallStreamObserver.isReady()) {
+        _serverCallStreamObserver.request(1);
+      } else {
+        // Backpressure begins here.
+        _onReadyHandler.setReady(false);
       }
     }
   }
