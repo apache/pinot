@@ -70,6 +70,11 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   void addRecord(MutableSegment segment, RecordInfo recordInfo);
 
   /**
+   * Removes the upsert metadata for the given segment.
+   */
+  void removeRecord(RecordInfo recordInfo);
+
+  /**
    * Replaces the upsert metadata for the old segment with the new immutable segment.
    */
   void replaceSegment(ImmutableSegment segment, IndexSegment oldSegment);

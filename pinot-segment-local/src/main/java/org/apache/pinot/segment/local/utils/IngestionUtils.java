@@ -43,6 +43,7 @@ import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -314,6 +315,16 @@ public final class IngestionUtils {
     return fieldsForRecordExtractor;
   }
 
+  //TODO: Combine this method with the previous method
+  public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, @Nullable UpsertConfig upsertConfig, Schema schema) {
+    Set<String> fieldsForRecordExtractor = new HashSet<>();
+    extractFieldsFromIngestionConfig(ingestionConfig, fieldsForRecordExtractor);
+    extractFieldsFromSchema(schema, fieldsForRecordExtractor);
+    extractFieldsFromUpsertConfig(upsertConfig, fieldsForRecordExtractor);
+    fieldsForRecordExtractor = getFieldsToReadWithComplexType(fieldsForRecordExtractor, ingestionConfig);
+    return fieldsForRecordExtractor;
+  }
+
   /**
    * Extracts the root-level names from the fields, to support the complex-type handling. For example,
    * a field a.b.c will return the top-level name a.
@@ -348,6 +359,13 @@ public final class IngestionUtils {
         }
         fields.add(fieldSpec.getName());
       }
+    }
+  }
+
+  private static void extractFieldsFromUpsertConfig(@Nullable UpsertConfig upsertConfig, Set<String> fields) {
+    if (upsertConfig == null) return;
+    if (upsertConfig.isEnableDeletes() && StringUtils.isNotEmpty(upsertConfig.getDeleteRecordKey())) {
+      fields.add(upsertConfig.getDeleteRecordKey());
     }
   }
 

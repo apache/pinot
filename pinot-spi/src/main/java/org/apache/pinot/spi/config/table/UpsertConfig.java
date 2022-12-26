@@ -63,6 +63,12 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Custom configs for upsert metadata manager")
   private Map<String, String> _metadataManagerConfigs;
 
+  @JsonPropertyDescription("Key which needs to be set to signal that the Key needs to be deleted")
+  private String _deleteRecordKey;
+
+  @JsonPropertyDescription("Set it to true to enable delete functionality")
+  private boolean _enableDeletes;
+
   @Deprecated
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
       @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
@@ -118,6 +124,14 @@ public class UpsertConfig extends BaseJsonConfig {
     return _enableSnapshot;
   }
 
+  public String getDeleteRecordKey() {
+    return _deleteRecordKey;
+  }
+
+  public boolean isEnableDeletes() {
+    return _enableDeletes;
+  }
+
   @Nullable
   public String getMetadataManagerClass() {
     return _metadataManagerClass;
@@ -162,6 +176,14 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setEnableSnapshot(boolean enableSnapshot) {
     _enableSnapshot = enableSnapshot;
+  }
+
+  public void setDeleteRecordKey(String deleteRecordKey) {
+    _deleteRecordKey = deleteRecordKey;
+  }
+
+  public void setEnableDeletes(boolean enableDeletes) {
+    _enableDeletes = enableDeletes;
   }
 
   public void setMetadataManagerClass(String metadataManagerClass) {
