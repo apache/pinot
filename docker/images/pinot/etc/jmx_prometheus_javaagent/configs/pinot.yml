@@ -433,6 +433,19 @@ rules:
     partition: "$3"
 
 # Pinot Minions
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.numberOfTasks.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_minion_numberOfTasks_$3"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+)_(\\w+).(\\w+).(taskExecution|taskQueueing|numberTasksExecuted|numberTasksCompleted|numberTasksCancelled|numberTasksFailed|numberTasksFatalFailed)\"><>(\\w+)"
+  name: "pinot_minion_$4_$5"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    taskType: "$3"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+)\"><>(\\w+)"
   name: "pinot_minion_$1_$2"
   cache: true
