@@ -69,4 +69,13 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public abstract Map<String, PartitionLagState> getPartitionToLagState(
       Map<String, ConsumerPartitionState> consumerPartitionStateMap);
+
+  /**
+   * The RT segment data manager can handle status change from external components like the ConsumptionStatusChecker
+   * etc. Currently, it acts as a way to signal the RT Segment data manager that the current partition has caught up.
+   *
+   * @param caughtUpWithUpstream Boolean indicating if the partition has caught up with upstream source or not based on
+   *                            the strategy used in the {@literal IngestionBasedConsumptionStatusChecker}
+   */
+  public abstract void notifyConsumptionCaughtUp(boolean caughtUpWithUpstream);
 }

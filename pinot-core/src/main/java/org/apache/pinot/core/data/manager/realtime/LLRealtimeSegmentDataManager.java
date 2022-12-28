@@ -254,6 +254,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private volatile boolean _forceCommitMessageReceived = false;
   private StreamPartitionMsgOffset _finalOffset; // Used when we want to catch up to this one
   private volatile boolean _shouldStop = false;
+  private volatile boolean _catchingUpPhase = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
   // For now, we let 31s pass for this state transition.
@@ -1562,6 +1563,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * @param indexedMessagesCount
    */
   private void updateIngestionDelay(int indexedMessageCount) {
+    if (_catchingUpPhase) {
+      // Don't update the metrics during catching up phase
+      return;
+    }
     if ((indexedMessageCount > 0) && (_lastRowMetadata != null)) {
       long ingestionDelayMs = _lastConsumedTimestampMs - _lastRowMetadata.getRecordIngestionTimeMs();
       ingestionDelayMs = Math.max(ingestionDelayMs, 0);
@@ -1610,5 +1615,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   public void forceCommit() {
     _forceCommitMessageReceived = true;
+  }
+
+  @Override
+  public void notifyConsumptionCaughtUp(boolean catchingUpPhase) {
+    _catchingUpPhase = catchingUpPhase;
   }
 }
