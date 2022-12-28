@@ -34,7 +34,6 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metrics.MinionGauge;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
-import org.apache.pinot.common.metrics.MinionQueryPhase;
 import org.apache.pinot.common.metrics.MinionTimer;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
