@@ -145,6 +145,16 @@ public class RangeQueriesTest extends BaseQueriesTest {
         {buildSelectionQuery(RAW_LONG_COL, 250, 500, false), 250, 500, false},
         {buildSelectionQuery(RAW_FLOAT_COL, 250, 500, false), 250, 500, false},
         {buildSelectionQuery(RAW_DOUBLE_COL, 250, 500, false), 250, 500, false},
+        {buildSelectionQuery(DICTIONARIZED_INT_COL, 300), 300, 300, true},
+        {buildSelectionQuery(RAW_INT_COL, 300), 300, 300, true},
+        {buildSelectionQuery(RAW_LONG_COL, 300), 300, 300, true},
+        {buildSelectionQuery(RAW_FLOAT_COL, 300), 300, 300, true},
+        {buildSelectionQuery(RAW_DOUBLE_COL, 300), 300, 300, true},
+        {buildSelectionQuery(DICTIONARIZED_INT_COL, 301), 301, 301, true},
+        {buildSelectionQuery(RAW_INT_COL, 301), 301, 301, true},
+        {buildSelectionQuery(RAW_LONG_COL, 301), 301, 301, true},
+        {buildSelectionQuery(RAW_FLOAT_COL, 301), 301, 301, true},
+        {buildSelectionQuery(RAW_DOUBLE_COL, 301), 301, 301, true}
     };
   }
 
@@ -156,6 +166,11 @@ public class RangeQueriesTest extends BaseQueriesTest {
       return "select " + RAW_INT_COL + " from " + RAW_TABLE_NAME + " where " + filterCol + " > "
           + formatValue(filterCol, min) + " and " + filterCol + " < " + formatValue(filterCol, max);
     }
+  }
+
+  private static String buildSelectionQuery(String filterCol, Number value) {
+      return "select " + RAW_INT_COL + " from " + RAW_TABLE_NAME + " where " + filterCol + " = "
+              + formatValue(filterCol, value);
   }
 
   @DataProvider
@@ -171,6 +186,16 @@ public class RangeQueriesTest extends BaseQueriesTest {
         {buildCountQuery(RAW_LONG_COL, 250, 500, false), 2},
         {buildCountQuery(RAW_FLOAT_COL, 250, 500, false), 2},
         {buildCountQuery(RAW_DOUBLE_COL, 250, 500, false), 2},
+        {buildCountQuery(DICTIONARIZED_INT_COL, 300), 1},
+        {buildCountQuery(RAW_INT_COL, 300), 1},
+        {buildCountQuery(RAW_LONG_COL, 300), 1},
+        {buildCountQuery(RAW_FLOAT_COL, 300), 1},
+        {buildCountQuery(RAW_DOUBLE_COL, 300), 1},
+        {buildCountQuery(DICTIONARIZED_INT_COL, 301), 0},
+        {buildCountQuery(RAW_INT_COL, 301), 0},
+        {buildCountQuery(RAW_LONG_COL, 301), 0},
+        {buildCountQuery(RAW_FLOAT_COL, 301), 0},
+        {buildCountQuery(RAW_DOUBLE_COL, 301), 0}
     };
   }
 
@@ -182,6 +207,10 @@ public class RangeQueriesTest extends BaseQueriesTest {
       return "select count(*) from " + RAW_TABLE_NAME + " where " + filterCol + " > "
           + formatValue(filterCol, min) + " and " + filterCol + " < " + formatValue(filterCol, max);
     }
+  }
+
+  private static String buildCountQuery(String filterCol, Number value) {
+    return "select count(*) from " + RAW_TABLE_NAME + " where " + filterCol + " = " + formatValue(filterCol, value);
   }
 
   private static String buildFilter(String filterCol, Number min, Number max) {
