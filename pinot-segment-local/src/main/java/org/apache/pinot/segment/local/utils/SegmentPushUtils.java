@@ -47,6 +47,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
@@ -381,7 +382,13 @@ public class SegmentPushUtils implements Serializable {
         new File(FileUtils.getTempDirectory(), "segmentTar-" + uuid + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     File segmentMetadataDir = new File(FileUtils.getTempDirectory(), "segmentMetadataDir-" + uuid);
     try {
-      fileSystem.copyToLocalFile(tarFileURI, tarFile);
+      if (fileSystem instanceof LocalPinotFS) {
+        // For local file system, we don't need to copy the tar file.
+        tarFile = new File(tarFileURI);
+      } else {
+        // For other file systems, we need to download the file to local file system
+        fileSystem.copyToLocalFile(tarFileURI, tarFile);
+      }
       if (segmentMetadataDir.exists()) {
         FileUtils.forceDelete(segmentMetadataDir);
       }
@@ -406,7 +413,10 @@ public class SegmentPushUtils implements Serializable {
       TarGzCompressionUtils.createTarGzFile(segmentMetadataDir, segmentMetadataTarFile);
       return segmentMetadataTarFile;
     } finally {
-      FileUtils.deleteQuietly(tarFile);
+      if (!(fileSystem instanceof LocalPinotFS)) {
+        // For local file system, we don't need to delete the tar file.
+        FileUtils.deleteQuietly(tarFile);
+      }
       FileUtils.deleteQuietly(segmentMetadataDir);
     }
   }
