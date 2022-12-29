@@ -401,9 +401,9 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     // init upsert-related data structure
-    _upsertMode = config.getUpsertConfig().getMode() == null
+    _upsertMode = (config.getUpsertConfig() == null || config.getUpsertConfig().getMode() == null)
         ? UpsertConfig.Mode.NONE : config.getUpsertConfig().getMode();
-    _upsertDeleteKey = config.getUpsertConfig().getDeleteRecordKey();
+    _upsertDeleteKey = config.getUpsertConfig() == null ? null : config.getUpsertConfig().getDeleteRecordKey();
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
 
     if (isUpsertEnabled()) {
