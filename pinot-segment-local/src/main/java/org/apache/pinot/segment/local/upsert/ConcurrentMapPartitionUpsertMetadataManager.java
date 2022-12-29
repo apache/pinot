@@ -216,6 +216,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         _primaryKeyToRecordLocationMap.size());
   }
 
+  //TODO: Doesn't handle the edge case when an older addRecord event arrives after removeRecord
   @Override
   public void removeRecord(RecordInfo recordInfo) {
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
