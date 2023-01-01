@@ -19,18 +19,20 @@
 package org.apache.pinot.connector.flink.sink;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.state.FunctionInitializationContext;
-import org.apache.flink.runtime.state.FunctionSnapshotContext;
-import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
+import org.apache.flink.streaming.api.checkpoint.ListCheckpointed;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
+import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.pinot.connector.flink.common.PinotGenericRowConverter;
 import org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 import org.slf4j.Logger;
@@ -43,7 +45,7 @@ import org.slf4j.LoggerFactory;
  * @param <T> type of record supported
  */
 @SuppressWarnings("NullAway")
-public class PinotSinkFunction<T> extends RichSinkFunction<T> implements CheckpointedFunction {
+public class PinotSinkFunction<T> extends RichSinkFunction<T> implements ListCheckpointed<GenericRow> {
 
   public static final long DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS = 500000;
   public static final int DEFAULT_EXECUTOR_POOL_SIZE = 5;
@@ -59,6 +61,8 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
 
   private TableConfig _tableConfig;
   private Schema _schema;
+
+  private List<GenericRow> _pendingRows;
 
   private transient SegmentWriter _segmentWriter;
   private transient SegmentUploader _segmentUploader;
@@ -88,6 +92,8 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
     _segmentUploader.init(_tableConfig);
     _segmentNumRecord = 0;
     _executor = Executors.newFixedThreadPool(_executorPoolSize);
+    _pendingRows = new ArrayList<>();
+
     LOG.info("Open Pinot Sink with the table {}", _tableConfig.toJsonString());
   }
 
@@ -96,7 +102,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
       throws Exception {
     LOG.info("Closing Pinot Sink");
     try {
-      if (_segmentNumRecord > 0) {
+      if (!((StreamingRuntimeContext) this.getRuntimeContext()).isCheckpointingEnabled()) {
         flush();
       }
     } catch (Exception e) {
@@ -117,24 +123,13 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   @Override
   public void invoke(T value, Context context)
       throws Exception {
-    _segmentWriter.collect(_recordConverter.convertToRow(value));
+    GenericRow row = _recordConverter.convertToRow(value);
+    _pendingRows.add(row);
+    _segmentWriter.collect(row);
     _segmentNumRecord++;
-    if (_segmentNumRecord > _segmentFlushMaxNumRecords) {
+    if (_segmentNumRecord >= _segmentFlushMaxNumRecords) {
       flush();
     }
-  }
-
-  @Override
-  public void snapshotState(FunctionSnapshotContext functionSnapshotContext)
-      throws Exception {
-    throw new UnsupportedOperationException("snapshotState is invoked in Pinot sink");
-  }
-
-  @Override
-  public void initializeState(FunctionInitializationContext functionInitializationContext)
-      throws Exception {
-    // no initialization needed
-    // ...
   }
 
   private void flush()
@@ -142,6 +137,8 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
     URI segmentURI = _segmentWriter.flush();
     LOG.info("Pinot segment writer flushed with {} records to {}", _segmentNumRecord, segmentURI);
     _segmentNumRecord = 0;
+    _pendingRows.clear();
+
     _executor.submit(() -> {
       try {
         _segmentUploader.uploadSegment(segmentURI, null);
@@ -150,5 +147,19 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
       }
       LOG.info("Pinot segment uploaded to {}", segmentURI);
     });
+  }
+
+  @Override
+  public List<GenericRow> snapshotState(long checkpointId, long timestamp) {
+    return _pendingRows;
+  }
+
+  @Override
+  public void restoreState(List<GenericRow> pendingRows)
+      throws Exception {
+    for (GenericRow row: pendingRows) {
+      _segmentWriter.collect(row);
+      _segmentNumRecord++;
+    }
   }
 }
