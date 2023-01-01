@@ -124,7 +124,8 @@ public class ImmutableDictionaryTest {
 
     Set<ByteArray> bytesSet = new HashSet<>();
     while (bytesSet.size() < NUM_VALUES) {
-      byte[] bytes = new byte[BYTES_LENGTH];
+      // ensure that at least one array with BYTES_LENGTH makes it into the set
+      byte[] bytes = new byte[bytesSet.isEmpty() ? BYTES_LENGTH : RANDOM.nextInt(BYTES_LENGTH)];
       RANDOM.nextBytes(bytes);
       bytesSet.add(new ByteArray(bytes));
     }
@@ -411,6 +412,9 @@ public class ImmutableDictionaryTest {
 
   private void testBytesDictionary(BaseImmutableDictionary bytesDictionary) {
     for (int i = 0; i < NUM_VALUES; i++) {
+      // passes
+      assertEquals(bytesDictionary.get(i), Arrays.copyOf(_bytesValues[i].getBytes(), BYTES_LENGTH));
+      // fails
       assertEquals(bytesDictionary.get(i), _bytesValues[i].getBytes());
       assertEquals(bytesDictionary.getStringValue(i), _bytesValues[i].toHexString());
       assertEquals(bytesDictionary.getBytesValue(i), _bytesValues[i].getBytes());
