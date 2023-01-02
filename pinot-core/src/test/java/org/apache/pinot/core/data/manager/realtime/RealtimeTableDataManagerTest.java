@@ -106,8 +106,6 @@ public class RealtimeTableDataManagerTest {
     File localSegDir = createSegment(tableConfig, schema, segName);
     long segCrc = TableDataManagerTestUtils.getCRC(localSegDir, SegmentVersion.v3);
     segmentZKMetadata.setCrc(segCrc);
-    when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE_NAME_WITH_TYPE, segName), null,
-        AccessOption.PERSISTENT)).thenReturn(segmentZKMetadata.toZNRecord());
 
     // Move the segment to the backup location.
     File backup = new File(TABLE_DATA_DIR, segName + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
@@ -116,7 +114,7 @@ public class RealtimeTableDataManagerTest {
     assertFalse(localSegDir.exists());
     IndexLoadingConfig indexLoadingConfig =
         TableDataManagerTestUtils.createIndexLoadingConfig("default", tableConfig, schema);
-    tmgr.addSegment(segName, tableConfig, indexLoadingConfig);
+    tmgr.addSegment(segName, indexLoadingConfig, segmentZKMetadata);
     // Segment data is put back the default location, and backup location is deleted.
     assertTrue(localSegDir.exists());
     assertFalse(backup.exists());
@@ -142,15 +140,13 @@ public class RealtimeTableDataManagerTest {
         TableDataManagerTestUtils.makeRawSegment(segName, createSegment(tableConfig, schema, segName),
             new File(TEMP_DIR, segName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION), true);
     segmentZKMetadata.setStatus(Status.DONE);
-    when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE_NAME_WITH_TYPE, segName), null,
-        AccessOption.PERSISTENT)).thenReturn(segmentZKMetadata.toZNRecord());
 
     // Local segment dir doesn't exist, thus downloading from deep store.
     File localSegDir = new File(TABLE_DATA_DIR, segName);
     assertFalse(localSegDir.exists());
     IndexLoadingConfig indexLoadingConfig =
         TableDataManagerTestUtils.createIndexLoadingConfig("default", tableConfig, schema);
-    tmgr.addSegment(segName, tableConfig, indexLoadingConfig);
+    tmgr.addSegment(segName, indexLoadingConfig, segmentZKMetadata);
     // Segment data is put on default location.
     assertTrue(localSegDir.exists());
     SegmentMetadataImpl llmd = new SegmentMetadataImpl(new File(TABLE_DATA_DIR, segName));

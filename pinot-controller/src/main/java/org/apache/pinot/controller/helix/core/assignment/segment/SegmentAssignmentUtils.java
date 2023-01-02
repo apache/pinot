@@ -292,6 +292,18 @@ public class SegmentAssignmentUtils {
     return numSegmentsToBeMovedPerInstance;
   }
 
+  public static Set<String> getSegmentsToMove(Map<String, Map<String, String>> oldAssignment,
+      Map<String, Map<String, String>> newAssignment) {
+    Set<String> result = new HashSet<>();
+    for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      if (!entry.getValue().equals(oldAssignment.get(segmentName))) {
+        result.add(segmentName);
+      }
+    }
+    return result;
+  }
+
   /**
    * Class that splits segment assignment into COMPLETED, CONSUMING and OFFLINE segments.
    */

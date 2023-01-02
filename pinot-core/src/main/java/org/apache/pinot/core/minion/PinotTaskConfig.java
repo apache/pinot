@@ -20,7 +20,9 @@ package org.apache.pinot.core.minion;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.helix.task.TaskConfig;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
 
@@ -43,6 +45,11 @@ public class PinotTaskConfig {
 
   public String getTaskId() {
     return _configs.get(TASK_ID_KEY);
+  }
+
+  @Nullable
+  public String getTableName() {
+    return _configs.get(MinionConstants.TABLE_NAME_KEY);
   }
 
   public Map<String, String> getConfigs() {

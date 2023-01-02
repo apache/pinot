@@ -140,10 +140,39 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Logs the timing for a table with an additional key
+   * @param tableName The table associated with this timer
+   * @param key The additional key associated with this timer
+   * @param timer The name of timer
+   * @param duration The log time duration time value
+   * @param timeUnit The log time duration time unit
+   */
+  public void addTimedTableValue(final String tableName, final String key, final T timer, final long duration,
+      final TimeUnit timeUnit) {
+    final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + key + "." + timer.getTimerName();
+    addValueToTimer(fullTimerName, duration, timeUnit);
+  }
+
+  /**
    * Logs the timing for a global timer
+   * @param timer The name of timer
+   * @param duration The log time duration time value
+   * @param timeUnit The log time duration time unit
    */
   public void addTimedValue(T timer, final long duration, final TimeUnit timeUnit) {
     final String fullTimerName = _metricPrefix + timer.getTimerName();
+    addValueToTimer(fullTimerName, duration, timeUnit);
+  }
+
+  /**
+   * Logs the timing for a timer with a key
+   * @param key The key associated with this timer
+   * @param timer The name of timer
+   * @param duration The log time duration time value
+   * @param timeUnit The log time duration time unit
+   */
+  public void addTimedValue(final String key, final T timer, final long duration, final TimeUnit timeUnit) {
+    final String fullTimerName = _metricPrefix + key + "." + timer.getTimerName();
     addValueToTimer(fullTimerName, duration, timeUnit);
   }
 
@@ -198,6 +227,31 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Logs a value to a meter with a key.
+   *
+   * @param key The key associated with this meter
+   * @param meter The meter to use
+   * @param unitCount The number of units to add to the meter
+   */
+  public void addMeteredValue(final String key, final M meter, final long unitCount) {
+    addMeteredValue(key, meter, unitCount, null);
+  }
+
+  /**
+   * Logs a value to a meter with a key.
+   *
+   * @param key The key associated with this meter
+   * @param meter The meter to use
+   * @param unitCount The number of units to add to the meter
+   * @param reusedMeter The meter to reuse
+   */
+  public PinotMeter addMeteredValue(final String key, final M meter, final long unitCount, PinotMeter reusedMeter) {
+    String meterName = meter.getMeterName();
+    final String fullMeterName = _metricPrefix + meterName;
+    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
+  }
+
+  /**
    * Logs a value to a table-level meter.
    *
    * @param tableName The table name
@@ -217,17 +271,46 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public PinotMeter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
       PinotMeter reusedMeter) {
+    String meterName = meter.getMeterName();
+    final String fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
+    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
+  }
+
+  /**
+   * Logs a value to a table-level meter with an additional key
+   * @param tableName The table name
+   * @param key The additional key associated with this meter
+   * @param meter The meter to use
+   * @param unitCount The number of units to add to the meter
+   */
+  public void addMeteredTableValue(final String tableName, final String key, final M meter, final long unitCount) {
+    addMeteredTableValue(tableName, key, meter, unitCount, null);
+  }
+
+  /**
+   * Logs a value to a table-level meter with an additional key
+   * @param tableName The table name
+   * @param key The additional key associated with this meter
+   * @param meter The meter to use
+   * @param unitCount The number of units to add to the meter
+   * @param reusedMeter The meter to reuse
+   */
+  public PinotMeter addMeteredTableValue(final String tableName, final String key, final M meter, final long unitCount,
+      PinotMeter reusedMeter) {
+    String meterName = meter.getMeterName();
+    final String fullMeterName = _metricPrefix + getTableName(tableName) + "." + key + "." + meterName;
+    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
+  }
+
+  private PinotMeter addValueToMeter(final String fullMeterName, final String unit, final long unitCount,
+      PinotMeter reusedMeter) {
     if (reusedMeter != null) {
       reusedMeter.mark(unitCount);
       return reusedMeter;
     } else {
-      final String fullMeterName;
-      String meterName = meter.getMeterName();
-      fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
       final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
-
       final PinotMeter newMeter =
-          PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+          PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, unit, TimeUnit.SECONDS);
       newMeter.mark(unitCount);
       return newMeter;
     }
@@ -254,7 +337,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String gaugeName = gauge.getGaugeName();
     fullGaugeName = gaugeName + "." + getTableName(tableName);
 
-    if (!_gaugeValues.containsKey(fullGaugeName)) {
+    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
+    if (gaugeValue == null) {
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(fullGaugeName)) {
           _gaugeValues.put(fullGaugeName, new AtomicLong(unitCount));
@@ -270,7 +354,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         }
       }
     } else {
-      _gaugeValues.get(fullGaugeName).addAndGet(unitCount);
+      gaugeValue.addAndGet(unitCount);
     }
   }
 
@@ -333,7 +417,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   private void setValueOfGauge(long value, String gaugeName) {
-    if (!_gaugeValues.containsKey(gaugeName)) {
+    AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
+    if (gaugeValue == null) {
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(value));
@@ -343,7 +428,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         }
       }
     } else {
-      _gaugeValues.get(gaugeName).set(value);
+      gaugeValue.set(value);
     }
   }
 
@@ -356,7 +441,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void addValueToGlobalGauge(final G gauge, final long unitCount) {
     String gaugeName = gauge.getGaugeName();
 
-    if (!_gaugeValues.containsKey(gaugeName)) {
+    AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
+    if (gaugeValue == null) {
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(unitCount));
@@ -372,28 +458,22 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         }
       }
     } else {
-      _gaugeValues.get(gaugeName).addAndGet(unitCount);
+      gaugeValue.addAndGet(unitCount);
     }
   }
 
   @VisibleForTesting
   public long getValueOfGlobalGauge(final G gauge) {
     String gaugeName = gauge.getGaugeName();
-    if (!_gaugeValues.containsKey(gaugeName)) {
-      return 0;
-    } else {
-      return _gaugeValues.get(gaugeName).get();
-    }
+    AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
+    return gaugeValue == null ? 0 : gaugeValue.get();
   }
 
   @VisibleForTesting
   public long getValueOfGlobalGauge(final G gauge, String suffix) {
     String fullGaugeName = gauge.getGaugeName() + "." + suffix;
-    if (!_gaugeValues.containsKey(fullGaugeName)) {
-      return 0;
-    } else {
-      return _gaugeValues.get(fullGaugeName).get();
-    }
+    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
+    return gaugeValue == null ? 0 : gaugeValue.get();
   }
 
   /**
@@ -407,11 +487,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String gaugeName = gauge.getGaugeName();
     fullGaugeName = gaugeName + "." + getTableName(tableName);
 
-    if (!_gaugeValues.containsKey(fullGaugeName)) {
-      return 0;
-    } else {
-      return _gaugeValues.get(fullGaugeName).get();
-    }
+    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
+    return gaugeValue == null ? 0 : gaugeValue.get();
   }
 
   /**
@@ -426,11 +503,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String gaugeName = gauge.getGaugeName();
     fullGaugeName = gaugeName + "." + getTableName(tableName) + "." + partitionId;
 
-    if (!_gaugeValues.containsKey(fullGaugeName)) {
-      return -1;
-    } else {
-      return _gaugeValues.get(fullGaugeName).get();
-    }
+    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
+    return gaugeValue == null ? -1 : gaugeValue.get();
   }
 
   /**
