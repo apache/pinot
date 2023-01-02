@@ -98,7 +98,7 @@ public class ConsumptionDelayTracker {
    * Class to handle timer thread that will track inactive partitions
    */
   private class TrackingTimerTask extends TimerTask {
-    final private ConsumptionDelayTracker _tracker;
+    private final ConsumptionDelayTracker _tracker;
 
     public TrackingTimerTask(ConsumptionDelayTracker tracker) {
       _tracker = tracker;
@@ -122,17 +122,17 @@ public class ConsumptionDelayTracker {
   // Mutable versions of timer constants so we can test with smaller delays
   final int _timerThreadTickIntervalMs;
   // Timer task to check partitions that are inactive against ideal state.
-  final private Timer _timer;
+  private final Timer _timer;
 
-  final private ServerMetrics _serverMetrics;
-  final private String _tableNameWithType;
+  private final ServerMetrics _serverMetrics;
+  private final String _tableNameWithType;
 
   private boolean _enableAging;
   private boolean _enablePerPartitionMetric = true;
   private boolean _enableAggregateMetric = true;
-  final private Logger _logger;
+  private final Logger _logger;
 
-  final private RealtimeTableDataManager _realTimeTableDataManager;
+  private final RealtimeTableDataManager _realTimeTableDataManager;
 
   /*
    * Helper function to update the maximum when the current maximum is removed or updated.

@@ -250,13 +250,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   /*
    * Method used by LLRealtimeSegmentManagers to update their partition delays
    *
-   * @param ingestionDelayMillis Ingestion delay being reported.
-   * @param currentTimeMillis Timestamp of the measure being provided, i.e. when this delay was computed.
+   * @param ingestionDelayMs Ingestion delay being reported.
+   * @param currentTimeMs Timestamp of the measure being provided, i.e. when this delay was computed.
    * @param partitionGroupId Partition ID for which delay is being updated.
    */
-  public void updateIngestionDelay(long ingestionDelayMillis, long currenTimeMillis, int partitionGroupId) {
+  public void updateIngestionDelay(long ingestionDelayMs, long currenTimeMs, int partitionGroupId) {
     if (_consumptionDelayTracker != null) {
-      _consumptionDelayTracker.storeConsumptionDelay(ingestionDelayMillis, currenTimeMillis, partitionGroupId);
+      _consumptionDelayTracker.storeConsumptionDelay(ingestionDelayMs, currenTimeMs, partitionGroupId);
     }
   }
 
