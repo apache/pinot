@@ -59,13 +59,13 @@ public class GroupByPlanNode implements PlanNode {
     assert _queryContext.getGroupByExpressions() != null;
 
     if (_queryContext.hasFilteredAggregations()) {
-      return filteredGroupByPlan();
+      return buildFilteredGroupByPlan();
     }
 
-    return nonFilteredGroupByPlan();
+    return buildNonFilteredGroupByPlan();
   }
 
-  private FilteredGroupByOperator filteredGroupByPlan() {
+  private FilteredGroupByOperator buildFilteredGroupByPlan() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     // Build the operator chain for the main predicate so the filter plan can be run only one time
     Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair =
@@ -82,7 +82,7 @@ public class GroupByPlanNode implements PlanNode {
         _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]), numTotalDocs, _queryContext);
   }
 
-  private GroupByOperator nonFilteredGroupByPlan() {
+  private GroupByOperator buildNonFilteredGroupByPlan() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     ExpressionContext[] groupByExpressions = _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
