@@ -21,6 +21,7 @@ package org.apache.pinot.server.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
@@ -28,6 +29,7 @@ import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -37,6 +39,8 @@ import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -222,6 +226,23 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
+  @Test
+  public void testDownloadValidDocIdsSnapshot()
+      throws Exception {
+    // Verify the content of the downloaded segment from a realtime table.
+    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) _realtimeIndexSegments.get(0));
+
+    // Verify non-existent table and segment download return NOT_FOUND status.
+    Response response = _webTarget.path("/tables/UNKNOWN_REALTIME/segments/segmentname/validDocIds").request().get(Response.class);
+    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+
+    response = _webTarget
+        .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT/validDocIds")
+        .request().get(Response.class);
+    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+  }
+
   // Verify metadata file from segments.
   private void downLoadAndVerifySegmentContent(String tableNameWithType, IndexSegment segment)
       throws IOException {
@@ -248,6 +269,23 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(metadata.getTableName(), TableNameBuilder.extractRawTableName(tableNameWithType));
 
     FileUtils.forceDelete(tempMetadataDir);
+  }
+
+  // Verify metadata file from segments.
+  private void downLoadAndVerifyValidDocIdsSnapshot(String tableNameWithType, ImmutableSegmentImpl segment)
+      throws IOException {
+    String snapshotPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName() + "/validDocIds";
+    int[] docIds1 = new int[]{1, 4, 6, 10, 15, 17, 18, 20};
+    MutableRoaringBitmap validDocIds = new MutableRoaringBitmap();
+    validDocIds.add(docIds1);
+    segment.persistValidDocIdsSnapshot(validDocIds);
+
+    Response response = _webTarget.path(snapshotPath).request().get(Response.class);
+    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    File snapshotFile = response.readEntity(File.class);
+
+    byte[] bytes = FileUtils.readFileToByteArray(snapshotFile);
+    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap(), validDocIds);
   }
 
   @Test

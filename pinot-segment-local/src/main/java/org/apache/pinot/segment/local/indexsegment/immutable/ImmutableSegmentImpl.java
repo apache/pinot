@@ -150,7 +150,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     }
   }
 
-  private File getValidDocIdsSnapshotFile() {
+  public File getValidDocIdsSnapshotFile() {
     return new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
         V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
   }
