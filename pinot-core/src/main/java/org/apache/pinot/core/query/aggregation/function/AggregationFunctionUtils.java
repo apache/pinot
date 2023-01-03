@@ -83,13 +83,12 @@ public class AggregationFunctionUtils {
    *          or group-by expressions.
    */
   public static Set<ExpressionContext> collectExpressionsToTransform(
-      @Nullable AggregationFunction[] aggregationFunctions, @Nullable ExpressionContext[] groupByExpressions) {
+      AggregationFunction[] aggregationFunctions, @Nullable ExpressionContext[] groupByExpressions) {
     Set<ExpressionContext> expressions = new HashSet<>();
-    if (aggregationFunctions != null) {
-      for (AggregationFunction aggregationFunction : aggregationFunctions) {
-        expressions.addAll(aggregationFunction.getInputExpressions());
-      }
+    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+      expressions.addAll(aggregationFunction.getInputExpressions());
     }
+
     if (groupByExpressions != null) {
       expressions.addAll(Arrays.asList(groupByExpressions));
     }
@@ -199,6 +198,7 @@ public class AggregationFunctionUtils {
   public static TransformOperator buildTransformOperatorForFilteredAggregates(IndexSegment indexSegment,
       QueryContext queryContext, BaseFilterOperator filterOperator, @Nullable ExpressionContext[] groupByExpressions) {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
 
@@ -222,6 +222,7 @@ public class AggregationFunctionUtils {
 
     // For each aggregation function, check if the aggregation function is a filtered agg.
     // If it is, populate the corresponding filter operator and corresponding transform operator
+    assert aggregationFunctions != null;
     for (Pair<AggregationFunction, FilterContext> inputPair : aggregationFunctions) {
       if (inputPair.getLeft() != null) {
         FilterContext currentFilterExpression = inputPair.getRight();
