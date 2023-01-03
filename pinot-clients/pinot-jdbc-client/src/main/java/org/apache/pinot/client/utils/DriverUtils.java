@@ -36,6 +36,7 @@ import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.auth.BasicAuthUtils;
@@ -49,6 +50,8 @@ public class DriverUtils {
   public static final String DRIVER = "pinot";
   public static final Logger LOG = LoggerFactory.getLogger(DriverUtils.class);
   private static final String LIMIT_STATEMENT_REGEX = "\\s(limit)\\s";
+
+  public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
 
   // SSL Properties
   public static final String PINOT_JDBC_TLS_PREFIX = "pinot.jdbc.tls";
@@ -216,5 +219,15 @@ public class DriverUtils {
     Pattern pattern = Pattern.compile(LIMIT_STATEMENT_REGEX, Pattern.CASE_INSENSITIVE);
     Matcher matcher = pattern.matcher(query);
     return matcher.find();
+  }
+
+  public static String checkEnableNullHandling(PinotConnection connection, String query) {
+    if (query.contains(ENABLE_NULL_HANDLING)) {
+      return query;
+    }
+
+    return connection.isNullHandlingEnabled()
+      ? String.format("%s option(%s=true)", query, ENABLE_NULL_HANDLING)
+      : query;
   }
 }
