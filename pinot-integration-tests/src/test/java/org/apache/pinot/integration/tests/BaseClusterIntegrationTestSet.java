@@ -227,21 +227,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT DaysSinceEpoch, MAX(ArrDelay) - MAX(AirTime) AS Diff FROM mytable GROUP BY DaysSinceEpoch HAVING "
         + "(Diff >= 300 AND Diff < 500) OR Diff < -500 ORDER BY Diff DESC";
     testQuery(query);
-  }
-
-  private void testHardCodedQueriesV1()
-      throws Exception {
-    String query;
-    String h2Query;
-    // Escape quotes
-    // TODO: move to common when multistage support correct escaping strategy.
-    query = "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
-        + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
-    h2Query = "SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
-    testQuery(query, h2Query);
 
     // LIKE
-    // TODO: move to common when multistage support LIKE
     query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
     testQuery(query);
     query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE 'C%'";
@@ -258,6 +245,18 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ArrTime + 5 + ArrDelay, ArrTime * 5 + ArrDelay FROM "
             + "mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0";
     testQuery(query, h2Query);
+
+    // Escape quotes
+    query = "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
+        + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
+    h2Query = "SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
+    testQuery(query, h2Query);
+  }
+
+  private void testHardCodedQueriesV1()
+      throws Exception {
+    String query;
+    String h2Query;
     // TODO: move to common when multistage support CAST AS 'LONG', for now it must use: CAST AS BIGINT
     query =
         "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
