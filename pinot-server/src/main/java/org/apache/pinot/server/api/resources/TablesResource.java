@@ -418,14 +418,15 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}/validDocIds")
-  @ApiOperation(value = "Download validDocIds for an REALTIME immutable segment", notes = "Download validDocIds for an immutable segment in bitmap format.")
+  @ApiOperation(value = "Download validDocIds for an REALTIME immutable segment", notes = "Download validDocIds for "
+      + "an immutable segment in bitmap format.")
   public Response downloadValidDocIds(
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders)
       throws Exception {
-    LOGGER.info("Received a request to download validDocIds for segment {} for table {}", segmentName, tableNameWithType);
+    LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
     // Validate data access
     ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
 

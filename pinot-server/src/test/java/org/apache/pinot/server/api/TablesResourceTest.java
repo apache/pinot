@@ -234,12 +234,13 @@ public class TablesResourceTest extends BaseResourceTest {
         (ImmutableSegmentImpl) _realtimeIndexSegments.get(0));
 
     // Verify non-existent table and segment download return NOT_FOUND status.
-    Response response = _webTarget.path("/tables/UNKNOWN_REALTIME/segments/segmentname/validDocIds").request().get(Response.class);
+    Response response = _webTarget.path("/tables/UNKNOWN_REALTIME/segments/segmentname/validDocIds").request()
+        .get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
-    response = _webTarget
-        .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT/validDocIds")
-        .request().get(Response.class);
+    response = _webTarget.path(
+        String.format("/tables/%s/segments/%s/validDocIds", TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+            "UNKNOWN_SEGMENT")).request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
