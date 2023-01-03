@@ -62,11 +62,9 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private long _numEntriesScannedPostFilter;
   private final DataSchema _dataSchema;
   private final QueryContext _queryContext;
-  private TableResizer _tableResizer;
-  private GroupKeyGenerator _groupKeyGenerator = null;
 
   public FilteredGroupByOperator(
-      @Nullable AggregationFunction[] aggregationFunctions,
+      AggregationFunction[] aggregationFunctions,
       List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator,
       ExpressionContext[] groupByExpressions,
       long numTotalDocs,
@@ -76,7 +74,6 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     _groupByExpressions = groupByExpressions;
     _numTotalDocs = numTotalDocs;
     _queryContext = queryContext;
-    _tableResizer = null;
 
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = groupByExpressions.length;
@@ -106,6 +103,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   @Override
   protected GroupByResultsBlock getNextBlock() {
+    GroupKeyGenerator groupKeyGenerator = null;
     // TODO(egalpin): Support Startree query resolution when possible, even with FILTER expressions
     assert _aggregationFunctions != null;
     boolean numGroupsLimitReached = false;
@@ -123,13 +121,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
       // Perform aggregation group-by on all the blocks
       DefaultGroupByExecutor groupByExecutor;
-      if (_groupKeyGenerator == null) {
+      if (groupKeyGenerator == null) {
         groupByExecutor = new DefaultGroupByExecutor(_queryContext, filteredAggFunctions, _groupByExpressions,
             transformOperator);
-        _groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
+        groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
       } else {
         groupByExecutor = new DefaultGroupByExecutor(_queryContext, filteredAggFunctions, _groupByExpressions,
-            transformOperator, _groupKeyGenerator);
+            transformOperator, groupKeyGenerator);
       }
 
       int numDocsScanned = 0;
@@ -149,12 +147,12 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     for (GroupByResultHolder groupByResultHolder : groupByResultHolders) {
-      groupByResultHolder.ensureCapacity(_groupKeyGenerator.getNumKeys());
+      groupByResultHolder.ensureCapacity(groupKeyGenerator.getNumKeys());
     }
 
     // Check if the groups limit is reached
-    numGroupsLimitReached = _groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsLimit();
-    Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), _groupKeyGenerator.getNumKeys());
+    numGroupsLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsLimit();
+    Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupKeyGenerator.getNumKeys());
 
     // Trim the groups when iff:
     // - Query has ORDER BY clause
@@ -165,12 +163,10 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
     if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
       int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
-      if (_groupKeyGenerator.getNumKeys() > trimSize) {
-        if (_tableResizer == null) {
-          _tableResizer = new TableResizer(_dataSchema, _queryContext);
-        }
+      if (groupKeyGenerator.getNumKeys() > trimSize) {
+        TableResizer tableResizer =  new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords =
-            _tableResizer.trimInSegmentResults(_groupKeyGenerator, groupByResultHolders, trimSize);
+            tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         return resultsBlock;
@@ -178,7 +174,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     AggregationGroupByResult aggGroupByResult =
-        new AggregationGroupByResult(_groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
+        new AggregationGroupByResult(groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     return resultsBlock;
