@@ -44,6 +44,12 @@ import org.apache.pinot.spi.data.Schema;
 @ThreadSafe
 public interface TableDataManager {
 
+  enum SegmentState {
+    CONSUMING,
+    ONLINE,
+    DROPPED,
+  }
+
   /**
    * Initializes the table data manager. Should be called only once and before calling any other method.
    */
@@ -203,16 +209,11 @@ public interface TableDataManager {
   Map<String, SegmentErrorInfo> getSegmentErrors();
 
   /**
-   * Interface to place actions to be performed when a Segment goes from CONSUMING to ONLINE.
+   * Interface to place actions to be performed when a Segment state transition occurs.
    *
    * @param segmentNameStr name of segment for which the state change is being handled
+   * @param fromState state from which segment is transitioning
+   * @param toState state to which the segment is transitioning
    */
-  default void onConsumingToOnline(String segmentNameStr) { };
-
-  /**
-   * Interface to place actions to be performed when a Segment goes from CONSUMING to DROPPED.
-   *
-   * @param segmentNameStr name of segment for which the state change is being handled
-   */
-  default void onConsumingToDropped(String segmentNameStr) { };
+  default void onSegmentStateTransition(String segmentNameStr, SegmentState fromState, SegmentState toState) { };
 }

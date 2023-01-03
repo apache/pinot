@@ -91,7 +91,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
       TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(realtimeTableName);
       Preconditions.checkNotNull(tableDataManager);
-      tableDataManager.onConsumingToOnline(segmentNameStr);
+      // tableDataManager.onConsumingToOnline(segmentNameStr);
+      tableDataManager.onSegmentStateTransition(segmentNameStr, TableDataManager.SegmentState.CONSUMING,
+          TableDataManager.SegmentState.ONLINE);
       SegmentDataManager acquiredSegment = tableDataManager.acquireSegment(segmentNameStr);
       // For this transition to be correct in helix, we should already have a segment that is consuming
       if (acquiredSegment == null) {
@@ -144,7 +146,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       String segmentNameStr = message.getPartitionName();
       TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(realtimeTableName);
       Preconditions.checkNotNull(tableDataManager);
-      tableDataManager.onConsumingToDropped(segmentNameStr);
+      // tableDataManager.onConsumingToDropped(segmentNameStr);
+      tableDataManager.onSegmentStateTransition(segmentNameStr, TableDataManager.SegmentState.CONSUMING,
+          TableDataManager.SegmentState.DROPPED);
       try {
         onBecomeOfflineFromConsuming(message, context);
         onBecomeDroppedFromOffline(message, context);

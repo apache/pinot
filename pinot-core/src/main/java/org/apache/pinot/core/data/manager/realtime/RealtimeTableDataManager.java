@@ -126,9 +126,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
-    // Tracks maximum ingestion delay amongst all partitions being served for this table
-    _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType,
-        this);
+    // Tracks ingestion delay of all partitions being served for this table
+    _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
@@ -253,28 +252,33 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   /*
-   * Method ta handle CONSUMING to ONLINE transitions of segments in this table.
-   * We mark partitions for verification with ideal state when we do not see a consuming segment for some time
+   * Method to handle supported transitions of segments states for this table.
+   * Supported transitions include:
+   *
+   * CONSUMING -> ONLINE:
+   * We mark partitions for verification against ideal state when we do not see a consuming segment for some time
    * for that partition. The idea is to remove the related metrics when the partition moves from the current server.
+   * CONSUMING -> DROPPED:
+   * We stop tracking partitions whose segments are dropped.
    *
    * @param segmentNameStr name of segment which is transitioning state.
+   * @param fromState state from which the segment is transitioning.
+   * @param toState state to which the segment is transitioning to.
    */
   @Override
-  public void onConsumingToOnline(String segmentNameStr) {
+  public void onSegmentStateTransition(String segmentNameStr, SegmentState fromState, SegmentState toState) {
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    markPartitionForVerification(segmentName.getPartitionGroupId());
-  }
-
-  /*
-   * Method ta handle CONSUMING to DROPPED transitions of segments in this table.
-   *
-   * @param segmentNameStr name of segment which is transitioning state.
-   */
-  @Override
-  public void onConsumingToDropped(String segmentNameStr) {
-    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    // We stop tracking ingestion delay partitions for which their segments go into DROPPED state.
-    stopTrackingPartitionDelay(segmentName.getPartitionGroupId());
+    if (fromState == SegmentState.CONSUMING) {
+      if (toState == SegmentState.ONLINE) {
+        markPartitionForVerification(segmentName.getPartitionGroupId());
+        return;
+      } else if (fromState == SegmentState.DROPPED) {
+        stopTrackingPartitionDelay(segmentName.getPartitionGroupId());
+        return;
+      }
+    }
+    // Throw for all other unsupported transitions
+    throw new RuntimeException("Undefined segment state transition from " + fromState.name() + "to " + toState.name());
   }
 
   /**

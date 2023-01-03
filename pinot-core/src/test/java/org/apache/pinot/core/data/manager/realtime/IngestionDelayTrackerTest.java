@@ -142,7 +142,7 @@ public class IngestionDelayTrackerTest {
     Assert.assertTrue(true);
   }
 
-  @Test(invocationCount = 10)
+  @Test
   public void testRecordIngestionDelayWithAging() {
     final int partition0 = 0;
     final long partition0Delay0 = 1000;

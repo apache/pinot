@@ -32,21 +32,22 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * A Class to track maximum realtime delay for a given table on a given server.
+ * A Class to track realtime ingestion delay for a given table on a given server.
  * Highlights:
  * 1-An object of this class is hosted by each RealtimeTableDataManager.
  * 2-The object tracks ingestion delays for all partitions hosted by the current server for the given Realtime table.
  * 3-Partition delays are updated by all LLRealtimeSegmentDataManager objects hosted in the corresponding
  *   RealtimeTableDataManager.
  * 4-The class tracks the maximum of all ingestion delays observed for all partitions of the given table.
- * 5-A Metric is derived from reading the maximum tracked by this class.
- * 6-Delay reported for partitions that do not have events to consume is reported as zero.
+ * 5-A Metric is derived from reading the maximum tracked by this class. And individual metrics are associated with
+ *   each partition being tracked.
+ * 6-Delays reported for partitions that do not have events to consume are reported as zero.
  * 7-We track the time at which each delay sample was collected so that delay can be increased when partition stops
  *   consuming for any reason other than no events being available for consumption.
  * 8-Segments that go from CONSUMING to DROPPED states stop being tracked so their delays do not cloud
  *   delays of active partitions.
- * 9-When a segment goes from CONSUMING to ONLINE, we start ticking time for the corresponding partition.
- *   If no consumption is noticed after a timeout, then we read ideal state to confirm the server still hosts the
+ * 9-When a segment goes from CONSUMING to ONLINE, we start a timeout for the corresponding partition.
+ *   If no consumption is noticed after the timeout, we then read ideal state to confirm the server still hosts the
  *   partition. If not, we stop tracking the respective partition.
  * 10-A timer thread is started by this object to track timeouts of partitions and drive the reading of their ideal
  *    state.
