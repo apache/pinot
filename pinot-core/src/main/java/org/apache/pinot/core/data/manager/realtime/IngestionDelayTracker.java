@@ -56,22 +56,22 @@ import org.slf4j.LoggerFactory;
  *     (CONSUMING -> ONLINE state change)
  *             |
  *      markPartitionForConfirmation(partitionId)
- *            |                         |<-storeConsumptionDelay()-{LLRealtimeSegmentDataManager(Partition 0}}
+ *            |                         |<-updateIngestionDelay()-{LLRealtimeSegmentDataManager(Partition 0}}
  *            |                         |
  * ___________V_________________________V_
- * |           (Table X)                |<-storeConsumptionDelay()-{LLRealtimeSegmentDataManager(Partition 1}}
- * | ConsumptionDelayTracker            |           ...
- * |____________________________________|<-storeConsumptionDelay()-{LLRealtimeSegmentDataManager (Partition n}}
+ * |           (Table X)                |<-updateIngestionDelay()-{LLRealtimeSegmentDataManager(Partition 1}}
+ * | IngestionDelayTracker              |           ...
+ * |____________________________________|<-updateIngestionDelay()-{LLRealtimeSegmentDataManager (Partition n}}
  *              ^                      ^
  *              |                       \
- *   timeoutInactivePartitions()    stopTrackingPartitionConsumptionDelay(partitionId)
+ *   timeoutInactivePartitions()    stopTrackingPartitionIngestionDelay(partitionId)
  *    _________|__________                \
  *   | TimerTrackingTask |          (CONSUMING -> DROPPED state change)
  *   |___________________|
  *
  */
 
-public class ConsumptionDelayTracker {
+public class IngestionDelayTracker {
 
   // Sleep interval for timer thread that triggers read of ideal state
   private static final int TIMER_THREAD_TICK_INTERVAL_MS = 300000; // 5 minutes +/- precision in timeouts
@@ -81,8 +81,8 @@ public class ConsumptionDelayTracker {
   private static final int INITIAL_TIMER_THREAD_DELAY_MS = 100;
 
   /*
-   * Class to keep a Pinot Consumption Delay measure and the time when the sample was taken (i.e. sample time)
-   * We will use the sample time to increase consumption delay when a partition stops consuming: the time
+   * Class to keep an ingestion delay measure and the time when the sample was taken (i.e. sample time)
+   * We will use the sample time to increase ingestion delay when a partition stops consuming: the time
    * difference between the sample time and current time will be added to the metric when read.
    */
   static private class DelayMeasure {
@@ -98,9 +98,9 @@ public class ConsumptionDelayTracker {
    * Class to handle timer thread that will track inactive partitions
    */
   private class TrackingTimerTask extends TimerTask {
-    private final ConsumptionDelayTracker _tracker;
+    private final IngestionDelayTracker _tracker;
 
-    public TrackingTimerTask(ConsumptionDelayTracker tracker) {
+    public TrackingTimerTask(IngestionDelayTracker tracker) {
       _tracker = tracker;
     }
 
@@ -181,7 +181,7 @@ public class ConsumptionDelayTracker {
     _partitionsMarkedForVerification.remove(partitionGroupId);
     if (_enablePerPartitionMetric) {
       _serverMetrics.removeTableGauge(getPerPartitionMetricName(partitionGroupId),
-          ServerGauge.PER_PARTITION_CONSUMPTION_DELAY_MS);
+          ServerGauge.TABLE_PER_PARTITION_INGESTION_DELAY_MS);
     }
   }
 
@@ -198,7 +198,7 @@ public class ConsumptionDelayTracker {
   }
 
   // Custom Constructor
-  public ConsumptionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
+  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, String metricNamePrefix,
       boolean enableAggregateMetric, boolean enablePerPartitionMetric)
       throws RuntimeException {
@@ -214,24 +214,24 @@ public class ConsumptionDelayTracker {
     _enablePerPartitionMetric = enablePerPartitionMetric;
     _enableAggregateMetric = enableAggregateMetric;
     _timerThreadTickIntervalMs = timerThreadTickIntervalMs;
-    _timer = new Timer("ConsumptionDelayTimerThread" + tableNameWithType);
+    _timer = new Timer("IngestionDelayTimerThread" + tableNameWithType);
     _timer.schedule(new TrackingTimerTask(this), INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
     // Install callback metric
     if (_enableAggregateMetric) {
-      _serverMetrics.addCallbackTableGaugeIfNeeded(_tableNameWithType, ServerGauge.MAX_CONSUMPTION_DELAY_MS,
-          () -> (long) getMaxConsumptionDelay());
+      _serverMetrics.addCallbackTableGaugeIfNeeded(_tableNameWithType, ServerGauge.TABLE_MAX_INGESTION_DELAY_MS,
+          () -> getMaximumIngestionDelay());
     }
   }
 
   // Constructor that uses defaults
-  public ConsumptionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
+  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager tableDataManager) {
     this(serverMetrics, tableNameWithType, tableDataManager, TIMER_THREAD_TICK_INTERVAL_MS,
         "", true, true);
   }
 
   // Constructor that takes a prefix to name the metric, so we can keep multiple trackers for the same table
-  public ConsumptionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType, String metricNamePrefix,
+  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType, String metricNamePrefix,
       RealtimeTableDataManager tableDataManager) {
     this(serverMetrics, metricNamePrefix + tableNameWithType, tableDataManager,
         TIMER_THREAD_TICK_INTERVAL_MS, metricNamePrefix, true, true);
@@ -254,19 +254,19 @@ public class ConsumptionDelayTracker {
    * If the new sample was for the partition that was maximum, but delay is not maximum anymore, we must select
    * a new maximum.
    *
-   * @param delayInMilliseconds pinot consumption delay being recorded.
+   * @param delayInMilliseconds ingestion delay being recorded.
    * @param sampleTime sample time.
    * @param partitionGroupId partition ID for which this delay is being recorded.
    */
-  public void storeConsumptionDelay(long delayInMilliseconds, long sampleTime, int partitionGroupId) {
+  public void updateIngestionDelay(long delayInMilliseconds, long sampleTime, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
     DelayMeasure previousMeasure = _partitionToDelaySampleMap.put(partitionGroupId,
         new DelayMeasure(sampleTime, delayInMilliseconds));
     if ((previousMeasure == null) && _enablePerPartitionMetric) {
       // First time we start tracking a partition we should start tracking it via metric
       _serverMetrics.addCallbackTableGaugeIfNeeded(getPerPartitionMetricName(partitionGroupId),
-          ServerGauge.PER_PARTITION_CONSUMPTION_DELAY_MS,
-          () -> (long) getPartitionConsumptionDelay(partitionGroupId));
+          ServerGauge.TABLE_PER_PARTITION_INGESTION_DELAY_MS,
+          () -> getPartitionIngestionDelay(partitionGroupId));
     }
     // If we are consuming we do not need to track this partition for removal.
     _partitionsMarkedForVerification.remove(partitionGroupId);
@@ -279,7 +279,7 @@ public class ConsumptionDelayTracker {
    *
    * @param partitionGroupId partition id that we should stop tracking.
    */
-  public void stopTrackingPartitionConsumptionDelay(int partitionGroupId) {
+  public void stopTrackingPartitionIngestionDelay(int partitionGroupId) {
     removePartitionId(partitionGroupId);
   }
 
@@ -320,25 +320,25 @@ public class ConsumptionDelayTracker {
 
   /*
    * This is the function to be invoked when reading the metric.
-   * It reports the maximum Pinot Consumption delay for all partitions of this table being served
+   * It reports the maximum ingestion delay for all partitions of this table being served
    * by current server; it adds the time elapsed since the sample was taken to the measure.
    * If no measures have been taken, then the reported value is zero.
    *
-   * @return max consumption delay in milliseconds.
+   * @return max ingestion delay in milliseconds.
    */
-  public long getMaxConsumptionDelay() {
+  public long getMaximumIngestionDelay() {
     DelayMeasure currentMaxDelay = getMaximumDelay();
     return getAgedDelay(currentMaxDelay);
   }
 
   /*
-   * Method to get consumption delay for a given partition.
+   * Method to get ingestion delay for a given partition.
    *
    * @param partitionGroupId partition for which we are retrieving the delay
    *
-   * @return consumption delay in milliseconds
+   * @return ingestion delay in milliseconds for the given partition ID.
    */
-  public long getPartitionConsumptionDelay(int partitionGroupId) {
+  public long getPartitionIngestionDelay(int partitionGroupId) {
     DelayMeasure currentMeasure = _partitionToDelaySampleMap.get(partitionGroupId);
     return getAgedDelay(currentMeasure);
   }
@@ -351,7 +351,7 @@ public class ConsumptionDelayTracker {
     // Now that segments can't report metric, destroy metric for this table
     _timer.cancel();
     if (_enableAggregateMetric) {
-      _serverMetrics.removeTableGauge(_tableNameWithType, ServerGauge.MAX_CONSUMPTION_DELAY_MS);
+      _serverMetrics.removeTableGauge(_tableNameWithType, ServerGauge.TABLE_MAX_INGESTION_DELAY_MS);
     }
     // Remove partitions so their related metrics get uninstalled.
     for (int partitionGroupId : _partitionToDelaySampleMap.keySet()) {

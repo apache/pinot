@@ -117,7 +117,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   // Object to track ingestion delay for all partitions
-  private ConsumptionDelayTracker _consumptionDelayTracker;
+  private IngestionDelayTracker _ingestionDelayTracker;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
@@ -126,8 +126,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
-    // Tracks maximum consumption delay amongst all partitions being served for this table
-    _consumptionDelayTracker = new ConsumptionDelayTracker(_serverMetrics, _tableNameWithType,
+    // Tracks maximum ingestion delay amongst all partitions being served for this table
+    _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType,
         this);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
@@ -218,8 +218,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _leaseExtender.shutDown();
     }
     // Make sure we do metric cleanup when we shut down the table.
-    if (_consumptionDelayTracker != null) {
-      _consumptionDelayTracker.shutdown();
+    if (_ingestionDelayTracker != null) {
+      _ingestionDelayTracker.shutdown();
     }
   }
 
@@ -229,21 +229,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param partitionGroupId Partition id that we must stop tracking on this server.
    */
   private void stopTrackingPartitionDelay(int partitionGroupId) {
-    if (_consumptionDelayTracker != null) {
-      _consumptionDelayTracker.stopTrackingPartitionConsumptionDelay(partitionGroupId);
+    if (_ingestionDelayTracker != null) {
+      _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionGroupId);
     }
   }
 
   /*
    * Method to handle CONSUMING->ONLINE transition.
-   * If no new consumption is noticed for this segment in some timeout, we will read
+   * If no new ingestion is noticed for this segment in some timeout, we will read
    * ideal state to verify the partition is still hosted in this server.
    *
    * @param partitionGroupId partition id of partition to be verified as hosted by this server.
    */
   private void markPartitionForVerification(int partitionGroupId) {
-    if (_consumptionDelayTracker != null) {
-      _consumptionDelayTracker.markPartitionForConfirmation(partitionGroupId);
+    if (_ingestionDelayTracker != null) {
+      _ingestionDelayTracker.markPartitionForConfirmation(partitionGroupId);
     }
   }
 
@@ -255,8 +255,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param partitionGroupId Partition ID for which delay is being updated.
    */
   public void updateIngestionDelay(long ingestionDelayMs, long currenTimeMs, int partitionGroupId) {
-    if (_consumptionDelayTracker != null) {
-      _consumptionDelayTracker.storeConsumptionDelay(ingestionDelayMs, currenTimeMs, partitionGroupId);
+    if (_ingestionDelayTracker != null) {
+      _ingestionDelayTracker.updateIngestionDelay(ingestionDelayMs, currenTimeMs, partitionGroupId);
     }
   }
 
@@ -287,6 +287,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   /**
    * Returns all partitionGroupIds for the partitions hosted by this server for current table.
+   * Note: this involves Zookeeper read and should not be used frequently due to efficiency concerns.
    */
   public List<Integer> getHostedPartitionsGroupIds() {
     ArrayList<Integer> partitionsHostedByThisServer = new ArrayList<>();

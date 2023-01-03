@@ -47,8 +47,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   CONSUMPTION_QUOTA_UTILIZATION("ratio", false),
   JVM_HEAP_USED_BYTES("bytes", true),
   // Lag metrics
-  MAX_CONSUMPTION_DELAY_MS("milliseconds", false),
-  PER_PARTITION_CONSUMPTION_DELAY_MS("milliseconds", false);
+  TABLE_MAX_INGESTION_DELAY_MS("milliseconds", false),
+  TABLE_PER_PARTITION_INGESTION_DELAY_MS("milliseconds", false);
   private final String _gaugeName;
   private final String _unit;
   private final boolean _global;
