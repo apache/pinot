@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Collection;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -55,18 +56,16 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   protected final boolean _hasMVGroupByExpression;
   protected final int[] _svGroupKeys;
   protected final int[][] _mvGroupKeys;
-  protected GroupKeyGenerator _groupKeyGenerator;
-  protected GroupByResultHolder[] _groupByResultHolders;
+  protected final GroupKeyGenerator _groupKeyGenerator;
+  protected final GroupByResultHolder[] _groupByResultHolders;
 
   public DefaultGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
       TransformOperator transformOperator) {
-
     this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, transformOperator, null);
   }
 
   public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, TransformOperator transformOperator) {
-
     this(queryContext, aggregationFunctions, groupByExpressions, transformOperator, null);
   }
 
@@ -80,11 +79,12 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, TransformOperator transformOperator,
-      GroupKeyGenerator groupKeyGenerator) {
+      @Nullable GroupKeyGenerator groupKeyGenerator) {
+    GroupKeyGenerator groupKeyGeneratorTemp;
     _aggregationFunctions = aggregationFunctions;
     assert _aggregationFunctions != null;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
-    _groupKeyGenerator = groupKeyGenerator;
+    groupKeyGeneratorTemp = groupKeyGenerator;
 
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
@@ -98,24 +98,25 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
-    if (_groupKeyGenerator == null) {
+    if (groupKeyGeneratorTemp == null) {
       if (hasNoDictionaryGroupByExpression || _nullHandlingEnabled) {
         if (groupByExpressions.length == 1) {
           // TODO(nhejazi): support MV and dictionary based when null handling is enabled.
-          _groupKeyGenerator =
+          groupKeyGeneratorTemp =
               new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit,
                   _nullHandlingEnabled);
         } else {
-          _groupKeyGenerator =
+          groupKeyGeneratorTemp =
               new NoDictionaryMultiColumnGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit);
         }
       } else {
-        _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
+        groupKeyGeneratorTemp = new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
             maxInitialResultHolderCapacity);
       }
     }
 
     // Initialize result holders
+    _groupKeyGenerator = groupKeyGeneratorTemp;
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
     int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
     int numAggregationFunctions = _aggregationFunctions.length;
