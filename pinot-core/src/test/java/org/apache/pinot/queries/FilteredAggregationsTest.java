@@ -338,10 +338,48 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   @Test
   public void testGroupBySupport() {
     String filterQuery =
-        "SELECT SUM(INT_COL), SUM(INT_COL) FILTER(WHERE INT_COL > 25000) AS total_sum FROM MyTable GROUP BY INT_COL";
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 25000) FROM MyTable GROUP BY BOOLEAN_COL";
+   String nonFilterQuery =
+        "SELECT SUM(INT_COL) FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL";
+    testQuery(filterQuery, nonFilterQuery);
+  }
+
+  @Test
+  public void testGroupBySupportCaseAlternative() {
+    String filterQuery =
+        "SELECT SUM(INT_COL), SUM(INT_COL) FILTER(WHERE INT_COL > 25000) AS total_sum FROM MyTable GROUP BY BOOLEAN_COL";
     String nonFilterQuery =
         "SELECT SUM(INT_COL), SUM(CASE WHEN INT_COL > 25000 THEN INT_COL ELSE 0 END) AS total_sum FROM MyTable GROUP "
-            + "BY INT_COL";
+            + "BY BOOLEAN_COL";
+    testQuery(filterQuery, nonFilterQuery);
+  }
+
+  @Test
+  public void testGroupBySupportSameFilter() {
+    String filterQuery =
+        "SELECT AVG(INT_COL) FILTER(WHERE INT_COL > 25000), SUM(INT_COL) FILTER(WHERE INT_COL > 25000) FROM MyTable "
+            + "GROUP BY BOOLEAN_COL";
+    String nonFilterQuery =
+        "SELECT AVG(INT_COL), SUM(INT_COL) FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL";
+    testQuery(filterQuery, nonFilterQuery);
+  }
+
+  @Test
+  public void testMultipleAggregationsOnSameFilterGroupBy() {
+    String filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990), "
+        + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990) FROM MyTable GROUP BY BOOLEAN_COL";
+    String nonFilterQuery = "SELECT MIN(INT_COL), MAX(INT_COL) FROM MyTable WHERE INT_COL > 29990 GROUP BY BOOLEAN_COL";
+    testQuery(filterQuery, nonFilterQuery);
+
+    filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990) AS total_min, "
+        + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990) AS total_max, "
+        + "SUM(INT_COL) FILTER(WHERE NO_INDEX_COL < 5000) AS total_sum, "
+        + "MAX(NO_INDEX_COL) FILTER(WHERE NO_INDEX_COL < 5000) AS total_max2 FROM MyTable GROUP BY BOOLEAN_COL";
+    nonFilterQuery = "SELECT MIN(CASE WHEN (NO_INDEX_COL > 29990) THEN INT_COL ELSE 99999 END) AS total_min, "
+        + "MAX(CASE WHEN (INT_COL > 29990) THEN INT_COL ELSE 0 END) AS total_max, "
+        + "SUM(CASE WHEN (NO_INDEX_COL < 5000) THEN INT_COL ELSE 0 END) AS total_sum, "
+        + "MAX(CASE WHEN (NO_INDEX_COL < 5000) THEN NO_INDEX_COL ELSE 0 END) AS total_max2 FROM MyTable GROUP BY "
+        + "BOOLEAN_COL";
     testQuery(filterQuery, nonFilterQuery);
   }
 }
