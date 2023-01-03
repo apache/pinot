@@ -613,7 +613,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _segmentLogger.debug("empty batch received - sleeping for {}ms", idlePipeSleepTimeMillis);
       }
       // Record Pinot ingestion delay as zero since we are up-to-date and no new events
-      setIngestionDelayToZero();
+      _realtimeTableDataManager.updateIngestionDelay(0, System.currentTimeMillis(), _partitionGroupId);
       // If there were no messages to be fetched from stream, wait for a little bit as to avoid hammering the stream
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
@@ -1576,12 +1576,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  /*
-   * Sets the ingestion delay to zero for current partition.
-   */
-  private void setIngestionDelayToZero() {
-    _realtimeTableDataManager.updateIngestionDelay(0, System.currentTimeMillis(), _partitionGroupId);
-  }
   // This should be done during commit? We may not always commit when we build a segment....
   // TODO Call this method when we are loading the segment, which we do from table datamanager afaik
   private void updateCurrentDocumentCountMetrics() {

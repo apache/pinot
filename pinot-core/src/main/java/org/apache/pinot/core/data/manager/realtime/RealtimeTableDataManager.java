@@ -218,9 +218,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _leaseExtender.shutDown();
     }
     // Make sure we do metric cleanup when we shut down the table.
-    if (_ingestionDelayTracker != null) {
-      _ingestionDelayTracker.shutdown();
-    }
+    _ingestionDelayTracker.shutdown();
   }
 
   /*
@@ -229,9 +227,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param partitionGroupId Partition id that we must stop tracking on this server.
    */
   private void stopTrackingPartitionDelay(int partitionGroupId) {
-    if (_ingestionDelayTracker != null) {
-      _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionGroupId);
-    }
+    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionGroupId);
   }
 
   /*
@@ -242,9 +238,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param partitionGroupId partition id of partition to be verified as hosted by this server.
    */
   private void markPartitionForVerification(int partitionGroupId) {
-    if (_ingestionDelayTracker != null) {
-      _ingestionDelayTracker.markPartitionForConfirmation(partitionGroupId);
-    }
+    _ingestionDelayTracker.markPartitionForConfirmation(partitionGroupId);
   }
 
   /*
@@ -255,9 +249,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param partitionGroupId Partition ID for which delay is being updated.
    */
   public void updateIngestionDelay(long ingestionDelayMs, long currenTimeMs, int partitionGroupId) {
-    if (_ingestionDelayTracker != null) {
-      _ingestionDelayTracker.updateIngestionDelay(ingestionDelayMs, currenTimeMs, partitionGroupId);
-    }
+    _ingestionDelayTracker.updateIngestionDelay(ingestionDelayMs, currenTimeMs, partitionGroupId);
   }
 
   /*
