@@ -16,6 +16,9 @@
       }
     },
     "queries": [
+      { "sql": "SELECT * FROM {tbl} WHERE strCol IN (SELECT strCol FROM {tbl} WHERE intCol < 100)" },
+      { "sql": "SELECT * FROM {tbl} WHERE strCol NOT IN (SELECT strCol FROM {tbl} WHERE intCol > 100)" },
+      { "sql": "SELECT * FROM {tbl} WHERE strCol NOT IN (SELECT strCol FROM {tbl} WHERE intCol < 100)" },
       { "sql": "SELECT * FROM {tbl} WHERE intCol > 5" },
       { "sql": "SELECT * FROM {tbl} WHERE strCol IN ('foo', 'bar')" },
       { "sql": "SELECT * FROM {tbl} WHERE intCol IN (196883, 42)" },
@@ -86,6 +89,7 @@
       }
     },
     "queries": [
+      { "sql": "SELECT * FROM {tbl1} WHERE strCol NOT IN (SELECT strCol1 FROM {tbl2} WHERE intCol > 100)" },
       { "sql": "SELECT strCol FROM {tbl1} GROUP BY strCol" },
       { "sql": "SELECT strCol FROM {tbl1} GROUP BY strCol, intCol" },
       { "sql": "SELECT strCol, intCol FROM {tbl1} GROUP BY strCol, intCol" },
