@@ -67,8 +67,8 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
 
   @Override
   protected BaseResultsBlock getNextBlock() {
-    BaseResultsBlock mergedBlock;
     startProcess();
+    BaseResultsBlock mergedBlock;
     try {
       mergedBlock = mergeResults();
     } catch (InterruptedException | EarlyTerminationException e) {
@@ -175,5 +175,15 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
       }
     }
     return mergedBlock;
+  }
+
+  @Override
+  public void start() {
+    throw new UnsupportedOperationException("Single block combine operator is not start-able!");
+  }
+
+  @Override
+  public void stop() {
+    throw new UnsupportedOperationException("Single block combine operator is not stop-able!");
   }
 }

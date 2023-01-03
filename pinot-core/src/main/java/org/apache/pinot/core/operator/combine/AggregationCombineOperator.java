@@ -29,7 +29,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 /**
  * Combine operator for aggregation queries.
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
+@SuppressWarnings({"rawtypes"})
 public class AggregationCombineOperator extends BaseSingleBlockCombineOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "COMBINE_AGGREGATE";
 

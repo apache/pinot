@@ -119,7 +119,6 @@ public class StreamingGroupByCombineOperator extends BaseStreamBlockCombineOpera
 
   @Override
   protected BaseResultsBlock getNextBlock() {
-    startProcess();
     while (_exceptionBlock == null && !_opCompleted) {
       try {
         // This guarantees final result block is reduced
@@ -141,7 +140,6 @@ public class StreamingGroupByCombineOperator extends BaseStreamBlockCombineOpera
         return _exceptionBlock;
       }
     }
-    stopProcess();
     // Setting the execution stats for the final return
     BaseResultsBlock finalBlock = new MetadataResultsBlock();
     int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);

@@ -55,22 +55,16 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
   protected int _numOperatorsFinished;
   protected BaseResultsBlock _exceptionBlock;
 
-  private boolean _processStarted;
-  private boolean _processStopped;
-
   public BaseStreamBlockCombineOperator(CombineFunction<T> combineFunction, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
     super(operators, queryContext, executorService);
     _combineFunction = combineFunction;
     _numOperatorsFinished = 0;
     _exceptionBlock = null;
-    _processStarted = false;
-    _processStopped = false;
   }
 
   @Override
   protected BaseResultsBlock getNextBlock() {
-    startProcess();
     long endTimeMs = _queryContext.getEndTimeMs();
     while (_exceptionBlock == null && _numOperatorsFinished < _numOperators) {
       try {
@@ -82,14 +76,12 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
           LOGGER.error("Timed out while polling results block (query: {})", _queryContext);
           _exceptionBlock = new ExceptionResultsBlock(QueryException.getException(
               QueryException.EXECUTION_TIMEOUT_ERROR, new TimeoutException("Timed out while polling results block")));
-          stopProcess();
           return _exceptionBlock;
         }
         if (resultsBlock.getProcessingExceptions() != null) {
           // Caught exception while processing segment, skip streaming the remaining results blocks and directly return
           // the exception
           _exceptionBlock = resultsBlock;
-          stopProcess();
           return _exceptionBlock;
         }
         if (resultsBlock == LAST_RESULTS_BLOCK) {
@@ -102,35 +94,15 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
       } catch (Exception e) {
         LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
         _exceptionBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
-        stopProcess();
         return _exceptionBlock;
       }
     }
-    // If we reached here, all tasks has finished or exception occurs. We stop all the processes and
-    // Return a metadata results block indicating that the process has finished.
-    stopProcess();
     // Setting the execution stats for the final return
     BaseResultsBlock finalBlock = new MetadataResultsBlock();
     int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
     CombineOperatorUtils.setExecutionStatistics(finalBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
         numServerThreads);
     return finalBlock;
-  }
-
-  @Override
-  protected void startProcess() {
-    if (!_processStarted) {
-      _processStarted = true;
-      super.startProcess();
-    }
-  }
-
-  @Override
-  protected void stopProcess() {
-    if (_processStarted && !_processStopped) {
-      _processStopped = true;
-      super.stopProcess();
-    }
   }
 
   /**
@@ -192,5 +164,15 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
   public BaseResultsBlock mergeResults()
       throws Exception {
     throw new UnsupportedOperationException("Streaming combine operator doesn't support merge results.");
+  }
+
+  @Override
+  public void start() {
+    startProcess();
+  }
+
+  @Override
+  public void stop() {
+    stopProcess();
   }
 }

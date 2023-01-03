@@ -41,40 +41,36 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public class StreamingInstanceResponseOperator extends InstanceResponseOperator {
 
   private final StreamObserver<Server.ServerResponse> _streamObserver;
-  private final int _limit;
-  private int _numRowsCollected;
 
   public StreamingInstanceResponseOperator(BaseCombineOperator<?> combinedOperator, List<IndexSegment> indexSegments,
       List<FetchContext> fetchContexts, StreamObserver<Server.ServerResponse> streamObserver,
       QueryContext queryContext) {
     super(combinedOperator, indexSegments, fetchContexts, queryContext);
     _streamObserver = streamObserver;
-    _limit = queryContext.getLimit();
-    _numRowsCollected = 0;
   }
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
     prefetchAll();
-    InstanceResponseBlock exceptionResultBlock = null;
     BaseResultsBlock combinedResult;
     try {
+      _combineOperator.start();
       combinedResult = _combineOperator.nextBlock();
       while (!(combinedResult instanceof MetadataResultsBlock)) {
         if (combinedResult instanceof ExceptionResultsBlock) {
-          exceptionResultBlock = new InstanceResponseBlock(combinedResult, _queryContext);
-          return exceptionResultBlock;
+          return new InstanceResponseBlock(combinedResult, _queryContext);
         } else {
           sendBlock(combinedResult);
         }
         combinedResult = _combineOperator.nextBlock();
       }
     } catch (IOException e) {
-      exceptionResultBlock = new InstanceResponseBlock();
+      InstanceResponseBlock exceptionResultBlock = new InstanceResponseBlock();
       exceptionResultBlock.addException(
           QueryException.getException(QueryException.DATA_TABLE_SERIALIZATION_ERROR, e));
       return exceptionResultBlock;
     } finally {
+      _combineOperator.stop();
       releaseAll();
     }
     // return a metadata-only block.
@@ -86,7 +82,6 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
     DataSchema dataSchema = baseResultBlock.getDataSchema(_queryContext);
     Collection<Object[]> rows = baseResultBlock.getRows(_queryContext);
     Preconditions.checkState(dataSchema != null && rows != null, "Malformed data block");
-    _numRowsCollected += rows.size();
     DataTable dataTable = baseResultBlock.getDataTable(_queryContext);
     _streamObserver.onNext(StreamingResponseUtils.getDataResponse(dataTable));
   }

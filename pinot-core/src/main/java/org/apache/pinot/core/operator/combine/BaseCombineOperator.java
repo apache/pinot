@@ -46,8 +46,8 @@ import org.slf4j.LoggerFactory;
  * the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
  * detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
-public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends BaseOperator<BaseResultsBlock>
+@SuppressWarnings({"rawtypes"})
+public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends BaseOperator<T>
     implements CombineOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseCombineOperator.class);
 
@@ -82,6 +82,9 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     _futures = new Future[_numTasks];
   }
 
+  /**
+   * Start the combine operator process. This will spin up multiple threads to process data segments in parallel.
+   */
   protected void startProcess() {
     Tracing.activeRecording().setNumTasks(_numTasks);
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
@@ -129,6 +132,9 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     }
   }
 
+  /**
+   * Stop the combine operator process. This will stop all sub-tasks that were spun up to process data segments.
+   */
   protected void stopProcess() {
     // Cancel all ongoing jobs
     for (Future future : _futures) {
@@ -151,4 +157,14 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   public List<Operator> getChildOperators() {
     return _operators;
   }
+
+  /**
+   * Start the combine operator.
+   */
+  public abstract void start();
+
+  /**
+   * Stop and clean up the combine operator.
+   */
+  public abstract void stop();
 }
