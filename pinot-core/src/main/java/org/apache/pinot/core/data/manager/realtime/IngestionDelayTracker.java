@@ -90,25 +90,8 @@ public class IngestionDelayTracker {
       _delayMilliseconds = d;
       _sampleTime = t;
     }
-    public long _delayMilliseconds;
-    public long _sampleTime;
-  }
-
-  /*
-   * Class to handle timer thread that will track inactive partitions
-   */
-  private class TrackingTimerTask extends TimerTask {
-    private final IngestionDelayTracker _tracker;
-
-    public TrackingTimerTask(IngestionDelayTracker tracker) {
-      _tracker = tracker;
-    }
-
-    @Override
-    public void run() {
-      // tick inactive partitions every interval of time to keep tracked partitions up to date
-      _tracker.timeoutInactivePartitions();
-    }
+    public final long _delayMilliseconds;
+    public final long _sampleTime;
   }
 
   // HashMap used to store delay measures for all partitions active for the current table.
@@ -128,8 +111,8 @@ public class IngestionDelayTracker {
   private final String _tableNameWithType;
 
   private boolean _enableAging;
-  private boolean _enablePerPartitionMetric = true;
-  private boolean _enableAggregateMetric = true;
+  private final boolean _enablePerPartitionMetric;
+  private final boolean _enableAggregateMetric;
   private final Logger _logger;
 
   private final RealtimeTableDataManager _realTimeTableDataManager;
@@ -215,7 +198,12 @@ public class IngestionDelayTracker {
     _enableAggregateMetric = enableAggregateMetric;
     _timerThreadTickIntervalMs = timerThreadTickIntervalMs;
     _timer = new Timer("IngestionDelayTimerThread" + tableNameWithType);
-    _timer.schedule(new TrackingTimerTask(this), INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
+    _timer.schedule(new TimerTask() {
+        @Override
+        public void run() {
+          timeoutInactivePartitions();
+        }
+      }, INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
     // Install callback metric
     if (_enableAggregateMetric) {
       _serverMetrics.addCallbackTableGaugeIfNeeded(_tableNameWithType, ServerGauge.TABLE_MAX_INGESTION_DELAY_MS,
@@ -239,7 +227,7 @@ public class IngestionDelayTracker {
 
 
   /**
-   * Use to set or rest the aging of reported values.
+   * Use to set or reset the aging of reported values.
    * @param enableAging true if we want maximum to be aged as per sample time or false if we do not want to age
    *                   samples
    */

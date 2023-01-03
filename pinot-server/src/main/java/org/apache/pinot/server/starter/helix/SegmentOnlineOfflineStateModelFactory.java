@@ -98,6 +98,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         throw new RuntimeException("Segment " + segmentNameStr + " + not present ");
       }
 
+      // TODO: https://github.com/apache/pinot/issues/10049
       try {
         if (!(acquiredSegment instanceof LLRealtimeSegmentDataManager)) {
           // We found an LLC segment that is not consuming right now, must be that we already swapped it with a
