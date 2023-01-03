@@ -110,8 +110,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
               new NoDictionaryMultiColumnGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit);
         }
       } else {
-        groupKeyGeneratorTemp = new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
-            maxInitialResultHolderCapacity);
+        groupKeyGeneratorTemp =
+            new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
+                maxInitialResultHolderCapacity);
       }
     }
 

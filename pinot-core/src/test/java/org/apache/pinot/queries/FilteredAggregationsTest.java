@@ -347,7 +347,8 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   @Test
   public void testGroupBySupportCaseAlternative() {
     String filterQuery =
-        "SELECT SUM(INT_COL), SUM(INT_COL) FILTER(WHERE INT_COL > 25000) AS total_sum FROM MyTable GROUP BY BOOLEAN_COL";
+        "SELECT SUM(INT_COL), SUM(INT_COL) FILTER(WHERE INT_COL > 25000) AS total_sum FROM MyTable GROUP BY "
+            + "BOOLEAN_COL";
     String nonFilterQuery =
         "SELECT SUM(INT_COL), SUM(CASE WHEN INT_COL > 25000 THEN INT_COL ELSE 0 END) AS total_sum FROM MyTable GROUP "
             + "BY BOOLEAN_COL";

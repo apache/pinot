@@ -171,7 +171,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
       int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
       if (groupKeyGenerator.getNumKeys() > trimSize) {
-        TableResizer tableResizer =  new TableResizer(_dataSchema, _queryContext);
+        TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords =
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords);
