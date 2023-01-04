@@ -105,11 +105,13 @@ public class AsyncQueryResponse implements QueryResponse {
   public Map<ServerRoutingInstance, ServerResponse> getFinalResponses(int expectedResponseSize)
       throws InterruptedException {
     try {
-      long N = _countDownLatch.getCount();
-      while (_countDownLatch.getCount() >= N - expectedResponseSize && _maxEndTimeMs > System.currentTimeMillis()) ;
-      
-      boolean finish =
-          (_countDownLatch.getCount() >= N - expectedResponseSize) || (_maxEndTimeMs == System.currentTimeMillis());
+      long totalResponseSize = _countDownLatch.getCount();
+      while (_countDownLatch.getCount() >= totalResponseSize - expectedResponseSize
+          && _maxEndTimeMs > System.currentTimeMillis()) {
+      }
+
+      boolean finish = (_countDownLatch.getCount() >= totalResponseSize - expectedResponseSize) || (_maxEndTimeMs
+          == System.currentTimeMillis());
 
       _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
 

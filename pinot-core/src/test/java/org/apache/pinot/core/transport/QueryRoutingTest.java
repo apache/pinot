@@ -256,7 +256,6 @@ public class QueryRoutingTest {
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
 
-
     // Submit query after server is down
     startTimeMs = System.currentTimeMillis();
     asyncQueryResponse =
@@ -287,7 +286,7 @@ public class QueryRoutingTest {
   public void tearDown() {
     _queryRouter.shutDown();
   }
-  
+
   private QueryServer startServer(String instanceName, int port, byte[] responseBytes) {
     InstanceRequestHandler handler =
         new InstanceRequestHandler(instanceName, new PinotConfiguration(), mockQueryScheduler(0, responseBytes),
@@ -321,19 +320,19 @@ public class QueryRoutingTest {
     ServerInstance serverInstance4 = new ServerInstance("localhost", 1114);
     ServerInstance serverInstance5 = new ServerInstance("localhost", 1115);
 
-    Map<ServerInstance, List<String>> ROUTING_TABLE = new HashMap<>();
-    ROUTING_TABLE.put(serverInstance1, Collections.emptyList());
-    ROUTING_TABLE.put(serverInstance2, Collections.emptyList());
-    ROUTING_TABLE.put(serverInstance3, Collections.emptyList());
-    ROUTING_TABLE.put(serverInstance4, Collections.emptyList());
-    ROUTING_TABLE.put(serverInstance5, Collections.emptyList());
+    Map<ServerInstance, List<String>> routingTable = new HashMap<>();
+    routingTable.put(serverInstance1, Collections.emptyList());
+    routingTable.put(serverInstance2, Collections.emptyList());
+    routingTable.put(serverInstance3, Collections.emptyList());
+    routingTable.put(serverInstance4, Collections.emptyList());
+    routingTable.put(serverInstance5, Collections.emptyList());
 
     {
-      BrokerRequest BROKER_REQUEST = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable LIMIT 2");
-      
+      BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable LIMIT 2");
+
       // Offline Only
       AsyncQueryResponse asyncQueryResponse =
-          _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 600_000L);
+          _queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, 600_000L);
       Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses(2);
       assertEquals(response.size(), 5);
 
@@ -374,11 +373,16 @@ public class QueryRoutingTest {
 
       _requestCount += 10;
       waitForStatsUpdate(_requestCount);
-      assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance1.getInstanceId()).intValue(), 0);
-      assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance2.getInstanceId()).intValue(), 0);
-      assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance3.getInstanceId()).intValue(), 0);
-      assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance4.getInstanceId()).intValue(), 0);
-      assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance5.getInstanceId()).intValue(), 0);
+      assertEquals(
+          _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance1.getInstanceId()).intValue(), 0);
+      assertEquals(
+          _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance2.getInstanceId()).intValue(), 0);
+      assertEquals(
+          _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance3.getInstanceId()).intValue(), 0);
+      assertEquals(
+          _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance4.getInstanceId()).intValue(), 0);
+      assertEquals(
+          _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance5.getInstanceId()).intValue(), 0);
     }
 
     // Shut down the server
