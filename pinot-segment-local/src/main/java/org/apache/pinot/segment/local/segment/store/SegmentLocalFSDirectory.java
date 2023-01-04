@@ -102,6 +102,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
+  public boolean isDirectoryMatchingWithLatestConfigs() {
+    return false;
+  }
+
+  @Override
   public URI getIndexDir() {
     return _indexDir.toURI();
   }
