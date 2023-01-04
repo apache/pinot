@@ -31,4 +31,11 @@ public interface BitmapBasedDocIdIterator extends BlockDocIdIterator {
    * Returns a bitmap of the matching document ids.
    */
   ImmutableRoaringBitmap getDocIds();
+
+  /**
+   * Returns true if the doc ids represent absence rather than presence and need to be handled specially
+   * */
+  default boolean isInverted() {
+    return false;
+  }
 }

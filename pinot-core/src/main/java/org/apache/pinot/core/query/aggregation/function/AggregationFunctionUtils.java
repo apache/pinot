@@ -211,7 +211,7 @@ public class AggregationFunctionUtils {
    */
   public static List<Pair<AggregationFunction[], TransformOperator>> buildFilteredAggTransformPairs(
       IndexSegment indexSegment, QueryContext queryContext, BaseFilterOperator mainPredicateFilterOperator,
-      TransformOperator mainTransformOperator, @Nullable ExpressionContext[] groupByExpressions) {
+      TransformOperator mainTransformOperator, @Nullable ExpressionContext[] groupByExpressions, int numDocs) {
     Map<FilterContext, Pair<List<AggregationFunction>, TransformOperator>> filterContextToAggFuncsMap = new HashMap<>();
     List<AggregationFunction> nonFilteredAggregationFunctions = new ArrayList<>();
     List<Pair<AggregationFunction, FilterContext>> aggregationFunctions =
@@ -232,7 +232,7 @@ public class AggregationFunctionUtils {
             buildFilterOperator(indexSegment, queryContext, currentFilterExpression);
         BaseFilterOperator wrappedFilterOperator =
             new CombinedFilterOperator(mainPredicateFilterOperator, filterPlanOpPair.getRight(),
-                queryContext.getQueryOptions());
+                queryContext.getQueryOptions(), numDocs);
         TransformOperator newTransformOperator =
             buildTransformOperatorForFilteredAggregates(indexSegment, queryContext, wrappedFilterOperator,
                 groupByExpressions);

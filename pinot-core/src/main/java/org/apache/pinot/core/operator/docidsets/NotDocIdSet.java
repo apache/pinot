@@ -33,6 +33,7 @@ public class NotDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public BlockDocIdIterator iterator() {
+    // FIXME if the child set is an inverted bitmap, we could just invert it again
     return new NotDocIdIterator(_childDocIdSet.iterator(), _numDocs);
   }
 

@@ -38,12 +38,14 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   private final BaseFilterOperator _mainFilterOperator;
   private final BaseFilterOperator _subFilterOperator;
   private final Map<String, String> _queryOptions;
+  private final int _numDocs;
 
   public CombinedFilterOperator(BaseFilterOperator mainFilterOperator, BaseFilterOperator subFilterOperator,
-      Map<String, String> queryOptions) {
+      Map<String, String> queryOptions, int numDocs) {
     _mainFilterOperator = mainFilterOperator;
     _subFilterOperator = subFilterOperator;
     _queryOptions = queryOptions;
+    _numDocs = numDocs;
   }
 
   @Override
@@ -61,6 +63,7 @@ public class CombinedFilterOperator extends BaseFilterOperator {
     Tracing.activeRecording().setNumChildren(2);
     FilterBlockDocIdSet mainFilterDocIdSet = _mainFilterOperator.nextBlock().getNonScanFilterBLockDocIdSet();
     FilterBlockDocIdSet subFilterDocIdSet = _subFilterOperator.nextBlock().getBlockDocIdSet();
-    return new FilterBlock(new AndDocIdSet(Arrays.asList(mainFilterDocIdSet, subFilterDocIdSet), _queryOptions));
+    return new FilterBlock(
+        new AndDocIdSet(Arrays.asList(mainFilterDocIdSet, subFilterDocIdSet), _queryOptions, _numDocs));
   }
 }
