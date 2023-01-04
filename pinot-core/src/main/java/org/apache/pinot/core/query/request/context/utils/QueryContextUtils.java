@@ -59,6 +59,12 @@ public class QueryContextUtils {
         || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
   }
 
+  public static boolean isMinMaxBasedSelectionOrderBy(QueryContext query) {
+    List<OrderByExpressionContext> orderByExpressions = query.getOrderByExpressions();
+    return orderByExpressions != null
+        && orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER;
+  }
+
   /**
    * Returns {@code true} if the given query is a distinct query, {@code false} otherwise.
    */

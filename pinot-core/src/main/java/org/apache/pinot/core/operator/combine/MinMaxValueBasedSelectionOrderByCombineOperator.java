@@ -72,7 +72,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   private final List<MinMaxValueContext> _minMaxValueContexts;
   private final AtomicReference<Comparable> _globalBoundaryValue = new AtomicReference<>();
 
-  MinMaxValueBasedSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
+  public MinMaxValueBasedSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
     super(operators, queryContext, executorService);
     _endOperatorId = new AtomicInteger(_numOperators);

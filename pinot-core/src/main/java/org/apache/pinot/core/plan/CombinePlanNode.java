@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
@@ -45,6 +46,8 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -52,6 +55,7 @@ import org.apache.pinot.spi.trace.Tracing;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class CombinePlanNode implements PlanNode {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
   // Try to schedule 10 plans for each thread, or evenly distribute plans to all MAX_NUM_THREADS_PER_QUERY threads
   private static final int TARGET_NUM_PLANS_PER_THREAD = 10;
 
@@ -190,6 +194,13 @@ public class CombinePlanNode implements PlanNode {
         return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
       } else {
         // Selection order-by
+        if (QueryContextUtils.isMinMaxBasedSelectionOrderBy(_queryContext)) {
+          try {
+            return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+          } catch (Exception e) {
+            LOGGER.warn("Caught exception while using min/max value based combine, using the default combine", e);
+          }
+        }
         return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
       }
     } else {
