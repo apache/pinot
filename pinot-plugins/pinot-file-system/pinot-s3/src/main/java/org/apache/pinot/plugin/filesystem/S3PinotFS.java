@@ -204,9 +204,9 @@ public class S3PinotFS extends BasePinotFS {
     Preconditions.checkNotNull(uri, "uri is null");
     URI strippedUri = getBase(uri).relativize(uri);
     if (isPathTerminatedByDelimiter(strippedUri)) {
-      return sanitizePath(strippedUri.getPath());
+      return sanitizePath(strippedUri.toString());
     }
-    return sanitizePath(strippedUri.getPath() + DELIMITER);
+    return sanitizePath(strippedUri.toString() + DELIMITER);
   }
 
   private URI normalizeToDirectoryUri(URI uri)
