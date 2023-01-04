@@ -19,14 +19,14 @@
 package org.apache.pinot.query.planner.logical;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.StageMetadata;
+import org.apache.pinot.query.planner.logical.worker.WorkerAssignmentStrategy;
+import org.apache.pinot.query.planner.logical.worker.WorkerAssignmentStrategyFactory;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -77,10 +77,10 @@ public class StagePlanner {
 
     QueryPlan queryPlan = StageMetadataVisitor.attachMetadata(relRoot.fields, globalReceiverNode);
 
-    // assign workers to each stage.
-    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
-      _workerManager.assignWorkerToStage(e.getKey(), e.getValue(), _requestId);
-    }
+    // assign workers to each stage. Strategy is determined by query options.
+    WorkerAssignmentStrategy workerAssignmentStrategy =
+        WorkerAssignmentStrategyFactory.create(_plannerContext.getOptions(), _workerManager);
+    workerAssignmentStrategy.assignWorkers(queryPlan, _requestId);
 
     return queryPlan;
   }
