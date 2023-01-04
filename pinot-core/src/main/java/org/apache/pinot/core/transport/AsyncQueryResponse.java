@@ -102,6 +102,39 @@ public class AsyncQueryResponse implements QueryResponse {
     }
   }
 
+  public Map<ServerRoutingInstance, ServerResponse> getFinalResponses(int expectedResponseSize)
+      throws InterruptedException {
+    try {
+      long N = _countDownLatch.getCount();
+      while (_countDownLatch.getCount() >= N - expectedResponseSize && _maxEndTimeMs > System.currentTimeMillis()) ;
+      
+      boolean finish =
+          (_countDownLatch.getCount() >= N - expectedResponseSize) || (_maxEndTimeMs == System.currentTimeMillis());
+
+      _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
+
+      int count = (int) _countDownLatch.getCount();
+      for (int i = 0; i < count; i++) {
+        _countDownLatch.countDown();
+      }
+
+      return _responseMap;
+    } finally {
+      // Update ServerRoutingStats.
+      for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
+        ServerResponse response = entry.getValue();
+        if (response == null || response.getDataTable() == null) {
+          // These are servers from which a response was not received. So update query response stats for such
+          // servers with maximum latency i.e timeout value.
+          _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, entry.getKey().getInstanceId(),
+              _timeoutMs);
+        }
+      }
+
+      _queryRouter.markQueryDone(_requestId);
+    }
+  }
+
   @Override
   public String getServerStats() {
     StringBuilder stringBuilder = new StringBuilder(

@@ -93,20 +93,10 @@ public class QueryRouter {
     // can prefer but not require TLS until all servers guaranteed to be on TLS
     boolean preferTls = _serverChannelsTls != null;
 
-    // Make broker short-circuit for point queries w/ a limit clause
-    boolean limitClausePresent = false;
-    int limit = 0;
-
     // Build map from server to request based on the routing table
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
-
-      if (offlineBrokerRequest.pinotQuery.limit > 0) {
-        limitClausePresent = true;
-        limit = offlineBrokerRequest.pinotQuery.limit;
-      }
-
       for (Map.Entry<ServerInstance, List<String>> entry : offlineRoutingTable.entrySet()) {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
@@ -116,12 +106,6 @@ public class QueryRouter {
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
-
-      if (realtimeBrokerRequest.pinotQuery.limit > 0) {
-        limitClausePresent = true;
-        limit += realtimeBrokerRequest.pinotQuery.limit;
-      }
-
       for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
@@ -146,10 +130,6 @@ public class QueryRouter {
         serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(),
             timeoutMs);
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
-
-        if (limitClausePresent && --limit == 0) {
-          break;
-        }
       } catch (TimeoutException e) {
         if (ServerChannels.CHANNEL_LOCK_TIMEOUT_MSG.equals(e.getMessage())) {
           _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS, 1);

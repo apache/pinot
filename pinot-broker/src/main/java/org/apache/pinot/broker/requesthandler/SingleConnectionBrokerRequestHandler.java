@@ -106,13 +106,36 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
       serverBrokerRequest.getPinotQuery().putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
     }
 
+    // broker short-circuit for `select` and `select distinct` queries without `ORDER BY`
+    boolean orderByPresent = false;
+    boolean selectPresent = false;
+    boolean limitClausePresent = false;
+    int expectedResponseSize = 0;
+    if (offlineBrokerRequest != null) {
+      orderByPresent = offlineBrokerRequest.pinotQuery.orderByList.size() == 0;
+      selectPresent = offlineBrokerRequest.pinotQuery.selectList.size() > 0;
+      limitClausePresent = offlineBrokerRequest.pinotQuery.limit > 0;
+      expectedResponseSize = offlineBrokerRequest.pinotQuery.limit;
+    }
+    if (realtimeBrokerRequest != null) {
+      orderByPresent = orderByPresent || realtimeBrokerRequest.pinotQuery.orderByList.size() == 0;
+      selectPresent = selectPresent || realtimeBrokerRequest.pinotQuery.selectList.size() > 0;
+      limitClausePresent = limitClausePresent || realtimeBrokerRequest.pinotQuery.limit > 0;
+      expectedResponseSize += offlineBrokerRequest.pinotQuery.limit;
+    }
+    boolean shortCircuitNeeded = !orderByPresent && selectPresent;
+
     String rawTableName = TableNameBuilder.extractRawTableName(serverBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
     AsyncQueryResponse asyncQueryResponse =
         _queryRouter.submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable,
             realtimeBrokerRequest, realtimeRoutingTable, timeoutMs);
     _failureDetector.notifyQuerySubmitted(asyncQueryResponse);
-    Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
+    Map<ServerRoutingInstance, ServerResponse> finalResponses =
+        shortCircuitNeeded && limitClausePresent ? asyncQueryResponse.getFinalResponses(expectedResponseSize)
+            : asyncQueryResponse.getFinalResponses();
+//    Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
+//    Need to implement cancelQuery here
     _failureDetector.notifyQueryFinished(asyncQueryResponse);
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
         System.nanoTime() - scatterGatherStartTimeNs);
