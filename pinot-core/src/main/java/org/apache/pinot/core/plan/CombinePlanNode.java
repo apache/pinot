@@ -48,8 +48,6 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -57,7 +55,6 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class CombinePlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
   // Try to schedule 10 plans for each thread, or evenly distribute plans to all MAX_NUM_THREADS_PER_QUERY threads
   private static final int TARGET_NUM_PLANS_PER_THREAD = 10;
 
