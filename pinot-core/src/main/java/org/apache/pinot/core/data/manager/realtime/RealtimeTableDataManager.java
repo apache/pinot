@@ -221,26 +221,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   /*
-   * Method to handle CONSUMING->DROPPED transition.
-   *
-   * @param partitionGroupId Partition id that we must stop tracking on this server.
-   */
-  private void stopTrackingPartitionDelay(int partitionGroupId) {
-    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionGroupId);
-  }
-
-  /*
-   * Method to handle CONSUMING->ONLINE transition.
-   * If no new ingestion is noticed for this segment in some timeout, we will read
-   * ideal state to verify the partition is still hosted in this server.
-   *
-   * @param partitionGroupId partition id of partition to be verified as hosted by this server.
-   */
-  private void markPartitionForVerification(int partitionGroupId) {
-    _ingestionDelayTracker.markPartitionForConfirmation(partitionGroupId);
-  }
-
-  /*
    * Method used by LLRealtimeSegmentManagers to update their partition delays
    *
    * @param ingestionDelayMs Ingestion delay being reported.
@@ -260,7 +240,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void onConsumingToDropped(String segmentNameStr) {
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    stopTrackingPartitionDelay(segmentName.getPartitionGroupId());
+    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName.getPartitionGroupId());
   }
 
   /*
@@ -273,12 +253,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void onConsumingToOnline(String segmentNameStr) {
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    markPartitionForVerification(segmentName.getPartitionGroupId());
+    _ingestionDelayTracker.markPartitionForVerification(segmentName.getPartitionGroupId());
   }
 
   /**
    * Returns all partitionGroupIds for the partitions hosted by this server for current table.
-   * Note: this involves Zookeeper read and should not be used frequently due to efficiency concerns.
+   * @Note: this involves Zookeeper read and should not be used frequently due to efficiency concerns.
    */
   public List<Integer> getHostedPartitionsGroupIds() {
     ArrayList<Integer> partitionsHostedByThisServer = new ArrayList<>();

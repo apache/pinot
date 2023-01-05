@@ -28,6 +28,7 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,19 +40,18 @@ import org.slf4j.LoggerFactory;
  * 2-The object tracks ingestion delays for all partitions hosted by the current server for the given Realtime table.
  * 3-Partition delays are updated by all LLRealtimeSegmentDataManager objects hosted in the corresponding
  *   RealtimeTableDataManager.
- * 4-The class tracks the maximum of all ingestion delays observed for all partitions of the given table.
- * 5-A Metric is derived from reading the maximum tracked by this class. And individual metrics are associated with
- *   each partition being tracked.
- * 6-Delays reported for partitions that do not have events to consume are reported as zero.
- * 7-We track the time at which each delay sample was collected so that delay can be increased when partition stops
+ * 4-A Metric is derived from reading the maximum tracked by this class. In addition, individual metrics are associated
+ *   with each partition being tracked.
+ * 5-Delays reported for partitions that do not have events to consume are reported as zero.
+ * 6-We track the time at which each delay sample was collected so that delay can be increased when partition stops
  *   consuming for any reason other than no events being available for consumption.
- * 8-Segments that go from CONSUMING to DROPPED states stop being tracked so their delays do not cloud
+ * 7-Partitions whose Segments go from CONSUMING to DROPPED state stop being tracked so their delays do not cloud
  *   delays of active partitions.
- * 9-When a segment goes from CONSUMING to ONLINE, we start a timeout for the corresponding partition.
+ * 8-When a segment goes from CONSUMING to ONLINE, we start a timeout for the corresponding partition.
  *   If no consumption is noticed after the timeout, we then read ideal state to confirm the server still hosts the
  *   partition. If not, we stop tracking the respective partition.
- * 10-A timer thread is started by this object to track timeouts of partitions and drive the reading of their ideal
- *    state.
+ * 9-A timer thread is started by this object to track timeouts of partitions and drive the reading of their ideal
+ *  state.
  *
  *  The following diagram illustrates the object interactions with main external APIs
  *
@@ -79,7 +79,7 @@ public class IngestionDelayTracker {
   private static final int TIMER_THREAD_TICK_INTERVAL_MS = 300000; // 5 minutes +/- precision in timeouts
   // Once a partition is marked for verification, we wait 10 minutes to pull its ideal state.
   private static final int PARTITION_TIMEOUT_MS = 600000;          // 10 minutes timeouts
-  // Delay Timer thread for this time after starting timer
+  // Delay Timer thread for this amount of time after starting timer
   private static final int INITIAL_TIMER_THREAD_DELAY_MS = 100;
 
   /*
@@ -97,20 +97,19 @@ public class IngestionDelayTracker {
   }
 
   // HashMap used to store delay measures for all partitions active for the current table.
-  // _partitionsToDelaySampleMap<Key=PartitionGroupId,Value=DelaySample>
-  private ConcurrentHashMap<Integer, DelayMeasure> _partitionToDelaySampleMap = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Integer, DelayMeasure> _partitionToDelaySampleMap = new ConcurrentHashMap<>();
   // We mark partitions that go from CONSUMING to ONLINE in _partitionsMarkedForVerification: if they do not
   // go back to CONSUMING in some period of time, we confirm whether they are still hosted in this server by reading
   // ideal state. This is done with the goal of minimizing reading ideal state for efficiency reasons.
-  // _partitionsMarkedForVerification<Key=PartitionGroupId,Value=TimePartitionWasMarkedForVerificationMilliseconds>
-  private ConcurrentHashMap<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
-  // Mutable versions of timer constants so we can test with smaller delays
+  private final ConcurrentHashMap<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
+
   final int _timerThreadTickIntervalMs;
   // Timer task to check partitions that are inactive against ideal state.
   private final Timer _timer;
 
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
+  private final String _metricName;
 
   private boolean _enableAging;
   private final boolean _enablePerPartitionMetric;
@@ -120,8 +119,7 @@ public class IngestionDelayTracker {
   private final RealtimeTableDataManager _realTimeTableDataManager;
 
   /*
-   * Helper function to update the maximum when the current maximum is removed or updated.
-   * If no samples left we set maximum to minimum so new samples can be recorded.
+   * Returns the maximum ingestion delay amongs all partitions we are tracking.
    */
   private DelayMeasure getMaximumDelay() {
     DelayMeasure newMax = null;
@@ -139,6 +137,8 @@ public class IngestionDelayTracker {
   /*
    * Helper function to age a delay measure. Aging means adding the time elapsed since the measure was
    * taken till the measure is being reported.
+  *
+  * @param currentDelay original sample delay to which we will add the age of the measure.
    */
   private long getAgedDelay(DelayMeasure currentDelay) {
     if (currentDelay == null) {
@@ -151,12 +151,9 @@ public class IngestionDelayTracker {
     return currentDelay._delayMilliseconds + measureAgeInMs;
   }
 
-  private List<Integer> getPartitionsHostedByThisServerPerIdealState() {
-    return _realTimeTableDataManager.getHostedPartitionsGroupIds();
-  }
   /*
    * Helper function to be called when we should stop tracking a given partition. Removes the partition from
-   * all our maps, it also updates the maximum if the tracked partition was the previous maximum.
+   * all our maps.
    *
    * @param partitionGroupId partition ID which we should stop tracking.
    */
@@ -176,10 +173,10 @@ public class IngestionDelayTracker {
    * @param partitionGroupId the partition group id to be appended to the table name so we
    *        can differentiate between metrics for various partitions.
    *
-   * @return a metric name with the following structure: tableNameWithType + partitionGroupId
+   * @return a metric name with the following structure: _metricName + partitionGroupId
    */
   private String getPerPartitionMetricName(int partitionGroupId) {
-    return _tableNameWithType + partitionGroupId;
+    return _metricName + partitionGroupId;
   }
 
   /*
@@ -204,19 +201,21 @@ public class IngestionDelayTracker {
       RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, String metricNamePrefix,
       boolean enableAggregateMetric, boolean enablePerPartitionMetric)
       throws RuntimeException {
-    _logger = LoggerFactory.getLogger(tableNameWithType + "-" + getClass().getSimpleName());
+    _logger = LoggerFactory.getLogger(getClass().getSimpleName());
     _serverMetrics = serverMetrics;
-    _tableNameWithType = metricNamePrefix + tableNameWithType;
+    _tableNameWithType = tableNameWithType;
+    _metricName = metricNamePrefix + tableNameWithType;
     _realTimeTableDataManager = realtimeTableDataManager;
     // Handle negative timer values
     if (timerThreadTickIntervalMs <= 0) {
-      throw new RuntimeException("Illegal timer timeout argument, expected > 0, got=" + timerThreadTickIntervalMs);
+      throw new RuntimeException(String.format("Illegal timer timeout argument, expected > 0, got=%d for table=%s",
+          timerThreadTickIntervalMs, _tableNameWithType));
     }
     _enableAging = true;
     _enablePerPartitionMetric = enablePerPartitionMetric;
     _enableAggregateMetric = enableAggregateMetric;
     _timerThreadTickIntervalMs = timerThreadTickIntervalMs;
-    _timer = new Timer("IngestionDelayTimerThread" + tableNameWithType);
+    _timer = new Timer("IngestionDelayTimerThread" + TableNameBuilder.extractRawTableName(tableNameWithType));
     _timer.schedule(new TimerTask() {
         @Override
         public void run() {
@@ -225,7 +224,7 @@ public class IngestionDelayTracker {
       }, INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
     // Install callback metric
     if (_enableAggregateMetric) {
-      _serverMetrics.addCallbackTableGaugeIfNeeded(_tableNameWithType, ServerGauge.TABLE_MAX_INGESTION_DELAY_MS,
+      _serverMetrics.addCallbackTableGaugeIfNeeded(_metricName, ServerGauge.TABLE_MAX_INGESTION_DELAY_MS,
           () -> getMaximumIngestionDelay());
     }
   }
@@ -247,6 +246,7 @@ public class IngestionDelayTracker {
 
   /**
    * Use to set or reset the aging of reported values.
+   *
    * @param enableAging true if we want maximum to be aged as per sample time or false if we do not want to age
    *                   samples
    */
@@ -257,9 +257,6 @@ public class IngestionDelayTracker {
 
   /*
    * Called by LLRealTimeSegmentDataManagers to post delay updates to this tracker class.
-   * If the new sample represents a new Maximum we update the current maximum.
-   * If the new sample was for the partition that was maximum, but delay is not maximum anymore, we must select
-   * a new maximum.
    *
    * @param delayInMilliseconds ingestion delay being recorded.
    * @param sampleTime sample time.
@@ -282,7 +279,6 @@ public class IngestionDelayTracker {
   /*
    * Handle partition removal event. This must be invoked when we stop serving a given partition for
    * this table in the current server.
-   * This function will be invoked when we receive CONSUMING -> DROPPED / OFFLINE state transitions.
    *
    * @param partitionGroupId partition id that we should stop tracking.
    */
@@ -302,16 +298,16 @@ public class IngestionDelayTracker {
     // involves network traffic and may be inefficient.
     ArrayList<Integer> partitionsToVerify = getPartitionsToBeVerified();
     if (partitionsToVerify.size() == 0) {
-      // Don't make the call to getPartitionsHostedByThisServerPerIdealState()
-      // as it involves checking ideal state.
+      // Don't make the call to getHostedPartitionsGroupIds() as it involves checking ideal state.
       return;
     }
     try {
-      partitionsHostedByThisServer = getPartitionsHostedByThisServerPerIdealState();
+      partitionsHostedByThisServer = _realTimeTableDataManager.getHostedPartitionsGroupIds();
     } catch (Exception e) {
-      _logger.error("Failed to get partitions hosted by this server");
+      _logger.error("Failed to get partitions hosted by this server, table={}", _tableNameWithType);
       return;
     }
+    // We create this hash to check for partitionsGroupId in O(1) vs O(n) for a list
     HashSet<Integer> hostedPartitions = new HashSet(partitionsHostedByThisServer);
     for (int partitionGroupId : partitionsToVerify) {
       if (!hostedPartitions.contains(partitionGroupId)) {
@@ -327,7 +323,7 @@ public class IngestionDelayTracker {
    *
    * @param partitionGroupId Partition id that we need confirmed via ideal state as still hosted by this server.
    */
-  public void markPartitionForConfirmation(int partitionGroupId) {
+  public void markPartitionForVerification(int partitionGroupId) {
     _partitionsMarkedForVerification.put(partitionGroupId, System.currentTimeMillis());
   }
 
@@ -364,11 +360,13 @@ public class IngestionDelayTracker {
     // Now that segments can't report metric, destroy metric for this table
     _timer.cancel();
     if (_enableAggregateMetric) {
-      _serverMetrics.removeTableGauge(_tableNameWithType, ServerGauge.TABLE_MAX_INGESTION_DELAY_MS);
+      _serverMetrics.removeTableGauge(_metricName, ServerGauge.TABLE_MAX_INGESTION_DELAY_MS);
     }
     // Remove partitions so their related metrics get uninstalled.
-    for (int partitionGroupId : _partitionToDelaySampleMap.keySet()) {
-      removePartitionId(partitionGroupId);
+    if (_enablePerPartitionMetric) {
+      for (int partitionGroupId : _partitionToDelaySampleMap.keySet()) {
+        removePartitionId(partitionGroupId);
+      }
     }
   }
 }
