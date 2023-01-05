@@ -28,6 +28,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
@@ -102,24 +104,22 @@ public class AsyncQueryResponse implements QueryResponse {
     }
   }
 
-  public Map<ServerRoutingInstance, ServerResponse> getFinalResponses(int expectedResponseSize)
+  public Map<ServerRoutingInstance, ServerResponse> getFinalResponses(QueryContext queryContext)
       throws InterruptedException {
     try {
-      long totalResponseSize = _countDownLatch.getCount();
-      while (_countDownLatch.getCount() >= totalResponseSize - expectedResponseSize
-          && _maxEndTimeMs > System.currentTimeMillis()) {
+      boolean finish;
+      if (!QueryContextUtils.isAggregationQuery(queryContext) && queryContext.getOrderByExpressions() == null) {
+        int expectedResponseSize = queryContext.getLimit();
+        long totalResponseSize = _countDownLatch.getCount();
+        while (expectedResponseSize + _countDownLatch.getCount() > totalResponseSize
+            && System.currentTimeMillis() <= _maxEndTimeMs) {
+        }
+        finish = (expectedResponseSize + _countDownLatch.getCount() <= totalResponseSize) || (System.currentTimeMillis()
+            >= _maxEndTimeMs);
+      } else {
+        finish = _countDownLatch.await(_maxEndTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       }
-
-      boolean finish = (_countDownLatch.getCount() >= totalResponseSize - expectedResponseSize) || (_maxEndTimeMs
-          == System.currentTimeMillis());
-
       _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
-
-      int count = (int) _countDownLatch.getCount();
-      for (int i = 0; i < count; i++) {
-        _countDownLatch.countDown();
-      }
-
       return _responseMap;
     } finally {
       // Update ServerRoutingStats.

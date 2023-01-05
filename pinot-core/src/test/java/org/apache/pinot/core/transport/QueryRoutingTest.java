@@ -29,6 +29,8 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.server.access.AccessControl;
@@ -295,7 +297,7 @@ public class QueryRoutingTest {
   }
 
   @Test
-  public void testValidResponse2()
+  public void testValidResponseWithShortCircuit()
       throws Exception {
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
@@ -304,14 +306,15 @@ public class QueryRoutingTest {
 
     // Start the server
     QueryServer qs1 = startServer("server01", 1111, responseBytes);
-    qs1.start();
     QueryServer qs2 = startServer("server02", 1112, responseBytes);
-    qs2.start();
     QueryServer qs3 = startServer("server03", 1113, responseBytes);
-    qs3.start();
     QueryServer qs4 = startServer("server04", 1114, responseBytes);
-    qs4.start();
     QueryServer qs5 = startServer("server05", 1115, responseBytes);
+    
+    qs1.start();
+    qs2.start();
+    qs3.start();
+    qs4.start();
     qs5.start();
 
     ServerInstance serverInstance1 = new ServerInstance("localhost", 1111);
@@ -328,12 +331,15 @@ public class QueryRoutingTest {
     routingTable.put(serverInstance5, Collections.emptyList());
 
     {
-      BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable LIMIT 2");
-
       // Offline Only
+      
+      String query = "SELECT * FROM testTable LIMIT 2";
+      BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      
       AsyncQueryResponse asyncQueryResponse =
           _queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, 600_000L);
-      Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses(2);
+      Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses(queryContext);
       assertEquals(response.size(), 5);
 
       ServerRoutingInstance offlineServerRoutingInstance =
