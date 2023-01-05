@@ -28,7 +28,9 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -92,6 +94,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -439,25 +442,34 @@ public class TablesResource {
           Response.Status.NOT_FOUND);
     }
 
-    IndexSegment indexSegment = segmentDataManager.getSegment();
-    if (indexSegment == null) {
-      throw new WebApplicationException(
-          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
-          Response.Status.NOT_FOUND);
-    }
-    if (!(indexSegment instanceof ImmutableSegmentImpl)) {
-      throw new WebApplicationException(
-          String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
-          Response.Status.BAD_REQUEST);
-    }
-    File validDocIdsSnapshotFile = ((ImmutableSegmentImpl) indexSegment).getValidDocIdsSnapshotFile();
-    if (validDocIdsSnapshotFile == null) {
-      throw new WebApplicationException(
-          String.format("Table %s segment %s validDocIdsSnapshot does not exist", tableNameWithType, segmentName),
-          Response.Status.NOT_FOUND);
-    }
-
     try {
+      IndexSegment indexSegment = segmentDataManager.getSegment();
+      if (indexSegment == null) {
+        throw new WebApplicationException(
+            String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
+            Response.Status.NOT_FOUND);
+      }
+      if (!(indexSegment instanceof ImmutableSegmentImpl)) {
+        throw new WebApplicationException(
+            String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
+            Response.Status.BAD_REQUEST);
+      }
+      MutableRoaringBitmap validDocIds =
+          indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
+
+      File validDocIdsSnapshotFile = ((ImmutableSegmentImpl) indexSegment).getValidDocIdsSnapshotFile();
+      if (validDocIdsSnapshotFile == null) {
+        throw new WebApplicationException(
+            String.format("Table %s segment %s validDocIdsSnapshot does not exist", tableNameWithType, segmentName),
+            Response.Status.NOT_FOUND);
+      }
+      if (validDocIdsSnapshotFile.exists()) {
+        FileUtils.delete(validDocIdsSnapshotFile);
+      }
+      try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(validDocIdsSnapshotFile))) {
+        validDocIds.serialize(dataOutputStream);
+      }
+
       // TODO Limit the number of concurrent downloads of segments because compression is an expensive operation.
       // Download the validDocIdsSnapshot with bitmap format.
       // Note two clients asking the same validDocIdsSnapshot will result in the same bitmap files being created twice.
