@@ -28,6 +28,8 @@ import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Server;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.combine.AggregationCombineOperator;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
@@ -194,14 +196,13 @@ public class CombinePlanNode implements PlanNode {
         return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
       } else {
         // Selection order-by
-        if (QueryContextUtils.isMinMaxBasedSelectionOrderBy(_queryContext)) {
-          try {
-            return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
-          } catch (Exception e) {
-            LOGGER.warn("Caught exception while using min/max value based combine, using the default combine", e);
-          }
+        List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
+        assert orderByExpressions != null;
+        if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+          return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+        } else {
+          return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
         }
-        return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
       }
     } else {
       assert QueryContextUtils.isDistinctQuery(_queryContext);

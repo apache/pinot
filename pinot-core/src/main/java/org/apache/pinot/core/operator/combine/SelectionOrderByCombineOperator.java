@@ -23,10 +23,8 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -58,19 +56,6 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator<Selecti
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * <p> Execute query on one or more segments in a single thread, and store multiple intermediate result blocks
-   * into BlockingQueue.
-   */
-  @Override
-  protected BaseResultsBlock getNextBlock() {
-    List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
-    assert orderByExpressions != null;
-    return super.getNextBlock();
   }
 
   @Override
