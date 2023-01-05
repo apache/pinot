@@ -98,7 +98,8 @@ public final class ListenerConfigUtil {
     String portString = controllerConf.getProperty("controller.port");
     if (portString != null) {
       listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(portString),
-          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(controllerConf, "controller")));
+          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(controllerConf,
+          "pinot.controller")));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(controllerConf, "controller.tls");
@@ -115,7 +116,7 @@ public final class ListenerConfigUtil {
     String queryPortString = brokerConf.getProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT);
     if (queryPortString != null) {
       listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(queryPortString),
-          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(brokerConf, "broker")));
+          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(brokerConf, "pinot.broker")));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(brokerConf, CommonConstants.Broker.BROKER_TLS_PREFIX);
@@ -126,7 +127,7 @@ public final class ListenerConfigUtil {
     if (listeners.isEmpty()) {
       listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST,
           CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT, CommonConstants.HTTP_PROTOCOL, new TlsConfig(),
-          buildServerThreadPoolConfig(brokerConf, "broker")));
+          buildServerThreadPoolConfig(brokerConf, "pinot.broker")));
     }
 
     return listeners;
@@ -139,7 +140,7 @@ public final class ListenerConfigUtil {
     if (adminApiPortString != null) {
       listeners.add(
           new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminApiPortString),
-              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(serverConf, "server")));
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(serverConf, "pinot.server")));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(serverConf, CommonConstants.Server.SERVER_TLS_PREFIX);
@@ -150,7 +151,7 @@ public final class ListenerConfigUtil {
     if (listeners.isEmpty()) {
       listeners.add(
           new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
-              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(serverConf, "server")));
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(serverConf, "pinot.server")));
     }
 
     return listeners;
@@ -162,7 +163,7 @@ public final class ListenerConfigUtil {
     String portString = minionConf.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT);
     if (portString != null) {
       listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(portString),
-          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(minionConf, "minion")));
+          CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(minionConf, "pinot.minion")));
     }
 
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(minionConf, CommonConstants.Minion.MINION_TLS_PREFIX);
@@ -172,7 +173,7 @@ public final class ListenerConfigUtil {
     if (listeners.isEmpty()) {
       listeners.add(
           new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, CommonConstants.Minion.DEFAULT_HELIX_PORT,
-              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(minionConf, "minion")));
+              CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(minionConf, "pinot.minion")));
     }
 
     return listeners;
