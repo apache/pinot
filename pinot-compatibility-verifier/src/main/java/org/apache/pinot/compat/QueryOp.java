@@ -137,13 +137,14 @@ public class QueryOp extends BaseOp {
             boolean passed = SqlResultComparator.areEqual(actualJson, expectedJson, query);
             if (passed) {
               succeededQueryCount++;
-              LOGGER.debug("Comparison PASSED: Line: {}, query: '{}', actual response: {}, expected response: {}",
-                  queryLineNum, query, actualJson, expectedJson);
+              LOGGER.debug(
+                  "Comparison PASSED: Line: {}, query: '{}', actual response: {}, expected response: {}, explain "
+                      + "plan: {}",
+                  queryLineNum, query, actualJson, expectedJson, getExplainPlan(query));
             } else {
               LOGGER.error(
                   "Comparison FAILED: Line: {}, query: '{}', actual response: {}, expected response: {}, explain "
-                      + "plan: {}",
-                  queryLineNum, query, actualJson, expectedJson, getExplainPlan(query));
+                      + "plan: {}", queryLineNum, query, actualJson, expectedJson, getExplainPlan(query));
             }
           } catch (Exception e) {
             LOGGER.error(
