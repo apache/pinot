@@ -20,6 +20,7 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Timer;
@@ -181,6 +182,23 @@ public class IngestionDelayTracker {
     return _tableNameWithType + partitionGroupId;
   }
 
+  /*
+   * Helper functions that creates a list of all the partitions that are marked for verification and whose
+   * timeouts are expired. This helps us optimize checks of the ideal state.
+   */
+  private ArrayList<Integer> getPartitionsToBeVerified() {
+    ArrayList<Integer> partitionsToVerify = new ArrayList<>();
+    for (int partitionGroupId : _partitionsMarkedForVerification.keySet()) {
+      long markTime = _partitionsMarkedForVerification.get(partitionGroupId);
+      long timeMarked = System.currentTimeMillis() - markTime;
+      if (timeMarked > PARTITION_TIMEOUT_MS) {
+        // Partition must be verified
+        partitionsToVerify.add(partitionGroupId);
+      }
+    }
+    return partitionsToVerify;
+  }
+
   // Custom Constructor
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, String metricNamePrefix,
@@ -280,6 +298,14 @@ public class IngestionDelayTracker {
    */
   public void timeoutInactivePartitions() {
     List<Integer> partitionsHostedByThisServer = null;
+    // Check if we have any partition to verify, else don't make the call to check ideal state as that
+    // involves network traffic and may be inefficient.
+    ArrayList<Integer> partitionsToVerify = getPartitionsToBeVerified();
+    if (partitionsToVerify.size() == 0) {
+      // Don't make the call to getPartitionsHostedByThisServerPerIdealState()
+      // as it involves checking ideal state.
+      return;
+    }
     try {
       partitionsHostedByThisServer = getPartitionsHostedByThisServerPerIdealState();
     } catch (Exception e) {
@@ -287,10 +313,8 @@ public class IngestionDelayTracker {
       return;
     }
     HashSet<Integer> hostedPartitions = new HashSet(partitionsHostedByThisServer);
-    for (int partitionGroupId : _partitionsMarkedForVerification.keySet()) {
-      long markTime = _partitionsMarkedForVerification.get(partitionGroupId);
-      long timeMarked = System.currentTimeMillis() - markTime;
-      if ((timeMarked > PARTITION_TIMEOUT_MS) && (!hostedPartitions.contains(partitionGroupId))) {
+    for (int partitionGroupId : partitionsToVerify) {
+      if (!hostedPartitions.contains(partitionGroupId)) {
         // Partition is not hosted in this server anymore, stop tracking it
         removePartitionId(partitionGroupId);
       }
