@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -625,7 +626,8 @@ public class ClusterIntegrationTestUtils {
           if (h2Value == null) {
             if (pinotNumRecordsSelected != 0) {
               throw new RuntimeException("No record selected in H2 but " + pinotNumRecordsSelected
-                  + " records selected in Pinot");
+                  + " records selected in Pinot, explain plan: " + getExplainPlan(pinotQuery, brokerUrl, headers,
+                  extraJsonProperties));
             }
 
             // Skip further comparison
@@ -644,8 +646,10 @@ public class ClusterIntegrationTestUtils {
           // Fuzzy compare expected value and actual value
           boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
           if (error) {
-            throw new RuntimeException("Value: " + c + " does not match, expected: " + h2Value
-                + ", got broker value: " + brokerValue + ", got client value:" + connectionValue);
+            throw new RuntimeException(
+                "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
+                    + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
+                    brokerUrl, headers, extraJsonProperties));
           }
         }
       } else {
@@ -666,8 +670,10 @@ public class ClusterIntegrationTestUtils {
                 String connectionValue = resultTableResultSet.getString(i, c);
                 boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
                 if (error) {
-                  throw new RuntimeException("Value: " + c + " does not match, expected: " + h2Value
-                      + ", got broker value: " + brokerValue + ", got client value:" + connectionValue);
+                  throw new RuntimeException(
+                      "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
+                          + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
+                          brokerUrl, headers, extraJsonProperties));
                 }
               }
               if (!h2ResultSet.next()) {
@@ -678,6 +684,47 @@ public class ClusterIntegrationTestUtils {
         }
       }
     }
+  }
+
+  private static String getExplainPlan(String pinotQuery, String brokerUrl, @Nullable Map<String, String> headers,
+      @Nullable Map<String, String> extraJsonProperties)
+      throws Exception {
+    JsonNode explainPlanForResponse =
+        ClusterTest.postQuery("explain plan for " + pinotQuery, brokerUrl, headers, extraJsonProperties);
+    Map<Integer, String> nodesById = new TreeMap<>();
+    JsonNode rows = explainPlanForResponse.get("resultTable").get("rows");
+    int[] parentMapping = new int[rows.size()];
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      int id = row.get(1).asInt();
+      if (id > 0) {
+        parentMapping[id] = row.get(2).asInt();
+      }
+      nodesById.put(id, row.get(0).asText());
+    }
+    int[] depths = new int[rows.size()];
+    for (Map.Entry<Integer, String> pair : nodesById.entrySet()) {
+      int depth = 0;
+      int id = pair.getKey();
+      int parentId = id;
+      while (parentId > 0) {
+        depth++;
+        parentId = parentMapping[parentId];
+      }
+      if (id > 0) {
+        depths[id] = depth;
+      }
+    }
+    StringBuilder explainPlan = new StringBuilder();
+    for (Map.Entry<Integer, String> pair : nodesById.entrySet()) {
+      explainPlan.append('\n');
+      int id = pair.getKey();
+      for (int i = 0; id > 0 && i < depths[id]; i++) {
+        explainPlan.append('\t');
+      }
+      explainPlan.append(pair.getValue());
+    }
+    return explainPlan.toString();
   }
 
   private static int getH2ExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
@@ -753,15 +800,13 @@ public class ClusterIntegrationTestUtils {
 
   private static void comparePinotResultsWithExpectedValues(Set<String> expectedValues,
       List<String> expectedOrderByValues, org.apache.pinot.client.ResultSet connectionResultSet,
-      Set<String> orderByColumns, String pinotQuery, String h2Query, int h2NumRows,
-      long pinotNumRecordsSelected) {
+      Set<String> orderByColumns, String pinotQuery, String h2Query, int h2NumRows, long pinotNumRecordsSelected) {
 
     int pinotNumRows = connectionResultSet.getRowCount();
     // No record selected in H2
     if (h2NumRows == 0) {
       if (pinotNumRows != 0) {
-        throw new RuntimeException(
-            "No record selected in H2 but number of records selected in Pinot: " + pinotNumRows);
+        throw new RuntimeException("No record selected in H2 but number of records selected in Pinot: " + pinotNumRows);
       }
 
       if (pinotNumRecordsSelected != 0) {
@@ -826,8 +871,8 @@ public class ClusterIntegrationTestUtils {
         String actualOrderByValue = actualOrderByValueBuilder.toString();
         // Check actual value in expected values set, skip comparison if query response is truncated by limit
         if ((!isLimitSet || limit > h2NumRows) && !expectedValues.contains(actualValue)) {
-          throw new RuntimeException("Selection result returned in Pinot but not in H2: " + actualValue
-              + ", " + expectedValues);
+          throw new RuntimeException(
+              "Selection result returned in Pinot but not in H2: " + actualValue + ", " + expectedValues);
         }
         if (!orderByColumns.isEmpty()) {
           // Check actual group value is the same as expected group value in the same order.
