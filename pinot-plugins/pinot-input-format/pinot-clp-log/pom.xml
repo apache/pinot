@@ -42,14 +42,6 @@
       <groupId>com.yscope.clp</groupId>
       <artifactId>clp-ffi</artifactId>
       <version>0.2</version>
-      <exclusions>
-        <!-- Exclude junit due to mitigate a bug in clp-ffi where junit is not marked as a test
-        dependency -->
-        <exclusion>
-          <groupId>org.junit.jupiter</groupId>
-          <artifactId>junit-jupiter-engine</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
   </dependencies>
 </project>
