@@ -310,7 +310,7 @@ public class QueryRoutingTest {
     QueryServer qs3 = startServer("server03", 1113, responseBytes);
     QueryServer qs4 = startServer("server04", 1114, responseBytes);
     QueryServer qs5 = startServer("server05", 1115, responseBytes);
-    
+
     qs1.start();
     qs2.start();
     qs3.start();
@@ -332,11 +332,11 @@ public class QueryRoutingTest {
 
     {
       // Offline Only
-      
+
       String query = "SELECT * FROM testTable LIMIT 2";
       BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
       QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-      
+
       AsyncQueryResponse asyncQueryResponse =
           _queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, 600_000L);
       Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses(queryContext);
