@@ -260,7 +260,7 @@ public class QueryContext {
   /**
    * Returns the filtered aggregation expressions for the query.
    */
-  public boolean isHasFilteredAggregations() {
+  public boolean hasFilteredAggregations() {
     return _hasFilteredAggregations;
   }
 
@@ -536,10 +536,6 @@ public class QueryContext {
         FunctionContext aggregation = pair.getLeft();
         FilterContext filter = pair.getRight();
         if (filter != null) {
-          // Filtered aggregation
-          if (_groupByExpressions != null) {
-            throw new IllegalStateException("GROUP BY with FILTER clauses is not supported");
-          }
           queryContext._hasFilteredAggregations = true;
         }
         int functionIndex = filteredAggregationFunctions.size();

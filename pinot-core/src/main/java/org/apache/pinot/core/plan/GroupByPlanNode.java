@@ -21,8 +21,12 @@ package org.apache.pinot.core.plan;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.query.FilteredGroupByOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -50,10 +54,34 @@ public class GroupByPlanNode implements PlanNode {
   }
 
   @Override
-  public GroupByOperator run() {
+  public Operator<GroupByResultsBlock> run() {
     assert _queryContext.getAggregationFunctions() != null;
     assert _queryContext.getGroupByExpressions() != null;
 
+    if (_queryContext.hasFilteredAggregations()) {
+      return buildFilteredGroupByPlan();
+    }
+    return buildNonFilteredGroupByPlan();
+  }
+
+  private FilteredGroupByOperator buildFilteredGroupByPlan() {
+    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    // Build the operator chain for the main predicate so the filter plan can be run only one time
+    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair =
+        AggregationFunctionUtils.buildFilterOperator(_indexSegment, _queryContext);
+    ExpressionContext[] groupByExpressions = _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
+    TransformOperator transformOperator =
+        AggregationFunctionUtils.buildTransformOperatorForFilteredAggregates(_indexSegment, _queryContext,
+            filterOperatorPair.getRight(), groupByExpressions);
+
+    List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
+        AggregationFunctionUtils.buildFilteredAggTransformPairs(_indexSegment, _queryContext,
+            filterOperatorPair.getRight(), transformOperator, groupByExpressions);
+    return new FilteredGroupByOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList,
+        _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]), numTotalDocs, _queryContext);
+  }
+
+  private GroupByOperator buildNonFilteredGroupByPlan() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     ExpressionContext[] groupByExpressions = _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
