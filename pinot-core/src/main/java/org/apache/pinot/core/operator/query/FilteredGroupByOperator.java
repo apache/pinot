@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -52,7 +51,6 @@ import org.apache.pinot.spi.trace.Tracing;
 public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private static final String EXPLAIN_NAME = "GROUP_BY_FILTERED";
 
-  @Nullable
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Pair<AggregationFunction[], TransformOperator>> _aggFunctionsWithTransformOperator;
   private final ExpressionContext[] _groupByExpressions;
@@ -63,12 +61,9 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private final DataSchema _dataSchema;
   private final QueryContext _queryContext;
 
-  public FilteredGroupByOperator(
-      AggregationFunction[] aggregationFunctions,
+  public FilteredGroupByOperator(AggregationFunction[] aggregationFunctions,
       List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator,
-      ExpressionContext[] groupByExpressions,
-      long numTotalDocs,
-      QueryContext queryContext) {
+      ExpressionContext[] groupByExpressions, long numTotalDocs, QueryContext queryContext) {
     _aggregationFunctions = aggregationFunctions;
     _aggFunctionsWithTransformOperator = aggFunctionsWithTransformOperator;
     _groupByExpressions = groupByExpressions;
@@ -103,10 +98,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   @Override
   protected GroupByResultsBlock getNextBlock() {
-    GroupKeyGenerator groupKeyGenerator = null;
     // TODO(egalpin): Support Startree query resolution when possible, even with FILTER expressions
-    assert _aggregationFunctions != null;
-    boolean numGroupsLimitReached = false;
     int numAggregations = _aggregationFunctions.length;
 
     GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[numAggregations];
@@ -115,6 +107,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       resultHolderIndexMap.put(_aggregationFunctions[i], i);
     }
 
+    GroupKeyGenerator groupKeyGenerator = null;
     for (Pair<AggregationFunction[], TransformOperator> filteredAggregation : _aggFunctionsWithTransformOperator) {
       TransformOperator transformOperator = filteredAggregation.getRight();
       AggregationFunction[] filteredAggFunctions = filteredAggregation.getLeft();
@@ -129,12 +122,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         // the GroupByExecutor to have sole ownership of the GroupKeyGenerator. Therefore, we allow constructing a
         // GroupByExecutor with a pre-existing GroupKeyGenerator so that the GroupKeyGenerator can be shared across
         // loop iterations i.e. across all aggs.
-        groupByExecutor = new DefaultGroupByExecutor(_queryContext, filteredAggFunctions, _groupByExpressions,
-            transformOperator);
+        groupByExecutor =
+            new DefaultGroupByExecutor(_queryContext, filteredAggFunctions, _groupByExpressions, transformOperator);
         groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
       } else {
-        groupByExecutor = new DefaultGroupByExecutor(_queryContext, filteredAggFunctions, _groupByExpressions,
-            transformOperator, groupKeyGenerator);
+        groupByExecutor =
+            new DefaultGroupByExecutor(_queryContext, filteredAggFunctions, _groupByExpressions, transformOperator,
+                groupKeyGenerator);
       }
 
       int numDocsScanned = 0;
@@ -152,13 +146,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         groupByResultHolders[resultHolderIndexMap.get(filteredAggFunctions[i])] = filterGroupByResults[i];
       }
     }
-
+    assert groupKeyGenerator != null;
     for (GroupByResultHolder groupByResultHolder : groupByResultHolders) {
       groupByResultHolder.ensureCapacity(groupKeyGenerator.getNumKeys());
     }
 
     // Check if the groups limit is reached
-    numGroupsLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsLimit();
+    boolean numGroupsLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsLimit();
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupKeyGenerator.getNumKeys());
 
     // Trim the groups when iff:

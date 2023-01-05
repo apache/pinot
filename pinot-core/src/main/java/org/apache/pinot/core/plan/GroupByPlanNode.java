@@ -61,7 +61,6 @@ public class GroupByPlanNode implements PlanNode {
     if (_queryContext.hasFilteredAggregations()) {
       return buildFilteredGroupByPlan();
     }
-
     return buildNonFilteredGroupByPlan();
   }
 
@@ -76,7 +75,7 @@ public class GroupByPlanNode implements PlanNode {
             filterOperatorPair.getRight(), groupByExpressions);
 
     List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
-        AggregationFunctionUtils.buildFilteredAggTranformPairs(_indexSegment, _queryContext,
+        AggregationFunctionUtils.buildFilteredAggTransformPairs(_indexSegment, _queryContext,
             filterOperatorPair.getRight(), transformOperator, groupByExpressions);
     return new FilteredGroupByOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList,
         _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]), numTotalDocs, _queryContext);

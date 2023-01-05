@@ -82,13 +82,12 @@ public class AggregationFunctionUtils {
    * <p>NOTE: We don't need to consider order-by columns here as the ordering is only allowed for aggregation functions
    *          or group-by expressions.
    */
-  public static Set<ExpressionContext> collectExpressionsToTransform(
-      AggregationFunction[] aggregationFunctions, @Nullable ExpressionContext[] groupByExpressions) {
+  public static Set<ExpressionContext> collectExpressionsToTransform(AggregationFunction[] aggregationFunctions,
+      @Nullable ExpressionContext[] groupByExpressions) {
     Set<ExpressionContext> expressions = new HashSet<>();
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
       expressions.addAll(aggregationFunction.getInputExpressions());
     }
-
     if (groupByExpressions != null) {
       expressions.addAll(Arrays.asList(groupByExpressions));
     }
@@ -200,10 +199,9 @@ public class AggregationFunctionUtils {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
     Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
-
-    return new TransformPlanNode(indexSegment, queryContext, expressionsToTransform,
-        DocIdSetPlanNode.MAX_DOC_PER_CALL, filterOperator).run();
+        collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
+    return new TransformPlanNode(indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+        filterOperator).run();
   }
 
   /**
@@ -211,7 +209,7 @@ public class AggregationFunctionUtils {
    * @param mainPredicateFilterOperator Filter operator corresponding to the main predicate
    * @param mainTransformOperator Transform operator corresponding to the main predicate
    */
-  public static List<Pair<AggregationFunction[], TransformOperator>> buildFilteredAggTranformPairs(
+  public static List<Pair<AggregationFunction[], TransformOperator>> buildFilteredAggTransformPairs(
       IndexSegment indexSegment, QueryContext queryContext, BaseFilterOperator mainPredicateFilterOperator,
       TransformOperator mainTransformOperator, @Nullable ExpressionContext[] groupByExpressions) {
     Map<FilterContext, Pair<List<AggregationFunction>, TransformOperator>> filterContextToAggFuncsMap = new HashMap<>();

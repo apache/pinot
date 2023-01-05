@@ -202,10 +202,10 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE BOOLEAN_COL=true AND STARTSWITH(STRING_COL, 'abc')";
     testQuery(filterQuery, nonFilterQuery);
 
-    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE BOOLEAN_COL AND STARTSWITH(REVERSE(STRING_COL), 'abc')) FROM "
-        + "MyTable";
-    nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE BOOLEAN_COL=true AND STARTSWITH(REVERSE(STRING_COL), "
-        + "'abc')";
+    filterQuery =
+        "SELECT SUM(INT_COL) FILTER(WHERE BOOLEAN_COL AND STARTSWITH(REVERSE(STRING_COL), 'abc')) FROM " + "MyTable";
+    nonFilterQuery =
+        "SELECT SUM(INT_COL) FROM MyTable WHERE BOOLEAN_COL=true AND STARTSWITH(REVERSE(STRING_COL), " + "'abc')";
     testQuery(filterQuery, nonFilterQuery);
   }
 
@@ -336,16 +336,14 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testGroupBySupport() {
-    String filterQuery =
-        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 25000) FROM MyTable GROUP BY BOOLEAN_COL";
-   String nonFilterQuery =
-        "SELECT SUM(INT_COL) FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL";
+  public void testGroupBy() {
+    String filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 25000) FROM MyTable GROUP BY BOOLEAN_COL";
+    String nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL";
     testQuery(filterQuery, nonFilterQuery);
   }
 
   @Test
-  public void testGroupBySupportCaseAlternative() {
+  public void testGroupByCaseAlternative() {
     String filterQuery =
         "SELECT SUM(INT_COL), SUM(INT_COL) FILTER(WHERE INT_COL > 25000) AS total_sum FROM MyTable GROUP BY "
             + "BOOLEAN_COL";
@@ -356,12 +354,11 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testGroupBySupportSameFilter() {
+  public void testGroupBySameFilter() {
     String filterQuery =
         "SELECT AVG(INT_COL) FILTER(WHERE INT_COL > 25000), SUM(INT_COL) FILTER(WHERE INT_COL > 25000) FROM MyTable "
             + "GROUP BY BOOLEAN_COL";
-    String nonFilterQuery =
-        "SELECT AVG(INT_COL), SUM(INT_COL) FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL";
+    String nonFilterQuery = "SELECT AVG(INT_COL), SUM(INT_COL) FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL";
     testQuery(filterQuery, nonFilterQuery);
   }
 

@@ -53,11 +53,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   protected final AggregationFunction[] _aggregationFunctions;
   protected final boolean _nullHandlingEnabled;
+  protected final GroupKeyGenerator _groupKeyGenerator;
+  protected final GroupByResultHolder[] _groupByResultHolders;
   protected final boolean _hasMVGroupByExpression;
   protected final int[] _svGroupKeys;
   protected final int[][] _mvGroupKeys;
-  protected final GroupKeyGenerator _groupKeyGenerator;
-  protected final GroupByResultHolder[] _groupByResultHolders;
 
   public DefaultGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
       TransformOperator transformOperator) {
@@ -80,11 +80,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, TransformOperator transformOperator,
       @Nullable GroupKeyGenerator groupKeyGenerator) {
-    GroupKeyGenerator groupKeyGeneratorTemp;
     _aggregationFunctions = aggregationFunctions;
     assert _aggregationFunctions != null;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
-    groupKeyGeneratorTemp = groupKeyGenerator;
 
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
@@ -98,26 +96,26 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
-    if (groupKeyGeneratorTemp == null) {
+    if (groupKeyGenerator != null) {
+      _groupKeyGenerator = groupKeyGenerator;
+    } else {
       if (hasNoDictionaryGroupByExpression || _nullHandlingEnabled) {
         if (groupByExpressions.length == 1) {
           // TODO(nhejazi): support MV and dictionary based when null handling is enabled.
-          groupKeyGeneratorTemp =
+          _groupKeyGenerator =
               new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit,
                   _nullHandlingEnabled);
         } else {
-          groupKeyGeneratorTemp =
+          _groupKeyGenerator =
               new NoDictionaryMultiColumnGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit);
         }
       } else {
-        groupKeyGeneratorTemp =
-            new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
-                maxInitialResultHolderCapacity);
+        _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
+            maxInitialResultHolderCapacity);
       }
     }
 
     // Initialize result holders
-    _groupKeyGenerator = groupKeyGeneratorTemp;
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
     int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
     int numAggregationFunctions = _aggregationFunctions.length;
@@ -179,6 +177,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   }
 
   @Override
+  public Collection<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer) {
+    return tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, trimSize);
+  }
+
+  @Override
   public GroupKeyGenerator getGroupKeyGenerator() {
     return _groupKeyGenerator;
   }
@@ -186,10 +189,5 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   @Override
   public GroupByResultHolder[] getGroupByResultHolders() {
     return _groupByResultHolders;
-  }
-
-  @Override
-  public Collection<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer) {
-    return tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, trimSize);
   }
 }
