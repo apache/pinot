@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.clplog;
 
+import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
 import java.io.IOException;
@@ -90,7 +91,8 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     }
 
     _clpEncodedMessage = new EncodedMessage();
-    _clpMessageEncoder = new MessageEncoder();
+    _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
+        BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
   }
 
   @Override

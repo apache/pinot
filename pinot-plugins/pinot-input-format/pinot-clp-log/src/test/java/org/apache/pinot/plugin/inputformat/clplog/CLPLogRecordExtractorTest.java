@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.clplog;
 
+import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.MessageDecoder;
 import java.io.IOException;
 import java.util.Arrays;
@@ -172,7 +173,10 @@ public class CLPLogRecordExtractorTest {
       Long[] encodedVars = (Long[]) row.getValue(fieldName + ENCODED_VARS_COLUMN_SUFFIX);
       assertNotEquals(encodedVars, null);
       long[] encodedVarsAsPrimitives = Arrays.stream(encodedVars).mapToLong(Long::longValue).toArray();
-      String decodedMessage = MessageDecoder.decodeMessage(logtype, dictionaryVars, encodedVarsAsPrimitives);
+
+      MessageDecoder messageDecoder = new MessageDecoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
+          BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
+      String decodedMessage = messageDecoder.decodeMessage(logtype, dictionaryVars, encodedVarsAsPrimitives);
       assertEquals(expectedFieldValue, decodedMessage);
     } catch (ClassCastException e) {
       fail(e.getMessage(), e);

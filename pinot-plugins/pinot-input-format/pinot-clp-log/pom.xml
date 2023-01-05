@@ -41,7 +41,7 @@
     <dependency>
       <groupId>com.yscope.clp</groupId>
       <artifactId>clp-ffi</artifactId>
-      <version>0.1</version>
+      <version>0.2</version>
       <exclusions>
         <!-- Exclude junit due to mitigate a bug in clp-ffi where junit is not marked as a test
         dependency -->
