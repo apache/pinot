@@ -61,6 +61,20 @@ public class PushJobSpec implements Serializable {
    */
   private String _pushFileNamePattern;
 
+  /**
+   * Prefer using segment metadata tar gz file to push segment if exists.
+   */
+  private boolean _preferMetadataTarGz = true;
+
+  public boolean isPreferMetadataTarGz() {
+    return _preferMetadataTarGz;
+  }
+
+  public PushJobSpec setPreferMetadataTarGz(boolean preferMetadataTarGz) {
+    _preferMetadataTarGz = preferMetadataTarGz;
+    return this;
+  }
+
   public String getPushFileNamePattern() {
     return _pushFileNamePattern;
   }

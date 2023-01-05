@@ -289,20 +289,28 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
           LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
               DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize));
-          //move segment to output PinotFS
-          URI outputSegmentTarURI =
-              SegmentGenerationUtils.getRelativeOutputPath(finalInputDirURI, inputFileURI, finalOutputDirURI)
-                  .resolve(segmentTarFileName);
-          LOGGER.info("Trying to move segment tar file from: [{}] to [{}]", localSegmentTarFile, outputSegmentTarURI);
-          if (!_spec.isOverwriteOutput() && PinotFSFactory.create(outputSegmentTarURI.getScheme())
-              .exists(outputSegmentTarURI)) {
-            LOGGER.warn("Not overwrite existing output segment tar file: {}",
-                finalOutputDirFS.exists(outputSegmentTarURI));
-          } else {
-            finalOutputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
+          // Move segment to output PinotFS
+          URI relativeOutputPath =
+              SegmentGenerationUtils.getRelativeOutputPath(finalInputDirURI, inputFileURI, finalOutputDirURI);
+          URI outputSegmentTarURI = relativeOutputPath.resolve(segmentTarFileName);
+          SegmentGenerationJobUtils.moveLocalTarFileToRemote(localSegmentTarFile, outputSegmentTarURI,
+              _spec.isOverwriteOutput());
+
+          // Create and upload segment metadata tar file
+          String metadataTarFileName = URLEncoder.encode(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT, "UTF-8");
+          URI outputMetadataTarURI = relativeOutputPath.resolve(metadataTarFileName);
+          if (finalOutputDirFS.exists(outputMetadataTarURI) && (_spec.isOverwriteOutput()
+              || !_spec.isCreateMetadataTarGz())) {
+            LOGGER.info("Deleting existing metadata tar gz file: {}", outputMetadataTarURI);
+            finalOutputDirFS.delete(outputMetadataTarURI, true);
+          }
+          if (taskSpec.isCreateMetadataTarGz()) {
+            File localMetadataTarFile = new File(localOutputTempDir, metadataTarFileName);
+            SegmentGenerationJobUtils.createSegmentMetadataTarGz(localSegmentDir, localMetadataTarFile);
+            SegmentGenerationJobUtils.moveLocalTarFileToRemote(localMetadataTarFile, outputMetadataTarURI,
+                _spec.isOverwriteOutput());
           }
           FileUtils.deleteQuietly(localSegmentDir);
-          FileUtils.deleteQuietly(localSegmentTarFile);
           FileUtils.deleteQuietly(localInputDataFile);
         }
       });
