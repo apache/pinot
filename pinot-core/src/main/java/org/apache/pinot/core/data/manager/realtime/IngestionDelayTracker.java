@@ -163,7 +163,7 @@ public class IngestionDelayTracker {
     _partitionsMarkedForVerification.remove(partitionGroupId);
     if (_enablePerPartitionMetric) {
       _serverMetrics.removeTableGauge(getPerPartitionMetricName(partitionGroupId),
-          ServerGauge.TABLE_PER_PARTITION_INGESTION_DELAY_MS);
+          ServerGauge.TABLE_INGESTION_DELAY_MS);
     }
   }
 
@@ -224,7 +224,7 @@ public class IngestionDelayTracker {
       }, INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
     // Install callback metric
     if (_enableAggregateMetric) {
-      _serverMetrics.addCallbackTableGaugeIfNeeded(_metricName, ServerGauge.TABLE_MAX_INGESTION_DELAY_MS,
+      _serverMetrics.addCallbackTableGaugeIfNeeded(_metricName, ServerGauge.TABLE_INGESTION_DELAY_MS,
           () -> getMaximumIngestionDelay());
     }
   }
@@ -269,7 +269,7 @@ public class IngestionDelayTracker {
     if ((previousMeasure == null) && _enablePerPartitionMetric) {
       // First time we start tracking a partition we should start tracking it via metric
       _serverMetrics.addCallbackTableGaugeIfNeeded(getPerPartitionMetricName(partitionGroupId),
-          ServerGauge.TABLE_PER_PARTITION_INGESTION_DELAY_MS,
+          ServerGauge.TABLE_INGESTION_DELAY_MS,
           () -> getPartitionIngestionDelay(partitionGroupId));
     }
     // If we are consuming we do not need to track this partition for removal.
@@ -360,7 +360,7 @@ public class IngestionDelayTracker {
     // Now that segments can't report metric, destroy metric for this table
     _timer.cancel();
     if (_enableAggregateMetric) {
-      _serverMetrics.removeTableGauge(_metricName, ServerGauge.TABLE_MAX_INGESTION_DELAY_MS);
+      _serverMetrics.removeTableGauge(_metricName, ServerGauge.TABLE_INGESTION_DELAY_MS);
     }
     // Remove partitions so their related metrics get uninstalled.
     if (_enablePerPartitionMetric) {
