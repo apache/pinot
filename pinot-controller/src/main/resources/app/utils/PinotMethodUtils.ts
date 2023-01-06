@@ -264,7 +264,15 @@ const getAsObject = (str: SQLResult) => {
 // Expected Output: {columns: [], records: []}
 const getQueryResults = (params) => {
   return getQueryResult(params).then(({ data }) => {
+  
+
     let queryResponse = getAsObject(data);
+    queryResponse.exceptions = [
+      {
+        "errorCode": 305,
+        "message": "null:\n1 segments unavailable: [airlineStats_OFFLINE_16072_16072_0]"
+      }
+    ]
 
     let errorStr = '';
     let dataArray = [];
@@ -272,15 +280,13 @@ const getQueryResults = (params) => {
     // if sql api throws error, handle here
     if(typeof queryResponse === 'string'){
       errorStr = queryResponse;
-    } else if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
+    } 
+    if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
       errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
-    } else
-    {
-      if (queryResponse.resultTable?.dataSchema?.columnNames?.length)
-      {
-        columnList = queryResponse.resultTable.dataSchema.columnNames;
-        dataArray = queryResponse.resultTable.rows;
-      }
+    } 
+    if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
+      columnList = queryResponse.resultTable.dataSchema.columnNames;
+      dataArray = queryResponse.resultTable.rows;
     }
 
     const columnStats = ['timeUsedMs',
