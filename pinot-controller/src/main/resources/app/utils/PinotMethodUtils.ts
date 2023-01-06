@@ -264,15 +264,7 @@ const getAsObject = (str: SQLResult) => {
 // Expected Output: {columns: [], records: []}
 const getQueryResults = (params) => {
   return getQueryResult(params).then(({ data }) => {
-  
-
     let queryResponse = getAsObject(data);
-    queryResponse.exceptions = [
-      {
-        "errorCode": 305,
-        "message": "null:\n1 segments unavailable: [airlineStats_OFFLINE_16072_16072_0]"
-      }
-    ]
 
     let errorStr = '';
     let dataArray = [];
