@@ -378,6 +378,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
     _consecutiveErrorCount++;
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+    _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
+        1L);
     if (_consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
       _segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after {} attempts",
           _consecutiveErrorCount, e);
@@ -420,6 +423,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+        _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
+            1L);
         _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
@@ -489,9 +495,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     if (_numRowsErrored > 0) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, _numRowsErrored);
-      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
-          _numRowsErrored);
       _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);
     }
