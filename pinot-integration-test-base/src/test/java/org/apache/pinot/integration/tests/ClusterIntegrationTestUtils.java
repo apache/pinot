@@ -41,7 +41,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -76,6 +75,7 @@ import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.tools.utils.ExplainPlanUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.testng.Assert;
 
@@ -691,40 +691,7 @@ public class ClusterIntegrationTestUtils {
       throws Exception {
     JsonNode explainPlanForResponse =
         ClusterTest.postQuery("explain plan for " + pinotQuery, brokerUrl, headers, extraJsonProperties);
-    Map<Integer, String> nodesById = new TreeMap<>();
-    JsonNode rows = explainPlanForResponse.get("resultTable").get("rows");
-    int[] parentMapping = new int[rows.size()];
-    for (int i = 0; i < rows.size(); i++) {
-      JsonNode row = rows.get(i);
-      int id = row.get(1).asInt();
-      if (id > 0) {
-        parentMapping[id] = row.get(2).asInt();
-      }
-      nodesById.put(id, row.get(0).asText());
-    }
-    int[] depths = new int[rows.size()];
-    for (Map.Entry<Integer, String> pair : nodesById.entrySet()) {
-      int depth = 0;
-      int id = pair.getKey();
-      int parentId = id;
-      while (parentId > 0) {
-        depth++;
-        parentId = parentMapping[parentId];
-      }
-      if (id > 0) {
-        depths[id] = depth;
-      }
-    }
-    StringBuilder explainPlan = new StringBuilder();
-    for (Map.Entry<Integer, String> pair : nodesById.entrySet()) {
-      explainPlan.append('\n');
-      int id = pair.getKey();
-      for (int i = 0; id > 0 && i < depths[id]; i++) {
-        explainPlan.append('\t');
-      }
-      explainPlan.append(pair.getValue());
-    }
-    return explainPlan.toString();
+    return ExplainPlanUtils.formatExplainPlan(explainPlanForResponse);
   }
 
   private static int getH2ExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
