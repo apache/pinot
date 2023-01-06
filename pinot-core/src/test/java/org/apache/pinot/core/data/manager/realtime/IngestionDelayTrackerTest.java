@@ -19,6 +19,10 @@
 
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.Assert;
@@ -27,26 +31,8 @@ import org.testng.annotations.Test;
 public class IngestionDelayTrackerTest {
 
   private static final int TIMER_THREAD_TICK_INTERVAL_MS = 100;
-  private static final int INITIAL_TIMER_THREAD_DELAY_MS = 100;
 
-  private void sleepMs(long timeMs) {
-    while (true) {
-      try {
-        Thread.sleep(timeMs);
-      } catch (InterruptedException e) {
-        continue;
-      }
-      break;
-    }
-  }
-
-  private long getAgeOfSample(long sampleTime) {
-    long ageOfSample = System.currentTimeMillis() - sampleTime;
-    ageOfSample = ageOfSample > 0 ? ageOfSample : 0;
-    return ageOfSample;
-  }
-
-  private IngestionDelayTracker createTracker(boolean enableAging) {
+  private IngestionDelayTracker createTracker() {
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     RealtimeTableDataManager realtimeTableDataManager = new RealtimeTableDataManager(null);
     IngestionDelayTracker ingestionDelayTracker =
@@ -54,7 +40,6 @@ public class IngestionDelayTrackerTest {
             realtimeTableDataManager);
     // With no samples, the time reported must be zero
     Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), 0);
-    ingestionDelayTracker.setEnableAging(enableAging);
     return ingestionDelayTracker;
   }
 
@@ -97,20 +82,24 @@ public class IngestionDelayTrackerTest {
     final int partition0 = 0;
     final int partition1 = 1;
 
-    IngestionDelayTracker ingestionDelayTracker = createTracker(false);
+    IngestionDelayTracker ingestionDelayTracker = createTracker();
+    // Use fixed clock so samples dont age
+    Instant now = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    Clock clock = Clock.fixed(now, zoneId);
+    ingestionDelayTracker.setClock(clock);
 
     // Test we follow a single partition up and down
     for (long i = 0; i <= maxTestDelay; i++) {
-      ingestionDelayTracker.updateIngestionDelay(i, 0,
-          partition0);
-      Assert.assertTrue(ingestionDelayTracker.getMaximumIngestionDelay() == i);
+      ingestionDelayTracker.updateIngestionDelay(i, 0, partition0);
+      Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), i + clock.millis());
     }
 
     // Test tracking down a measure for a given partition
     for (long i = maxTestDelay; i >= 0; i--) {
       ingestionDelayTracker.updateIngestionDelay(i, 0,
           partition0);
-      Assert.assertTrue(ingestionDelayTracker.getMaximumIngestionDelay() == i);
+      Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), i + clock.millis());
     }
 
     // Make the current partition maximum
@@ -120,10 +109,10 @@ public class IngestionDelayTrackerTest {
     for (long i = 0; i <= 2 * maxTestDelay; i++) {
       ingestionDelayTracker.updateIngestionDelay(i, 0, partition1);
       if (i >= maxTestDelay) {
-        Assert.assertTrue(ingestionDelayTracker.getMaximumIngestionDelay() == i);
+        Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), i + clock.millis());
       } else {
         // for values of i <= mextTestDelay, the max should be that of partition0
-        Assert.assertTrue(ingestionDelayTracker.getMaximumIngestionDelay() == maxTestDelay);
+        Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), maxTestDelay + clock.millis());
       }
     }
 
@@ -131,10 +120,10 @@ public class IngestionDelayTrackerTest {
     for (long i = 2 * maxTestDelay; i >= 0; i--) {
       ingestionDelayTracker.updateIngestionDelay(i, 0, partition1);
       if (i >= maxTestDelay) {
-        Assert.assertTrue(ingestionDelayTracker.getMaximumIngestionDelay() == i);
+        Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), i + clock.millis());
       } else {
         // for values of i <= mextTestDelay, the max should be that of partition0
-        Assert.assertTrue(ingestionDelayTracker.getMaximumIngestionDelay() == maxTestDelay);
+        Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), maxTestDelay + clock.millis());
       }
     }
 
@@ -147,60 +136,57 @@ public class IngestionDelayTrackerTest {
     final int partition0 = 0;
     final long partition0Delay0 = 1000;
     final long partition0Delay1 = 10; // record lower delay to make sure max gets reduced
+    final long partition0Offset0Ms = 300;
+    final long partition0Offset1Ms = 1000;
     final int partition1 = 1;
     final long partition1Delay0 = 11; // Record something slightly higher than previous max
     final long partition1Delay1 = 8;  // Record something lower so that partition0 is the current max again
+    final long partition1Offset0Ms = 150;
+    final long partition1Offset1Ms = 450;
+
     final long sleepMs = 500;
 
-    IngestionDelayTracker ingestionDelayTracker = createTracker(true);
+    IngestionDelayTracker ingestionDelayTracker = createTracker();
 
-    // With samples for a single partition, time reported should be at least sample plus aging
-    long partition0SampleTime = System.currentTimeMillis();
-    ingestionDelayTracker.updateIngestionDelay(partition0Delay0, partition0SampleTime, partition0);
-    long agingOfSample = getAgeOfSample(partition0SampleTime);
-    Assert.assertTrue(ingestionDelayTracker.getMaximumIngestionDelay()
-        >= (partition0Delay0 + agingOfSample));
+    // With samples for a single partition, test that sample is aged as expected
+    Instant now = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    Clock clock = Clock.fixed(now, zoneId);
+    ingestionDelayTracker.setClock(clock);
+    ingestionDelayTracker.updateIngestionDelay(partition0Delay0, clock.millis(), partition0);
+    Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), partition0Delay0);
+    // Advance clock and test aging
+    Clock offsetClock = Clock.offset(clock, Duration.ofMillis(partition0Offset0Ms));
+    ingestionDelayTracker.setClock(offsetClock);
+    Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), (partition0Delay0 + partition0Offset0Ms));
 
-    // Test we are aging the delay measures by sleeping some time and verifying that time was added to the measure
-    sleepMs(sleepMs);
-    agingOfSample = getAgeOfSample(partition0SampleTime);
-    Assert.assertTrue(agingOfSample >= sleepMs);
-    Assert.assertTrue(ingestionDelayTracker.getMaximumIngestionDelay()
-        >= (partition0Delay0 + agingOfSample));
+    // Add a new value below max and verify we are tracking the new max correctly
+    ingestionDelayTracker.updateIngestionDelay(partition0Delay1, offsetClock.millis(), partition0);
+    Clock partition0LastUpdate = Clock.offset(offsetClock, Duration.ZERO); // Save this as we need to verify aging later
+    Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), partition0Delay1);
+    // Add some offset to the last sample and make sure we age that measure properly
+    offsetClock = Clock.offset(offsetClock, Duration.ofMillis(partition0Offset1Ms));
+    ingestionDelayTracker.setClock(offsetClock);
+    Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), (partition0Delay1 + partition0Offset1Ms));
 
-    // Add a new value below max and verify we are tracking and verify that the new maximum is being tracked.
-    partition0SampleTime = System.currentTimeMillis();
-    ingestionDelayTracker.updateIngestionDelay(partition0Delay1, partition0SampleTime,
-        partition0);
-    agingOfSample = getAgeOfSample(partition0SampleTime);
-    long maxDelay = ingestionDelayTracker.getMaximumIngestionDelay();
-    Assert.assertTrue(maxDelay >= (partition0Delay1 + agingOfSample));
-
-    // Now try setting a new maximum for another partition
-    long partition1SampleTime = System.currentTimeMillis();
-    ingestionDelayTracker.updateIngestionDelay(partition1Delay0, partition1SampleTime,
-        partition1);
-    agingOfSample = getAgeOfSample(partition1SampleTime);
-    maxDelay = ingestionDelayTracker.getMaximumIngestionDelay();
-    Assert.assertTrue(maxDelay >= (partition1Delay0 + agingOfSample));
+    // Now try setting a new maximum in another partition
+    ingestionDelayTracker.updateIngestionDelay(partition1Delay0, offsetClock.millis(), partition1);
+    Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), partition1Delay0);
+    // Add some offset to the last sample and make sure we age that measure properly
+    offsetClock = Clock.offset(offsetClock, Duration.ofMillis(partition1Offset0Ms));
+    ingestionDelayTracker.setClock(offsetClock);
+    Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), (partition1Delay0 + partition1Offset0Ms));
 
     // Now try to set partition 1 below partition 0 and confirm that partition 0 becomes the new max
-    partition1SampleTime = System.currentTimeMillis();
-    ingestionDelayTracker.updateIngestionDelay(partition1Delay1, partition1SampleTime,
-        partition1);
-    // Partition 0 must be the new max
-    agingOfSample = getAgeOfSample(partition0SampleTime);
-    maxDelay = ingestionDelayTracker.getMaximumIngestionDelay();
-    Assert.assertTrue(maxDelay >= (partition0Delay1 + agingOfSample));
-
-    // Test setting partition 1 to zero, maximum should still be partition 0 last sample
-    partition1SampleTime = System.currentTimeMillis();
-    ingestionDelayTracker.updateIngestionDelay(0, partition1SampleTime,
-        partition1);
-    agingOfSample = getAgeOfSample(partition0SampleTime);
-    maxDelay = ingestionDelayTracker.getMaximumIngestionDelay();
-    Assert.assertTrue(maxDelay >= (partition0Delay1 + agingOfSample));
-
+    ingestionDelayTracker.updateIngestionDelay(partition1Delay1, offsetClock.millis(), partition1);
+    // Last delay recorded for Partition 0 must be the new maximum
+    Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(),
+        (partition0Delay1 + (offsetClock.millis() - partition0LastUpdate.millis())));
+    // Age the last sample som more and verify aging
+    offsetClock = Clock.offset(offsetClock, Duration.ofMillis(partition1Offset1Ms));
+    ingestionDelayTracker.setClock(offsetClock);
+    Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(),
+        (partition0Delay1 + (offsetClock.millis() - partition0LastUpdate.millis())));
     ingestionDelayTracker.shutdown();
   }
 
@@ -209,19 +195,23 @@ public class IngestionDelayTrackerTest {
     final long maxTestDelay = 100;
     final int maxPartition = 100;
 
-    IngestionDelayTracker ingestionDelayTracker = createTracker(false);
+    IngestionDelayTracker ingestionDelayTracker = createTracker();
+    // Use fixed clock so samples don't age
+    Instant now = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    Clock clock = Clock.fixed(now, zoneId);
+    ingestionDelayTracker.setClock(clock);
+
     // Record a number of partitions with delay equal to partition id
     for (int partitionGroupId = 0; partitionGroupId <= maxTestDelay; partitionGroupId++) {
-      ingestionDelayTracker.updateIngestionDelay(partitionGroupId, 0, partitionGroupId);
-      Assert.assertTrue(ingestionDelayTracker.getMaximumIngestionDelay() == partitionGroupId);
+      ingestionDelayTracker.updateIngestionDelay(partitionGroupId, clock.millis(), partitionGroupId);
+      Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), partitionGroupId);
     }
     // Verify that as we remove partitions the next available maximum takes over
-
     for (int partitionGroupId = maxPartition; partitionGroupId >= 0; partitionGroupId--) {
-      Assert.assertTrue(ingestionDelayTracker.getMaximumIngestionDelay() == partitionGroupId);
+      Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), partitionGroupId);
       ingestionDelayTracker.stopTrackingPartitionIngestionDelay((int) partitionGroupId);
     }
-    Assert.assertTrue(true);
   }
 
   @Test

@@ -20,6 +20,7 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -111,12 +112,12 @@ public class IngestionDelayTracker {
   private final String _tableNameWithType;
   private final String _metricName;
 
-  private boolean _enableAging;
   private final boolean _enablePerPartitionMetric;
   private final boolean _enableAggregateMetric;
   private final Logger _logger;
 
   private final RealtimeTableDataManager _realTimeTableDataManager;
+  private Clock _clock;
 
   /*
    * Returns the maximum ingestion delay amongs all partitions we are tracking.
@@ -145,7 +146,7 @@ public class IngestionDelayTracker {
       return 0; // return 0 when not initialized
     }
     // Add age of measure to the reported value
-    long measureAgeInMs = _enableAging ? (System.currentTimeMillis() - currentDelay._sampleTime) : 0;
+    long measureAgeInMs = _clock.millis() - currentDelay._sampleTime;
     // Correct to zero for any time shifts due to NTP or time reset.
     measureAgeInMs = Math.max(measureAgeInMs, 0);
     return currentDelay._delayMilliseconds + measureAgeInMs;
@@ -187,7 +188,7 @@ public class IngestionDelayTracker {
     ArrayList<Integer> partitionsToVerify = new ArrayList<>();
     for (int partitionGroupId : _partitionsMarkedForVerification.keySet()) {
       long markTime = _partitionsMarkedForVerification.get(partitionGroupId);
-      long timeMarked = System.currentTimeMillis() - markTime;
+      long timeMarked = _clock.millis() - markTime;
       if (timeMarked > PARTITION_TIMEOUT_MS) {
         // Partition must be verified
         partitionsToVerify.add(partitionGroupId);
@@ -206,12 +207,12 @@ public class IngestionDelayTracker {
     _tableNameWithType = tableNameWithType;
     _metricName = metricNamePrefix + tableNameWithType;
     _realTimeTableDataManager = realtimeTableDataManager;
+    _clock = Clock.systemDefaultZone();
     // Handle negative timer values
     if (timerThreadTickIntervalMs <= 0) {
       throw new RuntimeException(String.format("Illegal timer timeout argument, expected > 0, got=%d for table=%s",
           timerThreadTickIntervalMs, _tableNameWithType));
     }
-    _enableAging = true;
     _enablePerPartitionMetric = enablePerPartitionMetric;
     _enableAggregateMetric = enableAggregateMetric;
     _timerThreadTickIntervalMs = timerThreadTickIntervalMs;
@@ -243,16 +244,14 @@ public class IngestionDelayTracker {
         TIMER_THREAD_TICK_INTERVAL_MS, metricNamePrefix, true, true);
   }
 
-
   /**
-   * Use to set or reset the aging of reported values.
+   * Function that enable use to set predictable clocks for testing purposes.
    *
-   * @param enableAging true if we want maximum to be aged as per sample time or false if we do not want to age
-   *                   samples
+   * @param clock clock to be used by the class
    */
   @VisibleForTesting
-  void setEnableAging(boolean enableAging) {
-    _enableAging = enableAging;
+  void setClock(Clock clock) {
+    _clock = clock;
   }
 
   /*
@@ -324,7 +323,7 @@ public class IngestionDelayTracker {
    * @param partitionGroupId Partition id that we need confirmed via ideal state as still hosted by this server.
    */
   public void markPartitionForVerification(int partitionGroupId) {
-    _partitionsMarkedForVerification.put(partitionGroupId, System.currentTimeMillis());
+    _partitionsMarkedForVerification.put(partitionGroupId, _clock.millis());
   }
 
   /*
