@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -60,8 +61,10 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private long _numEntriesScannedPostFilter;
   private final DataSchema _dataSchema;
   private final QueryContext _queryContext;
+  private final IdentityHashMap<AggregationFunction, Integer> _resultHolderIndexMap;
 
   public FilteredGroupByOperator(AggregationFunction[] aggregationFunctions,
+      List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions,
       List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator,
       ExpressionContext[] groupByExpressions, long numTotalDocs, QueryContext queryContext) {
     _aggregationFunctions = aggregationFunctions;
@@ -85,11 +88,24 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
           aggFunctionsWithTransformOperator.get(i).getRight().getResultMetadata(groupByExpression).getDataType());
     }
 
+    _resultHolderIndexMap = new IdentityHashMap<>(_aggregationFunctions.length);
+    for (int i = 0; i < _aggregationFunctions.length; i++) {
+      _resultHolderIndexMap.put(_aggregationFunctions[i], i);
+    }
+
     // Extract column names and data types for aggregation functions
     for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunction aggregationFunction = aggregationFunctions[i];
       int index = numGroupByExpressions + i;
-      columnNames[index] = aggregationFunction.getResultColumnName();
+      Pair<AggregationFunction, FilterContext> filteredAggPair = filteredAggregationFunctions.get(i);
+      AggregationFunction aggregationFunction = filteredAggPair.getLeft();
+      String columnName = aggregationFunction.getResultColumnName();
+      FilterContext filterContext = filteredAggPair.getRight();
+
+      if (filterContext != null) {
+        // Agg is filtered i.e. has a FilterContext
+        columnName += " " + filterContext.getResultColumnName();
+      }
+      columnNames[index] = columnName;
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
     }
 
@@ -99,13 +115,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   @Override
   protected GroupByResultsBlock getNextBlock() {
     // TODO(egalpin): Support Startree query resolution when possible, even with FILTER expressions
-    int numAggregations = _aggregationFunctions.length;
-
-    GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[numAggregations];
-    IdentityHashMap<AggregationFunction, Integer> resultHolderIndexMap = new IdentityHashMap<>(numAggregations);
-    for (int i = 0; i < numAggregations; i++) {
-      resultHolderIndexMap.put(_aggregationFunctions[i], i);
-    }
+    GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[_aggregationFunctions.length];
 
     GroupKeyGenerator groupKeyGenerator = null;
     for (Pair<AggregationFunction[], TransformOperator> filteredAggregation : _aggFunctionsWithTransformOperator) {
@@ -143,7 +153,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
       GroupByResultHolder[] filterGroupByResults = groupByExecutor.getGroupByResultHolders();
       for (int i = 0; i < filteredAggFunctions.length; i++) {
-        groupByResultHolders[resultHolderIndexMap.get(filteredAggFunctions[i])] = filterGroupByResults[i];
+        groupByResultHolders[_resultHolderIndexMap.get(filteredAggFunctions[i])] = filterGroupByResults[i];
       }
     }
     assert groupKeyGenerator != null;

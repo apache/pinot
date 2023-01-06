@@ -59,6 +59,7 @@ public class GroupByPlanNode implements PlanNode {
     assert _queryContext.getGroupByExpressions() != null;
 
     if (_queryContext.hasFilteredAggregations()) {
+      assert _queryContext.getFilteredAggregationFunctions() != null;
       return buildFilteredGroupByPlan();
     }
     return buildNonFilteredGroupByPlan();
@@ -77,7 +78,8 @@ public class GroupByPlanNode implements PlanNode {
     List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
         AggregationFunctionUtils.buildFilteredAggTransformPairs(_indexSegment, _queryContext,
             filterOperatorPair.getRight(), transformOperator, groupByExpressions);
-    return new FilteredGroupByOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList,
+    return new FilteredGroupByOperator(_queryContext.getAggregationFunctions(),
+        _queryContext.getFilteredAggregationFunctions(), aggToTransformOpList,
         _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]), numTotalDocs, _queryContext);
   }
 
