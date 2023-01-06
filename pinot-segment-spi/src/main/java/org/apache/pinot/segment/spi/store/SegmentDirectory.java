@@ -143,6 +143,13 @@ public abstract class SegmentDirectory implements Closeable {
   }
 
   /**
+   * When reloading, is this segment directory expected to match with the latest table config and schema
+   */
+  public boolean isEnforceSegmentDirMatchCheckOnReload() {
+    return false;
+  }
+
+  /**
    * Copy segment directory to a local directory.
    * @param dest the destination directory
    */
