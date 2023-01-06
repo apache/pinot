@@ -23,6 +23,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -45,6 +46,7 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
   private static final String EXPLAIN_NAME = "AGGREGATE_FILTERED";
 
   private final AggregationFunction[] _aggregationFunctions;
+  private final List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private final List<Pair<AggregationFunction[], TransformOperator>> _aggFunctionsWithTransformOperator;
   private final long _numTotalDocs;
 
@@ -55,8 +57,18 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
   // We can potentially do away with aggregationFunctions parameter, but its cleaner to pass it in than to construct
   // it from aggFunctionsWithTransformOperator
   public FilteredAggregationOperator(AggregationFunction[] aggregationFunctions,
+      List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions,
       List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs) {
     _aggregationFunctions = aggregationFunctions;
+    _filteredAggregationFunctions = filteredAggregationFunctions;
+    _aggFunctionsWithTransformOperator = aggFunctionsWithTransformOperator;
+    _numTotalDocs = numTotalDocs;
+  }
+
+  public FilteredAggregationOperator(AggregationFunction[] aggregationFunctions,
+      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs) {
+    _aggregationFunctions = aggregationFunctions;
+    _filteredAggregationFunctions = null;
     _aggFunctionsWithTransformOperator = aggFunctionsWithTransformOperator;
     _numTotalDocs = numTotalDocs;
   }
@@ -89,7 +101,7 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
       _numEntriesScannedInFilter += transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
     }
-    return new AggregationResultsBlock(_aggregationFunctions, Arrays.asList(result));
+    return new AggregationResultsBlock(_aggregationFunctions, _filteredAggregationFunctions, Arrays.asList(result));
   }
 
   @Override
