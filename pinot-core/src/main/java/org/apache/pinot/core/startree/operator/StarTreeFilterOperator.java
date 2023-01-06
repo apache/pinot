@@ -43,6 +43,7 @@ import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
+import org.apache.pinot.segment.local.startree.CachedStarTreeNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
@@ -209,6 +210,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     StarTree starTree = _starTreeV2.getStarTree();
     List<String> dimensionNames = starTree.getDimensionNames();
     StarTreeNode starTreeRootNode = starTree.getRoot();
+    if (QueryOptionsUtils.isScanStarTreeNodesOnHeap(_queryContext.getQueryOptions())) {
+      starTreeRootNode = new CachedStarTreeNode(starTreeRootNode);
+    }
 
     // Use BFS to traverse the star tree
     Queue<StarTreeNode> queue = new ArrayDeque<>();

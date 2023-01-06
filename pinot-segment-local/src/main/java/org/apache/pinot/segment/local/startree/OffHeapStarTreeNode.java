@@ -39,11 +39,13 @@ public class OffHeapStarTreeNode implements StarTreeNode {
   private final PinotDataBuffer _dataBuffer;
   private final int _nodeId;
   private final int _firstChildId;
+  private final int _lastChildId;
 
   public OffHeapStarTreeNode(PinotDataBuffer dataBuffer, int nodeId) {
     _dataBuffer = dataBuffer;
     _nodeId = nodeId;
     _firstChildId = getInt(FIRST_CHILD_ID_OFFSET);
+    _lastChildId = getInt(LAST_CHILD_ID_OFFSET);
   }
 
   private int getInt(int fieldOffset) {
@@ -136,9 +138,8 @@ public class OffHeapStarTreeNode implements StarTreeNode {
 
   @Override
   public Iterator<OffHeapStarTreeNode> getChildrenIterator() {
-    return new Iterator<OffHeapStarTreeNode>() {
+    return new Iterator<>() {
       private int _currentChildId = _firstChildId;
-      private final int _lastChildId = getInt(LAST_CHILD_ID_OFFSET);
 
       @Override
       public boolean hasNext() {
