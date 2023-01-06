@@ -87,6 +87,9 @@ public class S3PinotFS extends BasePinotFS {
   private ServerSideEncryption _serverSideEncryption = null;
   private String _ssekmsKeyId;
   private String _ssekmsEncryptionContext;
+  private String _sseCustomerKey;
+  private String _sseCustomerKeyMD5;
+  private String _sseCustomerAlgorithm;
 
   @Override
   public void init(PinotConfiguration config) {
@@ -179,7 +182,10 @@ public class S3PinotFS extends BasePinotFS {
           _ssekmsEncryptionContext = s3Config.getSsekmsEncryptionContext();
           break;
         case AES256:
-          // Todo: Support AES256.
+          _sseCustomerAlgorithm = serverSideEncryption;
+          _sseCustomerKey = s3Config.getSseCustomerKey();
+          _sseCustomerKeyMD5 = s3Config.getSseCustomerKeyMD5();
+          break;
         default:
           throw new UnsupportedOperationException("Unsupported server side encryption: " + _serverSideEncryption);
       }
@@ -190,7 +196,7 @@ public class S3PinotFS extends BasePinotFS {
       throws IOException {
     URI base = getBase(uri);
     String path = sanitizePath(base.relativize(uri).getPath());
-    HeadObjectRequest headObjectRequest = HeadObjectRequest.builder().bucket(uri.getHost()).key(path).build();
+    HeadObjectRequest headObjectRequest = generateHeadObjectRequest(uri, path);
 
     return _s3Client.headObject(headObjectRequest);
   }
@@ -249,7 +255,7 @@ public class S3PinotFS extends BasePinotFS {
     try {
       URI base = getBase(uri);
       String path = sanitizePath(base.relativize(uri).getPath());
-      HeadObjectRequest headObjectRequest = HeadObjectRequest.builder().bucket(uri.getHost()).key(path).build();
+      HeadObjectRequest headObjectRequest = generateHeadObjectRequest(uri, path);
 
       _s3Client.headObject(headObjectRequest);
       return true;
@@ -543,7 +549,7 @@ public class S3PinotFS extends BasePinotFS {
     URI base = getBase(srcUri);
     FileUtils.forceMkdir(dstFile.getParentFile());
     String prefix = sanitizePath(base.relativize(srcUri).getPath());
-    GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(srcUri.getHost()).key(prefix).build();
+    GetObjectRequest getObjectRequest = generateGetObjectRequest(srcUri, prefix);
 
     _s3Client.getObject(getObjectRequest, ResponseTransformer.toFile(dstFile));
   }
@@ -611,6 +617,28 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
+  private HeadObjectRequest generateHeadObjectRequest(URI uri, String path) {
+    HeadObjectRequest.Builder headReqBuilder = HeadObjectRequest.builder().bucket(uri.getHost()).key(path);
+
+    if (_serverSideEncryption != null && _sseCustomerKey != null) {
+      headReqBuilder.sseCustomerKey(_sseCustomerKey).sseCustomerKeyMD5(_sseCustomerKeyMD5)
+          .sseCustomerAlgorithm(_sseCustomerAlgorithm);
+    }
+
+    return headReqBuilder.build();
+  }
+
+  private GetObjectRequest generateGetObjectRequest(URI uri, String key) {
+    GetObjectRequest.Builder getReqBuilder = GetObjectRequest.builder().bucket(uri.getHost()).key(key);
+
+    if (_serverSideEncryption != null && _sseCustomerKey != null) {
+      getReqBuilder.sseCustomerKey(_sseCustomerKey).sseCustomerKeyMD5(_sseCustomerKeyMD5)
+          .sseCustomerAlgorithm(_sseCustomerAlgorithm);
+    }
+
+    return getReqBuilder.build();
+  }
+
   private PutObjectRequest generatePutObjectRequest(URI uri, String path) {
     PutObjectRequest.Builder putReqBuilder = PutObjectRequest.builder().bucket(uri.getHost()).key(path);
 
@@ -622,6 +650,10 @@ public class S3PinotFS extends BasePinotFS {
       putReqBuilder.serverSideEncryption(_serverSideEncryption).ssekmsKeyId(_ssekmsKeyId);
       if (_ssekmsEncryptionContext != null) {
         putReqBuilder.ssekmsEncryptionContext(_ssekmsEncryptionContext);
+      }
+      if (_sseCustomerKey != null) {
+        putReqBuilder.sseCustomerAlgorithm(_sseCustomerAlgorithm).sseCustomerKey(_sseCustomerKey)
+            .sseCustomerKeyMD5(_sseCustomerKeyMD5);
       }
     }
     return putReqBuilder.build();
@@ -642,6 +674,10 @@ public class S3PinotFS extends BasePinotFS {
       if (_ssekmsEncryptionContext != null) {
         copyReqBuilder.ssekmsEncryptionContext(_ssekmsEncryptionContext);
       }
+      if (_sseCustomerKey != null) {
+        copyReqBuilder.sseCustomerAlgorithm(_sseCustomerAlgorithm).sseCustomerKey(_sseCustomerKey)
+            .sseCustomerKeyMD5(_sseCustomerKeyMD5);
+      }
     }
     return copyReqBuilder.build();
   }
@@ -649,14 +685,9 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public InputStream open(URI uri)
       throws IOException {
-    try {
-      String path = sanitizePath(uri.getPath());
-      GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(uri.getHost()).key(path).build();
-
-      return _s3Client.getObjectAsBytes(getObjectRequest).asInputStream();
-    } catch (S3Exception e) {
-      throw e;
-    }
+    String path = sanitizePath(uri.getPath());
+    GetObjectRequest getObjectRequest = generateGetObjectRequest(uri, path);
+    return _s3Client.getObjectAsBytes(getObjectRequest).asInputStream();
   }
 
   @Override
