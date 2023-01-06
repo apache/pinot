@@ -32,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -118,9 +119,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   // Object to track ingestion delay for all partitions
   private IngestionDelayTracker _ingestionDelayTracker;
+  private Supplier<Boolean> _isReadyToServeQueries;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
+    this(segmentBuildSemaphore, () -> true);
+  }
+
+  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, Supplier<Boolean> isReadyToServeQueries) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
+    _isReadyToServeQueries = isReadyToServeQueries;
   }
 
   @Override
@@ -410,7 +417,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       segmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
-              partitionDedupMetadataManager);
+              partitionDedupMetadataManager, _isReadyToServeQueries);
     } else {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
       segmentDataManager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,

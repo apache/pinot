@@ -481,9 +481,4 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentStatusTask.cancel();
     _realtimeSegment.destroy();
   }
-
-  @Override
-  public void notifyConsumptionCaughtUp(boolean caughtUp) {
-    // no-op
-  }
 }
