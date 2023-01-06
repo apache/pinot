@@ -124,6 +124,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String DELETED_SEGMENTS_CACHE_SIZE = "table.deleted.segments.cache.size";
   private static final String DELETED_SEGMENTS_CACHE_TTL_MINUTES = "table.deleted.segments.cache.ttl.minutes";
   private static final String PEER_DOWNLOAD_SCHEME = "peer.download.scheme";
+  private static final String ENABLE_SEGMENT_DIR_MATCH_ON_RELOAD = "";
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
@@ -278,6 +279,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getSegmentPeerDownloadScheme() {
     return _instanceDataManagerConfiguration.getProperty(PEER_DOWNLOAD_SCHEME);
+  }
+
+  @Override
+  public boolean isEnforceSegmentDirMatchCheckOnReload() {
+    return _instanceDataManagerConfiguration.getProperty(ENABLE_SEGMENT_DIR_MATCH_ON_RELOAD, false);
   }
 
   @Override

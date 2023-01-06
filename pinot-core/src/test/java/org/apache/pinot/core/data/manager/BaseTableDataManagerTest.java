@@ -120,7 +120,7 @@ public class BaseTableDataManagerTest {
 
     BaseTableDataManager tmgr = createTableManager();
     assertFalse(tmgr.getSegmentDataDir(segName).exists());
-    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false, false);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -145,7 +145,7 @@ public class BaseTableDataManagerTest {
     File defaultSegDir = tmgr.getSegmentDataDir(segName);
     assertFalse(defaultSegDir.exists());
     tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null),
-        zkmd, llmd, null, false);
+        zkmd, llmd, null, false, false);
     assertTrue(defaultSegDir.exists());
     llmd = new SegmentMetadataImpl(defaultSegDir);
     assertEquals(llmd.getTotalDocs(), 5);
@@ -156,7 +156,7 @@ public class BaseTableDataManagerTest {
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
     tmgr = createTableManager();
     IndexLoadingConfig loadingCfg = TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null);
-    tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false, false);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg.getTableConfig());
     assertTrue(segDirOnTier.exists());
     assertFalse(defaultSegDir.exists());
@@ -180,14 +180,14 @@ public class BaseTableDataManagerTest {
     when(llmd.getCrc()).thenReturn(Long.toString(segCrc));
 
     BaseTableDataManager tmgr = createTableManager();
-    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false, false);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
 
     FileUtils.deleteQuietly(localSegDir);
     try {
-      tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false);
+      tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false, false);
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
@@ -214,7 +214,7 @@ public class BaseTableDataManagerTest {
     // No dataDir for coolTier, thus stay on default tier.
     BaseTableDataManager tmgr = createTableManager();
     tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null),
-        zkmd, llmd, null, false);
+        zkmd, llmd, null, false, false);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -226,7 +226,7 @@ public class BaseTableDataManagerTest {
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
     tmgr = createTableManager();
     IndexLoadingConfig loadingCfg = TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, null);
-    tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false, false);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg.getTableConfig());
     assertTrue(segDirOnTier.exists());
     assertFalse(localSegDir.exists());
@@ -254,7 +254,7 @@ public class BaseTableDataManagerTest {
     idxCfg.setSegmentVersion(SegmentVersion.v3);
 
     BaseTableDataManager tmgr = createTableManager();
-    tmgr.reloadSegment(segName, idxCfg, zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, idxCfg, zkmd, llmd, null, false, false);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getVersion(), SegmentVersion.v3);
@@ -283,7 +283,7 @@ public class BaseTableDataManagerTest {
     idxCfg.setInvertedIndexColumns(new HashSet<>(Arrays.asList(STRING_COLUMN, LONG_COLUMN)));
 
     BaseTableDataManager tmgr = createTableManager();
-    tmgr.reloadSegment(segName, idxCfg, zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, idxCfg, zkmd, llmd, null, false, false);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -308,14 +308,14 @@ public class BaseTableDataManagerTest {
     // Remove the local segment dir. Segment reloading fails unless force to download.
     FileUtils.deleteQuietly(localSegDir);
     try {
-      tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false);
+      tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, false, false);
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
       assertTrue(e.getMessage().contains("does not exist or is not a directory"));
     }
 
-    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, true);
+    tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, true, false);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
 
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));

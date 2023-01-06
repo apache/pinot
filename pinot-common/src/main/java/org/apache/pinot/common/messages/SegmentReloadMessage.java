@@ -35,6 +35,7 @@ public class SegmentReloadMessage extends Message {
   public static final String RELOAD_SEGMENT_MSG_SUB_TYPE = "RELOAD_SEGMENT";
 
   private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
+  private static final String REUSE_SEGMENT_DIR_KEY = "reuseSegmentDir";
   private static final String SEGMENT_NAMES = "segmentNames";
 
   /**
@@ -43,8 +44,8 @@ public class SegmentReloadMessage extends Message {
    * @param tableNameWithType the table where the segments are from.
    * @param forceDownload     whether to download segments from deep store when reloading.
    */
-  public SegmentReloadMessage(String tableNameWithType, boolean forceDownload) {
-    this(tableNameWithType, null, forceDownload);
+  public SegmentReloadMessage(String tableNameWithType, boolean forceDownload, boolean shouldReuseSegmentDir) {
+    this(tableNameWithType, null, forceDownload, shouldReuseSegmentDir);
   }
 
   /**
@@ -54,7 +55,8 @@ public class SegmentReloadMessage extends Message {
    * @param segmentNames      a list of specified segments to reload, or null for all segments.
    * @param forceDownload     whether to download segments from deep store when reloading.
    */
-  public SegmentReloadMessage(String tableNameWithType, @Nullable List<String> segmentNames, boolean forceDownload) {
+  public SegmentReloadMessage(String tableNameWithType, @Nullable List<String> segmentNames, boolean forceDownload,
+      boolean shouldReuseSegmentDir) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setResourceName(tableNameWithType);
     setMsgSubType(RELOAD_SEGMENT_MSG_SUB_TYPE);
@@ -63,6 +65,7 @@ public class SegmentReloadMessage extends Message {
 
     ZNRecord znRecord = getRecord();
     znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
+    znRecord.setBooleanField(REUSE_SEGMENT_DIR_KEY, shouldReuseSegmentDir);
     if (CollectionUtils.isNotEmpty(segmentNames)) {
       // TODO: use the new List field and deprecate the partition name in next release.
       setPartitionName(segmentNames.get(0));
@@ -79,6 +82,10 @@ public class SegmentReloadMessage extends Message {
 
   public boolean shouldForceDownload() {
     return getRecord().getBooleanField(FORCE_DOWNLOAD_KEY, false);
+  }
+
+  public boolean shouldReuseExistingSegmentDir() {
+    return getRecord().getBooleanField(REUSE_SEGMENT_DIR_KEY, false);
   }
 
   @Nullable

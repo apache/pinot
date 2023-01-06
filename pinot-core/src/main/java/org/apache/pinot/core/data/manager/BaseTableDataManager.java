@@ -347,21 +347,39 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
+      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload, boolean shouldReuseExistingSegment)
       throws Exception {
     String segmentTier = getSegmentCurrentTier(segmentName);
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
+    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     try {
+
+      boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
+      boolean canReuseExistingSegment = (!shouldDownload) && (shouldReuseExistingSegment);
+
+      if (canReuseExistingSegment) {
+        SegmentDirectory segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()),
+            indexLoadingConfig);
+        boolean needReprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
+        if (!needReprocess) {
+          // No reprocessing needed, reuse the same segment
+          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
+          addSegment(segment);
+          return;
+        } else if (_tableDataManagerConfig.getInstanceDataManagerConfig().isEnforceSegmentDirMatchCheckOnReload()) {
+          throw new IllegalStateException("Expected segment directory not found");
+        }
+      }
+
       // Create backup directory to handle failure of segment reloading.
       createBackup(indexDir);
 
       // Download segment from deep store if CRC changes or forced to download;
       // otherwise, copy backup directory back to the original index directory.
       // And then continue to load the segment from the index directory.
-      boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
       if (shouldDownload && allowDownload(segmentName, zkMetadata)) {
         if (forceDownload) {
           LOGGER.info("Segment: {} of table: {} is forced to download", segmentName, _tableNameWithType);
@@ -384,7 +402,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
       // Load from indexDir and replace the old segment in memory. What's inside indexDir
       // may come from SegmentDirectory.copyTo() or the segment downloaded from deep store.
-      indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
       LOGGER.info("Load segment with data from indexDir: {} to tier: {}", indexDir,
           TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
       ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema);

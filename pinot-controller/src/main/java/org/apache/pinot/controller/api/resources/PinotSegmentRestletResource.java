@@ -463,11 +463,13 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload) {
+      @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Whether to reuse segment dir if no preprocessing needed") @QueryParam("reuseSegmentDir")
+      @DefaultValue("false") boolean reuseSegmentDir) {
     segmentName = URIUtils.decode(segmentName);
     String tableNameWithType = getExistingTable(tableName, segmentName);
     Pair<Integer, String> msgInfo =
-        _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload);
+        _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload, reuseSegmentDir);
     boolean zkJobMetaWriteSuccess = false;
     if (msgInfo.getLeft() > 0) {
       try {
@@ -592,7 +594,8 @@ public class PinotSegmentRestletResource {
             LOGGER);
     int numMessagesSent = 0;
     for (String tableNameWithType : tableNamesWithType) {
-      numMessagesSent += _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, false).getLeft();
+      numMessagesSent +=
+          _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, false, false).getLeft();
     }
     return new SuccessResponse("Sent " + numMessagesSent + " reload messages");
   }
@@ -721,7 +724,9 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload)
+      @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Whether to reuse existing segment dir if it doesn't need reprocessing")
+      @QueryParam("shouldReuseSegmentDir") @DefaultValue("false") boolean shouldReuseSegmentDir)
       throws JsonProcessingException {
     TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
@@ -738,7 +743,8 @@ public class PinotSegmentRestletResource {
             LOGGER);
     Map<String, Map<String, String>> perTableMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
+      Pair<Integer, String> msgInfo =
+          _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload, shouldReuseSegmentDir);
       Map<String, String> tableReloadMeta = new HashMap<>();
       tableReloadMeta.put("numMessagesSent", String.valueOf(msgInfo.getLeft()));
       tableReloadMeta.put("reloadJobId", msgInfo.getRight());
@@ -775,7 +781,7 @@ public class PinotSegmentRestletResource {
             LOGGER);
     int numMessagesSent = 0;
     for (String tableNameWithType : tableNamesWithType) {
-      numMessagesSent += _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, false).getLeft();
+      numMessagesSent += _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, false, false).getLeft();
     }
     return new SuccessResponse("Sent " + numMessagesSent + " reload messages");
   }

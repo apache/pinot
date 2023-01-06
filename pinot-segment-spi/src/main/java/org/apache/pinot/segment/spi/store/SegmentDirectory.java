@@ -97,7 +97,6 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
  * in the segment storage.
  */
 public abstract class SegmentDirectory implements Closeable {
-
   public abstract URI getIndexDir();
 
   public abstract SegmentMetadataImpl getSegmentMetadata();

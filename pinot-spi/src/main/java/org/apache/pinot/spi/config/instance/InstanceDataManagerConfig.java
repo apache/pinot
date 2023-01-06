@@ -68,4 +68,6 @@ public interface InstanceDataManagerConfig {
   int getDeletedSegmentsCacheTtlMinutes();
 
   String getSegmentPeerDownloadScheme();
+
+  boolean isEnforceSegmentDirMatchCheckOnReload();
 }

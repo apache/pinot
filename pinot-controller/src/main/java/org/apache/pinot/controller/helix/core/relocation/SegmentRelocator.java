@@ -352,7 +352,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       recipientCriteria.setResource(tableNameWithType);
       recipientCriteria.setSessionSpecific(true);
       SegmentReloadMessage segmentReloadMessage =
-          new SegmentReloadMessage(tableNameWithType, new ArrayList<>(segmentNames), false);
+          new SegmentReloadMessage(tableNameWithType, new ArrayList<>(segmentNames), false, false);
       LOGGER.info("Sending SegmentReloadMessage to server: {} to reload segments: {} of table: {}", serverName,
           segmentNames, tableNameWithType);
       int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, -1);
