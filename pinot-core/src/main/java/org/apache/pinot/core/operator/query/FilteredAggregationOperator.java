@@ -65,14 +65,6 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
     _numTotalDocs = numTotalDocs;
   }
 
-  public FilteredAggregationOperator(AggregationFunction[] aggregationFunctions,
-      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs) {
-    _aggregationFunctions = aggregationFunctions;
-    _filteredAggregationFunctions = null;
-    _aggFunctionsWithTransformOperator = aggFunctionsWithTransformOperator;
-    _numTotalDocs = numTotalDocs;
-  }
-
   @Override
   protected AggregationResultsBlock getNextBlock() {
     int numAggregations = _aggregationFunctions.length;

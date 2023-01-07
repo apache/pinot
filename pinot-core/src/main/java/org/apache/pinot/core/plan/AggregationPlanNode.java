@@ -91,7 +91,8 @@ public class AggregationPlanNode implements PlanNode {
     List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
         AggregationFunctionUtils.buildFilteredAggTransformPairs(_indexSegment, _queryContext,
             filterOperatorPair.getRight(), transformOperator, null);
-    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList, numTotalDocs);
+    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(),
+        _queryContext.getFilteredAggregationFunctions(), aggToTransformOpList, numTotalDocs);
   }
 
   /**

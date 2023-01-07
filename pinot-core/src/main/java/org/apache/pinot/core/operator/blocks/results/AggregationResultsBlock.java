@@ -64,6 +64,9 @@ public class AggregationResultsBlock extends BaseResultsBlock {
     return _aggregationFunctions;
   }
 
+  public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
+    return _filteredAggregationFunctions;
+  }
   public List<Object> getResults() {
     return _results;
   }
@@ -81,7 +84,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
     for (int i = 0; i < numColumns; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      String columnName = aggregationFunction.getColumnName();
+      String columnName = aggregationFunction.getResultColumnName();
       if (_filteredAggregationFunctions != null) {
         FilterContext filterContext = _filteredAggregationFunctions.get(i).getRight();
         if (filterContext != null) {
