@@ -30,19 +30,22 @@ import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
 
 
 public class TablesResourceTest extends BaseResourceTest {
@@ -229,7 +232,7 @@ public class TablesResourceTest extends BaseResourceTest {
   @Test
   public void testDownloadValidDocIdsSnapshot()
       throws Exception {
-    // Verify the content of the downloaded segment from a realtime table.
+    // Verify the content of the downloaded snapshot from a realtime table.
     downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
         (ImmutableSegmentImpl) _realtimeIndexSegments.get(0));
 
@@ -275,18 +278,27 @@ public class TablesResourceTest extends BaseResourceTest {
   // Verify metadata file from segments.
   private void downLoadAndVerifyValidDocIdsSnapshot(String tableNameWithType, ImmutableSegmentImpl segment)
       throws IOException {
-    String snapshotPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName() + "/validDocIds";
-    int[] docIds1 = new int[]{1, 4, 6, 10, 15, 17, 18, 20};
-    MutableRoaringBitmap validDocIds = new MutableRoaringBitmap();
-    validDocIds.add(docIds1);
-    segment.persistValidDocIdsSnapshot(validDocIds);
 
+    String snapshotPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName() + "/validDocIds";
+
+    PartitionUpsertMetadataManager upsertMetadataManager = mock(PartitionUpsertMetadataManager.class);
+    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+    int[] docIds = new int[]{1, 4, 6, 10, 15, 17, 18, 20};
+    for (int docId: docIds) {
+      validDocIds.add(docId);
+    }
+    segment.enableUpsert(upsertMetadataManager, validDocIds);
+
+    // Download the snapshot and save to a temp local file.
     Response response = _webTarget.path(snapshotPath).request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     File snapshotFile = response.readEntity(File.class);
 
+    // Load the snapshot file.
+    Assert.assertTrue(snapshotFile.exists());
     byte[] bytes = FileUtils.readFileToByteArray(snapshotFile);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap(), validDocIds);
+    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap(),
+        validDocIds.getMutableRoaringBitmap());
   }
 
   @Test

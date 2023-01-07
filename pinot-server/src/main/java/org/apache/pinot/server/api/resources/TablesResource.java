@@ -83,6 +83,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -457,15 +458,14 @@ public class TablesResource {
       MutableRoaringBitmap validDocIds =
           indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
 
-      File validDocIdsSnapshotFile = ((ImmutableSegmentImpl) indexSegment).getValidDocIdsSnapshotFile();
-      if (validDocIdsSnapshotFile == null) {
-        throw new WebApplicationException(
-            String.format("Table %s segment %s validDocIdsSnapshot does not exist", tableNameWithType, segmentName),
-            Response.Status.NOT_FOUND);
-      }
-      if (validDocIdsSnapshotFile.exists()) {
-        FileUtils.delete(validDocIdsSnapshotFile);
-      }
+      File tmpSegmentTarDir =
+          new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), PEER_SEGMENT_DOWNLOAD_DIR);
+      tmpSegmentTarDir.mkdir();
+
+      File validDocIdsSnapshotFile =
+          new File(tmpSegmentTarDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + "_"
+              + V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+
       try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(validDocIdsSnapshotFile))) {
         validDocIds.serialize(dataOutputStream);
       }
