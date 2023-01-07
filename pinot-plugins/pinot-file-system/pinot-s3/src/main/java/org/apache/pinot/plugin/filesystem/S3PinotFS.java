@@ -653,7 +653,7 @@ public class S3PinotFS extends BasePinotFS {
       String path = sanitizePath(uri.getPath());
       GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(uri.getHost()).key(path).build();
 
-      return _s3Client.getObjectAsBytes(getObjectRequest).asInputStream();
+      return _s3Client.getObject(getObjectRequest);
     } catch (S3Exception e) {
       throw e;
     }
