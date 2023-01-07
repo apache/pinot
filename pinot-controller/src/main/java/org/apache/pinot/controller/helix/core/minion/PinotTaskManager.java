@@ -547,13 +547,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
             taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(successRunTimestamp));
         // before the first task schedule, the follow two gauge metrics will be empty
         // TODO: find a better way to report task generation information
-        _controllerMetrics.addOrUpdateGauge(
-            ControllerGauge.TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION.getGaugeName() + "."
-                + tableConfig.getTableName() + "." + taskGenerator.getTaskType(),
+        _controllerMetrics.setOrUpdateTableGauge(tableConfig.getTableName(), taskGenerator.getTaskType(),
+            ControllerGauge.TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION,
             () -> System.currentTimeMillis() - successRunTimestamp);
-        _controllerMetrics.addOrUpdateGauge(
-            ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR.getGaugeName() + "."
-                + tableConfig.getTableName() + "." + taskGenerator.getTaskType(), () -> 0L);
+        _controllerMetrics.setOrUpdateTableGauge(tableConfig.getTableName(), taskGenerator.getTaskType(),
+            ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR, 0L);
       }
     } catch (Exception e) {
       StringWriter errors = new StringWriter();
@@ -567,9 +565,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
                 successRunTimestamp, errors.toString()));
         // before the first task schedule, the follow gauge metric will be empty
         // TODO: find a better way to report task generation information
-        _controllerMetrics.addOrUpdateGauge(
-            ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR.getGaugeName() + "."
-                + tableConfig.getTableName() + "." + taskGenerator.getTaskType(), () -> 1L);
+        _controllerMetrics.setOrUpdateTableGauge(tableConfig.getTableName(), taskGenerator.getTaskType(),
+            ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR, 1L);
       }
       throw e;
     }

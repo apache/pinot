@@ -263,6 +263,8 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     }
 
     testHardcodedQueries();
+
+    Thread.sleep(1000_000);
   }
 
   @Test
