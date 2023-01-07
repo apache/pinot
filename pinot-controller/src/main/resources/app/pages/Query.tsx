@@ -554,6 +554,13 @@ const QueryPage = () => {
                   )
                 }
         
+                {/* Sql result errors */}
+                {resultError && (
+                  <Alert severity="error" className={classes.sqlError}>
+                    {resultError}
+                  </Alert>
+                )}
+        
                 <Grid item xs style={{ backgroundColor: 'white' }}>
                   {resultData.columns.length ? (
                     <>
@@ -632,13 +639,6 @@ const QueryPage = () => {
                     </>
                   ) : null}
                 </Grid>
-
-                {/* Sql result errors */}
-                {resultError && (
-                  <Alert severity="error" className={classes.sqlError}>
-                    {resultError}
-                  </Alert>
-                )}
               </>
             )}
           </Grid>

@@ -274,7 +274,11 @@ const getQueryResults = (params) => {
       errorStr = queryResponse;
     } 
     if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
-      errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
+      try{
+        errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
+      } catch {
+        errorStr = "";
+      }
     } 
     if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
       columnList = queryResponse.resultTable.dataSchema.columnNames;
