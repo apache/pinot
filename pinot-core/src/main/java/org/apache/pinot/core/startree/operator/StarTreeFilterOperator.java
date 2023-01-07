@@ -110,7 +110,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   private final StarTreeV2 _starTreeV2;
   private final Map<String, List<CompositePredicateEvaluator>> _predicateEvaluatorsMap;
   private final Set<String> _groupByColumns;
-  private final boolean _scanStarTreeNodes;
+  private final boolean _reduceRandomAccess;
 
   boolean _resultEmpty = false;
 
@@ -120,7 +120,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
     _groupByColumns = groupByColumns != null ? groupByColumns : Collections.emptySet();
-    _scanStarTreeNodes = QueryOptionsUtils.isScanStarTreeNodes(_queryContext.getQueryOptions());
+    _reduceRandomAccess = QueryOptionsUtils.isReduceRandomAccess(_queryContext.getQueryOptions());
   }
 
   @Override
@@ -210,7 +210,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     StarTree starTree = _starTreeV2.getStarTree();
     List<String> dimensionNames = starTree.getDimensionNames();
     StarTreeNode starTreeRootNode = starTree.getRoot();
-    if (QueryOptionsUtils.isScanStarTreeNodesOnHeap(_queryContext.getQueryOptions())) {
+    if (_reduceRandomAccess) {
       starTreeRootNode = new CachedStarTreeNode(starTreeRootNode);
     }
 
@@ -283,7 +283,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         int numChildren = starTreeNode.getNumChildren();
 
         // If number of matching dictionary ids is large, use scan instead of binary search
-        if (numMatchingDictIds * USE_SCAN_TO_TRAVERSE_NODES_THRESHOLD > numChildren || _scanStarTreeNodes) {
+        if (numMatchingDictIds * USE_SCAN_TO_TRAVERSE_NODES_THRESHOLD > numChildren || _reduceRandomAccess) {
           Iterator<? extends StarTreeNode> childrenIterator = starTreeNode.getChildrenIterator();
 
           // When the star-node exists, and the number of matching dictionary ids is more than or equal to the

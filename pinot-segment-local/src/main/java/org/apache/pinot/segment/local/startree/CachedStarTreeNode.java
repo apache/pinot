@@ -88,7 +88,8 @@ public class CachedStarTreeNode implements StarTreeNode {
 
   @Override
   public StarTreeNode getChildForDimensionValue(int dimensionValue) {
-    return new CachedStarTreeNode(_delegate.getChildForDimensionValue(dimensionValue));
+    StarTreeNode child = _delegate.getChildForDimensionValue(dimensionValue);
+    return child == null ? null : new CachedStarTreeNode(child);
   }
 
   @Override

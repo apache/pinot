@@ -279,8 +279,7 @@ public class CommonConstants {
         public static final String TIMEOUT_MS = "timeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String USE_STAR_TREE = "useStarTree";
-        public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
-        public static final String SCAN_STAR_TREE_NODES_ON_HEAP = "scanStarTreeNodesOnHeap";
+        public static final String REDUCE_RANDOM_ACCESS = "reduceRandomAccess";
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";

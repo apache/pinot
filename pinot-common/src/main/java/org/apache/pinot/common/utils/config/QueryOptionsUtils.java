@@ -109,12 +109,8 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
 
-  public static boolean isScanStarTreeNodes(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SCAN_STAR_TREE_NODES));
-  }
-
-  public static boolean isScanStarTreeNodesOnHeap(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SCAN_STAR_TREE_NODES_ON_HEAP));
+  public static boolean isReduceRandomAccess(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.REDUCE_RANDOM_ACCESS));
   }
 
   public static boolean isSkipStarTree(Map<String, String> queryOptions) {
