@@ -246,6 +246,10 @@ public class PinotTenantRestletResource {
 
     for (String table : _pinotHelixResourceManager.getAllTables()) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(table);
+      if (tableConfig == null) {
+        LOGGER.error("Unable to retrieve table config for table: {}", table);
+        continue;
+      }
       String tableConfigTenant = tableConfig.getTenantConfig().getServer();
       if (tenantName.equals(tableConfigTenant)) {
         tables.add(table);
