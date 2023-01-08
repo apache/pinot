@@ -73,7 +73,7 @@ public class TableStateUtils {
   }
 
   /**
-   * Checks if all segments for the given @param tableNameWithType are succesfully loaded
+   * Checks if all segments for the given @param tableNameWithType were succesfully loaded
    * This function will get all segments in IDEALSTATE and CURRENTSTATE for the given table,
    * and then check if all ONLINE segments in IDEALSTATE match with CURRENTSTATE.
    * @param helixManager helix manager for the server instance

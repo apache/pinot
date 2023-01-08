@@ -185,6 +185,11 @@ public interface InstanceDataManager {
    */
   void forceCommit(String tableNameWithType, Set<String> segmentNames);
 
+  /**
+   * Enables the installation of a method to determine if a server is ready to server queries.
+   *
+   * @param isReadyToServeQueries supplier to retrieve state of server.
+   */
   void setSupplierOfReadyToServeQueries(Supplier<Boolean> isReadyToServeQueries);
   Supplier<Boolean> getSupplierOfReadyToServeQueries();
 }

@@ -82,6 +82,7 @@ public class IngestionDelayTracker {
   private static final int PARTITION_TIMEOUT_MS = 600000;          // 10 minutes timeouts
   // Delay Timer thread for this amount of time after starting timer
   private static final int INITIAL_TIMER_THREAD_DELAY_MS = 100;
+  private static final Logger _logger = LoggerFactory.getLogger(IngestionDelayTracker.class.getSimpleName());
 
   /*
    * Class to keep an ingestion delay measure and the time when the sample was taken (i.e. sample time)
@@ -90,10 +91,10 @@ public class IngestionDelayTracker {
    */
   static private class DelayMeasure {
     public DelayMeasure(long t, long d) {
-      _delayMilliseconds = d;
+      _delayMs = d;
       _sampleTime = t;
     }
-    public final long _delayMilliseconds;
+    public final long _delayMs;
     public final long _sampleTime;
   }
 
@@ -114,7 +115,6 @@ public class IngestionDelayTracker {
 
   private final boolean _enablePerPartitionMetric;
   private final boolean _enableAggregateMetric;
-  private final Logger _logger;
 
   private final RealtimeTableDataManager _realTimeTableDataManager;
   private Clock _clock;
@@ -128,7 +128,7 @@ public class IngestionDelayTracker {
       DelayMeasure currentMeasure = _partitionToDelaySampleMap.get(partitionGroupId);
       if ((newMax == null)
           ||
-          (currentMeasure != null) && (currentMeasure._delayMilliseconds > newMax._delayMilliseconds)) {
+          (currentMeasure != null) && (currentMeasure._delayMs > newMax._delayMs)) {
         newMax = currentMeasure;
       }
     }
@@ -149,7 +149,7 @@ public class IngestionDelayTracker {
     long measureAgeInMs = _clock.millis() - currentDelay._sampleTime;
     // Correct to zero for any time shifts due to NTP or time reset.
     measureAgeInMs = Math.max(measureAgeInMs, 0);
-    return currentDelay._delayMilliseconds + measureAgeInMs;
+    return currentDelay._delayMs + measureAgeInMs;
   }
 
   /*
@@ -163,21 +163,8 @@ public class IngestionDelayTracker {
     // If we are removing a partition we should stop reading its ideal state.
     _partitionsMarkedForVerification.remove(partitionGroupId);
     if (_enablePerPartitionMetric) {
-      _serverMetrics.removeTableGauge(getPerPartitionMetricName(partitionGroupId),
-          ServerGauge.TABLE_INGESTION_DELAY_MS);
+      _serverMetrics.removePartitionGauge(_metricName, partitionGroupId, ServerGauge.TABLE_INGESTION_DELAY_MS);
     }
-  }
-
-  /*
-   * Helper function to generate a per partition metric name.
-   *
-   * @param partitionGroupId the partition group id to be appended to the table name so we
-   *        can differentiate between metrics for various partitions.
-   *
-   * @return a metric name with the following structure: _metricName + partitionGroupId
-   */
-  private String getPerPartitionMetricName(int partitionGroupId) {
-    return _metricName + partitionGroupId;
   }
 
   /*
@@ -197,17 +184,15 @@ public class IngestionDelayTracker {
     return partitionsToVerify;
   }
 
-  // Custom Constructor
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, String metricNamePrefix,
       boolean enableAggregateMetric, boolean enablePerPartitionMetric)
       throws RuntimeException {
-    _logger = LoggerFactory.getLogger(getClass().getSimpleName());
     _serverMetrics = serverMetrics;
     _tableNameWithType = tableNameWithType;
     _metricName = metricNamePrefix + tableNameWithType;
     _realTimeTableDataManager = realtimeTableDataManager;
-    _clock = Clock.systemDefaultZone();
+    _clock = Clock.systemUTC();
     // Handle negative timer values
     if (timerThreadTickIntervalMs <= 0) {
       throw new RuntimeException(String.format("Illegal timer timeout argument, expected > 0, got=%d for table=%s",
@@ -230,14 +215,12 @@ public class IngestionDelayTracker {
     }
   }
 
-  // Constructor that uses defaults
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager tableDataManager) {
     this(serverMetrics, tableNameWithType, tableDataManager, TIMER_THREAD_TICK_INTERVAL_MS,
         "", true, true);
   }
 
-  // Constructor that takes a prefix to name the metric, so we can keep multiple trackers for the same table
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType, String metricNamePrefix,
       RealtimeTableDataManager tableDataManager) {
     this(serverMetrics, metricNamePrefix + tableNameWithType, tableDataManager,
@@ -257,19 +240,18 @@ public class IngestionDelayTracker {
   /*
    * Called by LLRealTimeSegmentDataManagers to post delay updates to this tracker class.
    *
-   * @param delayInMilliseconds ingestion delay being recorded.
+   * @param delayMs ingestion delay being recorded.
    * @param sampleTime sample time.
    * @param partitionGroupId partition ID for which this delay is being recorded.
    */
-  public void updateIngestionDelay(long delayInMilliseconds, long sampleTime, int partitionGroupId) {
+  public void updateIngestionDelay(long delayMs, long sampleTime, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
     DelayMeasure previousMeasure = _partitionToDelaySampleMap.put(partitionGroupId,
-        new DelayMeasure(sampleTime, delayInMilliseconds));
+        new DelayMeasure(sampleTime, delayMs));
     if ((previousMeasure == null) && _enablePerPartitionMetric) {
       // First time we start tracking a partition we should start tracking it via metric
-      _serverMetrics.addCallbackTableGaugeIfNeeded(getPerPartitionMetricName(partitionGroupId),
-          ServerGauge.TABLE_INGESTION_DELAY_MS,
-          () -> getPartitionIngestionDelay(partitionGroupId));
+      _serverMetrics.addCallbackPartitionGaugeIfNeeded(_metricName, partitionGroupId,
+          ServerGauge.TABLE_INGESTION_DELAY_MS, () -> getPartitionIngestionDelay(partitionGroupId));
     }
     // If we are consuming we do not need to track this partition for removal.
     _partitionsMarkedForVerification.remove(partitionGroupId);

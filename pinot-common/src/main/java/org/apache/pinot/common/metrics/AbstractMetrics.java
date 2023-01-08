@@ -464,6 +464,23 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Install a per-partition table gauge if needed.
+   *
+   * @param tableName The table name
+   * @param partitionId The partition name
+   * @param gauge The gauge to use
+   * @param valueCallback the callback function to be called while reading the metric.
+   */
+  public void addCallbackPartitionGaugeIfNeeded(final String tableName, final int partitionId, final G gauge,
+      final Callable<Long> valueCallback) {
+    final String fullGaugeName;
+    String gaugeName = gauge.getGaugeName();
+    fullGaugeName = gaugeName + "." + getTableName(tableName) + "." + partitionId;
+
+    addCallbackGaugeIfNeeded(fullGaugeName, valueCallback);
+  }
+
+  /**
    * Similar to addCallbackGauge method.
    * This method may be called multiple times, while it will be registered to callback function only once.
    * @param metricName The name of the metric
@@ -525,6 +542,20 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     final String fullGaugeName;
     String gaugeName = gauge.getGaugeName();
     fullGaugeName = gaugeName + "." + getTableName(tableName);
+    removeGauge(fullGaugeName);
+  }
+
+
+  /**
+   * Removes a table gauge given the table name and the gauge.
+   * The add/remove is expected to work correctly in case of being invoked across multiple threads.
+   * @param tableName table name
+   * @param gauge the gauge to be removed
+   */
+  public void removePartitionGauge(final String tableName, final int partitionId, final G gauge) {
+    final String fullGaugeName;
+    String gaugeName = gauge.getGaugeName();
+    fullGaugeName = gaugeName + "." + getTableName(tableName) + "." + partitionId;
     removeGauge(fullGaugeName);
   }
 
