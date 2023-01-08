@@ -52,12 +52,17 @@ public class S3Config {
   public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
   public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";
   public static final String DEFAULT_ASYNC_SESSION_UPDATED_ENABLED = "true";
+  public static final String KMS_CMK_ID = "kmsCmkId";
+  public static final String AES_HEX_SECRET = "aesHexSecret";
 
   private final String _accessKey;
   private final String _secretKey;
   private final String _region;
   private final boolean _disableAcl;
   private final String _endpoint;
+
+  private final String _kmsCmkId;
+  private final String _aesHexSecret;
 
   private final String _serverSideEncryption;
   private String _ssekmsKeyId;
@@ -76,6 +81,9 @@ public class S3Config {
     _secretKey = pinotConfig.getProperty(SECRET_KEY);
     _region = pinotConfig.getProperty(REGION);
     _endpoint = pinotConfig.getProperty(ENDPOINT);
+
+    _kmsCmkId = pinotConfig.getProperty(KMS_CMK_ID);
+    _aesHexSecret = pinotConfig.getProperty(AES_HEX_SECRET);
 
     _serverSideEncryption = pinotConfig.getProperty(SERVER_SIDE_ENCRYPTION_CONFIG_KEY);
     _ssekmsKeyId = pinotConfig.getProperty(SSE_KMS_KEY_ID_CONFIG_KEY);
@@ -115,6 +123,14 @@ public class S3Config {
 
   public String getEndpoint() {
     return _endpoint;
+  }
+
+  public String getKmsCmkId() {
+    return _kmsCmkId;
+  }
+
+  public String getAesHexSecret() {
+    return _aesHexSecret;
   }
 
   public String getServerSideEncryption() {
