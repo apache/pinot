@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.segment.local.utils.tablestate;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -39,21 +39,23 @@ public class TableStateUtils {
   }
 
   /**
-   * Returns all online segments for a given table.
+   * Returns all segments in a given state for a given table.
    *
    * @param helixManager instance of Helix manager
    * @param tableNameWithType table for which we are obtaining ONLINE segments
+   * @param state state of the segments to be returned
    *
-   * @return List of ONLINE segment names.
+   * @return List of segment names in a given state.
    */
-  public static List<String> getOnlineSegmentsForThisInstance(HelixManager helixManager, String tableNameWithType) {
+  public static Set<String> getSegmentsInGivenStateForThisInstance(HelixManager helixManager, String tableNameWithType,
+      String state) {
     HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
     IdealState idealState = dataAccessor.getProperty(keyBuilder.idealStates(tableNameWithType));
-    List<String> onlineSegments = new ArrayList<>();
+    Set<String> segmentsInGivenState = new HashSet<>();
     if (idealState == null) {
       LOGGER.warn("Failed to find ideal state for table: {}", tableNameWithType);
-      return onlineSegments;
+      return segmentsInGivenState;
     }
 
     // Get all ONLINE segments from idealState
@@ -64,12 +66,12 @@ public class TableStateUtils {
       Map<String, String> instanceStateMap = entry.getValue();
       String expectedState = instanceStateMap.get(instanceName);
       // Only track ONLINE segments assigned to the current instance
-      if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(expectedState)) {
+      if (!state.equals(expectedState)) {
         continue;
       }
-      onlineSegments.add(segmentName);
+      segmentsInGivenState.add(segmentName);
     }
-    return onlineSegments;
+    return segmentsInGivenState;
   }
 
   /**
@@ -85,7 +87,8 @@ public class TableStateUtils {
     PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
     String instanceName = helixManager.getInstanceName();
 
-    List<String> onlineSegments = getOnlineSegmentsForThisInstance(helixManager, tableNameWithType);
+    Set<String> onlineSegments = getSegmentsInGivenStateForThisInstance(helixManager, tableNameWithType,
+        CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE);
     if (onlineSegments.size() > 0) {
       LiveInstance liveInstance = dataAccessor.getProperty(keyBuilder.liveInstance(instanceName));
       if (liveInstance == null) {

@@ -22,8 +22,7 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -73,6 +72,7 @@ import org.slf4j.LoggerFactory;
  *   | TimerTrackingTask |          (CONSUMING -> DROPPED state change)
  *   |___________________|
  *
+ * TODO: handle bug situations like the one where a partition isot alolcated to a given server due to a bug.
  */
 
 public class IngestionDelayTracker {
@@ -283,7 +283,7 @@ public class IngestionDelayTracker {
    * This call is to be invoked by a timer thread that will periodically wake up and invoke this function.
    */
   public void timeoutInactivePartitions() {
-    List<Integer> partitionsHostedByThisServer = null;
+    Set<Integer> partitionsHostedByThisServer = null;
     // Check if we have any partition to verify, else don't make the call to check ideal state as that
     // involves network traffic and may be inefficient.
     ArrayList<Integer> partitionsToVerify = getPartitionsToBeVerified();
@@ -297,10 +297,8 @@ public class IngestionDelayTracker {
       _logger.error("Failed to get partitions hosted by this server, table={}", _tableNameWithType);
       return;
     }
-    // We create this hash to check for partitionsGroupId in O(1) vs O(n) for a list
-    HashSet<Integer> hostedPartitions = new HashSet(partitionsHostedByThisServer);
     for (int partitionGroupId : partitionsToVerify) {
-      if (!hostedPartitions.contains(partitionGroupId)) {
+      if (!partitionsHostedByThisServer.contains(partitionGroupId)) {
         // Partition is not hosted in this server anymore, stop tracking it
         removePartitionId(partitionGroupId);
       }

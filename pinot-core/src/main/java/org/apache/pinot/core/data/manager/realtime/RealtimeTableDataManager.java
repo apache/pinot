@@ -22,9 +22,10 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -268,9 +269,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * Returns all partitionGroupIds for the partitions hosted by this server for current table.
    * @Note: this involves Zookeeper read and should not be used frequently due to efficiency concerns.
    */
-  public List<Integer> getHostedPartitionsGroupIds() {
-    ArrayList<Integer> partitionsHostedByThisServer = new ArrayList<>();
-    List<String> segments = TableStateUtils.getOnlineSegmentsForThisInstance(_helixManager, _tableNameWithType);
+  public Set<Integer> getHostedPartitionsGroupIds() {
+    Set<Integer> partitionsHostedByThisServer = new HashSet<>();
+    Set<String> segments = TableStateUtils.getSegmentsInGivenStateForThisInstance(_helixManager, _tableNameWithType,
+        CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
     for (String segmentNameStr : segments) {
       LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
       partitionsHostedByThisServer.add(segmentName.getPartitionGroupId());
