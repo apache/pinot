@@ -21,6 +21,7 @@ package org.apache.pinot.connector.flink.sink;
 import java.net.URI;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -143,18 +144,21 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
     URI segmentURI = _segmentWriter.flush();
     LOG.info("Pinot segment writer flushed with {} records to {}", _segmentNumRecord, segmentURI);
     _segmentNumRecord = 0;
-    if (_isCheckpointingEnabled) {
-      _pendingRows.clear();
-    }
 
-    _executor.submit(() -> {
+    Future<Boolean> future = _executor.submit(() -> {
       try {
         _segmentUploader.uploadSegment(segmentURI, null);
+
       } catch (Exception e) {
         throw new RuntimeException("Failed to upload pinot segment", e);
       }
       LOG.info("Pinot segment uploaded to {}", segmentURI);
+      return true;
     });
+
+    if (_isCheckpointingEnabled && future.get()) {
+      _pendingRows.clear();
+    }
   }
 
 
