@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -117,10 +118,12 @@ public class IngestionDelayTracker {
   private final boolean _enableAggregateMetric;
 
   private final RealtimeTableDataManager _realTimeTableDataManager;
+  private final Supplier<Boolean> _isServerReadyToServeQueries;
+
   private Clock _clock;
 
   /*
-   * Returns the maximum ingestion delay amongs all partitions we are tracking.
+   * Returns the maximum ingestion delay amongst all partitions we are tracking.
    */
   private DelayMeasure getMaximumDelay() {
     DelayMeasure newMax = null;
@@ -186,13 +189,14 @@ public class IngestionDelayTracker {
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, String metricNamePrefix,
-      boolean enableAggregateMetric, boolean enablePerPartitionMetric)
+      boolean enableAggregateMetric, boolean enablePerPartitionMetric, Supplier<Boolean> isServerReadyToServeQueries)
       throws RuntimeException {
     _serverMetrics = serverMetrics;
     _tableNameWithType = tableNameWithType;
     _metricName = metricNamePrefix + tableNameWithType;
     _realTimeTableDataManager = realtimeTableDataManager;
     _clock = Clock.systemUTC();
+    _isServerReadyToServeQueries = isServerReadyToServeQueries;
     // Handle negative timer values
     if (timerThreadTickIntervalMs <= 0) {
       throw new RuntimeException(String.format("Illegal timer timeout argument, expected > 0, got=%d for table=%s",
@@ -216,15 +220,16 @@ public class IngestionDelayTracker {
   }
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-      RealtimeTableDataManager tableDataManager) {
+      RealtimeTableDataManager tableDataManager, Supplier<Boolean> isServerReadyToServeQueries) {
     this(serverMetrics, tableNameWithType, tableDataManager, TIMER_THREAD_TICK_INTERVAL_MS,
-        "", true, true);
+        "", true, true, isServerReadyToServeQueries);
   }
 
-  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType, String metricNamePrefix,
-      RealtimeTableDataManager tableDataManager) {
+  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
+      RealtimeTableDataManager tableDataManager, String metricNamePrefix,
+      Supplier<Boolean> isServerReadyToServeQueries) {
     this(serverMetrics, metricNamePrefix + tableNameWithType, tableDataManager,
-        TIMER_THREAD_TICK_INTERVAL_MS, metricNamePrefix, true, true);
+        TIMER_THREAD_TICK_INTERVAL_MS, metricNamePrefix, true, true, isServerReadyToServeQueries);
   }
 
   /**
@@ -246,6 +251,10 @@ public class IngestionDelayTracker {
    */
   public void updateIngestionDelay(long delayMs, long sampleTime, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
+    if (!_isServerReadyToServeQueries.get()) {
+      // Do not update the ingestion delay metrics during server startup period
+      return;
+    }
     DelayMeasure previousMeasure = _partitionToDelaySampleMap.put(partitionGroupId,
         new DelayMeasure(sampleTime, delayMs));
     if ((previousMeasure == null) && _enablePerPartitionMetric) {

@@ -37,7 +37,7 @@ public class IngestionDelayTrackerTest {
     RealtimeTableDataManager realtimeTableDataManager = new RealtimeTableDataManager(null);
     IngestionDelayTracker ingestionDelayTracker =
         new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
-            realtimeTableDataManager);
+            realtimeTableDataManager, () -> true);
     // With no samples, the time reported must be zero
     Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), 0);
     return ingestionDelayTracker;
@@ -50,18 +50,18 @@ public class IngestionDelayTrackerTest {
     // Test regular constructor
     IngestionDelayTracker ingestionDelayTracker =
         new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
-            realtimeTableDataManager);
+            realtimeTableDataManager, () -> true);
     Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), 0);
     ingestionDelayTracker.shutdown();
     // Test constructor with timer arguments
     ingestionDelayTracker =
         new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
-            realtimeTableDataManager, TIMER_THREAD_TICK_INTERVAL_MS, "", true, true);
+            realtimeTableDataManager, TIMER_THREAD_TICK_INTERVAL_MS, "", true, true, () -> true);
     Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), 0);
     // Test we can start a different tracker with different name
     IngestionDelayTracker prefixedIngestionDelayTracker =
         new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
-            realtimeTableDataManager, TIMER_THREAD_TICK_INTERVAL_MS, "dummyPrefix", true, true);
+            realtimeTableDataManager, TIMER_THREAD_TICK_INTERVAL_MS, "dummyPrefix", true, true, () -> true);
     Assert.assertEquals(prefixedIngestionDelayTracker.getMaximumIngestionDelay(), 0);
     prefixedIngestionDelayTracker.shutdown();
     ingestionDelayTracker.shutdown();
@@ -69,7 +69,7 @@ public class IngestionDelayTrackerTest {
     try {
       ingestionDelayTracker =
           new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
-              realtimeTableDataManager, 0, "", true, true);
+              realtimeTableDataManager, 0, "", true, true, () -> true);
       Assert.assertTrue(false); // Constructor must assert
     } catch (Exception e) {
       Assert.assertTrue(e instanceof RuntimeException);

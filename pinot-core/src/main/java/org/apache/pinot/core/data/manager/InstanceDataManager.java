@@ -188,8 +188,7 @@ public interface InstanceDataManager {
   /**
    * Enables the installation of a method to determine if a server is ready to server queries.
    *
-   * @param isReadyToServeQueries supplier to retrieve state of server.
+   * @param isServerReadyToServeQueries supplier to retrieve state of server.
    */
-  void setSupplierOfReadyToServeQueries(Supplier<Boolean> isReadyToServeQueries);
-  Supplier<Boolean> getSupplierOfReadyToServeQueries();
+  void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServerReadyToServeQueries);
 }

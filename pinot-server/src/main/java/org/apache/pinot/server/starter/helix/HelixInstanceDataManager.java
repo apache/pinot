@@ -97,13 +97,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private LoadingCache<Pair<String, String>, SegmentErrorInfo> _errorCache;
 
   @Override
-  public void setSupplierOfReadyToServeQueries(Supplier<Boolean> isServingQueries) {
+  public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
     _isReadyToServeQueries = isServingQueries;
-  }
-
-  @Override
-  public Supplier<Boolean> getSupplierOfReadyToServeQueries() {
-    return _isReadyToServeQueries;
   }
 
   @Override

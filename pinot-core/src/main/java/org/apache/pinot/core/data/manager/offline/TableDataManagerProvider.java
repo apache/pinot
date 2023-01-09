@@ -61,7 +61,7 @@ public class TableDataManagerProvider {
 
   public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache, Supplier<Boolean> isReadyToServeQueries) {
+      LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache, Supplier<Boolean> isServerReadyToServeQueries) {
     TableDataManager tableDataManager;
     switch (tableDataManagerConfig.getTableType()) {
       case OFFLINE:
@@ -72,7 +72,7 @@ public class TableDataManagerProvider {
         }
         break;
       case REALTIME:
-        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore, isReadyToServeQueries);
+        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToServeQueries);
         break;
       default:
         throw new IllegalStateException();
