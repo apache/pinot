@@ -28,6 +28,7 @@ import org.apache.pinot.query.planner.serde.ProtoProperties;
  * The {@code FieldSelectionKeySelector} simply extract a column value out from a row array {@link Object[]}.
  */
 public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]> {
+  private static final String HASH_ALGORITHM = "absHashCode";
 
   @ProtoProperties
   private List<Integer> _columnIndices;
@@ -89,5 +90,10 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]
 
     // return a positive number because this is used directly to modulo-index
     return Math.abs(hashCode);
+  }
+
+  @Override
+  public String hashAlgorithm() {
+    return HASH_ALGORITHM;
   }
 }
