@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -210,7 +212,7 @@ public class PinotHelixTaskResourceManagerTest {
 
     JobContext jobContext = mock(JobContext.class);
     when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
-    when(jobContext.getPartitionSet()).thenReturn(Set.of(0, 1));
+    when(jobContext.getPartitionSet()).thenReturn(ImmutableSet.of(0, 1));
     when(jobContext.getTaskIdForPartition(0)).thenReturn("taskId0");
     when(jobContext.getTaskIdForPartition(1)).thenReturn("taskId1");
     when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
@@ -220,7 +222,7 @@ public class PinotHelixTaskResourceManagerTest {
     when(taskDriver.getJobConfig(helixJobName)).thenReturn(jobConfig);
     when(jobConfig.getTaskConfig("taskId0")).thenReturn(new TaskConfig("", new HashMap<>()));
     when(jobConfig.getTaskConfig("taskId1")).thenReturn(new TaskConfig("",
-        new HashMap<>(Map.of("tableName", "table1_OFFLINE"))));
+        new HashMap<>(ImmutableMap.of("tableName", "table1_OFFLINE"))));
 
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
