@@ -1,0 +1,56 @@
+{
+  "tableName": "userAttributes",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "userAttributes",
+    "replication": 2,
+    "replicaGroupStrategyConfig": {
+      "partitionColumn": "userUUID",
+      "numInstancesPerPartition": 2
+    }
+  },
+  "instanceAssignmentConfigMap": {
+    "OFFLINE": {
+      "tagPoolConfig": {
+        "tag": "DefaultTenant_OFFLINE",
+        "poolBased": false,
+        "numPools": 0
+      },
+      "replicaGroupPartitionConfig": {
+        "replicaGroupBased": true,
+        "numInstances": 0,
+        "numReplicaGroups": 2,
+        "numInstancesPerReplicaGroup": 2,
+        "numPartitions": 2,
+        "numInstancesPerPartition": 1,
+        "minimizeDataMovement": false
+      },
+      "partitionSelector": "INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR"
+    }
+  },
+  "routing": {
+    "instanceSelectorType": "multiStageReplicaGroup"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [
+      "userUUID"
+    ],
+    "segmentPartitionConfig": {
+      "columnPartitionMap": {
+        "userUUID": {
+          "functionName": "Murmur",
+          "numPartitions": 4
+        }
+      }
+    }
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

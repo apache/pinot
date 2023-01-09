@@ -94,11 +94,6 @@ public class MultistageEngineQuickStart extends Quickstart {
     return overrides;
   }
 
-  @Override
-  protected int getNumQuickstartRunnerServers() {
-    return 4;
-  }
-
   public static void main(String[] args)
       throws Exception {
     List<String> arguments = new ArrayList<>();
