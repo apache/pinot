@@ -19,13 +19,16 @@
 package org.apache.pinot.connector.flink.sink;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.checkpoint.ListCheckpointed;
+import org.apache.flink.runtime.state.FunctionInitializationContext;
+import org.apache.flink.runtime.state.FunctionSnapshotContext;
+import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.pinot.connector.flink.common.PinotGenericRowConverter;
@@ -45,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * @param <T> type of record supported
  */
 @SuppressWarnings("NullAway")
-public class PinotSinkFunction<T> extends RichSinkFunction<T> implements ListCheckpointed<GenericRow> {
+public class PinotSinkFunction<T> extends RichSinkFunction<T> implements CheckpointedFunction {
 
   public static final long DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS = 500000;
   public static final int DEFAULT_EXECUTOR_POOL_SIZE = 5;
@@ -62,12 +65,13 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements ListChe
   private TableConfig _tableConfig;
   private Schema _schema;
 
-  private List<GenericRow> _pendingRows;
+  private ListState<GenericRow> _pendingRows;
 
   private transient SegmentWriter _segmentWriter;
   private transient SegmentUploader _segmentUploader;
   private transient ExecutorService _executor;
   private transient long _segmentNumRecord;
+  private transient boolean _isCheckpointingEnabled;
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema) {
     this(recordConverter, tableConfig, schema, DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
@@ -92,7 +96,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements ListChe
     _segmentUploader.init(_tableConfig);
     _segmentNumRecord = 0;
     _executor = Executors.newFixedThreadPool(_executorPoolSize);
-    _pendingRows = new ArrayList<>();
+    _isCheckpointingEnabled = ((StreamingRuntimeContext) this.getRuntimeContext()).isCheckpointingEnabled();
 
     LOG.info("Open Pinot Sink with the table {}", _tableConfig.toJsonString());
   }
@@ -102,7 +106,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements ListChe
       throws Exception {
     LOG.info("Closing Pinot Sink");
     try {
-      if (!((StreamingRuntimeContext) this.getRuntimeContext()).isCheckpointingEnabled()) {
+      if (_segmentNumRecord > 0 && !_isCheckpointingEnabled) {
         flush();
       }
     } catch (Exception e) {
@@ -124,7 +128,9 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements ListChe
   public void invoke(T value, Context context)
       throws Exception {
     GenericRow row = _recordConverter.convertToRow(value);
-    _pendingRows.add(row);
+    if (_isCheckpointingEnabled) {
+      _pendingRows.add(row);
+    }
     _segmentWriter.collect(row);
     _segmentNumRecord++;
     if (_segmentNumRecord >= _segmentFlushMaxNumRecords) {
@@ -137,7 +143,9 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements ListChe
     URI segmentURI = _segmentWriter.flush();
     LOG.info("Pinot segment writer flushed with {} records to {}", _segmentNumRecord, segmentURI);
     _segmentNumRecord = 0;
-    _pendingRows.clear();
+    if (_isCheckpointingEnabled) {
+      _pendingRows.clear();
+    }
 
     _executor.submit(() -> {
       try {
@@ -149,15 +157,20 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements ListChe
     });
   }
 
+
   @Override
-  public List<GenericRow> snapshotState(long checkpointId, long timestamp) {
-    return _pendingRows;
+  public void snapshotState(FunctionSnapshotContext functionSnapshotContext)
+      throws Exception {
+      // nothing to do here, state is already up to date
   }
 
   @Override
-  public void restoreState(List<GenericRow> pendingRows)
+  public void initializeState(FunctionInitializationContext functionInitializationContext)
       throws Exception {
-    for (GenericRow row: pendingRows) {
+    _pendingRows = functionInitializationContext.getOperatorStateStore()
+        .getListState(new ListStateDescriptor("pending-rows", TypeInformation.of(GenericRow.class)));
+
+    for (GenericRow row: _pendingRows.get()) {
       _segmentWriter.collect(row);
       _segmentNumRecord++;
     }
