@@ -368,10 +368,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
           // No reprocessing needed, reuse the same segment
           ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
           addSegment(segment);
-          closeSegmentDirectoryQuietly(segmentDirectory);
           return;
-        } else if (segmentDirectory.isEnforceSegmentDirMatchCheckOnReload()) {
-          throw new IllegalStateException("Expected segment directory not found");
+        } else {
+          closeSegmentDirectoryQuietly(segmentDirectory);
+          if (segmentDirectory.isEnforceSegmentDirMatchCheckOnReload()) {
+            throw new IllegalStateException("Expected segment directory not found");
+          }
         }
       }
 
