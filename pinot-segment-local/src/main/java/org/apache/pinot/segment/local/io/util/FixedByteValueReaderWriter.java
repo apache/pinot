@@ -122,6 +122,12 @@ public final class FixedByteValueReaderWriter implements ValueReader {
     return value;
   }
 
+  @Override
+  public int compareUtf8Bytes(int index, int numBytesPerValue, byte[] bytes) {
+    long startOffset = (long) index * numBytesPerValue;
+    return ValueReaderComparisons.compareUtf8Bytes(_dataBuffer, startOffset, numBytesPerValue, true, bytes);
+  }
+
   public void writeInt(int index, int value) {
     _dataBuffer.putInt((long) index * Integer.BYTES, value);
   }

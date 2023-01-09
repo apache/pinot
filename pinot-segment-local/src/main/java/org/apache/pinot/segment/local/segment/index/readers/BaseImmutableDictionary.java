@@ -219,14 +219,14 @@ public abstract class BaseImmutableDictionary implements Dictionary {
    * TODO: Clean up the segments with legacy non-zero padding byte, and remove the support for non-zero padding byte
    */
   protected int binarySearch(String value) {
-    byte[] buffer = getBuffer();
     int low = 0;
     int high = _length - 1;
     if (_paddingByte == 0) {
+      byte[] utf8 = value.getBytes(UTF_8);
       while (low <= high) {
         int mid = (low + high) >>> 1;
-        String midValue = _valueReader.getUnpaddedString(mid, _numBytesPerValue, _paddingByte, buffer);
-        int compareResult = midValue.compareTo(value);
+        // method requires zero padding byte, not safe to call in nonzero padding byte branch below
+        int compareResult = _valueReader.compareUtf8Bytes(mid, _numBytesPerValue, utf8);
         if (compareResult < 0) {
           low = mid + 1;
         } else if (compareResult > 0) {
@@ -236,6 +236,7 @@ public abstract class BaseImmutableDictionary implements Dictionary {
         }
       }
     } else {
+      byte[] buffer = getBuffer();
       String paddedValue = padString(value);
       while (low <= high) {
         int mid = (low + high) >>> 1;
