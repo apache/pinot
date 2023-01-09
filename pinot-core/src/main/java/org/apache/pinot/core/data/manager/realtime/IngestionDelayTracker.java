@@ -72,7 +72,7 @@ import org.slf4j.LoggerFactory;
  *   | TimerTrackingTask |          (CONSUMING -> DROPPED state change)
  *   |___________________|
  *
- * TODO: handle bug situations like the one where a partition isot alolcated to a given server due to a bug.
+ * TODO: handle bug situations like the one where a partition is not allocated to a given server due to a bug.
  */
 
 public class IngestionDelayTracker {
@@ -251,6 +251,7 @@ public class IngestionDelayTracker {
    */
   public void updateIngestionDelay(long delayMs, long sampleTime, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
+    // TODO: see if we can install gauges after the server is ready.
     if (!_isServerReadyToServeQueries.get()) {
       // Do not update the ingestion delay metrics during server startup period
       return;

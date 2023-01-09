@@ -206,11 +206,17 @@ public class IngestionDelayTrackerTest {
     for (int partitionGroupId = 0; partitionGroupId <= maxTestDelay; partitionGroupId++) {
       ingestionDelayTracker.updateIngestionDelay(partitionGroupId, clock.millis(), partitionGroupId);
       Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), partitionGroupId);
+      // Test retrieving per-partition delays
+      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelay(partitionGroupId), partitionGroupId);
     }
     // Verify that as we remove partitions the next available maximum takes over
     for (int partitionGroupId = maxPartition; partitionGroupId >= 0; partitionGroupId--) {
       Assert.assertEquals(ingestionDelayTracker.getMaximumIngestionDelay(), partitionGroupId);
       ingestionDelayTracker.stopTrackingPartitionIngestionDelay((int) partitionGroupId);
+    }
+    for (int partitionGroupId = 0; partitionGroupId <= maxTestDelay; partitionGroupId++) {
+      // Untracked partitions must return 0
+      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelay(partitionGroupId), 0);
     }
   }
 
