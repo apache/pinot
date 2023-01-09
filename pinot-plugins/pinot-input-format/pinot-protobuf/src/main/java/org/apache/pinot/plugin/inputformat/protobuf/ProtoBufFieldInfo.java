@@ -18,18 +18,33 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
-import java.net.URI;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import com.google.protobuf.Descriptors;
 
 
-public class ProtobufRecordReaderConfig implements RecordReaderConfig {
-  private URI _descriptorFile;
+/**
+ * Object for associating a ProtoBuf field value and its field descriptor used when extracting ProtoBuf records.
+ */
+public class ProtoBufFieldInfo {
 
-  public URI getDescriptorFile() {
-    return _descriptorFile;
+  private Object _fieldValue;
+  private Descriptors.FieldDescriptor _fieldDescriptor;
+
+  public ProtoBufFieldInfo(Object fieldValue, Descriptors.FieldDescriptor fieldDescriptor) {
+    _fieldValue = fieldValue;
+    _fieldDescriptor = fieldDescriptor;
   }
 
-  public void setDescriptorFile(URI descriptorFile) {
-    _descriptorFile = descriptorFile;
+  /**
+   * Returns the field value
+   */
+  public Object getFieldValue() {
+    return _fieldValue;
+  }
+
+  /**
+   * Returns the field descriptor
+   */
+  public Descriptors.FieldDescriptor getFieldDescriptor() {
+    return _fieldDescriptor;
   }
 }

@@ -40,11 +40,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ProtobufUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ProtobufUtils.class);
+public class ProtoBufUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufUtils.class);
   public static final String TMP_DIR_PREFIX = "pinot-protobuf";
 
-  private ProtobufUtils() {
+  private ProtoBufUtils() {
   }
 
   public static InputStream getDescriptorFileInputStream(String descriptorFilePath)

@@ -45,9 +45,9 @@ import org.slf4j.LoggerFactory;
 import static com.google.common.base.Preconditions.checkState;
 
 
-public class KafkaConfluentSchemaRegistryProtobufMessageDecoder implements StreamMessageDecoder<byte[]> {
+public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER =
-      LoggerFactory.getLogger(KafkaConfluentSchemaRegistryProtobufMessageDecoder.class);
+      LoggerFactory.getLogger(KafkaConfluentSchemaRegistryProtoBufMessageDecoder.class);
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private static final String SCHEMA_REGISTRY_OPTS_PREFIX = "schema.registry.";
   public static final String CACHED_SCHEMA_MAP_CAPACITY = "cached.schema.map.capacity";
@@ -101,7 +101,7 @@ public class KafkaConfluentSchemaRegistryProtobufMessageDecoder implements Strea
     _deserializer = new KafkaProtobufDeserializer<>(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");
     _topicName = topicName;
-    _protoBufRecordExtractor = PluginManager.get().createInstance(ProtobufRecordExtractor.class.getName());
+    _protoBufRecordExtractor = PluginManager.get().createInstance(ProtoBufRecordExtractor.class.getName());
     _protoBufRecordExtractor.init(fieldsToRead, null);
   }
 

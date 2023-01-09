@@ -34,9 +34,9 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
-public class ProtobufRecordReader implements RecordReader {
+public class ProtoBufRecordReader implements RecordReader {
   private File _dataFile;
-  private ProtobufRecordExtractor _recordExtractor;
+  private ProtoBufRecordExtractor _recordExtractor;
 
   private InputStream _inputStream;
   private boolean _hasNext;
@@ -65,21 +65,21 @@ public class ProtobufRecordReader implements RecordReader {
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
-    ProtobufRecordReaderConfig protoBufRecordReaderConfig = (ProtobufRecordReaderConfig) recordReaderConfig;
+    ProtoBufRecordReaderConfig protoBufRecordReaderConfig = (ProtoBufRecordReaderConfig) recordReaderConfig;
     Preconditions.checkNotNull(protoBufRecordReaderConfig.getDescriptorFile(),
         "Protocol Buffer schema descriptor file must be provided");
     Descriptors.Descriptor descriptor = buildProtoBufDescriptor(protoBufRecordReaderConfig);
-    _recordExtractor = new ProtobufRecordExtractor();
+    _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
     DynamicMessage dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
     _builder = dynamicMessage.newBuilderForType();
     init();
   }
 
-  private Descriptors.Descriptor buildProtoBufDescriptor(ProtobufRecordReaderConfig protoBufRecordReaderConfig)
+  private Descriptors.Descriptor buildProtoBufDescriptor(ProtoBufRecordReaderConfig protoBufRecordReaderConfig)
       throws IOException {
     try {
-      InputStream fin = ProtobufUtils.getDescriptorFileInputStream(
+      InputStream fin = ProtoBufUtils.getDescriptorFileInputStream(
           protoBufRecordReaderConfig.getDescriptorFile().toString());
       DescriptorProtos.FileDescriptorSet set = DescriptorProtos.FileDescriptorSet.parseFrom(fin);
       Descriptors.FileDescriptor fileDescriptor =

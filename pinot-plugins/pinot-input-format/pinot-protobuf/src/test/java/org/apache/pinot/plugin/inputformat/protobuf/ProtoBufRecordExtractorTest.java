@@ -37,9 +37,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Tests for the {@link ProtobufRecordExtractor}
+ * Tests for the {@link ProtoBufRecordExtractor}
  */
-public class ProtobufRecordExtractorTest extends AbstractRecordExtractorTest {
+public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
 
   private final File _dataFile = new File(_tempDir, "test_complex_proto.data");
 
@@ -78,7 +78,7 @@ public class ProtobufRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
-    ProtobufRecordReader protoBufRecordReader = new ProtobufRecordReader();
+    ProtoBufRecordReader protoBufRecordReader = new ProtoBufRecordReader();
     protoBufRecordReader.init(_dataFile, fieldsToRead, getProtoRecordReaderConfig());
     return protoBufRecordReader;
   }
@@ -178,9 +178,9 @@ public class ProtobufRecordExtractorTest extends AbstractRecordExtractorTest {
     return nestedMap;
   }
 
-  private ProtobufRecordReaderConfig getProtoRecordReaderConfig()
+  private ProtoBufRecordReaderConfig getProtoRecordReaderConfig()
       throws IOException {
-    ProtobufRecordReaderConfig config = new ProtobufRecordReaderConfig();
+    ProtoBufRecordReaderConfig config = new ProtoBufRecordReaderConfig();
     URI descriptorFile;
     try {
       descriptorFile = getClass().getClassLoader().getResource(DESCRIPTOR_FILE).toURI();

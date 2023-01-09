@@ -32,13 +32,13 @@ import org.slf4j.LoggerFactory;
 
 
 //TODO: Add support for Schema Registry
-public class ProtobufMessageDecoder implements StreamMessageDecoder<byte[]> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ProtobufMessageDecoder.class);
+public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufMessageDecoder.class);
 
   public static final String DESCRIPTOR_FILE_PATH = "descriptorFile";
   public static final String PROTO_CLASS_NAME = "protoClassName";
 
-  private ProtobufRecordExtractor _recordExtractor;
+  private ProtoBufRecordExtractor _recordExtractor;
   private String _protoClassName;
   private Message.Builder _builder;
 
@@ -49,9 +49,9 @@ public class ProtobufMessageDecoder implements StreamMessageDecoder<byte[]> {
         "Protocol Buffer schema class name must be provided");
 
     _protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
-    Descriptors.Descriptor descriptor = ProtobufUtils.buildDescriptor(_protoClassName,
+    Descriptors.Descriptor descriptor = ProtoBufUtils.buildDescriptor(_protoClassName,
             props.get(DESCRIPTOR_FILE_PATH));
-    _recordExtractor = new ProtobufRecordExtractor();
+    _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
     DynamicMessage dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
     _builder = dynamicMessage.newBuilderForType();

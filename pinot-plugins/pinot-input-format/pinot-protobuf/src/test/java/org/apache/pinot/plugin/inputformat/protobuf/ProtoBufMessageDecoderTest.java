@@ -37,7 +37,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-public class ProtobufMessageDecoderTest {
+public class ProtoBufMessageDecoderTest {
 
   private static final String STRING_FIELD = "string_field";
   private static final String INT_FIELD = "int_field";
@@ -61,7 +61,7 @@ public class ProtobufMessageDecoderTest {
     Map<String, String> decoderProps = new HashMap<>();
     URL descriptorFile = getClass().getClassLoader().getResource("sample.desc");
     decoderProps.put("protoClassName", "org.apache.pinot.plugin.inputformat.protobuf.Sample$SampleRecord");
-    ProtobufMessageDecoder messageDecoder = new ProtobufMessageDecoder();
+    ProtoBufMessageDecoder messageDecoder = new ProtoBufMessageDecoder();
     messageDecoder.init(decoderProps, getFieldsInSampleRecord(), "");
     Sample.SampleRecord sampleRecord = getSampleRecordMessage();
     GenericRow destination = new GenericRow();
@@ -86,7 +86,7 @@ public class ProtobufMessageDecoderTest {
     URL descriptorFile = getClass().getClassLoader().getResource("sample.desc");
     decoderProps.put("descriptorFile", descriptorFile.toURI().toString());
     decoderProps.put("protoClassName", "SampleRecord");
-    ProtobufMessageDecoder messageDecoder = new ProtobufMessageDecoder();
+    ProtoBufMessageDecoder messageDecoder = new ProtoBufMessageDecoder();
     messageDecoder.init(decoderProps, getFieldsInSampleRecord(), "");
     Sample.SampleRecord sampleRecord = getSampleRecordMessage();
     GenericRow destination = new GenericRow();
@@ -112,7 +112,7 @@ public class ProtobufMessageDecoderTest {
     URL descriptorFile = getClass().getClassLoader().getResource("complex_types.desc");
     // decoderProps.put("descriptorFile", descriptorFile.toURI().toString());
     decoderProps.put("protoClassName", "org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes$TestMessage");
-    ProtobufMessageDecoder messageDecoder = new ProtobufMessageDecoder();
+    ProtoBufMessageDecoder messageDecoder = new ProtoBufMessageDecoder();
     messageDecoder.init(decoderProps, getSourceFieldsForComplexType(), "");
     Map<String, Object> inputRecord = createComplexTypeRecord();
     GenericRow destination = new GenericRow();
@@ -139,7 +139,7 @@ public class ProtobufMessageDecoderTest {
     URL descriptorFile = getClass().getClassLoader().getResource("complex_types.desc");
     decoderProps.put("descriptorFile", descriptorFile.toURI().toString());
     decoderProps.put("protoClassName", "NestedMessage");
-    ProtobufMessageDecoder messageDecoder = new ProtobufMessageDecoder();
+    ProtoBufMessageDecoder messageDecoder = new ProtoBufMessageDecoder();
 
     ComplexTypes.NestedMessage nestedMessage =
             ComplexTypes.NestedMessage.newBuilder().setNestedStringField("hello").setNestedIntField(42).build();
@@ -160,7 +160,7 @@ public class ProtobufMessageDecoderTest {
       throws Exception {
     Map<String, String> decoderProps = new HashMap<>();
     decoderProps.put("protoClassName", "org.apache.pinot.plugin.inputformat.protobuf.CompositeTypes$CompositeMessage");
-    ProtobufMessageDecoder messageDecoder = new ProtobufMessageDecoder();
+    ProtoBufMessageDecoder messageDecoder = new ProtoBufMessageDecoder();
     Set<String> sourceFields = getSourceFieldsForComplexType();
     sourceFields.addAll(getFieldsInSampleRecord());
 
