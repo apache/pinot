@@ -58,8 +58,9 @@ public abstract class BaseBinaryGeoTransformFunction extends BaseTransformFuncti
             transformFunction.getResultMetadata().getDataType()
         );
     if (transformFunction instanceof LiteralTransformFunction) {
+      // TODO: Handle the case where getLiteral can be null.
       _firstLiteral = GeometrySerializer.deserialize(
-          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getLiteral()));
+          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getLiteral().toString()));
     } else {
       _firstArgument = transformFunction;
     }
@@ -72,8 +73,9 @@ public abstract class BaseBinaryGeoTransformFunction extends BaseTransformFuncti
             transformFunction.getResultMetadata().getDataType()
         );
     if (transformFunction instanceof LiteralTransformFunction) {
+      // TODO: Handle the case where getLiteral can be null.
       _secondLiteral = GeometrySerializer.deserialize(
-          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getLiteral()));
+          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getLiteral().toString()));
     } else {
       _secondArgument = transformFunction;
     }

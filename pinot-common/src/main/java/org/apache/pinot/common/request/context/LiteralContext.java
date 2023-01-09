@@ -48,6 +48,8 @@ public class LiteralContext {
         return FieldSpec.DataType.DOUBLE;
       case STRING_VALUE:
         return FieldSpec.DataType.STRING;
+      case NULL_VALUE:
+        return FieldSpec.DataType.NULL;
       default:
         throw new UnsupportedOperationException("Unsupported literal type:" + fields);
     }
@@ -74,7 +76,11 @@ public class LiteralContext {
 
   public LiteralContext(Literal literal) {
     _type = convertThriftTypeToDataType(literal.getSetField());
-    _value = literal.getFieldValue();
+    if(_type == FieldSpec.DataType.NULL){
+     _value = null;
+    } else {
+      _value = literal.getFieldValue();
+    }
   }
 
   public FieldSpec.DataType getType() {
@@ -87,8 +93,12 @@ public class LiteralContext {
   }
 
   public LiteralContext(FieldSpec.DataType type, Object value) {
-    Preconditions.checkArgument(convertDataTypeToJavaType(type) == value.getClass(),
-        "Unmatched data type: " + type + " java type: " + value.getClass());
+    if (value != null) {
+      Preconditions.checkArgument(convertDataTypeToJavaType(type) == value.getClass(),
+          "Unmatched data type: " + type + " java type: " + value.getClass());
+    } else {
+      Preconditions.checkArgument(type == FieldSpec.DataType.NULL, "Only null data type can pass null object");
+    }
     _type = type;
     _value = value;
   }

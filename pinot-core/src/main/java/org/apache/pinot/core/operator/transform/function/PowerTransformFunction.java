@@ -49,7 +49,8 @@ public class PowerTransformFunction extends BaseTransformFunction {
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     if (_rightTransformFunction instanceof LiteralTransformFunction) {
-      _exponent = Double.parseDouble(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
+      // TODO: Handle the case where getLiteral can be null.
+      _exponent = Double.parseDouble(((LiteralTransformFunction) _rightTransformFunction).getLiteral().toString());
       _fixedExponent = true;
     }
     Preconditions.checkArgument(

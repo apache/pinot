@@ -62,6 +62,7 @@ public class StPointFunction extends BaseTransformFunction {
       transformFunction = arguments.get(2);
       Preconditions.checkArgument(transformFunction instanceof LiteralTransformFunction,
           "Third argument must be a literal of integer: %s", getName());
+      // TODO: Handle the case where getLiteral can be null.
       _isGeography = BooleanUtils.toBoolean(((LiteralTransformFunction) transformFunction).getLiteral());
     }
   }

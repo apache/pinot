@@ -43,8 +43,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
  * TODO: Preserve the type of the literal instead of inferring the type from the string
  */
 public class LiteralTransformFunction implements TransformFunction {
-  // TODO: Deprecate the string representation of literal.
-  private final String _literal;
+  private final Object _literal;
   private final DataType _dataType;
   private final int _intLiteral;
   private final long _longLiteral;
@@ -63,21 +62,29 @@ public class LiteralTransformFunction implements TransformFunction {
 
   public LiteralTransformFunction(LiteralContext literalContext) {
     Preconditions.checkNotNull(literalContext);
-    _literal = literalContext.getValue() == null ? "" : literalContext.getValue().toString();
-    if (literalContext.getType() == DataType.BOOLEAN) {
-      _bigDecimalLiteral = PinotDataType.BOOLEAN.toBigDecimal(literalContext.getValue());
-      _dataType = DataType.BOOLEAN;
-    } else {
-      _dataType = inferLiteralDataType(_literal);
-      if (_dataType.isNumeric()) {
-        _bigDecimalLiteral = new BigDecimal(_literal);
-      } else if (_dataType == DataType.TIMESTAMP) {
-        // inferLiteralDataType successfully interpreted the literal as TIMESTAMP. _bigDecimalLiteral is populated and
-        // assigned to _longLiteral.
-        _bigDecimalLiteral = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(_literal));
-      } else {
+    _literal = literalContext.getValue();
+    switch (literalContext.getType()) {
+      case BOOLEAN:
+        _bigDecimalLiteral = PinotDataType.BOOLEAN.toBigDecimal(literalContext.getValue());
+        _dataType = DataType.BOOLEAN;
+        break;
+      case NULL:
+        // TODO: Figure out a better way for numerical representation of null literal
         _bigDecimalLiteral = BigDecimal.ZERO;
-      }
+        _dataType = DataType.NULL;
+        break;
+      default:
+        _dataType = inferLiteralDataType(_literal.toString());
+        if (_dataType.isNumeric()) {
+          _bigDecimalLiteral = new BigDecimal(_literal.toString());
+        } else if (_dataType == DataType.TIMESTAMP) {
+          // inferLiteralDataType successfully interpreted the literal as TIMESTAMP. _bigDecimalLiteral is populated and
+          // assigned to _longLiteral.
+          _bigDecimalLiteral = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(_literal.toString()));
+        } else {
+          _bigDecimalLiteral = BigDecimal.ZERO;
+        }
+        break;
     }
     _intLiteral = _bigDecimalLiteral.intValue();
     _longLiteral = _bigDecimalLiteral.longValue();
@@ -119,8 +126,17 @@ public class LiteralTransformFunction implements TransformFunction {
     return DataType.STRING;
   }
 
-  public String getLiteral() {
+  // TODO: Handle null for all references.
+  public Object getLiteral() {
     return _literal;
+  }
+
+  public String getLiteralString() {
+    // TODO: Double check whether we want to output empty string for null literal.
+    if (_literal == null) {
+      return "";
+    }
+    return _literal.toString();
   }
 
   @Override
@@ -181,7 +197,7 @@ public class LiteralTransformFunction implements TransformFunction {
           Arrays.fill(longResult, _longLiteral);
         }
       } else {
-        Arrays.fill(longResult, Timestamp.valueOf(_literal).getTime());
+        Arrays.fill(longResult, Timestamp.valueOf(_literal.toString()).getTime());
       }
       _longResult = longResult;
     }
@@ -234,7 +250,7 @@ public class LiteralTransformFunction implements TransformFunction {
     String[] stringResult = _stringResult;
     if (stringResult == null || stringResult.length < numDocs) {
       stringResult = new String[numDocs];
-      Arrays.fill(stringResult, _literal);
+      Arrays.fill(stringResult, getLiteralString());
       _stringResult = stringResult;
     }
     return stringResult;
@@ -246,7 +262,7 @@ public class LiteralTransformFunction implements TransformFunction {
     byte[][] bytesResult = _bytesResult;
     if (bytesResult == null || bytesResult.length < numDocs) {
       bytesResult = new byte[numDocs][];
-      Arrays.fill(bytesResult, BytesUtils.toBytes(_literal));
+      Arrays.fill(bytesResult, BytesUtils.toBytes(getLiteralString()));
       _bytesResult = bytesResult;
     }
     return bytesResult;

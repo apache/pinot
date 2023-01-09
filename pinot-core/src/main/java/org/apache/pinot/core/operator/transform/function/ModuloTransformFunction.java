@@ -48,7 +48,7 @@ public class ModuloTransformFunction extends BaseTransformFunction {
 
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction) {
-      _firstLiteral = Double.parseDouble(((LiteralTransformFunction) firstArgument).getLiteral());
+      _firstLiteral = Double.parseDouble(((LiteralTransformFunction) firstArgument).getLiteral().toString());
     } else {
       if (!firstArgument.getResultMetadata().isSingleValue()) {
         throw new IllegalArgumentException("First argument of MOD transform function must be single-valued");
@@ -58,7 +58,8 @@ public class ModuloTransformFunction extends BaseTransformFunction {
 
     TransformFunction secondArgument = arguments.get(1);
     if (secondArgument instanceof LiteralTransformFunction) {
-      _secondLiteral = Double.parseDouble(((LiteralTransformFunction) secondArgument).getLiteral());
+      // TODO: Handle the case where getLiteral can be null.
+      _secondLiteral = Double.parseDouble(((LiteralTransformFunction) secondArgument).getLiteral().toString());
     } else {
       if (!secondArgument.getResultMetadata().isSingleValue()) {
         throw new IllegalArgumentException("Second argument of MOD transform function must be single-valued");

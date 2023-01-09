@@ -67,10 +67,11 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
       TransformFunction argument = arguments.get(i);
       if (argument instanceof LiteralTransformFunction) {
         LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) argument;
+        // TODO: Handle the case where getLiteral can be null.
         if (_resultDataType == DataType.BIG_DECIMAL) {
-          _bigDecimalLiterals[i] = new BigDecimal(literalTransformFunction.getLiteral());
+          _bigDecimalLiterals[i] = new BigDecimal(literalTransformFunction.getLiteral().toString());
         } else {
-          _doubleLiterals[i] = Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
+          _doubleLiterals[i] = Double.parseDouble(((LiteralTransformFunction) argument).getLiteral().toString());
         }
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {

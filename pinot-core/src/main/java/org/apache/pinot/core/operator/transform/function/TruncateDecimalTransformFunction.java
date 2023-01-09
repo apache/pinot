@@ -55,7 +55,8 @@ public class TruncateDecimalTransformFunction extends BaseTransformFunction {
     if (numArguments > 1) {
       _rightTransformFunction = arguments.get(1);
       if (_rightTransformFunction instanceof LiteralTransformFunction) {
-        _scale = Integer.parseInt(((LiteralTransformFunction) _rightTransformFunction).getLiteral());
+        // TODO: Handle the case where getLiteral can be null.
+        _scale = Integer.parseInt(((LiteralTransformFunction) _rightTransformFunction).getLiteral().toString());
         _fixedScale = true;
       }
       Preconditions.checkArgument(

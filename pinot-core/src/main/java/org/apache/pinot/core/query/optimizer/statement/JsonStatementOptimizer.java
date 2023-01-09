@@ -491,7 +491,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     result.append(aliasing ? "'" : "");
     switch (literal.getSetField()) {
       case BOOL_VALUE:
-        result.append(String.valueOf(literal.getBinaryValue()));
+        result.append(literal.getBoolValue());
         break;
       case BYTE_VALUE:
         result.append(
@@ -502,21 +502,24 @@ public class JsonStatementOptimizer implements StatementOptimizer {
             aliasing ? String.valueOf(literal.getShortValue()) : "'" + String.valueOf(literal.getShortValue()) + "'");
         break;
       case INT_VALUE:
-        result.append(String.valueOf(literal.getIntValue()));
+        result.append(literal.getIntValue());
         break;
       case LONG_VALUE:
-        result.append(String.valueOf(literal.getLongValue()));
+        result.append(literal.getLongValue());
         break;
       case DOUBLE_VALUE:
-        result.append(String.valueOf(literal.getDoubleValue()));
+        result.append(literal.getDoubleValue());
         break;
       case STRING_VALUE:
         result.append("'" + literal.getStringValue() + "'");
         break;
       case BINARY_VALUE:
         result.append(
-            aliasing ? String.valueOf(literal.getBinaryValue()) : "'" + String.valueOf(literal.getBinaryValue()) + "'");
+            aliasing ? String.valueOf(literal.getBinaryValue()) : "'" + literal.getBinaryValue() + "'");
         break;
+      case NULL_VALUE:
+        // do not append value for null.
+        // fall through
       default:
         break;
     }
@@ -535,11 +538,13 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         return DataSchema.ColumnDataType.LONG;
       case DOUBLE_VALUE:
         return DataSchema.ColumnDataType.DOUBLE;
-      case STRING_VALUE:
-        return DataSchema.ColumnDataType.STRING;
       case BYTE_VALUE:
       case BINARY_VALUE:
         return DataSchema.ColumnDataType.BYTES;
+      case NULL_VALUE:
+        return DataSchema.ColumnDataType.NULL;
+      case STRING_VALUE:
+        // fall through
       default:
         return DataSchema.ColumnDataType.STRING;
     }

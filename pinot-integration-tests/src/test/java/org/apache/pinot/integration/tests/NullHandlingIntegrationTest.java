@@ -186,4 +186,13 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     query = "SELECT description FROM " + getTableName() + " where description IS NOT DISTINCT FROM description";
     testQuery(query);
   }
+
+  @Test
+  public void testCaseWithNullLiteral()
+      throws Exception {
+    String query = "SELECT (CASE WHEN salary IS NULL THEN 1 ELSE NULL END) FROM " + getTableName()
+        + " GROUP BY (CASE WHEN salary IS NULL THEN 1 ELSE NULL END)";
+    // TODO: h2 doesn't output any rows for the query above so disable the verification for now.
+    //testQuery(query);
+  }
 }

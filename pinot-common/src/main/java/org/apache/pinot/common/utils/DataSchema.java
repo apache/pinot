@@ -252,6 +252,7 @@ public class DataSchema {
   }
 
   public enum ColumnDataType {
+    NULL(null),
     INT(0),
     LONG(0L),
     FLOAT(0f),

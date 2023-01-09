@@ -91,7 +91,8 @@ public class GroovyTransformFunction extends BaseTransformFunction {
     TransformFunction returnValueMetadata = arguments.get(0);
     Preconditions.checkState(returnValueMetadata instanceof LiteralTransformFunction,
         "First argument of GROOVY transform function must be a literal, representing a json string");
-    String returnValueMetadataStr = ((LiteralTransformFunction) returnValueMetadata).getLiteral();
+    // TODO: Handle the case where getLiteral can be null.
+    String returnValueMetadataStr = ((LiteralTransformFunction) returnValueMetadata).getLiteral().toString();
     try {
       JsonNode returnValueMetadataJson = JsonUtils.stringToJsonNode(returnValueMetadataStr);
       Preconditions.checkState(returnValueMetadataJson.hasNonNull(RETURN_TYPE_KEY),
@@ -133,6 +134,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       // construct arguments string for GroovyFunctionEvaluator
       String argumentsStr = IntStream.range(0, _numGroovyArgs).mapToObj(i -> ARGUMENT_PREFIX + i)
           .collect(Collectors.joining(GROOVY_ARG_DELIMITER));
+      // TODO: Handle the case where getLiteral can be null.
       _groovyFunctionEvaluator = new GroovyFunctionEvaluator(
           String.format(GROOVY_TEMPLATE_WITH_ARGS, ((LiteralTransformFunction) groovyTransformFunction).getLiteral(),
               argumentsStr));
@@ -141,6 +143,7 @@ public class GroovyTransformFunction extends BaseTransformFunction {
       _fetchElementFunctions = new BiFunction[_numGroovyArgs];
       initFunctions();
     } else {
+      // TODO: Handle the case where getLiteral can be null.
       _groovyFunctionEvaluator = new GroovyFunctionEvaluator(String.format(GROOVY_TEMPLATE_WITHOUT_ARGS,
           ((LiteralTransformFunction) groovyTransformFunction).getLiteral()));
     }

@@ -37,9 +37,11 @@ public class LiteralTransformFunctionTest {
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("2020-02-02 20:20:20.20"), DataType.TIMESTAMP);
     LiteralTransformFunction trueBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, true));
     Assert.assertEquals(trueBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
-    Assert.assertEquals(trueBoolean.getLiteral(), "true");
+    Assert.assertEquals(trueBoolean.getLiteral(), true);
     LiteralTransformFunction falseBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, false));
     Assert.assertEquals(falseBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
-    Assert.assertEquals(falseBoolean.getLiteral(), "false");
+    Assert.assertEquals(falseBoolean.getLiteral(), false);
+    LiteralTransformFunction nullLiteral = new LiteralTransformFunction(new LiteralContext(DataType.NULL, null));
+    Assert.assertNull(nullLiteral.getLiteral());
   }
 }

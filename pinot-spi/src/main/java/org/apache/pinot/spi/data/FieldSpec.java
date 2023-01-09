@@ -397,7 +397,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BYTES(false, false),
     STRUCT(false, false),
     MAP(false, false),
-    LIST(false, false);
+    LIST(false, false),
+    NULL(false, true);
 
     private final DataType _storedType;
     private final int _size;

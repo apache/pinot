@@ -56,11 +56,12 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
         LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) argument;
         DataType dataType = literalTransformFunction.getResultMetadata().getDataType();
         if (dataType == DataType.BIG_DECIMAL) {
+          // TODO: Handle the case where getLiteral can be null.
           _literalBigDecimalProduct =
-              _literalBigDecimalProduct.multiply(new BigDecimal(literalTransformFunction.getLiteral()));
+              _literalBigDecimalProduct.multiply(new BigDecimal(literalTransformFunction.getLiteral().toString()));
           _resultDataType = DataType.BIG_DECIMAL;
         } else {
-          _literalDoubleProduct *= Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
+          _literalDoubleProduct *= Double.parseDouble(((LiteralTransformFunction) argument).getLiteral().toString());
         }
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {

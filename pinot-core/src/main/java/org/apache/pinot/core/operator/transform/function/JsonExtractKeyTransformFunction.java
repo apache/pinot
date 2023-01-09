@@ -75,7 +75,9 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
               + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
-    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getLiteral());
+    // TODO: Handle the case where getLiteral can be null.
+    _jsonPath =
+        JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getLiteral().toString());
   }
 
   @Override

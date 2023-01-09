@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
@@ -64,8 +65,8 @@ public class RequestUtils {
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
     Map<String, String> queryOptions = new HashMap<>();
     if (jsonRequest.has(CommonConstants.Broker.Request.DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = RequestUtils.getOptionsFromJson(jsonRequest,
-          CommonConstants.Broker.Request.DEBUG_OPTIONS);
+      Map<String, String> debugOptions =
+          RequestUtils.getOptionsFromJson(jsonRequest, CommonConstants.Broker.Request.DEBUG_OPTIONS);
       // TODO: remove debug options after releasing 0.11.0.
       if (!debugOptions.isEmpty()) {
         // NOTE: Debug options are deprecated. Put all debug options into query options for backward compatibility.
@@ -74,12 +75,13 @@ public class RequestUtils {
       }
     }
     if (jsonRequest.has(CommonConstants.Broker.Request.QUERY_OPTIONS)) {
-      Map<String, String> queryOptionsFromJson = RequestUtils.getOptionsFromJson(jsonRequest,
-          CommonConstants.Broker.Request.QUERY_OPTIONS);
+      Map<String, String> queryOptionsFromJson =
+          RequestUtils.getOptionsFromJson(jsonRequest, CommonConstants.Broker.Request.QUERY_OPTIONS);
       queryOptions.putAll(queryOptionsFromJson);
     }
-    boolean enableTrace = jsonRequest.has(CommonConstants.Broker.Request.TRACE) && jsonRequest.get(
-        CommonConstants.Broker.Request.TRACE).asBoolean();
+    boolean enableTrace =
+        jsonRequest.has(CommonConstants.Broker.Request.TRACE) && jsonRequest.get(CommonConstants.Broker.Request.TRACE)
+            .asBoolean();
     if (enableTrace) {
       queryOptions.put(CommonConstants.Broker.Request.TRACE, "true");
     }
@@ -119,6 +121,9 @@ public class RequestUtils {
       switch (node.getTypeName()) {
         case BOOLEAN:
           literal.setBoolValue(node.booleanValue());
+          break;
+        case NULL:
+          literal.setNullValue();
           break;
         default:
           literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
@@ -166,7 +171,16 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getLiteralExpression(Object object) {
+  public static Expression getNullLiteralExpression() {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setNullValue();
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(@Nullable Object object) {
+    if (object == null) {
+      return RequestUtils.getNullLiteralExpression();
+    }
     if (object instanceof Integer || object instanceof Long) {
       return RequestUtils.getLiteralExpression(((Number) object).longValue());
     }

@@ -96,20 +96,22 @@ public class LookupTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(arguments.size() >= 4,
         "At least 4 arguments are required for LOOKUP transform function: "
             + "LOOKUP(TableName, ColumnName, JoinKey, JoinValue [, JoinKey2, JoinValue2 ...])");
-    Preconditions
-        .checkArgument(arguments.size() % 2 == 0, "Should have the same number of JoinKey and JoinValue arguments");
+    Preconditions.checkArgument(arguments.size() % 2 == 0,
+        "Should have the same number of JoinKey and JoinValue arguments");
 
     TransformFunction dimTableNameFunction = arguments.get(0);
     Preconditions.checkArgument(dimTableNameFunction instanceof LiteralTransformFunction,
         "First argument must be a literal(string) representing the dimension table name");
     // Lookup parameters
-    String dimTableName =
-        TableNameBuilder.OFFLINE.tableNameWithType(((LiteralTransformFunction) dimTableNameFunction).getLiteral());
+    // TODO: Handle the case where getLiteral can be null.
+    String dimTableName = TableNameBuilder.OFFLINE.tableNameWithType(
+        ((LiteralTransformFunction) dimTableNameFunction).getLiteral().toString());
 
     TransformFunction dimColumnFunction = arguments.get(1);
     Preconditions.checkArgument(dimColumnFunction instanceof LiteralTransformFunction,
         "Second argument must be a literal(string) representing the column name from dimension table to lookup");
-    _dimColumnName = ((LiteralTransformFunction) dimColumnFunction).getLiteral();
+    // TODO: Handle the case where getLiteral can be null.
+    _dimColumnName = ((LiteralTransformFunction) dimColumnFunction).getLiteral().toString();
 
     List<TransformFunction> joinArguments = arguments.subList(2, arguments.size());
     int numJoinArguments = joinArguments.size();
@@ -117,7 +119,8 @@ public class LookupTransformFunction extends BaseTransformFunction {
       TransformFunction dimJoinKeyFunction = joinArguments.get((i * 2));
       Preconditions.checkArgument(dimJoinKeyFunction instanceof LiteralTransformFunction,
           "JoinKey argument must be a literal(string) representing the primary key for the dimension table");
-      _joinKeys.add(((LiteralTransformFunction) dimJoinKeyFunction).getLiteral());
+      // TODO: Handle the case where getLiteral can be null.
+      _joinKeys.add(((LiteralTransformFunction) dimJoinKeyFunction).getLiteral().toString());
 
       TransformFunction factJoinValueFunction = joinArguments.get((i * 2) + 1);
       TransformResultMetadata factJoinValueFunctionResultMetadata = factJoinValueFunction.getResultMetadata();
@@ -133,9 +136,8 @@ public class LookupTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(_dataManager.isPopulated(), "Dimension table is not populated: %s", dimTableName);
 
     _lookupColumnFieldSpec = _dataManager.getColumnFieldSpec(_dimColumnName);
-    Preconditions
-        .checkArgument(_lookupColumnFieldSpec != null, "Column does not exist in dimension table: %s:%s", dimTableName,
-            _dimColumnName);
+    Preconditions.checkArgument(_lookupColumnFieldSpec != null, "Column does not exist in dimension table: %s:%s",
+        dimTableName, _dimColumnName);
 
     for (String joinKey : _joinKeys) {
       FieldSpec pkColumnSpec = _dataManager.getColumnFieldSpec(joinKey);
