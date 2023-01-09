@@ -111,10 +111,6 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected List<Object[]> queryH2(String sql)
       throws Exception {
     Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    // TODO: Hack. Let's discuss how best to support this.
-    if (sql.contains("option")) {
-      sql = sql.replaceAll("option\\(useColocatedJoin\\=true\\)", "");
-    }
     h2statement.execute(sql);
     ResultSet h2ResultSet = h2statement.getResultSet();
     int columnCount = h2ResultSet.getMetaData().getColumnCount();
