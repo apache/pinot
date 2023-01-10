@@ -30,6 +30,9 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,15 +47,27 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
  */
 public class TransformOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "TRANSFORM";
+<<<<<<< HEAD
   private final MultiStageOperator _upstreamOperator;
+=======
+  private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
+
+  private final Operator<TransferableBlock> _upstreamOperator;
+>>>>>>> a5662b3d36 (opchain and operator stats)
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
+  private OperatorStats _operatorStats;
 
+<<<<<<< HEAD
   public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema,
       List<RexExpression> transforms, DataSchema upstreamDataSchema) {
+=======
+  public TransformOperator(Operator<TransferableBlock> upstreamOperator, DataSchema resultSchema,
+      List<RexExpression> transforms, DataSchema upstreamDataSchema, PlanRequestContext context) {
+>>>>>>> a5662b3d36 (opchain and operator stats)
     Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
     Preconditions.checkState(resultSchema.size() == transforms.size(),
         "result schema size:" + resultSchema.size() + " doesn't match transform operand size:" + transforms.size());
@@ -63,6 +78,7 @@ public class TransformOperator extends MultiStageOperator {
       _transformOperandsList.add(TransformOperand.toTransformOperand(rexExpression, upstreamDataSchema));
     }
     _resultSchema = resultSchema;
+    _operatorStats = new OperatorStats(context.getRequestId(), context.getStageId(), EXPLAIN_NAME);
   }
 
   @Override
@@ -78,10 +94,14 @@ public class TransformOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
+    _operatorStats.startTimer();
     try {
       return transform(_upstreamOperator.nextBlock());
     } catch (Exception e) {
+      LOGGER.error("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
+    } finally {
+      _operatorStats.endTimer();
     }
   }
 
@@ -91,10 +111,14 @@ public class TransformOperator extends MultiStageOperator {
       _upstreamErrorBlock = block;
     }
     if (_upstreamErrorBlock != null) {
+      LOGGER.error("OperatorStats:" + _operatorStats);
       return _upstreamErrorBlock;
     }
 
     if (TransferableBlockUtils.isEndOfStream(block) || TransferableBlockUtils.isNoOpBlock(block)) {
+      if (TransferableBlockUtils.isEndOfStream(block)) {
+        LOGGER.error("OperatorStats:" + _operatorStats);
+      }
       return block;
     }
 
@@ -103,11 +127,13 @@ public class TransformOperator extends MultiStageOperator {
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
       for (int i = 0; i < _resultColumnSize; i++) {
-        resultRow[i] = FunctionInvokeUtils.convert(_transformOperandsList.get(i).apply(row),
-            _resultSchema.getColumnDataType(i));
+        resultRow[i] =
+            FunctionInvokeUtils.convert(_transformOperandsList.get(i).apply(row), _resultSchema.getColumnDataType(i));
       }
       resultRows.add(resultRow);
     }
+    _operatorStats.recordInput(1, container.size());
+    _operatorStats.recordOutput(1, resultRows.size());
     return new TransferableBlock(resultRows, _resultSchema, DataBlock.Type.ROW);
   }
 }

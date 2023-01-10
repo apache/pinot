@@ -130,6 +130,7 @@ public class QueryRunner {
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
+    long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
     if (isLeafStage(distributedStagePlan)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
@@ -144,12 +145,12 @@ public class QueryRunner {
             new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
         serverQueryResults.add(processServerQuery(request, _scheduler.getWorkerPool()));
       }
-
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
           new MailboxSendOperator(_mailboxService,
-              new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema()),
+              new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), requestId,
+                  sendNode.getStageId()),
               receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
               sendNode.getPartitionKeySelector(), _hostname, _port, serverQueryRequests.get(0).getRequestId(),
               sendNode.getStageId());
@@ -158,7 +159,6 @@ public class QueryRunner {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
     } else {
-      long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
       long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
       StageNode stageRoot = distributedStagePlan.getStageRoot();
       OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot, new PlanRequestContext(_mailboxService, requestId,

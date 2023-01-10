@@ -65,6 +65,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   private final long _deadlineTimestampNano;
   private int _serverIdx;
   private TransferableBlock _upstreamErrorBlock;
+  private OperatorStats _operatorStats;
 
   private static MailboxIdentifier toMailboxId(ServerInstance fromInstance, long jobId, long stageId,
       String receiveHostName, int receivePort) {
@@ -109,6 +110,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     }
     _upstreamErrorBlock = null;
     _serverIdx = 0;
+    _operatorStats = new OperatorStats(jobId, stageId, EXPLAIN_NAME);
   }
 
   public List<MailboxIdentifier> getSendingMailbox() {
@@ -128,56 +130,70 @@ public class MailboxReceiveOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (_upstreamErrorBlock != null) {
-      return _upstreamErrorBlock;
-    } else if (System.nanoTime() >= _deadlineTimestampNano) {
-      LOGGER.error("Timed out after polling mailboxes: {}", _sendingMailbox);
-      return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
-    }
+    _operatorStats.startTimer();
+    try {
+      if (_upstreamErrorBlock != null) {
+        return _upstreamErrorBlock;
+      } else if (System.nanoTime() >= _deadlineTimestampNano) {
+        LOGGER.error("Timed out after polling mailboxes: {}", _sendingMailbox);
+        LOGGER.error("OperatorStats:" + _operatorStats);
+        return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+      }
 
-    int startingIdx = _serverIdx;
-    int openMailboxCount = 0;
-    int eosMailboxCount = 0;
+      int startingIdx = _serverIdx;
+      int openMailboxCount = 0;
+      int eosMailboxCount = 0;
 
-    // For all non-singleton distribution, we poll from every instance to check mailbox content.
-    // TODO: Fix wasted CPU cycles on waiting for servers that are not supposed to give content.
-    for (int i = 0; i < _sendingMailbox.size(); i++) {
-      // this implements a round-robin mailbox iterator, so we don't starve any mailboxes
-      _serverIdx = (startingIdx + i) % _sendingMailbox.size();
-      MailboxIdentifier mailboxId = _sendingMailbox.get(_serverIdx);
-      try {
-        ReceivingMailbox<TransferableBlock> mailbox = _mailboxService.getReceivingMailbox(mailboxId);
-        if (!mailbox.isClosed()) {
-          openMailboxCount++;
-          TransferableBlock block = mailbox.receive();
+      // For all non-singleton distribution, we poll from every instance to check mailbox content.
+      // TODO: Fix wasted CPU cycles on waiting for servers that are not supposed to give content.
+      for (int i = 0; i < _sendingMailbox.size(); i++) {
+        // this implements a round-robin mailbox iterator, so we don't starve any mailboxes
+        _serverIdx = (startingIdx + i) % _sendingMailbox.size();
+        MailboxIdentifier mailboxId = _sendingMailbox.get(_serverIdx);
+        try {
+          ReceivingMailbox<TransferableBlock> mailbox = _mailboxService.getReceivingMailbox(mailboxId);
+          if (!mailbox.isClosed()) {
+            openMailboxCount++;
+            TransferableBlock block = mailbox.receive();
 
-          // Get null block when pulling times out from mailbox.
-          if (block != null) {
-            if (block.isErrorBlock()) {
-              _upstreamErrorBlock =
-                  TransferableBlockUtils.getErrorTransferableBlock(block.getDataBlock().getExceptions());
-              return _upstreamErrorBlock;
-            }
-            if (!block.isEndOfStreamBlock()) {
-              return block;
-            } else {
-              eosMailboxCount++;
+            // Get null block when pulling times out from mailbox.
+            if (block != null) {
+              if (block.isErrorBlock()) {
+                _upstreamErrorBlock =
+                    TransferableBlockUtils.getErrorTransferableBlock(block.getDataBlock().getExceptions());
+                LOGGER.error("OperatorStats:" + _operatorStats);
+                return _upstreamErrorBlock;
+              }
+              if (!block.isEndOfStreamBlock()) {
+                _operatorStats.recordInput(1, block.getNumRows());
+                _operatorStats.recordOutput(1, block.getNumRows());
+                return block;
+              } else {
+                eosMailboxCount++;
+              }
             }
           }
+        } catch (Exception e) {
+          // TODO: Handle this exception.
+          LOGGER.error("OperatorStats:" + _operatorStats);
+          LOGGER.error(String.format("Error receiving data from mailbox %s", mailboxId), e);
         }
-      } catch (Exception e) {
-        return TransferableBlockUtils.getErrorTransferableBlock(
-            new RuntimeException(String.format("Error polling mailbox=%s", mailboxId), e));
       }
-    }
 
-    // there are two conditions in which we should return EOS: (1) there were
-    // no mailboxes to open (this shouldn't happen because the second condition
-    // should be hit first, but is defensive) (2) every mailbox that was opened
-    // returned an EOS block. in every other scenario, there are mailboxes that
-    // are not yet exhausted and we should wait for more data to be available
-    return openMailboxCount > 0 && openMailboxCount > eosMailboxCount
-        ? TransferableBlockUtils.getNoOpTransferableBlock()
-        : TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      // there are two conditions in which we should return EOS: (1) there were
+      // no mailboxes to open (this shouldn't happen because the second condition
+      // should be hit first, but is defensive) (2) every mailbox that was opened
+      // returned an EOS block. in every other scenario, there are mailboxes that
+      // are not yet exhausted and we should wait for more data to be available
+      TransferableBlock block =
+          openMailboxCount > 0 && openMailboxCount > eosMailboxCount ? TransferableBlockUtils.getNoOpTransferableBlock()
+              : TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      if (TransferableBlockUtils.isEndOfStream(block)) {
+        LOGGER.debug("OperatorStats:" + _operatorStats);
+      }
+      return block;
+    } finally {
+      _operatorStats.endTimer();
+    }
   }
 }

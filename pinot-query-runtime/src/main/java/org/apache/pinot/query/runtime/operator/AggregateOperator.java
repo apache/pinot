@@ -35,8 +35,14 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+<<<<<<< HEAD
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
+=======
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
+>>>>>>> cead50bd07 (opchain and operator stats)
 import org.apache.pinot.spi.data.FieldSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -55,8 +61,10 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
 
   private final MultiStageOperator _inputOperator;
+
   // TODO: Deal with the case where _aggCalls is empty but we have groupSet setup, which means this is a Distinct call.
   private final List<RexExpression.FunctionCall> _aggCalls;
   private final List<RexExpression> _groupSet;
@@ -69,19 +77,23 @@ public class AggregateOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _hasReturnedAggregateBlock;
 
+  // TODO: Move to OperatorContext class.
+  private OperatorStats _operatorStats;
+
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
   // aggCalls has to be a list of FunctionCall and cannot be null
   // groupSet has to be a list of InputRef and cannot be null
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
-  public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
-      List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema inputSchema) {
-    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.Accumulator.MERGERS);
+  public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
+      List<RexExpression> groupSet, DataSchema inputSchema, long requestId, int stageId) {
+    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.Accumulator.MERGERS, requestId,
+        stageId);
   }
 
   @VisibleForTesting
   AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema inputSchema, Map<String,
-      Function<DataSchema.ColumnDataType, Merger>> mergers) {
+      Function<DataSchema.ColumnDataType, Merger>> mergers, long requestId, int stageId) {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _upstreamErrorBlock = null;
@@ -105,6 +117,7 @@ public class AggregateOperator extends MultiStageOperator {
     _resultSchema = dataSchema;
     _readyToConstruct = false;
     _hasReturnedAggregateBlock = false;
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -120,6 +133,7 @@ public class AggregateOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
+    _operatorStats.startTimer();
     try {
       if (!_readyToConstruct && !consumeInputBlocks()) {
         return TransferableBlockUtils.getNoOpTransferableBlock();
@@ -132,10 +146,15 @@ public class AggregateOperator extends MultiStageOperator {
       if (!_hasReturnedAggregateBlock) {
         return produceAggregatedBlock();
       } else {
+        // TODO: Move to close call.
+        LOGGER.debug("OperatorStats:" + _operatorStats);
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } catch (Exception e) {
+      LOGGER.error("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
+    } finally {
+      _operatorStats.endTimer();
     }
   }
 
@@ -152,8 +171,10 @@ public class AggregateOperator extends MultiStageOperator {
     }
     _hasReturnedAggregateBlock = true;
     if (rows.size() == 0) {
+      LOGGER.debug("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } else {
+      _operatorStats.recordOutput(1, rows.size());
       return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
     }
   }
@@ -181,6 +202,7 @@ public class AggregateOperator extends MultiStageOperator {
           _accumulators[i].accumulate(key, row);
         }
       }
+      _operatorStats.recordInput(1, container.size());
       block = _inputOperator.nextBlock();
     }
     return false;

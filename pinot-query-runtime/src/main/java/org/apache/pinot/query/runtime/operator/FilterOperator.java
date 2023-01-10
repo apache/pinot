@@ -29,6 +29,9 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /*
@@ -46,16 +49,31 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
  */
 public class FilterOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "FILTER";
+<<<<<<< HEAD
   private final MultiStageOperator _upstreamOperator;
+=======
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
+
+  private final Operator<TransferableBlock> _upstreamOperator;
+>>>>>>> a5662b3d36 (opchain and operator stats)
   private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
+<<<<<<< HEAD
   public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter) {
+=======
+  // TODO: Move to OperatorContext class.
+  private OperatorStats _operatorStats;
+
+  public FilterOperator(Operator<TransferableBlock> upstreamOperator, DataSchema dataSchema, RexExpression filter,
+      PlanRequestContext context) {
+>>>>>>> a5662b3d36 (opchain and operator stats)
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);
     _upstreamErrorBlock = null;
+    _operatorStats = new OperatorStats(context.getRequestId(), context.getStageId(), EXPLAIN_NAME);
   }
 
   @Override
@@ -71,10 +89,14 @@ public class FilterOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
+    _operatorStats.startTimer();
     try {
       return transform(_upstreamOperator.nextBlock());
     } catch (Exception e) {
+      LOGGER.debug("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
+    } finally {
+      _operatorStats.endTimer();
     }
   }
 
@@ -82,11 +104,16 @@ public class FilterOperator extends MultiStageOperator {
   private TransferableBlock transform(TransferableBlock block)
       throws Exception {
     if (_upstreamErrorBlock != null) {
+      LOGGER.error("OperatorStats:" + _operatorStats);
       return _upstreamErrorBlock;
     } else if (block.isErrorBlock()) {
+      LOGGER.error("OperatorStats:" + _operatorStats);
       _upstreamErrorBlock = block;
       return _upstreamErrorBlock;
     } else if (TransferableBlockUtils.isEndOfStream(block) || TransferableBlockUtils.isNoOpBlock(block)) {
+      if (TransferableBlockUtils.isEndOfStream(block)) {
+        LOGGER.debug("OperatorStats:" + _operatorStats);
+      }
       return block;
     }
 
@@ -97,6 +124,9 @@ public class FilterOperator extends MultiStageOperator {
         resultRows.add(row);
       }
     }
+    _operatorStats.recordInput(1, container.size());
+    _operatorStats.recordOutput(1, resultRows.size());
+    LOGGER.debug("OperatorStats:" + _operatorStats);
     return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW);
   }
 }

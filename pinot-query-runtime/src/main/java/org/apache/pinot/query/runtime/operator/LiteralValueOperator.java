@@ -27,17 +27,25 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class LiteralValueOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "LITERAL_VALUE_PROVIDER";
+  private static final Logger LOGGER = LoggerFactory.getLogger(LiteralValueOperator.class);
 
   private final DataSchema _dataSchema;
   private final TransferableBlock _rexLiteralBlock;
   private boolean _isLiteralBlockReturned;
 
-  public LiteralValueOperator(DataSchema dataSchema, List<List<RexExpression>> rexLiteralRows) {
+  private OperatorStats _operatorStats;
+
+  public LiteralValueOperator(DataSchema dataSchema, List<List<RexExpression>> rexLiteralRows,
+      PlanRequestContext context) {
     _dataSchema = dataSchema;
+    _operatorStats = new OperatorStats(context.getRequestId(), context.getStageId(), EXPLAIN_NAME);
     _rexLiteralBlock = constructBlock(rexLiteralRows);
     _isLiteralBlockReturned = false;
   }
@@ -55,11 +63,17 @@ public class LiteralValueOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (!_isLiteralBlockReturned) {
-      _isLiteralBlockReturned = true;
-      return _rexLiteralBlock;
-    } else {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    _operatorStats.startTimer();
+    try {
+      if (!_isLiteralBlockReturned) {
+        _isLiteralBlockReturned = true;
+        return _rexLiteralBlock;
+      } else {
+        LOGGER.debug("OperatorStats:" + _operatorStats);
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      }
+    } finally {
+      _operatorStats.endTimer();
     }
   }
 
@@ -72,6 +86,8 @@ public class LiteralValueOperator extends MultiStageOperator {
       }
       blockContent.add(row);
     }
+    _operatorStats.recordInput(1, blockContent.size());
+    _operatorStats.recordOutput(1, blockContent.size());
     return new TransferableBlock(blockContent, _dataSchema, DataBlock.Type.ROW);
   }
 }

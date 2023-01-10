@@ -39,6 +39,10 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * This basic {@code BroadcastJoinOperator} implement a basic broadcast join algorithm.
@@ -55,6 +59,8 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 public class HashJoinOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
+
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES =
       ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL);
 
@@ -82,8 +88,16 @@ public class HashJoinOperator extends MultiStageOperator {
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
+<<<<<<< HEAD
   public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
       DataSchema leftSchema, JoinNode node) {
+=======
+  // TODO: Move to OperatorContext class.
+  private OperatorStats _operatorStats;
+
+  public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
+      DataSchema leftSchema, JoinNode node, PlanRequestContext context) {
+>>>>>>> a5662b3d36 (opchain and operator stats)
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
     _joinType = node.getJoinRelType();
@@ -111,6 +125,7 @@ public class HashJoinOperator extends MultiStageOperator {
       _matchedRightRows = null;
     }
     _upstreamErrorBlock = null;
+    _operatorStats = new OperatorStats(context.getRequestId(), context.getStageId(), EXPLAIN_NAME);
   }
 
   // TODO: Separate left and right table operator.
@@ -127,8 +142,10 @@ public class HashJoinOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
+    _operatorStats.startTimer();
     try {
       if (_isTerminated) {
+        LOGGER.debug("OperatorStats:" + _operatorStats);
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
       if (!_isHashTableBuilt) {
@@ -136,6 +153,7 @@ public class HashJoinOperator extends MultiStageOperator {
         buildBroadcastHashTable();
       }
       if (_upstreamErrorBlock != null) {
+        LOGGER.error("OperatorStats:" + _operatorStats);
         return _upstreamErrorBlock;
       } else if (!_isHashTableBuilt) {
         return TransferableBlockUtils.getNoOpTransferableBlock();
@@ -143,7 +161,10 @@ public class HashJoinOperator extends MultiStageOperator {
       // JOIN each left block with the right block.
       return buildJoinedDataBlock(_leftTableOperator.nextBlock());
     } catch (Exception e) {
+      LOGGER.error("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
+    } finally {
+      _operatorStats.endTimer();
     }
   }
 
@@ -165,7 +186,7 @@ public class HashJoinOperator extends MultiStageOperator {
             _broadcastRightTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>());
         hashCollection.add(row);
       }
-
+      _operatorStats.recordInput(1, container.size());
       rightBlock = _rightTableOperator.nextBlock();
     }
   }
@@ -196,6 +217,7 @@ public class HashJoinOperator extends MultiStageOperator {
         }
       }
       _isTerminated = true;
+      _operatorStats.recordOutput(1, returnRows.size());
       return new TransferableBlock(returnRows, _resultSchema, DataBlock.Type.ROW);
     }
     List<Object[]> rows = new ArrayList<>();
@@ -230,6 +252,8 @@ public class HashJoinOperator extends MultiStageOperator {
         rows.add(joinRow(leftRow, null));
       }
     }
+    _operatorStats.recordInput(1, container.size());
+    _operatorStats.recordOutput(1, rows.size());
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
   }
 

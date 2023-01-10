@@ -84,13 +84,17 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   public MultiStageOperator visitAggregate(AggregateNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new AggregateOperator(nextOperator, node.getDataSchema(), node.getAggCalls(),
+<<<<<<< HEAD
         node.getGroupSet(), node.getInputs().get(0).getDataSchema());
+=======
+        node.getGroupSet(), context);
+>>>>>>> cead50bd07 (opchain and operator stats)
   }
 
   @Override
   public MultiStageOperator visitFilter(FilterNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    return new FilterOperator(nextOperator, node.getDataSchema(), node.getCondition());
+    return new FilterOperator(nextOperator, node.getDataSchema(), node.getCondition(), context);
   }
 
   @Override
@@ -101,21 +105,21 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     MultiStageOperator leftOperator = left.visit(this, context);
     MultiStageOperator rightOperator = right.visit(this, context);
 
-    return new HashJoinOperator(leftOperator, rightOperator, left.getDataSchema(), node);
+    return new HashJoinOperator(leftOperator, rightOperator, left.getDataSchema(), node, context);
   }
 
   @Override
   public MultiStageOperator visitProject(ProjectNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new TransformOperator(nextOperator, node.getDataSchema(), node.getProjects(),
-        node.getInputs().get(0).getDataSchema());
+        node.getInputs().get(0).getDataSchema(), context);
   }
 
   @Override
   public MultiStageOperator visitSort(SortNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new SortOperator(nextOperator, node.getCollationKeys(), node.getCollationDirections(),
-        node.getFetch(), node.getOffset(), node.getDataSchema());
+        node.getFetch(), node.getOffset(), node.getDataSchema(), context);
   }
 
   @Override

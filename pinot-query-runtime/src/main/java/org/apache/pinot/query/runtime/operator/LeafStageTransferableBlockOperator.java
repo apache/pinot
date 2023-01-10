@@ -40,6 +40,8 @@ import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -57,17 +59,23 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  */
 public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
+  private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
 
   private final InstanceResponseBlock _errorBlock;
   private final List<InstanceResponseBlock> _baseResultBlock;
   private final DataSchema _desiredDataSchema;
   private int _currentIndex;
 
-  public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema) {
+  // TODO: Move to OperatorContext class.
+  private OperatorStats _operatorStats;
+
+  public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
+      long requestId, int stageId) {
     _baseResultBlock = baseResultBlock;
     _desiredDataSchema = dataSchema;
     _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
     _currentIndex = 0;
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -83,24 +91,35 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (_currentIndex < 0) {
-      throw new RuntimeException("Leaf transfer terminated. next block should no longer be called.");
-    }
-    if (_errorBlock != null) {
-      _currentIndex = -1;
-      return new TransferableBlock(DataBlockUtils.getErrorDataBlock(_errorBlock.getExceptions()));
-    } else {
-      if (_currentIndex < _baseResultBlock.size()) {
-        InstanceResponseBlock responseBlock = _baseResultBlock.get(_currentIndex++);
-        if (responseBlock.getResultsBlock() != null && responseBlock.getResultsBlock().getNumRows() > 0) {
-          return composeTransferableBlock(responseBlock, _desiredDataSchema);
-        } else {
-          return new TransferableBlock(Collections.emptyList(), _desiredDataSchema, DataBlock.Type.ROW);
-        }
-      } else {
-        _currentIndex = -1;
-        return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+    _operatorStats.startTimer();
+    try {
+      if (_currentIndex < 0) {
+        throw new RuntimeException("Leaf transfer terminated. next block should no longer be called.");
       }
+      if (_errorBlock != null) {
+        _currentIndex = -1;
+        LOGGER.error("OperatorStats:" + _operatorStats);
+        return new TransferableBlock(DataBlockUtils.getErrorDataBlock(_errorBlock.getExceptions()));
+      } else {
+        if (_currentIndex < _baseResultBlock.size()) {
+          InstanceResponseBlock responseBlock = _baseResultBlock.get(_currentIndex++);
+          if (responseBlock.getResultsBlock() != null && responseBlock.getResultsBlock().getNumRows() > 0) {
+            _operatorStats.recordInput(1, responseBlock.getResultsBlock().getNumRows());
+            _operatorStats.recordOutput(1, responseBlock.getResultsBlock().getNumRows());
+            return composeTransferableBlock(responseBlock, _desiredDataSchema);
+          } else {
+            _operatorStats.recordInput(1, responseBlock.getResultsBlock().getNumRows());
+            _operatorStats.recordOutput(1, responseBlock.getResultsBlock().getNumRows());
+            return new TransferableBlock(Collections.emptyList(), _desiredDataSchema, DataBlock.Type.ROW);
+          }
+        } else {
+          _currentIndex = -1;
+          LOGGER.debug("OperatorStats:" + _operatorStats);
+          return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+        }
+      }
+    } finally {
+      _operatorStats.endTimer();
     }
   }
 

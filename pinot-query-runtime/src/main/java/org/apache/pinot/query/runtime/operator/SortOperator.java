@@ -32,11 +32,16 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.PlanRequestContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class SortOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "SORT";
   private final MultiStageOperator _upstreamOperator;
+  private static final Logger LOGGER = LoggerFactory.getLogger(SortOperator.class);
+
   private final int _fetch;
   private final int _offset;
   private final DataSchema _dataSchema;
@@ -46,17 +51,19 @@ public class SortOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
+  private OperatorStats _operatorStats;
 
   public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema) {
+      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
+      PlanRequestContext context) {
     this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY);
+        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, context);
   }
 
   @VisibleForTesting
   SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      int maxHolderCapacity) {
+      int maxHolderCapacity, PlanRequestContext context) {
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
     _offset = offset;
@@ -68,6 +75,7 @@ public class SortOperator extends MultiStageOperator {
         : maxHolderCapacity;
     _rows = new PriorityQueue<>(_numRowsToKeep,
         new SortComparator(collationKeys, collationDirections, dataSchema, false));
+    _operatorStats = new OperatorStats(context.getRequestId(), context.getStageId(), EXPLAIN_NAME);
   }
 
   @Override
@@ -83,16 +91,21 @@ public class SortOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
+    _operatorStats.startTimer();
     try {
       consumeInputBlocks();
       return produceSortedBlock();
     } catch (Exception e) {
+      LOGGER.error("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
+    } finally {
+      _operatorStats.endTimer();
     }
   }
 
   private TransferableBlock produceSortedBlock() {
     if (_upstreamErrorBlock != null) {
+      LOGGER.error("OperatorStats:" + _operatorStats);
       return _upstreamErrorBlock;
     } else if (!_readyToConstruct) {
       return TransferableBlockUtils.getNoOpTransferableBlock();
@@ -104,13 +117,16 @@ public class SortOperator extends MultiStageOperator {
         Object[] row = _rows.poll();
         rows.addFirst(row);
       }
+      _operatorStats.recordOutput(1, rows.size());
       _isSortedBlockConstructed = true;
       if (rows.size() == 0) {
+        LOGGER.debug("OperatorStats:" + _operatorStats);
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       } else {
         return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }
     } else {
+      LOGGER.debug("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
   }
@@ -134,6 +150,7 @@ public class SortOperator extends MultiStageOperator {
         }
 
         block = _upstreamOperator.nextBlock();
+        _operatorStats.recordInput(1, block.getNumRows());
       }
     }
   }
