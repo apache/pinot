@@ -45,6 +45,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -52,6 +53,8 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -61,6 +64,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -220,5 +224,29 @@ public class RealtimeTableDataManagerTest {
     when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSchema(TABLE_NAME), null,
         AccessOption.PERSISTENT)).thenReturn(schemaZNRecord);
     return schema;
+  }
+
+  @Test
+  public void testSetDefaultTimeValueIfInvalid() {
+    SegmentZKMetadata segmentZKMetadata = mock(SegmentZKMetadata.class);
+    long currentTimeMs = System.currentTimeMillis();
+    when(segmentZKMetadata.getCreationTime()).thenReturn(currentTimeMs);
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("timeColumn").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addDateTime("timeColumn", FieldSpec.DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS").build();
+    RealtimeTableDataManager.setDefaultTimeValueIfInvalid(tableConfig, schema, segmentZKMetadata);
+    DateTimeFieldSpec timeFieldSpec = schema.getSpecForTimeColumn("timeColumn");
+    assertNotNull(timeFieldSpec);
+    assertEquals(timeFieldSpec.getDefaultNullValue(), currentTimeMs);
+
+    schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addDateTime("timeColumn", FieldSpec.DataType.INT, "SIMPLE_DATE_FORMAT|yyyyMMdd", "1:DAYS").build();
+    RealtimeTableDataManager.setDefaultTimeValueIfInvalid(tableConfig, schema, segmentZKMetadata);
+    timeFieldSpec = schema.getSpecForTimeColumn("timeColumn");
+    assertNotNull(timeFieldSpec);
+    assertEquals(timeFieldSpec.getDefaultNullValue(),
+        Integer.parseInt(DateTimeFormat.forPattern("yyyyMMdd").withZone(DateTimeZone.UTC).print(currentTimeMs)));
   }
 }
