@@ -203,8 +203,15 @@ export const reloadStatus = (tableName: string, tableType: string): Promise<Axio
 export const deleteSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/segments/${tableName}/${instanceName}`, {headers});
 
-export const getTableJobs = (tableName: string): Promise<AxiosResponse<TableSegmentJobs>> => 
-  baseApi.get(`/table/${tableName}/jobs`);
+export const getTableJobs = (tableName: string, jobTypes?: string): Promise<AxiosResponse<TableSegmentJobs>> => {
+  let queryParams = {};
+
+  if (jobTypes) {
+    queryParams["jobTypes"] = jobTypes
+  }
+
+  return baseApi.get(`/table/${tableName}/jobs`, { params: queryParams });
+}
 
 export const getSegmentReloadStatus = (jobId: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/segments/segmentReloadStatus/${jobId}`, {headers});
