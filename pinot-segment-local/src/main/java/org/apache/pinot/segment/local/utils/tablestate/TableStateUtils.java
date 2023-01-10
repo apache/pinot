@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.segment.local.utils.tablestate;
 
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -47,25 +47,25 @@ public class TableStateUtils {
    *
    * @return List of segment names in a given state.
    */
-  public static Set<String> getSegmentsInGivenStateForThisInstance(HelixManager helixManager, String tableNameWithType,
+  public static List<String> getSegmentsInGivenStateForThisInstance(HelixManager helixManager, String tableNameWithType,
       String state) {
     HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
     IdealState idealState = dataAccessor.getProperty(keyBuilder.idealStates(tableNameWithType));
-    Set<String> segmentsInGivenState = new HashSet<>();
+    List<String> segmentsInGivenState = new ArrayList<>();
     if (idealState == null) {
       LOGGER.warn("Failed to find ideal state for table: {}", tableNameWithType);
       return segmentsInGivenState;
     }
 
-    // Get all ONLINE segments from idealState
+    // Get all segments with state from idealState
     String instanceName = helixManager.getInstanceName();
     Map<String, Map<String, String>> idealStatesMap = idealState.getRecord().getMapFields();
     for (Map.Entry<String, Map<String, String>> entry : idealStatesMap.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> instanceStateMap = entry.getValue();
       String expectedState = instanceStateMap.get(instanceName);
-      // Only track ONLINE segments assigned to the current instance
+      // Only track state segments assigned to the current instance
       if (!state.equals(expectedState)) {
         continue;
       }
@@ -87,7 +87,7 @@ public class TableStateUtils {
     PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
     String instanceName = helixManager.getInstanceName();
 
-    Set<String> onlineSegments = getSegmentsInGivenStateForThisInstance(helixManager, tableNameWithType,
+    List<String> onlineSegments = getSegmentsInGivenStateForThisInstance(helixManager, tableNameWithType,
         CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE);
     if (onlineSegments.size() > 0) {
       LiveInstance liveInstance = dataAccessor.getProperty(keyBuilder.liveInstance(instanceName));

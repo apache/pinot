@@ -114,28 +114,40 @@ public class IngestionDelayTracker {
   private final String _tableNameWithType;
   private final String _metricName;
 
-  private final boolean _enablePerPartitionMetric;
-  private final boolean _enableAggregateMetric;
-
   private final RealtimeTableDataManager _realTimeTableDataManager;
   private final Supplier<Boolean> _isServerReadyToServeQueries;
 
   private Clock _clock;
 
-  /*
-   * Returns the maximum ingestion delay amongst all partitions we are tracking.
-   */
-  private DelayMeasure getMaximumDelay() {
-    DelayMeasure newMax = null;
-    for (int partitionGroupId : _partitionToDelaySampleMap.keySet()) {
-      DelayMeasure currentMeasure = _partitionToDelaySampleMap.get(partitionGroupId);
-      if ((newMax == null)
-          ||
-          (currentMeasure != null) && (currentMeasure._delayMs > newMax._delayMs)) {
-        newMax = currentMeasure;
-      }
+  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
+      RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs,
+      Supplier<Boolean> isServerReadyToServeQueries)
+      throws RuntimeException {
+    _serverMetrics = serverMetrics;
+    _tableNameWithType = tableNameWithType;
+    _metricName = tableNameWithType;
+    _realTimeTableDataManager = realtimeTableDataManager;
+    _clock = Clock.systemUTC();
+    _isServerReadyToServeQueries = isServerReadyToServeQueries;
+    // Handle negative timer values
+    if (timerThreadTickIntervalMs <= 0) {
+      throw new RuntimeException(String.format("Illegal timer timeout argument, expected > 0, got=%d for table=%s",
+          timerThreadTickIntervalMs, _tableNameWithType));
     }
-    return newMax;
+    _timerThreadTickIntervalMs = timerThreadTickIntervalMs;
+    _timer = new Timer("IngestionDelayTimerThread-" + TableNameBuilder.extractRawTableName(tableNameWithType));
+    _timer.schedule(new TimerTask() {
+      @Override
+      public void run() {
+        timeoutInactivePartitions();
+      }
+    }, INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
+  }
+
+  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
+      RealtimeTableDataManager tableDataManager, Supplier<Boolean> isServerReadyToServeQueries) {
+    this(serverMetrics, tableNameWithType, tableDataManager, TIMER_THREAD_TICK_INTERVAL_MS,
+        isServerReadyToServeQueries);
   }
 
   /*
@@ -165,9 +177,7 @@ public class IngestionDelayTracker {
     _partitionToDelaySampleMap.remove(partitionGroupId);
     // If we are removing a partition we should stop reading its ideal state.
     _partitionsMarkedForVerification.remove(partitionGroupId);
-    if (_enablePerPartitionMetric) {
-      _serverMetrics.removePartitionGauge(_metricName, partitionGroupId, ServerGauge.TABLE_INGESTION_DELAY_MS);
-    }
+    _serverMetrics.removePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
   }
 
   /*
@@ -176,61 +186,16 @@ public class IngestionDelayTracker {
    */
   private ArrayList<Integer> getPartitionsToBeVerified() {
     ArrayList<Integer> partitionsToVerify = new ArrayList<>();
-    for (int partitionGroupId : _partitionsMarkedForVerification.keySet()) {
-      long markTime = _partitionsMarkedForVerification.get(partitionGroupId);
-      long timeMarked = _clock.millis() - markTime;
+    for (ConcurrentHashMap.Entry<Integer, Long> entry : _partitionsMarkedForVerification.entrySet()) {
+      long timeMarked = _clock.millis() - entry.getValue();
       if (timeMarked > PARTITION_TIMEOUT_MS) {
         // Partition must be verified
-        partitionsToVerify.add(partitionGroupId);
+        partitionsToVerify.add(entry.getKey());
       }
     }
     return partitionsToVerify;
   }
 
-  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-      RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, String metricNamePrefix,
-      boolean enableAggregateMetric, boolean enablePerPartitionMetric, Supplier<Boolean> isServerReadyToServeQueries)
-      throws RuntimeException {
-    _serverMetrics = serverMetrics;
-    _tableNameWithType = tableNameWithType;
-    _metricName = metricNamePrefix + tableNameWithType;
-    _realTimeTableDataManager = realtimeTableDataManager;
-    _clock = Clock.systemUTC();
-    _isServerReadyToServeQueries = isServerReadyToServeQueries;
-    // Handle negative timer values
-    if (timerThreadTickIntervalMs <= 0) {
-      throw new RuntimeException(String.format("Illegal timer timeout argument, expected > 0, got=%d for table=%s",
-          timerThreadTickIntervalMs, _tableNameWithType));
-    }
-    _enablePerPartitionMetric = enablePerPartitionMetric;
-    _enableAggregateMetric = enableAggregateMetric;
-    _timerThreadTickIntervalMs = timerThreadTickIntervalMs;
-    _timer = new Timer("IngestionDelayTimerThread" + TableNameBuilder.extractRawTableName(tableNameWithType));
-    _timer.schedule(new TimerTask() {
-        @Override
-        public void run() {
-          timeoutInactivePartitions();
-        }
-      }, INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
-    // Install callback metric
-    if (_enableAggregateMetric) {
-      _serverMetrics.addCallbackTableGaugeIfNeeded(_metricName, ServerGauge.TABLE_INGESTION_DELAY_MS,
-          () -> getMaximumIngestionDelay());
-    }
-  }
-
-  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-      RealtimeTableDataManager tableDataManager, Supplier<Boolean> isServerReadyToServeQueries) {
-    this(serverMetrics, tableNameWithType, tableDataManager, TIMER_THREAD_TICK_INTERVAL_MS,
-        "", true, true, isServerReadyToServeQueries);
-  }
-
-  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-      RealtimeTableDataManager tableDataManager, String metricNamePrefix,
-      Supplier<Boolean> isServerReadyToServeQueries) {
-    this(serverMetrics, metricNamePrefix + tableNameWithType, tableDataManager,
-        TIMER_THREAD_TICK_INTERVAL_MS, metricNamePrefix, true, true, isServerReadyToServeQueries);
-  }
 
   /**
    * Function that enable use to set predictable clocks for testing purposes.
@@ -258,10 +223,10 @@ public class IngestionDelayTracker {
     }
     DelayMeasure previousMeasure = _partitionToDelaySampleMap.put(partitionGroupId,
         new DelayMeasure(sampleTime, delayMs));
-    if ((previousMeasure == null) && _enablePerPartitionMetric) {
+    if (previousMeasure == null) {
       // First time we start tracking a partition we should start tracking it via metric
       _serverMetrics.addCallbackPartitionGaugeIfNeeded(_metricName, partitionGroupId,
-          ServerGauge.TABLE_INGESTION_DELAY_MS, () -> getPartitionIngestionDelay(partitionGroupId));
+          ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelay(partitionGroupId));
     }
     // If we are consuming we do not need to track this partition for removal.
     _partitionsMarkedForVerification.remove(partitionGroupId);
@@ -317,19 +282,6 @@ public class IngestionDelayTracker {
   }
 
   /*
-   * This is the function to be invoked when reading the metric.
-   * It reports the maximum ingestion delay for all partitions of this table being served
-   * by current server; it adds the time elapsed since the sample was taken to the measure.
-   * If no measures have been taken, then the reported value is zero.
-   *
-   * @return max ingestion delay in milliseconds.
-   */
-  public long getMaximumIngestionDelay() {
-    DelayMeasure currentMaxDelay = getMaximumDelay();
-    return getAgedDelay(currentMaxDelay);
-  }
-
-  /*
    * Method to get ingestion delay for a given partition.
    *
    * @param partitionGroupId partition for which we are retrieving the delay
@@ -348,14 +300,9 @@ public class IngestionDelayTracker {
   public void shutdown() {
     // Now that segments can't report metric, destroy metric for this table
     _timer.cancel();
-    if (_enableAggregateMetric) {
-      _serverMetrics.removeTableGauge(_metricName, ServerGauge.TABLE_INGESTION_DELAY_MS);
-    }
     // Remove partitions so their related metrics get uninstalled.
-    if (_enablePerPartitionMetric) {
-      for (int partitionGroupId : _partitionToDelaySampleMap.keySet()) {
-        removePartitionId(partitionGroupId);
-      }
+    for (ConcurrentHashMap.Entry<Integer, DelayMeasure> entry : _partitionToDelaySampleMap.entrySet()) {
+      removePartitionId(entry.getKey());
     }
   }
 }

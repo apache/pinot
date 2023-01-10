@@ -271,7 +271,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   public Set<Integer> getHostedPartitionsGroupIds() {
     Set<Integer> partitionsHostedByThisServer = new HashSet<>();
-    Set<String> segments = TableStateUtils.getSegmentsInGivenStateForThisInstance(_helixManager, _tableNameWithType,
+    List<String> segments = TableStateUtils.getSegmentsInGivenStateForThisInstance(_helixManager, _tableNameWithType,
         CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
     for (String segmentNameStr : segments) {
       LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);

@@ -90,7 +90,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ServerMetrics _serverMetrics;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
-  private Supplier<Boolean> _isReadyToServeQueries;
+  private Supplier<Boolean> _isReadyToServeQueries = () -> true;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
