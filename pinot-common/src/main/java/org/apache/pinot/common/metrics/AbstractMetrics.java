@@ -517,6 +517,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
+  /**
+   * @deprecated please use setOrUpdateTableGauge(final String tableName, final G gauge, final long value) instead.
+   *
+   * Adds a new gauge whose values are retrieved from a callback function.
+   * This method may be called multiple times, while it will be registered to callback function only once.
+   *
+   * @param tableName The table name
+   * @param gauge the gauge to use
+   * @param valueCallback The callback function used to retrieve the value of the gauge
+   */
   @Deprecated
   public void addCallbackTableGaugeIfNeeded(final String tableName, final G gauge, final Callable<Long> valueCallback) {
     final String fullGaugeName = composeTableGaugeName(tableName, gauge);
@@ -524,6 +534,9 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * @deprecated please use setOrUpdateTableGauge(final String tableName, final String key, final G gauge,
+   * final long value) instead.
+   *
    * Install a per-partition table gauge if needed.
    *
    * @param tableName The table name
@@ -531,18 +544,21 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param gauge The gauge to use
    * @param valueCallback the callback function to be called while reading the metric.
    */
+  @Deprecated
   public void addCallbackPartitionGaugeIfNeeded(final String tableName, final int partitionId, final G gauge,
       final Callable<Long> valueCallback) {
-    final String fullGaugeName;
-    String gaugeName = gauge.getGaugeName();
-    fullGaugeName = gaugeName + "." + getTableName(tableName) + "." + partitionId;
-
+    final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
     addCallbackGaugeIfNeeded(fullGaugeName, valueCallback);
   }
 
   /**
-   * Similar to addCallbackGauge method.
+   * @deprecated please use setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) instead.
+   *
+   * Adds a new gauge whose values are retrieved from a callback function.
    * This method may be called multiple times, while it will be registered to callback function only once.
+   *
+   * It's actually same as addCallbackGauge(final String metricName, final Callable<Long> valueCallback) method.
+   *
    * @param metricName The name of the metric
    * @param valueCallback The callback function used to retrieve the value of the gauge
    */
@@ -559,8 +575,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * @deprecated please use setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) instead.
+   *
    * Adds a new gauge whose values are retrieved from a callback function.
    * Once added, the callback function cannot be updated.
+   *
+   * It's actually same as addCallbackGaugeIfNeeded(final String metricName, final Callable<Long> valueCallback) method
    *
    * @param metricName The name of the metric
    * @param valueCallback The callback function used to retrieve the value of the gauge
@@ -606,6 +626,33 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void setOrUpdateTableGauge(final String tableName, final String key, final G gauge,
       final Supplier<Long> valueSupplier) {
     String fullGaugeName = composeTableGaugeName(tableName, key, gauge);
+    setOrUpdateGauge(fullGaugeName, valueSupplier);
+  }
+
+  /**
+   * Sets or updates a gauge to the given value.
+   * The value can be updated by calling this method again.
+   *
+   * @param tableName The table name
+   * @param gauge The gauge to use
+   * @param value The value of the gauge
+   */
+  public void setOrUpdateTableGauge(final String tableName, final G gauge, final long value) {
+    String fullGaugeName = composeTableGaugeName(tableName, gauge);
+    setOrUpdateGauge(fullGaugeName, value);
+  }
+
+  /**
+   * Sets or updates a gauge whose values are retrieved from the given supplier function.
+   * The supplier function can be updated by calling this method again.
+   *
+   * @param tableName The table name
+   * @param gauge The gauge to use
+   * @param valueSupplier The supplier function used to retrieve the value of the gauge
+   */
+  public void setOrUpdateTableGauge(final String tableName, final G gauge,
+      final Supplier<Long> valueSupplier) {
+    String fullGaugeName = composeTableGaugeName(tableName, gauge);
     setOrUpdateGauge(fullGaugeName, valueSupplier);
   }
 
@@ -702,14 +749,14 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void removeGauge(final String gaugeName) {
     _gaugeValues.remove(gaugeName);
-    removeCallbackGauge(gaugeName);
+    removeGaugeFromMetricRegistry(gaugeName);
   }
 
   /**
    * Remove callback gauge.
    * @param metricName metric name
    */
-  private void removeCallbackGauge(String metricName) {
+  private void removeGaugeFromMetricRegistry(String metricName) {
     PinotMetricUtils
         .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName));
   }

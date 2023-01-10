@@ -367,18 +367,19 @@ public class PinotHelixTaskResourceManager {
 
   /**
    * This method returns a map of table name to count of sub-tasks in various states, given the top-level task name.
-   * @param parentTaskName in the form "Task_<taskType>_<uuid>_<timestamp>"
+   * @param taskName in the form "Task_<taskType>_<uuid>_<timestamp>"
    * @return a map of table name to {@link TaskCount}
    */
-  public synchronized Map<String, TaskCount> getTableTaskCount(String parentTaskName) {
-    Map<String, TaskPartitionState> subtaskStates = getSubtaskStates(parentTaskName);
+  public synchronized Map<String, TaskCount> getTableTaskCount(String taskName) {
+    Map<String, TaskPartitionState> subtaskStates = getSubtaskStates(taskName);
     if (subtaskStates.isEmpty()) {
       return Collections.emptyMap();
     }
 
-    JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(parentTaskName));
+    JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
     // in theory, this should not happen because we have already checked JobContext
     if (jobConfig == null) {
+      LOGGER.warn("task {} has job context but its job config does not exist", taskName);
       return Collections.emptyMap();
     }
 
@@ -388,6 +389,7 @@ public class PinotHelixTaskResourceManager {
       String tableNameWithType;
       // in theory, this should not happen because jobContext has this taskId
       if (taskConfig == null) {
+        LOGGER.warn("sub-task {} exists in helix job context but its task config does not exist", taskId);
         tableNameWithType = UNKNOWN_TABLE_NAME;
       } else {
         tableNameWithType = taskConfig.getConfigMap().getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME);

@@ -138,7 +138,6 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
               ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR, tablePercent);
         });
 
-
         if (_preReportedTables.containsKey(taskType)) {
           Set<String> tableNameWithTypeSet = _preReportedTables.get(taskType);
           tableNameWithTypeSet.removeAll(tableAccumulatedCount.keySet());
