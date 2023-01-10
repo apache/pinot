@@ -61,7 +61,7 @@ public class FilterOperatorUtils {
       if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
         return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
-      if (dataSource.getRangeIndex() != null) {
+      if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
         return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
       return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
@@ -79,6 +79,9 @@ public class FilterOperatorUtils {
       }
       if (dataSource.getInvertedIndex() != null) {
         return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+      }
+      if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
+        return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
       return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
     }
