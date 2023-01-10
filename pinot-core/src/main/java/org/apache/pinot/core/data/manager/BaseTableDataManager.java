@@ -81,7 +81,7 @@ import org.slf4j.LoggerFactory;
 
 @ThreadSafe
 public abstract class BaseTableDataManager implements TableDataManager {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
+  protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
 
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
   // Semaphore to restrict the maximum number of parallel segment downloads for a table.
