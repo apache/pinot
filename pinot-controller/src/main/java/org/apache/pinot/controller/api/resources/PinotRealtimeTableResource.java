@@ -27,7 +27,12 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -46,6 +51,8 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,29 +123,67 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/forceCommit")
-  @ApiOperation(value = "Force commit the current consuming segments",
-      notes = "Force commit the current segments in consuming state and restart consumption. "
+  @ApiOperation(value = "Force commit the current consuming segments", notes =
+      "Force commit the current segments in consuming state and restart consumption. "
           + "This should be used after schema/table config changes. "
           + "Please note that this is an asynchronous operation, "
           + "and 200 response does not mean it has actually been done already")
-  public Response forceCommit(
+  public SuccessResponse forceCommit(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validate(tableNameWithType);
+    String submittedJobId = null;
     try {
-      _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType);
-      return Response.ok().build();
+      Set<String> consumingSegmentsForceCommitted = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType);
+      try {
+        String jobId = UUID.randomUUID().toString();
+        _pinotHelixResourceManager.addNewForceCommitJob(tableNameWithType, jobId, consumingSegmentsForceCommitted);
+        submittedJobId = jobId;
+      } catch (Exception e) {
+        LOGGER.error("Could not add force commit job metadata to ZK table : {}", tableNameWithType, e);
+      }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+
+    return new SuccessResponse(
+        String.format("Successfully submitted force commit job id. Job meta ZK storage status: %s, job id : %s",
+            (submittedJobId != null) ? "SUCCESS" : "FAILED", submittedJobId));
   }
 
+  @GET
+  @Path("segments/forceCommitStatus/{jobId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get status for a submitted force commit operation", notes = "Get status for a submitted "
+      + "force commit operation")
+  public Map<String, String> getForceCommitJobStatus(
+      @ApiParam(value = "Force commit job id", required = true) @PathParam("jobId") String reloadJobId)
+      throws Exception {
+    Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId);
+    String tableNameWithType = controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
+    Set<String> consumingSegmentCommitted = new HashSet<>();
+    consumingSegmentCommitted = JsonUtils.stringToObject(
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST),
+        consumingSegmentCommitted.getClass());
+    Set<String> onlineSegmentsForTable =
+        _pinotHelixResourceManager.getOnlineSegmentsFromExternalView(tableNameWithType);
+    // Need to check how many are online
+    AtomicInteger onlineSegmentsCount = new AtomicInteger(0);
+    consumingSegmentCommitted.forEach(segmentName -> {
+      if (onlineSegmentsForTable.contains(segmentName)) {
+        onlineSegmentsCount.incrementAndGet();
+      }
+    });
+
+    controllerJobZKMetadata.put("onlineSegmentCount", Integer.toString(onlineSegmentsCount.get()));
+    return controllerJobZKMetadata;
+  }
 
   @GET
   @Path("/tables/{tableName}/pauseStatus")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Return pause status of a realtime table",
-      notes = "Return pause status of a realtime table along with list of consuming segments.")
+  @ApiOperation(value = "Return pause status of a realtime table", notes = "Return pause status of a realtime table "
+      + "along with list of consuming segments.")
   public Response getPauseStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
