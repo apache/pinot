@@ -47,7 +47,7 @@ public class OnHeapLongDictionary extends BaseImmutableDictionary {
    * @param length Length of the dictionary
    */
   public OnHeapLongDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, Long.BYTES, (byte) 0);
+    super(dataBuffer, length, Long.BYTES);
 
     _valToDictId = new Long2IntOpenHashMap(length);
     _valToDictId.defaultReturnValue(Dictionary.NULL_VALUE_INDEX);

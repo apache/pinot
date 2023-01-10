@@ -26,7 +26,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class IntDictionary extends BaseImmutableDictionary {
 
   public IntDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, Integer.BYTES, (byte) 0);
+    super(dataBuffer, length, Integer.BYTES);
   }
 
   @Override

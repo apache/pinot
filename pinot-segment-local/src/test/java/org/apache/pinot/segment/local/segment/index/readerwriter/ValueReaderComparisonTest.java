@@ -301,19 +301,19 @@ public class ValueReaderComparisonTest {
   private static void assertUtf8Comparison(ValueReader readerWriter, int index, int numBytesPerValue, String string,
       int signum) {
     byte[] value = string.getBytes(StandardCharsets.UTF_8);
-    String stored = readerWriter.getUnpaddedString(index, numBytesPerValue, (byte) 0, new byte[numBytesPerValue]);
+    String stored = readerWriter.getUnpaddedString(index, numBytesPerValue, new byte[numBytesPerValue]);
     String error = stored + " " + string;
     int comparisonViaMaterialization = stored.compareTo(string);
-    assertEquals(signum, Integer.compare(comparisonViaMaterialization, 0), error);
+    assertEquals(Integer.compare(comparisonViaMaterialization, 0), signum, error);
     int utf8Comparison = readerWriter.compareUtf8Bytes(index, numBytesPerValue, value);
-    assertEquals(signum, Integer.compare(utf8Comparison, 0), error);
+    assertEquals(Integer.compare(utf8Comparison, 0), signum, error);
   }
 
   private static void assertConsistentUtf8Comparison(ValueReader readerWriter, int index, int numBytesPerValue,
       String string) {
     byte[] value = string.getBytes(StandardCharsets.UTF_8);
     int utf8Comparison = readerWriter.compareUtf8Bytes(index, numBytesPerValue, value);
-    String stored = readerWriter.getUnpaddedString(index, numBytesPerValue, (byte) 0, new byte[numBytesPerValue]);
+    String stored = readerWriter.getUnpaddedString(index, numBytesPerValue, new byte[numBytesPerValue]);
     int comparisonViaMaterialization = stored.compareTo(string);
     assertTrue(
         (utf8Comparison == comparisonViaMaterialization) || (utf8Comparison < 0 && comparisonViaMaterialization < 0)
