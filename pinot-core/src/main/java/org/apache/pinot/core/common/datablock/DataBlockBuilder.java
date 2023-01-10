@@ -141,6 +141,8 @@ public class DataBlockBuilder {
           case TIMESTAMP:
             byteBuffer.putLong(((Timestamp) value).getTime());
             break;
+          case NULL:
+            // fall through
           case STRING:
             setColumn(rowBuilder, byteBuffer, (String) value);
             break;
@@ -461,6 +463,8 @@ public class DataBlockBuilder {
             }
             setColumn(columnarBuilder, byteBuffer, (String[]) value);
           }
+          break;
+        case NULL:
           break;
         default:
           throw new IllegalStateException(

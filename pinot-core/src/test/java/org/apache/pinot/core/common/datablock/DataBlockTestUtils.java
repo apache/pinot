@@ -127,6 +127,11 @@ public class DataBlockTestUtils {
           }
           row[colId] = timestampArray;
           break;
+        case NULL:
+          length = RANDOM.nextInt(ARRAY_SIZE);
+          Object[] nullArray = new Object[length];
+          row[colId] = nullArray;
+          break;
         default:
           throw new UnsupportedOperationException("Can't fill random data for column type: " + columnDataTypes[colId]);
       }

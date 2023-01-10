@@ -423,6 +423,8 @@ public class DataSchema {
           return toTimestampArray(value);
         case BYTES_ARRAY:
           return (byte[][]) value;
+        case NULL:
+          return null;
         default:
           throw new IllegalStateException(String.format("Cannot convert: '%s' to type: %s", value, this));
       }
