@@ -46,7 +46,7 @@ public class ResultsBlockUtilsTest {
         QueryContextConverterUtils.getQueryContext("SELECT COUNT(*), SUM(a), MAX(b) FROM testTable WHERE foo = 'bar'");
     dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
-    assertEquals(dataSchema.getColumnNames(), new String[]{"count_star", "sum_a", "max_b"});
+    assertEquals(dataSchema.getColumnNames(), new String[]{"count(*)", "sum(a)", "max(b)"});
     assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
     });
