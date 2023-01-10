@@ -69,7 +69,6 @@ import static org.testng.Assert.assertTrue;
 
 
 public class ForwardIndexHandlerTest {
-  private static final BigDecimal BASE_BIG_DECIMAL = BigDecimal.valueOf(new Random().nextDouble());
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ForwardIndexHandlerTest");
   private static final String TABLE_NAME = "myTable";
   private static final String SEGMENT_NAME = "testSegment";
@@ -356,7 +355,7 @@ public class ForwardIndexHandlerTest {
         tempIntRows[i] = 1001;
         tempLongRows[i] = 1001L;
         tempBytesRows[i] = str.getBytes();
-        tempBigDecimalRows[i] = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(1001));
+        tempBigDecimalRows[i] = BigDecimal.valueOf(1001);
 
         // Avoid creating empty arrays.
         int numMVElements = random.nextInt(maxNumberOfMVEntries) + 1;
@@ -372,7 +371,7 @@ public class ForwardIndexHandlerTest {
         tempIntRows[i] = i;
         tempLongRows[i] = (long) i;
         tempBytesRows[i] = str.getBytes();
-        tempBigDecimalRows[i] = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i));
+        tempBigDecimalRows[i] = BigDecimal.valueOf(i);
 
         // Avoid creating empty arrays.
         int numMVElements = random.nextInt(maxNumberOfMVEntries) + 1;
@@ -1022,7 +1021,7 @@ public class ForwardIndexHandlerTest {
       // This value is based on the rows in createTestData().
       dictionaryElementSize = 7;
     } else if (dataType == FieldSpec.DataType.BIG_DECIMAL) {
-      dictionaryElementSize = 11;
+      dictionaryElementSize = 4;
     }
     validateMetadataProperties(col1, true, dictionaryElementSize, metadata.getCardinality(), metadata.getTotalDocs(),
         dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
@@ -1042,7 +1041,7 @@ public class ForwardIndexHandlerTest {
       // This value is based on the rows in createTestData().
       dictionaryElementSize = 7;
     } else if (dataType == FieldSpec.DataType.BIG_DECIMAL) {
-      dictionaryElementSize = 11;
+      dictionaryElementSize = 4;
     }
     validateMetadataProperties(col2, true, dictionaryElementSize, metadata.getCardinality(), metadata.getTotalDocs(),
         dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
@@ -1085,7 +1084,7 @@ public class ForwardIndexHandlerTest {
         // This value is based on the rows in createTestData().
         dictionaryElementSize = 7;
       } else if (dataType == FieldSpec.DataType.BIG_DECIMAL) {
-        dictionaryElementSize = 11;
+        dictionaryElementSize = 4;
       }
       validateMetadataProperties(column, true, dictionaryElementSize, metadata.getCardinality(),
           metadata.getTotalDocs(), dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
@@ -1311,7 +1310,7 @@ public class ForwardIndexHandlerTest {
       // This value is based on the rows in createTestData().
       dictionaryElementSize = 7;
     } else if (dataType == FieldSpec.DataType.BIG_DECIMAL) {
-      dictionaryElementSize = 11;
+      dictionaryElementSize = 4;
     }
     validateMetadataProperties(col1, true, dictionaryElementSize, metadata.getCardinality(),
         metadata.getTotalDocs(), dataType, metadata.getFieldType(), metadata.isSorted(),
@@ -1329,7 +1328,7 @@ public class ForwardIndexHandlerTest {
       // This value is based on the rows in createTestData().
       dictionaryElementSize = 7;
     } else if (dataType == FieldSpec.DataType.BIG_DECIMAL) {
-      dictionaryElementSize = 11;
+      dictionaryElementSize = 4;
     }
     validateMetadataProperties(col2, true, dictionaryElementSize, metadata.getCardinality(),
         metadata.getTotalDocs(), dataType, metadata.getFieldType(), metadata.isSorted(),
@@ -1374,7 +1373,7 @@ public class ForwardIndexHandlerTest {
         // This value is based on the rows in createTestData().
         dictionaryElementSize = 7;
       } else if (dataType == FieldSpec.DataType.BIG_DECIMAL) {
-        dictionaryElementSize = 11;
+        dictionaryElementSize = 4;
       }
       validateMetadataProperties(column, true, dictionaryElementSize, metadata.getCardinality(),
           metadata.getTotalDocs(), dataType, metadata.getFieldType(), metadata.isSorted(), metadata.isSingleValue(),
@@ -1743,7 +1742,7 @@ public class ForwardIndexHandlerTest {
             }
             case BIG_DECIMAL: {
               assertTrue(isSingleValue);
-              assertEquals((BigDecimal) val, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(1001)));
+              assertEquals((BigDecimal) val, BigDecimal.valueOf(1001));
               break;
             }
             default:
