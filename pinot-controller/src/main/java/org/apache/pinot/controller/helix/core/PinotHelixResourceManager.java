@@ -2064,13 +2064,15 @@ public class PinotHelixResourceManager {
    * @param tableNameWithType the table for which jobs are to be fetched
    * @return A Map of jobId to job properties
    */
-  public Map<String, Map<String, String>> getAllJobsForTable(String tableNameWithType) {
+  public Map<String, Map<String, String>> getAllJobsForTable(String tableNameWithType, Set<String> jobTypesToFilter) {
     String jobsResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob();
     try {
       ZNRecord tableJobsRecord = _propertyStore.get(jobsResourcePath, null, -1);
       Map<String, Map<String, String>> controllerJobs = tableJobsRecord.getMapFields();
       return controllerJobs.entrySet().stream().filter(
-              job -> job.getValue().get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE).equals(tableNameWithType))
+              job -> job.getValue().get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE).equals(tableNameWithType)
+                  && (jobTypesToFilter == null || jobTypesToFilter.contains(
+                      job.getValue().get(CommonConstants.ControllerJob.JOB_TYPE))))
           .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     } catch (ZkNoNodeException e) {
       LOGGER.warn("Could not find controller job node for table : {}", tableNameWithType, e);
