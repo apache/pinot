@@ -1829,6 +1829,25 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
         "distinct_bar");
+
+    query = "SELECT sum(distinct bar) AS distinct_bar, count(*), sum(a),min(a),max(b) FROM foo GROUP BY city ORDER BY "
+            + "distinct_bar";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 5);
+    Function selectFunctionCall = pinotQuery.getSelectList().get(0).getFunctionCall();
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "as");
+    Assert.assertEquals(selectFunctionCall.getOperands().get(0).getFunctionCall().getOperator(), "distinctsum");
+    Assert.assertEquals(
+        selectFunctionCall.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "bar");
+    Assert.assertEquals(selectFunctionCall.getOperands().get(1).getIdentifier().getName(), "distinct_bar");
+    Assert.assertEquals(pinotQuery.getOrderByList().size(), 1);
+    Function orderbyFunctionCall = pinotQuery.getOrderByList().get(0).getFunctionCall();
+    Assert.assertEquals(orderbyFunctionCall.getOperator(), "asc");
+    Assert.assertEquals(orderbyFunctionCall.getOperands().get(0).getFunctionCall().getOperator(), "distinctsum");
+    Assert.assertEquals(
+        orderbyFunctionCall.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "bar");
   }
 
   @Test
@@ -1878,6 +1897,28 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
         "distinct_bar");
+
+    query = "SELECT avg(distinct bar) AS distinct_bar, count(*), avg(a),min(a),max(b) FROM foo GROUP BY city ORDER BY"
+        + " distinct_bar";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 5);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "as");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "distinctavg");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
+        "distinct_bar");
+    Assert.assertEquals(pinotQuery.getOrderByList().size(), 1);
+    Function orderbyFunctionCall = pinotQuery.getOrderByList().get(0).getFunctionCall();
+    Assert.assertEquals(orderbyFunctionCall.getOperator(), "asc");
+    Assert.assertEquals(orderbyFunctionCall.getOperands().get(0).getFunctionCall().getOperator(), "distinctavg");
+    Assert.assertEquals(
+        orderbyFunctionCall.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "bar");
   }
 
   @Test
