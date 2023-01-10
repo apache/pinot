@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.offline;
 
 import com.google.common.cache.LoadingCache;
 import java.util.concurrent.Semaphore;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -54,6 +55,13 @@ public class TableDataManagerProvider {
   public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
       LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache) {
+    return getTableDataManager(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager,
+        errorCache, () -> true);
+  }
+
+  public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig, String instanceId,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
+      LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache, Supplier<Boolean> isServerReadyToServeQueries) {
     TableDataManager tableDataManager;
     switch (tableDataManagerConfig.getTableType()) {
       case OFFLINE:
@@ -64,7 +72,7 @@ public class TableDataManagerProvider {
         }
         break;
       case REALTIME:
-        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore);
+        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToServeQueries);
         break;
       default:
         throw new IllegalStateException();

@@ -600,12 +600,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           }
         }
       }
-
       _currentOffset = messagesAndOffsets.getNextStreamPartitionMsgOffsetAtIndex(index);
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
       streamMessageCount++;
     }
+    updateIngestionDelay(indexedMessageCount);
     updateCurrentDocumentCountMetrics();
     if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
       _hasMessagesFetched = true;
@@ -617,6 +617,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (_segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("empty batch received - sleeping for {}ms", idlePipeSleepTimeMillis);
       }
+      // Record Pinot ingestion delay as zero since we are up-to-date and no new events
+      _realtimeTableDataManager.updateIngestionDelay(0, System.currentTimeMillis(), _partitionGroupId);
       // If there were no messages to be fetched from stream, wait for a little bit as to avoid hammering the stream
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
@@ -1558,6 +1560,21 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
     _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
+  }
+
+  /*
+   * Updates the ingestion delay if messages were processed using the time stamp for the last consumed event.
+   *
+   * @param indexedMessagesCount
+   */
+  private void updateIngestionDelay(int indexedMessageCount) {
+    if ((indexedMessageCount > 0) && (_lastRowMetadata != null)) {
+      long ingestionDelayMs = _lastConsumedTimestampMs - _lastRowMetadata.getRecordIngestionTimeMs();
+      ingestionDelayMs = Math.max(ingestionDelayMs, 0);
+      // Record Ingestion delay for this partition
+      _realtimeTableDataManager.updateIngestionDelay(ingestionDelayMs, _lastConsumedTimestampMs,
+          _partitionGroupId);
+    }
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

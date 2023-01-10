@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
@@ -183,4 +184,11 @@ public interface InstanceDataManager {
    * Immediately stop consumption and start committing the consuming segments.
    */
   void forceCommit(String tableNameWithType, Set<String> segmentNames);
+
+  /**
+   * Enables the installation of a method to determine if a server is ready to server queries.
+   *
+   * @param isServerReadyToServeQueries supplier to retrieve state of server.
+   */
+  void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServerReadyToServeQueries);
 }

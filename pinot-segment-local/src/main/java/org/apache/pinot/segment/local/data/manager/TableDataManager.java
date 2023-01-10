@@ -200,4 +200,20 @@ public interface TableDataManager {
    * @return List of {@link SegmentErrorInfo}
    */
   Map<String, SegmentErrorInfo> getSegmentErrors();
+
+  /**
+   * Interface to handle segment state transitions from CONSUMING to DROPPED
+   *
+   * @param segmentNameStr name of segment for which the state change is being handled
+   */
+  default void onConsumingToDropped(String segmentNameStr) {
+  };
+
+  /**
+   * Interface to handle segment state transitions from CONSUMING to ONLINE
+   *
+   * @param segmentNameStr name of segment for which the state change is being handled
+   */
+  default void onConsumingToOnline(String segmentNameStr) {
+  };
 }

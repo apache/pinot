@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
@@ -94,10 +95,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ServerMetrics _serverMetrics;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
+  private Supplier<Boolean> _isReadyToServeQueries = () -> true;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
   private LoadingCache<Pair<String, String>, SegmentErrorInfo> _errorCache;
+
+  @Override
+  public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
+    _isReadyToServeQueries = isServingQueries;
+  }
 
   @Override
   public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
@@ -225,7 +232,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(_instanceDataManagerConfig, tableConfig);
     TableDataManager tableDataManager =
         TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore,
-            _serverMetrics, _helixManager, _errorCache);
+            _serverMetrics, _helixManager, _errorCache, _isReadyToServeQueries);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
