@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.common.utils.log;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -31,35 +31,36 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 
-
 /**
- * Logger file server.
+ * A real log file server.
  */
-public class LoggerFileServer {
-  private final File _loggerRootDir;
-  private final Path _loggerRootDirPath;
+public class LocalLogFileServer implements LogFileServer {
+  private final File _logRootDir;
+  private final Path _logRootDirPath;
 
-  public LoggerFileServer(String loggerRootDir) {
-    Preconditions.checkNotNull(loggerRootDir, "Logger root directory is null");
-    _loggerRootDir = new File(loggerRootDir);
-    Preconditions.checkState(_loggerRootDir.exists(), "Logger directory doesn't exists");
-    _loggerRootDirPath = Paths.get(_loggerRootDir.getAbsolutePath());
+  public LocalLogFileServer(String logRootDir) {
+    Preconditions.checkNotNull(logRootDir, "Log root directory is null");
+    _logRootDir = new File(logRootDir);
+    Preconditions.checkState(_logRootDir.exists(), "Log directory doesn't exists");
+    _logRootDirPath = Paths.get(_logRootDir.getAbsolutePath());
   }
 
-  public Set<String> getAllPaths()
+  @Override
+  public Set<String> getAllLogFilePaths()
       throws IOException {
     Set<String> allFiles = new TreeSet<>();
-    Files.walk(_loggerRootDirPath).filter(Files::isRegularFile).forEach(
-        f -> allFiles.add(f.toAbsolutePath().toString().replace(_loggerRootDirPath.toAbsolutePath() + "/", "")));
+    Files.walk(_logRootDirPath).filter(Files::isRegularFile).forEach(
+        f -> allFiles.add(f.toAbsolutePath().toString().replace(_logRootDirPath.toAbsolutePath() + "/", "")));
     return allFiles;
   }
 
+  @Override
   public Response downloadLogFile(String filePath) {
     try {
-      if (!getAllPaths().contains(filePath)) {
+      if (!getAllLogFilePaths().contains(filePath)) {
         throw new WebApplicationException("Invalid file path: " + filePath, Response.Status.FORBIDDEN);
       }
-      File logFile = new File(_loggerRootDir, filePath);
+      File logFile = new File(_logRootDir, filePath);
       if (!logFile.exists()) {
         throw new WebApplicationException("File: " + filePath + " doesn't exists", Response.Status.NOT_FOUND);
       }

@@ -32,7 +32,9 @@ import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.LoggerFileServer;
+import org.apache.pinot.common.utils.log.DummyLogFileServer;
+import org.apache.pinot.common.utils.log.LocalLogFileServer;
+import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -91,7 +93,9 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(brokerMetrics).to(BrokerMetrics.class);
         String loggerRootDir = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
-          bind(new LoggerFileServer(loggerRootDir)).to(LoggerFileServer.class);
+          bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);
+        } else {
+          bind(new DummyLogFileServer()).to(LogFileServer.class);
         }
         bind(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID)).named(BROKER_INSTANCE_ID);
         bind(serverRoutingStatsManager).to(ServerRoutingStatsManager.class);
