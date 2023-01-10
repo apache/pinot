@@ -782,8 +782,10 @@ public class CalciteSqlParser {
             canonicalName = "distinctcount";
           } else if (canonicalName.equals("sum")) {
             canonicalName = "distinctsum";
+          } else if (canonicalName.equals("avg")) {
+            canonicalName = "distinctavg";
           } else if (AggregationFunctionType.isAggregationFunction(canonicalName)) {
-            // Aggregation function(other than COUNT) on DISTINCT is not supported, e.g. SUM(DISTINCT colA).
+            // Aggregation functions other than COUNT, SUM, AVG on DISTINCT are not supported.
             throw new SqlCompilationException("Function '" + functionName + "' on DISTINCT is not supported.");
           }
         }

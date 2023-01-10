@@ -24,10 +24,10 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class DistinctSumAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
+public class DistinctAvgAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
-  public DistinctSumAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTSUM);
+  public DistinctAvgAggregationFunction(ExpressionContext expression) {
+    super(expression, AggregationFunctionType.DISTINCTAVG);
   }
 
   @Override
@@ -42,7 +42,7 @@ public class DistinctSumAggregationFunction extends BaseDistinctAggregateAggrega
     for (Object obj : intermediateResult) {
       distinctSum += ((Number) obj).doubleValue();
     }
-
-    return distinctSum;
+    Double distinctAvg = distinctSum / intermediateResult.size();
+    return distinctAvg;
   }
 }

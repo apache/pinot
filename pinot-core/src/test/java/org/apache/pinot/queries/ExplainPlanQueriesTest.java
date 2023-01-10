@@ -1680,6 +1680,16 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"DOC_ID_SET", 6, 5});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
+
+    // No scan required as metadata is sufficient to answer the query for all segments
+    String query5 = "EXPLAIN PLAN FOR SELECT DISTINCTSUM(invertedIndexCol1) FROM testTable";
+    List<Object[]> result5 = new ArrayList<>();
+    result5.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
+    result5.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
+    result5.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
+        ExplainPlanRows.PLAN_START_IDS});
+    result5.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
+    check(query5, new ResultTable(DATA_SCHEMA, result5));
   }
 
   @Test

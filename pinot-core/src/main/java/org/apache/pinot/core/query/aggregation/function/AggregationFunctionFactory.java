@@ -242,6 +242,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountRawThetaSketchAggregationFunction(arguments);
           case DISTINCTSUM:
             return new DistinctSumAggregationFunction(firstArgument);
+          case DISTINCTAVG:
+            return new DistinctAvgAggregationFunction(firstArgument);
           case IDSET:
             return new IdSetAggregationFunction(arguments);
           case COUNTMV:
