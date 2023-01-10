@@ -64,9 +64,6 @@ public class AggregationResultsBlock extends BaseResultsBlock {
     return _aggregationFunctions;
   }
 
-  public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
-    return _filteredAggregationFunctions;
-  }
   public List<Object> getResults() {
     return _results;
   }
