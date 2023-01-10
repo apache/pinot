@@ -42,11 +42,11 @@ public class AbstractMetricsTest {
     ControllerMetrics controllerMetrics = new ControllerMetrics(new YammerMetricsRegistry());
     String metricName = "test";
     // add gauge
-    controllerMetrics.addOrUpdateGauge(metricName, () -> 1L);
+    controllerMetrics.setOrUpdateGauge(metricName, () -> 1L);
     checkGauge(controllerMetrics, metricName, 1);
 
     // update gauge
-    controllerMetrics.addOrUpdateGauge(metricName, () -> 2L);
+    controllerMetrics.setOrUpdateGauge(metricName, () -> 2L);
     checkGauge(controllerMetrics, metricName, 2);
 
     // remove gauge
