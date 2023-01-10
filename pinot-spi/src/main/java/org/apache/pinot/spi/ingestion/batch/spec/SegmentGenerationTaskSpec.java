@@ -70,6 +70,8 @@ public class SegmentGenerationTaskSpec implements Serializable {
 
   private boolean _failOnEmptySegment = false;
 
+  private boolean _createMetadataTarGz = false;
+
   /**
    * Custom properties set into segment metadata
    */
@@ -137,6 +139,14 @@ public class SegmentGenerationTaskSpec implements Serializable {
 
   public void setFailOnEmptySegment(boolean failOnEmptySegment) {
     _failOnEmptySegment = failOnEmptySegment;
+  }
+
+  public boolean isCreateMetadataTarGz() {
+    return _createMetadataTarGz;
+  }
+
+  public void setCreateMetadataTarGz(boolean createMetadataTarGz) {
+    _createMetadataTarGz = createMetadataTarGz;
   }
 
   public void setCustomProperty(String key, String value) {

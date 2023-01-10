@@ -58,4 +58,8 @@ public interface GroupByExecutor {
    *
    */
   Collection<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer);
+
+  GroupKeyGenerator getGroupKeyGenerator();
+
+  GroupByResultHolder[] getGroupByResultHolders();
 }

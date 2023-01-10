@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -31,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -115,15 +118,25 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
+  // Object to track ingestion delay for all partitions
+  private IngestionDelayTracker _ingestionDelayTracker;
+  private final Supplier<Boolean> _isServerReadyToServeQueries;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
+    this(segmentBuildSemaphore, () -> true);
+  }
+
+  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, Supplier<Boolean> isServerReadyToServeQueries) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
+    _isServerReadyToServeQueries = isServerReadyToServeQueries;
   }
 
   @Override
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
-
+    // Tracks ingestion delay of all partitions being served for this table
+    _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this,
+        _isServerReadyToServeQueries);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
@@ -212,6 +225,59 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (_leaseExtender != null) {
       _leaseExtender.shutDown();
     }
+    // Make sure we do metric cleanup when we shut down the table.
+    _ingestionDelayTracker.shutdown();
+  }
+
+  /*
+   * Method used by LLRealtimeSegmentManagers to update their partition delays
+   *
+   * @param ingestionDelayMs Ingestion delay being reported.
+   * @param currentTimeMs Timestamp of the measure being provided, i.e. when this delay was computed.
+   * @param partitionGroupId Partition ID for which delay is being updated.
+   */
+  public void updateIngestionDelay(long ingestionDelayMs, long currenTimeMs, int partitionGroupId) {
+    _ingestionDelayTracker.updateIngestionDelay(ingestionDelayMs, currenTimeMs, partitionGroupId);
+  }
+
+  /*
+   * Method to handle CONSUMING -> DROPPED segment state transitions:
+   * We stop tracking partitions whose segments are dropped.
+   *
+   * @param segmentNameStr name of segment which is transitioning state.
+   */
+  @Override
+  public void onConsumingToDropped(String segmentNameStr) {
+    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName.getPartitionGroupId());
+  }
+
+  /*
+   * Method to handle CONSUMING -> ONLINE segment state transitions:
+   * We mark partitions for verification against ideal state when we do not see a consuming segment for some time
+   * for that partition. The idea is to remove the related metrics when the partition moves from the current server.
+   *
+   * @param segmentNameStr name of segment which is transitioning state.
+   */
+  @Override
+  public void onConsumingToOnline(String segmentNameStr) {
+    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    _ingestionDelayTracker.markPartitionForVerification(segmentName.getPartitionGroupId());
+  }
+
+  /**
+   * Returns all partitionGroupIds for the partitions hosted by this server for current table.
+   * @Note: this involves Zookeeper read and should not be used frequently due to efficiency concerns.
+   */
+  public Set<Integer> getHostedPartitionsGroupIds() {
+    Set<Integer> partitionsHostedByThisServer = new HashSet<>();
+    List<String> segments = TableStateUtils.getSegmentsInGivenStateForThisInstance(_helixManager, _tableNameWithType,
+        CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
+    for (String segmentNameStr : segments) {
+      LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+      partitionsHostedByThisServer.add(segmentName.getPartitionGroupId());
+    }
+    return partitionsHostedByThisServer;
   }
 
   public RealtimeSegmentStatsHistory getStatsHistory() {

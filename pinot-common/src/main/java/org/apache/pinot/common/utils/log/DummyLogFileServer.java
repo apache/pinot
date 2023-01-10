@@ -16,18 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.converttorawindex;
+package org.apache.pinot.common.utils.log;
 
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.event.BaseMinionProgressObserverFactory;
-import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
+import java.io.IOException;
+import java.util.Set;
+import javax.ws.rs.core.Response;
 
 
-@EventObserverFactory
-public class ConvertToRowIndexTaskProgressObserverFactory extends BaseMinionProgressObserverFactory {
+/**
+ * A dummy log file server.
+ */
+public class DummyLogFileServer implements LogFileServer {
+  @Override
+  public Set<String> getAllLogFilePaths()
+      throws IOException {
+    throw new RuntimeException("DummyLogFileServer does not support this operation");
+  }
 
   @Override
-  public String getTaskType() {
-    return MinionConstants.ConvertToRawIndexTask.TASK_TYPE;
+  public Response downloadLogFile(String filePath) {
+    throw new RuntimeException("DummyLogFileServer does not support this operation");
   }
 }

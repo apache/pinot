@@ -30,6 +30,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class InbuiltFunctionEvaluatorTest {
@@ -130,7 +131,7 @@ public class InbuiltFunctionEvaluatorTest {
       throws Exception {
     MyFunc myFunc = new MyFunc();
     Method method = myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class);
-    FunctionRegistry.registerFunction(method, false);
+    FunctionRegistry.registerFunction(method, false, false);
     String expression = "appendToStringAndReturn('test ')";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertTrue(evaluator.getArguments().isEmpty());
@@ -154,6 +155,21 @@ public class InbuiltFunctionEvaluatorTest {
       InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
       GenericRow row = new GenericRow();
       assertNull(evaluator.evaluate(row));
+    }
+  }
+
+  @Test
+  public void testPlaceholderFunctionShouldNotBeRegistered()
+      throws Exception {
+    GenericRow row = new GenericRow();
+    row.putValue("testColumn", "testValue");
+    String expression = "text_match(testColumn, 'pattern')";
+    try {
+      InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+      evaluator.evaluate(row);
+      fail();
+    } catch (Throwable t) {
+      assertTrue(t.getMessage().contains("text_match"));
     }
   }
 

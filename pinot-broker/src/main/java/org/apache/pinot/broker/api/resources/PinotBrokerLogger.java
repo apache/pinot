@@ -40,8 +40,9 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.pinot.common.utils.LoggerFileServer;
 import org.apache.pinot.common.utils.LoggerUtils;
+import org.apache.pinot.common.utils.log.DummyLogFileServer;
+import org.apache.pinot.common.utils.log.LogFileServer;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -56,7 +57,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 public class PinotBrokerLogger {
 
   @Inject
-  private LoggerFileServer _loggerFileServer;
+  private LogFileServer _logFileServer;
 
   @GET
   @Path("/loggers")
@@ -94,10 +95,10 @@ public class PinotBrokerLogger {
   @ApiOperation(value = "Get all local log files")
   public Set<String> getLocalLogFiles() {
     try {
-      if (_loggerFileServer == null) {
+      if (_logFileServer == null || _logFileServer instanceof DummyLogFileServer) {
         throw new WebApplicationException("Root log directory doesn't exist", Response.Status.INTERNAL_SERVER_ERROR);
       }
-      return _loggerFileServer.getAllPaths();
+      return _logFileServer.getAllLogFilePaths();
     } catch (IOException e) {
       throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
@@ -109,10 +110,10 @@ public class PinotBrokerLogger {
   @ApiOperation(value = "Download a log file")
   public Response downloadLogFile(
       @ApiParam(value = "Log file path", required = true) @QueryParam("filePath") String filePath) {
-    if (_loggerFileServer == null) {
+    if (_logFileServer == null || _logFileServer instanceof DummyLogFileServer) {
       throw new WebApplicationException("Root log directory is not configured",
           Response.Status.INTERNAL_SERVER_ERROR);
     }
-    return _loggerFileServer.downloadLogFile(filePath);
+    return _logFileServer.downloadLogFile(filePath);
   }
 }

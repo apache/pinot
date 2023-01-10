@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
@@ -108,6 +109,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   private final StarTreeV2 _starTreeV2;
   private final Map<String, List<CompositePredicateEvaluator>> _predicateEvaluatorsMap;
   private final Set<String> _groupByColumns;
+  private final boolean _scanStarTreeNodes;
 
   boolean _resultEmpty = false;
 
@@ -117,6 +119,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
     _groupByColumns = groupByColumns != null ? groupByColumns : Collections.emptySet();
+    _scanStarTreeNodes = QueryOptionsUtils.isScanStarTreeNodes(_queryContext.getQueryOptions());
   }
 
   @Override
@@ -276,7 +279,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         int numChildren = starTreeNode.getNumChildren();
 
         // If number of matching dictionary ids is large, use scan instead of binary search
-        if (numMatchingDictIds * USE_SCAN_TO_TRAVERSE_NODES_THRESHOLD > numChildren) {
+        if (numMatchingDictIds * USE_SCAN_TO_TRAVERSE_NODES_THRESHOLD > numChildren || _scanStarTreeNodes) {
           Iterator<? extends StarTreeNode> childrenIterator = starTreeNode.getChildrenIterator();
 
           // When the star-node exists, and the number of matching dictionary ids is more than or equal to the

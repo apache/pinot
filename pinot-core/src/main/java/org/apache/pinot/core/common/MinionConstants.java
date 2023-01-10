@@ -59,11 +59,6 @@ public class MinionConstants {
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
   public static final String ENABLE_REPLACE_SEGMENTS_KEY = "enableReplaceSegments";
 
-  public static class ConvertToRawIndexTask {
-    public static final String TASK_TYPE = "ConvertToRawIndexTask";
-    public static final String COLUMNS_TO_CONVERT_KEY = "columnsToConvert";
-  }
-
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
     public static final String TASK_TYPE = "PurgeTask";

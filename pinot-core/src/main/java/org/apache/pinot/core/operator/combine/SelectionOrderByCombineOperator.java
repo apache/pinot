@@ -23,15 +23,11 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,32 +56,6 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator<Selecti
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * <p> Execute query on one or more segments in a single thread, and store multiple intermediate result blocks
-   * into BlockingQueue. Try to use
-   * {@link org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator} first, which
-   * will skip processing some segments based on the column min/max value. Otherwise fall back to the default combine
-   * (process all segments).
-   */
-  @Override
-  protected BaseResultsBlock getNextBlock() {
-    List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
-    assert orderByExpressions != null;
-    if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
-      try {
-        return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext,
-            _executorService).getNextBlock();
-      } catch (QueryCancelledException e) {
-        throw e;
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while using min/max value based combine, using the default combine", e);
-      }
-    }
-    return super.getNextBlock();
   }
 
   @Override

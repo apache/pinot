@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
-import org.apache.pinot.common.utils.LoggerFileServer;
+import org.apache.pinot.common.utils.log.DummyLogFileServer;
+import org.apache.pinot.common.utils.log.LocalLogFileServer;
+import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -62,7 +64,9 @@ public class MinionAdminApiApplication extends ResourceConfig {
         bind(instanceId).named(MINION_INSTANCE_ID);
         String loggerRootDir = minionConf.getProperty(CommonConstants.Minion.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
-          bind(new LoggerFileServer(loggerRootDir)).to(LoggerFileServer.class);
+          bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);
+        } else {
+          bind(new DummyLogFileServer()).to(LogFileServer.class);
         }
       }
     });

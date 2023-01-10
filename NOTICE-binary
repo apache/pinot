@@ -9,8 +9,8 @@ The Apache Software Foundation (http://www.apache.org/).
 // Version 2.0, in this case for
 // ------------------------------------------------------------------
 
-Apache Log4j Core
-Copyright 1999-2012 Apache Software Foundation
+Spark Project Tags
+Copyright 2022 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
@@ -643,6 +643,12 @@ its NOTICE file:
 Apache Commons Pool
 Copyright 2001-2012 The Apache Software Foundation
 
+Apache Log4j Core
+Copyright 1999-2012 Apache Software Foundation
+
 ResolverUtil.java
 Copyright 2005-2006 Tim Fennell
+
+Spark Project Launcher
+Copyright 2022 The Apache Software Foundation
 

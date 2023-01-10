@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLDecoder;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
@@ -47,6 +48,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
@@ -283,7 +285,22 @@ public class SegmentPushUtils implements Serializable {
       String segmentName = fileName.endsWith(Constants.TAR_GZ_FILE_EXT)
           ? fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length()) : fileName;
       SegmentNameUtils.validatePartialOrFullSegmentName(segmentName);
-      File segmentMetadataFile = generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
+      File segmentMetadataFile;
+      // Check if there is a segment metadata tar gz file named `segmentName.metadata.tar.gz`, already in the remote
+      // directory. This is to avoid generating a new segment metadata tar gz file every time we push a segment,
+      // which requires downloading the entire segment tar gz file.
+      URI metadataTarGzFilePath = URI.create(
+          new File(tarFilePath).getParentFile() + File.separator + segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+      if (spec.getPushJobSpec().isPreferMetadataTarGz() && fileSystem.exists(metadataTarGzFilePath)) {
+        segmentMetadataFile = new File(FileUtils.getTempDirectory(),
+            "segmentMetadata-" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        if (segmentMetadataFile.exists()) {
+          FileUtils.forceDelete(segmentMetadataFile);
+        }
+        fileSystem.copyToLocalFile(metadataTarGzFilePath, segmentMetadataFile);
+      } else {
+        segmentMetadataFile = generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
+      }
       try {
         for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
           URI controllerURI;
@@ -355,6 +372,10 @@ public class SegmentPushUtils implements Serializable {
       }
 
       URI uri = URI.create(file);
+      if (uri.getPath().endsWith(Constants.METADATA_TAR_GZ_FILE_EXT)) {
+        // Skip segment metadata tar gz files
+        continue;
+      }
       if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
         URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputDirURI, uri, pushSpec.getSegmentUriPrefix(),
             pushSpec.getSegmentUriSuffix());
@@ -381,7 +402,13 @@ public class SegmentPushUtils implements Serializable {
         new File(FileUtils.getTempDirectory(), "segmentTar-" + uuid + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     File segmentMetadataDir = new File(FileUtils.getTempDirectory(), "segmentMetadataDir-" + uuid);
     try {
-      fileSystem.copyToLocalFile(tarFileURI, tarFile);
+      if (fileSystem instanceof LocalPinotFS) {
+        // For local file system, we don't need to copy the tar file.
+        tarFile = new File(URLDecoder.decode(tarFileURI.getRawPath(), "UTF-8"));
+      } else {
+        // For other file systems, we need to download the file to local file system
+        fileSystem.copyToLocalFile(tarFileURI, tarFile);
+      }
       if (segmentMetadataDir.exists()) {
         FileUtils.forceDelete(segmentMetadataDir);
       }
@@ -406,7 +433,10 @@ public class SegmentPushUtils implements Serializable {
       TarGzCompressionUtils.createTarGzFile(segmentMetadataDir, segmentMetadataTarFile);
       return segmentMetadataTarFile;
     } finally {
-      FileUtils.deleteQuietly(tarFile);
+      if (!(fileSystem instanceof LocalPinotFS)) {
+        // For local file system, we don't need to delete the tar file.
+        FileUtils.deleteQuietly(tarFile);
+      }
       FileUtils.deleteQuietly(segmentMetadataDir);
     }
   }

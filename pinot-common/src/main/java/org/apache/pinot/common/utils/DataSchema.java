@@ -344,7 +344,11 @@ public class DataSchema {
      */
     public boolean isSuperTypeOf(ColumnDataType subTypeCandidate) {
       if (this.isNumber() && subTypeCandidate.isNumber() && this != BIG_DECIMAL && subTypeCandidate != BIG_DECIMAL) {
+        // NUMBER subtype check using type hoisting rules defined in NUMERIC_TYPE_ORDERING
         return NUMERIC_TYPE_ORDERING.max(this, subTypeCandidate) == this;
+      } else if (subTypeCandidate == BOOLEAN) {
+        // BOOLEAN type is sub-type of any number type, checking whether it is equal to 1.
+        return this == subTypeCandidate || (this.isNumber() && this != BIG_DECIMAL);
       } else {
         return this == subTypeCandidate;
       }
@@ -394,7 +398,7 @@ public class DataSchema {
         case BIG_DECIMAL:
           return (BigDecimal) value;
         case BOOLEAN:
-          return (Integer) value == 1;
+          return ((Number) value).intValue() == 1;
         case TIMESTAMP:
           return new Timestamp((long) value);
         case STRING:
@@ -456,7 +460,7 @@ public class DataSchema {
         case BIG_DECIMAL:
           return (BigDecimal) value;
         case BOOLEAN:
-          return (Integer) value == 1;
+          return ((Number) value).intValue() == 1;
         case TIMESTAMP:
           return new Timestamp((long) value).toString();
         case STRING:

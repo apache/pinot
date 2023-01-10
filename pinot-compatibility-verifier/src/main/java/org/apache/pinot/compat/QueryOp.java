@@ -26,6 +26,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import org.apache.pinot.common.utils.SqlResultComparator;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.tools.utils.ExplainPlanUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,27 +127,29 @@ public class QueryOp extends BaseOp {
           try {
             actualJson = Utils.postSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl());
           } catch (Exception e) {
-            LOGGER.error("Comparison FAILED: Line: {} Exception caught while running query: '{}'", queryLineNum, query,
-                e);
+            LOGGER.error("Comparison FAILED: Line: {} Exception caught while running query: '{}', explain plan: {}",
+                queryLineNum, query, getExplainPlan(query), e);
           }
         }
 
         if (expectedJson != null && actualJson != null) {
           try {
-            boolean passed = SqlResultComparator
-                .areEqual(actualJson, expectedJson, query);
+            boolean passed = SqlResultComparator.areEqual(actualJson, expectedJson, query);
             if (passed) {
               succeededQueryCount++;
               LOGGER.debug("Comparison PASSED: Line: {}, query: '{}', actual response: {}, expected response: {}",
                   queryLineNum, query, actualJson, expectedJson);
             } else {
-              LOGGER.error("Comparison FAILED: Line: {}, query: '{}', actual response: {}, expected response: {}",
-                  queryLineNum, query, actualJson, expectedJson);
+              LOGGER.error(
+                  "Comparison FAILED: Line: {}, query: '{}', actual response: {}, expected response: {}, explain "
+                      + "plan: {}",
+                  queryLineNum, query, actualJson, expectedJson, getExplainPlan(query));
             }
           } catch (Exception e) {
             LOGGER.error(
                 "Comparison FAILED: Line: {} Exception caught while comparing query: '{}' actual response: {}, "
-                    + "expected response: {}", queryLineNum, query, actualJson, expectedJson, e);
+                    + "expected response: {}, explain plan: {}", queryLineNum, query, actualJson, expectedJson,
+                getExplainPlan(query), e);
           }
         }
         totalQueryCount++;
@@ -158,5 +161,15 @@ public class QueryOp extends BaseOp {
       }
     }
     return testPassed;
+  }
+
+  private static String getExplainPlan(String query) {
+    try {
+      JsonNode explainPlanResponse =
+          Utils.postSqlQuery("explain plan for " + query, ClusterDescriptor.getInstance().getBrokerUrl());
+      return ExplainPlanUtils.formatExplainPlan(explainPlanResponse);
+    } catch (Throwable error) {
+      return error.getMessage();
+    }
   }
 }

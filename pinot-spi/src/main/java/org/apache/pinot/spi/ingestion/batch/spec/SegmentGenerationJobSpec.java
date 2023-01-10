@@ -139,6 +139,11 @@ public class SegmentGenerationJobSpec implements Serializable {
    */
   private String _authToken;
 
+  /**
+   * Create a separated metadata only tar gz file to reduce the data transfer of segment metadata push job.
+   */
+  private boolean _createMetadataTarGz;
+
   public ExecutionFrameworkSpec getExecutionFrameworkSpec() {
     return _executionFrameworkSpec;
   }
@@ -309,6 +314,14 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   public void setAuthToken(String authToken) {
     _authToken = authToken;
+  }
+
+  public boolean isCreateMetadataTarGz() {
+    return _createMetadataTarGz;
+  }
+
+  public void setCreateMetadataTarGz(boolean createMetadataTarGz) {
+    _createMetadataTarGz = createMetadataTarGz;
   }
 
   public String toJSONString(boolean removeSensitiveKeys) {

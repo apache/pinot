@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.common.utils.log;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,7 +31,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-public class LoggerFileServerTest {
+public class LocalLogFileServerTest {
 
   @Test
   public void testLoggerFileServer()
@@ -39,12 +39,12 @@ public class LoggerFileServerTest {
     File logRootDir = new File(FileUtils.getTempDirectory(), "testGetAllLoggers-" + System.currentTimeMillis());
     try {
       logRootDir.mkdirs();
-      LoggerFileServer loggerFileServer = new LoggerFileServer(logRootDir.getAbsolutePath());
+      LogFileServer logFileServer = new LocalLogFileServer(logRootDir.getAbsolutePath());
 
       // Empty root log directory
-      assertEquals(loggerFileServer.getAllPaths().size(), 0);
+      assertEquals(logFileServer.getAllLogFilePaths().size(), 0);
       try {
-        loggerFileServer.downloadLogFile("log1");
+        logFileServer.downloadLogFile("log1");
         Assert.fail("Shouldn't reach here");
       } catch (WebApplicationException e1) {
         assertEquals(e1.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
@@ -52,10 +52,10 @@ public class LoggerFileServerTest {
 
       // 1 file: [ log1 ] in root log directory
       FileUtils.writeStringToFile(new File(logRootDir, "log1"), "mylog1", Charset.defaultCharset());
-      assertEquals(loggerFileServer.getAllPaths().size(), 1);
-      assertNotNull(loggerFileServer.downloadLogFile("log1"));
+      assertEquals(logFileServer.getAllLogFilePaths().size(), 1);
+      assertNotNull(logFileServer.downloadLogFile("log1"));
       try {
-        loggerFileServer.downloadLogFile("log2");
+        logFileServer.downloadLogFile("log2");
         Assert.fail("Shouldn't reach here");
       } catch (WebApplicationException e1) {
         assertEquals(e1.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
@@ -63,11 +63,11 @@ public class LoggerFileServerTest {
 
       // 2 files: [ log1, log2 ] in root log directory
       FileUtils.writeStringToFile(new File(logRootDir, "log2"), "mylog2", Charset.defaultCharset());
-      assertEquals(loggerFileServer.getAllPaths().size(), 2);
-      assertNotNull(loggerFileServer.downloadLogFile("log1"));
-      assertNotNull(loggerFileServer.downloadLogFile("log2"));
+      assertEquals(logFileServer.getAllLogFilePaths().size(), 2);
+      assertNotNull(logFileServer.downloadLogFile("log1"));
+      assertNotNull(logFileServer.downloadLogFile("log2"));
       try {
-        loggerFileServer.downloadLogFile("log3");
+        logFileServer.downloadLogFile("log3");
         Assert.fail("Shouldn't reach here");
       } catch (WebApplicationException e1) {
         assertEquals(e1.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
