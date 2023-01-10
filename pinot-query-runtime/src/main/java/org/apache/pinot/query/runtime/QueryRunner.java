@@ -135,6 +135,7 @@ public class QueryRunner {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
       // server executor.
+      long leafStageStartMillis = System.currentTimeMillis();
       List<ServerPlanRequestContext> serverQueryRequests = constructServerQueryRequests(distributedStagePlan,
           requestMetadataMap, _helixPropertyStore, _mailboxService);
 
@@ -145,6 +146,8 @@ public class QueryRunner {
             new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
         serverQueryResults.add(processServerQuery(request, _scheduler.getWorkerPool()));
       }
+      LOGGER.debug("RequestId:", requestId, " StageId:", distributedStagePlan.getStageId(),
+          "Leaf stage processing time:", System.currentTimeMillis() - leafStageStartMillis, " ms");
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
