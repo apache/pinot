@@ -41,9 +41,12 @@ public class ShutDownFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext requestContext)
       throws IOException {
-    if (_shutDownInProgress.get() && !(requestContext.getMethod().equals("GET") && requestContext.getUriInfo().getPath()
-        .equals("health/liveness"))) {
-      throw new WebApplicationException("Server is shutting down", Response.Status.SERVICE_UNAVAILABLE);
+    // NOTE: Allow health check requests for liveness check
+    if (_shutDownInProgress.get() && !(requestContext.getUriInfo().getMatchedResources()
+        .get(0) instanceof HealthCheckResource)) {
+      String errMessage = "Server is shutting down";
+      throw new WebApplicationException(errMessage,
+          Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build());
     }
   }
 }

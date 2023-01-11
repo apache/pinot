@@ -41,29 +41,44 @@ public class HealthCheckResourceTest extends BaseResourceTest {
     when(mockFailureCallback.getServiceStatus()).thenReturn(ServiceStatus.Status.BAD);
 
     assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
-    assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 503);
-    assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 503);
-
-    ServiceStatus.setServiceStatusCallback(_instanceId, mockSuccessCallback);
-    assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
-    assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 200);
-    assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 200);
-
-    ServiceStatus.setServiceStatusCallback(_instanceId, mockFailureCallback);
-    assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(
+        _webTarget.path(healthPath).queryParam("checkType", "liveness").request().get(Response.class).getStatus(), 200);
     assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 503);
     assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 503);
     assertEquals(
         _webTarget.path(healthPath).queryParam("checkType", "readiness").request().get(Response.class).getStatus(),
         503);
+
+    ServiceStatus.setServiceStatusCallback(_instanceId, mockSuccessCallback);
+    assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
     assertEquals(
         _webTarget.path(healthPath).queryParam("checkType", "liveness").request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(
+        _webTarget.path(healthPath).queryParam("checkType", "readiness").request().get(Response.class).getStatus(),
+        200);
+
+    ServiceStatus.setServiceStatusCallback(_instanceId, mockFailureCallback);
+    assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(
+        _webTarget.path(healthPath).queryParam("checkType", "liveness").request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 503);
+    assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 503);
+    assertEquals(
+        _webTarget.path(healthPath).queryParam("checkType", "readiness").request().get(Response.class).getStatus(),
+        503);
 
     // Start shutting down the HTTP server, only liveness check should go through
     ServiceStatus.setServiceStatusCallback(_instanceId, mockSuccessCallback);
     _adminApiApplication.startShuttingDown();
     assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(
+        _webTarget.path(healthPath).queryParam("checkType", "liveness").request().get(Response.class).getStatus(), 200);
     assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 503);
     assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 503);
+    assertEquals(
+        _webTarget.path(healthPath).queryParam("checkType", "readiness").request().get(Response.class).getStatus(),
+        503);
   }
 }

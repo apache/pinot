@@ -23,6 +23,8 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.util.concurrent.atomic.AtomicBoolean;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.GET;
@@ -47,6 +49,9 @@ import org.apache.pinot.server.api.AdminApiApplication;
 public class HealthCheckResource {
 
   @Inject
+  private AtomicBoolean _shutDownInProgress;
+
+  @Inject
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
   private String _instanceId;
 
@@ -62,11 +67,12 @@ public class HealthCheckResource {
       @ApiResponse(code = 503, message = "Server is not healthy")
   })
   public String checkHealth(
-      @ApiParam(value = "health check type: liveness or readiness") @QueryParam("checkType") String checkType) {
+      @ApiParam(value = "health check type: liveness or readiness") @QueryParam("checkType") @Nullable
+      String checkType) {
     if ("liveness".equalsIgnoreCase(checkType)) {
-      return "OK";
+      return checkLiveness();
     } else {
-      return getReadinessStatus();
+      return checkReadiness();
     }
   }
 
@@ -92,10 +98,11 @@ public class HealthCheckResource {
       @ApiResponse(code = 503, message = "Server is not ready to serve queries")
   })
   public String checkReadiness() {
-    return getReadinessStatus();
-  }
-
-  private String getReadinessStatus() throws WebApplicationException {
+    if (_shutDownInProgress.get()) {
+      String errMessage = "Server is shutting down";
+      throw new WebApplicationException(errMessage,
+          Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build());
+    }
     Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == Status.GOOD) {
       _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
