@@ -270,10 +270,10 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
         + tableNameWithType) == expectedNumReplicas
         && MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.PERCENT_OF_REPLICAS.getGaugeName() + "."
         + tableNameWithType) == expectedPercentReplicas
-        && MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.SEGMENTS_IN_ERROR_STATE.getGaugeName() + "."
-        + tableNameWithType) == expectedSegmentsInErrorState
-        && MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName() + "."
-        + tableNameWithType) == expectedPercentSegmentsAvailable;
+        && MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.SEGMENTS_IN_ERROR_STATE.getGaugeName()
+        + "." + tableNameWithType) == expectedSegmentsInErrorState
+        && MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName()
+        + "." + tableNameWithType) == expectedPercentSegmentsAvailable;
   }
 
   @Test

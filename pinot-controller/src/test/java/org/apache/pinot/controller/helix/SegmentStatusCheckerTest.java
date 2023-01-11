@@ -153,21 +153,21 @@ public class SegmentStatusCheckerTest {
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-        ControllerGauge.REPLICATION_FROM_CONFIG.getGaugeName() + "." + tableName),2);
+        ControllerGauge.REPLICATION_FROM_CONFIG.getGaugeName() + "." + tableName), 2);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.SEGMENT_COUNT.getGaugeName() + "." + externalView.getId()),3);
+            ControllerGauge.SEGMENT_COUNT.getGaugeName() + "." + externalView.getId()), 3);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
             ControllerGauge.SEGMENT_COUNT_INCLUDING_REPLACED.getGaugeName() + "." + externalView.getId()), 5);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
             ControllerGauge.SEGMENTS_IN_ERROR_STATE.getGaugeName() + "." + externalView.getId()), 1);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.NUMBER_OF_REPLICAS.getGaugeName() + "." + externalView.getId()),2);
+            ControllerGauge.NUMBER_OF_REPLICAS.getGaugeName() + "." + externalView.getId()), 2);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
             ControllerGauge.PERCENT_OF_REPLICAS.getGaugeName() + "." + externalView.getId()), 66);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName() + "." + externalView.getId()),100);
+            ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName() + "." + externalView.getId()), 100);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.TABLE_COMPRESSED_SIZE.getGaugeName() + "." + externalView.getId()),0);
+            ControllerGauge.TABLE_COMPRESSED_SIZE.getGaugeName() + "." + externalView.getId()), 0);
   }
 
   @Test
@@ -250,7 +250,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
             ControllerGauge.PERCENT_OF_REPLICAS.getGaugeName() + "." + externalView.getId()), 100);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName() + "." + externalView.getId()),100);
+            ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName() + "." + externalView.getId()), 100);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
             ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT.getGaugeName() + "." + externalView.getId()), 2);
   }
@@ -348,7 +348,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
             ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName() + "." + externalView.getId()), 75);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.TABLE_COMPRESSED_SIZE.getGaugeName() + "." + externalView.getId()),1111);
+            ControllerGauge.TABLE_COMPRESSED_SIZE.getGaugeName() + "." + externalView.getId()), 1111);
   }
 
   @Test
@@ -401,9 +401,9 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
             ControllerGauge.SEGMENTS_IN_ERROR_STATE.getGaugeName() + "." + tableName), 0);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.NUMBER_OF_REPLICAS.getGaugeName() + "." + tableName),0);
+            ControllerGauge.NUMBER_OF_REPLICAS.getGaugeName() + "." + tableName), 0);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.TABLE_COMPRESSED_SIZE.getGaugeName() + "." + tableName),0);
+            ControllerGauge.TABLE_COMPRESSED_SIZE.getGaugeName() + "." + tableName), 0);
   }
 
   @Test
@@ -540,7 +540,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
             ControllerGauge.PERCENT_OF_REPLICAS.getGaugeName() + "." + externalView.getId()), 100);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName() + "." + externalView.getId()),100);
+            ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName() + "." + externalView.getId()), 100);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
             ControllerGauge.TABLE_COMPRESSED_SIZE.getGaugeName() + "." + externalView.getId()), 0);
   }
@@ -589,7 +589,7 @@ public class SegmentStatusCheckerTest {
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE.getGaugeName() + "." + tableName),0);
+        ControllerGauge.SEGMENTS_IN_ERROR_STATE.getGaugeName() + "." + tableName), 0);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
             ControllerGauge.NUMBER_OF_REPLICAS.getGaugeName() + "." + tableName), 1);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
@@ -745,8 +745,8 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
         ControllerGauge.NUMBER_OF_REPLICAS.getGaugeName() + "." + tableName), nReplicasExpectedValue);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-        ControllerGauge.PERCENT_OF_REPLICAS.getGaugeName() + "." + tableName),100);
+        ControllerGauge.PERCENT_OF_REPLICAS.getGaugeName() + "." + tableName), 100);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerMetrics,
-        ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName() + "." + tableName),100);
+        ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName() + "." + tableName), 100);
   }
 }
