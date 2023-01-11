@@ -19,20 +19,26 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemoryMailboxService implements MailboxService<TransferableBlock> {
+  private static final Duration MAILBOX_CACHE_EXPIRY = Duration.ofMinutes(5);
   // channel manager
   private final String _hostname;
   private final int _mailboxPort;
   private final Consumer<MailboxIdentifier> _receivedMailContentCallback;
 
-  private final ConcurrentHashMap<String, InMemoryMailboxState> _mailboxStateMap = new ConcurrentHashMap<>();
+  private final Cache<String, InMemoryMailboxState> _mailboxStateCache =
+      CacheBuilder.newBuilder().expireAfterAccess(MAILBOX_CACHE_EXPIRY.toMinutes(), TimeUnit.MINUTES).build();
 
   public InMemoryMailboxService(String hostname, int mailboxPort,
       Consumer<MailboxIdentifier> receivedMailContentCallback) {
@@ -61,22 +67,27 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
 
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
-    String mId = mailboxId.toString();
-    return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._sendingMailbox;
+    return getMailboxState(mailboxId.toString())._sendingMailbox;
   }
 
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
-    String mId = mailboxId.toString();
-    return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._receivingMailbox;
+    return getMailboxState(mailboxId.toString())._receivingMailbox;
   }
 
-  InMemoryMailboxState newMailboxState(String mailboxId) {
-    BlockingQueue<TransferableBlock> queue = createDefaultChannel();
-    return new InMemoryMailboxState(
-        new InMemorySendingMailbox(mailboxId, queue, _receivedMailContentCallback),
-        new InMemoryReceivingMailbox(mailboxId, queue),
-        queue);
+  private InMemoryMailboxState getMailboxState(String mailboxId) {
+    try {
+      return _mailboxStateCache.get(mailboxId, () -> {
+        BlockingQueue<TransferableBlock> queue = createDefaultChannel();
+        InMemoryMailboxState mailboxState = new InMemoryMailboxState(
+            new InMemorySendingMailbox(mailboxId, queue, _receivedMailContentCallback),
+            new InMemoryReceivingMailbox(mailboxId, queue),
+            queue);
+        return mailboxState;
+      });
+    } catch (ExecutionException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private BlockingQueue<TransferableBlock> createDefaultChannel() {

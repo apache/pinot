@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import io.grpc.ManagedChannel;
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.Duration;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -44,16 +48,17 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * </ul>
  */
 public class GrpcMailboxService implements MailboxService<TransferableBlock> {
+  private static final Duration MAILBOX_CACHE_EXPIRY = Duration.ofMinutes(5);
   // channel manager
   private final ChannelManager _channelManager;
   private final String _hostname;
   private final int _mailboxPort;
 
   // maintaining a list of registered mailboxes.
-  private final ConcurrentHashMap<String, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap =
-      new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap =
-      new ConcurrentHashMap<>();
+  private final Cache<String, ReceivingMailbox<TransferableBlock>> _receivingMailboxCache =
+      CacheBuilder.newBuilder().expireAfterAccess(MAILBOX_CACHE_EXPIRY.toMinutes(), TimeUnit.MINUTES).build();
+  private final Cache<String, SendingMailbox<TransferableBlock>> _sendingMailboxCache =
+      CacheBuilder.newBuilder().expireAfterAccess(MAILBOX_CACHE_EXPIRY.toMinutes(), TimeUnit.MINUTES).build();
   private final Consumer<MailboxIdentifier> _gotMailCallback;
 
   public GrpcMailboxService(String hostname, int mailboxPort, PinotConfiguration extraConfig,
@@ -89,7 +94,12 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * @param mailboxId the id of the mailbox.
    */
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
-    return _sendingMailboxMap.computeIfAbsent(mailboxId.toString(), (mId) -> new GrpcSendingMailbox(mId, this));
+    try {
+      return _sendingMailboxCache.get(mailboxId.toString(),
+          () -> new GrpcSendingMailbox(mailboxId.toString(), this));
+    } catch (ExecutionException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**
@@ -97,8 +107,12 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * @param mailboxId the id of the mailbox.
    */
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
-    return _receivingMailboxMap.computeIfAbsent(
-        mailboxId.toString(), (mId) -> new GrpcReceivingMailbox(mId, this, _gotMailCallback));
+    try {
+      return _receivingMailboxCache.get(mailboxId.toString(),
+          () -> new GrpcReceivingMailbox(mailboxId.toString(), this, _gotMailCallback));
+    } catch (ExecutionException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public ManagedChannel getChannel(String mailboxId) {
