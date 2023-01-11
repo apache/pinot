@@ -247,7 +247,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public PinotMeter addMeteredValue(final String key, final M meter, final long unitCount, PinotMeter reusedMeter) {
     String meterName = meter.getMeterName();
-    final String fullMeterName = _metricPrefix + meterName;
+    final String fullMeterName = _metricPrefix + key + "." + meterName;
     return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
   }
 
