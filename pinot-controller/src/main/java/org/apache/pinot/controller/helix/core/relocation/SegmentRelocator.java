@@ -72,6 +72,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final HttpConnectionManager _connectionManager;
   private final boolean _enableLocalTierMigration;
   private final int _timeoutMs;
+  private final long _externalViewCheckIntervalInMs;
+  private final long _externalViewStabilizationTimeoutInMs;
 
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
@@ -83,6 +85,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     _connectionManager = connectionManager;
     _enableLocalTierMigration = config.enableSegmentRelocatorLocalTierMigration();
     _timeoutMs = config.getServerAdminRequestTimeoutSeconds() * 1000;
+    _externalViewCheckIntervalInMs = config.getSegmentRelocatorExternalViewCheckIntervalInMs();
+    _externalViewStabilizationTimeoutInMs = config.getSegmentRelocatorExternalViewStabilizationTimeoutInMs();
   }
 
   @Override
@@ -118,6 +122,10 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     // Allow at most one replica unavailable during relocation
     Configuration rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, -1);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
+        _externalViewCheckIntervalInMs);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
+        _externalViewStabilizationTimeoutInMs);
     // Run rebalance asynchronously
     _executorService.submit(() -> {
       try {

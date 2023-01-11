@@ -32,6 +32,7 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
@@ -196,6 +197,10 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segmentRelocator.initialDelayInSeconds";
     public static final String SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION =
         "controller.segmentRelocator.enableLocalTierMigration";
+    public static final String SEGMENT_RELOCATOR_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS =
+        "controller.segmentRelocator.externalViewStabilizationTimeoutInMs";
+    public static final String SEGMENT_RELOCATOR_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS =
+        "controller.segmentRelocator.externalViewCheckIntervalInMs";
 
     // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
     // Default value is false.
@@ -910,6 +915,16 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean enableSegmentRelocatorLocalTierMigration() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION, false);
+  }
+
+  public long getSegmentRelocatorExternalViewCheckIntervalInMs() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
+        RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS);
+  }
+
+  public long getSegmentRelocatorExternalViewStabilizationTimeoutInMs() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
+        RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
   }
 
   public long getPeriodicTaskInitialDelayInSeconds() {
