@@ -21,7 +21,8 @@ package org.apache.pinot.query.mailbox.channel;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -59,7 +60,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private final boolean _isEnabledFeedback;
 
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
-  private final ArrayBlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
+  private final BlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
 
   ReadWriteLock _errorLock = new ReentrantReadWriteLock();
   private Mailbox.MailboxContent _errorContent = null; // Guarded by _errorLock.
@@ -75,7 +76,8 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
       StreamObserver<Mailbox.MailboxStatus> responseObserver, boolean isEnabledFeedback) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
-    _receivingBuffer = new ArrayBlockingQueue<>(DEFAULT_MAILBOX_QUEUE_CAPACITY);
+    // TODO: Replace unbounded queue with bounded queue when we have backpressure in place.
+    _receivingBuffer = new LinkedBlockingQueue();
     _isEnabledFeedback = isEnabledFeedback;
   }
 
