@@ -56,7 +56,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
-    String segmentName = _segmentMetadata.getName();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
     // Check if any existing index need to be removed.
@@ -68,7 +68,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
     }
     // Check if any new index need to be added.
     for (String column : columnsToAddIdx) {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateRangeIndex(columnMetadata)) {
         LOGGER.info("Need to create new range index for segment: {}, column: {}", segmentName, column);
         return true;
@@ -81,7 +81,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
   public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
       throws IOException {
     // Remove indices not set in table config any more
-    String segmentName = _segmentMetadata.getName();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
     for (String column : existingColumns) {
@@ -92,7 +92,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
       }
     }
     for (String column : columnsToAddIdx) {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateRangeIndex(columnMetadata)) {
         createRangeIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider, indexCreatorProvider);
       }
@@ -107,8 +107,8 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private void createRangeIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
       RangeIndexCreatorProvider rangeIndexCreatorProvider, IndexCreatorProvider indexCreatorProvider)
       throws IOException {
-    File indexDir = _segmentMetadata.getIndexDir();
-    String segmentName = _segmentMetadata.getName();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
     File inProgress = new File(indexDir, columnName + ".range.inprogress");
     File rangeIndexFile = new File(indexDir, columnName + V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
@@ -136,7 +136,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
     }
 
     // For v3, write the generated range index file into the single file and remove it.
-    if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
+    if (_segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3) {
       LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, rangeIndexFile, ColumnIndexType.RANGE_INDEX);
     }
 
@@ -246,7 +246,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata,
       RangeIndexCreatorProvider indexCreatorProvider)
       throws IOException {
-    File indexDir = _segmentMetadata.getIndexDir();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     return indexCreatorProvider.newRangeIndexCreator(
         IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
             .forRangeIndex(_rangeIndexVersion));
