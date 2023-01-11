@@ -39,7 +39,11 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
-
+/**
+ * Base class for Distinct Aggregate functions that require collecting all distinct elements in a set before
+ * performing the aggregate computation. This is used by DistinctSum, DistinctAvg and DistinctCount aggregation
+ * functions.
+ */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseDistinctAggregateAggregationFunction<T extends Comparable>
     extends BaseSingleInputAggregationFunction<Set, T> {

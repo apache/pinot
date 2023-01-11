@@ -23,7 +23,9 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
-
+/**
+ * Aggregation function to compute the sum of distinct values.
+ */
 public class DistinctSumAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
   public DistinctSumAggregationFunction(ExpressionContext expression) {

@@ -91,6 +91,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT MAX(column1) AS v1, MAX(column3) AS v2 FROM testTable";
 
     // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
@@ -119,6 +120,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT MIN(column1) AS v1, MIN(column3) AS v2 FROM testTable";
 
     // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
@@ -203,6 +205,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT MINMAXRANGE(column1) AS v1, MINMAXRANGE(column3) AS v2 FROM testTable";
 
     // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
@@ -231,6 +234,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT DISTINCTCOUNT(column1) AS v1, DISTINCTCOUNT(column3) AS v2 FROM testTable";
 
     // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
@@ -256,6 +260,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT DISTINCTCOUNTHLL(column1) AS v1, DISTINCTCOUNTHLL(column3) AS v2 FROM testTable";
 
     // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.LONG});
@@ -283,6 +288,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         value -> ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) value)).cardinality();
 
     // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.LONG});
@@ -574,6 +580,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "select DISTINCTSUM(column1) as v1, DISTINCTSUM(column3) as v2 from testTable";
 
     // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
@@ -602,6 +609,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "select DISTINCTAVG(column1) as v1, DISTINCTAVG(column3) as v2 from testTable";
 
     // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"v1", "v2"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});

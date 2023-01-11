@@ -23,8 +23,9 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
-
-@SuppressWarnings({"rawtypes", "unchecked"})
+/**
+ * Aggregation function to compute the average of distinct values.
+ */
 public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
 
   public DistinctCountAggregationFunction(ExpressionContext expression) {
