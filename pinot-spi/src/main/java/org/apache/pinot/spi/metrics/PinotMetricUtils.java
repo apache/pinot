@@ -196,8 +196,8 @@ public class PinotMetricUtils {
   public static void cleanUp() {
     if (_pinotMetricsFactory != null) {
       _pinotMetricsFactory.getPinotMetricsRegistry().shutdown();
+      _pinotMetricsFactory = null;
     }
-    _pinotMetricsFactory = null;
   }
 
   /**
