@@ -35,7 +35,6 @@ import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.BloomFilterCreatorProvider;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -60,14 +59,14 @@ public class BloomFilterHandler extends BaseIndexHandler {
 
   private final Map<String, BloomFilterConfig> _bloomFilterConfigs;
 
-  public BloomFilterHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentMetadata, indexLoadingConfig);
+  public BloomFilterHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+    super(segmentDirectory, indexLoadingConfig);
     _bloomFilterConfigs = indexLoadingConfig.getBloomFilterConfigs();
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
-    String segmentName = _segmentMetadata.getName();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
     // Check if any existing bloomfilter need to be removed.
@@ -79,7 +78,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
     }
     // Check if any new bloomfilter need to be added.
     for (String column : columnsToAddBF) {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateBloomFilter(columnMetadata)) {
         LOGGER.info("Need to create new bloom filter for segment: {}, column: {}", segmentName, column);
         return true;
@@ -93,7 +92,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
       throws Exception {
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
     // Remove indices not set in table config any more.
-    String segmentName = _segmentMetadata.getName();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
     for (String column : existingColumns) {
       if (!columnsToAddBF.remove(column)) {
@@ -103,7 +102,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
       }
     }
     for (String column : columnsToAddBF) {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateBloomFilter(columnMetadata)) {
         createBloomFilterForColumn(segmentWriter, columnMetadata, indexCreatorProvider, indexCreatorProvider);
       }
@@ -247,8 +246,8 @@ public class BloomFilterHandler extends BaseIndexHandler {
   private void createBloomFilterForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
       BloomFilterCreatorProvider bloomFilterCreatorProvider, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
-    File indexDir = _segmentMetadata.getIndexDir();
-    String segmentName = _segmentMetadata.getName();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
     File bloomFilterFileInProgress = new File(indexDir, columnName + ".bloom.inprogress");
     File bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
@@ -265,7 +264,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
 
     if (!columnMetadata.hasDictionary()) {
       // Create a temporary forward index if it is disabled and does not exist
-      createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+      columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, indexCreatorProvider, true);
     }
 
     // Create new bloom filter for the column.
@@ -281,7 +280,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
     }
 
     // For v3, write the generated bloom filter file into the single file and remove it.
-    if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
+    if (_segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3) {
       LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, bloomFilterFile, ColumnIndexType.BLOOM_FILTER);
     }
 
