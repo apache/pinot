@@ -162,7 +162,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       String textIndexCol1, int rawCol1) {
 
     GenericRow record = new GenericRow();
-    record.putValue(COL1_RAW, noIndexCol1);
+    record.putValue(COL1_RAW, rawCol1);
 
     record.putValue(COL1_NO_INDEX, noIndexCol1);
     record.putValue(COL2_NO_INDEX, noIndexCol2);
@@ -373,13 +373,13 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, "
             + "noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, "
-            + "sortedIndexCol1, textIndexCol1)", 3, 2});
+            + "rawCol1, sortedIndexCol1, textIndexCol1)", 3, 2});
     result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, "
         + "jsonIndexCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, "
-        + "rangeIndexCol3, sortedIndexCol1, textIndexCol1)", 4, 3});
-    result1.add(new Object[]{"PROJECT(noIndexCol4, sortedIndexCol1, noIndexCol3, rangeIndexCol1, rangeIndexCol2, "
-        + "invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, rangeIndexCol3, textIndexCol1, "
-        + "jsonIndexCol1, invertedIndexCol3)", 5, 4});
+        + "rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1)", 4, 3});
+    result1.add(new Object[]{"PROJECT(noIndexCol4, rawCol1, sortedIndexCol1, noIndexCol3, rangeIndexCol1, "
+        + "rangeIndexCol2, invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, rangeIndexCol3, "
+        + "textIndexCol1, jsonIndexCol1, invertedIndexCol3)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
@@ -437,13 +437,13 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, "
             + "noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, "
-            + "sortedIndexCol1, textIndexCol1)", 3, 2});
+            + "rawCol1, sortedIndexCol1, textIndexCol1)", 3, 2});
     result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, "
         + "jsonIndexCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, "
-        + "rangeIndexCol3, sortedIndexCol1, textIndexCol1)", 4, 3});
-    result1.add(new Object[]{"PROJECT(noIndexCol4, sortedIndexCol1, noIndexCol3, rangeIndexCol1, rangeIndexCol2, "
-        + "invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, rangeIndexCol3, textIndexCol1, "
-        + "jsonIndexCol1, invertedIndexCol3)", 5, 4});
+        + "rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1)", 4, 3});
+    result1.add(new Object[]{"PROJECT(noIndexCol4, rawCol1, sortedIndexCol1, noIndexCol3, rangeIndexCol1, "
+        + "rangeIndexCol2, invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, rangeIndexCol3, "
+        + "textIndexCol1, jsonIndexCol1, invertedIndexCol3)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
