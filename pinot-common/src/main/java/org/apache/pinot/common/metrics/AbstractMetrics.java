@@ -536,12 +536,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   /**
    * @deprecated please use setOrUpdateTableGauge(final String tableName, final String key, final G gauge,
-   * final long value) instead.
+   *     final Supplier<Long> valueSupplier) instead.
    *
    * Install a per-partition table gauge if needed.
    *
    * @param tableName The table name
-   * @param partitionId The partition name
+   * @param partitionId The partition id
    * @param gauge The gauge to use
    * @param valueCallback the callback function to be called while reading the metric.
    */
@@ -708,15 +708,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
 
   /**
+   * @deprecated please use removeTableGauge(final String tableName, final String key, final G gauge) instead
+   *
    * Removes a table gauge given the table name and the gauge.
    * The add/remove is expected to work correctly in case of being invoked across multiple threads.
    * @param tableName table name
+   * @param partitionId The partition id
    * @param gauge the gauge to be removed
    */
   public void removePartitionGauge(final String tableName, final int partitionId, final G gauge) {
-    final String fullGaugeName;
-    String gaugeName = gauge.getGaugeName();
-    fullGaugeName = gaugeName + "." + getTableName(tableName) + "." + partitionId;
+    final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
     removeGauge(fullGaugeName);
   }
 
