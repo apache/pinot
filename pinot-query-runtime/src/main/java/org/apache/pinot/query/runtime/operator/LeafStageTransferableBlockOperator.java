@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -56,7 +57,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  *       thus requires canonicalization.</li>
  * </ul>
  */
-public class LeafStageTransferableBlockOperator extends BaseOperator<TransferableBlock> {
+public class LeafStageTransferableBlockOperator extends V2Operator {
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
 
   private final InstanceResponseBlock _errorBlock;
@@ -72,8 +73,8 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    return null;
+  public List<V2Operator> getV2ChildOperators() {
+    return ImmutableList.of();
   }
 
   @Nullable

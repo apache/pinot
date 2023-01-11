@@ -46,7 +46,7 @@ public class TransformOperatorTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private Operator<TransferableBlock> _upstreamOp;
+  private V2Operator _upstreamOp;
 
   @BeforeMethod
   public void setUp() {

@@ -21,6 +21,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,7 +35,6 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Key;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
@@ -56,7 +56,7 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
  * The output is in the format of [left_row, right_row]
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
-public class HashJoinOperator extends BaseOperator<TransferableBlock> {
+public class HashJoinOperator extends V2Operator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES =
       ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL);
@@ -68,8 +68,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   // TODO: Replace hashset with rolling bit map.
   private final HashMap<Key, HashSet<Integer>> _matchedRightRows;
 
-  private final Operator<TransferableBlock> _leftTableOperator;
-  private final Operator<TransferableBlock> _rightTableOperator;
+  private final V2Operator _leftTableOperator;
+  private final V2Operator _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
   private final int _leftRowSize;
@@ -85,7 +85,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
-  public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
+  public HashJoinOperator(V2Operator leftTableOperator, V2Operator rightTableOperator,
       DataSchema leftSchema, JoinNode node) {
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
@@ -116,10 +116,10 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     _upstreamErrorBlock = null;
   }
 
+  // TODO: Separate left and right table operator.
   @Override
-  public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+  public List<V2Operator> getV2ChildOperators() {
+    return ImmutableList.of(_leftTableOperator, _rightTableOperator);
   }
 
   @Nullable

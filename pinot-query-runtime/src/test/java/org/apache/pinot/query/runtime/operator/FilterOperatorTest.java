@@ -41,7 +41,7 @@ import org.testng.annotations.Test;
 public class FilterOperatorTest {
   private AutoCloseable _mocks;
   @Mock
-  private Operator<TransferableBlock> _upstreamOperator;
+  private V2Operator _upstreamOperator;
 
   @BeforeMethod
   public void setUp() {

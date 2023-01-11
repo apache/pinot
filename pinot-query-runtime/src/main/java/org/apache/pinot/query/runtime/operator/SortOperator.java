@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,9 +36,9 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 
 
-public class SortOperator extends BaseOperator<TransferableBlock> {
+public class SortOperator extends V2Operator {
   private static final String EXPLAIN_NAME = "SORT";
-  private final Operator<TransferableBlock> _upstreamOperator;
+  private final V2Operator _upstreamOperator;
   private final int _fetch;
   private final int _offset;
   private final DataSchema _dataSchema;
@@ -48,14 +49,14 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
 
-  public SortOperator(Operator<TransferableBlock> upstreamOperator, List<RexExpression> collationKeys,
+  public SortOperator(V2Operator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema) {
     this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
         SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY);
   }
 
   @VisibleForTesting
-  SortOperator(Operator<TransferableBlock> upstreamOperator, List<RexExpression> collationKeys,
+  SortOperator(V2Operator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
       int maxHolderCapacity) {
     _upstreamOperator = upstreamOperator;
@@ -72,9 +73,8 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+  public List<V2Operator> getV2ChildOperators() {
+    return ImmutableList.of(_upstreamOperator);
   }
 
   @Nullable

@@ -71,6 +71,10 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     LOGGER.info("Triggered shutdown on OpChainScheduler...");
     // this will just notify all waiters that the scheduler is shutting down
     _monitor.enter();
+    while(_scheduler.hasNext()){
+      OpChain operatorChain = _scheduler.next();
+      operatorChain.close();
+    }
     _monitor.leave();
   }
 
@@ -111,8 +115,10 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                   } else {
                     LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
                   }
+                  operatorChain.close();
                 }
               } catch (Exception e) {
+                operatorChain.close();
                 LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
               }
             }

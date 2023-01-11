@@ -46,7 +46,7 @@ public class SortOperatorTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private Operator<TransferableBlock> _input;
+  private V2Operator _input;
 
   @BeforeMethod
   public void setUp() {

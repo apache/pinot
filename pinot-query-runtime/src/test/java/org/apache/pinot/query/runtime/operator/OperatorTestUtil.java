@@ -51,7 +51,7 @@ public class OperatorTestUtil {
   private OperatorTestUtil() {
   }
 
-  public static BaseOperator<TransferableBlock> getOperator(String operatorName) {
+  public static V2Operator getOperator(String operatorName) {
     return MOCK_OPERATOR_FACTORY.buildMockOperator(operatorName);
   }
 

@@ -25,6 +25,7 @@ import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.V2Operator;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -39,7 +40,7 @@ public class RoundRobinSchedulerTest {
   private static final MailboxIdentifier MAILBOX_2 = new StringMailboxIdentifier("1_2:foo:2:bar:3");
 
   @Mock
-  private Operator<TransferableBlock> _operator;
+  private V2Operator _operator;
 
   private AutoCloseable _mocks;
 
