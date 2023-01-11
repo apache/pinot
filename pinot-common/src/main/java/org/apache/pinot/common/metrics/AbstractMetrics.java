@@ -414,7 +414,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(value));
-          addCallbackGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
+          setOrUpdateGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
         } else {
           _gaugeValues.get(gaugeName).set(value);
         }
@@ -438,13 +438,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(unitCount));
-          addCallbackGauge(gaugeName, new Callable<Long>() {
-            @Override
-            public Long call()
-                throws Exception {
-              return _gaugeValues.get(gaugeName).get();
-            }
-          });
+          setOrUpdateGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
         } else {
           _gaugeValues.get(gaugeName).addAndGet(unitCount);
         }

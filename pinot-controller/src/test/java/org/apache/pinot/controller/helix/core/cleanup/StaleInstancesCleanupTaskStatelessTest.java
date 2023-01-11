@@ -24,6 +24,7 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -42,6 +43,7 @@ public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
   @Test
   public void testStaleInstancesCleanupTaskForBrokers()
       throws Exception {
+    PinotMetricUtils.cleanUp();
     StaleInstancesCleanupTask staleInstancesCleanupTask = _controllerStarter.getStaleInstancesCleanupTask();
     staleInstancesCleanupTask.runTask(new Properties());
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
@@ -69,6 +71,7 @@ public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
   @Test
   public void testStaleInstancesCleanupTaskForServers()
       throws Exception {
+    PinotMetricUtils.cleanUp();
     StaleInstancesCleanupTask staleInstancesCleanupTask = _controllerStarter.getStaleInstancesCleanupTask();
     staleInstancesCleanupTask.runTask(new Properties());
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
@@ -96,6 +99,7 @@ public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
   @Test
   public void testStaleInstancesCleanupTaskForMinions()
       throws Exception {
+    PinotMetricUtils.cleanUp();
     StaleInstancesCleanupTask staleInstancesCleanupTask = _controllerStarter.getStaleInstancesCleanupTask();
     staleInstancesCleanupTask.runTask(new Properties());
     Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
