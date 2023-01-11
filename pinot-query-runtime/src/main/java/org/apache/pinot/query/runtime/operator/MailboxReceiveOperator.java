@@ -167,8 +167,8 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
           }
         }
       } catch (Exception e) {
-        // TODO: Handle this exception.
-        LOGGER.error(String.format("Error receiving data from mailbox %s", mailboxId), e);
+        return TransferableBlockUtils.getErrorTransferableBlock(
+            new RuntimeException(String.format("Error polling mailbox=%s", mailboxId), e));
       }
     }
 
