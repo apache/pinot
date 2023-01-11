@@ -1783,13 +1783,152 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testInvalidDistinctCountRewrite() {
+  public void testDistinctSumRewrite() {
     String query = "SELECT sum(distinct bar) FROM foo";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctsum");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT sum(distinct bar) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctsum");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT sum(distinct bar), distinctSum(bar) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctsum");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getFunctionCall().getOperator(), "distinctsum");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT sum(distinct bar), count(*), sum(a),min(a),max(b) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 5);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctsum");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT sum(distinct bar) AS distinct_bar, count(*), sum(a),min(a),max(b) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 5);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "as");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "distinctsum");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
+        "distinct_bar");
+
+    query = "SELECT sum(distinct bar) AS distinct_bar, count(*), sum(a),min(a),max(b) FROM foo GROUP BY city ORDER BY "
+            + "distinct_bar";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 5);
+    Function selectFunctionCall = pinotQuery.getSelectList().get(0).getFunctionCall();
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "as");
+    Assert.assertEquals(selectFunctionCall.getOperands().get(0).getFunctionCall().getOperator(), "distinctsum");
+    Assert.assertEquals(
+        selectFunctionCall.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "bar");
+    Assert.assertEquals(selectFunctionCall.getOperands().get(1).getIdentifier().getName(), "distinct_bar");
+    Assert.assertEquals(pinotQuery.getOrderByList().size(), 1);
+    Function orderbyFunctionCall = pinotQuery.getOrderByList().get(0).getFunctionCall();
+    Assert.assertEquals(orderbyFunctionCall.getOperator(), "asc");
+    Assert.assertEquals(orderbyFunctionCall.getOperands().get(0).getFunctionCall().getOperator(), "distinctsum");
+    Assert.assertEquals(
+        orderbyFunctionCall.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "bar");
+  }
+
+  @Test
+  public void testDistinctAvgRewrite() {
+    String query = "SELECT avg(distinct bar) FROM foo";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctavg");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT avg(distinct bar) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctavg");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT avg(distinct bar), distinctAvg(bar) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctavg");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getFunctionCall().getOperator(), "distinctavg");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT avg(distinct bar), count(*), avg(a),min(a),max(b) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 5);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctavg");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT avg(distinct bar) AS distinct_bar, count(*), avg(a),min(a),max(b) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 5);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "as");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "distinctavg");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
+        "distinct_bar");
+
+    query = "SELECT avg(distinct bar) AS distinct_bar, count(*), avg(a),min(a),max(b) FROM foo GROUP BY city ORDER BY"
+        + " distinct_bar";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 5);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "as");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "distinctavg");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
+        "distinct_bar");
+    Assert.assertEquals(pinotQuery.getOrderByList().size(), 1);
+    Function orderbyFunctionCall = pinotQuery.getOrderByList().get(0).getFunctionCall();
+    Assert.assertEquals(orderbyFunctionCall.getOperator(), "asc");
+    Assert.assertEquals(orderbyFunctionCall.getOperands().get(0).getFunctionCall().getOperator(), "distinctavg");
+    Assert.assertEquals(
+        orderbyFunctionCall.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "bar");
+  }
+
+  @Test
+  public void testInvalidDistinctAggregationRewrite() {
+    String query = "SELECT max(distinct bar) FROM foo";
     try {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertEquals(e.getMessage(), "Function 'sum' on DISTINCT is not supported.");
+      Assert.assertEquals(e.getMessage(), "Function 'max' on DISTINCT is not supported.");
     }
   }
 

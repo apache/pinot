@@ -113,6 +113,12 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
           result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
               ((DistinctCountRawHLLAggregationFunction) aggregationFunction).getDistinctCountHLLAggregationFunction());
           break;
+        case DISTINCTSUM:
+          result = getDistinctValueSet(Objects.requireNonNull(dataSource.getDictionary()));
+          break;
+        case DISTINCTAVG:
+          result = getDistinctValueSet(Objects.requireNonNull(dataSource.getDictionary()));
+          break;
         case SEGMENTPARTITIONEDDISTINCTCOUNT:
           result = (long) Objects.requireNonNull(dataSource.getDictionary()).length();
           break;

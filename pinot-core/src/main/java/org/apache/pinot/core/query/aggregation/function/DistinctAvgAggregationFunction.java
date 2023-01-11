@@ -20,25 +20,31 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 /**
  * Aggregation function to compute the average of distinct values.
  */
-public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
+public class DistinctAvgAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
-  public DistinctCountAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTCOUNT);
+  public DistinctAvgAggregationFunction(ExpressionContext expression) {
+    super(expression, AggregationFunctionType.DISTINCTAVG);
   }
 
   @Override
-  public ColumnDataType getFinalResultColumnType() {
-    return ColumnDataType.INT;
+  public DataSchema.ColumnDataType getFinalResultColumnType() {
+    return DataSchema.ColumnDataType.DOUBLE;
   }
 
   @Override
-  public Integer extractFinalResult(Set intermediateResult) {
-    return intermediateResult.size();
+  public Double extractFinalResult(Set intermediateResult) {
+    Double distinctSum = 0.0;
+
+    for (Object obj : intermediateResult) {
+      distinctSum += ((Number) obj).doubleValue();
+    }
+    Double distinctAvg = distinctSum / intermediateResult.size();
+    return distinctAvg;
   }
 }
