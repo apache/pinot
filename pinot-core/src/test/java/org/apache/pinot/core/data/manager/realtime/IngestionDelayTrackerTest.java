@@ -60,12 +60,13 @@ public class IngestionDelayTrackerTest {
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelay(0), 0);
     // Test bad timer args to the constructor
     try {
-      ingestionDelayTracker =
-          new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
+      new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
               realtimeTableDataManager, 0, () -> true);
-      Assert.assertTrue(false); // Constructor must assert
+      Assert.fail("Must have asserted due to invalid arguments"); // Constructor must assert
     } catch (Exception e) {
-      Assert.assertTrue(e instanceof RuntimeException);
+      if ((e instanceof NullPointerException) || !(e instanceof RuntimeException)) {
+        Assert.fail(String.format("Unexpected exception: %s:%s", e.getClass(), e.getMessage()));
+      }
     }
   }
 
@@ -177,7 +178,7 @@ public class IngestionDelayTrackerTest {
     }
     // Verify that as we remove partitions the next available maximum takes over
     for (int partitionGroupId = maxPartition; partitionGroupId >= 0; partitionGroupId--) {
-      ingestionDelayTracker.stopTrackingPartitionIngestionDelay((int) partitionGroupId);
+      ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionGroupId);
     }
     for (int partitionGroupId = 0; partitionGroupId <= maxTestDelay; partitionGroupId++) {
       // Untracked partitions must return 0

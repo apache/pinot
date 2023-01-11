@@ -22,6 +22,8 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -35,23 +37,20 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * A Class to track realtime ingestion delay for a given table on a given server.
+ * A Class to track realtime ingestion delay for table partitions on a given server.
  * Highlights:
  * 1-An object of this class is hosted by each RealtimeTableDataManager.
  * 2-The object tracks ingestion delays for all partitions hosted by the current server for the given Realtime table.
  * 3-Partition delays are updated by all LLRealtimeSegmentDataManager objects hosted in the corresponding
  *   RealtimeTableDataManager.
- * 4-A Metric is derived from reading the maximum tracked by this class. In addition, individual metrics are associated
- *   with each partition being tracked.
- * 5-Delays reported for partitions that do not have events to consume are reported as zero.
- * 6-We track the time at which each delay sample was collected so that delay can be increased when partition stops
- *   consuming for any reason other than no events being available for consumption.
- * 7-Partitions whose Segments go from CONSUMING to DROPPED state stop being tracked so their delays do not cloud
+ * 4-Individual metrics are associated with each partition being tracked.
+ * 5-Delays for partitions that do not have events to consume are reported as zero.
+ * 6-Partitions whose Segments go from CONSUMING to DROPPED state stop being tracked so their delays do not cloud
  *   delays of active partitions.
- * 8-When a segment goes from CONSUMING to ONLINE, we start a timeout for the corresponding partition.
+ * 7-When a segment goes from CONSUMING to ONLINE, we start a timeout for the corresponding partition.
  *   If no consumption is noticed after the timeout, we then read ideal state to confirm the server still hosts the
  *   partition. If not, we stop tracking the respective partition.
- * 9-A timer thread is started by this object to track timeouts of partitions and drive the reading of their ideal
+ * 8-A timer thread is started by this object to track timeouts of partitions and drive the reading of their ideal
  *  state.
  *
  *  The following diagram illustrates the object interactions with main external APIs
@@ -85,12 +84,12 @@ public class IngestionDelayTracker {
   private static final int INITIAL_TIMER_THREAD_DELAY_MS = 100;
   private static final Logger _logger = LoggerFactory.getLogger(IngestionDelayTracker.class.getSimpleName());
 
-  // HashMap used to store delay measures for all partitions active for the current table.
-  private final ConcurrentHashMap<Integer, Long> _partitionToDelaySampleMap = new ConcurrentHashMap<>();
+  // HashMap used to store ingestion time measures for all partitions active for the current table.
+  private final Map<Integer, Long> _partitionToIngestionTimeMsMap = new ConcurrentHashMap<>();
   // We mark partitions that go from CONSUMING to ONLINE in _partitionsMarkedForVerification: if they do not
-  // go back to CONSUMING in some period of time, we confirm whether they are still hosted in this server by reading
+  // go back to CONSUMING in some period of time, we verify whether they are still hosted in this server by reading
   // ideal state. This is done with the goal of minimizing reading ideal state for efficiency reasons.
-  private final ConcurrentHashMap<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
+  private final Map<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
 
   final int _timerThreadTickIntervalMs;
   // Timer task to check partitions that are inactive against ideal state.
@@ -123,11 +122,11 @@ public class IngestionDelayTracker {
     _timerThreadTickIntervalMs = timerThreadTickIntervalMs;
     _timer = new Timer("IngestionDelayTimerThread-" + TableNameBuilder.extractRawTableName(tableNameWithType));
     _timer.schedule(new TimerTask() {
-      @Override
-      public void run() {
-        timeoutInactivePartitions();
-      }
-    }, INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
+        @Override
+        public void run() {
+          timeoutInactivePartitions();
+        }
+      }, INITIAL_TIMER_THREAD_DELAY_MS, _timerThreadTickIntervalMs);
   }
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
@@ -160,7 +159,7 @@ public class IngestionDelayTracker {
    * @param partitionGroupId partition ID which we should stop tracking.
    */
   private void removePartitionId(int partitionGroupId) {
-    _partitionToDelaySampleMap.remove(partitionGroupId);
+    _partitionToIngestionTimeMsMap.remove(partitionGroupId);
     // If we are removing a partition we should stop reading its ideal state.
     _partitionsMarkedForVerification.remove(partitionGroupId);
     _serverMetrics.removePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
@@ -170,9 +169,9 @@ public class IngestionDelayTracker {
    * Helper functions that creates a list of all the partitions that are marked for verification and whose
    * timeouts are expired. This helps us optimize checks of the ideal state.
    */
-  private ArrayList<Integer> getPartitionsToBeVerified() {
-    ArrayList<Integer> partitionsToVerify = new ArrayList<>();
-    for (ConcurrentHashMap.Entry<Integer, Long> entry : _partitionsMarkedForVerification.entrySet()) {
+  private List<Integer> getPartitionsToBeVerified() {
+    List<Integer> partitionsToVerify = new ArrayList<>();
+    for (Map.Entry<Integer, Long> entry : _partitionsMarkedForVerification.entrySet()) {
       long timeMarked = _clock.millis() - entry.getValue();
       if (timeMarked > PARTITION_TIMEOUT_MS) {
         // Partition must be verified
@@ -206,7 +205,7 @@ public class IngestionDelayTracker {
       // Do not update the ingestion delay metrics during server startup period
       return;
     }
-    Long previousMeasure = _partitionToDelaySampleMap.put(partitionGroupId,
+    Long previousMeasure = _partitionToIngestionTimeMsMap.put(partitionGroupId,
         ingestionTimeMs);
     if (previousMeasure == null) {
       // First time we start tracking a partition we should start tracking it via metric
@@ -234,18 +233,23 @@ public class IngestionDelayTracker {
    * This call is to be invoked by a timer thread that will periodically wake up and invoke this function.
    */
   public void timeoutInactivePartitions() {
-    Set<Integer> partitionsHostedByThisServer = null;
+    if (!_isServerReadyToServeQueries.get()) {
+      // Do not update the tracker state during server startup period
+      return;
+    }
     // Check if we have any partition to verify, else don't make the call to check ideal state as that
     // involves network traffic and may be inefficient.
-    ArrayList<Integer> partitionsToVerify = getPartitionsToBeVerified();
+    List<Integer> partitionsToVerify = getPartitionsToBeVerified();
     if (partitionsToVerify.size() == 0) {
       // Don't make the call to getHostedPartitionsGroupIds() as it involves checking ideal state.
       return;
     }
+    Set<Integer> partitionsHostedByThisServer;
     try {
       partitionsHostedByThisServer = _realTimeTableDataManager.getHostedPartitionsGroupIds();
     } catch (Exception e) {
-      _logger.error("Failed to get partitions hosted by this server, table={}", _tableNameWithType);
+      _logger.error("Failed to get partitions hosted by this server, table={}, exception={}:{}", _tableNameWithType,
+          e.getClass(), e.getMessage());
       return;
     }
     for (int partitionGroupId : partitionsToVerify) {
@@ -263,6 +267,10 @@ public class IngestionDelayTracker {
    * @param partitionGroupId Partition id that we need confirmed via ideal state as still hosted by this server.
    */
   public void markPartitionForVerification(int partitionGroupId) {
+    if (!_isServerReadyToServeQueries.get()) {
+      // Do not update the tracker state during server startup period
+      return;
+    }
     _partitionsMarkedForVerification.put(partitionGroupId, _clock.millis());
   }
 
@@ -274,7 +282,8 @@ public class IngestionDelayTracker {
    * @return ingestion delay in milliseconds for the given partition ID.
    */
   public long getPartitionIngestionDelay(int partitionGroupId) {
-    Long currentMeasure = _partitionToDelaySampleMap.get(partitionGroupId);
+    // Not protected as this will only be invoked when metric is installed which happens after server ready
+    Long currentMeasure = _partitionToIngestionTimeMsMap.get(partitionGroupId);
     return getAgedDelay(currentMeasure);
   }
 
@@ -284,9 +293,13 @@ public class IngestionDelayTracker {
    */
   public void shutdown() {
     // Now that segments can't report metric, destroy metric for this table
-    _timer.cancel();
+    _timer.cancel(); // Timer is installed in constructor so must always be cancelled
+    if (!_isServerReadyToServeQueries.get()) {
+      // Do not update the tracker state during server startup period
+      return;
+    }
     // Remove partitions so their related metrics get uninstalled.
-    for (ConcurrentHashMap.Entry<Integer, Long> entry : _partitionToDelaySampleMap.entrySet()) {
+    for (Map.Entry<Integer, Long> entry : _partitionToIngestionTimeMsMap.entrySet()) {
       removePartitionId(entry.getKey());
     }
   }
