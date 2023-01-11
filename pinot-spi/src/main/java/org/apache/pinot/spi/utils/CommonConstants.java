@@ -699,7 +699,7 @@ public class CommonConstants {
      */
     public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "segmentName";
     // Force commit job ZK props
-    public static final String CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST = "segmentForceCommitted";
+    public static final String CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST = "segmentsForceCommitted";
   }
 
   public static class Accounting {

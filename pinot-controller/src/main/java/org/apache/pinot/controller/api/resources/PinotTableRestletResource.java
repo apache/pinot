@@ -855,7 +855,7 @@ public class PinotTableRestletResource {
             LOGGER);
     Set<String> jobTypesToFilter = null;
     if (StringUtils.isNotEmpty(jobTypesString)) {
-      jobTypesToFilter = new HashSet<>(java.util.Arrays.asList(StringUtils.split(jobTypesString, ",")));
+      jobTypesToFilter = new HashSet<>(java.util.Arrays.asList(StringUtils.split(jobTypesString, ',')));
     }
     Map<String, Map<String, String>> result = new HashMap<>();
     for (String tableNameWithType : tableNamesWithType) {

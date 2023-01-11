@@ -2064,7 +2064,8 @@ public class PinotHelixResourceManager {
    * @param tableNameWithType the table for which jobs are to be fetched
    * @return A Map of jobId to job properties
    */
-  public Map<String, Map<String, String>> getAllJobsForTable(String tableNameWithType, Set<String> jobTypesToFilter) {
+  public Map<String, Map<String, String>> getAllJobsForTable(String tableNameWithType,
+      @Nullable Set<String> jobTypesToFilter) {
     String jobsResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob();
     try {
       ZNRecord tableJobsRecord = _propertyStore.get(jobsResourcePath, null, -1);
@@ -2108,7 +2109,6 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
     jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.FORCE_COMMIT.toString());
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
-    jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(consumingSegmentsCommitted.size()));
     jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST,
         JsonUtils.objectToString(consumingSegmentsCommitted));
 
@@ -3626,6 +3626,21 @@ public class PinotHelixResourceManager {
     throw new TimeoutException(
         String.format("Time out while waiting segments become ONLINE. (tableNameWithType = %s, segmentsToCheck = %s)",
             tableNameWithType, segmentsToCheck));
+  }
+
+  public Set<String> getOnlineSegmentsFromIdealState(String tableNameWithType, boolean includeConsuming) {
+    IdealState tableIdealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState((tableIdealState != null), "Table ideal state is null");
+    Map<String, Map<String, String>> segmentAssignment = tableIdealState.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      Map<String, String> instanceStateMap = entry.getValue();
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || (includeConsuming
+          && instanceStateMap.containsValue(SegmentStateModel.CONSUMING))) {
+        onlineSegments.add(entry.getKey());
+      }
+    }
+    return onlineSegments;
   }
 
   public Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
