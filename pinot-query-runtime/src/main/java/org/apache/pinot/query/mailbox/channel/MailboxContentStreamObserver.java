@@ -25,7 +25,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import javax.annotation.concurrent.GuardedBy;
@@ -66,7 +65,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
   private final BlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
 
-  private ReentrantLock _bufferSizeLock = new ReentrantLock();
+  private ReadWriteLock _bufferSizeLock = new ReentrantReadWriteLock();
   @GuardedBy("bufferSizeLock")
   private int _maxBufferSize = 0;
   private ReadWriteLock _errorLock = new ReentrantReadWriteLock();
@@ -76,9 +75,18 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private Consumer<MailboxIdentifier> _gotMailCallback;
 
   private void updateMaxBufferSize() {
-    _bufferSizeLock.lock();
+    _bufferSizeLock.writeLock().lock();
     _maxBufferSize = max(_maxBufferSize, _receivingBuffer.size());
-    _bufferSizeLock.unlock();
+    _bufferSizeLock.writeLock().unlock();
+  }
+
+  private int getMaxBufferSize() {
+    try {
+      _bufferSizeLock.readLock().lock();
+      return _maxBufferSize;
+    } finally {
+      _bufferSizeLock.readLock().unlock();
+    }
   }
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
@@ -141,6 +149,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
           _errorContent = createErrorContent(e);
         } catch (IOException ioe) {
           e = new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
+          LOGGER.error("MaxBufferSize:", getMaxBufferSize(), " for mailbox:", _mailboxId);
           LOGGER.error(e.getMessage());
           throw e;
         } finally {
@@ -180,6 +189,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
       throw new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
     } finally {
       _errorLock.writeLock().unlock();
+      LOGGER.error("MaxBufferSize:", getMaxBufferSize(), " for mailbox:", _mailboxId);
     }
   }
 
@@ -187,6 +197,6 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   public void onCompleted() {
     _isCompleted.set(true);
     _responseObserver.onCompleted();
-    LOGGER.debug("MaxBufferSize:" + _maxBufferSize);
+    LOGGER.debug("MaxBufferSize:", getMaxBufferSize(), " for mailbox:", _mailboxId);
   }
 }
