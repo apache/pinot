@@ -518,7 +518,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
-   * @deprecated please use setOrUpdateTableGauge(final String tableName, final G gauge, final long value) instead.
+   * @deprecated please use setOrUpdateTableGauge(final String tableName, final G gauge,
+   *     final Supplier<Long> valueSupplier) instead.
    *
    * Adds a new gauge whose values are retrieved from a callback function.
    * This method may be called multiple times, while it will be registered to callback function only once.
