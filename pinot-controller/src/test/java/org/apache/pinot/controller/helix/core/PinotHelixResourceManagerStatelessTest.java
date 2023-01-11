@@ -589,6 +589,47 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   }
 
   @Test
+  public void testCreateColocatedTenant() {
+    untagServers();
+    Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_SERVER_INSTANCES, NUM_SERVER_INSTANCES,
+        NUM_SERVER_INSTANCES);
+    assertTrue(_helixResourceManager.createServerTenant(serverTenant).isSuccessful());
+    assertEquals(
+        _helixResourceManager.getInstancesWithTag(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME)).size(),
+        NUM_SERVER_INSTANCES);
+    assertEquals(
+        _helixResourceManager.getInstancesWithTag(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME)).size(),
+        NUM_SERVER_INSTANCES);
+    assertTrue(_helixResourceManager.getOnlineUnTaggedServerInstanceList().isEmpty());
+
+    untagServers();
+    serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_SERVER_INSTANCES, NUM_SERVER_INSTANCES - 1,
+        NUM_SERVER_INSTANCES - 1);
+    assertTrue(_helixResourceManager.createServerTenant(serverTenant).isSuccessful());
+    assertEquals(
+        _helixResourceManager.getInstancesWithTag(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME)).size(),
+        NUM_SERVER_INSTANCES - 1);
+    assertEquals(
+        _helixResourceManager.getInstancesWithTag(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME)).size(),
+        NUM_SERVER_INSTANCES - 1);
+    assertTrue(_helixResourceManager.getOnlineUnTaggedServerInstanceList().isEmpty());
+
+    untagServers();
+    serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_SERVER_INSTANCES - 1, NUM_SERVER_INSTANCES - 1,
+        NUM_SERVER_INSTANCES - 1);
+    assertTrue(_helixResourceManager.createServerTenant(serverTenant).isSuccessful());
+    assertEquals(
+        _helixResourceManager.getInstancesWithTag(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME)).size(),
+        NUM_SERVER_INSTANCES - 1);
+    assertEquals(
+        _helixResourceManager.getInstancesWithTag(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME)).size(),
+        NUM_SERVER_INSTANCES - 1);
+    assertEquals(_helixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 1);
+
+    resetServerTags();
+  }
+
+  @Test
   public void testLeadControllerResource() {
     IdealState leadControllerResourceIdealState =
         _helixAdmin.getResourceIdealState(_clusterName, Helix.LEAD_CONTROLLER_RESOURCE_NAME);
