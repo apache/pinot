@@ -71,7 +71,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final ExecutorService _executorService;
   private final HttpConnectionManager _connectionManager;
   private final boolean _enableLocalTierMigration;
-  private final int _timeoutMs;
+  private final int _serverAdminRequestTimeoutMs;
   private final long _externalViewCheckIntervalInMs;
   private final long _externalViewStabilizationTimeoutInMs;
 
@@ -84,9 +84,13 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     _executorService = executorService;
     _connectionManager = connectionManager;
     _enableLocalTierMigration = config.enableSegmentRelocatorLocalTierMigration();
-    _timeoutMs = config.getServerAdminRequestTimeoutSeconds() * 1000;
-    _externalViewCheckIntervalInMs = config.getSegmentRelocatorExternalViewCheckIntervalInMs();
-    _externalViewStabilizationTimeoutInMs = config.getSegmentRelocatorExternalViewStabilizationTimeoutInMs();
+    _serverAdminRequestTimeoutMs = config.getServerAdminRequestTimeoutSeconds() * 1000;
+    long taskIntervalInMs = config.getSegmentRelocatorFrequencyInSeconds() * 1000L;
+    // Best effort to let inner part of the task run no longer than the task interval, although not enforced strictly.
+    _externalViewCheckIntervalInMs =
+        Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewCheckIntervalInMs());
+    _externalViewStabilizationTimeoutInMs =
+        Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewStabilizationTimeoutInMs());
   }
 
   @Override
@@ -196,7 +200,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     try {
       TableTierReader.TableTierDetails tableTiers =
           new TableTierReader(_executorService, _connectionManager, _pinotHelixResourceManager).getTableTierDetails(
-              tableNameWithType, null, _timeoutMs, true);
+              tableNameWithType, null, _serverAdminRequestTimeoutMs, true);
       triggerLocalTierMigration(tableNameWithType, tableTiers,
           _pinotHelixResourceManager.getHelixZkManager().getMessagingService());
       LOGGER.info("Migrated segments of table: {} to new tiers on hosting servers", tableNameWithType);
