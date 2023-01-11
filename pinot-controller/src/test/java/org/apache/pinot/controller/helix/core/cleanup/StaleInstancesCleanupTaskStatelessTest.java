@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.cleanup;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
@@ -43,26 +44,26 @@ public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
       throws Exception {
     StaleInstancesCleanupTask staleInstancesCleanupTask = _controllerStarter.getStaleInstancesCleanupTask();
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_BROKER_INSTANCES), 0);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+            ControllerGauge.DROPPED_BROKER_INSTANCES.getGaugeName()), 0);
     addFakeBrokerInstancesToAutoJoinHelixCluster(3, true);
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_BROKER_INSTANCES), 0);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_BROKER_INSTANCES.getGaugeName()), 0);
     stopFakeInstance("Broker_localhost_0");
     Thread.sleep(1000);
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_BROKER_INSTANCES), 1);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_BROKER_INSTANCES.getGaugeName()), 1);
     stopFakeInstance("Broker_localhost_1");
     Thread.sleep(1000);
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_BROKER_INSTANCES), 2);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_BROKER_INSTANCES.getGaugeName()), 2);
     stopFakeInstance("Broker_localhost_2");
     Thread.sleep(1000);
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_BROKER_INSTANCES), 3);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_BROKER_INSTANCES.getGaugeName()), 3);
   }
 
   @Test
@@ -70,26 +71,26 @@ public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
       throws Exception {
     StaleInstancesCleanupTask staleInstancesCleanupTask = _controllerStarter.getStaleInstancesCleanupTask();
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_SERVER_INSTANCES), 0);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_SERVER_INSTANCES.getGaugeName()), 0);
     addFakeServerInstancesToAutoJoinHelixCluster(3, true);
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_SERVER_INSTANCES), 0);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_SERVER_INSTANCES.getGaugeName()), 0);
     stopFakeInstance("Server_localhost_0");
     Thread.sleep(1000);
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_SERVER_INSTANCES), 1);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_SERVER_INSTANCES.getGaugeName()), 1);
     stopFakeInstance("Server_localhost_1");
     Thread.sleep(1000);
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_SERVER_INSTANCES), 2);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_SERVER_INSTANCES.getGaugeName()), 2);
     stopFakeInstance("Server_localhost_2");
     Thread.sleep(1000);
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_SERVER_INSTANCES), 3);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_SERVER_INSTANCES.getGaugeName()), 3);
   }
 
   @Test
@@ -97,26 +98,26 @@ public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
       throws Exception {
     StaleInstancesCleanupTask staleInstancesCleanupTask = _controllerStarter.getStaleInstancesCleanupTask();
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 0);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_MINION_INSTANCES.getGaugeName()), 0);
     addFakeMinionInstancesToAutoJoinHelixCluster(3);
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 0);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_MINION_INSTANCES.getGaugeName()), 0);
     stopFakeInstance("Minion_localhost_0");
     Thread.sleep(1000);
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 1);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_MINION_INSTANCES.getGaugeName()), 1);
     stopFakeInstance("Minion_localhost_1");
     Thread.sleep(1000);
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 2);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_MINION_INSTANCES.getGaugeName()), 2);
     stopFakeInstance("Minion_localhost_2");
     Thread.sleep(1000);
     staleInstancesCleanupTask.runTask(new Properties());
-    Assert.assertEquals(
-        _controllerStarter.getControllerMetrics().getValueOfGlobalGauge(ControllerGauge.DROPPED_MINION_INSTANCES), 3);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.DROPPED_MINION_INSTANCES.getGaugeName()), 3);
   }
 
   @Override

@@ -30,6 +30,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -142,14 +143,14 @@ public class RealtimeConsumerMonitorTest {
             controllerMetrics, consumingSegmentReader);
     realtimeConsumerMonitor.start();
     realtimeConsumerMonitor.run();
-    Assert.assertEquals(controllerMetrics.getValueOfPartitionGauge(tableName, 1,
-        ControllerGauge.MAX_RECORDS_LAG), 0);
-    Assert.assertEquals(controllerMetrics.getValueOfPartitionGauge(tableName, 2,
-        ControllerGauge.MAX_RECORDS_LAG), 40);
-    Assert.assertEquals(controllerMetrics.getValueOfPartitionGauge(tableName, 1,
-        ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS), 0);
-    Assert.assertEquals(controllerMetrics.getValueOfPartitionGauge(tableName, 2,
-        ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS), 60000);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+        ControllerGauge.MAX_RECORDS_LAG.getGaugeName() + "." + tableName + ".1"), 0);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+        ControllerGauge.MAX_RECORDS_LAG.getGaugeName() + "." + tableName + ".2"), 40);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS.getGaugeName() + "." + tableName + ".1"), 0);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+        ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS.getGaugeName() + "." + tableName + ".2"), 60000);
   }
 
   ConsumingSegmentInfoReader.ConsumingSegmentInfo getConsumingSegmentInfoForServer(String serverName,

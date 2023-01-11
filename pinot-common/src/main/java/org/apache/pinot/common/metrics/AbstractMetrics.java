@@ -454,20 +454,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
-  @VisibleForTesting
-  public long getValueOfGlobalGauge(final G gauge) {
-    String gaugeName = gauge.getGaugeName();
-    AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
-    return gaugeValue == null ? 0 : gaugeValue.get();
-  }
-
-  @VisibleForTesting
-  public long getValueOfGlobalGauge(final G gauge, String suffix) {
-    String fullGaugeName = composeGlobalGaugeName(suffix, gauge);
-    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
-    return gaugeValue == null ? 0 : gaugeValue.get();
-  }
-
   /**
    * Gets the value of a table gauge.
    *
@@ -479,20 +465,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
     AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
     return gaugeValue == null ? 0 : gaugeValue.get();
-  }
-
-  /**
-   * Gets the value of a table partition gauge.
-   *
-   * @param tableName The table name
-   * @param partitionId The partition name
-   * @param gauge The gauge to use
-   */
-  public long getValueOfPartitionGauge(final String tableName, final int partitionId, final G gauge) {
-    final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
-
-    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
-    return gaugeValue == null ? -1 : gaugeValue.get();
   }
 
   /**
