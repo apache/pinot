@@ -139,13 +139,13 @@ public class IngestionDelayTracker {
    * Helper function to age a delay measure. Aging means adding the time elapsed since the measure was
    * taken till the measure is being reported.
   *
-  * @param currentDelay original sample delay to which we will add the age of the measure.
+  * @param ingestionTimeMs original ingestion time in milliseconds.
    */
   private long getAgedDelay(Long ingestionTimeMs) {
     if (ingestionTimeMs == null) {
       return 0; // return 0 when not initialized
     }
-    // Add age of measure to the reported value
+    // Compute aged delay for current partition
     long agedIngestionDelayMs = _clock.millis() - ingestionTimeMs;
     // Correct to zero for any time shifts due to NTP or time reset.
     agedIngestionDelayMs = Math.max(agedIngestionDelayMs, 0);
@@ -193,10 +193,10 @@ public class IngestionDelayTracker {
   }
 
   /*
-   * Called by LLRealTimeSegmentDataManagers to post delay updates to this tracker class.
+   * Called by LLRealTimeSegmentDataManagers to post ingestion time updates to this tracker class.
    *
-   * @param ingestionTimeMs ingestion delay being recorded.
-   * @param partitionGroupId partition ID for which this delay is being recorded.
+   * @param ingestionTimeMs ingestion time being recorded.
+   * @param partitionGroupId partition ID for which this ingestion time is being recorded.
    */
   public void updateIngestionDelay(long ingestionTimeMs, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
