@@ -25,8 +25,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import javax.annotation.concurrent.GuardedBy;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.GrpcReceivingMailbox;
@@ -35,6 +37,8 @@ import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.lang.Math.max;
 
 
 /**
@@ -62,10 +66,20 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
   private final BlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
 
-  ReadWriteLock _errorLock = new ReentrantReadWriteLock();
-  private Mailbox.MailboxContent _errorContent = null; // Guarded by _errorLock.
+  private ReentrantLock _bufferSizeLock = new ReentrantLock();
+  @GuardedBy("bufferSizeLock")
+  private int _maxBufferSize = 0;
+  private ReadWriteLock _errorLock = new ReentrantReadWriteLock();
+  @GuardedBy("_errorLock")
+  private Mailbox.MailboxContent _errorContent = null;
   private StringMailboxIdentifier _mailboxId;
   private Consumer<MailboxIdentifier> _gotMailCallback;
+
+  private void updateMaxBufferSize() {
+    _bufferSizeLock.lock();
+    _maxBufferSize = max(_maxBufferSize, _receivingBuffer.size());
+    _bufferSizeLock.unlock();
+  }
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
       StreamObserver<Mailbox.MailboxStatus> responseObserver) {
@@ -77,6 +91,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
     // TODO: Replace unbounded queue with bounded queue when we have backpressure in place.
+    // It is possible this will create high memory pressure since we have memory leak issues.
     _receivingBuffer = new LinkedBlockingQueue();
     _isEnabledFeedback = isEnabledFeedback;
   }
@@ -134,6 +149,8 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
       }
       _gotMailCallback.accept(_mailboxId);
 
+      updateMaxBufferSize();
+
       if (_isEnabledFeedback) {
         // TODO: this has race conditions with onCompleted() because sender blindly closes connection channels once
         // it has finished sending all the data packets.
@@ -170,5 +187,6 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   public void onCompleted() {
     _isCompleted.set(true);
     _responseObserver.onCompleted();
+    LOGGER.debug("MaxBufferSize:" + _maxBufferSize);
   }
 }
