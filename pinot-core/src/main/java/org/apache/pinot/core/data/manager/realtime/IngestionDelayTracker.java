@@ -85,22 +85,8 @@ public class IngestionDelayTracker {
   private static final int INITIAL_TIMER_THREAD_DELAY_MS = 100;
   private static final Logger _logger = LoggerFactory.getLogger(IngestionDelayTracker.class.getSimpleName());
 
-  /*
-   * Class to keep an ingestion delay measure and the time when the sample was taken (i.e. sample time)
-   * We will use the sample time to increase ingestion delay when a partition stops consuming: the time
-   * difference between the sample time and current time will be added to the metric when read.
-   */
-  static private class DelayMeasure {
-    public DelayMeasure(long t, long d) {
-      _delayMs = d;
-      _sampleTime = t;
-    }
-    public final long _delayMs;
-    public final long _sampleTime;
-  }
-
   // HashMap used to store delay measures for all partitions active for the current table.
-  private final ConcurrentHashMap<Integer, DelayMeasure> _partitionToDelaySampleMap = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Integer, Long> _partitionToDelaySampleMap = new ConcurrentHashMap<>();
   // We mark partitions that go from CONSUMING to ONLINE in _partitionsMarkedForVerification: if they do not
   // go back to CONSUMING in some period of time, we confirm whether they are still hosted in this server by reading
   // ideal state. This is done with the goal of minimizing reading ideal state for efficiency reasons.
@@ -156,15 +142,15 @@ public class IngestionDelayTracker {
   *
   * @param currentDelay original sample delay to which we will add the age of the measure.
    */
-  private long getAgedDelay(DelayMeasure currentDelay) {
-    if (currentDelay == null) {
+  private long getAgedDelay(Long ingestionTimeMs) {
+    if (ingestionTimeMs == null) {
       return 0; // return 0 when not initialized
     }
     // Add age of measure to the reported value
-    long measureAgeInMs = _clock.millis() - currentDelay._sampleTime;
+    long agedIngestionDelayMs = _clock.millis() - ingestionTimeMs;
     // Correct to zero for any time shifts due to NTP or time reset.
-    measureAgeInMs = Math.max(measureAgeInMs, 0);
-    return currentDelay._delayMs + measureAgeInMs;
+    agedIngestionDelayMs = Math.max(agedIngestionDelayMs, 0);
+    return agedIngestionDelayMs;
   }
 
   /*
@@ -210,19 +196,18 @@ public class IngestionDelayTracker {
   /*
    * Called by LLRealTimeSegmentDataManagers to post delay updates to this tracker class.
    *
-   * @param delayMs ingestion delay being recorded.
-   * @param sampleTime sample time.
+   * @param ingestionTimeMs ingestion delay being recorded.
    * @param partitionGroupId partition ID for which this delay is being recorded.
    */
-  public void updateIngestionDelay(long delayMs, long sampleTime, int partitionGroupId) {
+  public void updateIngestionDelay(long ingestionTimeMs, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
     // TODO: see if we can install gauges after the server is ready.
     if (!_isServerReadyToServeQueries.get()) {
       // Do not update the ingestion delay metrics during server startup period
       return;
     }
-    DelayMeasure previousMeasure = _partitionToDelaySampleMap.put(partitionGroupId,
-        new DelayMeasure(sampleTime, delayMs));
+    Long previousMeasure = _partitionToDelaySampleMap.put(partitionGroupId,
+        ingestionTimeMs);
     if (previousMeasure == null) {
       // First time we start tracking a partition we should start tracking it via metric
       _serverMetrics.addCallbackPartitionGaugeIfNeeded(_metricName, partitionGroupId,
@@ -289,7 +274,7 @@ public class IngestionDelayTracker {
    * @return ingestion delay in milliseconds for the given partition ID.
    */
   public long getPartitionIngestionDelay(int partitionGroupId) {
-    DelayMeasure currentMeasure = _partitionToDelaySampleMap.get(partitionGroupId);
+    Long currentMeasure = _partitionToDelaySampleMap.get(partitionGroupId);
     return getAgedDelay(currentMeasure);
   }
 
@@ -301,7 +286,7 @@ public class IngestionDelayTracker {
     // Now that segments can't report metric, destroy metric for this table
     _timer.cancel();
     // Remove partitions so their related metrics get uninstalled.
-    for (ConcurrentHashMap.Entry<Integer, DelayMeasure> entry : _partitionToDelaySampleMap.entrySet()) {
+    for (ConcurrentHashMap.Entry<Integer, Long> entry : _partitionToDelaySampleMap.entrySet()) {
       removePartitionId(entry.getKey());
     }
   }
