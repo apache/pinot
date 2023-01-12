@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -82,6 +83,7 @@ public class QueryDispatcher {
         reduceStageId = stageId;
       } else {
         List<ServerInstance> serverInstances = stage.getValue().getServerInstances();
+        long submitDeadline = System.currentTimeMillis() + timeoutMs;
         for (ServerInstance serverInstance : serverInstances) {
           String host = serverInstance.getHostname();
           int servicePort = serverInstance.getQueryServicePort();
@@ -89,11 +91,14 @@ public class QueryDispatcher {
           Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
                   QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
               .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
-              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs)).build());
+              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs)).build(), timeoutMs);
           if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
             throw new RuntimeException(
                 String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", stageId,
                     serverInstance, response));
+          }
+          if (System.currentTimeMillis() > submitDeadline) {
+            throw new RuntimeException("Timed out trying to submit query to the workers");
           }
         }
       }
@@ -208,8 +213,8 @@ public class QueryDispatcher {
       _blockingStub = PinotQueryWorkerGrpc.newBlockingStub(_managedChannel);
     }
 
-    public Worker.QueryResponse submit(Worker.QueryRequest request) {
-      return _blockingStub.submit(request);
+    public Worker.QueryResponse submit(Worker.QueryRequest request, long timeoutMs) {
+      return _blockingStub.withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS).submit(request);
     }
   }
 }
