@@ -237,12 +237,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   /*
    * Method used by LLRealtimeSegmentManagers to update their partition delays
    *
-   * @param ingestionDelayMs Ingestion delay being reported.
-   * @param currentTimeMs Timestamp of the measure being provided, i.e. when this delay was computed.
+   * @param ingestionTimeMs Ingestion delay being reported.
    * @param partitionGroupId Partition ID for which delay is being updated.
    */
-  public void updateIngestionDelay(long ingestionDelayMs, long currenTimeMs, int partitionGroupId) {
-    _ingestionDelayTracker.updateIngestionDelay(ingestionDelayMs, currenTimeMs, partitionGroupId);
+  public void updateIngestionDelay(long ingestionTimeMs, int partitionGroupId) {
+    _ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs, partitionGroupId);
   }
 
   /*
@@ -272,7 +271,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   /**
    * Returns all partitionGroupIds for the partitions hosted by this server for current table.
-   * @Note: this involves Zookeeper read and should not be used frequently due to efficiency concerns.
+   * @apiNote  this involves Zookeeper read and should not be used frequently due to efficiency concerns.
    */
   public Set<Integer> getHostedPartitionsGroupIds() {
     Set<Integer> partitionsHostedByThisServer = new HashSet<>();

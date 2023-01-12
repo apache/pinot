@@ -42,7 +42,7 @@ public class TableStateUtils {
    * Returns all segments in a given state for a given table.
    *
    * @param helixManager instance of Helix manager
-   * @param tableNameWithType table for which we are obtaining ONLINE segments
+   * @param tableNameWithType table for which we are obtaining segments in a given state
    * @param state state of the segments to be returned
    *
    * @return List of segment names in a given state.
