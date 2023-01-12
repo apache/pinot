@@ -641,7 +641,11 @@ public class PinotTableRestletResource {
           + "number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
   @QueryParam("minAvailableReplicas") int minAvailableReplicas, @ApiParam(
       value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
-          + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
+          + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts, @ApiParam(
+      value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
+  @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
+      @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
+      @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs) {
 
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
 
@@ -653,6 +657,10 @@ public class PinotTableRestletResource {
     rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, downtime);
     rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, minAvailableReplicas);
     rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, bestEfforts);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
+        externalViewCheckIntervalInMs);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
+        externalViewStabilizationTimeoutInMs);
 
     try {
       if (dryRun || downtime) {

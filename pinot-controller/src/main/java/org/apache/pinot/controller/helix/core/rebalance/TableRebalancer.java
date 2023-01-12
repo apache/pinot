@@ -113,11 +113,6 @@ import org.slf4j.LoggerFactory;
  */
 public class TableRebalancer {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalancer.class);
-
-  // TODO: make them configurable
-  private static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
-  private static final long EXTERNAL_VIEW_STABILIZATION_MAX_WAIT_MS = 60 * 60_000L; // 1 hour
-
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
 
@@ -148,11 +143,19 @@ public class TableRebalancer {
         tableConfig.getRoutingConfig().getInstanceSelectorType());
     boolean bestEfforts = rebalanceConfig.getBoolean(RebalanceConfigConstants.BEST_EFFORTS,
         RebalanceConfigConstants.DEFAULT_BEST_EFFORTS);
+    long externalViewCheckIntervalInMs =
+        rebalanceConfig.getLong(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
+            RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS);
+    long externalViewStabilizationTimeoutInMs =
+        rebalanceConfig.getLong(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
+            RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
     LOGGER.info(
         "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, bootstrap: {}, "
-            + "downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, bestEfforts: {}",
+            + "downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, bestEfforts: {}, "
+            + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}",
         tableNameWithType, dryRun, reassignInstances, includeConsuming, bootstrap, downtime,
-        minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, bestEfforts);
+        minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, bestEfforts, externalViewCheckIntervalInMs,
+        externalViewStabilizationTimeoutInMs);
 
     // Validate table config
     try {
@@ -301,15 +304,19 @@ public class TableRebalancer {
       minAvailableReplicas = Math.max(numReplicas + minReplicasToKeepUpForNoDowntime, 0);
     }
 
-    LOGGER.info("Rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, bestEfforts: {}",
-        tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts);
+    LOGGER.info("Rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, bestEfforts: {}, "
+            + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}", tableNameWithType,
+        minAvailableReplicas, enableStrictReplicaGroup, bestEfforts, externalViewCheckIntervalInMs,
+        externalViewStabilizationTimeoutInMs);
     int expectedVersion = currentIdealState.getRecord().getVersion();
     while (true) {
       // Wait for ExternalView to converge before updating the next IdealState
       Set<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
       IdealState idealState;
       try {
-        idealState = waitForExternalViewToConverge(tableNameWithType, bestEfforts, segmentsToMove);
+        idealState =
+            waitForExternalViewToConverge(tableNameWithType, bestEfforts, segmentsToMove, externalViewCheckIntervalInMs,
+                externalViewStabilizationTimeoutInMs);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while waiting for ExternalView to converge for table: {}, aborting the rebalance",
             tableNameWithType, e);
@@ -544,12 +551,13 @@ public class TableRebalancer {
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts,
-      Set<String> segmentsToMonitor)
+      Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs)
       throws InterruptedException, TimeoutException {
-    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_STABILIZATION_MAX_WAIT_MS;
+    long endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
 
     IdealState idealState;
     do {
+      LOGGER.debug("Start to check if ExternalView converges to IdealStates");
       idealState = _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
       // IdealState might be null if table got deleted, throwing exception to abort the rebalance
       Preconditions.checkState(idealState != null, "Failed to find the IdealState");
@@ -564,16 +572,17 @@ public class TableRebalancer {
           return idealState;
         }
       }
-
-      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+      LOGGER.debug("ExternalView has not converged to IdealStates. Retry after: {}ms", externalViewCheckIntervalInMs);
+      Thread.sleep(externalViewCheckIntervalInMs);
     } while (System.currentTimeMillis() < endTimeMs);
 
     if (bestEfforts) {
       LOGGER.warn("ExternalView has not converged within: {}ms for table: {}, continuing the rebalance (best-efforts)",
-          EXTERNAL_VIEW_STABILIZATION_MAX_WAIT_MS, tableNameWithType);
+          externalViewStabilizationTimeoutInMs, tableNameWithType);
       return idealState;
     } else {
-      throw new TimeoutException("Timeout while waiting for ExternalView to converge");
+      throw new TimeoutException(String.format("ExternalView has not converged within: %d ms for table: %s",
+          externalViewStabilizationTimeoutInMs, tableNameWithType));
     }
   }
 
