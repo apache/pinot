@@ -71,11 +71,8 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     LOGGER.info("Triggered shutdown on OpChainScheduler...");
     // this will just notify all waiters that the scheduler is shutting down
     _monitor.enter();
-    while(_scheduler.hasNext()){
-      OpChain operatorChain = _scheduler.next();
-      operatorChain.close();
-    }
     _monitor.leave();
+    _workerPool.shutdown();
   }
 
   @Override

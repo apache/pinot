@@ -46,8 +46,6 @@ public class OpChainSchedulerServiceTest {
   private V2Operator _operatorA;
   @Mock
   private V2Operator _operatorB;
-  @Mock
-  private OpChainScheduler _scheduler;
 
   @BeforeClass
   public void beforeClass() {
@@ -208,6 +206,7 @@ public class OpChainSchedulerServiceTest {
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected hasNext to be called");
     scheduler.stopAsync().awaitTerminated();
+
     Mockito.verify(_scheduler, Mockito.never()).next();
   }
 
