@@ -30,13 +30,18 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class StreamMessageMetadata implements RowMetadata {
   private final long _recordIngestionTimeMs;
+  private final long _recordCreationTimeMs;
   private final GenericRow _headers;
   private final Map<String, String> _metadata;
 
   public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers) {
-    this(recordIngestionTimeMs, headers, Collections.emptyMap());
+    this(recordIngestionTimeMs, Long.MIN_VALUE, headers, Collections.emptyMap());
   }
 
+  public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
+      Map<String, String> metadata) {
+    this(recordIngestionTimeMs, Long.MIN_VALUE, headers, metadata);
+  }
   /**
    * Construct the stream based message/row message metadata
    *
@@ -44,9 +49,10 @@ public class StreamMessageMetadata implements RowMetadata {
    *                         use Long.MIN_VALUE if not applicable
    * @param metadata
    */
-  public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
+  public StreamMessageMetadata(long recordIngestionTimeMs, long recordCreationTimeMs, @Nullable GenericRow headers,
       Map<String, String> metadata) {
     _recordIngestionTimeMs = recordIngestionTimeMs;
+    _recordCreationTimeMs = recordCreationTimeMs;
     _headers = headers;
     _metadata = metadata;
   }
@@ -54,6 +60,11 @@ public class StreamMessageMetadata implements RowMetadata {
   @Override
   public long getRecordIngestionTimeMs() {
     return _recordIngestionTimeMs;
+  }
+
+  @Override
+  public long getRecordCreationTimeMs() {
+    return _recordCreationTimeMs;
   }
 
   @Override

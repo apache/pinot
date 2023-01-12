@@ -50,6 +50,17 @@ public interface RowMetadata {
   long getRecordIngestionTimeMs();
 
   /**
+   * Returns the creation timestamp associated with the record. In cases where the upstream ingestion pipeline is
+   * simple this timestamp matches the result of getRecordIngestionTimeMs();
+   *
+   * Expected to be used for stream-based sources.
+   *
+   * @return timestamp (epoch in milliseconds) when the row was initially created and ingested upstream for the first
+   *         time Long.MIN_VALUE if not available
+   */
+  long getRecordCreationTimeMs();
+
+  /**
    * Returns the stream message headers
    *
    * @return A {@link GenericRow} that encapsulates the headers in the ingested row

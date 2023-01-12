@@ -240,8 +240,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param ingestionTimeMs Ingestion delay being reported.
    * @param partitionGroupId Partition ID for which delay is being updated.
    */
-  public void updateIngestionDelay(long ingestionTimeMs, int partitionGroupId) {
-    _ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs, partitionGroupId);
+  public void updateIngestionDelay(long ingestionTimeMs, long creationTimeMs, int partitionGroupId) {
+    _ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs, creationTimeMs, partitionGroupId);
   }
 
   /*

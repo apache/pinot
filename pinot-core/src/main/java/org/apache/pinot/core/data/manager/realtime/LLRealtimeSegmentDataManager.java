@@ -615,7 +615,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     } else if (!prematureExit) {
       // Record Pinot ingestion delay as zero since we are up-to-date and no new events
-      _realtimeTableDataManager.updateIngestionDelay(System.currentTimeMillis(), _partitionGroupId);
+      _realtimeTableDataManager.updateIngestionDelay(System.currentTimeMillis(), System.currentTimeMillis(),
+          _partitionGroupId);
       if (_segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("empty batch received - sleeping for {}ms", idlePipeSleepTimeMillis);
       }
@@ -1571,6 +1572,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if ((indexedMessageCount > 0) && (_lastRowMetadata != null)) {
       // Record Ingestion delay for this partition
       _realtimeTableDataManager.updateIngestionDelay(_lastRowMetadata.getRecordIngestionTimeMs(),
+          _lastRowMetadata.getRecordCreationTimeMs(),
           _partitionGroupId);
     }
   }
