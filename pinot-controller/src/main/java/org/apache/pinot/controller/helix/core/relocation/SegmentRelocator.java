@@ -24,8 +24,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.configuration.BaseConfiguration;
@@ -74,6 +76,10 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final int _serverAdminRequestTimeoutMs;
   private final long _externalViewCheckIntervalInMs;
   private final long _externalViewStabilizationTimeoutInMs;
+  private final boolean _rebalanceTablesSequentially;
+  // This variable can be accessed from multiple threads, thus made volatile.
+  private volatile String _tableInProgress;
+  private final Queue<String> _waitingQueue = new LinkedList<>();
 
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
@@ -91,6 +97,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewCheckIntervalInMs());
     _externalViewStabilizationTimeoutInMs =
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewStabilizationTimeoutInMs());
+    _rebalanceTablesSequentially = config.isSegmentRelocatorRebalanceTablesSequentially();
   }
 
   @Override
@@ -130,40 +137,114 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         _externalViewCheckIntervalInMs);
     rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
         _externalViewStabilizationTimeoutInMs);
-    // Run rebalance asynchronously
-    _executorService.submit(() -> {
-      try {
-        // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
-        // Table rebalance moves segments to the new ideal servers, which can change for a segment when its target
-        // tier is updated. New servers can put segments onto the right tier when loading the segments. After that,
-        // all segments are put on the right servers. If any segments are not on their target tier, the server local
-        // tier migration is triggered for them, basically asking the hosting servers to reload them.
-        //
-        // We assume segment target tier is not changed between the two actions, so update target tier here as well,
-        // instead of using a separate task.
-        // TODO: can add some sanity checks on the server side when reloading segments to be more defensive, e.g. only
-        //       migrating segment to new tier when the hosting server is in the server pool configured for that tier.
-        updateTargetTier(tableNameWithType);
+    if (_rebalanceTablesSequentially) {
+      rebalanceTableSequentially(tableNameWithType, tableConfig, rebalanceConfig);
+    } else {
+      _executorService.submit(() -> rebalanceTable(tableNameWithType, tableConfig, rebalanceConfig));
+    }
+  }
 
-        RebalanceResult rebalance =
-            new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager()).rebalance(tableConfig, rebalanceConfig);
-        switch (rebalance.getStatus()) {
-          case NO_OP:
-            LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);
-            migrateToTargetTier(tableNameWithType);
-            break;
-          case DONE:
-            LOGGER.info("Finished relocating segments for table: {}", tableNameWithType);
-            migrateToTargetTier(tableNameWithType);
-            break;
-          default:
-            LOGGER.error("Relocation failed for table: {}", tableNameWithType);
-            break;
+  /**
+   * Use queue to rebalance tables sequentially, meanwhile make sure every table gets its turn.
+   * @param tableNameWithType table requested to rebalance
+   */
+  private void rebalanceTableSequentially(String tableNameWithType, TableConfig tableConfig,
+      Configuration rebalanceConfig) {
+    if (!rebalanceNextTable(tableNameWithType)) {
+      return;
+    }
+    try {
+      _executorService.submit(() -> {
+        try {
+          rebalanceTable(_tableInProgress, tableConfig, rebalanceConfig);
+        } finally {
+          LOGGER.debug("Rebalance task completed for table: {}", _tableInProgress);
+          _tableInProgress = null;
         }
-      } catch (Throwable t) {
-        LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
+      });
+    } catch (Exception e) {
+      LOGGER.debug("Failed to submit rebalance task for table: {}", _tableInProgress);
+      _tableInProgress = null;
+    }
+  }
+
+  /**
+   * This method can be called in multiple threads like one from periodic task scheduler and those from restful APIs.
+   *
+   * @param tableNameWithType table requested to rebalance
+   * @return true if a new table is to be rebalanced; false if previous table has completed rebalance.
+   */
+  @VisibleForTesting
+  synchronized boolean rebalanceNextTable(String tableNameWithType) {
+    // Add table into the waiting queue if it's not there yet.
+    if (_waitingQueue.contains(tableNameWithType)) {
+      LOGGER.debug("Table: {} is already put in waiting queue for rebalance, queue size: {}", tableNameWithType,
+          _waitingQueue.size());
+    } else {
+      _waitingQueue.offer(tableNameWithType);
+      LOGGER.debug("Put table: {} in waiting queue for rebalance, queue size: {}", tableNameWithType,
+          _waitingQueue.size());
+    }
+    if (_tableInProgress != null) {
+      LOGGER.debug("Rebalance is still ongoing for table: {}", _tableInProgress);
+      return false;
+    }
+    // _tableInProgress won't be null, as at least tableNameWithType passed to the method is in the waiting queue.
+    _tableInProgress = _waitingQueue.poll();
+    LOGGER.debug("Rebalancing table: {}, queue size: {}", _tableInProgress, _waitingQueue.size());
+    return true;
+  }
+
+  // For test purpose
+  @VisibleForTesting
+  Queue<String> getWaitingQueue() {
+    return _waitingQueue;
+  }
+
+  // For test purpose
+  @VisibleForTesting
+  String getTableInProgress() {
+    return _tableInProgress;
+  }
+
+  // For test purpose
+  @VisibleForTesting
+  void setTableInProgress(String table) {
+    _tableInProgress = table;
+  }
+
+  private void rebalanceTable(String tableNameWithType, TableConfig tableConfig, Configuration rebalanceConfig) {
+    try {
+      // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
+      // Table rebalance moves segments to the new ideal servers, which can change for a segment when its target
+      // tier is updated. New servers can put segments onto the right tier when loading the segments. After that,
+      // all segments are put on the right servers. If any segments are not on their target tier, the server local
+      // tier migration is triggered for them, basically asking the hosting servers to reload them.
+      //
+      // We assume segment target tier is not changed between the two actions, so update target tier here as well,
+      // instead of using a separate task.
+      // TODO: can add some sanity checks on the server side when reloading segments to be more defensive, e.g. only
+      //       migrating segment to new tier when the hosting server is in the server pool configured for that tier.
+      updateTargetTier(tableNameWithType);
+
+      RebalanceResult rebalance =
+          new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager()).rebalance(tableConfig, rebalanceConfig);
+      switch (rebalance.getStatus()) {
+        case NO_OP:
+          LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);
+          migrateToTargetTier(tableNameWithType);
+          break;
+        case DONE:
+          LOGGER.info("Finished relocating segments for table: {}", tableNameWithType);
+          migrateToTargetTier(tableNameWithType);
+          break;
+        default:
+          LOGGER.error("Relocation failed for table: {}", tableNameWithType);
+          break;
       }
-    });
+    } catch (Throwable t) {
+      LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
+    }
   }
 
   /**

@@ -201,6 +201,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segmentRelocator.externalViewStabilizationTimeoutInMs";
     public static final String SEGMENT_RELOCATOR_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS =
         "controller.segmentRelocator.externalViewCheckIntervalInMs";
+    public static final String SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY =
+        "controller.segmentRelocator.rebalanceTablesSequentially";
 
     // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
     // Default value is false.
@@ -925,6 +927,10 @@ public class ControllerConf extends PinotConfiguration {
   public long getSegmentRelocatorExternalViewStabilizationTimeoutInMs() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
         RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
+  }
+
+  public boolean isSegmentRelocatorRebalanceTablesSequentially() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY, false);
   }
 
   public long getPeriodicTaskInitialDelayInSeconds() {

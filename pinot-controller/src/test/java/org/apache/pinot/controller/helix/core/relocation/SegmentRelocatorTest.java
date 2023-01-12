@@ -24,16 +24,25 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.tier.FixedTierSegmentSelector;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
@@ -42,10 +51,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class SegmentRelocatorTest {
@@ -139,6 +145,83 @@ public class SegmentRelocatorTest {
     verify(helixMgrMock).updateZkMetadata(eq(tableName), recordCapture.capture(), eq(10));
     SegmentZKMetadata record = recordCapture.getValue();
     assertEquals(record.getTier(), "coldTier");
+  }
+
+  @Test
+  public void testRebalanceNextTable() {
+    SegmentRelocator relocator =
+        new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class),
+            mock(ControllerConf.class), mock(ControllerMetrics.class), mock(ExecutorService.class),
+            mock(HttpConnectionManager.class));
+    Queue<String> queue = relocator.getWaitingQueue();
+    assertTrue(relocator.rebalanceNextTable("t1"));
+    assertEquals(relocator.getTableInProgress(), "t1");
+    assertEquals(queue.size(), 0);
+    // t1 is still in progress, so t2 waits in queue
+    assertFalse(relocator.rebalanceNextTable("t2"));
+    assertEquals(relocator.getTableInProgress(), "t1");
+    assertEquals(queue.size(), 1);
+    // t1 is still in progress, so t2 waits in queue
+    assertFalse(relocator.rebalanceNextTable("t3"));
+    assertEquals(relocator.getTableInProgress(), "t1");
+    assertEquals(queue.size(), 2);
+    // Add t2 again, queue size doesn't change
+    assertFalse(relocator.rebalanceNextTable("t2"));
+    assertEquals(relocator.getTableInProgress(), "t1");
+    assertEquals(queue.size(), 2);
+    // t1 finishes, add t3 again and it waits
+    relocator.setTableInProgress(null);
+    assertTrue(relocator.rebalanceNextTable("t3"));
+    assertEquals(relocator.getTableInProgress(), "t2");
+    assertEquals(queue.size(), 1);
+    // t2 finishes, add t3 again and it's next to rebalance
+    relocator.setTableInProgress(null);
+    assertTrue(relocator.rebalanceNextTable("t3"));
+    assertEquals(relocator.getTableInProgress(), "t3");
+    assertEquals(queue.size(), 0);
+  }
+
+  @Test
+  public void testRebalanceNextTableMultiThreads() {
+    SegmentRelocator relocator =
+        new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class),
+            mock(ControllerConf.class), mock(ControllerMetrics.class), mock(ExecutorService.class),
+            mock(HttpConnectionManager.class));
+    ExecutorService runner = Executors.newCachedThreadPool();
+    Queue<String> queue = relocator.getWaitingQueue();
+    relocator.rebalanceNextTable("tX");
+    assertEquals(relocator.getTableInProgress(), "tX");
+    assertEquals(queue.size(), 0);
+    // As we put tX in progress, all the new tables are waiting in queue.
+    runner.submit(() -> {
+      relocator.rebalanceNextTable("t1");
+      Thread.sleep(RandomUtils.nextLong(100, 300));
+      return null;
+    });
+    runner.submit(() -> {
+      relocator.rebalanceNextTable("t2");
+      Thread.sleep(RandomUtils.nextLong(100, 300));
+      return null;
+    });
+    runner.submit(() -> {
+      relocator.rebalanceNextTable("t3");
+      Thread.sleep(RandomUtils.nextLong(100, 300));
+      return null;
+    });
+    TestUtils.waitForCondition((Void v) -> queue.size() == 3, 100, 3000, "Expecting 3 tables in waiting queue");
+    // No duplicates of tasks.
+    assertTrue(queue.containsAll(Arrays.asList("t1", "t2", "t3")));
+    // t4 will get its turn.
+    relocator.rebalanceNextTable("t4");
+    assertEquals(queue.size(), 4);
+    TestUtils.waitForCondition((Void v) -> {
+      // To mock the completion of task.
+      relocator.setTableInProgress(null);
+      // To trigger the check of new task.
+      relocator.rebalanceNextTable("tX");
+      String newTaskInProgress = relocator.getTableInProgress();
+      return newTaskInProgress.equals("t4");
+    }, 100, 4000, "Table t4 should get its turn");
   }
 
   private static ZNRecord createSegmentMetadataZNRecord(String segmentName, String tierName) {
