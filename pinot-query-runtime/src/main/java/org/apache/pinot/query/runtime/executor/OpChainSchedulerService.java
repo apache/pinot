@@ -72,7 +72,6 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     // this will just notify all waiters that the scheduler is shutting down
     _monitor.enter();
     _monitor.leave();
-    _workerPool.shutdown();
   }
 
   @Override
