@@ -218,6 +218,14 @@ public class ControllerRequestURLBuilder {
     return stringBuilder.toString();
   }
 
+  public String forTableForceCommit(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "forceCommit");
+  }
+
+  public String forForceCommitJobStatus(String jobId) {
+    return StringUtil.join("/", _baseUrl, "tables", "forceCommitStatus", jobId);
+  }
+
   public String forTableReload(String tableName, TableType tableType, boolean forceDownload) {
     String query = String.format("reload?type=%s&forceDownload=%s", tableType.name(), forceDownload);
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);

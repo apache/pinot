@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -124,36 +125,39 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/forceCommit")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Force commit the current consuming segments",
       notes = "Force commit the current segments in consuming state and restart consumption. "
           + "This should be used after schema/table config changes. "
           + "Please note that this is an asynchronous operation, "
           + "and 200 response does not mean it has actually been done already")
-  public SuccessResponse forceCommit(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+  public Map<String, String> forceCommit(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName)
+      throws JsonProcessingException {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validate(tableNameWithType);
-    String submittedJobId = null;
+    Map<String, String> response = new HashMap<>();
     try {
       Set<String> consumingSegmentsForceCommitted = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType);
+      response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();
         _pinotHelixResourceManager.addNewForceCommitJob(tableNameWithType, jobId, consumingSegmentsForceCommitted);
-        submittedJobId = jobId;
+        response.put("jobMetaZKWriteStatus", "SUCCESS");
+        response.put("forceCommitJobId", jobId);
       } catch (Exception e) {
+        response.put("jobMetaZKWriteStatus", "FAILED");
         LOGGER.error("Could not add force commit job metadata to ZK table : {}", tableNameWithType, e);
       }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
 
-    return new SuccessResponse(
-        String.format("Successfully submitted force commit job id. Job meta ZK storage status: %s, job id : %s",
-            (submittedJobId != null) ? "SUCCESS" : "FAILED", submittedJobId));
+    return response;
   }
 
   @GET
-  @Path("segments/forceCommitStatus/{jobId}")
+  @Path("/tables/forceCommitStatus/{jobId}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get status for a submitted force commit operation",
       notes = "Get status for a submitted force commit operation")
@@ -170,7 +174,8 @@ public class PinotRealtimeTableResource {
     Set<String> consumingSegmentCommitted = JsonUtils.stringToObject(
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST), Set.class);
     Set<String> onlineSegmentsForTable =
-        _pinotHelixResourceManager.getOnlineSegmentsFromIdealState(tableNameWithType, false);
+        _pinotHelixResourceManager.getSegmentsFromIdealStateMatchingState(tableNameWithType,
+            Set.of(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
 
     Set<String> segmentsYetToBeCommitted = new HashSet<>();
     consumingSegmentCommitted.forEach(segmentName -> {
