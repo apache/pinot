@@ -42,7 +42,7 @@ import org.apache.calcite.rex.RexInputRef;
  *  ordering, i.e. the data is partitioned by both the join-key of the left child and the join-key of the right child.
  * </p>
  */
-public class ColocationKey {
+class ColocationKey {
   private List<Integer> _indices;
   private int _numPartitions;
   private String _hashAlgorithm;
