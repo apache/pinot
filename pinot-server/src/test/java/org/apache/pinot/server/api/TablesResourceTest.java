@@ -19,13 +19,11 @@
 package org.apache.pinot.server.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
@@ -294,10 +292,7 @@ public class TablesResourceTest extends BaseResourceTest {
     // Download the snapshot in byte[] format.
     Response response = _webTarget.path(snapshotPath).request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-    StreamingOutput stream = (StreamingOutput) response.getEntity();
-    ByteArrayOutputStream output = new ByteArrayOutputStream();
-    stream.write(output);
-    byte[] snapshot = output.toByteArray();
+    byte[] snapshot = response.readEntity(byte[].class);
 
     // Load the snapshot file.
     Assert.assertNotNull(snapshot);
