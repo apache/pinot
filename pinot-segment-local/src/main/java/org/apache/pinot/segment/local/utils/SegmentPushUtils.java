@@ -28,6 +28,7 @@ import java.net.URLDecoder;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -285,7 +286,22 @@ public class SegmentPushUtils implements Serializable {
       String segmentName = fileName.endsWith(Constants.TAR_GZ_FILE_EXT)
           ? fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length()) : fileName;
       SegmentNameUtils.validatePartialOrFullSegmentName(segmentName);
-      File segmentMetadataFile = generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
+      File segmentMetadataFile;
+      // Check if there is a segment metadata tar gz file named `segmentName.metadata.tar.gz`, already in the remote
+      // directory. This is to avoid generating a new segment metadata tar gz file every time we push a segment,
+      // which requires downloading the entire segment tar gz file.
+      URI metadataTarGzFilePath = URI.create(
+          new File(tarFilePath).getParentFile() + File.separator + segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+      if (spec.getPushJobSpec().isPreferMetadataTarGz() && fileSystem.exists(metadataTarGzFilePath)) {
+        segmentMetadataFile = new File(FileUtils.getTempDirectory(),
+            "segmentMetadata-" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        if (segmentMetadataFile.exists()) {
+          FileUtils.forceDelete(segmentMetadataFile);
+        }
+        fileSystem.copyToLocalFile(metadataTarGzFilePath, segmentMetadataFile);
+      } else {
+        segmentMetadataFile = generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
+      }
       try {
         for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
           URI controllerURI;
@@ -304,18 +320,19 @@ public class SegmentPushUtils implements Serializable {
             retryWaitMs = spec.getPushJobSpec().getPushRetryIntervalMillis();
           }
           RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
+            List<Header> reqHttpHeaders = new ArrayList<>(headers);
             try {
-              headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath));
-              headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+              reqHttpHeaders.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath));
+              reqHttpHeaders.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
                   FileUploadDownloadClient.FileUploadType.METADATA.toString()));
               if (spec.getPushJobSpec() != null) {
-                headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE,
+                reqHttpHeaders.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE,
                     String.valueOf(spec.getPushJobSpec().getCopyToDeepStoreForMetadataPush())));
               }
 
               SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegmentMetadata(
                   FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName,
-                  segmentMetadataFile, headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+                  segmentMetadataFile, reqHttpHeaders, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
               LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
                   controllerURI, response.getStatusCode(), response.getResponse());
               return true;
@@ -357,6 +374,10 @@ public class SegmentPushUtils implements Serializable {
       }
 
       URI uri = URI.create(file);
+      if (uri.getPath().endsWith(Constants.METADATA_TAR_GZ_FILE_EXT)) {
+        // Skip segment metadata tar gz files
+        continue;
+      }
       if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
         URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputDirURI, uri, pushSpec.getSegmentUriPrefix(),
             pushSpec.getSegmentUriSuffix());

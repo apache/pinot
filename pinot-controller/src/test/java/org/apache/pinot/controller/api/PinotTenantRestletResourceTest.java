@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableType;
@@ -67,6 +69,17 @@ public class PinotTenantRestletResourceTest {
     }
 
     assertTrue(found);
+
+    // reset the ZK node to simulate corruption
+    ZkHelixPropertyStore<ZNRecord> propertyStore = TEST_INSTANCE.getPropertyStore();
+    String zkPath = "/CONFIGS/TABLE/" + TABLE_NAME;
+    ZNRecord znRecord = propertyStore.get(zkPath, null, 0);
+    propertyStore.set(zkPath, new ZNRecord(znRecord.getId()), 1);
+
+    // Now there should be no tables
+    tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
+    tables = tableList.get("tables");
+    assertEquals(tables.size(), 0);
   }
 
   @AfterClass

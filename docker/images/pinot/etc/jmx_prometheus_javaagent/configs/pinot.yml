@@ -108,6 +108,18 @@ rules:
     table: "$1"
     tableType: "$2"
     taskType: "$3"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError).(\\w+)_(\\w+).(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$5"
+  cache: true
+  labels:
+    table: "$2"
+    tableType: "$3"
+    taskType: "$4"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError).(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$3"
+  cache: true
+  labels:
+    taskType: "$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastSuccessfulMinionTaskGeneration.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_timeMsSinceLastSuccessfulMinionTaskGeneration_$4"
   cache: true
@@ -401,6 +413,9 @@ rules:
   cache: true
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeRowsConsumed\"><>(\\w+)"
   name: "pinot_server_realtime_rowsConsumed_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.rowsWithErrors\"><>(\\w+)"
+  name: "pinot_server_realtime_rowsErrored_$1"
   cache: true
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)Exceptions\"><>(\\w+)"
   name: "pinot_server_realtime_exceptions_$1_$2"

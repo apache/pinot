@@ -16,17 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.transformer;
+package org.apache.pinot.core.operator.filter.predicate.traits;
 
-import org.apache.pinot.spi.data.readers.GenericRow;
-
-
-/**
- * Record transformer which does no transformation
- */
-public class NoOpRecordTransformer implements RecordTransformer {
-  @Override
-  public GenericRow transformRecord(GenericRow row) {
-    return row;
-  }
+public interface DoubleValue {
+  double getDouble();
 }

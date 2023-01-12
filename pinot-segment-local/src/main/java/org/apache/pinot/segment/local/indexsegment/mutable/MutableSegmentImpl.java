@@ -349,8 +349,8 @@ public class MutableSegmentImpl implements MutableSegment {
           //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
           //  text indexes remain statically defined. Revisit this after this refactoring has been done.
           RealtimeLuceneTextIndex luceneTextIndex =
-              new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName,
-                  stopWordsInclude, stopWordsExclude);
+              new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName, stopWordsInclude,
+                  stopWordsExclude);
           if (_realtimeLuceneReaders == null) {
             _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
           }
@@ -640,15 +640,20 @@ public class MutableSegmentImpl implements MutableSegment {
         // results, hence the extra care. A metric will already have been emitted when trying to update the dictionary.
         continue;
       }
+
       FieldSpec fieldSpec = indexContainer._fieldSpec;
+      DataType dataType = fieldSpec.getDataType();
+
       if (fieldSpec.isSingleValueField()) {
         // Single-value column
 
         // Check partitions
         if (column.equals(_partitionColumn)) {
-          int partition = _partitionFunction.getPartition(value);
+          Object valueToPartition = (dataType == BYTES) ? new ByteArray((byte[]) value) : value;
+          int partition = _partitionFunction.getPartition(valueToPartition);
           if (indexContainer._partitions.add(partition)) {
-            _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column, value);
+            _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column,
+                valueToPartition);
             if (_serverMetrics != null) {
               _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
             }
@@ -680,7 +685,6 @@ public class MutableSegmentImpl implements MutableSegment {
           // Single-value column with raw index
 
           // Update forward index
-          DataType dataType = fieldSpec.getDataType();
           switch (dataType.getStoredType()) {
             case INT:
               forwardIndex.setInt(docId, (Integer) value);
@@ -787,8 +791,6 @@ public class MutableSegmentImpl implements MutableSegment {
         } else {
           // Raw MV columns
 
-          // Update forward index and numValues info
-          DataType dataType = fieldSpec.getDataType();
           switch (dataType.getStoredType()) {
             case INT:
               Object[] values = (Object[]) value;

@@ -20,19 +20,24 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.DoubleRawValueBasedRangePredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.FloatRawValueBasedRangePredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.IntRawValueBasedRangePredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.LongRawValueBasedRangePredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.SortedDictionaryBasedRangePredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.traits.DoubleRange;
+import org.apache.pinot.core.operator.filter.predicate.traits.DoubleValue;
+import org.apache.pinot.core.operator.filter.predicate.traits.FloatRange;
+import org.apache.pinot.core.operator.filter.predicate.traits.FloatValue;
+import org.apache.pinot.core.operator.filter.predicate.traits.IntRange;
+import org.apache.pinot.core.operator.filter.predicate.traits.IntValue;
+import org.apache.pinot.core.operator.filter.predicate.traits.LongRange;
+import org.apache.pinot.core.operator.filter.predicate.traits.LongValue;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.trace.FilterType;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.Tracing;
@@ -44,24 +49,32 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
 
   private static final String EXPLAIN_NAME = "FILTER_RANGE_INDEX";
 
-  private final RangeEvaluator _rangeEvaluator;
-  private final PredicateEvaluator _rangePredicateEvaluator;
+  private final RangeIndexReader<ImmutableRoaringBitmap> _rangeIndexReader;
+  private final PredicateEvaluator _predicateEvaluator;
   private final DataSource _dataSource;
+  private final FieldSpec.DataType _parameterType;
   private final int _numDocs;
 
+  static boolean canEvaluate(PredicateEvaluator predicateEvaluator, DataSource dataSource) {
+    Predicate.Type type = predicateEvaluator.getPredicateType();
+    RangeIndexReader<?> rangeIndex = dataSource.getRangeIndex();
+    return rangeIndex != null && (type == Predicate.Type.RANGE || (type == Predicate.Type.EQ
+        && dataSource.getRangeIndex().isExact()));
+  }
+
   @SuppressWarnings("unchecked")
-  public RangeIndexBasedFilterOperator(PredicateEvaluator rangePredicateEvaluator, DataSource dataSource, int numDocs) {
-    _rangePredicateEvaluator = rangePredicateEvaluator;
-    _rangeEvaluator = RangeEvaluator.of((RangeIndexReader<ImmutableRoaringBitmap>) dataSource.getRangeIndex(),
-        rangePredicateEvaluator);
+  public RangeIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+    _predicateEvaluator = predicateEvaluator;
+    _rangeIndexReader = (RangeIndexReader<ImmutableRoaringBitmap>) dataSource.getRangeIndex();
     _dataSource = dataSource;
     _numDocs = numDocs;
+    _parameterType = predicateEvaluator.isDictionaryBased() ? FieldSpec.DataType.INT : predicateEvaluator.getDataType();
   }
 
   @Override
   protected FilterBlock getNextBlock() {
-    if (_rangeEvaluator.isExact()) {
-      ImmutableRoaringBitmap matches = _rangeEvaluator.getMatchingDocIds();
+    if (_rangeIndexReader.isExact()) {
+      ImmutableRoaringBitmap matches = getMatchingDocIds();
       recordFilter(matches);
       return new FilterBlock(new BitmapDocIdSet(matches, _numDocs));
     }
@@ -69,11 +82,11 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   }
 
   private FilterBlock evaluateLegacyRangeFilter() {
-    ImmutableRoaringBitmap matches = _rangeEvaluator.getMatchingDocIds();
+    ImmutableRoaringBitmap matches = getMatchingDocIds();
     // if the implementation cannot match the entire query exactly, it will
     // yield partial matches, which need to be verified by scanning. If it
     // can answer the query exactly, this will be null.
-    ImmutableRoaringBitmap partialMatches = _rangeEvaluator.getPartiallyMatchingDocIds();
+    ImmutableRoaringBitmap partialMatches = getPartiallyMatchingDocIds();
     // this branch is likely until RangeIndexReader reimplemented and enabled by default
     if (partialMatches == null) {
       return new FilterBlock(new BitmapDocIdSet(matches == null ? new MutableRoaringBitmap() : matches, _numDocs));
@@ -81,7 +94,7 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     // TODO: support proper null handling in range index.
     // Need to scan the first and last range as they might be partially matched
     ScanBasedFilterOperator scanBasedFilterOperator =
-        new ScanBasedFilterOperator(_rangePredicateEvaluator, _dataSource, _numDocs, false);
+        new ScanBasedFilterOperator(_predicateEvaluator, _dataSource, _numDocs, false);
     FilterBlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getNextBlock().getBlockDocIdSet();
     MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(partialMatches);
     if (matches != null) {
@@ -97,24 +110,114 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     });
   }
 
+  ImmutableRoaringBitmap getMatchingDocIds() {
+    switch (_parameterType) {
+      case INT:
+        if (_predicateEvaluator instanceof IntValue) {
+          return _rangeIndexReader.getMatchingDocIds(((IntValue) _predicateEvaluator).getInt());
+        }
+        IntRange intRange = (IntRange) _predicateEvaluator;
+        return _rangeIndexReader.getMatchingDocIds(intRange.getInclusiveLowerBound(),
+            intRange.getInclusiveUpperBound());
+      case LONG:
+        if (_predicateEvaluator instanceof LongValue) {
+          return _rangeIndexReader.getMatchingDocIds(((LongValue) _predicateEvaluator).getLong());
+        }
+        LongRange longRange = (LongRange) _predicateEvaluator;
+        return _rangeIndexReader.getMatchingDocIds(longRange.getInclusiveLowerBound(),
+            longRange.getInclusiveUpperBound());
+      case FLOAT:
+        if (_predicateEvaluator instanceof FloatValue) {
+          return _rangeIndexReader.getMatchingDocIds(((FloatValue) _predicateEvaluator).getFloat());
+        }
+        FloatRange floatRange = (FloatRange) _predicateEvaluator;
+        return _rangeIndexReader.getMatchingDocIds(floatRange.getInclusiveLowerBound(),
+            floatRange.getInclusiveUpperBound());
+      case DOUBLE:
+        if (_predicateEvaluator instanceof DoubleValue) {
+          return _rangeIndexReader.getMatchingDocIds(((DoubleValue) _predicateEvaluator).getDouble());
+        }
+        DoubleRange doubleRange = (DoubleRange) _predicateEvaluator;
+        return _rangeIndexReader.getMatchingDocIds(doubleRange.getInclusiveLowerBound(),
+            doubleRange.getInclusiveUpperBound());
+      default:
+        throw unsupportedDataType(_parameterType);
+    }
+  }
+
+  ImmutableRoaringBitmap getPartiallyMatchingDocIds() {
+    assert !_rangeIndexReader.isExact();
+    switch (_parameterType) {
+      case INT:
+        IntRange intRange = (IntRange) _predicateEvaluator;
+        return _rangeIndexReader.getPartiallyMatchingDocIds(intRange.getInclusiveLowerBound(),
+            intRange.getInclusiveUpperBound());
+      case LONG:
+        LongRange longRange = (LongRange) _predicateEvaluator;
+        return _rangeIndexReader.getPartiallyMatchingDocIds(longRange.getInclusiveLowerBound(),
+            longRange.getInclusiveUpperBound());
+      case FLOAT:
+        FloatRange floatRange = (FloatRange) _predicateEvaluator;
+        return _rangeIndexReader.getPartiallyMatchingDocIds(floatRange.getInclusiveLowerBound(),
+            floatRange.getInclusiveUpperBound());
+      case DOUBLE:
+        DoubleRange doubleRange = (DoubleRange) _predicateEvaluator;
+        return _rangeIndexReader.getPartiallyMatchingDocIds(doubleRange.getInclusiveLowerBound(),
+            doubleRange.getInclusiveUpperBound());
+      default:
+        throw unsupportedDataType(_parameterType);
+    }
+  }
+
   @Override
   public boolean canOptimizeCount() {
-    return _rangeEvaluator.isExact();
+    return _rangeIndexReader.isExact();
   }
 
   @Override
   public int getNumMatchingDocs() {
-    return _rangeEvaluator.getNumMatchingDocs();
+    switch (_parameterType) {
+      case INT:
+        if (_predicateEvaluator instanceof IntValue) {
+          return _rangeIndexReader.getNumMatchingDocs(((IntValue) _predicateEvaluator).getInt());
+        }
+        IntRange intRange = (IntRange) _predicateEvaluator;
+        return _rangeIndexReader.getNumMatchingDocs(intRange.getInclusiveLowerBound(),
+            intRange.getInclusiveUpperBound());
+      case LONG:
+        if (_predicateEvaluator instanceof LongValue) {
+          return _rangeIndexReader.getNumMatchingDocs(((LongValue) _predicateEvaluator).getLong());
+        }
+        LongRange longRange = (LongRange) _predicateEvaluator;
+        return _rangeIndexReader.getNumMatchingDocs(longRange.getInclusiveLowerBound(),
+            longRange.getInclusiveUpperBound());
+      case FLOAT:
+        if (_predicateEvaluator instanceof FloatValue) {
+          return _rangeIndexReader.getNumMatchingDocs(((FloatValue) _predicateEvaluator).getFloat());
+        }
+        FloatRange floatRange = (FloatRange) _predicateEvaluator;
+        return _rangeIndexReader.getNumMatchingDocs(floatRange.getInclusiveLowerBound(),
+            floatRange.getInclusiveUpperBound());
+      case DOUBLE:
+        if (_predicateEvaluator instanceof DoubleValue) {
+          return _rangeIndexReader.getNumMatchingDocs(((DoubleValue) _predicateEvaluator).getDouble());
+        }
+        DoubleRange doubleRange = (DoubleRange) _predicateEvaluator;
+        return _rangeIndexReader.getNumMatchingDocs(doubleRange.getInclusiveLowerBound(),
+            doubleRange.getInclusiveUpperBound());
+      default:
+        throw unsupportedDataType(_parameterType);
+    }
   }
 
   @Override
   public boolean canProduceBitmaps() {
-    return _rangeEvaluator.isExact();
+    return _rangeIndexReader.isExact();
   }
 
   @Override
   public BitmapCollection getBitmaps() {
-    return new BitmapCollection(_numDocs, false, _rangeEvaluator.getMatchingDocIds());
+    return new BitmapCollection(_numDocs, false, getMatchingDocIds());
   }
 
   @Override
@@ -124,187 +227,16 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   public String toExplainString() {
-    return EXPLAIN_NAME + "(indexLookUp:range_index"
-        + ",operator:" + _rangePredicateEvaluator.getPredicateType()
-        + ",predicate:" + _rangePredicateEvaluator.getPredicate().toString()
-        + ')';
+    return EXPLAIN_NAME + "(indexLookUp:range_index" + ",operator:" + _predicateEvaluator.getPredicateType()
+        + ",predicate:" + _predicateEvaluator.getPredicate().toString() + ')';
   }
 
-  interface RangeEvaluator {
-    static RangeEvaluator of(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
-        PredicateEvaluator predicateEvaluator) {
-      if (predicateEvaluator instanceof SortedDictionaryBasedRangePredicateEvaluator) {
-        return new IntRangeEvaluator(rangeIndexReader,
-            (SortedDictionaryBasedRangePredicateEvaluator) predicateEvaluator);
-      } else {
-        switch (predicateEvaluator.getDataType()) {
-          case INT:
-            return new IntRangeEvaluator(rangeIndexReader,
-                (IntRawValueBasedRangePredicateEvaluator) predicateEvaluator);
-          case LONG:
-            return new LongRangeEvaluator(rangeIndexReader,
-                (LongRawValueBasedRangePredicateEvaluator) predicateEvaluator);
-          case FLOAT:
-            return new FloatRangeEvaluator(rangeIndexReader,
-                (FloatRawValueBasedRangePredicateEvaluator) predicateEvaluator);
-          case DOUBLE:
-            return new DoubleRangeEvaluator(rangeIndexReader,
-                (DoubleRawValueBasedRangePredicateEvaluator) predicateEvaluator);
-          default:
-            throw new IllegalStateException("String and Bytes data type not supported for Range Indexing");
-        }
-      }
-    }
-
-    ImmutableRoaringBitmap getMatchingDocIds();
-
-    ImmutableRoaringBitmap getPartiallyMatchingDocIds();
-
-    int getNumMatchingDocs();
-
-    boolean isExact();
+  static RuntimeException unsupportedPredicateType(Predicate.Type type) {
+    return new IllegalStateException("Range index cannot satisfy " + type);
   }
 
-  private static final class IntRangeEvaluator implements RangeEvaluator {
-    final RangeIndexReader<ImmutableRoaringBitmap> _rangeIndexReader;
-    final int _min;
-    final int _max;
-
-    private IntRangeEvaluator(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader, int min, int max) {
-      _rangeIndexReader = rangeIndexReader;
-      _min = min;
-      _max = max;
-    }
-
-    IntRangeEvaluator(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
-        IntRawValueBasedRangePredicateEvaluator predicateEvaluator) {
-      this(rangeIndexReader, predicateEvaluator.getInclusiveLowerBound(), predicateEvaluator.getInclusiveUpperBound());
-    }
-
-    IntRangeEvaluator(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
-        SortedDictionaryBasedRangePredicateEvaluator predicateEvaluator) {
-      // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
-      this(rangeIndexReader, predicateEvaluator.getStartDictId(), predicateEvaluator.getEndDictId() - 1);
-    }
-
-    @Override
-    public ImmutableRoaringBitmap getMatchingDocIds() {
-      return _rangeIndexReader.getMatchingDocIds(_min, _max);
-    }
-
-    @Override
-    public ImmutableRoaringBitmap getPartiallyMatchingDocIds() {
-      return _rangeIndexReader.getPartiallyMatchingDocIds(_min, _max);
-    }
-
-    @Override
-    public int getNumMatchingDocs() {
-      return _rangeIndexReader.getNumMatchingDocs(_min, _max);
-    }
-
-    @Override
-    public boolean isExact() {
-      return _rangeIndexReader.isExact();
-    }
-  }
-
-  private static final class LongRangeEvaluator implements RangeEvaluator {
-    final RangeIndexReader<ImmutableRoaringBitmap> _rangeIndexReader;
-    final long _min;
-    final long _max;
-
-    LongRangeEvaluator(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
-        LongRawValueBasedRangePredicateEvaluator predicateEvaluator) {
-      _rangeIndexReader = rangeIndexReader;
-      _min = predicateEvaluator.getInclusiveLowerBound();
-      _max = predicateEvaluator.getInclusiveUpperBound();
-    }
-
-    @Override
-    public ImmutableRoaringBitmap getMatchingDocIds() {
-      return _rangeIndexReader.getMatchingDocIds(_min, _max);
-    }
-
-    @Override
-    public ImmutableRoaringBitmap getPartiallyMatchingDocIds() {
-      return _rangeIndexReader.getPartiallyMatchingDocIds(_min, _max);
-    }
-
-    @Override
-    public int getNumMatchingDocs() {
-      return _rangeIndexReader.getNumMatchingDocs(_min, _max);
-    }
-
-    @Override
-    public boolean isExact() {
-      return _rangeIndexReader.isExact();
-    }
-  }
-
-  private static final class FloatRangeEvaluator implements RangeEvaluator {
-    final RangeIndexReader<ImmutableRoaringBitmap> _rangeIndexReader;
-    final float _min;
-    final float _max;
-
-    FloatRangeEvaluator(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
-        FloatRawValueBasedRangePredicateEvaluator predicateEvaluator) {
-      _rangeIndexReader = rangeIndexReader;
-      _min = predicateEvaluator.getInclusiveLowerBound();
-      _max = predicateEvaluator.getInclusiveUpperBound();
-    }
-
-    @Override
-    public ImmutableRoaringBitmap getMatchingDocIds() {
-      return _rangeIndexReader.getMatchingDocIds(_min, _max);
-    }
-
-    @Override
-    public ImmutableRoaringBitmap getPartiallyMatchingDocIds() {
-      return _rangeIndexReader.getPartiallyMatchingDocIds(_min, _max);
-    }
-
-    @Override
-    public int getNumMatchingDocs() {
-      return _rangeIndexReader.getNumMatchingDocs(_min, _max);
-    }
-
-    @Override
-    public boolean isExact() {
-      return _rangeIndexReader.isExact();
-    }
-  }
-
-  private static final class DoubleRangeEvaluator implements RangeEvaluator {
-    final RangeIndexReader<ImmutableRoaringBitmap> _rangeIndexReader;
-    final double _min;
-    final double _max;
-
-    DoubleRangeEvaluator(RangeIndexReader<ImmutableRoaringBitmap> rangeIndexReader,
-        DoubleRawValueBasedRangePredicateEvaluator predicateEvaluator) {
-      _rangeIndexReader = rangeIndexReader;
-      _min = predicateEvaluator.getInclusiveLowerBound();
-      _max = predicateEvaluator.getInclusiveUpperBound();
-    }
-
-    @Override
-    public ImmutableRoaringBitmap getMatchingDocIds() {
-      return _rangeIndexReader.getMatchingDocIds(_min, _max);
-    }
-
-    @Override
-    public ImmutableRoaringBitmap getPartiallyMatchingDocIds() {
-      return _rangeIndexReader.getPartiallyMatchingDocIds(_min, _max);
-    }
-
-    @Override
-    public int getNumMatchingDocs() {
-      return _rangeIndexReader.getNumMatchingDocs(_min, _max);
-    }
-
-    @Override
-    public boolean isExact() {
-      return _rangeIndexReader.isExact();
-    }
+  static RuntimeException unsupportedDataType(FieldSpec.DataType dataType) {
+    return new IllegalStateException("Range index does not support " + dataType);
   }
 
   private void recordFilter(ImmutableRoaringBitmap bitmap) {
@@ -312,7 +244,7 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     if (recording.isEnabled()) {
       recording.setNumDocsMatchingAfterFilter(bitmap == null ? 0 : bitmap.getCardinality());
       recording.setColumnName(_dataSource.getDataSourceMetadata().getFieldSpec().getName());
-      recording.setFilter(FilterType.INDEX, _rangePredicateEvaluator.getPredicateType().name());
+      recording.setFilter(FilterType.INDEX, _predicateEvaluator.getPredicateType().name());
       recording.setNumDocsScanned(_numDocs);
     }
   }

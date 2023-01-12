@@ -91,15 +91,17 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
       TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(realtimeTableName);
       Preconditions.checkNotNull(tableDataManager);
+      tableDataManager.onConsumingToOnline(segmentNameStr);
       SegmentDataManager acquiredSegment = tableDataManager.acquireSegment(segmentNameStr);
       // For this transition to be correct in helix, we should already have a segment that is consuming
       if (acquiredSegment == null) {
         throw new RuntimeException("Segment " + segmentNameStr + " + not present ");
       }
 
+      // TODO: https://github.com/apache/pinot/issues/10049
       try {
         if (!(acquiredSegment instanceof LLRealtimeSegmentDataManager)) {
-          // We found a LLC segment that is not consuming right now, must be that we already swapped it with a
+          // We found an LLC segment that is not consuming right now, must be that we already swapped it with a
           // segment that has been built. Nothing to do for this state transition.
           _logger
               .info("Segment {} not an instance of LLRealtimeSegmentDataManager. Reporting success for the transition",
@@ -138,6 +140,11 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "CONSUMING", to = "DROPPED")
     public void onBecomeDroppedFromConsuming(Message message, NotificationContext context) {
       _logger.info("SegmentOnlineOfflineStateModel.onBecomeDroppedFromConsuming() : " + message);
+      String realtimeTableName = message.getResourceName();
+      String segmentNameStr = message.getPartitionName();
+      TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(realtimeTableName);
+      Preconditions.checkNotNull(tableDataManager);
+      tableDataManager.onConsumingToDropped(segmentNameStr);
       try {
         onBecomeOfflineFromConsuming(message, context);
         onBecomeDroppedFromOffline(message, context);

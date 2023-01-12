@@ -28,12 +28,15 @@ import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Server;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.combine.AggregationCombineOperator;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
@@ -190,7 +193,13 @@ public class CombinePlanNode implements PlanNode {
         return new SelectionOnlyCombineOperator(operators, _queryContext, _executorService);
       } else {
         // Selection order-by
-        return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+        List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
+        assert orderByExpressions != null;
+        if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+          return new MinMaxValueBasedSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+        } else {
+          return new SelectionOrderByCombineOperator(operators, _queryContext, _executorService);
+        }
       }
     } else {
       assert QueryContextUtils.isDistinctQuery(_queryContext);

@@ -16,18 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.converttorawindex;
+package org.apache.pinot.core.operator.filter.predicate.traits;
 
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.event.BaseMinionProgressObserverFactory;
-import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
+public interface FloatRange {
+  float getInclusiveLowerBound();
 
-
-@EventObserverFactory
-public class ConvertToRowIndexTaskProgressObserverFactory extends BaseMinionProgressObserverFactory {
-
-  @Override
-  public String getTaskType() {
-    return MinionConstants.ConvertToRawIndexTask.TASK_TYPE;
-  }
+  float getInclusiveUpperBound();
 }

@@ -49,6 +49,8 @@ public enum AggregationFunctionType {
   FASTHLL("fastHLL"),
   DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch"),
   DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch"),
+  DISTINCTSUM("distinctSum"),
+  DISTINCTAVG("distinctAvg"),
   PERCENTILE("percentile"),
   PERCENTILEEST("percentileEst"),
   PERCENTILERAWEST("percentileRawEst"),

@@ -45,7 +45,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIn
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -103,8 +102,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     CHANGE_RAW_INDEX_COMPRESSION_TYPE,
   }
 
-  public ForwardIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig, Schema schema) {
-    super(segmentMetadata, indexLoadingConfig);
+  public ForwardIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig, Schema schema) {
+    super(segmentDirectory, indexLoadingConfig);
     _schema = schema;
   }
 
@@ -149,8 +148,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           break;
         }
         case ENABLE_FORWARD_INDEX_FOR_DICT_COLUMN: {
-          createForwardIndexIfNeeded(segmentWriter, _segmentMetadata.getColumnMetadataFor(column), indexCreatorProvider,
-              false);
+          createForwardIndexIfNeeded(segmentWriter, column, indexCreatorProvider, false);
           if (!segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
             throw new IOException(
                 String.format("Dictionary should still exist after rebuilding forward index for dictionary column: %s",
@@ -159,8 +157,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           break;
         }
         case ENABLE_FORWARD_INDEX_FOR_RAW_COLUMN: {
-          createForwardIndexIfNeeded(segmentWriter, _segmentMetadata.getColumnMetadataFor(column), indexCreatorProvider,
-              false);
+          createForwardIndexIfNeeded(segmentWriter, column, indexCreatorProvider, false);
           if (segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
             throw new IOException(
                 String.format("Dictionary should not exist after rebuilding forward index for raw column: %s", column));
@@ -191,12 +188,12 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     Map<String, Operation> columnOperationMap = new HashMap<>();
 
     // Does not work for segment versions < V3.
-    if (_segmentMetadata.getVersion().compareTo(SegmentVersion.v3) < 0) {
+    if (_segmentDirectory.getSegmentMetadata().getVersion().compareTo(SegmentVersion.v3) < 0) {
       return columnOperationMap;
     }
 
     // From existing column config.
-    Set<String> existingAllColumns = _segmentMetadata.getAllColumns();
+    Set<String> existingAllColumns = _segmentDirectory.getSegmentMetadata().getAllColumns();
     Set<String> existingDictColumns =
         segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.DICTIONARY);
     Set<String> existingNoDictColumns = new HashSet<>();
@@ -228,7 +225,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         Preconditions.checkState(_indexLoadingConfig.getInvertedIndexColumns().contains(column),
             String.format("Must enable inverted index to disable the forward index for column: %s", column));
 
-        ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         if (columnMetadata.isSorted()) {
           // Check if the column is sorted. If sorted, disabling forward index should be a no-op. Do not return an
           // operation for this column related to disabling forward index.
@@ -244,7 +241,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       } else if (existingForwardIndexDisabledColumns.contains(column)
           && !newForwardIndexDisabledColumns.contains(column)) {
         // Existing column does not have a forward index. New column config enables the forward index
-        ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         if (columnMetadata != null && columnMetadata.isSorted()) {
           // Check if the column is sorted. If sorted, disabling forward index should be a no-op and forward index
           // should already exist. Do not return an operation for this column related to enabling forward index.
@@ -274,13 +271,13 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
 
         // Note that RAW columns cannot be sorted.
-        ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
+        ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         Preconditions.checkState(!existingColMetadata.isSorted(), "Raw column=" + column + " cannot be sorted.");
 
         columnOperationMap.put(column, Operation.ENABLE_DICTIONARY);
       } else if (existingDictColumns.contains(column) && newNoDictColumns.contains(column)) {
         // Existing column has dictionary. New config for the column is RAW.
-        if (shouldDisableDictionary(column, _segmentMetadata.getColumnMetadataFor(column))) {
+        if (shouldDisableDictionary(column, _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column))) {
           columnOperationMap.put(column, Operation.DISABLE_DICTIONARY);
         }
       } else if (existingNoDictColumns.contains(column) && newNoDictColumns.contains(column)) {
@@ -321,7 +318,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
   private boolean shouldChangeCompressionType(String column, SegmentDirectory.Reader segmentReader)
       throws Exception {
-    ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
+    ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
 
     // The compression type for an existing segment can only be determined by reading the forward index header.
     try (ForwardIndexReader fwdIndexReader = LoaderUtils.getForwardIndexReader(segmentReader, existingColMetadata)) {
@@ -346,11 +343,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private void rewriteRawForwardIndexForCompressionChange(String column, SegmentDirectory.Writer segmentWriter,
       IndexCreatorProvider indexCreatorProvider)
       throws Exception {
-    ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
+    ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
     boolean isSingleValue = existingColMetadata.isSingleValue();
 
-    File indexDir = _segmentMetadata.getIndexDir();
-    String segmentName = _segmentMetadata.getName();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     File inProgress = new File(indexDir, column + ".fwd.inprogress");
     String fileExtension = isSingleValue ? V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION
         : V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
@@ -705,11 +702,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private void createDictBasedForwardIndex(String column, SegmentDirectory.Writer segmentWriter,
       IndexCreatorProvider indexCreatorProvider)
       throws Exception {
-    ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
+    ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
     boolean isSingleValue = existingColMetadata.isSingleValue();
 
-    File indexDir = _segmentMetadata.getIndexDir();
-    String segmentName = _segmentMetadata.getName();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     File inProgress = new File(indexDir, column + ".dict.inprogress");
     File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENSION);
     String fwdIndexFileExtension;
@@ -760,7 +757,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // .MIN_VALUE. When dictionary is enabled for this column later, cardinality value should be rightly populated so
     // that the dictionary can be loaded.
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(statsCollector.getCardinality()));
-    SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties);
+    SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
     // handler will take care of recreating the index.
@@ -792,8 +789,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       boolean useVarLength = SegmentIndexCreationDriverImpl.shouldUseVarLengthDictionary(column,
           _indexLoadingConfig.getVarLengthDictionaryColumns(), reader.getStoredType(), statsCollector);
       SegmentDictionaryCreator dictionaryCreator =
-          new SegmentDictionaryCreator(existingColMetadata.getFieldSpec(), _segmentMetadata.getIndexDir(),
-              useVarLength);
+          new SegmentDictionaryCreator(existingColMetadata.getFieldSpec(),
+              _segmentDirectory.getSegmentMetadata().getIndexDir(), useVarLength);
 
       dictionaryCreator.build(statsCollector.getUniqueValuesSet());
       return dictionaryCreator;
@@ -832,11 +829,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private void disableDictionaryAndCreateRawForwardIndex(String column, SegmentDirectory.Writer segmentWriter,
       IndexCreatorProvider indexCreatorProvider)
       throws Exception {
-    ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
+    ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
     boolean isSingleValue = existingColMetadata.isSingleValue();
 
-    File indexDir = _segmentMetadata.getIndexDir();
-    String segmentName = _segmentMetadata.getName();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     File inProgress = new File(indexDir, column + ".fwd.inprogress");
     String fileExtension = isSingleValue ? V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION
         : V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
@@ -865,7 +862,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
-    SegmentMetadataUtils.updateMetadataProperties(_segmentMetadata, metadataProperties);
+    SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // Remove range index, inverted index and FST index.
     removeDictRelatedIndexes(column, segmentWriter);
@@ -920,7 +917,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
   private int getMaxRowLengthForMVColumn(String column, ForwardIndexReader reader, Dictionary dictionary)
       throws Exception {
-    ColumnMetadata existingColMetadata = _segmentMetadata.getColumnMetadataFor(column);
+    ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
     AbstractColumnStatisticsCollector statsCollector =
         getStatsCollector(column, dictionary.getValueType().getStoredType());
     PinotSegmentColumnReader columnReader =

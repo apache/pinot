@@ -30,7 +30,6 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.GeoSpatialIndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -54,14 +53,14 @@ public class H3IndexHandler extends BaseIndexHandler {
 
   private final Map<String, H3IndexConfig> _h3Configs;
 
-  public H3IndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentMetadata, indexLoadingConfig);
+  public H3IndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+    super(segmentDirectory, indexLoadingConfig);
     _h3Configs = indexLoadingConfig.getH3IndexConfigs();
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
-    String segmentName = _segmentMetadata.getName();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_h3Configs.keySet());
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
     // Check if any existing index need to be removed.
@@ -73,7 +72,7 @@ public class H3IndexHandler extends BaseIndexHandler {
     }
     // Check if any new index need to be added.
     for (String column : columnsToAddIdx) {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateH3Index(columnMetadata)) {
         LOGGER.info("Need to create new H3 index for segment: {}, column: {}", segmentName, column);
         return true;
@@ -87,7 +86,7 @@ public class H3IndexHandler extends BaseIndexHandler {
       throws Exception {
     Set<String> columnsToAddIdx = new HashSet<>(_h3Configs.keySet());
     // Remove indices not set in table config any more
-    String segmentName = _segmentMetadata.getName();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.H3_INDEX);
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
@@ -97,7 +96,7 @@ public class H3IndexHandler extends BaseIndexHandler {
       }
     }
     for (String column : columnsToAddIdx) {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateH3Index(columnMetadata)) {
         createH3IndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider, indexCreatorProvider);
       }
@@ -111,8 +110,8 @@ public class H3IndexHandler extends BaseIndexHandler {
   private void createH3IndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
       GeoSpatialIndexCreatorProvider geoSpatialIndexCreatorProvider, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
-    File indexDir = _segmentMetadata.getIndexDir();
-    String segmentName = _segmentMetadata.getName();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
     File inProgress = new File(indexDir, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION + ".inprogress");
     File h3IndexFile = new File(indexDir, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
@@ -129,7 +128,7 @@ public class H3IndexHandler extends BaseIndexHandler {
     }
 
     // Create a temporary forward index if it is disabled and does not exist
-    createForwardIndexIfNeeded(segmentWriter, columnMetadata, indexCreatorProvider, true);
+    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, indexCreatorProvider, true);
 
     // Create new H3 index for the column.
     LOGGER.info("Creating new H3 index for segment: {}, column: {}", segmentName, columnName);
@@ -142,7 +141,7 @@ public class H3IndexHandler extends BaseIndexHandler {
     }
 
     // For v3, write the generated H3 index file into the single file and remove it.
-    if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
+    if (_segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3) {
       LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, h3IndexFile, ColumnIndexType.H3_INDEX);
     }
 
@@ -155,7 +154,7 @@ public class H3IndexHandler extends BaseIndexHandler {
   private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
       GeoSpatialIndexCreatorProvider indexCreatorProvider)
       throws IOException {
-    File indexDir = _segmentMetadata.getIndexDir();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
@@ -175,7 +174,7 @@ public class H3IndexHandler extends BaseIndexHandler {
   private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
       GeoSpatialIndexCreatorProvider indexCreatorProvider)
       throws Exception {
-    File indexDir = _segmentMetadata.getIndexDir();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String columnName = columnMetadata.getColumnName();
     try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();

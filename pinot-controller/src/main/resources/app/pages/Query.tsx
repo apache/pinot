@@ -553,93 +553,92 @@ const QueryPage = () => {
                                    </Alert>
                   )
                 }
-
-                {resultError ? (
+        
+                {/* Sql result errors */}
+                {resultError && (
                   <Alert severity="error" className={classes.sqlError}>
                     {resultError}
                   </Alert>
-                ) : (
-                  <>
-                    <Grid item xs style={{ backgroundColor: 'white' }}>
-                      {resultData.columns.length ? (
-                        <>
-                          <Grid container className={classes.actionBtns}>
-                            <Button
-                              variant="contained"
-                              color="primary"
-                              size="small"
-                              className={classes.btn}
-                              onClick={() => downloadData('xls')}
-                            >
-                              Excel
-                            </Button>
-                            <Button
-                              variant="contained"
-                              color="primary"
-                              size="small"
-                              className={classes.btn}
-                              onClick={() => downloadData('csv')}
-                            >
-                              CSV
-                            </Button>
-                            <Button
-                              variant="contained"
-                              color="primary"
-                              size="small"
-                              className={classes.btn}
-                              onClick={() => copyToClipboard()}
-                            >
-                              Copy
-                            </Button>
-                            {copyMsg ? (
-                              <Alert
-                                icon={<FileCopyIcon fontSize="inherit" />}
-                                severity="info"
-                              >
-                                Copied {resultData.records.length} rows to
-                                Clipboard
-                              </Alert>
-                            ) : null}
-
-                            <FormControlLabel
-                              control={
-                                <Switch
-                                  checked={checked.showResultJSON}
-                                  onChange={handleChange}
-                                  name="showResultJSON"
-                                  color="primary"
-                                />
-                              }
-                              label="Show JSON format"
-                              className={classes.runNowBtn}
-                            />
-                          </Grid>
-                          {!checked.showResultJSON ? (
-                            <CustomizedTables
-                              title="Query Result"
-                              data={resultData}
-                              isSticky={true}
-                              showSearchBox={true}
-                              inAccordionFormat={true}
-                            />
-                          ) : resultData.columns.length ? (
-                            <SimpleAccordion
-                              headerTitle="Query Result (JSON Format)"
-                              showSearchBox={false}
-                            >
-                              <CodeMirror
-                                options={jsonoptions}
-                                value={outputResult}
-                                className={classes.queryOutput}
-                                autoCursor={false}
-                              />
-                            </SimpleAccordion>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </Grid>
-                  </>
                 )}
+        
+                <Grid item xs style={{ backgroundColor: 'white' }}>
+                  {resultData.columns.length ? (
+                    <>
+                      <Grid container className={classes.actionBtns}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          className={classes.btn}
+                          onClick={() => downloadData('xls')}
+                        >
+                          Excel
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          className={classes.btn}
+                          onClick={() => downloadData('csv')}
+                        >
+                          CSV
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          className={classes.btn}
+                          onClick={() => copyToClipboard()}
+                        >
+                          Copy
+                        </Button>
+                        {copyMsg ? (
+                          <Alert
+                            icon={<FileCopyIcon fontSize="inherit" />}
+                            severity="info"
+                          >
+                            Copied {resultData.records.length} rows to
+                            Clipboard
+                          </Alert>
+                        ) : null}
+
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={checked.showResultJSON}
+                              onChange={handleChange}
+                              name="showResultJSON"
+                              color="primary"
+                            />
+                          }
+                          label="Show JSON format"
+                          className={classes.runNowBtn}
+                        />
+                      </Grid>
+                      {!checked.showResultJSON ? (
+                        <CustomizedTables
+                          title="Query Result"
+                          data={resultData}
+                          isSticky={true}
+                          showSearchBox={true}
+                          inAccordionFormat={true}
+                        />
+                      ) : resultData.columns.length ? (
+                        <SimpleAccordion
+                          headerTitle="Query Result (JSON Format)"
+                          showSearchBox={false}
+                        >
+                          <CodeMirror
+                            options={jsonoptions}
+                            value={outputResult}
+                            className={classes.queryOutput}
+                            autoCursor={false}
+                          />
+                        </SimpleAccordion>
+                      ) : null}
+                    </>
+                  ) : null}
+                </Grid>
               </>
             )}
           </Grid>

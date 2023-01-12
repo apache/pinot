@@ -18,15 +18,20 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
+import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskPartitionState;
+import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -192,5 +197,51 @@ public class PinotHelixTaskResourceManagerTest {
     assertEquals(taskProgress, "No worker has run this subtask");
     taskProgress = (String) progress.get(subtaskNames[2]);
     assertEquals(taskProgress, "No worker has run this subtask");
+  }
+
+  @Test
+  public void testGetTableTaskCount() {
+    String taskType = "TestTask";
+    String taskName = "Task_TestTask_12345";
+    String helixJobQueueName = PinotHelixTaskResourceManager.getHelixJobQueueName(taskType);
+    String helixJobName = helixJobQueueName + "_" + taskName;
+
+    TaskDriver taskDriver = mock(TaskDriver.class);
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+
+    JobContext jobContext = mock(JobContext.class);
+    when(taskDriver.getJobContext(helixJobName)).thenReturn(jobContext);
+    when(jobContext.getPartitionSet()).thenReturn(ImmutableSet.of(0, 1));
+    when(jobContext.getTaskIdForPartition(0)).thenReturn("taskId0");
+    when(jobContext.getTaskIdForPartition(1)).thenReturn("taskId1");
+    when(jobContext.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
+    when(jobContext.getPartitionState(1)).thenReturn(TaskPartitionState.COMPLETED);
+
+    JobConfig jobConfig = mock(JobConfig.class);
+    when(taskDriver.getJobConfig(helixJobName)).thenReturn(jobConfig);
+    when(jobConfig.getTaskConfig("taskId0")).thenReturn(new TaskConfig("", new HashMap<>()));
+    when(jobConfig.getTaskConfig("taskId1")).thenReturn(new TaskConfig("",
+        new HashMap<>(ImmutableMap.of("tableName", "table1_OFFLINE"))));
+
+    PinotHelixTaskResourceManager mgr =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), taskDriver);
+    Map<String, PinotHelixTaskResourceManager.TaskCount> tableTaskCount = mgr.getTableTaskCount(taskName);
+    assertEquals(tableTaskCount.size(), 2);
+
+    PinotHelixTaskResourceManager.TaskCount taskCount = tableTaskCount.get("table1_OFFLINE");
+    assertEquals(taskCount.getTotal(), 1);
+    assertEquals(taskCount.getCompleted(), 1);
+    assertEquals(taskCount.getRunning(), 0);
+    assertEquals(taskCount.getWaiting(), 0);
+    assertEquals(taskCount.getError(), 0);
+    assertEquals(taskCount.getUnknown(), 0);
+    taskCount = tableTaskCount.get("unknown");
+    assertEquals(taskCount.getTotal(), 1);
+    assertEquals(taskCount.getCompleted(), 0);
+    assertEquals(taskCount.getRunning(), 1);
+    assertEquals(taskCount.getWaiting(), 0);
+    assertEquals(taskCount.getError(), 0);
+    assertEquals(taskCount.getUnknown(), 0);
   }
 }

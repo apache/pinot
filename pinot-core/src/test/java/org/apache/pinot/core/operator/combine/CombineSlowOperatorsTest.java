@@ -146,8 +146,8 @@ public class CombineSlowOperatorsTest {
     });
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY column");
     queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
-    SelectionOrderByCombineOperator combineOperator =
-        new SelectionOrderByCombineOperator(operators, queryContext, _executorService);
+    MinMaxValueBasedSelectionOrderByCombineOperator combineOperator =
+        new MinMaxValueBasedSelectionOrderByCombineOperator(operators, queryContext, _executorService);
     testCancelCombineOperator(combineOperator, ready, "Cancelled while merging results blocks");
   }
 

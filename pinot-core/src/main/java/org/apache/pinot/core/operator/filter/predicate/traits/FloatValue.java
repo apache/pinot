@@ -16,21 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.transformer;
+package org.apache.pinot.core.operator.filter.predicate.traits;
 
-import org.apache.pinot.spi.data.readers.GenericRow;
-
-
-/**
- * Interface for record transformer
- */
-public interface RecordTransformer {
-
-  /**
-   * Transform the given row to another row
-   *
-   * @param row an original row
-   * @return a transformed row
-   */
-  GenericRow transformRecord(GenericRow row);
+public interface FloatValue {
+  float getFloat();
 }

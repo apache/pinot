@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -41,12 +40,12 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseIndexHandler.class);
 
-  protected final SegmentMetadata _segmentMetadata;
   protected final IndexLoadingConfig _indexLoadingConfig;
   protected final Set<String> _tmpForwardIndexColumns;
+  protected final SegmentDirectory _segmentDirectory;
 
-  public BaseIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    _segmentMetadata = segmentMetadata;
+  public BaseIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+    _segmentDirectory = segmentDirectory;
     _indexLoadingConfig = indexLoadingConfig;
     _tmpForwardIndexColumns = new HashSet<>();
   }
@@ -62,13 +61,12 @@ public abstract class BaseIndexHandler implements IndexHandler {
     }
   }
 
-  protected void createForwardIndexIfNeeded(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      IndexCreatorProvider indexCreatorProvider, boolean isTemporaryForwardIndex)
+  protected ColumnMetadata createForwardIndexIfNeeded(SegmentDirectory.Writer segmentWriter,
+      String columnName, IndexCreatorProvider indexCreatorProvider, boolean isTemporaryForwardIndex)
       throws IOException {
-    String columnName = columnMetadata.getColumnName();
     if (segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)) {
       LOGGER.info("Forward index already exists for column: {}, skip trying to create it", columnName);
-      return;
+      return _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(columnName);
     }
 
     // If forward index is disabled it means that it has to be dictionary based and the inverted index must exist.
@@ -79,7 +77,7 @@ public abstract class BaseIndexHandler implements IndexHandler {
 
     LOGGER.info("Rebuilding the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
     InvertedIndexAndDictionaryBasedForwardIndexCreator invertedIndexAndDictionaryBasedForwardIndexCreator =
-        new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentMetadata, _indexLoadingConfig,
+        new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, _indexLoadingConfig,
             segmentWriter, indexCreatorProvider, isTemporaryForwardIndex);
     invertedIndexAndDictionaryBasedForwardIndexCreator.regenerateForwardIndex();
 
@@ -94,5 +92,7 @@ public abstract class BaseIndexHandler implements IndexHandler {
     }
 
     LOGGER.info("Rebuilt the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
+
+    return _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(columnName);
   }
 }

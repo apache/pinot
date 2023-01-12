@@ -272,15 +272,17 @@ const getQueryResults = (params) => {
     // if sql api throws error, handle here
     if(typeof queryResponse === 'string'){
       errorStr = queryResponse;
-    } else if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
-      errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
-    } else
-    {
-      if (queryResponse.resultTable?.dataSchema?.columnNames?.length)
-      {
-        columnList = queryResponse.resultTable.dataSchema.columnNames;
-        dataArray = queryResponse.resultTable.rows;
+    } 
+    if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
+      try{
+        errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
+      } catch {
+        errorStr = "";
       }
+    } 
+    if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
+      columnList = queryResponse.resultTable.dataSchema.columnNames;
+      dataArray = queryResponse.resultTable.rows;
     }
 
     const columnStats = ['timeUsedMs',

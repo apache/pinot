@@ -990,8 +990,16 @@ public class PinotHelixResourceManager {
   }
 
   private void retagInstance(String instanceName, String oldTag, String newTag) {
-    _helixAdmin.removeInstanceTag(_helixClusterName, instanceName, oldTag);
-    _helixAdmin.addInstanceTag(_helixClusterName, instanceName, newTag);
+    PropertyKey instanceConfigKey = _keyBuilder.instanceConfig(instanceName);
+    InstanceConfig instanceConfig = _helixDataAccessor.getProperty(instanceConfigKey);
+    if (instanceConfig == null) {
+      throw new NotFoundException("Failed to find instance config for instance: " + instanceName);
+    }
+    instanceConfig.removeTag(oldTag);
+    instanceConfig.addTag(newTag);
+    if (!_helixDataAccessor.setProperty(instanceConfigKey, instanceConfig)) {
+      throw new RuntimeException("Failed to set instance config for instance: " + instanceName);
+    }
   }
 
   public PinotResourceManagerResponse updateServerTenant(Tenant serverTenant) {
@@ -1162,51 +1170,39 @@ public class PinotHelixResourceManager {
   }
 
   public PinotResourceManagerResponse createServerTenant(Tenant serverTenant) {
-    int numberOfInstances = serverTenant.getNumberOfInstances();
-    List<String> unTaggedInstanceList = getOnlineUnTaggedServerInstanceList();
-    if (unTaggedInstanceList.size() < numberOfInstances) {
+    int numInstances = serverTenant.getNumberOfInstances();
+    int numOfflineInstances = serverTenant.getOfflineInstances();
+    int numRealtimeInstances = serverTenant.getRealtimeInstances();
+    if (numInstances < numOfflineInstances || numInstances < numRealtimeInstances) {
+      throw new BadRequestException(
+          String.format("Cannot request more offline instances: %d or realtime instances: %d than total instances: %d",
+              numOfflineInstances, numRealtimeInstances, numInstances));
+    }
+    // TODO: Consider throwing BadRequestException
+    List<String> untaggedInstances = getOnlineUnTaggedServerInstanceList();
+    if (untaggedInstances.size() < numInstances) {
       String message = "Failed to allocate server instances to Tag : " + serverTenant.getTenantName()
-          + ", Current number of untagged server instances : " + unTaggedInstanceList.size()
+          + ", Current number of untagged server instances : " + untaggedInstances.size()
           + ", Request asked number is : " + serverTenant.getNumberOfInstances();
       LOGGER.error(message);
       return PinotResourceManagerResponse.failure(message);
-    } else {
-      if (serverTenant.isCoLocated()) {
-        assignColocatedServerTenant(serverTenant, numberOfInstances, unTaggedInstanceList);
-      } else {
-        assignIndependentServerTenant(serverTenant, numberOfInstances, unTaggedInstanceList);
+    }
+    int index = 0;
+    if (numOfflineInstances > 0) {
+      String offlineServerTag = TagNameUtils.getOfflineTagForTenant(serverTenant.getTenantName());
+      for (int i = 0; i < numOfflineInstances; i++) {
+        retagInstance(untaggedInstances.get(index), Helix.UNTAGGED_SERVER_INSTANCE, offlineServerTag);
+        index = (index + 1) % numInstances;
+      }
+    }
+    if (numRealtimeInstances > 0) {
+      String realtimeServerTag = TagNameUtils.getRealtimeTagForTenant(serverTenant.getTenantName());
+      for (int i = 0; i < numRealtimeInstances; i++) {
+        retagInstance(untaggedInstances.get(index), Helix.UNTAGGED_SERVER_INSTANCE, realtimeServerTag);
+        index = (index + 1) % numInstances;
       }
     }
     return PinotResourceManagerResponse.SUCCESS;
-  }
-
-  private void assignIndependentServerTenant(Tenant serverTenant, int numberOfInstances,
-      List<String> unTaggedInstanceList) {
-    String offlineServerTag = TagNameUtils.getOfflineTagForTenant(serverTenant.getTenantName());
-    for (int i = 0; i < serverTenant.getOfflineInstances(); i++) {
-      retagInstance(unTaggedInstanceList.get(i), Helix.UNTAGGED_SERVER_INSTANCE, offlineServerTag);
-    }
-    String realtimeServerTag = TagNameUtils.getRealtimeTagForTenant(serverTenant.getTenantName());
-    for (int i = 0; i < serverTenant.getRealtimeInstances(); i++) {
-      retagInstance(unTaggedInstanceList.get(i + serverTenant.getOfflineInstances()), Helix.UNTAGGED_SERVER_INSTANCE,
-          realtimeServerTag);
-    }
-  }
-
-  private void assignColocatedServerTenant(Tenant serverTenant, int numberOfInstances,
-      List<String> unTaggedInstanceList) {
-    int cnt = 0;
-    String offlineServerTag = TagNameUtils.getOfflineTagForTenant(serverTenant.getTenantName());
-    for (int i = 0; i < serverTenant.getOfflineInstances(); i++) {
-      retagInstance(unTaggedInstanceList.get(cnt++), Helix.UNTAGGED_SERVER_INSTANCE, offlineServerTag);
-    }
-    String realtimeServerTag = TagNameUtils.getRealtimeTagForTenant(serverTenant.getTenantName());
-    for (int i = 0; i < serverTenant.getRealtimeInstances(); i++) {
-      retagInstance(unTaggedInstanceList.get(cnt++), Helix.UNTAGGED_SERVER_INSTANCE, realtimeServerTag);
-      if (cnt == numberOfInstances) {
-        cnt = 0;
-      }
-    }
   }
 
   public PinotResourceManagerResponse createBrokerTenant(Tenant brokerTenant) {

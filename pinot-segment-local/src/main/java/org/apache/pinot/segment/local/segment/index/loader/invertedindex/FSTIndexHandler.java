@@ -29,7 +29,6 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -70,15 +69,15 @@ public class FSTIndexHandler extends BaseIndexHandler {
   private final Set<String> _columnsToAddIdx;
   private final FSTType _fstType;
 
-  public FSTIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentMetadata, indexLoadingConfig);
+  public FSTIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
+    super(segmentDirectory, indexLoadingConfig);
     _fstType = indexLoadingConfig.getFSTIndexType();
     _columnsToAddIdx = indexLoadingConfig.getFSTIndexColumns();
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
-    String segmentName = _segmentMetadata.getName();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
     // Check if any existing index need to be removed.
@@ -90,7 +89,7 @@ public class FSTIndexHandler extends BaseIndexHandler {
     }
     // Check if any new index need to be added.
     for (String column : columnsToAddIdx) {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateFSTIndex(columnMetadata)) {
         LOGGER.info("Need to create new FST index for segment: {}, column: {}", segmentName, column);
         return true;
@@ -103,7 +102,7 @@ public class FSTIndexHandler extends BaseIndexHandler {
   public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
       throws Exception {
     // Remove indices not set in table config any more
-    String segmentName = _segmentMetadata.getName();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FST_INDEX);
     for (String column : existingColumns) {
@@ -114,7 +113,7 @@ public class FSTIndexHandler extends BaseIndexHandler {
       }
     }
     for (String column : columnsToAddIdx) {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateFSTIndex(columnMetadata)) {
         createFSTIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
       }
@@ -154,8 +153,8 @@ public class FSTIndexHandler extends BaseIndexHandler {
   private void createFSTIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
       TextIndexCreatorProvider indexCreatorProvider)
       throws IOException {
-    File indexDir = _segmentMetadata.getIndexDir();
-    String segmentName = _segmentMetadata.getName();
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
     File inProgress = new File(indexDir, columnName + ".fst.inprogress");
     File fstIndexFile = new File(indexDir, columnName + FST_INDEX_FILE_EXTENSION);
@@ -182,7 +181,7 @@ public class FSTIndexHandler extends BaseIndexHandler {
     fstIndexCreator.seal();
 
     // For v3, write the generated range index file into the single file and remove it.
-    if (_segmentMetadata.getVersion() == SegmentVersion.v3) {
+    if (_segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3) {
       LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, fstIndexFile, ColumnIndexType.FST_INDEX);
     }
 

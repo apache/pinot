@@ -21,38 +21,36 @@ package org.apache.pinot.plugin.minion.tasks;
 import java.util.Set;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
-import org.apache.pinot.plugin.minion.tasks.converttorawindex.ConvertToRawIndexTaskExecutorFactory;
-import org.apache.pinot.plugin.minion.tasks.converttorawindex.ConvertToRawIndexTaskGenerator;
 import org.apache.pinot.plugin.minion.tasks.mergerollup.MergeRollupTaskExecutorFactory;
 import org.apache.pinot.plugin.minion.tasks.mergerollup.MergeRollupTaskGenerator;
 import org.apache.pinot.plugin.minion.tasks.purge.PurgeTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.purge.PurgeTaskGenerator;
 import org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskExecutorFactory;
 import org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskGenerator;
 import org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush.SegmentGenerationAndPushTaskExecutorFactory;
 import org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush.SegmentGenerationAndPushTaskGenerator;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertTrue;
 
 
 public class TaskRegistryTest {
+
   @Test
   public void testTaskGeneratorRegistry() {
     Set<Class<?>> classes = TaskGeneratorRegistry.getTaskGeneratorClasses();
-    Assert.assertTrue(classes.size() >= 4);
-    Assert.assertTrue(classes.contains(ConvertToRawIndexTaskGenerator.class));
-    Assert.assertTrue(classes.contains(MergeRollupTaskGenerator.class));
-    Assert.assertTrue(classes.contains(SegmentGenerationAndPushTaskGenerator.class));
-    Assert.assertTrue(classes.contains(RealtimeToOfflineSegmentsTaskGenerator.class));
+    assertTrue(classes.contains(MergeRollupTaskGenerator.class));
+    assertTrue(classes.contains(PurgeTaskGenerator.class));
+    assertTrue(classes.contains(SegmentGenerationAndPushTaskGenerator.class));
+    assertTrue(classes.contains(RealtimeToOfflineSegmentsTaskGenerator.class));
   }
 
   @Test
   public void testTaskExecutorRegistry() {
     Set<Class<?>> classes = TaskExecutorFactoryRegistry.getTaskExecutorFactoryClasses();
-    Assert.assertTrue(classes.size() >= 5);
-    Assert.assertTrue(classes.contains(ConvertToRawIndexTaskExecutorFactory.class));
-    Assert.assertTrue(classes.contains(MergeRollupTaskExecutorFactory.class));
-    Assert.assertTrue(classes.contains(PurgeTaskExecutorFactory.class));
-    Assert.assertTrue(classes.contains(SegmentGenerationAndPushTaskExecutorFactory.class));
-    Assert.assertTrue(classes.contains(RealtimeToOfflineSegmentsTaskExecutorFactory.class));
+    assertTrue(classes.contains(MergeRollupTaskExecutorFactory.class));
+    assertTrue(classes.contains(PurgeTaskExecutorFactory.class));
+    assertTrue(classes.contains(SegmentGenerationAndPushTaskExecutorFactory.class));
+    assertTrue(classes.contains(RealtimeToOfflineSegmentsTaskExecutorFactory.class));
   }
 }

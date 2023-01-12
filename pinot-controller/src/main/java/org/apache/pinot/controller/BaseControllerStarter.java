@@ -60,13 +60,15 @@ import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.minion.InMemoryTaskManagerStatusCache;
 import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
-import org.apache.pinot.common.utils.LoggerFileServer;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.common.utils.log.DummyLogFileServer;
+import org.apache.pinot.common.utils.log.LocalLogFileServer;
+import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -76,7 +78,7 @@ import org.apache.pinot.controller.api.resources.InvalidControllerConfigExceptio
 import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.minion.MinionInstancesCleanupTask;
+import org.apache.pinot.controller.helix.core.cleanup.StaleInstancesCleanupTask;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
@@ -164,7 +166,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected SegmentCompletionManager _segmentCompletionManager;
   protected LeadControllerManager _leadControllerManager;
   protected List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbackList;
-  protected MinionInstancesCleanupTask _minionInstancesCleanupTask;
+  protected StaleInstancesCleanupTask _staleInstancesCleanupTask;
   protected TaskMetricsEmitter _taskMetricsEmitter;
   protected MultiThreadedHttpConnectionManager _connectionManager;
 
@@ -295,8 +297,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return _taskManager;
   }
 
-  public MinionInstancesCleanupTask getMinionInstancesCleanupTask() {
-    return _minionInstancesCleanupTask;
+  public StaleInstancesCleanupTask getStaleInstancesCleanupTask() {
+    return _staleInstancesCleanupTask;
   }
 
   @Override
@@ -483,7 +485,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_pinotLLCRealtimeSegmentManager).to(PinotLLCRealtimeSegmentManager.class);
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
-          bind(new LoggerFileServer(loggerRootDir)).to(LoggerFileServer.class);
+          bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);
+        } else {
+          bind(new DummyLogFileServer()).to(LogFileServer.class);
         }
       }
     });
@@ -687,9 +691,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         _executorService, _connectionManager);
     periodicTasks.add(_segmentRelocator);
-    _minionInstancesCleanupTask =
-        new MinionInstancesCleanupTask(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
-    periodicTasks.add(_minionInstancesCleanupTask);
+    _staleInstancesCleanupTask =
+        new StaleInstancesCleanupTask(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+    periodicTasks.add(_staleInstancesCleanupTask);
     _taskMetricsEmitter =
         new TaskMetricsEmitter(_helixResourceManager, _helixTaskResourceManager, _leadControllerManager, _config,
             _controllerMetrics);

@@ -65,4 +65,9 @@ public interface ValueReader extends Closeable {
    * NOTE: Do not reuse buffer for BYTES because the return value can have variable length.
    */
   byte[] getBytes(int index, int numBytesPerValue);
+
+  /**
+   * Assumes a zero padding byte, caller responsible for checking before use.
+   */
+  int compareUtf8Bytes(int index, int numBytesPerValue, byte[] bytes);
 }

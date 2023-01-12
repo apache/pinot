@@ -378,6 +378,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
     _consecutiveErrorCount++;
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+    _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
+        1L);
     if (_consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
       _segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after {} attempts",
           _consecutiveErrorCount, e);
@@ -420,6 +423,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+        _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
+            1L);
         _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
@@ -594,12 +600,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           }
         }
       }
-
       _currentOffset = messagesAndOffsets.getNextStreamPartitionMsgOffsetAtIndex(index);
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
       streamMessageCount++;
     }
+    updateIngestionDelay(indexedMessageCount);
     updateCurrentDocumentCountMetrics();
     if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
       _hasMessagesFetched = true;
@@ -608,6 +614,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             indexedMessageCount, streamMessageCount, _currentOffset);
       }
     } else if (!prematureExit) {
+      // Record Pinot ingestion delay as zero since we are up-to-date and no new events
+      _realtimeTableDataManager.updateIngestionDelay(System.currentTimeMillis(), _partitionGroupId);
       if (_segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("empty batch received - sleeping for {}ms", idlePipeSleepTimeMillis);
       }
@@ -1552,6 +1560,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
     _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
+  }
+
+  /*
+   * Updates the ingestion delay if messages were processed using the time stamp for the last consumed event.
+   *
+   * @param indexedMessagesCount
+   */
+  private void updateIngestionDelay(int indexedMessageCount) {
+    if ((indexedMessageCount > 0) && (_lastRowMetadata != null)) {
+      // Record Ingestion delay for this partition
+      _realtimeTableDataManager.updateIngestionDelay(_lastRowMetadata.getRecordIngestionTimeMs(),
+          _partitionGroupId);
+    }
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

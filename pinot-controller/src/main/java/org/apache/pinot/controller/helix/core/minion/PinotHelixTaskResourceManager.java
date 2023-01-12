@@ -58,6 +58,7 @@ import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -80,6 +81,7 @@ public class PinotHelixTaskResourceManager {
 
   private static final String TASK_QUEUE_PREFIX = "TaskQueue" + TASK_NAME_SEPARATOR;
   private static final String TASK_PREFIX = "Task" + TASK_NAME_SEPARATOR;
+  private static final String UNKNOWN_TABLE_NAME = "unknown";
 
   private final TaskDriver _taskDriver;
   private final PinotHelixResourceManager _helixResourceManager;
@@ -345,7 +347,7 @@ public class PinotHelixTaskResourceManager {
 
   /**
    * This method returns a count of sub-tasks in various states, given the top-level task name.
-   * @param parentTaskName (e.g. "Task_TestTask_1624403781879")
+   * @param parentTaskName in the form "Task_<taskType>_<uuid>_<timestamp>"
    * @return TaskCount object
    */
   public synchronized TaskCount getTaskCount(String parentTaskName) {
@@ -364,7 +366,48 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Returns a set of Task names (in the form "Task_TestTask_1624403781879") that are in progress or not started yet.
+   * This method returns a map of table name to count of sub-tasks in various states, given the top-level task name.
+   * @param taskName in the form "Task_<taskType>_<uuid>_<timestamp>"
+   * @return a map of table name to {@link TaskCount}
+   */
+  public synchronized Map<String, TaskCount> getTableTaskCount(String taskName) {
+    Map<String, TaskPartitionState> subtaskStates = getSubtaskStates(taskName);
+    if (subtaskStates.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
+    // in theory, this should not happen because we have already checked JobContext
+    if (jobConfig == null) {
+      LOGGER.warn("task {} has job context but its job config does not exist", taskName);
+      return Collections.emptyMap();
+    }
+
+    Map<String, TaskCount> tableTaskCountMap = new HashMap<>();
+    subtaskStates.forEach((taskId, taskState) -> {
+      TaskConfig taskConfig = jobConfig.getTaskConfig(taskId);
+      String tableNameWithType;
+      // in theory, this should not happen because jobContext has this taskId
+      if (taskConfig == null) {
+        LOGGER.warn("sub-task {} exists in helix job context but its task config does not exist", taskId);
+        tableNameWithType = UNKNOWN_TABLE_NAME;
+      } else {
+        tableNameWithType = taskConfig.getConfigMap().getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME);
+      }
+      tableTaskCountMap.compute(tableNameWithType, (name, taskCount) -> {
+        if (taskCount == null) {
+          taskCount = new TaskCount();
+        }
+        taskCount.addTaskState(taskState);
+        return taskCount;
+      });
+    });
+    return tableTaskCountMap;
+  }
+
+  /**
+   * Returns a set of Task names (in the form "Task_<taskType>_<uuid>_<timestamp>") that are in progress or not started
+   * yet.
    *
    * @param taskType
    * @return Set of task names
@@ -594,16 +637,12 @@ public class PinotHelixTaskResourceManager {
 
       // Iterate through all task configs associated with this task name
       for (PinotTaskConfig taskConfig : getSubtaskConfigs(taskName)) {
-        Map<String, String> pinotConfigs = taskConfig.getConfigs();
-
         // Filter task configs that matches this table name
-        if (pinotConfigs != null) {
-          String tableNameConfig = pinotConfigs.get(TABLE_NAME);
-          if (tableNameConfig != null && tableNameConfig.equals(tableNameWithType)) {
-            // Found a match ! Track state for this particular task in the final result map
-            filteredTaskStateMap.put(taskName, taskStateMap.get(taskName));
-            break;
-          }
+        String tableNameConfig = taskConfig.getTableName();
+        if (tableNameConfig != null && tableNameConfig.equals(tableNameWithType)) {
+          // Found a match ! Track state for this particular task in the final result map
+          filteredTaskStateMap.put(taskName, taskStateMap.get(taskName));
+          break;
         }
       }
     }
