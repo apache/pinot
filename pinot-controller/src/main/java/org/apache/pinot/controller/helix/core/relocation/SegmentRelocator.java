@@ -24,12 +24,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.function.Consumer;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -76,10 +78,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final int _serverAdminRequestTimeoutMs;
   private final long _externalViewCheckIntervalInMs;
   private final long _externalViewStabilizationTimeoutInMs;
-  private final boolean _rebalanceTablesSequentially;
-  // This variable can be accessed from multiple threads, thus made volatile.
-  private volatile String _tableInProgress;
-  private final Queue<String> _waitingQueue = new LinkedList<>();
+  private final Set<String> _waitingTables;
+  private final BlockingQueue<String> _waitingQueue;
 
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
@@ -97,11 +97,65 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewCheckIntervalInMs());
     _externalViewStabilizationTimeoutInMs =
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewStabilizationTimeoutInMs());
-    _rebalanceTablesSequentially = config.isSegmentRelocatorRebalanceTablesSequentially();
+    if (config.isSegmentRelocatorRebalanceTablesSequentially()) {
+      _waitingTables = ConcurrentHashMap.newKeySet();
+      _waitingQueue = new LinkedBlockingQueue<>();
+      _executorService.submit(() -> {
+        LOGGER.info("Rebalance tables sequentially");
+        while (!Thread.currentThread().isInterrupted()) {
+          rebalanceWaitingTable(this::rebalanceTable);
+        }
+        return null;
+      });
+    } else {
+      _waitingTables = null;
+      _waitingQueue = null;
+    }
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
+    if (_waitingTables == null) {
+      LOGGER.debug("Rebalance table: {} immediately", tableNameWithType);
+      _executorService.submit(() -> rebalanceTable(tableNameWithType));
+      return;
+    }
+    putTableToWait(tableNameWithType);
+  }
+
+  @VisibleForTesting
+  synchronized void putTableToWait(String tableNameWithType) {
+    if (_waitingTables.contains(tableNameWithType)) {
+      LOGGER.debug("Table: {} is already in waiting queue", tableNameWithType);
+      return;
+    }
+    if (_waitingQueue.offer(tableNameWithType)) {
+      _waitingTables.add(tableNameWithType);
+      LOGGER.debug("Table: {} is added in waiting queue, total waiting: {}", tableNameWithType, _waitingTables.size());
+      return;
+    }
+    // Should not happen as the number of tables is limited in a cluster.
+    LOGGER.warn("Table: {} failed to be put in waiting queue", tableNameWithType);
+  }
+
+  @VisibleForTesting
+  void rebalanceWaitingTable(Consumer<String> rebalancer)
+      throws InterruptedException {
+    String nextTable = _waitingQueue.take();
+    try {
+      rebalancer.accept(nextTable);
+    } finally {
+      _waitingTables.remove(nextTable);
+      LOGGER.debug("Rebalance done for table: {}, total waiting: {}", nextTable, _waitingTables.size());
+    }
+  }
+
+  @VisibleForTesting
+  BlockingQueue<String> getWaitingQueue() {
+    return _waitingQueue;
+  }
+
+  private void rebalanceTable(String tableNameWithType) {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
 
@@ -137,83 +191,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         _externalViewCheckIntervalInMs);
     rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
         _externalViewStabilizationTimeoutInMs);
-    if (_rebalanceTablesSequentially) {
-      rebalanceTableSequentially(tableNameWithType, tableConfig, rebalanceConfig);
-    } else {
-      _executorService.submit(() -> rebalanceTable(tableNameWithType, tableConfig, rebalanceConfig));
-    }
-  }
 
-  /**
-   * Use queue to rebalance tables sequentially, meanwhile make sure every table gets its turn.
-   * @param tableNameWithType table requested to rebalance
-   */
-  private void rebalanceTableSequentially(String tableNameWithType, TableConfig tableConfig,
-      Configuration rebalanceConfig) {
-    if (!rebalanceNextTable(tableNameWithType)) {
-      return;
-    }
-    try {
-      _executorService.submit(() -> {
-        try {
-          rebalanceTable(_tableInProgress, tableConfig, rebalanceConfig);
-        } finally {
-          LOGGER.debug("Rebalance task completed for table: {}", _tableInProgress);
-          _tableInProgress = null;
-        }
-      });
-    } catch (Exception e) {
-      LOGGER.debug("Failed to submit rebalance task for table: {}", _tableInProgress);
-      _tableInProgress = null;
-    }
-  }
-
-  /**
-   * This method can be called in multiple threads like one from periodic task scheduler and those from restful APIs.
-   *
-   * @param tableNameWithType table requested to rebalance
-   * @return true if a new table is to be rebalanced; false if previous table has completed rebalance.
-   */
-  @VisibleForTesting
-  synchronized boolean rebalanceNextTable(String tableNameWithType) {
-    // Add table into the waiting queue if it's not there yet.
-    if (_waitingQueue.contains(tableNameWithType)) {
-      LOGGER.debug("Table: {} is already put in waiting queue for rebalance, queue size: {}", tableNameWithType,
-          _waitingQueue.size());
-    } else {
-      _waitingQueue.offer(tableNameWithType);
-      LOGGER.debug("Put table: {} in waiting queue for rebalance, queue size: {}", tableNameWithType,
-          _waitingQueue.size());
-    }
-    if (_tableInProgress != null) {
-      LOGGER.debug("Rebalance is still ongoing for table: {}", _tableInProgress);
-      return false;
-    }
-    // _tableInProgress won't be null, as at least tableNameWithType passed to the method is in the waiting queue.
-    _tableInProgress = _waitingQueue.poll();
-    LOGGER.debug("Rebalancing table: {}, queue size: {}", _tableInProgress, _waitingQueue.size());
-    return true;
-  }
-
-  // For test purpose
-  @VisibleForTesting
-  Queue<String> getWaitingQueue() {
-    return _waitingQueue;
-  }
-
-  // For test purpose
-  @VisibleForTesting
-  String getTableInProgress() {
-    return _tableInProgress;
-  }
-
-  // For test purpose
-  @VisibleForTesting
-  void setTableInProgress(String table) {
-    _tableInProgress = table;
-  }
-
-  private void rebalanceTable(String tableNameWithType, TableConfig tableConfig, Configuration rebalanceConfig) {
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
       // Table rebalance moves segments to the new ideal servers, which can change for a segment when its target

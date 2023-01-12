@@ -22,9 +22,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -148,80 +150,93 @@ public class SegmentRelocatorTest {
   }
 
   @Test
-  public void testRebalanceNextTable() {
+  public void testRebalanceTablesSequentially()
+      throws InterruptedException {
+    ControllerConf conf = mock(ControllerConf.class);
+    when(conf.isSegmentRelocatorRebalanceTablesSequentially()).thenReturn(true);
     SegmentRelocator relocator =
-        new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class),
-            mock(ControllerConf.class), mock(ControllerMetrics.class), mock(ExecutorService.class),
-            mock(HttpConnectionManager.class));
-    Queue<String> queue = relocator.getWaitingQueue();
-    assertTrue(relocator.rebalanceNextTable("t1"));
-    assertEquals(relocator.getTableInProgress(), "t1");
-    assertEquals(queue.size(), 0);
-    // t1 is still in progress, so t2 waits in queue
-    assertFalse(relocator.rebalanceNextTable("t2"));
-    assertEquals(relocator.getTableInProgress(), "t1");
-    assertEquals(queue.size(), 1);
-    // t1 is still in progress, so t2 waits in queue
-    assertFalse(relocator.rebalanceNextTable("t3"));
-    assertEquals(relocator.getTableInProgress(), "t1");
-    assertEquals(queue.size(), 2);
-    // Add t2 again, queue size doesn't change
-    assertFalse(relocator.rebalanceNextTable("t2"));
-    assertEquals(relocator.getTableInProgress(), "t1");
-    assertEquals(queue.size(), 2);
-    // t1 finishes, add t3 again and it waits
-    relocator.setTableInProgress(null);
-    assertTrue(relocator.rebalanceNextTable("t3"));
-    assertEquals(relocator.getTableInProgress(), "t2");
-    assertEquals(queue.size(), 1);
-    // t2 finishes, add t3 again and it's next to rebalance
-    relocator.setTableInProgress(null);
-    assertTrue(relocator.rebalanceNextTable("t3"));
-    assertEquals(relocator.getTableInProgress(), "t3");
-    assertEquals(queue.size(), 0);
+        new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class), conf,
+            mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpConnectionManager.class));
+    int cnt = 10;
+    for (int i = 0; i < cnt; i++) {
+      relocator.putTableToWait("t_" + i);
+    }
+    for (int i = 0; i < cnt; i++) {
+      relocator.putTableToWait("t_" + RandomUtils.nextInt(0, cnt));
+    }
+    // All tables are tracked and no duplicate table names.
+    Queue<String> waitingQueue = relocator.getWaitingQueue();
+    assertEquals(waitingQueue.size(), cnt);
+    Set<String> tablesInQueue = new HashSet<>(waitingQueue);
+    for (int i = 0; i < cnt; i++) {
+      assertTrue(tablesInQueue.contains("t_" + i));
+    }
+    String[] tableName = new String[1];
+    for (int i = 0; i < cnt; i++) {
+      assertEquals(waitingQueue.size(), cnt - i);
+      relocator.rebalanceWaitingTable(s -> tableName[0] = s);
+      assertEquals(tableName[0], "t_" + i);
+    }
+    assertEquals(waitingQueue.size(), 0);
   }
 
   @Test
-  public void testRebalanceNextTableMultiThreads() {
+  public void testRebalanceTablesSequentiallyWithMultiRequesters() {
+    ControllerConf conf = mock(ControllerConf.class);
+    when(conf.isSegmentRelocatorRebalanceTablesSequentially()).thenReturn(true);
     SegmentRelocator relocator =
-        new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class),
-            mock(ControllerConf.class), mock(ControllerMetrics.class), mock(ExecutorService.class),
-            mock(HttpConnectionManager.class));
+        new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class), conf,
+            mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpConnectionManager.class));
     ExecutorService runner = Executors.newCachedThreadPool();
-    Queue<String> queue = relocator.getWaitingQueue();
-    relocator.rebalanceNextTable("tX");
-    assertEquals(relocator.getTableInProgress(), "tX");
-    assertEquals(queue.size(), 0);
-    // As we put tX in progress, all the new tables are waiting in queue.
+    int cnt = 10;
+    // Three threads to submit tables randomly.
     runner.submit(() -> {
-      relocator.rebalanceNextTable("t1");
-      Thread.sleep(RandomUtils.nextLong(100, 300));
+      for (int i = 0; i < cnt; i++) {
+        relocator.putTableToWait("t_" + RandomUtils.nextInt(0, cnt));
+        Thread.sleep(RandomUtils.nextLong(10, 30));
+      }
       return null;
     });
     runner.submit(() -> {
-      relocator.rebalanceNextTable("t2");
-      Thread.sleep(RandomUtils.nextLong(100, 300));
+      for (int i = 0; i < cnt; i++) {
+        relocator.putTableToWait("t_" + RandomUtils.nextInt(0, cnt));
+        Thread.sleep(RandomUtils.nextLong(10, 30));
+      }
       return null;
     });
     runner.submit(() -> {
-      relocator.rebalanceNextTable("t3");
-      Thread.sleep(RandomUtils.nextLong(100, 300));
+      // This thread puts all tables into queue so let it kick in a bit later.
+      Thread.sleep(100);
+      for (int i = 0; i < cnt; i++) {
+        relocator.putTableToWait("t_" + i);
+        Thread.sleep(RandomUtils.nextLong(10, 30));
+      }
       return null;
     });
-    TestUtils.waitForCondition((Void v) -> queue.size() == 3, 100, 3000, "Expecting 3 tables in waiting queue");
-    // No duplicates of tasks.
-    assertTrue(queue.containsAll(Arrays.asList("t1", "t2", "t3")));
-    // t4 will get its turn.
-    relocator.rebalanceNextTable("t4");
-    assertEquals(queue.size(), 4);
-    TestUtils.waitForCondition((Void v) -> {
-      // To mock the completion of task.
-      relocator.setTableInProgress(null);
-      // To trigger the check of new task.
-      relocator.rebalanceNextTable("tX");
-      String newTaskInProgress = relocator.getTableInProgress();
-      return newTaskInProgress.equals("t4");
-    }, 100, 4000, "Table t4 should get its turn");
+    try {
+      Queue<String> waitingQueue = relocator.getWaitingQueue();
+      TestUtils.waitForCondition((Void v) -> waitingQueue.size() == cnt, 100, 3000,
+          "Expecting all tables get in waiting queue");
+      // No duplicates of tasks.
+      Set<String> tablesInQueue = new HashSet<>(waitingQueue);
+      for (int i = 0; i < cnt; i++) {
+        assertTrue(tablesInQueue.contains("t_" + i));
+      }
+      // t_X will get its turn.
+      relocator.putTableToWait("t_X");
+      assertEquals(waitingQueue.size(), cnt + 1);
+      TestUtils.waitForCondition((Void v) -> {
+        try {
+          String[] tableName = new String[1];
+          relocator.rebalanceWaitingTable(s -> tableName[0] = s);
+          return tableName[0].equals("t_X");
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }, 10, 3000, "Table t_X should get its turn");
+    } finally {
+      runner.shutdownNow();
+    }
   }
 
   private static ZNRecord createSegmentMetadataZNRecord(String segmentName, String tierName) {
