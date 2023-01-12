@@ -28,9 +28,9 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -83,7 +83,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -445,11 +444,6 @@ public class TablesResource {
 
     try {
       IndexSegment indexSegment = segmentDataManager.getSegment();
-      if (indexSegment == null) {
-        throw new WebApplicationException(
-            String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
-            Response.Status.NOT_FOUND);
-      }
       if (!(indexSegment instanceof ImmutableSegmentImpl)) {
         throw new WebApplicationException(
             String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
@@ -458,33 +452,20 @@ public class TablesResource {
       MutableRoaringBitmap validDocIds =
           indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
 
-      File tmpSegmentTarDir =
-          new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), PEER_SEGMENT_DOWNLOAD_DIR);
-      tmpSegmentTarDir.mkdir();
-
-      File validDocIdsSnapshotFile =
-          new File(tmpSegmentTarDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + "_"
-              + V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-
-      try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(validDocIdsSnapshotFile))) {
-        validDocIds.serialize(dataOutputStream);
+      if (validDocIds == null) {
+        throw new WebApplicationException(
+            String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
+            Response.Status.NOT_FOUND);
       }
 
-      // TODO Limit the number of concurrent downloads of segments because compression is an expensive operation.
-      // Download the validDocIdsSnapshot with bitmap format.
-      // Note two clients asking the same validDocIdsSnapshot will result in the same bitmap files being created twice.
-      // Will revisit for optimization if performance becomes an issue.
-
-      Response.ResponseBuilder builder = Response.ok();
-      builder.entity((StreamingOutput) output -> {
-        try {
-          Files.copy(validDocIdsSnapshotFile.toPath(), output);
-        } finally {
-          FileUtils.deleteQuietly(validDocIdsSnapshotFile);
-        }
-      });
-      builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + validDocIdsSnapshotFile.getName());
-      builder.header(HttpHeaders.CONTENT_LENGTH, validDocIdsSnapshotFile.length());
+      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+      try (DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)) {
+        validDocIds.serialize(dataOutputStream);
+        byteArrayOutputStream.close();
+      }
+      byte[] validDocIdsSnapshot = byteArrayOutputStream.toByteArray();
+      Response.ResponseBuilder builder = Response.ok(validDocIdsSnapshot);
+      builder.header(HttpHeaders.CONTENT_LENGTH, byteArrayOutputStream.size());
       return builder.build();
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
