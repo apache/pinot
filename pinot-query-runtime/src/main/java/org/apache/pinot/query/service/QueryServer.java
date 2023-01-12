@@ -25,9 +25,12 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
@@ -45,13 +48,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   private final Server _server;
   private final QueryRunner _queryRunner;
+  private final ExecutorService _executorService;
 
   public QueryServer(int port, QueryRunner queryRunner) {
     _server = ServerBuilder.forPort(port).addService(this).build();
     _queryRunner = queryRunner;
+    _executorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_RUNNER_THREADS,
+        new NamedThreadFactory("query_server_on_" + port + "_port"));
 
-    LOGGER.info("Initialized QueryWorker on port: {} with numWorkerThreads: {}", port,
-        ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    LOGGER.info("Initialized QueryServer on port: {} with numServerThreads: {}", port,
+        ResourceManager.DEFAULT_QUERY_RUNNER_THREADS);
   }
 
   public void start() {
@@ -89,25 +95,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       return;
     }
 
-    // return dispatch successful.
-    // TODO: return meaningful value here.
+    // TODO: break this into parsing and execution, so that responseObserver can return upon compilation complete.
+    // compilation complete indicates dispatch successful.
+    _executorService.submit(() -> _queryRunner.processQuery(distributedStagePlan, requestMetadataMap));
+
     responseObserver.onNext(Worker.QueryResponse.newBuilder()
         .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
     responseObserver.onCompleted();
-
-    // start a new GRPC ctx has all the values as the current context, but won't be cancelled
-    Context ctx = Context.current().fork();
-    // Set ctx as the current context within the Runnable can start asynchronous work here that will not
-    // be cancelled when submit returns
-    ctx.run(() -> {
-      // Process the query
-      try {
-        // TODO: break this into parsing and execution, so that responseObserver can return upon parsing complete.
-        _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while processing request", e);
-        throw new RuntimeException(e);
-      }
-    });
   }
 }

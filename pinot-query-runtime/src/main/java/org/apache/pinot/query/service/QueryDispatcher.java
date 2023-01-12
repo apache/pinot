@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -51,6 +52,7 @@ import org.roaringbitmap.RoaringBitmap;
  * {@code QueryDispatcher} dispatch a query to different workers.
  */
 public class QueryDispatcher {
+  private static final long DEFAULT_SUBMISSION_DEADLINE_MS = 1000;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
 
   public QueryDispatcher() {
@@ -75,6 +77,8 @@ public class QueryDispatcher {
   public int submit(long requestId, QueryPlan queryPlan, long timeoutMs)
       throws Exception {
     int reduceStageId = -1;
+    long submissionDeadlineMs = System.currentTimeMillis() + DEFAULT_SUBMISSION_DEADLINE_MS;
+    List<Future<Worker.QueryResponse>> querySubmitResponse = new ArrayList<>();
     for (Map.Entry<Integer, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
       int stageId = stage.getKey();
       // stage rooting at a mailbox receive node means reduce stage.
@@ -86,19 +90,29 @@ public class QueryDispatcher {
           String host = serverInstance.getHostname();
           int servicePort = serverInstance.getQueryServicePort();
           DispatchClient client = getOrCreateDispatchClient(host, servicePort);
-          Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
+          Future<Worker.QueryResponse> response = client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
                   QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
               .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
               .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs)).build());
-          if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
-            throw new RuntimeException(
-                String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", stageId,
-                    serverInstance, response));
-          }
+          querySubmitResponse.add(response);
         }
       }
     }
-    return reduceStageId;
+    while (System.currentTimeMillis() < submissionDeadlineMs) {
+      for (Future<Worker.QueryResponse> future : querySubmitResponse) {
+        if (!future.isDone()) {
+          break;
+          Thread.sleep(100);
+        }
+      }
+      for (Future<Worker.QueryResponse> future : querySubmitResponse) {
+        if (future.get().containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
+          throw new RuntimeException(
+              String.format("Unable to execute query plan!");
+        }
+      }
+    }
+    throw new RuntimeException("Timeout during query submission");
   }
 
   private DispatchClient getOrCreateDispatchClient(String host, int port) {
@@ -199,16 +213,16 @@ public class QueryDispatcher {
   }
 
   public static class DispatchClient {
-    private final PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub _blockingStub;
+    private final PinotQueryWorkerGrpc.PinotQueryWorkerFutureStub _blockingStub;
     private final ManagedChannel _managedChannel;
 
     public DispatchClient(String host, int port) {
       ManagedChannelBuilder managedChannelBuilder = ManagedChannelBuilder.forAddress(host, port).usePlaintext();
       _managedChannel = managedChannelBuilder.build();
-      _blockingStub = PinotQueryWorkerGrpc.newBlockingStub(_managedChannel);
+      _blockingStub = PinotQueryWorkerGrpc.newFutureStub(_managedChannel);
     }
 
-    public Worker.QueryResponse submit(Worker.QueryRequest request) {
+    public Future<Worker.QueryResponse> submit(Worker.QueryRequest request) {
       return _blockingStub.submit(request);
     }
   }
