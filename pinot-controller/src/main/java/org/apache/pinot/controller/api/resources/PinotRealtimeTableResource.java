@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.ImmutableSet;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -175,7 +176,7 @@ public class PinotRealtimeTableResource {
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST), Set.class);
     Set<String> onlineSegmentsForTable =
         _pinotHelixResourceManager.getSegmentsFromIdealStateMatchingState(tableNameWithType,
-            Set.of(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
+            ImmutableSet.of(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
 
     Set<String> segmentsYetToBeCommitted = new HashSet<>();
     consumingSegmentCommitted.forEach(segmentName -> {

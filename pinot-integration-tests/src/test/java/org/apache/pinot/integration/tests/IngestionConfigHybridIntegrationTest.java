@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
@@ -226,7 +227,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
       throws Exception {
     Set<String> consumingSegments = _controllerStarter.getHelixResourceManager()
         .getSegmentsFromIdealStateMatchingState(getTableName() + "_REALTIME",
-            Set.of(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING));
+            ImmutableSet.of(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING));
     String jobId = forceCommit(getTableName());
 
     TestUtils.waitForCondition(aVoid -> {
@@ -234,7 +235,8 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
         if (isForceCommitJobCompleted(jobId)) {
           assertTrue(_controllerStarter.getHelixResourceManager()
               .getSegmentsFromIdealStateMatchingState(getTableName() + "_REALTIME",
-                  Set.of(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)).containsAll(consumingSegments));
+                  ImmutableSet.of(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE))
+              .containsAll(consumingSegments));
           return true;
         }
         return false;
