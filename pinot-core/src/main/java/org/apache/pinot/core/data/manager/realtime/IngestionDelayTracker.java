@@ -136,12 +136,12 @@ public class IngestionDelayTracker {
   }
 
   /*
-   * Helper function to age a delay measure. Aging means adding the time elapsed since the measure was
-   * taken till the measure is being reported.
-  *
-  * @param ingestionTimeMs original ingestion time in milliseconds.
+   * Helper function to get the ingestion delay for a given ingestion time.
+   * Ingestion delay == Current Time - Ingestion Time
+   *
+   * @param ingestionTimeMs original ingestion time in milliseconds.
    */
-  private long getAgedDelay(Long ingestionTimeMs) {
+  private long getIngestionDelayMs(Long ingestionTimeMs) {
     if (ingestionTimeMs == null) {
       return 0; // return 0 when not initialized
     }
@@ -210,7 +210,7 @@ public class IngestionDelayTracker {
     if (previousMeasure == null) {
       // First time we start tracking a partition we should start tracking it via metric
       _serverMetrics.addCallbackPartitionGaugeIfNeeded(_metricName, partitionGroupId,
-          ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelay(partitionGroupId));
+          ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelayMs(partitionGroupId));
     }
     // If we are consuming we do not need to track this partition for removal.
     _partitionsMarkedForVerification.remove(partitionGroupId);
@@ -281,10 +281,10 @@ public class IngestionDelayTracker {
    *
    * @return ingestion delay in milliseconds for the given partition ID.
    */
-  public long getPartitionIngestionDelay(int partitionGroupId) {
+  public long getPartitionIngestionDelayMs(int partitionGroupId) {
     // Not protected as this will only be invoked when metric is installed which happens after server ready
     Long currentMeasure = _partitionToIngestionTimeMsMap.get(partitionGroupId);
-    return getAgedDelay(currentMeasure);
+    return getIngestionDelayMs(currentMeasure);
   }
 
   /*
