@@ -155,16 +155,17 @@ public class AggregationDataTableReducer implements DataTableReducer {
     int numAggregationFunctions = _aggregationFunctions.length;
     String[] columnNames = new String[numAggregationFunctions];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      String columnName = aggregationFunction.getResultColumnName();
-      if (_filteredAggregationFunctions != null && _filteredAggregationFunctions.get(i) != null
-          && _filteredAggregationFunctions.get(i).getRight() != null) {
-        columnName += " " + _filteredAggregationFunctions.get(i).getRight().getResultColumnName();
-      }
+
+    int i = 0;
+    for (Pair<AggregationFunction, FilterContext> aggFilterPair : _filteredAggregationFunctions) {
+      AggregationFunction aggregationFunction = aggFilterPair.getLeft();
+      String columnName =
+          AggregationFunctionUtils.getResultColumnName(aggregationFunction, aggFilterPair.getRight());
       columnNames[i] = columnName;
       columnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
+      i++;
     }
+
     return new DataSchema(columnNames, columnDataTypes);
   }
 }

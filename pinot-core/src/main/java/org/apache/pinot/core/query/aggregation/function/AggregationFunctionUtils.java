@@ -263,7 +263,7 @@ public class AggregationFunctionUtils {
   public static String getResultColumnName(AggregationFunction aggregationFunction, @Nullable FilterContext filter) {
       String columnName = aggregationFunction.getResultColumnName();
       if (filter != null) {
-        columnName += "FILTER(WHERE " + filter + ")";
+        columnName += " FILTER(WHERE " + filter + ")";
       }
       return columnName;
   }

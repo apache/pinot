@@ -116,8 +116,4 @@ public class FilterContext {
         throw new IllegalStateException();
     }
   }
-
-  public String getResultColumnName() {
-    return "filter(where " + this + ")";
-  }
 }

@@ -35,6 +35,7 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -98,13 +99,8 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       int index = numGroupByExpressions + i;
       Pair<AggregationFunction, FilterContext> filteredAggPair = filteredAggregationFunctions.get(i);
       AggregationFunction aggregationFunction = filteredAggPair.getLeft();
-      String columnName = aggregationFunction.getResultColumnName();
-      FilterContext filterContext = filteredAggPair.getRight();
-
-      if (filterContext != null) {
-        // Agg is filtered i.e. has a FilterContext
-        columnName += " " + filterContext.getResultColumnName();
-      }
+      String columnName =
+          AggregationFunctionUtils.getResultColumnName(aggregationFunction, filteredAggPair.getRight());
       columnNames[index] = columnName;
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
     }

@@ -149,7 +149,10 @@ public class TableResizer {
       FunctionContext aggregation = function.getArguments().get(0).getFunction();
       ExpressionContext filterExpression = function.getArguments().get(1);
       FilterContext filter = RequestContextUtils.getFilter(filterExpression);
-      return new AggregationFunctionExtractor(_filteredAggregationIndexMap.get(Pair.of(aggregation, filter)), true);
+
+      int functionIndex = _filteredAggregationIndexMap.get(Pair.of(aggregation, filter));
+      AggregationFunction aggregationFunction = _filteredAggregationFunctions.get(functionIndex).getLeft();
+      return new AggregationFunctionExtractor(functionIndex, aggregationFunction);
     } else {
       // Post-aggregation function
       return new PostAggregationFunctionExtractor(function);
@@ -420,23 +423,16 @@ public class TableResizer {
    */
   private class AggregationFunctionExtractor implements OrderByValueExtractor {
     final int _index;
-    final boolean _isFilteredAgg;
     final AggregationFunction _aggregationFunction;
 
     AggregationFunctionExtractor(int aggregationFunctionIndex) {
       _index = aggregationFunctionIndex + _numGroupByExpressions;
-      _isFilteredAgg = false;
       _aggregationFunction = _aggregationFunctions[aggregationFunctionIndex];
     }
 
-    AggregationFunctionExtractor(int aggregationFunctionIndex, boolean isFilteredAgg) {
+    AggregationFunctionExtractor(int aggregationFunctionIndex, AggregationFunction aggregationFunction) {
       _index = aggregationFunctionIndex + _numGroupByExpressions;
-      _isFilteredAgg = isFilteredAgg;
-      if (_isFilteredAgg) {
-        _aggregationFunction = _filteredAggregationFunctions.get(aggregationFunctionIndex).getLeft();
-      } else {
-        _aggregationFunction = _aggregationFunctions[aggregationFunctionIndex];
-      }
+      _aggregationFunction = aggregationFunction;
     }
 
     @Override

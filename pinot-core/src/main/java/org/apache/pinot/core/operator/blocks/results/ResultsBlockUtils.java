@@ -28,6 +28,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -82,14 +83,12 @@ public class ResultsBlockUtils {
   }
 
   private static GroupByResultsBlock buildEmptyGroupByQueryResults(QueryContext queryContext) {
-    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
-    assert aggregationFunctions != null;
-    int numAggregations = aggregationFunctions.length;
+
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
-    int numColumns = groupByExpressions.size() + numAggregations;
+    int numColumns = groupByExpressions.size() + filteredAggregationFunctions.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
     int index = 0;
@@ -99,16 +98,11 @@ public class ResultsBlockUtils {
       columnDataTypes[index] = ColumnDataType.STRING;
       index++;
     }
-    for (int i = 0; i < aggregationFunctions.length; i++) {
+    for (Pair<AggregationFunction, FilterContext> aggFilterPair : filteredAggregationFunctions) {
       // NOTE: Use AggregationFunction.getResultColumnName() for SQL format response
-      AggregationFunction aggregationFunction = aggregationFunctions[i];
-      String columnName = aggregationFunction.getResultColumnName();
-      if (filteredAggregationFunctions != null) {
-        FilterContext filterContext = filteredAggregationFunctions.get(i).getRight();
-        if (filterContext != null) {
-          columnName += " " + filterContext.getResultColumnName();
-        }
-      }
+      AggregationFunction aggregationFunction = aggFilterPair.getLeft();
+      String columnName =
+          AggregationFunctionUtils.getResultColumnName(aggregationFunction, aggFilterPair.getRight());
       columnNames[index] = columnName;
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
       index++;

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -252,7 +253,7 @@ public class QueryContext {
   /**
    * Returns the filtered aggregation functions for a query, or {@code null} if the query does not have any aggregation.
    */
-  @Nullable
+  @Nonnull
   public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
     return _filteredAggregationFunctions;
   }

@@ -209,32 +209,36 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         "SELECT SUM(INT_COL) sum1 FROM MyTable WHERE BOOLEAN_COL=true AND STARTSWITH(REVERSE(STRING_COL), " + "'abc')";
     testQuery(filterQuery, nonFilterQuery);
   }
+
   @Test
-  public void testFilterResultColumnName() {
-    String filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999) FROM MyTable WHERE INT_COL < 1000000";
-    String nonFilterQuery =
-        "SELECT SUM(INT_COL) \"sum(INT_COL) filter(where INT_COL > '9999')\" FROM MyTable WHERE INT_COL > 9999 AND "
-            + "INT_COL < 1000000";
-    testQuery(filterQuery, nonFilterQuery);
-
-    filterQuery =
+  public void testFilterResultColumnNameGroupBy() {
+    String filterQuery =
         "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999) FROM MyTable WHERE INT_COL < 1000000 GROUP BY BOOLEAN_COL";
-    nonFilterQuery =
-        "SELECT SUM(INT_COL) \"sum(INT_COL) filter(where INT_COL > '9999')\" FROM MyTable WHERE INT_COL > 9999 AND "
+    String nonFilterQuery =
+        "SELECT SUM(INT_COL) \"sum(INT_COL) FILTER(WHERE INT_COL > '9999')\" FROM MyTable WHERE INT_COL > 9999 AND "
             + "INT_COL < 1000000 GROUP BY BOOLEAN_COL";
-    testQuery(filterQuery, nonFilterQuery);
-
-    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999 AND INT_COL < 1000000) FROM MyTable";
-    nonFilterQuery =
-        "SELECT SUM(INT_COL) \"sum(INT_COL) filter(where (INT_COL > '9999' AND INT_COL < '1000000'))\" FROM MyTable "
-            + "WHERE INT_COL > 9999 AND INT_COL < 1000000";
     testQuery(filterQuery, nonFilterQuery);
 
     filterQuery =
         "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999 AND INT_COL < 1000000) FROM MyTable GROUP BY BOOLEAN_COL";
     nonFilterQuery =
-        "SELECT SUM(INT_COL) \"sum(INT_COL) filter(where (INT_COL > '9999' AND INT_COL < '1000000'))\" FROM MyTable "
+        "SELECT SUM(INT_COL) \"sum(INT_COL) FILTER(WHERE (INT_COL > '9999' AND INT_COL < '1000000'))\" FROM MyTable "
             + "WHERE INT_COL > 9999 AND INT_COL < 1000000 GROUP BY BOOLEAN_COL";
+    testQuery(filterQuery, nonFilterQuery);
+  }
+
+  @Test
+  public void testFilterResultColumnNameNonGroupBy() {
+    String filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999) FROM MyTable WHERE INT_COL < 1000000";
+    String nonFilterQuery =
+        "SELECT SUM(INT_COL) \"sum(INT_COL) FILTER(WHERE INT_COL > '9999')\" FROM MyTable WHERE INT_COL > 9999 AND "
+            + "INT_COL < 1000000";
+    testQuery(filterQuery, nonFilterQuery);
+
+    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999 AND INT_COL < 1000000) FROM MyTable";
+    nonFilterQuery =
+        "SELECT SUM(INT_COL) \"sum(INT_COL) FILTER(WHERE (INT_COL > '9999' AND INT_COL < '1000000'))\" FROM MyTable "
+            + "WHERE INT_COL > 9999 AND INT_COL < 1000000";
     testQuery(filterQuery, nonFilterQuery);
   }
 
