@@ -126,6 +126,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       if (validDocIdsSnapshotFile.exists()) {
         if (!FileUtils.deleteQuietly(validDocIdsSnapshotFile)) {
           LOGGER.warn("Cannot delete old valid doc ids snapshot file: {}, skipping", validDocIdsSnapshotFile);
+          return;
         }
       }
       try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(validDocIdsSnapshotFile))) {
@@ -145,6 +146,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       try {
         if (!FileUtils.deleteQuietly(validDocIdsSnapshotFile)) {
           LOGGER.warn("Cannot delete old valid doc ids snapshot file: {}, skipping", validDocIdsSnapshotFile);
+          return;
         }
         LOGGER.info("Deleted valid doc ids snapshot for segment: {}", getSegmentName());
       } catch (Exception e) {
