@@ -708,9 +708,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
 
   /**
-   * @deprecated please use removeTableGauge(final String tableName, final String key, final G gauge) instead
-   *
-   * Removes a table gauge given the table name and the gauge.
+   * Removes a table gauge given the table name, the partition id and the gauge.
    * The add/remove is expected to work correctly in case of being invoked across multiple threads.
    * @param tableName table name
    * @param partitionId The partition id
