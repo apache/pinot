@@ -78,7 +78,7 @@ public class ResultsBlockUtils {
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
       results.add(aggregationFunction.extractAggregationResult(aggregationFunction.createAggregationResultHolder()));
     }
-    return new AggregationResultsBlock(aggregationFunctions, filteredAggregationFunctions, results);
+    return new AggregationResultsBlock(aggregationFunctions, results);
   }
 
   private static GroupByResultsBlock buildEmptyGroupByQueryResults(QueryContext queryContext) {

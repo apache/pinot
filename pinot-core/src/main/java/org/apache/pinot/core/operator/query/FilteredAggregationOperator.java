@@ -93,7 +93,7 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
       _numEntriesScannedInFilter += transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
     }
-    return new AggregationResultsBlock(_aggregationFunctions, _filteredAggregationFunctions, Arrays.asList(result));
+    return new AggregationResultsBlock(_aggregationFunctions, Arrays.asList(result));
   }
 
   @Override

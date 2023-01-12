@@ -24,9 +24,7 @@ import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -43,20 +41,10 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationResultsBlock extends BaseResultsBlock {
   private final AggregationFunction[] _aggregationFunctions;
-  private final List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private final List<Object> _results;
 
   public AggregationResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> results) {
     _aggregationFunctions = aggregationFunctions;
-    _filteredAggregationFunctions = null;
-    _results = results;
-  }
-
-  public AggregationResultsBlock(AggregationFunction[] aggregationFunctions,
-      List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions,
-      List<Object> results) {
-    _aggregationFunctions = aggregationFunctions;
-    _filteredAggregationFunctions = filteredAggregationFunctions;
     _results = results;
   }
 
@@ -81,14 +69,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
     for (int i = 0; i < numColumns; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      String columnName = aggregationFunction.getResultColumnName();
-      if (_filteredAggregationFunctions != null) {
-        FilterContext filterContext = _filteredAggregationFunctions.get(i).getRight();
-        if (filterContext != null) {
-          columnName += " " + filterContext.getResultColumnName();
-        }
-      }
-      columnNames[i] = columnName;
+      columnNames[i] = aggregationFunction.getColumnName();
       columnDataTypes[i] = returnFinalResult ? aggregationFunction.getFinalResultColumnType()
           : aggregationFunction.getIntermediateResultColumnType();
     }
