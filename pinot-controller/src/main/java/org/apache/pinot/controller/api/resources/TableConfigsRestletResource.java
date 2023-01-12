@@ -483,7 +483,7 @@ public class TableConfigsRestletResource {
         .getConfig(helixConfigScope, Collections.singletonList(ControllerConf.DISABLE_GROOVY));
 
     if (configMap != null && configMap.containsKey(ControllerConf.DISABLE_GROOVY)) {
-      return  Boolean.parseBoolean(configMap.get(ControllerConf.DISABLE_GROOVY));
+      return Boolean.parseBoolean(configMap.get(ControllerConf.DISABLE_GROOVY));
     } else {
       return _controllerConf.isDisableIngestionGroovy();
     }
