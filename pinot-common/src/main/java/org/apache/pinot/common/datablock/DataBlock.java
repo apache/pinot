@@ -74,6 +74,8 @@ public interface DataBlock {
 
   String[] getStringArray(int rowId, int colId);
 
+  Object getCustomObject(int rowId, int colId);
+
   @Nullable
   RoaringBitmap getNullRowIds(int colId);
 

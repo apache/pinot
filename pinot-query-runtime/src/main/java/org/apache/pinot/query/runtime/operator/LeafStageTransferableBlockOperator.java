@@ -282,7 +282,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     for (int colId = 0; colId < row.length; colId++) {
       Object value = row[colId];
       if (value != null) {
-        resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
+        if (dataSchema.getColumnDataType(colId) == DataSchema.ColumnDataType.OBJECT) {
+          resultRow[colId] = value;
+        } else {
+          resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
+        }
       }
     }
     return resultRow;
@@ -293,7 +297,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     for (int colId = 0; colId < columnIndices.length; colId++) {
       Object value = row[columnIndices[colId]];
       if (value != null) {
-        resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
+        if (dataSchema.getColumnDataType(colId) == DataSchema.ColumnDataType.OBJECT) {
+          resultRow[colId] = value;
+        } else {
+          resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
+        }
       }
     }
     return resultRow;

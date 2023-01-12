@@ -30,11 +30,15 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -209,6 +213,11 @@ public class AggregateOperator extends MultiStageOperator {
     return ((Boolean) left) || ((Boolean) right);
   }
 
+  private static PinotFourthMoment mergePinotFourthMoment(Object left, Object right) {
+    ((PinotFourthMoment) left).combine(ObjectSerDeUtils.deserialize((DataTable.CustomObject) right));
+    return (PinotFourthMoment) left;
+  }
+
   private static Key extraRowKey(Object[] row, List<RexExpression> groupSet) {
     Object[] keyElements = new Object[groupSet.size()];
     for (int i = 0; i < groupSet.size(); i++) {
@@ -240,6 +249,9 @@ public class AggregateOperator extends MultiStageOperator {
         .put("BOOL_OR", AggregateOperator::mergeBoolOr)
         .put("$BOOL_OR", AggregateOperator::mergeBoolOr)
         .put("$BOOL_OR0", AggregateOperator::mergeBoolOr)
+        .put("FOURTHMOMENT", AggregateOperator::mergePinotFourthMoment)
+        .put("$FOURTHMOMENT", AggregateOperator::mergePinotFourthMoment)
+        .put("$FOURTHMOMENT0", AggregateOperator::mergePinotFourthMoment)
         .build();
 
     final int _inputRef;

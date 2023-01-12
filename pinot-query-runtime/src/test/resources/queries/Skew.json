@@ -1,0 +1,31 @@
+{
+  "skew": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "key", "type": "STRING"},
+          {"name": "val", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 1],
+          ["a", 2],
+          ["a", 3],
+          ["a", 4],
+          ["a", 4],
+          ["a", 4],
+          ["a", 7],
+          ["a", 9]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "skew for int column",
+        "sql": "SELECT SKEWNESS(val), KURTOSIS(val) FROM {tbl} GROUP BY key",
+        "outputs": [
+          [0.8647536091225356, 0.3561662049861511]
+        ]
+      }
+    ]
+  }
+}

@@ -67,6 +67,7 @@ public enum AggregationFunctionType {
   STDDEVSAMP("stdDevSamp"),
   SKEWNESS("skewness"),
   KURTOSIS("kurtosis"),
+  FOURTHMOMENT("fourthmoment"),
 
   // Geo aggregation functions
   STUNION("STUnion"),

@@ -250,6 +250,9 @@ public final class DataBlockUtils {
           case TIMESTAMP_ARRAY:
             row[colId] = DataSchema.ColumnDataType.TIMESTAMP_ARRAY.convert(dataBlock.getLongArray(rowId, colId));
             break;
+          case OBJECT:
+            row[colId] = dataBlock.getCustomObject(rowId, colId);
+            break;
           default:
             throw new IllegalStateException(
                 String.format("Unsupported data type: %s for column: %s", dataTypes[colId], colId));
