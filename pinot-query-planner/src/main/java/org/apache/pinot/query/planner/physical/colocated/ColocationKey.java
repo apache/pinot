@@ -25,24 +25,24 @@ import org.apache.calcite.rex.RexInputRef;
 
 
 /**
- * PartitionKey describes how data is distributed in a given stage. It consists of a list of columns which are stored
+ * ColocationKey describes how data is distributed in a given stage. It consists of a list of columns which are stored
  * as a list of {@link RexInputRef#getIndex()}, the number of partitions and the hash-algorithm used. A given stage may
- * have more than 1 PartitionKey, in which case one may use a {@link java.util.Set<PartitionKey>} to represent this
+ * have more than 1 ColocationKey, in which case one may use a {@link java.util.Set< ColocationKey >} to represent this
  * behavior.
  *
  * <p>
- *  In other words, when a StageNode has the schema: (user_uuid, col1, col2, ...), and the PartitionKey is
+ *  In other words, when a StageNode has the schema: (user_uuid, col1, col2, ...), and the ColocationKey is
  *  ([0], 8, murmur), then that means that the data for the StageNode is partitioned using the user_uuid column, into
  *  8 partitions where the partitionId is computed using murmur(user_uuid) % 8.
  *
  *  For a join stage the data is partitioned by the senders using their respective join-keys. In that case, we may
- *  have more than 1 PartitionKey applicable for the JoinNode, and it can be represented by a set as:
+ *  have more than 1 ColocationKey applicable for the JoinNode, and it can be represented by a set as:
  *  {([0], 8, murmur), ([leftSchemaSize + 0], 8, murmur)}, assuming both senders partition using Murmur into 8
- *  partitions. Note that a set of PartitionKey means that the partition keys are independent and they don't have any
+ *  partitions. Note that a set of ColocationKey means that the partition keys are independent and they don't have any
  *  ordering, i.e. the data is partitioned by both the join-key of the left child and the join-key of the right child.
  * </p>
  */
-public class PartitionKey {
+public class ColocationKey {
   private List<Integer> _indices;
   private int _numPartitions;
   private String _hashAlgorithm;
@@ -59,13 +59,13 @@ public class PartitionKey {
     return _hashAlgorithm;
   }
 
-  public PartitionKey(int numPartitions, String algorithm) {
+  public ColocationKey(int numPartitions, String algorithm) {
     _numPartitions = numPartitions;
     _hashAlgorithm = algorithm;
     _indices = new ArrayList<>();
   }
 
-  public PartitionKey(int index, int numPartitions, String algorithm) {
+  public ColocationKey(int index, int numPartitions, String algorithm) {
     _indices = new ArrayList<>();
     _indices.add(index);
     _numPartitions = numPartitions;
@@ -84,7 +84,7 @@ public class PartitionKey {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    PartitionKey that = (PartitionKey) o;
+    ColocationKey that = (ColocationKey) o;
     return _indices.equals(that._indices) && _numPartitions == that._numPartitions && _hashAlgorithm
         .equals(that._hashAlgorithm);
   }

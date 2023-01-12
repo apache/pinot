@@ -40,13 +40,13 @@ class GreedyShuffleRewriteContext {
    * because the {@link GreedyShuffleRewriteVisitor} doesn't determine the distribution of the sender if the receiver
    * is a join-stage.
    */
-  private final Map<Integer, Set<PartitionKey>> _senderInputPartitionKeys;
+  private final Map<Integer, Set<ColocationKey>> _senderInputColocationKeys;
 
   GreedyShuffleRewriteContext() {
     _rootStageNode = new HashMap<>();
     _leafNodes = new HashMap<>();
     _joinStages = new HashSet<>();
-    _senderInputPartitionKeys = new HashMap<>();
+    _senderInputColocationKeys = new HashMap<>();
   }
 
   /**
@@ -93,16 +93,16 @@ class GreedyShuffleRewriteContext {
   }
 
   /**
-   * This returns the {@link Set<PartitionKey>} for the input to the {@link MailboxSendNode} of the given stageId.
+   * This returns the {@link Set<ColocationKey>} for the input to the {@link MailboxSendNode} of the given stageId.
    */
-  Set<PartitionKey> getPartitionKeys(Integer stageId) {
-    return _senderInputPartitionKeys.get(stageId);
+  Set<ColocationKey> getColocationKeys(Integer stageId) {
+    return _senderInputColocationKeys.get(stageId);
   }
 
   /**
-   * This sets the {@link Set<PartitionKey>} for the input to the {@link MailboxSendNode} of the given stageId.
+   * This sets the {@link Set<ColocationKey>} for the input to the {@link MailboxSendNode} of the given stageId.
    */
-  void setPartitionKeys(Integer stageId, Set<PartitionKey> partitionKeys) {
-    _senderInputPartitionKeys.put(stageId, partitionKeys);
+  void setColocationKeys(Integer stageId, Set<ColocationKey> colocationKeys) {
+    _senderInputColocationKeys.put(stageId, colocationKeys);
   }
 }

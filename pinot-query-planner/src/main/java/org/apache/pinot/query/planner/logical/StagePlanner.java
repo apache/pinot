@@ -113,11 +113,8 @@ public class StagePlanner {
 
   // TODO: Switch to Worker SPI to avoid multiple-places where workers are assigned.
   private void runPhysicalOptimizers(QueryPlan queryPlan) {
-    StageNode globalStageRoot = queryPlan.getQueryStageMap().get(0);
     if (_plannerContext.getOptions().getOrDefault("useColocatedJoin", "false").equals("true")) {
       GreedyShuffleRewriteVisitor.optimizeShuffles(queryPlan, _tableCache);
-    } else {
-      ShuffleRewriteVisitor.optimizeShuffles(globalStageRoot);
     }
   }
 

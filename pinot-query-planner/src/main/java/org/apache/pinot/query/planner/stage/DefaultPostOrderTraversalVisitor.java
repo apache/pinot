@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.query.planner.stage;
 
+/**
+ * A base implementation of a visitor pattern where the children of a given node are visited first and after that the
+ * node is processed (post-order traversal).
+ */
 public abstract class DefaultPostOrderTraversalVisitor<T, C> implements StageNodeVisitor<T, C> {
 
   public abstract T process(StageNode stageNode, C context);
