@@ -32,7 +32,7 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
-import org.apache.pinot.core.operator.combine.function.CombineFunction;
+import org.apache.pinot.core.operator.combine.merger.ResultBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.slf4j.Logger;
@@ -50,12 +50,12 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
 
   // Use a BlockingQueue to store the intermediate results blocks
   protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
-  protected final CombineFunction<T> _combineFunction;
+  protected final ResultBlockMerger<T> _combineFunction;
 
   protected int _numOperatorsFinished;
   protected BaseResultsBlock _exceptionBlock;
 
-  public BaseStreamBlockCombineOperator(CombineFunction<T> combineFunction, List<Operator> operators,
+  public BaseStreamBlockCombineOperator(ResultBlockMerger<T> combineFunction, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
     super(operators, queryContext, executorService);
     _combineFunction = combineFunction;
@@ -109,7 +109,7 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
    * Executes query on one or more segments in a worker thread.
    */
   @Override
-  public void processSegments() {
+  protected void processSegments() {
     int operatorId;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator operator = _operators.get(operatorId);
@@ -140,14 +140,14 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
   /**
    * Invoked when {@link #processSegments()} throws exception/error.
    */
-  public void onProcessSegmentsException(Throwable t) {
+  protected void onProcessSegmentsException(Throwable t) {
     _blockingQueue.offer(new ExceptionResultsBlock(t));
   }
 
   /**
    * Invoked when {@link #processSegments()} is finished (called in the finally block).
    */
-  public void onProcessSegmentsFinish() {
+  protected void onProcessSegmentsFinish() {
   }
 
   /**
@@ -161,17 +161,15 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
   }
 
   @Override
-  public BaseResultsBlock mergeResults()
+  protected BaseResultsBlock mergeResults()
       throws Exception {
     throw new UnsupportedOperationException("Streaming combine operator doesn't support merge results.");
   }
 
-  @Override
   public void start() {
     startProcess();
   }
 
-  @Override
   public void stop() {
     stopProcess();
   }

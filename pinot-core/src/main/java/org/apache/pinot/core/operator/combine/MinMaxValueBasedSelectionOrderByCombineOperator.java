@@ -131,7 +131,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
    * documents to fulfill the LIMIT and OFFSET requirement.
    */
   @Override
-  public void processSegments() {
+  protected void processSegments() {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
     int numOrderByExpressions = orderByExpressions.size();
@@ -260,7 +260,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
    * </ul>
    */
   @Override
-  public BaseResultsBlock mergeResults()
+  protected BaseResultsBlock mergeResults()
       throws Exception {
     SelectionResultsBlock mergedBlock = null;
     int numBlocksMerged = 0;
@@ -302,12 +302,12 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
   }
 
   @Override
-  public void onProcessSegmentsException(Throwable t) {
+  protected void onProcessSegmentsException(Throwable t) {
     _blockingQueue.offer(new ExceptionResultsBlock(t));
   }
 
   @Override
-  public void onProcessSegmentsFinish() {
+  protected void onProcessSegmentsFinish() {
   }
 
   protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.combine.function;
+package org.apache.pinot.core.operator.combine.merger;
 
 import java.util.Collection;
 import java.util.PriorityQueue;
@@ -29,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SelectionOrderByCombineFunction implements CombineFunction<SelectionResultsBlock> {
+public class SelectionOrderByCombineFunction implements ResultBlockMerger<SelectionResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOrderByCombineFunction.class);
   private final int _numRowsToKeep;
 

@@ -31,7 +31,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
-import org.apache.pinot.core.operator.combine.function.CombineFunction;
+import org.apache.pinot.core.operator.combine.merger.ResultBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
@@ -52,14 +52,14 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
     extends BaseCombineOperator<BaseResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleBlockCombineOperator.class);
 
-  protected final CombineFunction<T> _combineFunction;
+  protected final ResultBlockMerger<T> _combineFunction;
   // Use an AtomicInteger to track the next operator to execute
   protected final AtomicInteger _nextOperatorId = new AtomicInteger();
   // Use a BlockingQueue to store the intermediate results blocks
   protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
-  protected BaseSingleBlockCombineOperator(CombineFunction<T> combineFunction, List<Operator> operators,
+  protected BaseSingleBlockCombineOperator(ResultBlockMerger<T> combineFunction, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
     super(operators, queryContext, executorService);
     _combineFunction = combineFunction;
@@ -99,7 +99,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
    * Executes query on one or more segments in a worker thread.
    */
   @Override
-  public void processSegments() {
+  protected void processSegments() {
     int operatorId;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator operator = _operators.get(operatorId);
@@ -128,21 +128,21 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   /**
    * Invoked when {@link #processSegments()} throws exception/error.
    */
-  public void onProcessSegmentsException(Throwable t) {
+  protected void onProcessSegmentsException(Throwable t) {
     _blockingQueue.offer(new ExceptionResultsBlock(t));
   }
 
   /**
    * Invoked when {@link #processSegments()} is finished (called in the finally block).
    */
-  public void onProcessSegmentsFinish() {
+  protected void onProcessSegmentsFinish() {
   }
 
   /**
    * Merges the results from the worker threads into a results block.
    */
   @Override
-  public BaseResultsBlock mergeResults()
+  protected BaseResultsBlock mergeResults()
       throws Exception {
     T mergedBlock = null;
     int numBlocksMerged = 0;
@@ -175,15 +175,5 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
       }
     }
     return mergedBlock;
-  }
-
-  @Override
-  public void start() {
-    throw new UnsupportedOperationException("Single block combine operator is not start-able!");
-  }
-
-  @Override
-  public void stop() {
-    throw new UnsupportedOperationException("Single block combine operator is not stop-able!");
   }
 }

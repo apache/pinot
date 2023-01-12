@@ -128,7 +128,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
    * Executes query on one segment in a worker thread and merges the results into the indexed table.
    */
   @Override
-  public void processSegments() {
+  protected void processSegments() {
     int operatorId;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator operator = _operators.get(operatorId);

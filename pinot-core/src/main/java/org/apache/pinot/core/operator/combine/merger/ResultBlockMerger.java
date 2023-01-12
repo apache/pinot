@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.combine.function;
+package org.apache.pinot.core.operator.combine.merger;
 
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 
 
-public interface CombineFunction<T extends BaseResultsBlock> {
+public interface ResultBlockMerger<T extends BaseResultsBlock> {
 
   /**
    * Merges a results block into the main mergeable results block.
    *
    * <p>NOTE: {@code blockToMerge} should contain the result for a segment without any exception. The errored segment
-   * results are handled by {@link org.apache.pinot.core.operator.combine.CombineOperator}.
+   * results are handled by {@link org.apache.pinot.core.operator.combine.BaseCombineOperator}.
    *
    * @param mergedBlock The block that accumulates previous results. It should be modified to add the information of the
    *                    other block.
@@ -49,7 +49,7 @@ public interface CombineFunction<T extends BaseResultsBlock> {
    * Converts the given results block into a mergeable results block.
    *
    * <p>This conversion is necessary if a block is used as the first argument for:
-   * {@link CombineFunction#mergeResultsBlocks(BaseResultsBlock, BaseResultsBlock)}.
+   * {@link ResultBlockMerger#mergeResultsBlocks(BaseResultsBlock, BaseResultsBlock)}.
    */
   default T convertToMergeableBlock(T resultsBlock) {
     return resultsBlock;

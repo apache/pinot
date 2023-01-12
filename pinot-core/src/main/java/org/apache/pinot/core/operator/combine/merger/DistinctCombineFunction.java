@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.combine.function;
+package org.apache.pinot.core.operator.combine.merger;
 
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-public class DistinctCombineFunction implements CombineFunction<DistinctResultsBlock> {
+public class DistinctCombineFunction implements ResultBlockMerger<DistinctResultsBlock> {
   private final QueryContext _queryContext;
   private final boolean _hasOrderBy;
 

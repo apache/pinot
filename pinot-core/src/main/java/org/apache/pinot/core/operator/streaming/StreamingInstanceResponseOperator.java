@@ -49,12 +49,13 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
     _streamObserver = streamObserver;
   }
 
+  @SuppressWarnings("rawtypes")
   @Override
   protected InstanceResponseBlock getNextBlock() {
     prefetchAll();
     BaseResultsBlock combinedResult;
     try {
-      _combineOperator.start();
+      ((BaseStreamBlockCombineOperator) _combineOperator).start();
       combinedResult = _combineOperator.nextBlock();
       while (!(combinedResult instanceof MetadataResultsBlock)) {
         if (combinedResult instanceof ExceptionResultsBlock) {
@@ -70,7 +71,7 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
           QueryException.getException(QueryException.DATA_TABLE_SERIALIZATION_ERROR, e));
       return exceptionResultBlock;
     } finally {
-      _combineOperator.stop();
+      ((BaseStreamBlockCombineOperator) _combineOperator).stop();
       releaseAll();
     }
     // return a metadata-only block.

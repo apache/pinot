@@ -47,8 +47,7 @@ import org.slf4j.LoggerFactory;
  * detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
  */
 @SuppressWarnings({"rawtypes"})
-public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends BaseOperator<T>
-    implements CombineOperator {
+public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends BaseOperator<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseCombineOperator.class);
 
   protected final List<Operator> _operators;
@@ -159,12 +158,24 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   }
 
   /**
-   * Start the combine operator.
+   * Invoke a step to process a segment.
    */
-  public abstract void start();
+  protected abstract void processSegments();
 
   /**
-   * Stop and clean up the combine operator.
+   * Invoked when {@link #processSegments()} throws exception/error.
    */
-  public abstract void stop();
+  protected abstract void onProcessSegmentsException(Throwable t);
+
+  /**
+   * Invoked when {@link #processSegments()} is finished (called in the finally block).
+   */
+  protected abstract void onProcessSegmentsFinish();
+
+  /**
+   * Invoke a final step to reduce result into a single {@link BaseResultsBlock}. This is useful for
+   * {@link BaseCombineOperator} that returns a single reduced block.
+   */
+  protected abstract BaseResultsBlock mergeResults()
+      throws Exception;
 }

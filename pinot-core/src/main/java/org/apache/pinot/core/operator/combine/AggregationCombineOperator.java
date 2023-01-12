@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
-import org.apache.pinot.core.operator.combine.function.AggregateCombineFunction;
+import org.apache.pinot.core.operator.combine.merger.AggregateCombineFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.combine.function;
+package org.apache.pinot.core.operator.combine.merger;
 
 import java.util.List;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
@@ -24,7 +24,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-public class AggregateCombineFunction implements CombineFunction<AggregationResultsBlock> {
+public class AggregateCombineFunction implements ResultBlockMerger<AggregationResultsBlock> {
 
   public AggregateCombineFunction(QueryContext queryContext) {
   }
