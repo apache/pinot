@@ -62,7 +62,6 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private long _numEntriesScannedPostFilter;
   private final DataSchema _dataSchema;
   private final QueryContext _queryContext;
-  private final IdentityHashMap<AggregationFunction, Integer> _resultHolderIndexMap;
 
   public FilteredGroupByOperator(AggregationFunction[] aggregationFunctions,
       List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions,
@@ -89,11 +88,6 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
           aggFunctionsWithTransformOperator.get(i).getRight().getResultMetadata(groupByExpression).getDataType());
     }
 
-    _resultHolderIndexMap = new IdentityHashMap<>(_aggregationFunctions.length);
-    for (int i = 0; i < _aggregationFunctions.length; i++) {
-      _resultHolderIndexMap.put(_aggregationFunctions[i], i);
-    }
-
     // Extract column names and data types for aggregation functions
     for (int i = 0; i < numAggregationFunctions; i++) {
       int index = numGroupByExpressions + i;
@@ -111,7 +105,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   @Override
   protected GroupByResultsBlock getNextBlock() {
     // TODO(egalpin): Support Startree query resolution when possible, even with FILTER expressions
-    GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[_aggregationFunctions.length];
+    int numAggregations = _aggregationFunctions.length;
+
+    GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[numAggregations];
+    IdentityHashMap<AggregationFunction, Integer> resultHolderIndexMap = new IdentityHashMap<>(_aggregationFunctions.length);
+    for (int i = 0; i < numAggregations; i++) {
+      resultHolderIndexMap.put(_aggregationFunctions[i], i);
+    }
 
     GroupKeyGenerator groupKeyGenerator = null;
     for (Pair<AggregationFunction[], TransformOperator> filteredAggregation : _aggFunctionsWithTransformOperator) {
@@ -149,7 +149,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
       GroupByResultHolder[] filterGroupByResults = groupByExecutor.getGroupByResultHolders();
       for (int i = 0; i < filteredAggFunctions.length; i++) {
-        groupByResultHolders[_resultHolderIndexMap.get(filteredAggFunctions[i])] = filterGroupByResults[i];
+        groupByResultHolders[resultHolderIndexMap.get(filteredAggFunctions[i])] = filterGroupByResults[i];
       }
     }
     assert groupKeyGenerator != null;
