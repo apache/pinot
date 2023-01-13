@@ -28,8 +28,6 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
@@ -71,6 +69,7 @@ import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -458,14 +457,9 @@ public class TablesResource {
             Response.Status.NOT_FOUND);
       }
 
-      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-      try (DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)) {
-        validDocIds.serialize(dataOutputStream);
-        byteArrayOutputStream.close();
-      }
-      byte[] validDocIdsSnapshot = byteArrayOutputStream.toByteArray();
+      byte[] validDocIdsSnapshot = RoaringBitmapUtils.serialize(validDocIds.toRoaringBitmap());
       Response.ResponseBuilder builder = Response.ok(validDocIdsSnapshot);
-      builder.header(HttpHeaders.CONTENT_LENGTH, byteArrayOutputStream.size());
+      builder.header(HttpHeaders.CONTENT_LENGTH, validDocIdsSnapshot.length);
       return builder.build();
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
