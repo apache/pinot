@@ -495,7 +495,9 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       assertTrue(Math.abs((Double) rows.get(0)[1] - min) < 1e-1);
       double max = baseValue.doubleValue() + 998;
       assertTrue(Math.abs((Double) rows.get(0)[2] - max) < 1e-1);
-      double avg = _sum / (double) _records.size();
+      // Nulls are added for all records where index % 2 is false, so half of the records are null.
+      double numNonNullRecords = nullValuesExist ? (_records.size() / 2.0) : _records.size();
+      double avg = _sum / numNonNullRecords;
       assertTrue(Math.abs((Double) rows.get(0)[3] - avg) < 1e-1);
       assertTrue(Math.abs((Double) rows.get(0)[4] - (4 * _sum)) < 1e-1);
     }
