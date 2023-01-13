@@ -895,8 +895,8 @@ const deleteSegmentOp = (tableName, segmentName) => {
   });
 };
 
-const fetchTableJobs = async (tableName: string) => {
-  const response = await getTableJobs(tableName);
+const fetchTableJobs = async (tableName: string, jobTypes?: string) => {
+  const response = await getTableJobs(tableName, jobTypes);
   
   return response.data;
 }

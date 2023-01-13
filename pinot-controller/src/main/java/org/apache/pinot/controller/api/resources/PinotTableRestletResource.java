@@ -855,16 +855,19 @@ public class PinotTableRestletResource {
       notes = "Get list of controller jobs for this table")
   public Map<String, Map<String, String>> getControllerJobs(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr
-  ) {
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Comma separated list of job types") @QueryParam("jobTypes") @Nullable String jobTypesString) {
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
             LOGGER);
-
+    Set<String> jobTypesToFilter = null;
+    if (StringUtils.isNotEmpty(jobTypesString)) {
+      jobTypesToFilter = new HashSet<>(java.util.Arrays.asList(StringUtils.split(jobTypesString, ',')));
+    }
     Map<String, Map<String, String>> result = new HashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      result.putAll(_pinotHelixResourceManager.getAllJobsForTable(tableNameWithType));
+      result.putAll(_pinotHelixResourceManager.getAllJobsForTable(tableNameWithType, jobTypesToFilter));
     }
 
     return result;
