@@ -45,6 +45,7 @@ public class MultiDirQuickstart extends Quickstart {
     properties.put("controller.segmentRelocator.enableLocalTierMigration", "true");
     properties.put("controller.segmentRelocator.externalViewCheckIntervalInMs", "2000");
     properties.put("controller.segmentRelocator.externalViewStabilizationTimeoutInMs", "60000");
+    properties.put("controller.segmentRelocator.rebalanceTablesSequentially", "true");
     /*
      * One can also set `dataDir` as part of tierConfigs in TableConfig to overwrite the instance configs (or set as
      * cluster configs), but it's recommended to use instance (or cluster) configs for consistency across tables.

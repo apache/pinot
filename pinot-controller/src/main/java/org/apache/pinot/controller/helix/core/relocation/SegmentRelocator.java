@@ -141,6 +141,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   @VisibleForTesting
   void rebalanceWaitingTable(Consumer<String> rebalancer)
       throws InterruptedException {
+    LOGGER.debug("Getting next waiting table to rebalance");
     String nextTable = _waitingQueue.take();
     try {
       rebalancer.accept(nextTable);
