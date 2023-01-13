@@ -58,6 +58,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     }
   };
 
+  // Note that workerPool is shut down in this class.
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
     this(scheduler, workerPool, -1);
   }
