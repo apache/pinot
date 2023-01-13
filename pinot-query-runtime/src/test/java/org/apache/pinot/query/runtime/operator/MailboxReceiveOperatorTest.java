@@ -496,7 +496,6 @@ public class MailboxReceiveOperatorTest {
     Assert.assertTrue(error.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("mailboxError"));
   }
 
-  // TODO: Exception should be passed as an errorBlock.
   @Test
   public void shouldThrowReceiveWhenOneServerReceiveThrowException()
       throws Exception {
@@ -531,8 +530,6 @@ public class MailboxReceiveOperatorTest {
     MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.HASH_DISTRIBUTED, toHost, toPort, jobId, stageId, null);
     TransferableBlock receivedBlock = receiveOp.nextBlock();
-    List<Object[]> resultRows = receivedBlock.getContainer();
-    Assert.assertEquals(resultRows.size(), 1);
-    Assert.assertEquals(resultRows.get(0), expRow3);
+    Assert.assertTrue(receivedBlock.isErrorBlock(), "server-1 should have returned an error-block");
   }
 }
