@@ -98,8 +98,7 @@ public interface TableDataManager {
    * @throws Exception thrown upon failure when to reload the segment
    */
   void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload,
-      boolean shouldReuseExistingSegmentDir)
+      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
       throws Exception;
 
   /**

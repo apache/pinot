@@ -1345,7 +1345,7 @@ public class PinotHelixResourceManager {
       LOGGER.info("Reloading tables with name: {}", schemaName);
       List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       for (String tableNameWithType : tableNamesWithType) {
-        reloadAllSegments(tableNameWithType, false, false);
+        reloadAllSegments(tableNameWithType, false);
       }
     }
   }
@@ -2343,8 +2343,7 @@ public class PinotHelixResourceManager {
     sendSegmentRefreshMessage(tableNameWithType, segmentName, true, true);
   }
 
-  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
-      boolean shouldReuseSegmentDir) {
+  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload) {
     LOGGER.info("Sending reload message for table: {} with forceDownload: {}", tableNameWithType, forceDownload);
 
     if (forceDownload) {
@@ -2360,7 +2359,7 @@ public class PinotHelixResourceManager {
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setSessionSpecific(true);
     SegmentReloadMessage segmentReloadMessage =
-        new SegmentReloadMessage(tableNameWithType, forceDownload, shouldReuseSegmentDir);
+        new SegmentReloadMessage(tableNameWithType, forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient
@@ -2375,8 +2374,7 @@ public class PinotHelixResourceManager {
     return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
   }
 
-  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
-      boolean shouldReuseSegmentDir) {
+  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
     LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}", segmentName,
         tableNameWithType, forceDownload);
 
@@ -2395,8 +2393,7 @@ public class PinotHelixResourceManager {
     recipientCriteria.setPartition(segmentName);
     recipientCriteria.setSessionSpecific(true);
     SegmentReloadMessage segmentReloadMessage =
-        new SegmentReloadMessage(tableNameWithType, Collections.singletonList(segmentName), forceDownload,
-            shouldReuseSegmentDir);
+        new SegmentReloadMessage(tableNameWithType, Collections.singletonList(segmentName), forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient

@@ -269,8 +269,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
-      boolean shouldReuseExistingSegmentDir)
+  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
       throws Exception {
     LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
     SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
@@ -284,25 +283,23 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
-    reloadSegmentWithMetadata(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload,
-        shouldReuseExistingSegmentDir);
+    reloadSegmentWithMetadata(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
 
     LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
   }
 
   @Override
-  public void reloadAllSegments(String tableNameWithType, boolean forceDownload, boolean shouldReuseExistingSegmentDir,
+  public void reloadAllSegments(String tableNameWithType, boolean forceDownload,
       SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
-    reloadSegmentsWithMetadata(tableNameWithType, segmentsMetadata, forceDownload, shouldReuseExistingSegmentDir,
-        segmentRefreshSemaphore);
+    reloadSegmentsWithMetadata(tableNameWithType, segmentsMetadata, forceDownload, segmentRefreshSemaphore);
   }
 
   @Override
   public void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
-      boolean shouldReuseExistingSegmentDir, SegmentRefreshSemaphore segmentRefreshSemaphore)
+      SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception {
     LOGGER.info("Reloading multiple segments: {} in table: {}", segmentNames, tableNameWithType);
 
@@ -328,12 +325,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
-    reloadSegmentsWithMetadata(tableNameWithType, segmentsMetadata, forceDownload, shouldReuseExistingSegmentDir,
-        segmentRefreshSemaphore);
+    reloadSegmentsWithMetadata(tableNameWithType, segmentsMetadata, forceDownload, segmentRefreshSemaphore);
   }
 
   private void reloadSegmentsWithMetadata(String tableNameWithType, List<SegmentMetadata> segmentsMetadata,
-      boolean forceDownload, boolean shouldReuseExistingSegmentDir, SegmentRefreshSemaphore segmentRefreshSemaphore)
+      boolean forceDownload, SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception {
     long startTime = System.currentTimeMillis();
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
@@ -348,8 +344,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       try {
         segmentRefreshSemaphore.acquireSema(segmentMetadata.getName(), LOGGER);
         try {
-          reloadSegmentWithMetadata(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload,
-              shouldReuseExistingSegmentDir);
+          reloadSegmentWithMetadata(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
         } finally {
           segmentRefreshSemaphore.releaseSema();
         }
@@ -372,7 +367,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   private void reloadSegmentWithMetadata(String tableNameWithType, SegmentMetadata segmentMetadata,
-      TableConfig tableConfig, @Nullable Schema schema, boolean forceDownload, boolean shouldReuseExistingSegmentDir)
+      TableConfig tableConfig, @Nullable Schema schema, boolean forceDownload)
       throws Exception {
     String segmentName = segmentMetadata.getName();
     LOGGER.info("Reloading segment: {} in table: {} with forceDownload: {}", segmentName, tableNameWithType,
@@ -424,7 +419,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       // Reloads an existing segment, and the local segment metadata is existing as asserted above.
       tableDataManager.reloadSegment(segmentName,
           new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema), zkMetadata, segmentMetadata, schema,
-          forceDownload, shouldReuseExistingSegmentDir);
+          forceDownload);
       LOGGER.info("Reloaded segment: {} of table: {}", segmentName, tableNameWithType);
     } finally {
       segmentLock.unlock();

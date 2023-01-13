@@ -347,7 +347,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload, boolean shouldReuseExistingSegment)
+      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
       throws Exception {
     String segmentTier = getSegmentCurrentTier(segmentName);
     indexLoadingConfig.setSegmentTier(segmentTier);
@@ -358,9 +358,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     try {
 
       boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
-      boolean canReuseExistingSegment = (!shouldDownload) && (shouldReuseExistingSegment);
 
-      if (canReuseExistingSegment) {
+      if (!shouldDownload) {
+        // We should first try to reuse directory
         SegmentDirectory segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()),
             indexLoadingConfig);
         boolean needReprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
