@@ -108,7 +108,8 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     int numAggregations = _aggregationFunctions.length;
 
     GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[numAggregations];
-    IdentityHashMap<AggregationFunction, Integer> resultHolderIndexMap = new IdentityHashMap<>(_aggregationFunctions.length);
+    IdentityHashMap<AggregationFunction, Integer> resultHolderIndexMap =
+        new IdentityHashMap<>(_aggregationFunctions.length);
     for (int i = 0; i < numAggregations; i++) {
       resultHolderIndexMap.put(_aggregationFunctions[i], i);
     }

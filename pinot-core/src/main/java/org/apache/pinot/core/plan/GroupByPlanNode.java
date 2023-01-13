@@ -59,7 +59,6 @@ public class GroupByPlanNode implements PlanNode {
     assert _queryContext.getGroupByExpressions() != null;
 
     if (_queryContext.hasFilteredAggregations()) {
-      assert _queryContext.getFilteredAggregationFunctions() != null;
       return buildFilteredGroupByPlan();
     }
     return buildNonFilteredGroupByPlan();
