@@ -27,7 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTableImplV3;
 import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.response.ProcessingException;
@@ -348,16 +348,16 @@ public abstract class BaseDataBlock implements DataBlock {
 
   @Nullable
   @Override
-  public DataTable.CustomObject getCustomObject(int rowId, int colId) {
+  public CustomObject getCustomObject(int rowId, int colId) {
     int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     int type = _variableSizeData.getInt();
     if (size == 0) {
-      assert type == DataTable.CustomObject.NULL_TYPE_VALUE;
+      assert type == CustomObject.NULL_TYPE_VALUE;
       return null;
     }
     ByteBuffer buffer = _variableSizeData.slice();
     buffer.limit(size);
-    return new DataTable.CustomObject(type, buffer);
+    return new CustomObject(type, buffer);
   }
 
   @Nullable

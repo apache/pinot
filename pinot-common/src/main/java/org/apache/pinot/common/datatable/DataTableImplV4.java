@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;

@@ -3,27 +3,40 @@
     "tables": {
       "tbl": {
         "schema": [
-          {"name": "key", "type": "STRING"},
+          {"name": "groupingCol", "type": "STRING"},
+          {"name": "partition", "type": "STRING"},
           {"name": "val", "type": "INT"}
         ],
         "inputs": [
-          ["a", 1],
-          ["a", 2],
-          ["a", 3],
-          ["a", 4],
-          ["a", 4],
-          ["a", 4],
-          ["a", 7],
-          ["a", 9]
+          ["a", "key1", 1],
+          ["a", "key2", 2],
+          ["a", "key3", 3],
+          ["a", "key1", 4],
+          ["a", "key2", 4],
+          ["a", "key3", 4],
+          ["a", "key1", 7],
+          ["a", "key2", 9],
+          ["b", "key3", 1],
+          ["b", "key1", 2],
+          ["b", "key2", 3],
+          ["b", "key3", 4],
+          ["b", "key1", 4],
+          ["b", "key2", 4],
+          ["b", "key3", 7],
+          ["b", "key1", 9]
+        ],
+        "partitionColumns": [
+          "partition"
         ]
       }
     },
     "queries": [
       {
         "description": "skew for int column",
-        "sql": "SELECT SKEWNESS(val), KURTOSIS(val) FROM {tbl} GROUP BY key",
+        "sql": "SELECT groupingCol, SKEWNESS(val), KURTOSIS(val) FROM {tbl} GROUP BY groupingCol",
         "outputs": [
-          [0.8647536091225356, 0.3561662049861511]
+          ["a", 0.8647536091225356, 0.3561662049861511],
+          ["b", 0.8647536091225356, 0.3561662049861511]
         ]
       }
     ]

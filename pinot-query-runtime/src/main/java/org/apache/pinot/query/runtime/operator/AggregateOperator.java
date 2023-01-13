@@ -29,8 +29,8 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.Operator;
@@ -214,7 +214,7 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   private static PinotFourthMoment mergePinotFourthMoment(Object left, Object right) {
-    ((PinotFourthMoment) left).combine(ObjectSerDeUtils.deserialize((DataTable.CustomObject) right));
+    ((PinotFourthMoment) left).combine(ObjectSerDeUtils.deserialize((CustomObject) right));
     return (PinotFourthMoment) left;
   }
 
