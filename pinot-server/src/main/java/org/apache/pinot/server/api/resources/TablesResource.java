@@ -426,8 +426,7 @@ public class TablesResource {
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @Context HttpHeaders httpHeaders)
-      throws Exception {
+      @Context HttpHeaders httpHeaders) {
     LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
     // Validate data access
     ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
@@ -450,16 +449,15 @@ public class TablesResource {
       }
       MutableRoaringBitmap validDocIds =
           indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
-
       if (validDocIds == null) {
         throw new WebApplicationException(
             String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
             Response.Status.NOT_FOUND);
       }
 
-      byte[] validDocIdsSnapshot = RoaringBitmapUtils.serialize(validDocIds.toRoaringBitmap());
-      Response.ResponseBuilder builder = Response.ok(validDocIdsSnapshot);
-      builder.header(HttpHeaders.CONTENT_LENGTH, validDocIdsSnapshot.length);
+      byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIds);
+      Response.ResponseBuilder builder = Response.ok(validDocIdsBytes);
+      builder.header(HttpHeaders.CONTENT_LENGTH, validDocIdsBytes.length);
       return builder.build();
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
