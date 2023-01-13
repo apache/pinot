@@ -97,6 +97,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
  * in the segment storage.
  */
 public abstract class SegmentDirectory implements Closeable {
+
   public abstract URI getIndexDir();
 
   public abstract SegmentMetadataImpl getSegmentMetadata();
@@ -140,13 +141,6 @@ public abstract class SegmentDirectory implements Closeable {
    * @param fetchContext context for this segment's fetch
    */
   public void release(FetchContext fetchContext) {
-  }
-
-  /**
-   * When reloading, is this segment directory expected to match with the latest table config and schema
-   */
-  public boolean isEnforceSegmentDirMatchCheckOnReload() {
-    return false;
   }
 
   /**

@@ -592,8 +592,7 @@ public class PinotSegmentRestletResource {
             LOGGER);
     int numMessagesSent = 0;
     for (String tableNameWithType : tableNamesWithType) {
-      numMessagesSent +=
-          _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, false).getLeft();
+      numMessagesSent += _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, false).getLeft();
     }
     return new SuccessResponse("Sent " + numMessagesSent + " reload messages");
   }
@@ -739,8 +738,7 @@ public class PinotSegmentRestletResource {
             LOGGER);
     Map<String, Map<String, String>> perTableMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      Pair<Integer, String> msgInfo =
-          _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
+      Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
       Map<String, String> tableReloadMeta = new HashMap<>();
       tableReloadMeta.put("numMessagesSent", String.valueOf(msgInfo.getLeft()));
       tableReloadMeta.put("reloadJobId", msgInfo.getRight());
