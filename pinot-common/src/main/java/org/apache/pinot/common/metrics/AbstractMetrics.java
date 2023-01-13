@@ -535,21 +535,17 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
-   * @deprecated please use setOrUpdateTableGauge(final String tableName, final String key, final G gauge,
-   *     final Supplier<Long> valueSupplier) instead.
-   *
-   * Install a per-partition table gauge if needed.
+   * Install a per-partition table gauge.
    *
    * @param tableName The table name
    * @param partitionId The partition id
    * @param gauge The gauge to use
-   * @param valueCallback the callback function to be called while reading the metric.
+   * @param valueSupplier The supplier function used to retrieve the value of the gauge.
    */
-  @Deprecated
-  public void addCallbackPartitionGaugeIfNeeded(final String tableName, final int partitionId, final G gauge,
-      final Callable<Long> valueCallback) {
+  public void setOrUpdatePartitionGauge(final String tableName, final int partitionId, final G gauge,
+      final Supplier<Long> valueSupplier) {
     final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
-    addCallbackGaugeIfNeeded(fullGaugeName, valueCallback);
+    setOrUpdateGauge(fullGaugeName, valueSupplier);
   }
 
   /**
