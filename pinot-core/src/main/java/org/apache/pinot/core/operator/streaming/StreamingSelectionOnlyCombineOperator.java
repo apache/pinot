@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.combine.merger.SelectionOnlyCombineFunction;
+import org.apache.pinot.core.operator.combine.merger.SelectionOnlyResultBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -35,7 +35,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseStreamBlockCombin
 
   public StreamingSelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(new SelectionOnlyCombineFunction(queryContext), operators, queryContext, executorService);
+    super(new SelectionOnlyResultBlockMerger(queryContext), operators, queryContext, executorService);
   }
 
   @Override

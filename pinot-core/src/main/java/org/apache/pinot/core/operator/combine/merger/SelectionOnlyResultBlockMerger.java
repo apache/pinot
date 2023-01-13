@@ -28,11 +28,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SelectionOnlyCombineFunction implements ResultBlockMerger<SelectionResultsBlock> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyCombineFunction.class);
+public class SelectionOnlyResultBlockMerger implements ResultBlockMerger<SelectionResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyResultBlockMerger.class);
   private final int _numRowsToKeep;
 
-  public SelectionOnlyCombineFunction(QueryContext queryContext) {
+  public SelectionOnlyResultBlockMerger(QueryContext queryContext) {
     _numRowsToKeep = queryContext.getLimit();
   }
 

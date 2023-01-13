@@ -24,9 +24,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-public class AggregateCombineFunction implements ResultBlockMerger<AggregationResultsBlock> {
+public class AggregateResultBlockMerger implements ResultBlockMerger<AggregationResultsBlock> {
 
-  public AggregateCombineFunction(QueryContext queryContext) {
+  public AggregateResultBlockMerger(QueryContext queryContext) {
   }
 
   @Override

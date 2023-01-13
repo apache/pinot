@@ -29,11 +29,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SelectionOrderByCombineFunction implements ResultBlockMerger<SelectionResultsBlock> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOrderByCombineFunction.class);
+public class SelectionOrderByResultBlockMerger implements ResultBlockMerger<SelectionResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOrderByResultBlockMerger.class);
   private final int _numRowsToKeep;
 
-  public SelectionOrderByCombineFunction(QueryContext queryContext) {
+  public SelectionOrderByResultBlockMerger(QueryContext queryContext) {
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
   }
 
