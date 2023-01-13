@@ -80,7 +80,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
      if (!_workerPool.awaitTermination(TERMINATION_TIMEOUT_SEC, TimeUnit.SECONDS)) {
        _workerPool.shutdownNow(); // Cancel currently executing tasks
       } else {
-       // TODO: Consider wait for cancellation kicks in.
+       // TODO: Consider waiting for cancellation kicks in.
        LOGGER.error("OpChainScheduler doesn't terminate within ", TERMINATION_TIMEOUT_SEC, " seconds");
      }
     } catch (InterruptedException ie) {
