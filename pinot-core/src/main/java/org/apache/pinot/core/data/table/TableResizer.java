@@ -28,9 +28,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -51,6 +54,8 @@ public class TableResizer {
   private final Map<ExpressionContext, Integer> _groupByExpressionIndexMap;
   private final AggregationFunction[] _aggregationFunctions;
   private final Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
+  private final Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationIndexMap;
+  private final List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private final int _numOrderByExpressions;
   private final OrderByValueExtractor[] _orderByValueExtractors;
   private final Comparator<IntermediateRecord> _intermediateRecordComparator;
@@ -73,6 +78,8 @@ public class TableResizer {
     assert _aggregationFunctions != null;
     _aggregationFunctionIndexMap = queryContext.getAggregationFunctionIndexMap();
     assert _aggregationFunctionIndexMap != null;
+    _filteredAggregationIndexMap = queryContext.getFilteredAggregationsIndexMap();
+    _filteredAggregationFunctions = queryContext.getFilteredAggregationFunctions();
 
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
@@ -137,6 +144,15 @@ public class TableResizer {
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
       return new AggregationFunctionExtractor(_aggregationFunctionIndexMap.get(function));
+    } else if (function.getType() == FunctionContext.Type.TRANSFORM
+        && "FILTER".equalsIgnoreCase(function.getFunctionName())) {
+      FunctionContext aggregation = function.getArguments().get(0).getFunction();
+      ExpressionContext filterExpression = function.getArguments().get(1);
+      FilterContext filter = RequestContextUtils.getFilter(filterExpression);
+
+      int functionIndex = _filteredAggregationIndexMap.get(Pair.of(aggregation, filter));
+      AggregationFunction aggregationFunction = _filteredAggregationFunctions.get(functionIndex).getLeft();
+      return new AggregationFunctionExtractor(functionIndex, aggregationFunction);
     } else {
       // Post-aggregation function
       return new PostAggregationFunctionExtractor(function);
@@ -412,6 +428,11 @@ public class TableResizer {
     AggregationFunctionExtractor(int aggregationFunctionIndex) {
       _index = aggregationFunctionIndex + _numGroupByExpressions;
       _aggregationFunction = _aggregationFunctions[aggregationFunctionIndex];
+    }
+
+    AggregationFunctionExtractor(int aggregationFunctionIndex, AggregationFunction aggregationFunction) {
+      _index = aggregationFunctionIndex + _numGroupByExpressions;
+      _aggregationFunction = aggregationFunction;
     }
 
     @Override

@@ -259,4 +259,12 @@ public class AggregationFunctionUtils {
 
     return aggToTransformOpList;
   }
+
+  public static String getResultColumnName(AggregationFunction aggregationFunction, @Nullable FilterContext filter) {
+      String columnName = aggregationFunction.getResultColumnName();
+      if (filter != null) {
+        columnName += " FILTER(WHERE " + filter + ")";
+      }
+      return columnName;
+  }
 }

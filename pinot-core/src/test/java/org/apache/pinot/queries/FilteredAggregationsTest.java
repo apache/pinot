@@ -161,51 +161,84 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
   @Test
   public void testSimpleQueries() {
-    String filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999) FROM MyTable WHERE INT_COL < 1000000";
-    String nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE INT_COL > 9999 AND INT_COL < 1000000";
+    String filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999) sum1 FROM MyTable WHERE INT_COL < 1000000";
+    String nonFilterQuery = "SELECT SUM(INT_COL) sum1 FROM MyTable WHERE INT_COL > 9999 AND INT_COL < 1000000";
     testQuery(filterQuery, nonFilterQuery);
 
-    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL < 3) FROM MyTable WHERE INT_COL > 1";
-    nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE INT_COL > 1 AND INT_COL < 3";
+    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL < 3) sum1 FROM MyTable WHERE INT_COL > 1";
+    nonFilterQuery = "SELECT SUM(INT_COL) sum1 FROM MyTable WHERE INT_COL > 1 AND INT_COL < 3";
     testQuery(filterQuery, nonFilterQuery);
 
-    filterQuery = "SELECT COUNT(*) FILTER(WHERE INT_COL = 4) FROM MyTable";
-    nonFilterQuery = "SELECT COUNT(*) FROM MyTable WHERE INT_COL = 4";
+    filterQuery = "SELECT COUNT(*) FILTER(WHERE INT_COL = 4) count1 FROM MyTable";
+    nonFilterQuery = "SELECT COUNT(*) count1 FROM MyTable WHERE INT_COL = 4";
     testQuery(filterQuery, nonFilterQuery);
 
-    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 8000) FROM MyTable ";
-    nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE INT_COL > 8000";
+    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 8000) sum1 FROM MyTable ";
+    nonFilterQuery = "SELECT SUM(INT_COL) sum1 FROM MyTable WHERE INT_COL > 8000";
     testQuery(filterQuery, nonFilterQuery);
 
-    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE NO_INDEX_COL <= 1) FROM MyTable WHERE INT_COL > 1";
-    nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE NO_INDEX_COL <= 1 AND INT_COL > 1";
+    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE NO_INDEX_COL <= 1) sum1 FROM MyTable WHERE INT_COL > 1";
+    nonFilterQuery = "SELECT SUM(INT_COL) sum1 FROM MyTable WHERE NO_INDEX_COL <= 1 AND INT_COL > 1";
     testQuery(filterQuery, nonFilterQuery);
 
-    filterQuery = "SELECT AVG(NO_INDEX_COL) FROM MyTable WHERE NO_INDEX_COL > -1";
-    nonFilterQuery = "SELECT AVG(NO_INDEX_COL) FROM MyTable";
+    filterQuery = "SELECT AVG(NO_INDEX_COL) avg1 FROM MyTable WHERE NO_INDEX_COL > -1";
+    nonFilterQuery = "SELECT AVG(NO_INDEX_COL) avg1 FROM MyTable";
     testQuery(filterQuery, nonFilterQuery);
 
-    filterQuery = "SELECT AVG(INT_COL) FILTER(WHERE NO_INDEX_COL > -1) FROM MyTable";
-    nonFilterQuery = "SELECT AVG(INT_COL) FROM MyTable";
-    testQuery(filterQuery, nonFilterQuery);
-
-    filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990), MAX(INT_COL) FILTER(WHERE INT_COL > 29990) "
-        + "FROM MyTable";
-    nonFilterQuery = "SELECT MIN(INT_COL), MAX(INT_COL) FROM MyTable WHERE INT_COL > 29990";
-    testQuery(filterQuery, nonFilterQuery);
-
-    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE BOOLEAN_COL) FROM MyTable";
-    nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE BOOLEAN_COL=true";
-    testQuery(filterQuery, nonFilterQuery);
-
-    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE BOOLEAN_COL AND STARTSWITH(STRING_COL, 'abc')) FROM MyTable";
-    nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE BOOLEAN_COL=true AND STARTSWITH(STRING_COL, 'abc')";
+    filterQuery = "SELECT AVG(INT_COL) FILTER(WHERE NO_INDEX_COL > -1) avg1 FROM MyTable";
+    nonFilterQuery = "SELECT AVG(INT_COL) avg1 FROM MyTable";
     testQuery(filterQuery, nonFilterQuery);
 
     filterQuery =
-        "SELECT SUM(INT_COL) FILTER(WHERE BOOLEAN_COL AND STARTSWITH(REVERSE(STRING_COL), 'abc')) FROM " + "MyTable";
+        "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990) min1, MAX(INT_COL) FILTER(WHERE INT_COL > 29990) max1"
+            + " FROM MyTable";
+    nonFilterQuery = "SELECT MIN(INT_COL) min1, MAX(INT_COL) max1 FROM MyTable WHERE INT_COL > 29990";
+    testQuery(filterQuery, nonFilterQuery);
+
+    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE BOOLEAN_COL) sum1 FROM MyTable";
+    nonFilterQuery = "SELECT SUM(INT_COL) sum1 FROM MyTable WHERE BOOLEAN_COL=true";
+    testQuery(filterQuery, nonFilterQuery);
+
+    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE BOOLEAN_COL AND STARTSWITH(STRING_COL, 'abc')) sum1 FROM MyTable";
+    nonFilterQuery = "SELECT SUM(INT_COL) sum1 FROM MyTable WHERE BOOLEAN_COL=true AND STARTSWITH(STRING_COL, 'abc')";
+    testQuery(filterQuery, nonFilterQuery);
+
+    filterQuery =
+        "SELECT SUM(INT_COL) FILTER(WHERE BOOLEAN_COL AND STARTSWITH(REVERSE(STRING_COL), 'abc')) sum1 FROM MyTable";
     nonFilterQuery =
-        "SELECT SUM(INT_COL) FROM MyTable WHERE BOOLEAN_COL=true AND STARTSWITH(REVERSE(STRING_COL), " + "'abc')";
+        "SELECT SUM(INT_COL) sum1 FROM MyTable WHERE BOOLEAN_COL=true AND STARTSWITH(REVERSE(STRING_COL), " + "'abc')";
+    testQuery(filterQuery, nonFilterQuery);
+  }
+
+  @Test
+  public void testFilterResultColumnNameGroupBy() {
+    String filterQuery =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999) FROM MyTable WHERE INT_COL < 1000000 GROUP BY BOOLEAN_COL";
+    String nonFilterQuery =
+        "SELECT SUM(INT_COL) \"sum(INT_COL) FILTER(WHERE INT_COL > '9999')\" FROM MyTable WHERE INT_COL > 9999 AND "
+            + "INT_COL < 1000000 GROUP BY BOOLEAN_COL";
+    testQuery(filterQuery, nonFilterQuery);
+
+    filterQuery =
+        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999 AND INT_COL < 1000000) FROM MyTable GROUP BY BOOLEAN_COL";
+    nonFilterQuery =
+        "SELECT SUM(INT_COL) \"sum(INT_COL) FILTER(WHERE (INT_COL > '9999' AND INT_COL < '1000000'))\" FROM MyTable "
+            + "WHERE INT_COL > 9999 AND INT_COL < 1000000 GROUP BY BOOLEAN_COL";
+    testQuery(filterQuery, nonFilterQuery);
+  }
+
+  @Test
+  public void testFilterResultColumnNameNonGroupBy() {
+    String filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999) FROM MyTable WHERE INT_COL < 1000000";
+    String nonFilterQuery =
+        "SELECT SUM(INT_COL) \"sum(INT_COL) FILTER(WHERE INT_COL > '9999')\" FROM MyTable WHERE INT_COL > 9999 AND "
+            + "INT_COL < 1000000";
+    testQuery(filterQuery, nonFilterQuery);
+
+    filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 9999 AND INT_COL < 1000000) FROM MyTable";
+    nonFilterQuery =
+        "SELECT SUM(INT_COL) \"sum(INT_COL) FILTER(WHERE (INT_COL > '9999' AND INT_COL < '1000000'))\" FROM MyTable "
+            + "WHERE INT_COL > 9999 AND INT_COL < 1000000";
     testQuery(filterQuery, nonFilterQuery);
   }
 
@@ -305,9 +338,9 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
   @Test
   public void testMultipleAggregationsOnSameFilter() {
-    String filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990), "
-        + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990) FROM MyTable";
-    String nonFilterQuery = "SELECT MIN(INT_COL), MAX(INT_COL) FROM MyTable WHERE INT_COL > 29990";
+    String filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990) testMin, "
+        + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990) testMax FROM MyTable";
+    String nonFilterQuery = "SELECT MIN(INT_COL) testMin, MAX(INT_COL) testMax FROM MyTable WHERE INT_COL > 29990";
     testQuery(filterQuery, nonFilterQuery);
 
     filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990) AS total_min, "
@@ -318,6 +351,26 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "MAX(CASE WHEN (INT_COL > 29990) THEN INT_COL ELSE 0 END) AS total_max, "
         + "SUM(CASE WHEN (NO_INDEX_COL < 5000) THEN INT_COL ELSE 0 END) AS total_sum, "
         + "MAX(CASE WHEN (NO_INDEX_COL < 5000) THEN NO_INDEX_COL ELSE 0 END) AS total_max2 FROM MyTable";
+    testQuery(filterQuery, nonFilterQuery);
+  }
+
+  @Test
+  public void testMultipleAggregationsOnSameFilterOrderByFiltered() {
+    String filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990) testMin, "
+        + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990) testMax FROM MyTable ORDER BY testMax";
+    String nonFilterQuery =
+        "SELECT MIN(INT_COL) testMin, MAX(INT_COL) testMax FROM MyTable WHERE INT_COL > 29990 ORDER BY testMax";
+    testQuery(filterQuery, nonFilterQuery);
+
+    filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990) AS total_min, "
+        + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990) AS total_max, "
+        + "SUM(INT_COL) FILTER(WHERE NO_INDEX_COL < 5000) AS total_sum, "
+        + "MAX(NO_INDEX_COL) FILTER(WHERE NO_INDEX_COL < 5000) AS total_max2 FROM MyTable ORDER BY total_sum";
+    nonFilterQuery = "SELECT MIN(CASE WHEN (NO_INDEX_COL > 29990) THEN INT_COL ELSE 99999 END) AS total_min, "
+        + "MAX(CASE WHEN (INT_COL > 29990) THEN INT_COL ELSE 0 END) AS total_max, "
+        + "SUM(CASE WHEN (NO_INDEX_COL < 5000) THEN INT_COL ELSE 0 END) AS total_sum, "
+        + "MAX(CASE WHEN (NO_INDEX_COL < 5000) THEN NO_INDEX_COL ELSE 0 END) AS total_max2 FROM MyTable ORDER BY "
+        + "total_sum";
     testQuery(filterQuery, nonFilterQuery);
   }
 
@@ -337,8 +390,8 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
   @Test
   public void testGroupBy() {
-    String filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 25000) FROM MyTable GROUP BY BOOLEAN_COL";
-    String nonFilterQuery = "SELECT SUM(INT_COL) FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL";
+    String filterQuery = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 25000) testSum FROM MyTable GROUP BY BOOLEAN_COL";
+    String nonFilterQuery = "SELECT SUM(INT_COL) testSum FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL";
     testQuery(filterQuery, nonFilterQuery);
   }
 
@@ -356,17 +409,19 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   @Test
   public void testGroupBySameFilter() {
     String filterQuery =
-        "SELECT AVG(INT_COL) FILTER(WHERE INT_COL > 25000), SUM(INT_COL) FILTER(WHERE INT_COL > 25000) FROM MyTable "
-            + "GROUP BY BOOLEAN_COL";
-    String nonFilterQuery = "SELECT AVG(INT_COL), SUM(INT_COL) FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL";
+        "SELECT AVG(INT_COL) FILTER(WHERE INT_COL > 25000) testAvg, SUM(INT_COL) FILTER(WHERE INT_COL > 25000) "
+            + "testSum FROM MyTable GROUP BY BOOLEAN_COL";
+    String nonFilterQuery =
+        "SELECT AVG(INT_COL) testAvg, SUM(INT_COL) testSum FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL";
     testQuery(filterQuery, nonFilterQuery);
   }
 
   @Test
   public void testMultipleAggregationsOnSameFilterGroupBy() {
-    String filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990), "
-        + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990) FROM MyTable GROUP BY BOOLEAN_COL";
-    String nonFilterQuery = "SELECT MIN(INT_COL), MAX(INT_COL) FROM MyTable WHERE INT_COL > 29990 GROUP BY BOOLEAN_COL";
+    String filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990) testMin, "
+        + "MAX(INT_COL) FILTER(WHERE INT_COL > 29990) testMax FROM MyTable GROUP BY BOOLEAN_COL";
+    String nonFilterQuery =
+        "SELECT MIN(INT_COL) testMin, MAX(INT_COL) testMax FROM MyTable WHERE INT_COL > 29990 GROUP BY BOOLEAN_COL";
     testQuery(filterQuery, nonFilterQuery);
 
     filterQuery = "SELECT MIN(INT_COL) FILTER(WHERE NO_INDEX_COL > 29990) AS total_min, "
@@ -378,6 +433,17 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
         + "SUM(CASE WHEN (NO_INDEX_COL < 5000) THEN INT_COL ELSE 0 END) AS total_sum, "
         + "MAX(CASE WHEN (NO_INDEX_COL < 5000) THEN NO_INDEX_COL ELSE 0 END) AS total_max2 FROM MyTable GROUP BY "
         + "BOOLEAN_COL";
+    testQuery(filterQuery, nonFilterQuery);
+  }
+
+  @Test
+  public void testGroupBySameFilterOrderByFiltered() {
+    String filterQuery =
+        "SELECT AVG(INT_COL) FILTER(WHERE INT_COL > 25000) testAvg, SUM(INT_COL) FILTER(WHERE INT_COL > 25000) "
+            + "testSum FROM MyTable GROUP BY BOOLEAN_COL ORDER BY testAvg";
+    String nonFilterQuery =
+        "SELECT AVG(INT_COL) testAvg, SUM(INT_COL) testSum FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL "
+            + "ORDER BY testAvg";
     testQuery(filterQuery, nonFilterQuery);
   }
 }
