@@ -253,7 +253,7 @@ public class QueryContext {
   /**
    * Returns the filtered aggregation functions for a query, or {@code null} if the query does not have any aggregation.
    */
-  @Nonnull
+  @Nullable
   public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
     return _filteredAggregationFunctions;
   }
