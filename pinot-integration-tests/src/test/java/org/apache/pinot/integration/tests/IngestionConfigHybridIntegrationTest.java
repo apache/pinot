@@ -19,13 +19,11 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -33,8 +31,6 @@ import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -42,8 +38,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
-
 
 /**
  * Tests ingestion configs on a hybrid table
@@ -220,46 +214,6 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "_OFFLINE" + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
     response = postQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
-  }
-
-  @Test
-  public void testForceCommit()
-      throws Exception {
-    Set<String> consumingSegments = _controllerStarter.getHelixResourceManager()
-        .getSegmentsFromIdealStateMatchingState(getTableName() + "_REALTIME",
-            ImmutableSet.of(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING));
-    String jobId = forceCommit(getTableName());
-
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        if (isForceCommitJobCompleted(jobId)) {
-          assertTrue(_controllerStarter.getHelixResourceManager()
-              .getSegmentsFromIdealStateMatchingState(getTableName() + "_REALTIME",
-                  ImmutableSet.of(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE))
-              .containsAll(consumingSegments));
-          return true;
-        }
-        return false;
-      } catch (Exception e) {
-        return false;
-      }
-    }, 60000L, "Error verifying force commit operation on table!");
-  }
-
-  public boolean isForceCommitJobCompleted(String forceCommitJobId)
-      throws Exception {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forForceCommitJobStatus(forceCommitJobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
-
-    assertEquals(jobStatus.get("jobId").asText(), forceCommitJobId);
-    assertEquals(jobStatus.get("jobType").asText(), "FORCE_COMMIT");
-    return jobStatus.get("numberOfSegmentsYetToBeCommitted").asInt(-1) == 0;
-  }
-
-  private String forceCommit(String tableName)
-      throws Exception {
-    String response = sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName), null);
-    return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
   }
 
   @AfterClass

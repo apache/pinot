@@ -3628,16 +3628,16 @@ public class PinotHelixResourceManager {
             tableNameWithType, segmentsToCheck));
   }
 
-  public Set<String> getSegmentsFromIdealStateMatchingState(String tableNameWithType,
-      @Nullable Set<String> filterStates) {
+  public Set<String> getOnlineSegmentsFromIdealState(String tableNameWithType, boolean includeConsuming) {
     IdealState tableIdealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState((tableIdealState != null), "Table ideal state is null");
     Map<String, Map<String, String>> segmentAssignment = tableIdealState.getRecord().getMapFields();
     Set<String> matchingSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
-      String segmentName = entry.getKey();
-      if (filterStates == null || !Collections.disjoint(entry.getValue().values(), filterStates)) {
-        matchingSegments.add(segmentName);
+      Map<String, String> instanceStateMap = entry.getValue();
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || (includeConsuming
+          && instanceStateMap.containsValue(SegmentStateModel.CONSUMING))) {
+        matchingSegments.add(entry.getKey());
       }
     }
     return matchingSegments;
