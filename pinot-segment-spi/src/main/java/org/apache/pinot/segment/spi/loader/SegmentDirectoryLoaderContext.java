@@ -88,7 +88,9 @@ public class SegmentDirectoryLoaderContext {
     return _segmentDirectoryConfigs;
   }
 
-  public Object getSegmentDirectoryLoaderProp(String propName) { return _segmentDirectoryLoaderProps.get(propName); }
+  public Object getSegmentDirectoryLoaderProp(String propName) {
+    return _segmentDirectoryLoaderProps.get(propName);
+  }
 
   public Map<String, Map<String, String>> getInstanceTierConfigs() {
     return _instanceTierConfigs;
