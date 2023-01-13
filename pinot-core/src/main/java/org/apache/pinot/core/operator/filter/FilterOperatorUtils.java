@@ -110,7 +110,7 @@ public class FilterOperatorUtils {
     } else {
       // Return the AND filter operator with re-ordered child filter operators
       FilterOperatorUtils.reorderAndFilterChildOperators(queryContext, childFilterOperators);
-      return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions());
+      return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs);
     }
   }
 

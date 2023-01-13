@@ -88,7 +88,11 @@ public final class OrDocIdSet implements FilterBlockDocIdSet {
         }
       }
       for (BitmapBasedDocIdIterator bitmapBasedDocIdIterator : bitmapBasedDocIdIterators) {
-        docIds.or(bitmapBasedDocIdIterator.getDocIds());
+        if (bitmapBasedDocIdIterator.isInverted()) {
+          docIds.orNot(bitmapBasedDocIdIterator.getDocIds(), _numDocs);
+        } else {
+          docIds.or(bitmapBasedDocIdIterator.getDocIds());
+        }
       }
       BitmapDocIdIterator bitmapDocIdIterator = new BitmapDocIdIterator(docIds, _numDocs);
       int numRemainingDocIdIterators = remainingDocIdIterators.size();

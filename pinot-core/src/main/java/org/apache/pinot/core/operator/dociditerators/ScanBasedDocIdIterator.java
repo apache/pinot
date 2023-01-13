@@ -40,6 +40,14 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
   MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds);
 
   /**
+   * Applies ANDNOT operation to the given bitmap of document ids, returns a bitmap of the matching document ids.
+   */
+  default MutableRoaringBitmap applyAndNot(ImmutableRoaringBitmap docIds, int numDocs) {
+    // FIXME we're scanning anyway, so flipping a bitmap doesn't seem quite so bad, but this can be improved
+    return applyAnd(ImmutableRoaringBitmap.flip(docIds, 0L, numDocs));
+  }
+
+  /**
    * Returns the number of entries (SV value contains one entry, MV value contains multiple entries) scanned during the
    * iteration. This method should be called after the iteration is done.
    */

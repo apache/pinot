@@ -76,7 +76,7 @@ public class GroupByPlanNode implements PlanNode {
 
     List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
         AggregationFunctionUtils.buildFilteredAggTransformPairs(_indexSegment, _queryContext,
-            filterOperatorPair.getRight(), transformOperator, groupByExpressions);
+            filterOperatorPair.getRight(), transformOperator, groupByExpressions, numTotalDocs);
     return new FilteredGroupByOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList,
         _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]), numTotalDocs, _queryContext);
   }

@@ -32,7 +32,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
 
   private int _nextDocId = 0;
 
-  public AndDocIdIterator(BlockDocIdIterator[] docIdIterators) {
+  public AndDocIdIterator(BlockDocIdIterator... docIdIterators) {
     _docIdIterators = docIdIterators;
   }
 

@@ -27,6 +27,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.InvertedBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
@@ -56,11 +57,13 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public final class AndDocIdSet implements FilterBlockDocIdSet {
   private final List<FilterBlockDocIdSet> _docIdSets;
   private final boolean _cardinalityBasedRankingForScan;
+  private final int _numDocs;
 
-  public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets, Map<String, String> queryOptions) {
+  public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets, Map<String, String> queryOptions, int numDocs) {
     _docIdSets = docIdSets;
     _cardinalityBasedRankingForScan =
         !MapUtils.isEmpty(queryOptions) && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
+    _numDocs = numDocs;
   }
 
   @Override
@@ -88,8 +91,16 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
     }
 
     // evaluate the bitmaps in the order of the lowest matching num docIds comes first, so that we minimize the number
-    // of containers (range) for comparison from the beginning, as will minimize the effort of bitmap AND application
-    bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
+    // of containers (range) for comparison from the beginning, as will minimize the effort of bitmap AND application.
+    // We also put inverted iterators last to avoid flipping them wherever possible, but if we have to flip one, we
+    // want it to be the largest one
+    bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> {
+      int cardinality = x.getDocIds().getCardinality();
+      if (x.isInverted()) {
+        return Integer.MAX_VALUE - cardinality;
+      }
+      return Integer.MIN_VALUE + cardinality;
+    }));
 
     // Evaluate the scan based operator with the highest cardinality coming first, this potentially reduce the range of
     // scanning from the beginning. Automatically place N/A cardinality column (negative infinity) to the back as we
@@ -113,6 +124,7 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
       // BlockDocIdIterator, directly return the merged RangelessBitmapDocIdIterator; otherwise, construct and return
       // an AndDocIdIterator with the merged RangelessBitmapDocIdIterator and the remaining BlockDocIdIterators.
 
+      boolean inverted = false;
       ImmutableRoaringBitmap docIds;
       if (numSortedDocIdIterators > 0) {
         List<IntPair> docIdRanges;
@@ -132,29 +144,52 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
           mutableDocIds.add(docIdRange.getLeft(), docIdRange.getRight() + 1L);
         }
         for (BitmapBasedDocIdIterator bitmapBasedDocIdIterator : bitmapBasedDocIdIterators) {
-          mutableDocIds.and(bitmapBasedDocIdIterator.getDocIds());
+          if (bitmapBasedDocIdIterator.isInverted()) {
+            mutableDocIds.andNot(bitmapBasedDocIdIterator.getDocIds());
+          } else {
+            mutableDocIds.and(bitmapBasedDocIdIterator.getDocIds());
+          }
         }
         docIds = mutableDocIds;
       } else {
         if (numBitmapBasedDocIdIterators == 1) {
-          docIds = bitmapBasedDocIdIterators.get(0).getDocIds();
+          BitmapBasedDocIdIterator bitmapBasedDocIdIterator = bitmapBasedDocIdIterators.get(0);
+          docIds = bitmapBasedDocIdIterator.getDocIds();
+          inverted = bitmapBasedDocIdIterator.isInverted();
         } else {
-          MutableRoaringBitmap mutableDocIds = bitmapBasedDocIdIterators.get(0).getDocIds().toMutableRoaringBitmap();
+          BitmapBasedDocIdIterator firstBitmapBasedDocIdIterator = bitmapBasedDocIdIterators.get(0);
+          MutableRoaringBitmap mutableDocIds = firstBitmapBasedDocIdIterator.getDocIds().toMutableRoaringBitmap();
+          if (firstBitmapBasedDocIdIterator.isInverted()) {
+            // because of the sort order, this means all the filters are inverted, so this may be avoidable,
+            // but it's also the largest bitmap so we should only create a small bitmap
+            mutableDocIds.flip(0L, _numDocs);
+          }
           for (int i = 1; i < numBitmapBasedDocIdIterators; i++) {
-            mutableDocIds.and(bitmapBasedDocIdIterators.get(i).getDocIds());
+            BitmapBasedDocIdIterator bitmapBasedDocIdIterator = bitmapBasedDocIdIterators.get(i);
+            if (bitmapBasedDocIdIterator.isInverted()) {
+              mutableDocIds.andNot(bitmapBasedDocIdIterators.get(i).getDocIds());
+            } else {
+              mutableDocIds.and(bitmapBasedDocIdIterators.get(i).getDocIds());
+            }
           }
           docIds = mutableDocIds;
         }
       }
       for (ScanBasedDocIdIterator scanBasedDocIdIterator : scanBasedDocIdIterators) {
-        docIds = scanBasedDocIdIterator.applyAnd(docIds);
+        if (inverted) {
+          docIds = scanBasedDocIdIterator.applyAndNot(docIds, _numDocs);
+          inverted = false;
+        } else {
+          docIds = scanBasedDocIdIterator.applyAnd(docIds);
+        }
       }
-      RangelessBitmapDocIdIterator rangelessBitmapDocIdIterator = new RangelessBitmapDocIdIterator(docIds);
+      BitmapBasedDocIdIterator lastBitmapDocIdIterator =
+          inverted ? new InvertedBitmapDocIdIterator(docIds, _numDocs) : new RangelessBitmapDocIdIterator(docIds);
       if (numRemainingDocIdIterators == 0) {
-        return rangelessBitmapDocIdIterator;
+        return lastBitmapDocIdIterator;
       } else {
         BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[numRemainingDocIdIterators + 1];
-        docIdIterators[0] = rangelessBitmapDocIdIterator;
+        docIdIterators[0] = lastBitmapDocIdIterator;
         for (int i = 0; i < numRemainingDocIdIterators; i++) {
           docIdIterators[i + 1] = remainingDocIdIterators.get(i);
         }

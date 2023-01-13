@@ -61,7 +61,8 @@ public class BenchmarkAndDocIdIterator {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void benchAndFilterOperator(MyState myState, Blackhole bh) {
     for (int i = 0; i < 100; i++) {
-      bh.consume(new AndFilterOperator(myState._childOperators).nextBlock().getBlockDocIdSet().iterator());
+      bh.consume(new AndFilterOperator(myState._childOperators, NUM_DOCS).nextBlock()
+              .getBlockDocIdSet().iterator());
     }
   }
 
@@ -70,7 +71,8 @@ public class BenchmarkAndDocIdIterator {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void benchAndFilterOperatorDegenerate(MyState myState, Blackhole bh) {
     for (int i = 0; i < 100; i++) {
-      bh.consume(new AndFilterOperator(myState._childOperatorsNoOrdering).nextBlock().getBlockDocIdSet().iterator());
+      bh.consume(new AndFilterOperator(myState._childOperatorsNoOrdering, NUM_DOCS).nextBlock()
+              .getBlockDocIdSet().iterator());
     }
   }
 

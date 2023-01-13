@@ -36,13 +36,16 @@ public class AndFilterOperator extends BaseFilterOperator {
   private final List<BaseFilterOperator> _filterOperators;
   private final Map<String, String> _queryOptions;
 
-  public AndFilterOperator(List<BaseFilterOperator> filterOperators, Map<String, String> queryOptions) {
+  private final int _numDocs;
+
+  public AndFilterOperator(List<BaseFilterOperator> filterOperators, Map<String, String> queryOptions, int numDocs) {
     _filterOperators = filterOperators;
     _queryOptions = queryOptions;
+    _numDocs = numDocs;
   }
 
-  public AndFilterOperator(List<BaseFilterOperator> filterOperators) {
-    this(filterOperators, null);
+  public AndFilterOperator(List<BaseFilterOperator> filterOperators, int numDocs) {
+    this(filterOperators, null, numDocs);
   }
 
   @Override
@@ -52,7 +55,7 @@ public class AndFilterOperator extends BaseFilterOperator {
     for (BaseFilterOperator filterOperator : _filterOperators) {
       filterBlockDocIdSets.add(filterOperator.nextBlock().getBlockDocIdSet());
     }
-    return new FilterBlock(new AndDocIdSet(filterBlockDocIdSets, _queryOptions));
+    return new FilterBlock(new AndDocIdSet(filterBlockDocIdSets, _queryOptions, _numDocs));
   }
 
   @Override
@@ -76,7 +79,6 @@ public class AndFilterOperator extends BaseFilterOperator {
     }
     return BufferFastAggregation.andCardinality(bitmaps);
   }
-
 
   @Override
   public List<Operator> getChildOperators() {

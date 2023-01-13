@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -37,7 +38,7 @@ public class AndFilterOperatorTest {
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(new TestFilterOperator(docIds1));
     operators.add(new TestFilterOperator(docIds2));
-    AndFilterOperator andOperator = new AndFilterOperator(operators);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 40);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 3);
@@ -55,7 +56,7 @@ public class AndFilterOperatorTest {
     operators.add(new TestFilterOperator(docIds1));
     operators.add(new TestFilterOperator(docIds2));
     operators.add(new TestFilterOperator(docIds3));
-    AndFilterOperator andOperator = new AndFilterOperator(operators);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 40);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 3);
@@ -72,12 +73,12 @@ public class AndFilterOperatorTest {
     List<BaseFilterOperator> childOperators = new ArrayList<>();
     childOperators.add(new TestFilterOperator(docIds1));
     childOperators.add(new TestFilterOperator(docIds2));
-    AndFilterOperator childAndOperator = new AndFilterOperator(childOperators);
+    AndFilterOperator childAndOperator = new AndFilterOperator(childOperators, 40);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childAndOperator);
     operators.add(new TestFilterOperator(docIds3));
-    AndFilterOperator andOperator = new AndFilterOperator(operators);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 40);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 3);
@@ -112,8 +113,8 @@ public class AndFilterOperatorTest {
               numDocs));
     }
 
-    AndFilterOperator andFilterOperator1 = new AndFilterOperator(childOperators1);
-    AndFilterOperator andFilterOperator2 = new AndFilterOperator(childOperators2);
+    AndFilterOperator andFilterOperator1 = new AndFilterOperator(childOperators1, numDocs);
+    AndFilterOperator andFilterOperator2 = new AndFilterOperator(childOperators2, numDocs);
     BlockDocIdIterator iterator1 = andFilterOperator1.getNextBlock().getBlockDocIdSet().iterator();
     BlockDocIdIterator iterator2 = andFilterOperator2.getNextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator1.next(), 0);
@@ -145,13 +146,81 @@ public class AndFilterOperatorTest {
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childOrOperator);
     operators.add(new TestFilterOperator(docIds1));
-    AndFilterOperator andOperator = new AndFilterOperator(operators);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 40);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 2);
     Assert.assertEquals(iterator.next(), 3);
     Assert.assertEquals(iterator.next(), 6);
     Assert.assertEquals(iterator.next(), 28);
+    Assert.assertEquals(iterator.next(), Constants.EOF);
+  }
+
+  @Test
+  public void testComplexOrWithNot() {
+    int[] include1 = new int[]{2, 3, 6, 10, 15, 16, 28};
+    int[] include2 = new int[]{3, 6, 8, 20, 28};
+    int[] exclude1 = new int[]{1, 2, 3, 6, 30}; // negation = {4, 5, 7, ... 29}
+    int[] expected = new int[]{3, 6, 10, 15, 16, 28};
+
+    List<BaseFilterOperator> childOperators = new ArrayList<>();
+    childOperators.add(new BitmapBasedFilterOperator(ImmutableRoaringBitmap.bitmapOf(exclude1), true, 40));
+    childOperators.add(new BitmapBasedFilterOperator(ImmutableRoaringBitmap.bitmapOf(include2), false, 40));
+    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators, 40);
+
+    List<BaseFilterOperator> operators = new ArrayList<>();
+    operators.add(childOrOperator);
+    operators.add(new TestFilterOperator(include1));
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 40);
+
+    BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
+    for (int j : expected) {
+      Assert.assertEquals(iterator.next(), j);
+    }
+    Assert.assertEquals(iterator.next(), Constants.EOF);
+  }
+
+  @Test
+  public void testComplexAndWithNot() {
+    int[] include1 = new int[]{2, 3, 6, 10, 15, 16, 28};
+    int[] include2 = new int[]{3, 6, 8, 20, 28};
+    int[] exclude1 = new int[]{1, 2, 3, 6, 30}; // negation = {4, 5, 7, ... 29}
+    int[] expected = new int[]{28};
+
+    List<BaseFilterOperator> operators = new ArrayList<>();
+    operators.add(new BitmapBasedFilterOperator(ImmutableRoaringBitmap.bitmapOf(exclude1), true, 40));
+    operators.add(new BitmapBasedFilterOperator(ImmutableRoaringBitmap.bitmapOf(include2), false, 40));
+    operators.add(new TestFilterOperator(include1));
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 40);
+
+    BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
+    for (int j : expected) {
+      Assert.assertEquals(iterator.next(), j);
+    }
+    Assert.assertEquals(iterator.next(), Constants.EOF);
+  }
+
+  @Test
+  public void testAndWithNot() {
+    int[] include1 = new int[]{2, 3, 6, 10, 15, 16, 28};
+    int[] include2 = new int[]{3, 6, 8, 20, 28};
+    int[] exclude1 = new int[]{1, 2, 3, 6, 30}; // negation = {4, 5, 7, ... 29}
+    int[] expected = new int[]{28};
+
+    List<BaseFilterOperator> childOperators = new ArrayList<>();
+    childOperators.add(new BitmapBasedFilterOperator(ImmutableRoaringBitmap.bitmapOf(exclude1), true, 40));
+    childOperators.add(new BitmapBasedFilterOperator(ImmutableRoaringBitmap.bitmapOf(include2), false, 40));
+    AndFilterOperator childAndOperator = new AndFilterOperator(childOperators, 40);
+
+    List<BaseFilterOperator> operators = new ArrayList<>();
+    operators.add(childAndOperator);
+    operators.add(new TestFilterOperator(include1));
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 40);
+
+    BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
+    for (int j : expected) {
+      Assert.assertEquals(iterator.next(), j);
+    }
     Assert.assertEquals(iterator.next(), Constants.EOF);
   }
 }

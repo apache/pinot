@@ -18,15 +18,21 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.InvertedBitmapDocIdIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class BitmapDocIdSet implements FilterBlockDocIdSet {
-  private final BitmapDocIdIterator _iterator;
+  private final BitmapBasedDocIdIterator _iterator;
 
   public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs) {
-    _iterator = new BitmapDocIdIterator(docIds, numDocs);
+    this(docIds, numDocs, false);
+  }
+
+  public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs, boolean inverted) {
+    _iterator = inverted ? new InvertedBitmapDocIdIterator(docIds, numDocs) : new BitmapDocIdIterator(docIds, numDocs);
   }
 
   public BitmapDocIdSet(BitmapDocIdIterator iterator) {
@@ -34,7 +40,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
   }
 
   @Override
-  public BitmapDocIdIterator iterator() {
+  public BitmapBasedDocIdIterator iterator() {
     return _iterator;
   }
 
