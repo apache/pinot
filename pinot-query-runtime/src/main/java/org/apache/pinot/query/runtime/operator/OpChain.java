@@ -30,15 +30,14 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  * An {@code OpChain} represents a chain of operators that are separated
  * by send/receive stages.
  */
-public class OpChain implements AutoCloseable{
+public class OpChain implements AutoCloseable {
 
   private final V2Operator _root;
   private final Set<MailboxIdentifier> _receivingMailbox;
   private final OpChainStats _stats;
   private final String _id;
 
-  public OpChain(V2Operator root, List<MailboxIdentifier> receivingMailboxes, long requestId,
-      int stageId) {
+  public OpChain(V2Operator root, List<MailboxIdentifier> receivingMailboxes, long requestId, int stageId) {
     _root = root;
     _receivingMailbox = new HashSet<>(receivingMailboxes);
     _id = String.format("%s_%s", requestId, stageId);
@@ -63,7 +62,7 @@ public class OpChain implements AutoCloseable{
   }
 
   @Override
-  public void close(){
+  public void close() {
     _root.close();
   }
 }

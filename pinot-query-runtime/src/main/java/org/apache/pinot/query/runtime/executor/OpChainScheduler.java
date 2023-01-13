@@ -45,6 +45,11 @@ public interface OpChainScheduler {
   void onDataAvailable(MailboxIdentifier mailbox);
 
   /**
+   * This method is called when scheduler is terminating. It should clean up all of the resources if there are any.
+   */
+  void shutDown();
+
+  /**
    * @return whether or not there is any work for the scheduler to do
    */
   boolean hasNext();

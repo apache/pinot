@@ -43,6 +43,8 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainSchedulerService.class);
 
+  private static final int TERMINATION_TIMEOUT_SEC = 60;
+
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
   private final long _pollIntervalMs;
@@ -72,6 +74,24 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     // this will just notify all waiters that the scheduler is shutting down
     _monitor.enter();
     _monitor.leave();
+    _workerPool.shutdown();
+    try {
+     // Wait a while for existing tasks to terminate
+     if (!_workerPool.awaitTermination(TERMINATION_TIMEOUT_SEC, TimeUnit.SECONDS)) {
+       _workerPool.shutdownNow(); // Cancel currently executing tasks
+      } else {
+       // TODO: Consider wait for cancellation kicks in.
+       LOGGER.error("OpChainScheduler doesn't terminate within ", TERMINATION_TIMEOUT_SEC, " seconds");
+     }
+    } catch (InterruptedException ie) {
+      // (Re-)Cancel if current thread also interrupted
+      _workerPool.shutdownNow();
+      LOGGER.error("OpChainScheduler termination got interrupted");
+      // Preserve interrupt status
+      Thread.currentThread().interrupt();
+    } finally {
+      _scheduler.shutDown();
+    }
   }
 
   @Override

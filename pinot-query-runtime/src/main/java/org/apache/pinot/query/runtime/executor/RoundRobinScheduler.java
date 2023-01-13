@@ -131,6 +131,16 @@ public class RoundRobinScheduler implements OpChainScheduler {
     return _ready.size() + _available.size();
   }
 
+  @Override
+  public void shutDown() {
+    while (!_ready.isEmpty()) {
+      _ready.poll().close();
+    }
+    while (!_available.isEmpty()) {
+      _available.poll()._opChain.close();
+    }
+  }
+
   private void computeReady() {
     Iterator<AvailableEntry> availableChains = _available.iterator();
 
@@ -161,8 +171,7 @@ public class RoundRobinScheduler implements OpChainScheduler {
   }
 
   private void trace(String operation) {
-    LOGGER.trace("({}) Ready: {}, Available: {}, Mail: {}",
-        operation, _ready, _available, _seenMail);
+    LOGGER.trace("({}) Ready: {}, Available: {}, Mail: {}", operation, _ready, _available, _seenMail);
   }
 
   private static class AvailableEntry {
