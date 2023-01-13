@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.InputStream;
@@ -290,8 +291,7 @@ public class SegmentPushUtils implements Serializable {
       // Check if there is a segment metadata tar gz file named `segmentName.metadata.tar.gz`, already in the remote
       // directory. This is to avoid generating a new segment metadata tar gz file every time we push a segment,
       // which requires downloading the entire segment tar gz file.
-      URI metadataTarGzFilePath = URI.create(
-          new File(tarFilePath).getParentFile() + File.separator + segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+      URI metadataTarGzFilePath = buildMetadataTarGzFilePath(tarFilePath, segmentName);
       if (spec.getPushJobSpec().isPreferMetadataTarGz() && fileSystem.exists(metadataTarGzFilePath)) {
         segmentMetadataFile = new File(FileUtils.getTempDirectory(),
             "segmentMetadata-" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
@@ -441,5 +441,23 @@ public class SegmentPushUtils implements Serializable {
       }
       FileUtils.deleteQuietly(segmentMetadataDir);
     }
+  }
+
+  @VisibleForTesting
+  static URI buildMetadataTarGzFilePath(String tarFilePath, String segmentName)
+      throws URISyntaxException {
+    // Local path like '/var/folder/object.tar.gz'
+    if (new URI(tarFilePath).getScheme() == null) {
+      return URI.create(
+          new File(tarFilePath).getParentFile() + File.separator + segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    }
+
+    // Some remote path like 's3://bucket/prefix/object.tar.gz'
+    int fileNameIndex = tarFilePath.lastIndexOf(File.separator);
+    String parentFilePath = tarFilePath.substring(0, fileNameIndex);
+    String[] pathArray = parentFilePath.split(":");
+    String scheme = pathArray[0] + ":"; // Examples: s3, gs, file, https etc...
+    String path = pathArray[1];
+    return new URI(scheme + path + File.separator + segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
   }
 }
