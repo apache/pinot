@@ -82,6 +82,8 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTBITMAPMV("distinctCountBitmapMV"),
   DISTINCTCOUNTHLLMV("distinctCountHLLMV"),
   DISTINCTCOUNTRAWHLLMV("distinctCountRawHLLMV"),
+  DISTINCTSUMMV("distinctSumMV"),
+  DISTINCTAVGMV("distinctAvgMV"),
   PERCENTILEMV("percentileMV"),
   PERCENTILEESTMV("percentileEstMV"),
   PERCENTILERAWESTMV("percentileRawEstMV"),
