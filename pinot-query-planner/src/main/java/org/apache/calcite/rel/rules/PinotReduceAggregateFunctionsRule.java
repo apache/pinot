@@ -31,7 +31,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.fun.PinotFourthMomentAggregateFunction;
@@ -176,10 +175,6 @@ public class PinotReduceAggregateFunctionsRule extends RelOptRule {
     RexNode fmRef = rexBuilder.addAggCall(fourthMomentCall, nGroups, newCalls,
         aggCallMapping, oldAggRel.getInput()::fieldIsNullable);
 
-    final RelDataTypeFactory typeFactory = oldAggRel.getCluster().getTypeFactory();
-    final RelDataType resultType = typeFactory.createTypeWithNullability(
-        oldCall.getType(), fmRef.getType().isNullable());
-    rexBuilder.ensureType(resultType, fmRef, true);
     final RexNode skewRef = rexBuilder.makeCall(
         isKurtosis ? PinotOperatorTable.KURTOSIS_REDUCE : PinotOperatorTable.SKEWNESS_REDUCE,
         fmRef);

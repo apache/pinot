@@ -31,6 +31,7 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 
 
@@ -87,7 +88,7 @@ public class TransferableBlock implements Block {
     if (_container == null) {
       switch (_type) {
         case ROW:
-          _container = DataBlockUtils.extractRows(_dataBlock);
+          _container = DataBlockUtils.extractRows(_dataBlock, ObjectSerDeUtils::deserialize);
           break;
         case COLUMNAR:
         case METADATA:
