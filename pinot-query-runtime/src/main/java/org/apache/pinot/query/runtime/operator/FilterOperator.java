@@ -29,7 +29,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,31 +48,22 @@ import org.slf4j.LoggerFactory;
  */
 public class FilterOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "FILTER";
-<<<<<<< HEAD
   private final MultiStageOperator _upstreamOperator;
-=======
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
-
-  private final Operator<TransferableBlock> _upstreamOperator;
->>>>>>> a5662b3d36 (opchain and operator stats)
   private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-<<<<<<< HEAD
-  public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter) {
-=======
   // TODO: Move to OperatorContext class.
   private OperatorStats _operatorStats;
 
-  public FilterOperator(Operator<TransferableBlock> upstreamOperator, DataSchema dataSchema, RexExpression filter,
-      PlanRequestContext context) {
->>>>>>> a5662b3d36 (opchain and operator stats)
+  public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
+      long requestId, int stageId) {
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);
     _upstreamErrorBlock = null;
-    _operatorStats = new OperatorStats(context.getRequestId(), context.getStageId(), EXPLAIN_NAME);
+    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
   }
 
   @Override
@@ -91,7 +81,10 @@ public class FilterOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock() {
     _operatorStats.startTimer();
     try {
-      return transform(_upstreamOperator.nextBlock());
+      _operatorStats.endTimer();
+      TransferableBlock block = _upstreamOperator.nextBlock();
+      _operatorStats.startTimer();
+      return transform(block);
     } catch (Exception e) {
       LOGGER.debug("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);

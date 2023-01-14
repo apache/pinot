@@ -47,13 +47,8 @@ import org.slf4j.LoggerFactory;
  */
 public class TransformOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "TRANSFORM";
-<<<<<<< HEAD
   private final MultiStageOperator _upstreamOperator;
-=======
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
-
-  private final Operator<TransferableBlock> _upstreamOperator;
->>>>>>> a5662b3d36 (opchain and operator stats)
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
@@ -61,13 +56,8 @@ public class TransformOperator extends MultiStageOperator {
   private TransferableBlock _upstreamErrorBlock;
   private OperatorStats _operatorStats;
 
-<<<<<<< HEAD
   public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema,
-      List<RexExpression> transforms, DataSchema upstreamDataSchema) {
-=======
-  public TransformOperator(Operator<TransferableBlock> upstreamOperator, DataSchema resultSchema,
-      List<RexExpression> transforms, DataSchema upstreamDataSchema, PlanRequestContext context) {
->>>>>>> a5662b3d36 (opchain and operator stats)
+      List<RexExpression> transforms, DataSchema upstreamDataSchema, long requestId, int stageId) {
     Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
     Preconditions.checkState(resultSchema.size() == transforms.size(),
         "result schema size:" + resultSchema.size() + " doesn't match transform operand size:" + transforms.size());
@@ -78,7 +68,7 @@ public class TransformOperator extends MultiStageOperator {
       _transformOperandsList.add(TransformOperand.toTransformOperand(rexExpression, upstreamDataSchema));
     }
     _resultSchema = resultSchema;
-    _operatorStats = new OperatorStats(context.getRequestId(), context.getStageId(), EXPLAIN_NAME);
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -96,7 +86,10 @@ public class TransformOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock() {
     _operatorStats.startTimer();
     try {
-      return transform(_upstreamOperator.nextBlock());
+      _operatorStats.endTimer();
+      TransferableBlock block = _upstreamErrorBlock;
+      _operatorStats.startTimer();
+      return transform(block);
     } catch (Exception e) {
       LOGGER.error("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);

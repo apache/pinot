@@ -110,7 +110,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     }
     _upstreamErrorBlock = null;
     _serverIdx = 0;
-    _operatorStats = new OperatorStats(jobId, stageId, EXPLAIN_NAME);
+    _operatorStats = new OperatorStats(jobId, stageId, toExplainString());
   }
 
   public List<MailboxIdentifier> getSendingMailbox() {

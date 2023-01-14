@@ -35,11 +35,7 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-<<<<<<< HEAD
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
-=======
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
->>>>>>> cead50bd07 (opchain and operator stats)
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,9 +87,9 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   @VisibleForTesting
-  AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
-      List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema inputSchema, Map<String,
-      Function<DataSchema.ColumnDataType, Merger>> mergers, long requestId, int stageId) {
+  AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
+      List<RexExpression> groupSet, DataSchema inputSchema, Map<String, Function<DataSchema.ColumnDataType, Merger>> mergers,
+      long requestId, int stageId) {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _upstreamErrorBlock = null;
@@ -183,7 +179,9 @@ public class AggregateOperator extends MultiStageOperator {
    * @return whether or not the operator is ready to move on (EOS or ERROR)
    */
   private boolean consumeInputBlocks() {
+    _operatorStats.endTimer();
     TransferableBlock block = _inputOperator.nextBlock();
+    _operatorStats.startTimer();
     while (!block.isNoOpBlock()) {
       // setting upstream error block
       if (block.isErrorBlock()) {
@@ -203,7 +201,9 @@ public class AggregateOperator extends MultiStageOperator {
         }
       }
       _operatorStats.recordInput(1, container.size());
+      _operatorStats.endTimer();
       block = _inputOperator.nextBlock();
+      _operatorStats.startTimer();
     }
     return false;
   }
@@ -291,8 +291,7 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   private static class Accumulator {
-
-    private static final Map<String, Function<DataSchema.ColumnDataType, Merger>> MERGERS = ImmutableMap
+  private static final Map<String, Function<DataSchema.ColumnDataType, Merger>> MERGERS = ImmutableMap
         .<String, Function<DataSchema.ColumnDataType, Merger>>builder()
         .put("SUM", cdt -> AggregateOperator::mergeSum)
         .put("$SUM", cdt -> AggregateOperator::mergeSum)

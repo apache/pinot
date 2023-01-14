@@ -50,8 +50,6 @@ public class AggregateOperatorTest {
   @Mock
   private MultiStageOperator _input;
 
-  @Mock
-  private PlanRequestContext _context;
 
   @BeforeMethod
   public void setUp() {

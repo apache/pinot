@@ -39,7 +39,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,16 +87,10 @@ public class HashJoinOperator extends MultiStageOperator {
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
-<<<<<<< HEAD
-  public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
-      DataSchema leftSchema, JoinNode node) {
-=======
-  // TODO: Move to OperatorContext class.
   private OperatorStats _operatorStats;
 
-  public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
-      DataSchema leftSchema, JoinNode node, PlanRequestContext context) {
->>>>>>> a5662b3d36 (opchain and operator stats)
+  public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
+      DataSchema leftSchema, JoinNode node, long requestId, int stageId) {
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
     _joinType = node.getJoinRelType();
@@ -125,7 +118,7 @@ public class HashJoinOperator extends MultiStageOperator {
       _matchedRightRows = null;
     }
     _upstreamErrorBlock = null;
-    _operatorStats = new OperatorStats(context.getRequestId(), context.getStageId(), EXPLAIN_NAME);
+    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
   }
 
   // TODO: Separate left and right table operator.
@@ -158,8 +151,11 @@ public class HashJoinOperator extends MultiStageOperator {
       } else if (!_isHashTableBuilt) {
         return TransferableBlockUtils.getNoOpTransferableBlock();
       }
+      _operatorStats.endTimer();
+      TransferableBlock leftBlock = _leftTableOperator.nextBlock();
+      _operatorStats.startTimer();
       // JOIN each left block with the right block.
-      return buildJoinedDataBlock(_leftTableOperator.nextBlock());
+      return buildJoinedDataBlock(leftBlock);
     } catch (Exception e) {
       LOGGER.error("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
@@ -169,7 +165,9 @@ public class HashJoinOperator extends MultiStageOperator {
   }
 
   private void buildBroadcastHashTable() {
+    _operatorStats.endTimer();
     TransferableBlock rightBlock = _rightTableOperator.nextBlock();
+    _operatorStats.startTimer();
     while (!rightBlock.isNoOpBlock()) {
       if (rightBlock.isErrorBlock()) {
         _upstreamErrorBlock = rightBlock;
@@ -187,7 +185,9 @@ public class HashJoinOperator extends MultiStageOperator {
         hashCollection.add(row);
       }
       _operatorStats.recordInput(1, container.size());
+      _operatorStats.endTimer();
       rightBlock = _rightTableOperator.nextBlock();
+      _operatorStats.startTimer();
     }
   }
 

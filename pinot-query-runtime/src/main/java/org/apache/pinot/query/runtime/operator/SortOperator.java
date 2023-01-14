@@ -32,7 +32,6 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,15 +54,15 @@ public class SortOperator extends MultiStageOperator {
 
   public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      PlanRequestContext context) {
+      long requestId, int stageId) {
     this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, context);
+        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, requestId, stageId);
   }
 
   @VisibleForTesting
   SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      int maxHolderCapacity, PlanRequestContext context) {
+      int maxHolderCapacity, long requestId, int stageId) {
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
     _offset = offset;
@@ -75,7 +74,7 @@ public class SortOperator extends MultiStageOperator {
         : maxHolderCapacity;
     _rows = new PriorityQueue<>(_numRowsToKeep,
         new SortComparator(collationKeys, collationDirections, dataSchema, false));
-    _operatorStats = new OperatorStats(context.getRequestId(), context.getStageId(), EXPLAIN_NAME);
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -133,7 +132,9 @@ public class SortOperator extends MultiStageOperator {
 
   private void consumeInputBlocks() {
     if (!_isSortedBlockConstructed) {
+      _operatorStats.endTimer();
       TransferableBlock block = _upstreamOperator.nextBlock();
+      _operatorStats.startTimer();
       while (!block.isNoOpBlock()) {
         // setting upstream error block
         if (block.isErrorBlock()) {
@@ -148,8 +149,9 @@ public class SortOperator extends MultiStageOperator {
         for (Object[] row : container) {
           SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
         }
-
+        _operatorStats.endTimer();
         block = _upstreamOperator.nextBlock();
+        _operatorStats.startTimer();
         _operatorStats.recordInput(1, block.getNumRows());
       }
     }

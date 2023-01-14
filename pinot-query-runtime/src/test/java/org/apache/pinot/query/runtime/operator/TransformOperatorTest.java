@@ -75,7 +75,7 @@ public class TransformOperatorTest {
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
     RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
     TransformOperator op =
-        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(ref0, ref1), upStreamSchema, _context);
+        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(ref0, ref1), upStreamSchema, 1, 2);
     TransferableBlock result = op.nextBlock();
 
     Assert.assertTrue(!result.isErrorBlock());
@@ -99,8 +99,7 @@ public class TransformOperatorTest {
     RexExpression.Literal boolLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
     RexExpression.Literal strLiteral = new RexExpression.Literal(FieldSpec.DataType.STRING, "str");
     TransformOperator op =
-        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema,
-            _context);
+        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema, 1, 2);
     TransferableBlock result = op.nextBlock();
     // Literal operands should just output original literals.
     Assert.assertTrue(!result.isErrorBlock());
@@ -130,7 +129,7 @@ public class TransformOperatorTest {
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     TransformOperator op =
-        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(plus01, minus01), upStreamSchema, _context);
+        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(plus01, minus01), upStreamSchema, 1, 2);
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(!result.isErrorBlock());
     List<Object[]> resultRows = result.getContainer();
@@ -158,7 +157,7 @@ public class TransformOperatorTest {
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     TransformOperator op =
-        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(plus01, minus01), upStreamSchema, _context);
+        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(plus01, minus01), upStreamSchema, 1, 2);
 
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
@@ -178,8 +177,7 @@ public class TransformOperatorTest {
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
     TransformOperator op =
-        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema,
-            _context);
+        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema, 1, 2);
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
     DataBlock data = result.getDataBlock();
@@ -202,8 +200,7 @@ public class TransformOperatorTest {
     DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "strCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.STRING});
     TransformOperator op =
-        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema,
-            _context);
+        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema, 1, 2);
     TransferableBlock result = op.nextBlock();
     // First block has two rows
     Assert.assertFalse(result.isErrorBlock());
@@ -235,7 +232,7 @@ public class TransformOperatorTest {
         DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
     });
     TransformOperator transform =
-        new TransformOperator(_upstreamOp, resultSchema, new ArrayList<>(), upStreamSchema, _context);
+        new TransformOperator(_upstreamOp, resultSchema, new ArrayList<>(), upStreamSchema, 1, 2);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*doesn't match "
@@ -248,6 +245,6 @@ public class TransformOperatorTest {
     });
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
     TransformOperator transform =
-        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(ref0), upStreamSchema, _context);
+        new TransformOperator(_upstreamOp, resultSchema, ImmutableList.of(ref0), upStreamSchema, 1, 2);
   }
 };

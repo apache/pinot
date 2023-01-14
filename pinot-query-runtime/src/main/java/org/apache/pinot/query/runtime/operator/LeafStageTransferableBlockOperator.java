@@ -75,7 +75,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     _desiredDataSchema = dataSchema;
     _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
     _currentIndex = 0;
-    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
+    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
   }
 
   @Override

@@ -126,7 +126,9 @@ public class MailboxSendOperator extends MultiStageOperator {
     _operatorStats.startTimer();
     TransferableBlock transferableBlock;
     try {
+      _operatorStats.endTimer();
       transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+      _operatorStats.startTimer();
       while (!transferableBlock.isNoOpBlock()) {
         _exchange.send(transferableBlock);
         _operatorStats.recordInput(1, transferableBlock.getNumRows());
@@ -136,8 +138,9 @@ public class MailboxSendOperator extends MultiStageOperator {
           LOGGER.debug("OperatorStats:" + _operatorStats);
           return transferableBlock;
         }
-
+        _operatorStats.endTimer();
         transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+        _operatorStats.startTimer();
       }
     } catch (final Exception e) {
       // ideally, MailboxSendOperator doesn't ever throw an exception because

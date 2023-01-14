@@ -65,8 +65,9 @@ public class OperatorStats {
   @Override
   public String toString() {
     return String.format(
-        "(%s) OperatorStats[requestId: %s, stageId] ExecutionWalTime: %sms, InputRows: %s, InputBlock: %s, "
-            + "OutputRows: %s, OutputBlock: %s", _requestId, _stageId, _executeStopwatch.elapsed(TimeUnit.MILLISECONDS),
-        _numInputRows, _numInputBlock, _numOutputRows, _numOutputBlock);
+        "OperatorStats[type: %s, requestId: %s, stageId %s] ExecutionWalTime: %sms, InputRows: %s, InputBlock: "
+            + "%s, OutputRows: %s, OutputBlock: %s", _operatorType, _requestId, _stageId,
+        _executeStopwatch.elapsed(TimeUnit.MILLISECONDS), _numInputRows, _numInputBlock, _numOutputRows,
+        _numOutputBlock);
   }
 }
