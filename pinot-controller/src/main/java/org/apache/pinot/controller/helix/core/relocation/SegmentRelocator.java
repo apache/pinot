@@ -102,10 +102,15 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       _waitingQueue = new LinkedBlockingQueue<>();
       _executorService.submit(() -> {
         LOGGER.info("Rebalance tables sequentially");
-        while (!Thread.currentThread().isInterrupted()) {
-          rebalanceWaitingTable(this::rebalanceTable);
+        try {
+          // Keep checking any table waiting to rebalance.
+          while (true) {
+            rebalanceWaitingTable(this::rebalanceTable);
+          }
+        } catch (InterruptedException e) {
+          LOGGER.warn("Got interrupted while rebalancing tables sequentially", e);
+          Thread.currentThread().interrupt();
         }
-        return null;
       });
     } else {
       _waitingTables = null;
@@ -124,18 +129,13 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   }
 
   @VisibleForTesting
-  synchronized void putTableToWait(String tableNameWithType) {
-    if (_waitingTables.contains(tableNameWithType)) {
-      LOGGER.debug("Table: {} is already in waiting queue", tableNameWithType);
-      return;
-    }
-    if (_waitingQueue.offer(tableNameWithType)) {
-      _waitingTables.add(tableNameWithType);
+  void putTableToWait(String tableNameWithType) {
+    if (_waitingTables.add(tableNameWithType)) {
+      _waitingQueue.offer(tableNameWithType);
       LOGGER.debug("Table: {} is added in waiting queue, total waiting: {}", tableNameWithType, _waitingTables.size());
       return;
     }
-    // Should not happen as the number of tables is limited in a cluster.
-    LOGGER.warn("Table: {} failed to be put in waiting queue", tableNameWithType);
+    LOGGER.debug("Table: {} is already in waiting queue", tableNameWithType);
   }
 
   @VisibleForTesting
