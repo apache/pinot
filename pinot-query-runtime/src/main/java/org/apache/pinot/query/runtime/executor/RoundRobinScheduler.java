@@ -27,6 +27,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.slf4j.Logger;
@@ -39,6 +40,7 @@ import org.slf4j.LoggerFactory;
  * of work is signaled using the {@link #onDataAvailable(MailboxIdentifier)}
  * callback.
  */
+@NotThreadSafe
 public class RoundRobinScheduler implements OpChainScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoundRobinScheduler.class);
   private static final long DEFAULT_RELEASE_TIMEOUT = TimeUnit.MINUTES.toMillis(1);
@@ -52,6 +54,8 @@ public class RoundRobinScheduler implements OpChainScheduler {
   // to be scheduled (have data, or are first-time scheduled)
   private final Queue<AvailableEntry> _available = new LinkedList<>();
   private final Queue<OpChain> _ready = new LinkedList<>();
+
+  private boolean _isShutDown = false;
 
   // using a Set here is acceptable because calling hasNext() and
   // onDataAvailable() cannot occur concurrently - that means that
@@ -79,6 +83,9 @@ public class RoundRobinScheduler implements OpChainScheduler {
 
   @Override
   public void register(OpChain operatorChain, boolean isNew) {
+    if (_isShutDown) {
+      return;
+    }
     // the first time an operator chain is scheduled, it should
     // immediately be considered ready in case it does not need
     // read from any mailbox (e.g. with a LiteralValueOperator)
@@ -133,12 +140,16 @@ public class RoundRobinScheduler implements OpChainScheduler {
 
   @Override
   public void shutDown() {
+    if (_isShutDown) {
+      return;
+    }
     while (!_ready.isEmpty()) {
       _ready.poll().close();
     }
     while (!_available.isEmpty()) {
       _available.poll()._opChain.close();
     }
+    _isShutDown = true;
   }
 
   private void computeReady() {
