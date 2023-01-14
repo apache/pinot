@@ -109,7 +109,6 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
           }
         } catch (InterruptedException e) {
           LOGGER.warn("Got interrupted while rebalancing tables sequentially", e);
-          Thread.currentThread().interrupt();
         }
       });
     } else {
