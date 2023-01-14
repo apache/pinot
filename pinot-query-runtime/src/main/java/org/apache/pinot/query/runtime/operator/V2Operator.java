@@ -35,6 +35,8 @@ public abstract class V2Operator extends BaseOperator<TransferableBlock> impleme
 
   abstract List<V2Operator> getV2ChildOperators();
 
+  // TODO: Ideally close() call should finish within request deadline.
+  // TODO: Consider passing deadline as part of the API.
   @Override
   public void close() {
     for (V2Operator op : getV2ChildOperators()) {
@@ -42,7 +44,7 @@ public abstract class V2Operator extends BaseOperator<TransferableBlock> impleme
         op.close();
       } catch (Exception e) {
         LOGGER.error("Failed to close operator:" + op);
-        // Continue processing because even one operator failed to be close, we should close the rest.
+        // Continue processing because even one operator failed to be close, we should still close the rest.
       }
     }
   }
