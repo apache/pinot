@@ -22,18 +22,29 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.tier.FixedTierSegmentSelector;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
@@ -139,6 +150,96 @@ public class SegmentRelocatorTest {
     verify(helixMgrMock).updateZkMetadata(eq(tableName), recordCapture.capture(), eq(10));
     SegmentZKMetadata record = recordCapture.getValue();
     assertEquals(record.getTier(), "coldTier");
+  }
+
+  @Test
+  public void testRebalanceTablesSequentially()
+      throws InterruptedException {
+    ControllerConf conf = mock(ControllerConf.class);
+    when(conf.isSegmentRelocatorRebalanceTablesSequentially()).thenReturn(true);
+    SegmentRelocator relocator =
+        new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class), conf,
+            mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpConnectionManager.class));
+    int cnt = 10;
+    for (int i = 0; i < cnt; i++) {
+      relocator.putTableToWait("t_" + i);
+    }
+    for (int i = 0; i < cnt; i++) {
+      relocator.putTableToWait("t_" + RandomUtils.nextInt(0, cnt));
+    }
+    // All tables are tracked and no duplicate table names.
+    Queue<String> waitingQueue = relocator.getWaitingQueue();
+    assertEquals(waitingQueue.size(), cnt);
+    Set<String> tablesInQueue = new HashSet<>(waitingQueue);
+    for (int i = 0; i < cnt; i++) {
+      assertTrue(tablesInQueue.contains("t_" + i));
+    }
+    String[] tableName = new String[1];
+    for (int i = 0; i < cnt; i++) {
+      assertEquals(waitingQueue.size(), cnt - i);
+      relocator.rebalanceWaitingTable(s -> tableName[0] = s);
+      assertEquals(tableName[0], "t_" + i);
+    }
+    assertEquals(waitingQueue.size(), 0);
+  }
+
+  @Test
+  public void testRebalanceTablesSequentiallyWithMultiRequesters() {
+    ControllerConf conf = mock(ControllerConf.class);
+    when(conf.isSegmentRelocatorRebalanceTablesSequentially()).thenReturn(true);
+    SegmentRelocator relocator =
+        new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class), conf,
+            mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpConnectionManager.class));
+    ExecutorService runner = Executors.newCachedThreadPool();
+    int cnt = 10;
+    // Three threads to submit tables randomly.
+    runner.submit(() -> {
+      for (int i = 0; i < cnt; i++) {
+        relocator.putTableToWait("t_" + RandomUtils.nextInt(0, cnt));
+        Thread.sleep(RandomUtils.nextLong(10, 30));
+      }
+      return null;
+    });
+    runner.submit(() -> {
+      for (int i = 0; i < cnt; i++) {
+        relocator.putTableToWait("t_" + RandomUtils.nextInt(0, cnt));
+        Thread.sleep(RandomUtils.nextLong(10, 30));
+      }
+      return null;
+    });
+    runner.submit(() -> {
+      // This thread puts all tables into queue so let it kick in a bit later.
+      Thread.sleep(100);
+      for (int i = 0; i < cnt; i++) {
+        relocator.putTableToWait("t_" + i);
+        Thread.sleep(RandomUtils.nextLong(10, 30));
+      }
+      return null;
+    });
+    try {
+      Queue<String> waitingQueue = relocator.getWaitingQueue();
+      TestUtils.waitForCondition((Void v) -> waitingQueue.size() == cnt, 100, 3000,
+          "Expecting all tables get in waiting queue");
+      // No duplicates of tasks.
+      Set<String> tablesInQueue = new HashSet<>(waitingQueue);
+      for (int i = 0; i < cnt; i++) {
+        assertTrue(tablesInQueue.contains("t_" + i));
+      }
+      // t_X will get its turn.
+      relocator.putTableToWait("t_X");
+      assertEquals(waitingQueue.size(), cnt + 1);
+      TestUtils.waitForCondition((Void v) -> {
+        try {
+          String[] tableName = new String[1];
+          relocator.rebalanceWaitingTable(s -> tableName[0] = s);
+          return tableName[0].equals("t_X");
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }, 10, 3000, "Table t_X should get its turn");
+    } finally {
+      runner.shutdownNow();
+    }
   }
 
   private static ZNRecord createSegmentMetadataZNRecord(String segmentName, String tierName) {
