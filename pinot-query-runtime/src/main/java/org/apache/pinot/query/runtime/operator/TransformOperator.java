@@ -79,7 +79,7 @@ public class TransformOperator extends MultiStageOperator {
   @Override
   public String toExplainString() {
     _upstreamOperator.toExplainString();
-    LOGGER.error(_operatorStats.toString());
+    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 

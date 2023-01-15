@@ -77,7 +77,7 @@ public class QueryDispatcher {
     long toResultTableStartTime = System.currentTimeMillis();
     ResultTable resultTable = toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
         queryPlan.getQueryStageMap().get(0).getDataSchema());
-    LOGGER.error(
+    LOGGER.debug(
         "RequestId:" + requestId + " StageId: 0 Broker toResultTable processing time:" + (System.currentTimeMillis()
             - toResultTableStartTime) + " ms");
     return resultTable;

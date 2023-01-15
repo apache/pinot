@@ -119,7 +119,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   @Override
   public String toExplainString() {
     _dataTableBlockBaseOperator.toExplainString();
-    LOGGER.error(_operatorStats.toString());
+    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
