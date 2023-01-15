@@ -121,4 +121,15 @@ public class PinotMetricUtilsTest {
       // Expected
     }
   }
+
+  @Test
+  public void testCleanUp() {
+    PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
+    PinotMetricsRegistry registry1 = PinotMetricUtils.getPinotMetricsRegistry();
+    Assert.assertEquals(registry, registry1);
+    PinotMetricUtils.cleanUp();
+    // after cleaning up, a new one will be created
+    PinotMetricsRegistry registry2 = PinotMetricUtils.getPinotMetricsRegistry();
+    Assert.assertNotEquals(registry, registry2);
+  }
 }
