@@ -143,14 +143,14 @@ public class RealtimeConsumerMonitorTest {
             controllerMetrics, consumingSegmentReader);
     realtimeConsumerMonitor.start();
     realtimeConsumerMonitor.run();
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
-        ControllerGauge.MAX_RECORDS_LAG.getGaugeName() + "." + tableName + ".1"), 0);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
-        ControllerGauge.MAX_RECORDS_LAG.getGaugeName() + "." + tableName + ".2"), 40);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS.getGaugeName() + "." + tableName + ".1"), 0);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
-        ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS.getGaugeName() + "." + tableName + ".2"), 60000);
+    Assert.assertEquals(MetricValueUtils.getPartitionGaugeValue(controllerMetrics, tableName, 1,
+        ControllerGauge.MAX_RECORDS_LAG), 0);
+    Assert.assertEquals(MetricValueUtils.getPartitionGaugeValue(controllerMetrics, tableName, 2,
+        ControllerGauge.MAX_RECORDS_LAG), 40);
+    Assert.assertEquals(MetricValueUtils.getPartitionGaugeValue(controllerMetrics, tableName, 1,
+            ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS), 0);
+    Assert.assertEquals(MetricValueUtils.getPartitionGaugeValue(controllerMetrics, tableName, 2,
+        ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS), 60000);
   }
 
   ConsumingSegmentInfoReader.ConsumingSegmentInfo getConsumingSegmentInfoForServer(String serverName,

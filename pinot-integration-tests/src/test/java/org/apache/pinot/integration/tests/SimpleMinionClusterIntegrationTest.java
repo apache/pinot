@@ -167,12 +167,11 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     String stoppedGauge = TASK_TYPE + "." + TaskState.STOPPED;
     String completedGauge = TASK_TYPE + "." + TaskState.COMPLETED;
     TestUtils.waitForCondition(
-        input -> MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + inProgressGauge) == NUM_TASKS
-            && MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + stoppedGauge) == 0
-            && MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + completedGauge) == 0,
+        input -> MetricValueUtils.getGlobalGaugeValue(controllerMetrics, inProgressGauge, ControllerGauge.TASK_STATUS)
+            == NUM_TASKS
+            && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, stoppedGauge, ControllerGauge.TASK_STATUS) == 0
+            && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, completedGauge, ControllerGauge.TASK_STATUS)
+            == 0,
         ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
 
     // Stop the task queue
@@ -196,12 +195,12 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
 
     // Wait at most 30 seconds for ZK callback to update the controller gauges
     TestUtils.waitForCondition(
-        input -> MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + inProgressGauge) == 0
-            && MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + stoppedGauge) == NUM_TASKS
-            && MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + completedGauge) == 0,
+        input -> MetricValueUtils.getGlobalGaugeValue(controllerMetrics, inProgressGauge, ControllerGauge.TASK_STATUS)
+            == 0
+            && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, stoppedGauge, ControllerGauge.TASK_STATUS)
+            == NUM_TASKS
+            && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, completedGauge, ControllerGauge.TASK_STATUS)
+            == 0,
         ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
 
     // Task deletion requires the task queue to be stopped,
@@ -232,12 +231,11 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
 
     // Wait at most 30 seconds for ZK callback to update the controller gauges
     TestUtils.waitForCondition(
-        input -> MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + inProgressGauge) == 0
-            && MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + stoppedGauge) == 0
-            && MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + completedGauge) == (NUM_TASKS - 1),
+        input -> MetricValueUtils.getGlobalGaugeValue(controllerMetrics, inProgressGauge, ControllerGauge.TASK_STATUS)
+            == 0
+            && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, stoppedGauge, ControllerGauge.TASK_STATUS) == 0
+            && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, completedGauge, ControllerGauge.TASK_STATUS)
+            == (NUM_TASKS - 1),
         ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
 
     // Delete the task queue
@@ -249,12 +247,11 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
 
     // Wait at most 30 seconds for ZK callback to update the controller gauges
     TestUtils.waitForCondition(
-        input -> MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + inProgressGauge) == 0
-            && MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + stoppedGauge) == 0
-            && MetricValueUtils.getGaugeValue(controllerMetrics,
-            ControllerGauge.TASK_STATUS.getGaugeName() + "." + completedGauge) == 0,
+        input -> MetricValueUtils.getGlobalGaugeValue(controllerMetrics, inProgressGauge, ControllerGauge.TASK_STATUS)
+            == 0
+            && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, stoppedGauge, ControllerGauge.TASK_STATUS) == 0
+            && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, completedGauge, ControllerGauge.TASK_STATUS)
+            == 0,
         ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
   }
 

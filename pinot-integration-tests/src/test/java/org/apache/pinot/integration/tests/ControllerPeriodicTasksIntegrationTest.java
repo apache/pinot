@@ -207,9 +207,8 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     int numTables = 5;
     ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
     TestUtils.waitForCondition(aVoid -> {
-      if (MetricValueUtils.getGaugeValue(controllerMetrics,
-          ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED.getGaugeName() + ".SegmentStatusChecker")
-          != numTables) {
+      if (MetricValueUtils.getGlobalGaugeValue(controllerMetrics, "SegmentStatusChecker",
+          ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED) != numTables) {
         return false;
       }
       if (!checkSegmentStatusCheckerMetrics(controllerMetrics, TableNameBuilder.OFFLINE.tableNameWithType(emptyTable),
@@ -240,10 +239,9 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           100)) {
         return false;
       }
-      return MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName()) == 4
-          && MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.REALTIME_TABLE_COUNT.getGaugeName()) == 1
-          && MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.DISABLED_TABLE_COUNT.getGaugeName())
-          == 1;
+      return MetricValueUtils.getGlobalGaugeValue(controllerMetrics, ControllerGauge.OFFLINE_TABLE_COUNT) == 4
+          && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, ControllerGauge.REALTIME_TABLE_COUNT) == 1
+          && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, ControllerGauge.DISABLED_TABLE_COUNT) == 1;
     }, 60_000, "Timed out waiting for SegmentStatusChecker");
 
     dropOfflineTable(emptyTable);
@@ -255,25 +253,23 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
       IdealState idealState, long expectedNumReplicas, long expectedPercentReplicas, long expectedSegmentsInErrorState,
       long expectedPercentSegmentsAvailable) {
     if (idealState != null) {
-      if (MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.IDEALSTATE_ZNODE_SIZE.getGaugeName() + "."
-          + tableNameWithType) != idealState
-          .toString().length()) {
+      if (MetricValueUtils.getTableGaugeValue(controllerMetrics, tableNameWithType,
+          ControllerGauge.IDEALSTATE_ZNODE_SIZE) != idealState.toString().length()) {
         return false;
       }
-      if (MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.SEGMENT_COUNT.getGaugeName() + "."
-          + tableNameWithType) != idealState
-          .getPartitionSet().size()) {
+      if (MetricValueUtils.getTableGaugeValue(controllerMetrics, tableNameWithType, ControllerGauge.SEGMENT_COUNT)
+          != idealState.getPartitionSet().size()) {
         return false;
       }
     }
-    return MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.NUMBER_OF_REPLICAS.getGaugeName() + "."
-        + tableNameWithType) == expectedNumReplicas
-        && MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.PERCENT_OF_REPLICAS.getGaugeName() + "."
-        + tableNameWithType) == expectedPercentReplicas
-        && MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.SEGMENTS_IN_ERROR_STATE.getGaugeName()
-        + "." + tableNameWithType) == expectedSegmentsInErrorState
-        && MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE.getGaugeName()
-        + "." + tableNameWithType) == expectedPercentSegmentsAvailable;
+    return MetricValueUtils.getTableGaugeValue(controllerMetrics, tableNameWithType,
+        ControllerGauge.NUMBER_OF_REPLICAS) == expectedNumReplicas
+        && MetricValueUtils.getTableGaugeValue(controllerMetrics, tableNameWithType,
+        ControllerGauge.PERCENT_OF_REPLICAS) == expectedPercentReplicas
+        && MetricValueUtils.getTableGaugeValue(controllerMetrics, tableNameWithType,
+        ControllerGauge.SEGMENTS_IN_ERROR_STATE) == expectedSegmentsInErrorState
+        && MetricValueUtils.getTableGaugeValue(controllerMetrics, tableNameWithType,
+        ControllerGauge.PERCENT_SEGMENTS_AVAILABLE) == expectedPercentSegmentsAvailable;
   }
 
   @Test

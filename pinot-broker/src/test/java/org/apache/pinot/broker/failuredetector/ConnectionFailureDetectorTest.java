@@ -97,7 +97,7 @@ public class ConnectionFailureDetectorTest {
       int numRetries = _listener._retryUnhealthyServerCalled.get();
       if (numRetries < Broker.FailureDetector.DEFAULT_MAX_RETIRES) {
         assertEquals(_failureDetector.getUnhealthyServers(), Collections.singleton(INSTANCE_ID));
-        assertEquals(MetricValueUtils.getGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS.getGaugeName()), 1);
+        assertEquals(MetricValueUtils.getGlobalGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS), 1);
         return false;
       }
       assertEquals(numRetries, Broker.FailureDetector.DEFAULT_MAX_RETIRES);
@@ -114,7 +114,7 @@ public class ConnectionFailureDetectorTest {
   private void verify(Set<String> expectedUnhealthyServers, int expectedNotifyUnhealthyServerCalled,
       int expectedNotifyHealthyServerCalled) {
     assertEquals(_failureDetector.getUnhealthyServers(), expectedUnhealthyServers);
-    assertEquals(MetricValueUtils.getGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS.getGaugeName()),
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS),
         expectedUnhealthyServers.size());
     assertEquals(_listener._notifyUnhealthyServerCalled.get(), expectedNotifyUnhealthyServerCalled);
     assertEquals(_listener._notifyHealthyServerCalled.get(), expectedNotifyHealthyServerCalled);

@@ -119,9 +119,8 @@ public class ControllerPeriodicTaskTest {
     assertEquals(_tablesProcessed.get(), 0);
     assertFalse(_stopTaskCalled.get());
     assertTrue(_task.isStarted());
-    assertEquals(
-        MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED.getGaugeName() + "." + TASK_NAME), 0);
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
+            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
 
     // Run periodic task with leadership
     resetState();
@@ -129,9 +128,8 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_startTaskCalled.get());
     assertTrue(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), _numTables);
-    assertEquals(
-        MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED.getGaugeName() + "." + TASK_NAME),
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
+            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED),
         _numTables);
     assertFalse(_stopTaskCalled.get());
     assertTrue(_task.isStarted());
@@ -142,9 +140,8 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_startTaskCalled.get());
     assertFalse(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), 0);
-    assertEquals(
-        MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED.getGaugeName() + "." + TASK_NAME), 0);
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
+            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
     assertTrue(_stopTaskCalled.get());
     assertFalse(_task.isStarted());
 
@@ -154,9 +151,8 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_startTaskCalled.get());
     assertFalse(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), 0);
-    assertEquals(
-        MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED.getGaugeName() + "." + TASK_NAME), 0);
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
+            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
     assertFalse(_stopTaskCalled.get());
     assertFalse(_task.isStarted());
 
@@ -168,9 +164,8 @@ public class ControllerPeriodicTaskTest {
     assertEquals(_tablesProcessed.get(), 0);
     assertFalse(_stopTaskCalled.get());
     assertTrue(_task.isStarted());
-    assertEquals(
-        MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED.getGaugeName() + "." + TASK_NAME), 0);
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
+            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
 
     // Run periodic task with leadership
     resetState();
@@ -178,10 +173,8 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_startTaskCalled.get());
     assertTrue(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), _numTables);
-    assertEquals(
-        MetricValueUtils.getGaugeValue(_controllerMetrics,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED.getGaugeName() + "." + TASK_NAME),
-        _numTables);
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
+            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), _numTables);
     assertFalse(_stopTaskCalled.get());
     assertTrue(_task.isStarted());
   }

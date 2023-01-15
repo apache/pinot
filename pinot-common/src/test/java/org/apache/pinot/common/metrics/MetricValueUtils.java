@@ -40,6 +40,70 @@ public class MetricValueUtils {
     return ((YammerSettableGauge<Long>) pinotMetric.getMetric()).value();
   }
 
+  public static boolean globalGaugeExists(AbstractMetrics metrics, AbstractMetrics.Gauge gauge) {
+    return extractMetric(metrics, gauge.getGaugeName()) != null;
+  }
+
+  public static long getGlobalGaugeValue(AbstractMetrics metrics, AbstractMetrics.Gauge gauge) {
+    PinotMetric pinotMetric = extractMetric(metrics, gauge.getGaugeName());
+    if (pinotMetric == null) {
+      return 0;
+    }
+    return ((YammerSettableGauge<Long>) pinotMetric.getMetric()).value();
+  }
+
+  public static boolean globalGaugeExists(AbstractMetrics metrics, String key, AbstractMetrics.Gauge gauge) {
+    return extractMetric(metrics, gauge.getGaugeName() + "." + key) != null;
+  }
+
+  public static long getGlobalGaugeValue(AbstractMetrics metrics, String key, AbstractMetrics.Gauge gauge) {
+    PinotMetric pinotMetric = extractMetric(metrics, gauge.getGaugeName() + "." + key);
+    if (pinotMetric == null) {
+      return 0;
+    }
+    return ((YammerSettableGauge<Long>) pinotMetric.getMetric()).value();
+  }
+
+  public static boolean tableGaugeExists(AbstractMetrics metrics, String tableName, AbstractMetrics.Gauge gauge) {
+    return extractMetric(metrics, gauge.getGaugeName() + "." + tableName) != null;
+  }
+
+  public static long getTableGaugeValue(AbstractMetrics metrics, String tableName, AbstractMetrics.Gauge gauge) {
+    PinotMetric pinotMetric = extractMetric(metrics, gauge.getGaugeName() + "." + tableName);
+    if (pinotMetric == null) {
+      return 0;
+    }
+    return ((YammerSettableGauge<Long>) pinotMetric.getMetric()).value();
+  }
+
+  public static boolean tableGaugeExists(AbstractMetrics metrics, String tableName, String key,
+      AbstractMetrics.Gauge gauge) {
+    return extractMetric(metrics, gauge.getGaugeName() + "." + tableName + "." + key) != null;
+  }
+
+  public static long getTableGaugeValue(AbstractMetrics metrics, String tableName, String key,
+      AbstractMetrics.Gauge gauge) {
+    PinotMetric pinotMetric = extractMetric(metrics, gauge.getGaugeName() + "." + tableName + "." + key);
+    if (pinotMetric == null) {
+      return 0;
+    }
+    return ((YammerSettableGauge<Long>) pinotMetric.getMetric()).value();
+  }
+
+  public static boolean partitionGaugeExists(AbstractMetrics metrics, String tableName, int partitionId,
+      AbstractMetrics.Gauge gauge) {
+    return extractMetric(metrics, gauge.getGaugeName() + "." + tableName + "." + partitionId) != null;
+  }
+
+  public static long getPartitionGaugeValue(AbstractMetrics metrics, String tableName, int partitionId,
+      AbstractMetrics.Gauge gauge) {
+    PinotMetric pinotMetric = extractMetric(metrics, gauge.getGaugeName() + "." + tableName + "." + partitionId);
+    if (pinotMetric == null) {
+      return 0;
+    }
+    return ((YammerSettableGauge<Long>) pinotMetric.getMetric()).value();
+  }
+
   private static PinotMetric extractMetric(AbstractMetrics metrics, String metricName) {
     String metricPrefix;
     Class metricClass;
