@@ -211,11 +211,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (QueryContextUtils.isAggregationQuery(queryContext) && queryContext.getGroupByExpressions() != null) {
       // Set maxInitialResultHolderCapacity
       Integer initResultCap = QueryOptionsUtils.getMaxInitResultCap(queryOptions);
-      if (initResultCap != null) {
-        queryContext.setMaxInitialResultHolderCapacity(initResultCap);
-      } else {
-        queryContext.setMaxInitialResultHolderCapacity(_maxInitialResultHolderCapacity);
-      }
+      int maxInitialResultHolderCapacity = initResultCap == null ? _maxInitialResultHolderCapacity : initResultCap;
+      queryContext.setMaxInitialResultHolderCapacity(maxInitialResultHolderCapacity);
       // Set numGroupsLimit
       Integer numGroupsLimit = QueryOptionsUtils.getNumGroupLimit(queryOptions);
       if (numGroupsLimit != null) {
