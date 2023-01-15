@@ -354,7 +354,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
-    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     try {
 
@@ -369,13 +368,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
             initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig,
                 loaderContextProps);
         boolean needReprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
+        closeSegmentDirectoryQuietly(segmentDirectory);
         if (!needReprocess) {
           // No reprocessing needed, reuse the same segment
-          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
+          // Need to init directory again with updated tier
+          indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+          SegmentDirectory updatedSegmentDirectory =
+              initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
+          ImmutableSegment segment = ImmutableSegmentLoader.load(updatedSegmentDirectory, indexLoadingConfig, schema);
           addSegment(segment);
           return;
-        } else {
-          closeSegmentDirectoryQuietly(segmentDirectory);
         }
       }
 
@@ -407,6 +409,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
       // Load from indexDir and replace the old segment in memory. What's inside indexDir
       // may come from SegmentDirectory.copyTo() or the segment downloaded from deep store.
+      indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
       LOGGER.info("Load segment with data from indexDir: {} to tier: {}", indexDir,
           TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
       ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema);
