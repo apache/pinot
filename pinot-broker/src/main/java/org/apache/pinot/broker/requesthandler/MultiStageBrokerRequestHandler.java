@@ -98,7 +98,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // it is OK to ignore the onDataAvailable callback because the broker top-level operators
     // always run in-line (they don't have any scheduler)
-    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config, ignored -> { });
+    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config, ignored -> {
+    });
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
@@ -176,8 +177,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long executionEndTimeNs = System.nanoTime();
 
     // Set total query processing time
-    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(sqlNodeAndOptions.getParseTimeNs()
-        + (executionEndTimeNs - compilationStartTimeNs));
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
+        sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
     requestContext.setQueryProcessingTime(totalTimeMs);
