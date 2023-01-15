@@ -111,6 +111,7 @@ public class PinotMetricUtilsTest {
 
   @Test
   public void testMetricRegistryFailure() {
+    PinotMetricUtils.cleanUp();
     try {
       Map<String, Object> properties = new HashMap<>();
       properties.put("factory.className", "NonExistentClass");
@@ -124,6 +125,7 @@ public class PinotMetricUtilsTest {
 
   @Test
   public void testCleanUp() {
+    PinotMetricUtils.cleanUp();
     PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
     PinotMetricsRegistry registry1 = PinotMetricUtils.getPinotMetricsRegistry();
     Assert.assertEquals(registry, registry1);
