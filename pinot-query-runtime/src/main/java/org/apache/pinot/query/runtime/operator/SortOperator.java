@@ -85,6 +85,8 @@ public class SortOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    _upstreamOperator.toExplainString();
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
@@ -95,7 +97,6 @@ public class SortOperator extends MultiStageOperator {
       consumeInputBlocks();
       return produceSortedBlock();
     } catch (Exception e) {
-      LOGGER.error("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     } finally {
       _operatorStats.endTimer();
@@ -119,13 +120,11 @@ public class SortOperator extends MultiStageOperator {
       _operatorStats.recordOutput(1, rows.size());
       _isSortedBlockConstructed = true;
       if (rows.size() == 0) {
-        LOGGER.debug("OperatorStats:" + _operatorStats);
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       } else {
         return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }
     } else {
-      LOGGER.debug("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
   }

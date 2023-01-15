@@ -63,7 +63,7 @@ public class FilterOperator extends MultiStageOperator {
     _dataSchema = dataSchema;
     _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);
     _upstreamErrorBlock = null;
-    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -74,6 +74,8 @@ public class FilterOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    _upstreamOperator.toExplainString();
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
@@ -86,7 +88,6 @@ public class FilterOperator extends MultiStageOperator {
       _operatorStats.startTimer();
       return transform(block);
     } catch (Exception e) {
-      LOGGER.debug("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     } finally {
       _operatorStats.endTimer();
@@ -97,16 +98,11 @@ public class FilterOperator extends MultiStageOperator {
   private TransferableBlock transform(TransferableBlock block)
       throws Exception {
     if (_upstreamErrorBlock != null) {
-      LOGGER.error("OperatorStats:" + _operatorStats);
       return _upstreamErrorBlock;
     } else if (block.isErrorBlock()) {
-      LOGGER.error("OperatorStats:" + _operatorStats);
       _upstreamErrorBlock = block;
       return _upstreamErrorBlock;
     } else if (TransferableBlockUtils.isEndOfStream(block) || TransferableBlockUtils.isNoOpBlock(block)) {
-      if (TransferableBlockUtils.isEndOfStream(block)) {
-        LOGGER.debug("OperatorStats:" + _operatorStats);
-      }
       return block;
     }
 
@@ -119,7 +115,6 @@ public class FilterOperator extends MultiStageOperator {
     }
     _operatorStats.recordInput(1, container.size());
     _operatorStats.recordOutput(1, resultRows.size());
-    LOGGER.debug("OperatorStats:" + _operatorStats);
     return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW);
   }
 }

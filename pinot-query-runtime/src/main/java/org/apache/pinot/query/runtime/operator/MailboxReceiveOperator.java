@@ -110,7 +110,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     }
     _upstreamErrorBlock = null;
     _serverIdx = 0;
-    _operatorStats = new OperatorStats(jobId, stageId, toExplainString());
+    _operatorStats = new OperatorStats(jobId, stageId, EXPLAIN_NAME);
   }
 
   public List<MailboxIdentifier> getSendingMailbox() {
@@ -125,18 +125,17 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     try {
+      _operatorStats.startTimer();
       if (_upstreamErrorBlock != null) {
         return _upstreamErrorBlock;
       } else if (System.nanoTime() >= _deadlineTimestampNano) {
-        LOGGER.error("Timed out after polling mailboxes: {}", _sendingMailbox);
-        LOGGER.error("OperatorStats:" + _operatorStats);
         return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
       }
 
@@ -155,13 +154,11 @@ public class MailboxReceiveOperator extends MultiStageOperator {
           if (!mailbox.isClosed()) {
             openMailboxCount++;
             TransferableBlock block = mailbox.receive();
-
             // Get null block when pulling times out from mailbox.
             if (block != null) {
               if (block.isErrorBlock()) {
                 _upstreamErrorBlock =
                     TransferableBlockUtils.getErrorTransferableBlock(block.getDataBlock().getExceptions());
-                LOGGER.error("OperatorStats:" + _operatorStats);
                 return _upstreamErrorBlock;
               }
               if (!block.isEndOfStreamBlock()) {
@@ -175,7 +172,6 @@ public class MailboxReceiveOperator extends MultiStageOperator {
           }
         } catch (Exception e) {
           // TODO: Handle this exception.
-          LOGGER.error("OperatorStats:" + _operatorStats);
           LOGGER.error(String.format("Error receiving data from mailbox %s", mailboxId), e);
         }
       }
@@ -188,9 +184,6 @@ public class MailboxReceiveOperator extends MultiStageOperator {
       TransferableBlock block =
           openMailboxCount > 0 && openMailboxCount > eosMailboxCount ? TransferableBlockUtils.getNoOpTransferableBlock()
               : TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      if (TransferableBlockUtils.isEndOfStream(block)) {
-        LOGGER.debug("OperatorStats:" + _operatorStats);
-      }
       return block;
     } finally {
       _operatorStats.endTimer();

@@ -114,15 +114,18 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                   register(operatorChain, false);
                 } else {
                   if (result.isErrorBlock()) {
+                    operatorChain.getRoot().toExplainString();
                     LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
                         result.getDataBlock().getExceptions());
                   } else {
-                    LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
+                    operatorChain.getRoot().toExplainString();
+                    LOGGER.error("({}): Completed {}", operatorChain, operatorChain.getStats());
                   }
                   operatorChain.close();
                 }
               } catch (Exception e) {
                 operatorChain.close();
+                operatorChain.getRoot().toExplainString();
                 LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
               }
             }

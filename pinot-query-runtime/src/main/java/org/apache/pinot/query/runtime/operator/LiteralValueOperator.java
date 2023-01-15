@@ -44,7 +44,7 @@ public class LiteralValueOperator extends MultiStageOperator {
   public LiteralValueOperator(DataSchema dataSchema, List<List<RexExpression>> rexLiteralRows,
       long requestId, int stageId) {
     _dataSchema = dataSchema;
-    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
     _rexLiteralBlock = constructBlock(rexLiteralRows);
     _isLiteralBlockReturned = false;
   }
@@ -57,18 +57,18 @@ public class LiteralValueOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     try {
+      _operatorStats.startTimer();
       if (!_isLiteralBlockReturned) {
         _isLiteralBlockReturned = true;
         return _rexLiteralBlock;
       } else {
-        LOGGER.debug("OperatorStats:" + _operatorStats);
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } finally {

@@ -28,7 +28,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -47,9 +46,6 @@ public class TransformOperatorTest {
 
   @Mock
   private MultiStageOperator _upstreamOp;
-
-  @Mock
-  private PlanRequestContext _context;
 
   @BeforeMethod
   public void setUp() {

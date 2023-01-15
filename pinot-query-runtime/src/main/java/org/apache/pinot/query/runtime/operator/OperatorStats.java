@@ -65,7 +65,7 @@ public class OperatorStats {
   @Override
   public String toString() {
     return String.format(
-        "OperatorStats[type: %s, requestId: %s, stageId %s] ExecutionWalTime: %sms, InputRows: %s, InputBlock: "
+        "OperatorStats[type: %s, requestId: %s, stageId %s] ExecutionWallTime: %sms, InputRows: %s, InputBlock: "
             + "%s, OutputRows: %s, OutputBlock: %s", _operatorType, _requestId, _stageId,
         _executeStopwatch.elapsed(TimeUnit.MILLISECONDS), _numInputRows, _numInputBlock, _numOutputRows,
         _numOutputBlock);

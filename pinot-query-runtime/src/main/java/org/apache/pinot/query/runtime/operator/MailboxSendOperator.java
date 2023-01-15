@@ -118,6 +118,8 @@ public class MailboxSendOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    _dataTableBlockBaseOperator.toExplainString();
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
@@ -135,7 +137,6 @@ public class MailboxSendOperator extends MultiStageOperator {
         // The # of output block is not accurate because we may do a split in exchange send.
         _operatorStats.recordOutput(1, transferableBlock.getNumRows());
         if (transferableBlock.isEndOfStreamBlock()) {
-          LOGGER.debug("OperatorStats:" + _operatorStats);
           return transferableBlock;
         }
         _operatorStats.endTimer();
@@ -151,10 +152,8 @@ public class MailboxSendOperator extends MultiStageOperator {
         _exchange.send(transferableBlock);
       } catch (Exception e2) {
         LOGGER.error("Exception while sending block to mailbox.", e2);
-        LOGGER.error("OperatorStats:" + _operatorStats);
       }
     } finally {
-      // This time is incorrect because mailbox send is async.
       _operatorStats.endTimer();
     }
     return transferableBlock;

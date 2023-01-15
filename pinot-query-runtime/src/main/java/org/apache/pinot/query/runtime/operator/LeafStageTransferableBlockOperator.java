@@ -75,7 +75,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     _desiredDataSchema = dataSchema;
     _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
     _currentIndex = 0;
-    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -86,19 +86,19 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     try {
+      _operatorStats.startTimer();
       if (_currentIndex < 0) {
         throw new RuntimeException("Leaf transfer terminated. next block should no longer be called.");
       }
       if (_errorBlock != null) {
         _currentIndex = -1;
-        LOGGER.error("OperatorStats:" + _operatorStats);
         return new TransferableBlock(DataBlockUtils.getErrorDataBlock(_errorBlock.getExceptions()));
       } else {
         if (_currentIndex < _baseResultBlock.size()) {
@@ -114,7 +114,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
           }
         } else {
           _currentIndex = -1;
-          LOGGER.debug("OperatorStats:" + _operatorStats);
           return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
         }
       }

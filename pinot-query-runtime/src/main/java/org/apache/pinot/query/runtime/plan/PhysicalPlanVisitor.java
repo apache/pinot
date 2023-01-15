@@ -110,7 +110,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   public MultiStageOperator visitProject(ProjectNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new TransformOperator(nextOperator, node.getDataSchema(), node.getProjects(),
-        node.getInputs().get(0).getDataSchema(), context._requestId, context._stageId);
+        node.getInputs().get(0).getDataSchema(), context.getRequestId(), context.getStageId());
   }
 
   @Override

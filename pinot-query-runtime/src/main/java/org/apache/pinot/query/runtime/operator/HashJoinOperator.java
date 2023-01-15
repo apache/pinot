@@ -118,7 +118,7 @@ public class HashJoinOperator extends MultiStageOperator {
       _matchedRightRows = null;
     }
     _upstreamErrorBlock = null;
-    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   // TODO: Separate left and right table operator.
@@ -130,6 +130,9 @@ public class HashJoinOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    _leftTableOperator.toExplainString();
+    _rightTableOperator.toExplainString();
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
@@ -138,7 +141,6 @@ public class HashJoinOperator extends MultiStageOperator {
     _operatorStats.startTimer();
     try {
       if (_isTerminated) {
-        LOGGER.debug("OperatorStats:" + _operatorStats);
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
       if (!_isHashTableBuilt) {
@@ -146,7 +148,6 @@ public class HashJoinOperator extends MultiStageOperator {
         buildBroadcastHashTable();
       }
       if (_upstreamErrorBlock != null) {
-        LOGGER.error("OperatorStats:" + _operatorStats);
         return _upstreamErrorBlock;
       } else if (!_isHashTableBuilt) {
         return TransferableBlockUtils.getNoOpTransferableBlock();
@@ -157,7 +158,6 @@ public class HashJoinOperator extends MultiStageOperator {
       // JOIN each left block with the right block.
       return buildJoinedDataBlock(leftBlock);
     } catch (Exception e) {
-      LOGGER.error("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     } finally {
       _operatorStats.endTimer();

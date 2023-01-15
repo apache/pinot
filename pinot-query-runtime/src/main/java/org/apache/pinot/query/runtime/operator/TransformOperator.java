@@ -30,7 +30,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +78,8 @@ public class TransformOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    _upstreamOperator.toExplainString();
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
@@ -87,11 +88,10 @@ public class TransformOperator extends MultiStageOperator {
     _operatorStats.startTimer();
     try {
       _operatorStats.endTimer();
-      TransferableBlock block = _upstreamErrorBlock;
+      TransferableBlock block = _upstreamOperator.nextBlock();
       _operatorStats.startTimer();
       return transform(block);
     } catch (Exception e) {
-      LOGGER.error("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     } finally {
       _operatorStats.endTimer();
@@ -104,14 +104,10 @@ public class TransformOperator extends MultiStageOperator {
       _upstreamErrorBlock = block;
     }
     if (_upstreamErrorBlock != null) {
-      LOGGER.error("OperatorStats:" + _operatorStats);
       return _upstreamErrorBlock;
     }
 
     if (TransferableBlockUtils.isEndOfStream(block) || TransferableBlockUtils.isNoOpBlock(block)) {
-      if (TransferableBlockUtils.isEndOfStream(block)) {
-        LOGGER.error("OperatorStats:" + _operatorStats);
-      }
       return block;
     }
 

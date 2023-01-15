@@ -28,7 +28,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -47,9 +46,6 @@ public class SortOperatorTest {
 
   @Mock
   private MultiStageOperator _input;
-
-  @Mock
-  private PlanRequestContext _context;
 
   @BeforeMethod
   public void setUp() {

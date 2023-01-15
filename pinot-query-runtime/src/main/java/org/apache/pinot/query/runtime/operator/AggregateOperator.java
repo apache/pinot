@@ -124,6 +124,9 @@ public class AggregateOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    // TODO: move to close call;
+    _inputOperator.toExplainString();
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
@@ -143,11 +146,9 @@ public class AggregateOperator extends MultiStageOperator {
         return produceAggregatedBlock();
       } else {
         // TODO: Move to close call.
-        LOGGER.debug("OperatorStats:" + _operatorStats);
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } catch (Exception e) {
-      LOGGER.error("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     } finally {
       _operatorStats.endTimer();
@@ -167,7 +168,6 @@ public class AggregateOperator extends MultiStageOperator {
     }
     _hasReturnedAggregateBlock = true;
     if (rows.size() == 0) {
-      LOGGER.debug("OperatorStats:" + _operatorStats);
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } else {
       _operatorStats.recordOutput(1, rows.size());
