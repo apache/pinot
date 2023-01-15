@@ -209,7 +209,7 @@ public class IngestionDelayTracker {
         ingestionTimeMs);
     if (previousMeasure == null) {
       // First time we start tracking a partition we should start tracking it via metric
-      _serverMetrics.addCallbackPartitionGaugeIfNeeded(_metricName, partitionGroupId,
+      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
           ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelayMs(partitionGroupId));
     }
     // If we are consuming we do not need to track this partition for removal.

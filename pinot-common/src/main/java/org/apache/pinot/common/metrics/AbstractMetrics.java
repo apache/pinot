@@ -518,7 +518,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
-   * @deprecated please use setOrUpdateTableGauge(final String tableName, final G gauge, final long value) instead.
+   * @deprecated please use setOrUpdateTableGauge(final String tableName, final G gauge,
+   *     final Supplier<Long> valueSupplier) instead.
    *
    * Adds a new gauge whose values are retrieved from a callback function.
    * This method may be called multiple times, while it will be registered to callback function only once.
@@ -534,21 +535,17 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
-   * @deprecated please use setOrUpdateTableGauge(final String tableName, final String key, final G gauge,
-   * final long value) instead.
-   *
-   * Install a per-partition table gauge if needed.
+   * Install a per-partition table gauge.
    *
    * @param tableName The table name
-   * @param partitionId The partition name
+   * @param partitionId The partition id
    * @param gauge The gauge to use
-   * @param valueCallback the callback function to be called while reading the metric.
+   * @param valueSupplier The supplier function used to retrieve the value of the gauge.
    */
-  @Deprecated
-  public void addCallbackPartitionGaugeIfNeeded(final String tableName, final int partitionId, final G gauge,
-      final Callable<Long> valueCallback) {
+  public void setOrUpdatePartitionGauge(final String tableName, final int partitionId, final G gauge,
+      final Supplier<Long> valueSupplier) {
     final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
-    addCallbackGaugeIfNeeded(fullGaugeName, valueCallback);
+    setOrUpdateGauge(fullGaugeName, valueSupplier);
   }
 
   /**
@@ -707,15 +704,14 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
 
   /**
-   * Removes a table gauge given the table name and the gauge.
+   * Removes a table gauge given the table name, the partition id and the gauge.
    * The add/remove is expected to work correctly in case of being invoked across multiple threads.
    * @param tableName table name
+   * @param partitionId The partition id
    * @param gauge the gauge to be removed
    */
   public void removePartitionGauge(final String tableName, final int partitionId, final G gauge) {
-    final String fullGaugeName;
-    String gaugeName = gauge.getGaugeName();
-    fullGaugeName = gaugeName + "." + getTableName(tableName) + "." + partitionId;
+    final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
     removeGauge(fullGaugeName);
   }
 
