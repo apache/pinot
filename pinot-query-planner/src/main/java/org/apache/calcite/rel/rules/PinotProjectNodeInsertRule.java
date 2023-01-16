@@ -41,7 +41,7 @@ import org.apache.calcite.tools.RelBuilderFactory;
  * For an aggregate query which doesn't contain any grouping-sets, Calcite doesn't generate a Projection node which
  * leads to the table-scan stage reading all the columns. For this case, this rule adds a LogicalProject on the
  * join-key columns on top of the LogicalJoin node. The projection would later be pushed down by
- * @{link CoreRules.PROJECT_JOIN_TRANSPOSE}.
+ * {@link ProjectJoinTransposeRule}.
  *
  * <h3>Example Query:</h3>
  * <pre>
