@@ -70,4 +70,20 @@ public interface MinionEventObserver {
    * @param exception Exception encountered during execution
    */
   void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception);
+
+  /**
+   * Gets the minion task state
+   * @return a {@link MinionTaskState}
+   */
+  default MinionTaskState getTaskState() {
+    return MinionTaskState.UNKNOWN;
+  }
+
+  /**
+   * Gets the minion task start timestamp
+   * @return the minion task start timestamp
+   */
+  default long getStartTs() {
+    return -1;
+  }
 }

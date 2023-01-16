@@ -37,6 +37,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
@@ -618,6 +619,58 @@ public class PinotHelixTaskResourceManager {
       }
     }
     return subtaskProgressMap;
+  }
+
+  /**
+   * Gets progress of all subtasks with specified state tracked by given minion workers in memory
+   * @param subtaskState a specified subtask state, valid values are in org.apache.pinot.minion.event.MinionTaskState
+   * @param executor an {@link Executor} used to run logic on
+   * @param connMgr a {@link HttpConnectionManager} used to manage http connections
+   * @param selectedMinionWorkerEndpoints a map of worker id to http endpoint for minions to get subtask progress from
+   * @param requestHeaders http headers used to send requests to minion workers
+   * @param timeoutMs timeout (in millisecond) for requests sent to minion workers
+   * @return a map of minion worker id to subtask progress
+   */
+  public synchronized Map<String, Object> getSubtaskWithGivenStateProgress(String subtaskState,
+      Executor executor, HttpConnectionManager connMgr, Map<String, String> selectedMinionWorkerEndpoints,
+      Map<String, String> requestHeaders, int timeoutMs) {
+    return getSubtaskWithGivenStateProgress(subtaskState,
+        new CompletionServiceHelper(executor, connMgr, HashBiMap.create(0)), selectedMinionWorkerEndpoints,
+        requestHeaders, timeoutMs);
+  }
+
+  @VisibleForTesting
+  Map<String, Object> getSubtaskWithGivenStateProgress(String subtaskState,
+      CompletionServiceHelper completionServiceHelper, Map<String, String> selectedMinionWorkerEndpoints,
+      Map<String, String> requestHeaders, int timeoutMs) {
+    Map<String, Object> minionWorkerIdSubtaskProgressMap = new HashMap<>();
+    if (selectedMinionWorkerEndpoints.isEmpty()) {
+      return minionWorkerIdSubtaskProgressMap;
+    }
+    Map<String, String> invertedSelectedMinionWorkerEndpoints = selectedMinionWorkerEndpoints.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+    List<String> workerUrls = selectedMinionWorkerEndpoints.values().stream()
+        .map(workerEndpoint -> String.format("%s/tasks/subtask/state/%s/progress", workerEndpoint, subtaskState))
+        .collect(Collectors.toList());
+    LOGGER.debug("Getting task progress with workerUrls: {}", workerUrls);
+    // Scatter and gather progress from multiple workers.
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse
+        = completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs);
+    for (Map.Entry<String, String> entry : serviceResponse._httpResponses.entrySet()) {
+      String worker = entry.getKey();
+      String resp = entry.getValue();
+      LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
+      if (StringUtils.isNotEmpty(resp)) {
+        minionWorkerIdSubtaskProgressMap.put(invertedSelectedMinionWorkerEndpoints.get(worker), resp);
+      }
+    }
+    if (serviceResponse._failedResponseCount > 0) {
+      // Instead of aborting, subtasks without worker side progress return the task status tracked by Helix.
+      // The detailed worker failure response is logged as error by CompletionServiceResponse for debugging.
+      LOGGER.warn("There were {} workers failed to report task progress. Got partial progress info: {}",
+          serviceResponse._failedResponseCount, minionWorkerIdSubtaskProgressMap);
+    }
+    return minionWorkerIdSubtaskProgressMap;
   }
 
   /**

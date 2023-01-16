@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
@@ -40,6 +41,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
+import org.apache.pinot.minion.event.MinionTaskState;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -81,6 +83,36 @@ public class PinotTaskProgressResource {
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
           String.format("Failed to get task progress for subtasks: %s due to error: %s", subtaskNames, e.getMessage()))
+          .build());
+    }
+  }
+
+  @GET
+  @Path("/tasks/subtask/state/{subTaskState}/progress")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get finer grained task progress tracked in memory for subtasks with the given state")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getSubtaskWithGivenStateProgress(
+      @ApiParam(value = "Subtask state", required = true) @PathParam("subTaskState") String subTaskState) {
+    try {
+      MinionTaskState minionTaskState = MinionTaskState.IN_PROGRESS;
+      try {
+        minionTaskState = MinionTaskState.valueOf(subTaskState.toUpperCase());
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn("{} is not a valid subtask state, defaulting to IN_PROGRESS", subTaskState);
+        subTaskState = MinionTaskState.IN_PROGRESS.toString();
+      }
+      LOGGER.debug("Getting progress for subtasks with state {}", subTaskState);
+      Map<String, MinionEventObserver> progress
+          = MinionEventObservers.getInstance().getMinionEventObserverWithGivenState(minionTaskState);
+      LOGGER.debug("Got subtasks progress: {}", progress);
+      return JsonUtils.objectToString(progress);
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
+              String.format("Failed to get task progress for subtasks with state: %s due to error: %s",
+                  subTaskState, e.getMessage()))
           .build());
     }
   }
