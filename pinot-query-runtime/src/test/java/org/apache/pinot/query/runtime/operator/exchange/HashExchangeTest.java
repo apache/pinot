@@ -89,6 +89,7 @@ public class HashExchangeTest {
   }
 
   private static class TestSelector implements KeySelector<Object[], Object[]> {
+    private static final String HASH_ALGORITHM = "dummyHash";
 
     private final Iterator<Integer> _hashes;
 
@@ -104,6 +105,11 @@ public class HashExchangeTest {
     @Override
     public int computeHash(Object[] input) {
       return _hashes.next();
+    }
+
+    @Override
+    public String hashAlgorithm() {
+      return HASH_ALGORITHM;
     }
   }
 }

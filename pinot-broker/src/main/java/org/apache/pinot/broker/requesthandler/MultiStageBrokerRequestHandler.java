@@ -93,7 +93,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
-        new WorkerManager(_reducerHostname, _reducerPort, routingManager));
+        new WorkerManager(_reducerHostname, _reducerPort, routingManager), _tableCache);
     _queryDispatcher = new QueryDispatcher();
 
     // it is OK to ignore the onDataAvailable callback because the broker top-level operators
