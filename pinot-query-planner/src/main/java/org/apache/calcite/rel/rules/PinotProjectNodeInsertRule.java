@@ -27,7 +27,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
-import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -39,20 +38,37 @@ import org.apache.calcite.tools.RelBuilderFactory;
 
 
 /**
+ * For an aggregate query which doesn't contain any grouping-sets, Calcite doesn't generate a Projection node which
+ * leads to the table-scan stage reading all the columns. For this case, this rule adds a LogicalProject on the
+ * join-key columns on top of the LogicalJoin node. The projection would later be pushed down by
+ * @{link CoreRules.PROJECT_JOIN_TRANSPOSE}.
+ *
+ * <h3>Example Query:</h3>
+ * <pre>
+ *   SELECT COUNT(*)
+ *     FROM baseballStats_OFFLINE AS A JOIN baseballStats_OFFLINE AS B
+ *       ON A.playerID = B.playerID
+ * </pre>
+ *
  * <h3>Plan before</h3>
  * <pre>
- * LogicalAggregate(correlation=[$cor0], joinType=[left], requiredColumns=[{7}])
- *   LogicalJoin()
+ * LogicalAggregate(group={}, EXPR$0=COUNT())
+ *   LogicalJoin(left=..., right=..., condition=EQ($27, $55))
  *     ...
- *       LogicalTableScan(table=[[scott, EMP]])
+ *       LogicalTableScan(table=baseballStats, rowType.fieldList=[homeRuns, playerStint, numberOfGames, ...])
+ *     ...
+ *       LogicalTableScan(table=baseballStats, rowType.fieldList=[homeRuns, playerStint, numberOfGames, ...])
  * </pre>
  *
  * <h3>Plan after</h3>
  * <pre>
- * LogicalAggregate()
- *   LogicalProject()
- *     LogicalJoin()
- *       ...
+ * LogicalAggregate(group={}, EXPR$0=COUNT())
+ *   LogicalProject(exprs=[$27, $55])
+ *     LogicalJoin(left=..., right=..., condition=EQ($27, $55))
+ *     ...
+ *       LogicalTableScan(table=baseballStats, rowType.fieldList=[homeRuns, playerStint, numberOfGames, ...])
+ *     ...
+ *       LogicalTableScan(table=baseballStats, rowType.fieldList=[homeRuns, playerStint, numberOfGames, ...])
  * </pre>
  */
 public class PinotProjectNodeInsertRule extends RelOptRule {
@@ -70,7 +86,10 @@ public class PinotProjectNodeInsertRule extends RelOptRule {
     }
     if (call.rel(0) instanceof Aggregate) {
       Aggregate agg = call.rel(0);
-      return getRelNode(agg) instanceof Join;
+      if (agg.getGroupCount() == 0) {
+        RelNode relNode = getRelNode(agg);
+        return relNode instanceof LogicalJoin;
+      }
     }
     return false;
   }
@@ -82,9 +101,11 @@ public class PinotProjectNodeInsertRule extends RelOptRule {
     if (!(join.getCondition() instanceof RexCall)) {
       return;
     }
+    // Create a list of projects from the join condition.
     List<RexNode> projects = new ArrayList<>(((RexCall) join.getCondition()).getOperands());
     RelRecordType relRecordType = (RelRecordType) join.getRowType();
     int[] fields = getProjectFields(projects);
+    // Continue only if the join condition operands are RexInputRef
     if (fields == null) {
       return;
     }
