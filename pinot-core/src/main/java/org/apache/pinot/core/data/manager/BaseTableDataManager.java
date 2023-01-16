@@ -356,11 +356,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     try {
-
       boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
 
-      if (!shouldDownload) {
-        // We should first try to reuse directory
+      if (!shouldDownload && (zkMetadata.getTier().equals(segmentTier))) {
+        // We should first try to reuse existing segment directory
         Properties loaderContextProps = new Properties();
         loaderContextProps.put(CommonConstants.Server.DIRECTORY_LOADER_PURPOSE_CONFIG,
             CommonConstants.Server.DIRECTORY_LOADER_PURPOSE_RELOAD);
@@ -368,16 +367,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
             initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig,
                 loaderContextProps);
         boolean needReprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
-        closeSegmentDirectoryQuietly(segmentDirectory);
         if (!needReprocess) {
+          LOGGER.info("Reloading segment : {} of table : {} using existing segment directory as no reprocessing needed",
+              segmentName, _tableNameWithType);
           // No reprocessing needed, reuse the same segment
-          // Need to init directory again with updated tier
-          indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-          SegmentDirectory updatedSegmentDirectory =
-              initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
-          ImmutableSegment segment = ImmutableSegmentLoader.load(updatedSegmentDirectory, indexLoadingConfig, schema);
+          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
           addSegment(segment);
           return;
+        } else {
+          LOGGER.info("Segment : {} of table : {} requires reprocessing before reloading", segmentName,
+              _tableNameWithType);
+          segmentDirectory.close();
         }
       }
 
