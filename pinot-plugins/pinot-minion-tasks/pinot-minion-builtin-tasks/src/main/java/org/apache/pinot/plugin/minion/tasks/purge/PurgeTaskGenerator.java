@@ -23,13 +23,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -62,15 +60,6 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
     for (TableConfig tableConfig : tableConfigs) {
 
       String tableName = tableConfig.getTableName();
-      List<SegmentZKMetadata> completedSegmentsZKMetadata = new ArrayList<>();
-      if (tableConfig.getTableType() == TableType.REALTIME) {
-        completedSegmentsZKMetadata = new ArrayList<>();
-        Map<Integer, String> partitionToLatestLLCSegmentName = new HashMap<>();
-        Set<Integer> allPartitions = new HashSet<>();
-        getCompletedSegmentsInfo(tableName, completedSegmentsZKMetadata, partitionToLatestLLCSegmentName,
-            allPartitions);
-      }
-
       Map<String, String> taskConfigs;
       TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
       if (tableTaskConfig == null) {
@@ -99,9 +88,15 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       } else {
         tableMaxNumTasks = Integer.MAX_VALUE;
       }
-      List<SegmentZKMetadata> segmentsZKMetadata;
+      List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
       if (tableConfig.getTableType() == TableType.REALTIME) {
-        segmentsZKMetadata = completedSegmentsZKMetadata;
+        List<SegmentZKMetadata> segmentsZKMetadataAll = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
+        for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadataAll) {
+          CommonConstants.Segment.Realtime.Status status = segmentZKMetadata.getStatus();
+          if (status.isCompleted()) {
+            segmentsZKMetadata.add(segmentZKMetadata);
+          }
+        }
       } else {
         segmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
       }
@@ -161,47 +156,5 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
           taskType);
     }
     return pinotTaskConfigs;
-  }
-
-  /**
-   * Fetch completed (DONE/UPLOADED) segment and partition information
-   *
-   * @param realtimeTableName the realtime table name
-   * @param completedSegmentsZKMetadata list for collecting the completed (DONE/UPLOADED) segments ZK metadata
-   * @param partitionToLatestLLCSegmentName map for collecting the partitionId to the latest LLC segment name
-   * @param allPartitions set for collecting all partition ids
-   */
-  private void getCompletedSegmentsInfo(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
-      Map<Integer, String> partitionToLatestLLCSegmentName, Set<Integer> allPartitions) {
-    List<SegmentZKMetadata> segmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(realtimeTableName);
-
-    Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
-    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
-      CommonConstants.Segment.Realtime.Status status = segmentZKMetadata.getStatus();
-      if (status.isCompleted()) {
-        completedSegmentsZKMetadata.add(segmentZKMetadata);
-      }
-
-      // Skip UPLOADED segments that don't conform to the LLC segment name
-      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName());
-      if (llcSegmentName != null) {
-        int partitionId = llcSegmentName.getPartitionGroupId();
-        allPartitions.add(partitionId);
-        if (status.isCompleted()) {
-          latestLLCSegmentNameMap.compute(partitionId, (k, latestLLCSegmentName) -> {
-            if (latestLLCSegmentName == null
-                || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
-              return llcSegmentName;
-            } else {
-              return latestLLCSegmentName;
-            }
-          });
-        }
-      }
-    }
-
-    for (Map.Entry<Integer, LLCSegmentName> entry : latestLLCSegmentNameMap.entrySet()) {
-      partitionToLatestLLCSegmentName.put(entry.getKey(), entry.getValue().getSegmentName());
-    }
   }
 }
