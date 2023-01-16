@@ -19,9 +19,14 @@
 package org.apache.pinot.server.api.resources;
 
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.server.access.AccessControlFactory;
+import org.apache.pinot.server.access.HttpRequesterIdentity;
+import org.apache.pinot.server.access.RequesterIdentity;
 import org.apache.pinot.server.starter.ServerInstance;
 
 
@@ -53,5 +58,21 @@ public class ServerResourceUtils {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
     return instanceDataManager;
+  }
+
+  public static void validateDataAccess(AccessControlFactory accessControlFactory, String tableNameWithType,
+      HttpHeaders httpHeaders) {
+    boolean hasDataAccess;
+    try {
+      AccessControl accessControl = accessControlFactory.create();
+      RequesterIdentity httpRequestIdentity = new HttpRequesterIdentity(httpHeaders);
+      hasDataAccess = accessControl.hasDataAccess(httpRequestIdentity, tableNameWithType);
+    } catch (Exception e) {
+      throw new WebApplicationException("Caught exception while validating access to table: " + tableNameWithType,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    if (!hasDataAccess) {
+      throw new WebApplicationException("No data access to table: " + tableNameWithType, Response.Status.FORBIDDEN);
+    }
   }
 }

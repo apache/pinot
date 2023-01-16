@@ -1453,10 +1453,11 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * Force commit the current segments in consuming state and restart consumption
    */
-  public void forceCommit(String tableNameWithType) {
+  public Set<String> forceCommit(String tableNameWithType) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> consumingSegments = findConsumingSegments(idealState);
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
+    return consumingSegments;
   }
 
   /**

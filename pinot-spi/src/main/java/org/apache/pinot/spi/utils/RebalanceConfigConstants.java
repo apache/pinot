@@ -57,4 +57,12 @@ public class RebalanceConfigConstants {
   // - ExternalView has not converged within the maximum wait time -> continue to the next stage
   public static final String BEST_EFFORTS = "bestEfforts";
   public static final boolean DEFAULT_BEST_EFFORTS = false;
+
+  // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
+  // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
+  // check less frequently and bail out sooner to rebalance at best effort if configured so.
+  public static final String EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS = "externalViewCheckIntervalInMs";
+  public static final long DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS = 1_000L; // 1 second
+  public static final String EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS = "externalViewStabilizationTimeoutInMs";
+  public static final long DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS = 60 * 60_000L; // 1 hour
 }

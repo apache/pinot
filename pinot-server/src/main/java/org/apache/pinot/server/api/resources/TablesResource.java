@@ -69,6 +69,7 @@ import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -77,14 +78,13 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
-import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
-import org.apache.pinot.server.access.HttpRequesterIdentity;
-import org.apache.pinot.server.access.RequesterIdentity;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
@@ -93,6 +93,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -374,18 +375,7 @@ public class TablesResource {
       throws Exception {
     LOGGER.info("Received a request to download segment {} for table {}", segmentName, tableNameWithType);
     // Validate data access
-    boolean hasDataAccess;
-    try {
-      AccessControl accessControl = _accessControlFactory.create();
-      RequesterIdentity httpRequestIdentity = new HttpRequesterIdentity(httpHeaders);
-      hasDataAccess = accessControl.hasDataAccess(httpRequestIdentity, tableNameWithType);
-    } catch (Exception e) {
-      throw new WebApplicationException("Caught exception while validating access to table: " + tableNameWithType,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    }
-    if (!hasDataAccess) {
-      throw new WebApplicationException("No data access to table: " + tableNameWithType, Response.Status.FORBIDDEN);
-    }
+    ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
 
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
@@ -417,6 +407,57 @@ public class TablesResource {
       });
       builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + segmentTarFile.getName());
       builder.header(HttpHeaders.CONTENT_LENGTH, segmentTarFile.length());
+      return builder.build();
+    } finally {
+      tableDataManager.releaseSegment(segmentDataManager);
+    }
+  }
+
+  /**
+   * Download snapshot for the given immutable segment for upsert table. This endpoint is used when get snapshot from
+   * peer to avoid recompute when reload segments.
+   */
+  @GET
+  @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  @Path("/segments/{tableNameWithType}/{segmentName}/validDocIds")
+  @ApiOperation(value = "Download validDocIds for an REALTIME immutable segment", notes = "Download validDocIds for "
+      + "an immutable segment in bitmap format.")
+  public Response downloadValidDocIds(
+      @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @Context HttpHeaders httpHeaders) {
+    LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
+    // Validate data access
+    ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
+
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+
+    try {
+      IndexSegment indexSegment = segmentDataManager.getSegment();
+      if (!(indexSegment instanceof ImmutableSegmentImpl)) {
+        throw new WebApplicationException(
+            String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
+            Response.Status.BAD_REQUEST);
+      }
+      MutableRoaringBitmap validDocIds =
+          indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
+      if (validDocIds == null) {
+        throw new WebApplicationException(
+            String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
+            Response.Status.NOT_FOUND);
+      }
+
+      byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIds);
+      Response.ResponseBuilder builder = Response.ok(validDocIdsBytes);
+      builder.header(HttpHeaders.CONTENT_LENGTH, validDocIdsBytes.length);
       return builder.build();
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);

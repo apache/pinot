@@ -530,8 +530,8 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
   public void testFilteredAggregations() {
     String query = "SELECT COUNT(*) FILTER(WHERE column1 > 5) FROM testTable WHERE column3 > 0";
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*)"}, new DataSchema.ColumnDataType[]
-        {DataSchema.ColumnDataType.LONG});
+    DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*) FILTER(WHERE column1 > '5')"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
     ResultTable expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{370236L}));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 740472L, 400000L, 0L, 400000L, expectedResultTable);

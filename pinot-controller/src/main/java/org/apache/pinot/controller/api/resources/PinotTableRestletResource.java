@@ -641,7 +641,11 @@ public class PinotTableRestletResource {
           + "number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
   @QueryParam("minAvailableReplicas") int minAvailableReplicas, @ApiParam(
       value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
-          + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
+          + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts, @ApiParam(
+      value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
+  @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
+      @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
+      @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs) {
 
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
 
@@ -653,6 +657,10 @@ public class PinotTableRestletResource {
     rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, downtime);
     rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, minAvailableReplicas);
     rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, bestEfforts);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
+        externalViewCheckIntervalInMs);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
+        externalViewStabilizationTimeoutInMs);
 
     try {
       if (dryRun || downtime) {
@@ -847,16 +855,19 @@ public class PinotTableRestletResource {
       notes = "Get list of controller jobs for this table")
   public Map<String, Map<String, String>> getControllerJobs(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr
-  ) {
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Comma separated list of job types") @QueryParam("jobTypes") @Nullable String jobTypesString) {
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
             LOGGER);
-
+    Set<String> jobTypesToFilter = null;
+    if (StringUtils.isNotEmpty(jobTypesString)) {
+      jobTypesToFilter = new HashSet<>(java.util.Arrays.asList(StringUtils.split(jobTypesString, ',')));
+    }
     Map<String, Map<String, String>> result = new HashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      result.putAll(_pinotHelixResourceManager.getAllJobsForTable(tableNameWithType));
+      result.putAll(_pinotHelixResourceManager.getAllJobsForTable(tableNameWithType, jobTypesToFilter));
     }
 
     return result;
