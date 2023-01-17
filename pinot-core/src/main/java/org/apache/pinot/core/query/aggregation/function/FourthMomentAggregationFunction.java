@@ -164,6 +164,7 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
       case MOMENT:
         // this should never happen, as we're not extracting
         // final result when using this method
+        throw new UnsupportedOperationException("Fourth moment cannot be used as aggregation function directly");
       default:
         throw new IllegalStateException("Unexpected value: " + _type);
     }

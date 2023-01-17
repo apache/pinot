@@ -60,7 +60,6 @@
     },
     "queries": [
       {
-        "ignored": true,
         "description": "skew for int column",
         "sql": "SELECT groupingCol, SKEWNESS(val), KURTOSIS(val) FROM {tbl} GROUP BY groupingCol",
         "outputs": [

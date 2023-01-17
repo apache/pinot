@@ -50,8 +50,8 @@ import org.apache.calcite.util.CompositeList;
  * that the aggregation computation can merge partial results from different
  * intermediate nodes before reducing it into the final result.
  *
- * Also see {@link AggregateReduceFunctionsRule}, as this implementation
- * closely follows that.
+ * <p>This implementation follows closely with Calcite's
+ * {@link AggregateReduceFunctionsRule}.
  */
 public class PinotReduceAggregateFunctionsRule extends RelOptRule {
 
