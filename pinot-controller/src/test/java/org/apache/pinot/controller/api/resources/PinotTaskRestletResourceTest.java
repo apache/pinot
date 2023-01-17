@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.net.URI;
@@ -70,7 +71,8 @@ public class PinotTaskRestletResourceTest {
   }
 
   @Test
-  public void testGetSubtaskWithGivenStateProgressWhenMinionWorkerIdsAreNotSpecified() {
+  public void testGetSubtaskWithGivenStateProgressWhenMinionWorkerIdsAreNotSpecified()
+      throws JsonProcessingException {
     Map<String, String> minionWorkerEndpoints
         = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints(null);
     assertEquals(minionWorkerEndpoints,
@@ -78,7 +80,8 @@ public class PinotTaskRestletResourceTest {
   }
 
   @Test
-  public void testGetSubtaskWithGivenStateProgressWhenAllMinionWorkerIdsAreSpecified() {
+  public void testGetSubtaskWithGivenStateProgressWhenAllMinionWorkerIdsAreSpecified()
+      throws JsonProcessingException {
     Map<String, String> minionWorkerEndpoints
         = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints("minion1,minion2");
     assertEquals(minionWorkerEndpoints,
@@ -86,7 +89,8 @@ public class PinotTaskRestletResourceTest {
   }
 
   @Test
-  public void testGetSubtaskWithGivenStateProgressWhenOneMinionWorkerIdIsSpecified() {
+  public void testGetSubtaskWithGivenStateProgressWhenOneMinionWorkerIdIsSpecified()
+      throws JsonProcessingException {
     Map<String, String> minionWorkerEndpoints
         = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints("minion1");
     assertEquals(minionWorkerEndpoints,
@@ -94,7 +98,8 @@ public class PinotTaskRestletResourceTest {
   }
 
   private Map<String, String> invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints(
-      String minionWorkerIds) {
+      String minionWorkerIds)
+      throws JsonProcessingException {
     InstanceConfig minion1 = createInstanceConfig("minion1", "minion1", "9514");
     InstanceConfig minion2 = createInstanceConfig("minion2", "minion2", "9514");
     when(_pinotHelixResourceManager.getAllMinionInstanceConfigs()).thenReturn(ImmutableList.of(minion1, minion2));
@@ -119,7 +124,8 @@ public class PinotTaskRestletResourceTest {
 
 
   @Test
-  public void testGetSubtaskWithGivenStateProgressWithException() {
+  public void testGetSubtaskWithGivenStateProgressWithException()
+      throws JsonProcessingException {
     when(_pinotHelixResourceManager.getAllMinionInstanceConfigs()).thenReturn(Collections.emptyList());
     HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
     when(httpHeaders.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());

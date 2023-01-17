@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
@@ -206,7 +207,8 @@ public class PinotHelixTaskResourceManagerTest {
   }
 
   @Test
-  public void testGetSubtaskWithGivenStateProgressNoWorker() {
+  public void testGetSubtaskWithGivenStateProgressNoWorker()
+      throws JsonProcessingException {
     CompletionServiceHelper httpHelper = mock(CompletionServiceHelper.class);
     PinotHelixTaskResourceManager mgr =
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), mock(TaskDriver.class));
@@ -261,7 +263,7 @@ public class PinotHelixTaskResourceManagerTest {
     assertEquals(progress.size(), 3);
     for (int i = 0; i < 3; i++) {
       Object responseFromMinionWorker = progress.get(workerIds[i]);
-      Map<String, Object> subtaskProgressMap = JsonUtils.stringToObject((String) responseFromMinionWorker, Map.class);
+      Map<String, Object> subtaskProgressMap = (Map<String, Object>) responseFromMinionWorker;
       assertEquals(subtaskProgressMap.size(), 2);
       assertTrue(subtaskProgressMap.containsKey(subtaskIds[2 * i]));
       assertTrue(subtaskProgressMap.containsKey(subtaskIds[2 * i + 1]));

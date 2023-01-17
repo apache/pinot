@@ -633,7 +633,8 @@ public class PinotHelixTaskResourceManager {
    */
   public synchronized Map<String, Object> getSubtaskWithGivenStateProgress(String subtaskState,
       Executor executor, HttpConnectionManager connMgr, Map<String, String> selectedMinionWorkerEndpoints,
-      Map<String, String> requestHeaders, int timeoutMs) {
+      Map<String, String> requestHeaders, int timeoutMs)
+      throws JsonProcessingException {
     return getSubtaskWithGivenStateProgress(subtaskState,
         new CompletionServiceHelper(executor, connMgr, HashBiMap.create(0)), selectedMinionWorkerEndpoints,
         requestHeaders, timeoutMs);
@@ -642,7 +643,8 @@ public class PinotHelixTaskResourceManager {
   @VisibleForTesting
   Map<String, Object> getSubtaskWithGivenStateProgress(String subtaskState,
       CompletionServiceHelper completionServiceHelper, Map<String, String> selectedMinionWorkerEndpoints,
-      Map<String, String> requestHeaders, int timeoutMs) {
+      Map<String, String> requestHeaders, int timeoutMs)
+      throws JsonProcessingException {
     Map<String, Object> minionWorkerIdSubtaskProgressMap = new HashMap<>();
     if (selectedMinionWorkerEndpoints.isEmpty()) {
       return minionWorkerIdSubtaskProgressMap;
@@ -660,7 +662,8 @@ public class PinotHelixTaskResourceManager {
       String worker = entry.getKey();
       String resp = entry.getValue();
       LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
-      minionWorkerIdSubtaskProgressMap.put(minionWorkerUrlToWorkerIdMap.get(worker), resp);
+      minionWorkerIdSubtaskProgressMap
+          .put(minionWorkerUrlToWorkerIdMap.get(worker), JsonUtils.stringToObject(resp, Map.class));
     }
     if (serviceResponse._failedResponseCount > 0) {
       // Instead of aborting, subtasks without worker side progress return the task status tracked by Helix.
