@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  *  When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
  *  When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
-public class MailboxReceiveOperator extends V2Operator {
+public class MailboxReceiveOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
 
@@ -116,7 +116,7 @@ public class MailboxReceiveOperator extends V2Operator {
   }
 
   @Override
-  public List<V2Operator> getV2ChildOperators() {
+  public List<MultiStageOperator> getMultiStageChildOperators() {
     return ImmutableList.of();
   }
 

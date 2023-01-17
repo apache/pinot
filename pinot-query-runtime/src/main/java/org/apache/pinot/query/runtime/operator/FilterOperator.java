@@ -44,14 +44,14 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
     3) All boolean scalar functions we have that take tranformOperand.
     Note: Scalar functions are the ones we have in v1 engine and only do function name and arg # matching.
  */
-public class FilterOperator extends V2Operator {
+public class FilterOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "FILTER";
-  private final V2Operator _upstreamOperator;
+  private final MultiStageOperator _upstreamOperator;
   private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public FilterOperator(V2Operator upstreamOperator, DataSchema dataSchema, RexExpression filter) {
+  public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter) {
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);
@@ -59,7 +59,7 @@ public class FilterOperator extends V2Operator {
   }
 
   @Override
-  public List<V2Operator> getV2ChildOperators() {
+  public List<MultiStageOperator> getMultiStageChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
 

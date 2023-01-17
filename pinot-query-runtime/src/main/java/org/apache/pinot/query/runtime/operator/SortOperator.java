@@ -34,9 +34,9 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 
 
-public class SortOperator extends V2Operator {
+public class SortOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "SORT";
-  private final V2Operator _upstreamOperator;
+  private final MultiStageOperator _upstreamOperator;
   private final int _fetch;
   private final int _offset;
   private final DataSchema _dataSchema;
@@ -47,14 +47,14 @@ public class SortOperator extends V2Operator {
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
 
-  public SortOperator(V2Operator upstreamOperator, List<RexExpression> collationKeys,
+  public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema) {
     this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
         SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY);
   }
 
   @VisibleForTesting
-  SortOperator(V2Operator upstreamOperator, List<RexExpression> collationKeys,
+  SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
       int maxHolderCapacity) {
     _upstreamOperator = upstreamOperator;
@@ -71,7 +71,7 @@ public class SortOperator extends V2Operator {
   }
 
   @Override
-  public List<V2Operator> getV2ChildOperators() {
+  public List<MultiStageOperator> getMultiStageChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
 

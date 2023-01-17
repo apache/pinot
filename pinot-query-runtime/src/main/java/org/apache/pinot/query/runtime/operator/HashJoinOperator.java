@@ -53,7 +53,7 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
  * The output is in the format of [left_row, right_row]
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
-public class HashJoinOperator extends V2Operator {
+public class HashJoinOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES =
       ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL);
@@ -65,8 +65,8 @@ public class HashJoinOperator extends V2Operator {
   // TODO: Replace hashset with rolling bit map.
   private final HashMap<Key, HashSet<Integer>> _matchedRightRows;
 
-  private final V2Operator _leftTableOperator;
-  private final V2Operator _rightTableOperator;
+  private final MultiStageOperator _leftTableOperator;
+  private final MultiStageOperator _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
   private final int _leftRowSize;
@@ -82,7 +82,7 @@ public class HashJoinOperator extends V2Operator {
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
-  public HashJoinOperator(V2Operator leftTableOperator, V2Operator rightTableOperator,
+  public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
       DataSchema leftSchema, JoinNode node) {
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
@@ -115,7 +115,7 @@ public class HashJoinOperator extends V2Operator {
 
   // TODO: Separate left and right table operator.
   @Override
-  public List<V2Operator> getV2ChildOperators() {
+  public List<MultiStageOperator> getMultiStageChildOperators() {
     return ImmutableList.of(_leftTableOperator, _rightTableOperator);
   }
 

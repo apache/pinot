@@ -42,16 +42,16 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
  * Note: Function transform only runs functions from v1 engine scalar function factory, which only does argument count
  * and canonicalized function name matching (lower case).
  */
-public class TransformOperator extends V2Operator {
+public class TransformOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "TRANSFORM";
-  private final V2Operator _upstreamOperator;
+  private final MultiStageOperator _upstreamOperator;
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public TransformOperator(V2Operator upstreamOperator, DataSchema resultSchema,
+  public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema,
       List<RexExpression> transforms, DataSchema upstreamDataSchema) {
     Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
     Preconditions.checkState(resultSchema.size() == transforms.size(),
@@ -66,7 +66,7 @@ public class TransformOperator extends V2Operator {
   }
 
   @Override
-  public List<V2Operator> getV2ChildOperators() {
+  public List<MultiStageOperator> getMultiStageChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
 

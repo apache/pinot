@@ -47,7 +47,7 @@ public class AggregateOperatorTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private V2Operator _input;
+  private MultiStageOperator _input;
 
   @BeforeMethod
   public void setUp() {
@@ -210,7 +210,7 @@ public class AggregateOperatorTest {
 
   @Test
   public void testGroupByAggregateWithHashCollision() {
-    V2Operator upstreamOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
+    MultiStageOperator upstreamOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
     // Create an aggregation call with sum for first column and group by second column.
     RexExpression.FunctionCall agg = getSum(new RexExpression.InputRef(0));
     AggregateOperator sum0GroupBy1 =

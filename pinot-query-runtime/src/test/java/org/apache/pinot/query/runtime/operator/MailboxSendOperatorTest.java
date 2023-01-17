@@ -44,7 +44,7 @@ public class MailboxSendOperatorTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private V2Operator _input;
+  private MultiStageOperator _input;
   @Mock
   private MailboxService<TransferableBlock> _mailboxService;
   @Mock

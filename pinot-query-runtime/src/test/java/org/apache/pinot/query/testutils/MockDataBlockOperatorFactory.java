@@ -26,7 +26,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.V2Operator;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -54,8 +54,8 @@ public class MockDataBlockOperatorFactory {
   }
 
   @SuppressWarnings("unchecked")
-  public V2Operator buildMockOperator(String operatorName) {
-    V2Operator operator = Mockito.mock(V2Operator.class);
+  public MultiStageOperator buildMockOperator(String operatorName) {
+    MultiStageOperator operator = Mockito.mock(MultiStageOperator.class);
     Mockito.when(operator.nextBlock()).thenAnswer(new Answer<Object>() {
       private int _invocationCount = 0;
       public Object answer(InvocationOnMock invocation) {

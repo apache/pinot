@@ -52,10 +52,10 @@ import org.apache.pinot.spi.data.FieldSpec;
  * Note: This class performs aggregation over the double value of input.
  * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  */
-public class AggregateOperator extends V2Operator {
+public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
 
-  private final V2Operator _inputOperator;
+  private final MultiStageOperator _inputOperator;
   // TODO: Deal with the case where _aggCalls is empty but we have groupSet setup, which means this is a Distinct call.
   private final List<RexExpression.FunctionCall> _aggCalls;
   private final List<RexExpression> _groupSet;
@@ -72,13 +72,13 @@ public class AggregateOperator extends V2Operator {
   // aggCalls has to be a list of FunctionCall and cannot be null
   // groupSet has to be a list of InputRef and cannot be null
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
-  public AggregateOperator(V2Operator inputOperator, DataSchema dataSchema,
+  public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet) {
     this(inputOperator, dataSchema, aggCalls, groupSet, AggregateOperator.Accumulator.MERGERS);
   }
 
   @VisibleForTesting
-  AggregateOperator(V2Operator inputOperator, DataSchema dataSchema,
+  AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet, Map<String, Merger> mergers) {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
@@ -106,7 +106,7 @@ public class AggregateOperator extends V2Operator {
   }
 
   @Override
-  public List<V2Operator> getV2ChildOperators() {
+  public List<MultiStageOperator> getMultiStageChildOperators() {
     return ImmutableList.of(_inputOperator);
   }
 

@@ -25,8 +25,8 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.slf4j.LoggerFactory;
 
 
-public abstract class V2Operator extends BaseOperator<TransferableBlock> implements AutoCloseable {
-  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
+public abstract class MultiStageOperator extends BaseOperator<TransferableBlock> implements AutoCloseable {
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
   // TODO: use the API public List<? extends Operator> getChildOperators() to merge two APIs.
   @Override
@@ -34,13 +34,13 @@ public abstract class V2Operator extends BaseOperator<TransferableBlock> impleme
     throw new UnsupportedOperationException();
   }
 
-  abstract List<V2Operator> getV2ChildOperators();
+  abstract List<MultiStageOperator> getMultiStageChildOperators();
 
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
   @Override
   public void close() {
-    for (V2Operator op : getV2ChildOperators()) {
+    for (MultiStageOperator op : getMultiStageChildOperators()) {
       try {
         op.close();
       } catch (Exception e) {

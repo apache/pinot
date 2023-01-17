@@ -55,7 +55,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  *       thus requires canonicalization.</li>
  * </ul>
  */
-public class LeafStageTransferableBlockOperator extends V2Operator {
+public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
 
   private final InstanceResponseBlock _errorBlock;
@@ -71,7 +71,7 @@ public class LeafStageTransferableBlockOperator extends V2Operator {
   }
 
   @Override
-  public List<V2Operator> getV2ChildOperators() {
+  public List<MultiStageOperator> getMultiStageChildOperators() {
     return ImmutableList.of();
   }
 

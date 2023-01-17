@@ -45,7 +45,7 @@ public class SortOperatorTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private V2Operator _input;
+  private MultiStageOperator _input;
 
   @BeforeMethod
   public void setUp() {

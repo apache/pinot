@@ -46,10 +46,10 @@ public class HashJoinOperatorTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private V2Operator _leftOperator;
+  private MultiStageOperator _leftOperator;
 
   @Mock
-  private V2Operator _rightOperator;
+  private MultiStageOperator _rightOperator;
 
   @BeforeMethod
   public void setUp() {

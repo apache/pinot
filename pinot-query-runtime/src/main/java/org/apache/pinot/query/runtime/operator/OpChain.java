@@ -32,12 +32,12 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  */
 public class OpChain implements AutoCloseable {
 
-  private final V2Operator _root;
+  private final MultiStageOperator _root;
   private final Set<MailboxIdentifier> _receivingMailbox;
   private final OpChainStats _stats;
   private final String _id;
 
-  public OpChain(V2Operator root, List<MailboxIdentifier> receivingMailboxes, long requestId, int stageId) {
+  public OpChain(MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes, long requestId, int stageId) {
     _root = root;
     _receivingMailbox = new HashSet<>(receivingMailboxes);
     _id = String.format("%s_%s", requestId, stageId);

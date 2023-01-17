@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This {@code MailboxSendOperator} is created to send {@link TransferableBlock}s to the receiving end.
  */
-public class MailboxSendOperator extends V2Operator {
+public class MailboxSendOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
 
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
@@ -52,7 +52,7 @@ public class MailboxSendOperator extends V2Operator {
       ImmutableSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
           RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED);
 
-  private final V2Operator _dataTableBlockBaseOperator;
+  private final MultiStageOperator _dataTableBlockBaseOperator;
   private final BlockExchange _exchange;
 
   @VisibleForTesting
@@ -67,7 +67,7 @@ public class MailboxSendOperator extends V2Operator {
   }
 
   public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
-      V2Operator dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
+      MultiStageOperator dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
       long jobId, int stageId) {
     this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
@@ -76,7 +76,7 @@ public class MailboxSendOperator extends V2Operator {
 
   @VisibleForTesting
   MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
-      V2Operator dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
+      MultiStageOperator dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory) {
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
@@ -109,7 +109,7 @@ public class MailboxSendOperator extends V2Operator {
   }
 
   @Override
-  public List<V2Operator> getV2ChildOperators() {
+  public List<MultiStageOperator> getMultiStageChildOperators() {
     return ImmutableList.of();
   }
 

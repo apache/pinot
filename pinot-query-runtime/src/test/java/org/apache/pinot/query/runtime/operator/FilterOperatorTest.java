@@ -40,7 +40,7 @@ import org.testng.annotations.Test;
 public class FilterOperatorTest {
   private AutoCloseable _mocks;
   @Mock
-  private V2Operator _upstreamOperator;
+  private MultiStageOperator _upstreamOperator;
 
   @BeforeMethod
   public void setUp() {

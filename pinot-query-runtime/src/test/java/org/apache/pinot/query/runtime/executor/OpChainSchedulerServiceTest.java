@@ -25,8 +25,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.apache.pinot.query.runtime.operator.V2Operator;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -45,9 +45,9 @@ public class OpChainSchedulerServiceTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private V2Operator _operatorA;
+  private MultiStageOperator _operatorA;
   @Mock
-  private V2Operator _operatorB;
+  private MultiStageOperator _operatorB;
   @Mock
   private OpChainScheduler _scheduler;
 
@@ -73,7 +73,7 @@ public class OpChainSchedulerServiceTest {
     _executor = Executors.newFixedThreadPool(numThreads);
   }
 
-  private OpChain getChain(V2Operator operator) {
+  private OpChain getChain(MultiStageOperator operator) {
     return new OpChain(operator, ImmutableList.of(), 123, 1);
   }
 

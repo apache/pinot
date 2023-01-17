@@ -29,7 +29,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 
 
-public class LiteralValueOperator extends V2Operator {
+public class LiteralValueOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "LITERAL_VALUE_PROVIDER";
 
   private final DataSchema _dataSchema;
@@ -43,7 +43,7 @@ public class LiteralValueOperator extends V2Operator {
   }
 
   @Override
-  public List<V2Operator> getV2ChildOperators() {
+  public List<MultiStageOperator> getMultiStageChildOperators() {
     return ImmutableList.of();
   }
 
