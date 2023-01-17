@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.minion.api.resources;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.minion.event.MinionEventObserver;
@@ -59,8 +58,7 @@ public class PinotTaskProgressResourceTest {
 
     String subtaskWithSucceededState =
         pinotTaskProgressResource.getSubtaskWithGivenStateProgress(MinionTaskState.SUCCEEDED.toString());
-    JsonNode jsonNode = JsonUtils.stringToJsonNode(subtaskWithSucceededState);
-    Map<String, Object> subtaskProgressMap = JsonUtils.jsonNodeToMap(jsonNode);
+    Map<String, Object> subtaskProgressMap = JsonUtils.stringToObject(subtaskWithSucceededState, Map.class);
     assertEquals(subtaskProgressMap.size(), 1);
 
     String subtaskWithUnknownState =
@@ -78,15 +76,13 @@ public class PinotTaskProgressResourceTest {
 
   private void assertInProgressSubtasks(String subtaskWithInProgressState)
       throws IOException {
-    JsonNode jsonNode = JsonUtils.stringToJsonNode(subtaskWithInProgressState);
-    Map<String, Object> subtaskProgressMap = JsonUtils.jsonNodeToMap(jsonNode);
+    Map<String, Object> subtaskProgressMap = JsonUtils.stringToObject(subtaskWithInProgressState, Map.class);
     assertEquals(subtaskProgressMap.size(), 2);
   }
 
   private void assertNoSubtaskWithTheGivenState(String subtaskWithTheGivenState)
       throws IOException {
-    JsonNode jsonNode = JsonUtils.stringToJsonNode(subtaskWithTheGivenState);
-    Map<String, Object> subtaskProgressMap = JsonUtils.jsonNodeToMap(jsonNode);
+    Map<String, Object> subtaskProgressMap = JsonUtils.stringToObject(subtaskWithTheGivenState, Map.class);
     assertEquals(subtaskProgressMap.size(), 0);
   }
 }

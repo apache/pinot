@@ -647,22 +647,20 @@ public class PinotHelixTaskResourceManager {
     if (selectedMinionWorkerEndpoints.isEmpty()) {
       return minionWorkerIdSubtaskProgressMap;
     }
-    Map<String, String> invertedSelectedMinionWorkerEndpoints = selectedMinionWorkerEndpoints.entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
-    List<String> workerUrls = selectedMinionWorkerEndpoints.values().stream()
-        .map(workerEndpoint -> String.format("%s/tasks/subtask/state/%s/progress", workerEndpoint, subtaskState))
-        .collect(Collectors.toList());
+    Map<String, String> minionWorkerUrlToWorkerIdMap = selectedMinionWorkerEndpoints.entrySet().stream()
+        .collect(Collectors.toMap(
+            entry -> String.format("%s/tasks/subtask/state/%s/progress", entry.getValue(), subtaskState),
+            Map.Entry::getKey));
+    List<String> workerUrls = new ArrayList<>(minionWorkerUrlToWorkerIdMap.keySet());
     LOGGER.debug("Getting task progress with workerUrls: {}", workerUrls);
     // Scatter and gather progress from multiple workers.
-    CompletionServiceHelper.CompletionServiceResponse serviceResponse
-        = completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs);
     for (Map.Entry<String, String> entry : serviceResponse._httpResponses.entrySet()) {
       String worker = entry.getKey();
       String resp = entry.getValue();
       LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
-      if (StringUtils.isNotEmpty(resp)) {
-        minionWorkerIdSubtaskProgressMap.put(invertedSelectedMinionWorkerEndpoints.get(worker), resp);
-      }
+      minionWorkerIdSubtaskProgressMap.put(minionWorkerUrlToWorkerIdMap.get(worker), resp);
     }
     if (serviceResponse._failedResponseCount > 0) {
       // Instead of aborting, subtasks without worker side progress return the task status tracked by Helix.

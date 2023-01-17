@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
@@ -240,7 +239,7 @@ public class PinotHelixTaskResourceManagerTest {
       subtaskIds[2 * i + 1] = taskIdPrefix + "_" + (2 * i + 1);
       // Notice that for testing purpose, we map subtask names to empty strings. In reality, subtask names will be
       // mapped to jsonized org.apache.pinot.minion.event.MinionEventObserver
-      httpResp._httpResponses.put(workerEndpoint,
+      httpResp._httpResponses.put(String.format("%s/tasks/subtask/state/IN_PROGRESS/progress", workerEndpoint),
           JsonUtils.objectToString(ImmutableMap.of(subtaskIds[2 * i], "", subtaskIds[2 * i + 1], "")));
     }
     httpResp._failedResponseCount = 1;
@@ -262,8 +261,7 @@ public class PinotHelixTaskResourceManagerTest {
     assertEquals(progress.size(), 3);
     for (int i = 0; i < 3; i++) {
       Object responseFromMinionWorker = progress.get(workerIds[i]);
-      JsonNode jsonNode = JsonUtils.stringToJsonNode((String) responseFromMinionWorker);
-      Map<String, Object> subtaskProgressMap = JsonUtils.jsonNodeToMap(jsonNode);
+      Map<String, Object> subtaskProgressMap = JsonUtils.stringToObject((String) responseFromMinionWorker, Map.class);
       assertEquals(subtaskProgressMap.size(), 2);
       assertTrue(subtaskProgressMap.containsKey(subtaskIds[2 * i]));
       assertTrue(subtaskProgressMap.containsKey(subtaskIds[2 * i + 1]));

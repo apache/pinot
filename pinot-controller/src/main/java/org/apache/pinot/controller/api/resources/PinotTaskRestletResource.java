@@ -463,7 +463,8 @@ public class PinotTaskRestletResource {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
   public String getSubtaskWithGivenStateProgress(@Context HttpHeaders httpHeaders,
-      @ApiParam(value = "Subtask state", required = true) @PathParam("subTaskState") String subTaskState,
+      @ApiParam(value = "Subtask state (UNKNOWN,IN_PROGRESS,SUCCEEDED,CANCELLED,ERROR)", required = true)
+      @PathParam("subTaskState") String subTaskState,
       @ApiParam(value = "Minion work IDs separated by comma") @QueryParam("minionWorkerIds") @Nullable
           String minionWorkerIds) {
     Set<String> selectedMinionWorkers = new HashSet<>();
