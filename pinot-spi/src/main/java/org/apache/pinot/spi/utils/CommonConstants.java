@@ -554,9 +554,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.server.logger.root.dir";
 
-    public static final String DIRECTORY_LOADER_PURPOSE_CONFIG = "directory.loader.purpose";
-    public static final String DIRECTORY_LOADER_PURPOSE_RELOAD = "reload";
-
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 

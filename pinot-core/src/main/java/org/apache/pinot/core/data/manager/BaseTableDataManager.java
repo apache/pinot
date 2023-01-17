@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -360,12 +359,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
       if (!shouldDownload && (zkMetadata.getTier().equals(segmentTier))) {
         // We should first try to reuse existing segment directory
-        Properties loaderContextProps = new Properties();
-        loaderContextProps.put(CommonConstants.Server.DIRECTORY_LOADER_PURPOSE_CONFIG,
-            CommonConstants.Server.DIRECTORY_LOADER_PURPOSE_RELOAD);
         SegmentDirectory segmentDirectory =
-            initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig,
-                loaderContextProps);
+            initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
         boolean needReprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
         if (!needReprocess) {
           LOGGER.info("Reloading segment : {} of table : {} using existing segment directory as no reprocessing needed",
@@ -821,20 +816,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
       IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    return initSegmentDirectory(segmentName, segmentCrc, indexLoadingConfig, new Properties());
-  }
-
-  private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
-      IndexLoadingConfig indexLoadingConfig, Properties directoryLoadProps)
-      throws Exception {
     SegmentDirectoryLoaderContext loaderContext =
         new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
             .setSchema(indexLoadingConfig.getSchema()).setInstanceId(indexLoadingConfig.getInstanceId())
             .setTableDataDir(indexLoadingConfig.getTableDataDir()).setSegmentName(segmentName).setSegmentCrc(segmentCrc)
             .setSegmentTier(indexLoadingConfig.getSegmentTier())
             .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
-            .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs())
-            .setSegmentDirectoryLoaderProps(directoryLoadProps).build();
+            .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs()).build();
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     File indexDir =
