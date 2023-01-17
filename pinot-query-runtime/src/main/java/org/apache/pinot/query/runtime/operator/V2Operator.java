@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 public abstract class V2Operator extends BaseOperator<TransferableBlock> implements AutoCloseable {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
 
+  // TODO: use the API public List<? extends Operator> getChildOperators() to merge two APIs.
   @Override
   public List<Operator> getChildOperators() {
     throw new UnsupportedOperationException();
