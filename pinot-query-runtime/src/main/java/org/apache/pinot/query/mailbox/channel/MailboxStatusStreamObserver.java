@@ -39,6 +39,7 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
   private final AtomicInteger _bufferSize = new AtomicInteger(5);
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
+  private Throwable _error;
 
   private StreamObserver<Mailbox.MailboxContent> _mailboxContentStreamObserver;
 
@@ -50,6 +51,10 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   }
 
   public void send(Mailbox.MailboxContent mailboxContent) {
+    if (_error != null) {
+      LOGGER.error(String.format("Receiver already indicated error=%s", mailboxContent.getMailboxId()), _error);
+      return;
+    }
     _mailboxContentStreamObserver.onNext(mailboxContent);
   }
 
@@ -73,16 +78,11 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
   @Override
   public void onError(Throwable e) {
     _isCompleted.set(true);
-    shutdown();
-    throw new RuntimeException(e);
-  }
-
-  private void shutdown() {
+    _error = e;
   }
 
   @Override
   public void onCompleted() {
     _isCompleted.set(true);
-    shutdown();
   }
 }

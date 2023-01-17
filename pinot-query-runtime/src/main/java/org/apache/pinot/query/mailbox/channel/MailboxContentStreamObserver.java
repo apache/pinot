@@ -22,6 +22,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -115,20 +116,20 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
     if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {
       // when the receiving end receives a message put it in the mailbox queue.
       // TODO: pass a timeout to _receivingBuffer.
-      if (!_receivingBuffer.offer(mailboxContent)) {
-        // TODO: close the stream.
-        RuntimeException e = new RuntimeException("Mailbox receivingBuffer is full:" + _mailboxId);
-        LOGGER.error(e.getMessage());
-        try {
-          _errorLock.writeLock().lock();
-          _errorContent = createErrorContent(e);
-        } catch (IOException ioe) {
-          e = new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
+      try {
+        if (!_receivingBuffer.offer(mailboxContent, 30, TimeUnit.SECONDS)) {
+          // TODO: close the stream.
+          RuntimeException e = new RuntimeException("Mailbox receivingBuffer is full: " + _mailboxId);
+          initError(e);
           LOGGER.error(e.getMessage());
-          throw e;
-        } finally {
-          _errorLock.writeLock().unlock();
+          _responseObserver.onError(e);
+          return;
         }
+      } catch (InterruptedException e) {
+        LOGGER.info("Interrupted while waiting to offer to receivingBuffer");
+        initError(e);
+        _responseObserver.onError(e);
+        return;
       }
       _gotMailCallback.accept(_mailboxId);
 
@@ -151,22 +152,22 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   @Override
   public void onError(Throwable e) {
-    try {
-      _errorLock.writeLock().lock();
-      _errorContent = createErrorContent(e);
-      _gotMailCallback.accept(_mailboxId);
-      // TODO: close the stream.
-      throw new RuntimeException(e);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
-    } finally {
-      _errorLock.writeLock().unlock();
-    }
+    initError(e);
   }
 
   @Override
   public void onCompleted() {
     _isCompleted.set(true);
-    _responseObserver.onCompleted();
+  }
+
+  private void initError(Throwable e) {
+    try {
+      _errorLock.writeLock().lock();
+      _errorContent = createErrorContent(e);
+    } catch (IOException ioException) {
+      LOGGER.error("Unexpected error", ioException);
+    } finally {
+      _errorLock.writeLock().unlock();
+    }
   }
 }

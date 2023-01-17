@@ -21,6 +21,7 @@ package org.apache.pinot.query.mailbox;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -53,7 +54,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   public void init()
       throws UnsupportedOperationException {
     ManagedChannel channel = _mailboxService.getChannel(_mailboxId);
-    PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
+    PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel).withDeadlineAfter(2, TimeUnit.MINUTES);
     _statusStreamObserver = new MailboxStatusStreamObserver();
     _statusStreamObserver.init(stub.open(_statusStreamObserver));
     // send a begin-of-stream message.
