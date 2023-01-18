@@ -446,6 +446,13 @@ rules:
     table: "$1"
     tableType: "$2"
     partition: "$3"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeIngestionDelayMs.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_realtimeIngestionDelayMs_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    partition: "$3"
 
 # Pinot Minions
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.numberOfTasks.(\\w+)_(\\w+)\"><>(\\w+)"
