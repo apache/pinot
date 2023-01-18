@@ -84,6 +84,7 @@ public class QueryRunner {
   private String _hostname;
   private int _port;
   private VirtualServerAddress _rootServer;
+  private ExecutorService _executorService;
   private OpChainSchedulerService _scheduler;
 
   /**
@@ -102,10 +103,10 @@ public class QueryRunner {
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
           QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
-
-      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
-          Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
-              new NamedThreadFactory("query_worker_on_" + _port + "_port")), releaseMs);
+      _executorService = Executors.newFixedThreadPool(
+          ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
+          new NamedThreadFactory("query_worker_on_" + _port + "_port"));
+      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs), _executorService, releaseMs);
       _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config, _scheduler::onDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
@@ -169,6 +170,10 @@ public class QueryRunner {
               new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap()));
       _scheduler.register(rootOperator);
     }
+  }
+
+  public ExecutorService getExecutorService() {
+    return _executorService;
   }
 
   private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
