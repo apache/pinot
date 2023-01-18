@@ -43,8 +43,8 @@ public class PinotQueryRuleSets {
           CoreRules.FILTER_AGGREGATE_TRANSPOSE,
           // push filter through set operation
           CoreRules.FILTER_SET_OP_TRANSPOSE,
-          // add
-          PinotProjectNodeInsertRule.INSTANCE,
+          // create a project on top of an aggregate when the aggregate is on top of a join
+          PinotRuleUtils.PINOT_AGGREGATE_EXTRACT_PROJECT_RULE,
           // push project through join,
           CoreRules.PROJECT_JOIN_TRANSPOSE,
           // push project through set operation

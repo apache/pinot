@@ -23,6 +23,8 @@ import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 
@@ -31,14 +33,18 @@ public class PinotRuleUtils {
   private static final RelBuilder.Config DEFAULT_CONFIG =
       RelBuilder.Config.DEFAULT.withAggregateUnique(true).withPushJoinCondition(true);
 
-  public static final RelBuilderFactory PINOT_REL_FACTORY =
+  static final RelBuilderFactory PINOT_REL_FACTORY =
       RelBuilder.proto(Contexts.of(RelFactories.DEFAULT_STRUCT, DEFAULT_CONFIG));
+
+  // A AggregateExtractProjectRule configured to run when a LogicalAggregate sits atop a LogicalJoin.
+  static final AggregateExtractProjectRule PINOT_AGGREGATE_EXTRACT_PROJECT_RULE =
+      new AggregateExtractProjectRule(LogicalAggregate.class, LogicalJoin.class, PinotRuleUtils.PINOT_REL_FACTORY);
 
   private PinotRuleUtils() {
     // do not instantiate.
   }
 
-  public static boolean isExchange(RelNode rel) {
+  static boolean isExchange(RelNode rel) {
     RelNode reference = rel;
     if (reference instanceof HepRelVertex) {
       reference = ((HepRelVertex) reference).getCurrentRel();
