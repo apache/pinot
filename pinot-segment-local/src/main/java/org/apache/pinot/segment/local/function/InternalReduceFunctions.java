@@ -26,7 +26,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 /**
  * This class contains functions that are necessary for the multistage engine
  * aggregations that need to be reduced after the initial aggregation to get
- *
+ * the final result.
  */
 public class InternalReduceFunctions {
 
