@@ -360,8 +360,8 @@ public class ImmutableDictionaryTest {
   public void testStringDictionary()
       throws Exception {
     try (StringDictionary stringDictionary = new StringDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, _numBytesPerStringValue,
-        (byte) 0)) {
+        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
+        _numBytesPerStringValue)) {
       testStringDictionary(stringDictionary);
     }
   }
@@ -372,7 +372,7 @@ public class ImmutableDictionaryTest {
     try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
         PinotDataBuffer.mapReadOnlyBigEndianFile(
             new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        _numBytesPerStringValue, (byte) 0)) {
+        _numBytesPerStringValue)) {
       testStringDictionary(onHeapStringDictionary);
     }
   }

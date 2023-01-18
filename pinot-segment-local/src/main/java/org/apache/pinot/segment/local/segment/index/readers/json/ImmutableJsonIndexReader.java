@@ -68,7 +68,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     long dictionaryEndOffset = dictionaryStartOffset + dictionaryLength;
     _dictionary =
         new StringDictionary(dataBuffer.view(dictionaryStartOffset, dictionaryEndOffset, ByteOrder.BIG_ENDIAN), 0,
-            maxValueLength, (byte) 0);
+            maxValueLength);
     long invertedIndexEndOffset = dictionaryEndOffset + invertedIndexLength;
     _invertedIndex = new BitmapInvertedIndexReader(
         dataBuffer.view(dictionaryEndOffset, invertedIndexEndOffset, ByteOrder.BIG_ENDIAN), _dictionary.length());

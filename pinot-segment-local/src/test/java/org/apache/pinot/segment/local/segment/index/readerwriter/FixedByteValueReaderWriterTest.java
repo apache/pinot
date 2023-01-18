@@ -56,7 +56,6 @@ public class FixedByteValueReaderWriterTest {
   @Test(dataProvider = "params")
   public void testFixedByteValueReaderWriter(int maxStringLength, int configuredMaxLength, ByteOrder byteOrder)
       throws IOException {
-    byte nt = 0;
     byte[] bytes = new byte[configuredMaxLength];
     try (PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(configuredMaxLength * 1000L, byteOrder,
         "testFixedByteValueReaderWriter")) {
@@ -67,10 +66,10 @@ public class FixedByteValueReaderWriterTest {
         Arrays.fill(bytes, 0, length, (byte) 'a');
         readerWriter.writeBytes(i, configuredMaxLength, bytes);
         inputs.add(new String(bytes, 0, length, StandardCharsets.UTF_8));
-        Arrays.fill(bytes, nt);
+        Arrays.fill(bytes, 0, length, (byte) 0);
       }
       for (int i = 0; i < 1000; i++) {
-        assertEquals(readerWriter.getUnpaddedString(i, configuredMaxLength, nt, bytes), inputs.get(i));
+        assertEquals(readerWriter.getUnpaddedString(i, configuredMaxLength, bytes), inputs.get(i));
       }
     }
   }

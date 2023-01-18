@@ -82,12 +82,12 @@ public class VarLengthValueReader implements ValueReader {
   }
 
   @Override
-  public byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
+  public byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
     return getBytes(index, numBytesPerValue);
   }
 
   @Override
-  public String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
+  public String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer) {
     assert buffer.length >= numBytesPerValue;
 
     // Read the offset of the byte array first and then read the actual byte array.

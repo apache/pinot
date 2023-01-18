@@ -39,7 +39,7 @@ public class OnHeapBigDecimalDictionary extends BaseImmutableDictionary {
   private final BigDecimal[] _dictIdToVal;
 
   public OnHeapBigDecimalDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
-    super(dataBuffer, length, numBytesPerValue, (byte) 0);
+    super(dataBuffer, length, numBytesPerValue);
 
     _dictIdToVal = new BigDecimal[length];
     for (int dictId = 0; dictId < length; dictId++) {
