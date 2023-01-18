@@ -59,13 +59,13 @@ rules:
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).groupBySize\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\S+)_(\\w+).groupBySize\"><>(\\w+)"
   name: "pinot_broker_groupBySize_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).noServingHostForSegment\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\S+)_(\\w+).noServingHostForSegment\"><>(\\w+)"
   name: "pinot_broker_noServingHostForSegment_$3"
   cache: true
   labels:
@@ -128,7 +128,7 @@ rules:
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).serverMissingForRouting\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\S+)_(\\w+).serverMissingForRouting\"><>(\\w+)"
   name: "pinot_broker_serverMissingForRouting_$3"
   cache: true
   labels:

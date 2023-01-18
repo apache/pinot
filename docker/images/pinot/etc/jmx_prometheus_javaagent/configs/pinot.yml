@@ -9,43 +9,43 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.helixZookeeperReconnects\"><>(\\w+)"
   name: "pinot_controller_helix_ZookeeperReconnects_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.idealstateZnodeSize.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.idealstateZnodeSize.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_idealstateZnodeSize_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.idealstateZnodeByteSize.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.idealstateZnodeByteSize.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_idealstateZnodeByteSize_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.numberOfReplicas.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.numberOfReplicas.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_numberOfReplicas_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.percentOfReplicas.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.percentOfReplicas.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_percentOfReplicas_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.percentSegmentsAvailable.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.percentSegmentsAvailable.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_percentSegmentsAvailable_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.segmentCount.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.segmentCount.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_segmentCount_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.segmentsInErrorState.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.segmentsInErrorState.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_segmentsInErrorState_$3"
   cache: true
   labels:
@@ -101,14 +101,14 @@ rules:
   labels:
     taskType: "$1"
     status: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastMinionTaskMetadataUpdate.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastMinionTaskMetadataUpdate.(\\S+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_timeMsSinceLastMinionTaskMetadataUpdate_$4"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
     taskType: "$3"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError).(\\w+)_(\\w+).(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError).(\\S+)_(\\w+).(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$5"
   cache: true
   labels:
@@ -120,14 +120,14 @@ rules:
   cache: true
   labels:
     taskType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastSuccessfulMinionTaskGeneration.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastSuccessfulMinionTaskGeneration.(\\S+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_timeMsSinceLastSuccessfulMinionTaskGeneration_$4"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
     taskType: "$3"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.lastMinionTaskGenerationEncountersError.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.lastMinionTaskGenerationEncountersError.(\\S+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_lastMinionTaskGenerationEncountersError_$4"
   cache: true
   labels:
@@ -147,34 +147,34 @@ rules:
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableTotalSizeOnServer.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableTotalSizeOnServer.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_tableTotalSizeOnServer_$3"
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableSizePerReplicaOnServer.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableSizePerReplicaOnServer.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_tableSizePerReplicaOnServer_$3"
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableCompressedSize.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableCompressedSize.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_tableCompressedSize_$3"
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableQuota.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableQuota.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_tableQuota_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageQuotaUtilization.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageQuotaUtilization.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_tableStorageQuotaUtilization_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageEstMissingSegmentPercent.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageEstMissingSegmentPercent.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_tableStorageEstMissingSegmentPercent_$3"
   cache: true
   labels:
@@ -247,13 +247,13 @@ rules:
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).groupBySize\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\S+)_(\\w+).groupBySize\"><>(\\w+)"
   name: "pinot_broker_groupBySize_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).noServingHostForSegment\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\S+)_(\\w+).noServingHostForSegment\"><>(\\w+)"
   name: "pinot_broker_noServingHostForSegment_$3"
   cache: true
   labels:
@@ -306,7 +306,7 @@ rules:
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).serverMissingForRouting\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\S+)_(\\w+).serverMissingForRouting\"><>(\\w+)"
   name: "pinot_broker_serverMissingForRouting_$3"
   cache: true
   labels:
@@ -324,25 +324,25 @@ rules:
     table: "$1"
 
 # Pinot Server
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.documentCount.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.documentCount.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_server_documentCount_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.segmentCount.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.segmentCount.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_server_segmentCount_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\S+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_$3_$4"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+)\\-(.+)\\-(\\w+).realtimeRowsConsumed\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\S+)_(\\w+)\\-(.+)\\-(\\w+).realtimeRowsConsumed\"><>(\\w+)"
   name: "pinot_server_realtimeRowsConsumed_$5"
   cache: true
   labels:
@@ -356,7 +356,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.helixZookeeperReconnects\"><>(\\w+)"
   name: "pinot_server_helix_zookeeperReconnects_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestKafkaOffsetConsumed.(\\w+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestKafkaOffsetConsumed.(\\S+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_highestKafkaOffsetConsumed_$5"
   cache: true
   labels:
@@ -364,7 +364,7 @@ rules:
     tableType: "$2"
     topic: "$3"
     partition: "$4"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestStreamOffsetConsumed.(\\w+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestStreamOffsetConsumed.(\\S+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_highestStreamOffsetConsumed_$5"
   cache: true
   labels:
@@ -372,7 +372,7 @@ rules:
     tableType: "$2"
     topic: "$3"
     partition: "$4"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.lastRealtimeSegment(\\w+)Seconds.(\\w+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.lastRealtimeSegment(\\w+)Seconds.(\\S+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_lastRealtimeSegment$1Seconds_$6"
   cache: true
   labels:
@@ -383,7 +383,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcControllerResponse(\\w+)\"><>(\\w+)"
   name: "pinot_server_llcControllerResponse_$1_$2"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcPartitionConsuming.(\\w+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcPartitionConsuming.(\\S+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_llcPartitionConsuming_$5"
   cache: true
   labels:
@@ -433,13 +433,13 @@ rules:
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.resizeTimeMs.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.resizeTimeMs.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_server_resizeTimeMs_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysCount.(\\w+)_(\\w+).(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysCount.(\\S+)_(\\w+).(\\w+)\"><>(\\w+)"
   name: "pinot_server_upsertPrimaryKeysCount_$4"
   cache: true
   labels:
@@ -448,13 +448,13 @@ rules:
     partition: "$3"
 
 # Pinot Minions
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.numberOfTasks.(\\w+)_(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.numberOfTasks.(\\S+)_(\\w+)\"><>(\\w+)"
   name: "pinot_minion_numberOfTasks_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+)_(\\w+).(\\w+).(taskExecution|taskQueueing|numberTasksExecuted|numberTasksCompleted|numberTasksCancelled|numberTasksFailed|numberTasksFatalFailed)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\S+)_(\\w+).(\\w+).(taskExecution|taskQueueing|numberTasksExecuted|numberTasksCompleted|numberTasksCancelled|numberTasksFailed|numberTasksFatalFailed)\"><>(\\w+)"
   name: "pinot_minion_$4_$5"
   cache: true
   labels:
