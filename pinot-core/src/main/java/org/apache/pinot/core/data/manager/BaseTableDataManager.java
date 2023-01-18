@@ -40,6 +40,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationConverter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -375,8 +376,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         SegmentDirectory segmentDirectory =
             initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
         // We should first try to reuse existing segment directory
-        if (zkMetadata.getTier().equals(segmentTier) && !ImmutableSegmentLoader.needPreprocess(segmentDirectory,
-            indexLoadingConfig, schema)) {
+        if ((StringUtils.equals(zkMetadata.getTier(), segmentTier)) && !ImmutableSegmentLoader.needPreprocess(
+            segmentDirectory, indexLoadingConfig, schema)) {
           LOGGER.info("Reloading segment: {} of table: {} using existing segment directory as no reprocessing needed",
               segmentName, _tableNameWithType);
           // No reprocessing needed, reuse the same segment
