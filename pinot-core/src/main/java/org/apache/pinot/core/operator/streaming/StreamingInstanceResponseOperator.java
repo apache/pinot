@@ -39,6 +39,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class StreamingInstanceResponseOperator extends InstanceResponseOperator {
+  private static final String EXPLAIN_NAME = "STREAMING_INSTANCE_RESPONSE";
 
   private final StreamObserver<Server.ServerResponse> _streamObserver;
 
@@ -52,30 +53,27 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
   @SuppressWarnings("rawtypes")
   @Override
   protected InstanceResponseBlock getNextBlock() {
-    prefetchAll();
-    BaseResultsBlock combinedResult;
+    BaseStreamingCombineOperator<?> streamingCombineOperator = (BaseStreamingCombineOperator) _combineOperator;
     try {
-      ((BaseStreamBlockCombineOperator) _combineOperator).start();
-      combinedResult = _combineOperator.nextBlock();
-      while (!(combinedResult instanceof MetadataResultsBlock)) {
-        if (combinedResult instanceof ExceptionResultsBlock) {
-          return new InstanceResponseBlock(combinedResult, _queryContext);
-        } else {
-          sendBlock(combinedResult);
+      prefetchAll();
+      streamingCombineOperator.start();
+      BaseResultsBlock resultsBlock = streamingCombineOperator.nextBlock();
+      while (!(resultsBlock instanceof MetadataResultsBlock)) {
+        if (resultsBlock instanceof ExceptionResultsBlock) {
+          return new InstanceResponseBlock(resultsBlock, _queryContext);
         }
-        combinedResult = _combineOperator.nextBlock();
+        sendBlock(resultsBlock);
+        resultsBlock = streamingCombineOperator.nextBlock();
       }
-    } catch (IOException e) {
-      InstanceResponseBlock exceptionResultBlock = new InstanceResponseBlock();
-      exceptionResultBlock.addException(
-          QueryException.getException(QueryException.DATA_TABLE_SERIALIZATION_ERROR, e));
-      return exceptionResultBlock;
+      // Return a metadata-only block
+      return new InstanceResponseBlock(resultsBlock, _queryContext);
+    } catch (Exception e) {
+      return new InstanceResponseBlock(new ExceptionResultsBlock(QueryException.DATA_TABLE_SERIALIZATION_ERROR, e),
+          _queryContext);
     } finally {
-      ((BaseStreamBlockCombineOperator) _combineOperator).stop();
+      streamingCombineOperator.stop();
       releaseAll();
     }
-    // return a metadata-only block.
-    return new InstanceResponseBlock(combinedResult, _queryContext);
   }
 
   private void sendBlock(BaseResultsBlock baseResultBlock)
@@ -85,5 +83,10 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
     Preconditions.checkState(dataSchema != null && rows != null, "Malformed data block");
     DataTable dataTable = baseResultBlock.getDataTable(_queryContext);
     _streamObserver.onNext(StreamingResponseUtils.getDataResponse(dataTable));
+  }
+
+  @Override
+  public String toExplainString() {
+    return EXPLAIN_NAME;
   }
 }

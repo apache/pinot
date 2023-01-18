@@ -65,11 +65,11 @@ import org.slf4j.LoggerFactory;
  *       all threads
  */
 @SuppressWarnings("rawtypes")
-public class StreamingGroupByCombineOperator extends BaseStreamBlockCombineOperator<GroupByResultsBlock> {
+public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperator<GroupByResultsBlock> {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingGroupByCombineOperator.class);
-  private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
+  private static final String EXPLAIN_NAME = "STREAMING_COMBINE_GROUP_BY";
 
   private final int _trimSize;
   private final int _trimThreshold;

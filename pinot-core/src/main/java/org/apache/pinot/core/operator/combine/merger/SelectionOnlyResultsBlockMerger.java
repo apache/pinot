@@ -28,17 +28,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SelectionOnlyResultBlockMerger implements ResultBlockMerger<SelectionResultsBlock> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyResultBlockMerger.class);
+public class SelectionOnlyResultsBlockMerger implements ResultsBlockMerger<SelectionResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyResultsBlockMerger.class);
   private final int _numRowsToKeep;
 
-  public SelectionOnlyResultBlockMerger(QueryContext queryContext) {
+  public SelectionOnlyResultsBlockMerger(QueryContext queryContext) {
     _numRowsToKeep = queryContext.getLimit();
   }
 
   @Override
   public boolean isQuerySatisfied(SelectionResultsBlock resultsBlock) {
-    return resultsBlock.getRows().size() == _numRowsToKeep;
+    return resultsBlock.getRows().size() >= _numRowsToKeep;
   }
 
   @Override

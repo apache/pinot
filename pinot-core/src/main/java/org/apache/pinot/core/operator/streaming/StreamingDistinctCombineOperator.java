@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.operator.combine.merger.DistinctResultBlockMerger;
+import org.apache.pinot.core.operator.combine.merger.DistinctResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -30,12 +30,12 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * Combine operator for distinct queries with streaming response.
  */
 @SuppressWarnings("rawtypes")
-public class StreamingDistinctCombineOperator extends BaseStreamBlockCombineOperator<DistinctResultsBlock> {
-  private static final String EXPLAIN_NAME = "DISTINCT_STREAMING_COMBINE";
+public class StreamingDistinctCombineOperator extends BaseStreamingCombineOperator<DistinctResultsBlock> {
+  private static final String EXPLAIN_NAME = "STREAMING_COMBINE_DISTINCT";
 
   public StreamingDistinctCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(new DistinctResultBlockMerger(queryContext), operators, queryContext, executorService);
+    super(new DistinctResultsBlockMerger(queryContext), operators, queryContext, executorService);
   }
 
   @Override

@@ -31,7 +31,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
-import org.apache.pinot.core.operator.combine.merger.ResultBlockMerger;
+import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
@@ -52,30 +52,30 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
     extends BaseCombineOperator<BaseResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleBlockCombineOperator.class);
 
-  protected final ResultBlockMerger<T> _combineFunction;
   // Use an AtomicInteger to track the next operator to execute
   protected final AtomicInteger _nextOperatorId = new AtomicInteger();
   // Use a BlockingQueue to store the intermediate results blocks
   protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
+  protected final ResultsBlockMerger<T> _resultsBlockMerger;
 
-  protected BaseSingleBlockCombineOperator(ResultBlockMerger<T> combineFunction, List<Operator> operators,
+  protected BaseSingleBlockCombineOperator(ResultsBlockMerger<T> resultsBlockMerger, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
     super(operators, queryContext, executorService);
-    _combineFunction = combineFunction;
+    _resultsBlockMerger = resultsBlockMerger;
   }
 
   @Override
   protected BaseResultsBlock getNextBlock() {
-    startProcess();
     BaseResultsBlock mergedBlock;
     try {
+      startProcess();
       mergedBlock = mergeResults();
     } catch (InterruptedException | EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
       throw new QueryCancelledException(
-          "Cancelled while merging results blocks"
-              + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg), e);
+          "Cancelled while merging results blocks" + (killedErrorMsg == null ? StringUtils.EMPTY
+              : " " + killedErrorMsg), e);
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
       mergedBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
@@ -95,9 +95,6 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
     return mergedBlock;
   }
 
-  /**
-   * Executes query on one or more segments in a worker thread.
-   */
   @Override
   protected void processSegments() {
     int operatorId;
@@ -115,7 +112,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
         }
       }
 
-      if (_combineFunction.isQuerySatisfied(resultsBlock)) {
+      if (_resultsBlockMerger.isQuerySatisfied(resultsBlock)) {
         // Query is satisfied, skip processing the remaining segments
         _blockingQueue.offer(resultsBlock);
         return;
@@ -125,23 +122,18 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
     }
   }
 
-  /**
-   * Invoked when {@link #processSegments()} throws exception/error.
-   */
+  @Override
   protected void onProcessSegmentsException(Throwable t) {
     _blockingQueue.offer(new ExceptionResultsBlock(t));
   }
 
-  /**
-   * Invoked when {@link #processSegments()} is finished (called in the finally block).
-   */
+  @Override
   protected void onProcessSegmentsFinish() {
   }
 
   /**
    * Merges the results from the worker threads into a results block.
    */
-  @Override
   protected BaseResultsBlock mergeResults()
       throws Exception {
     T mergedBlock = null;
@@ -164,12 +156,12 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = _combineFunction.convertToMergeableBlock((T) blockToMerge);
+        mergedBlock = _resultsBlockMerger.convertToMergeableBlock((T) blockToMerge);
       } else {
-        _combineFunction.mergeResultsBlocks(mergedBlock, (T) blockToMerge);
+        _resultsBlockMerger.mergeResultsBlocks(mergedBlock, (T) blockToMerge);
       }
       numBlocksMerged++;
-      if (_combineFunction.isQuerySatisfied(mergedBlock)) {
+      if (_resultsBlockMerger.isQuerySatisfied(mergedBlock)) {
         // Query is satisfied, skip merging the remaining results blocks
         return mergedBlock;
       }

@@ -107,7 +107,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
-  protected BaseResultsBlock getCombinedResults() {
+  private BaseResultsBlock getCombinedResults() {
     try {
       prefetchAll();
       return _combineOperator.nextBlock();

@@ -24,9 +24,10 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-public class AggregateResultBlockMerger implements ResultBlockMerger<AggregationResultsBlock> {
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class AggregationResultsBlockMerger implements ResultsBlockMerger<AggregationResultsBlock> {
 
-  public AggregateResultBlockMerger(QueryContext queryContext) {
+  public AggregationResultsBlockMerger(QueryContext queryContext) {
   }
 
   @Override

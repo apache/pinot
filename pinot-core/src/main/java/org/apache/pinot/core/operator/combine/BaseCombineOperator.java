@@ -61,8 +61,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   protected final AtomicInteger _nextOperatorId = new AtomicInteger();
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
-  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService) {
+  protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     _operators = operators;
     _numOperators = _operators.size();
     _queryContext = queryContext;
@@ -137,7 +136,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   protected void stopProcess() {
     // Cancel all ongoing jobs
     for (Future future : _futures) {
-      if (!future.isDone()) {
+      if (future != null && !future.isDone()) {
         future.cancel(true);
       }
     }
@@ -158,7 +157,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   }
 
   /**
-   * Invoke a step to process a segment.
+   * Executes query on one or more segments in a worker thread.
    */
   protected abstract void processSegments();
 
@@ -171,11 +170,4 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
    * Invoked when {@link #processSegments()} is finished (called in the finally block).
    */
   protected abstract void onProcessSegmentsFinish();
-
-  /**
-   * Invoke a final step to reduce result into a single {@link BaseResultsBlock}. This is useful for
-   * {@link BaseCombineOperator} that returns a single reduced block.
-   */
-  protected abstract BaseResultsBlock mergeResults()
-      throws Exception;
 }

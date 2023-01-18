@@ -21,7 +21,7 @@ package org.apache.pinot.core.operator.combine.merger;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 
 
-public interface ResultBlockMerger<T extends BaseResultsBlock> {
+public interface ResultsBlockMerger<T extends BaseResultsBlock> {
 
   /**
    * Merges a results block into the main mergeable results block.
@@ -49,7 +49,7 @@ public interface ResultBlockMerger<T extends BaseResultsBlock> {
    * Converts the given results block into a mergeable results block.
    *
    * <p>This conversion is necessary if a block is used as the first argument for:
-   * {@link ResultBlockMerger#mergeResultsBlocks(BaseResultsBlock, BaseResultsBlock)}.
+   * {@link ResultsBlockMerger#mergeResultsBlocks(BaseResultsBlock, BaseResultsBlock)}.
    */
   default T convertToMergeableBlock(T resultsBlock) {
     return resultsBlock;

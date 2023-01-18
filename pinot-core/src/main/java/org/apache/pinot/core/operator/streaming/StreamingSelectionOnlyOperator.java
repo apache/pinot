@@ -44,7 +44,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * This optimization doesn't apply to any other combine/merge required operators.
  */
 public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
-
   private static final String EXPLAIN_NAME = "SELECT_STREAMING";
 
   private final IndexSegment _indexSegment;

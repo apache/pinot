@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
-import org.apache.pinot.core.operator.combine.merger.AggregateResultBlockMerger;
+import org.apache.pinot.core.operator.combine.merger.AggregationResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -30,12 +30,12 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * Combine operator for aggregation queries with streaming response.
  */
 @SuppressWarnings("rawtypes")
-public class StreamingAggregationCombineOperator extends BaseStreamBlockCombineOperator<AggregationResultsBlock> {
-  private static final String EXPLAIN_NAME = "AGGREGATE_STREAMING_COMBINE";
+public class StreamingAggregationCombineOperator extends BaseStreamingCombineOperator<AggregationResultsBlock> {
+  private static final String EXPLAIN_NAME = "STREAMING_COMBINE_AGGREGATE";
 
   public StreamingAggregationCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(new AggregateResultBlockMerger(queryContext), operators, queryContext, executorService);
+    super(new AggregationResultsBlockMerger(queryContext), operators, queryContext, executorService);
   }
 
   @Override

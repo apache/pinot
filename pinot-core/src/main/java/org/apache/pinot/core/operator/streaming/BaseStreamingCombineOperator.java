@@ -32,16 +32,17 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
-import org.apache.pinot.core.operator.combine.merger.ResultBlockMerger;
+import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
+@SuppressWarnings({"rawtypes", "unchecked"})
+public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
     extends BaseCombineOperator<BaseResultsBlock> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseStreamBlockCombineOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseStreamingCombineOperator.class);
 
   /**
    * Special results block to indicate that this is the last results block for a child operator in the list
@@ -50,22 +51,21 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
 
   // Use a BlockingQueue to store the intermediate results blocks
   protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
-  protected final ResultBlockMerger<T> _combineFunction;
+  protected final ResultsBlockMerger<T> _resultsBlockMerger;
 
   protected int _numOperatorsFinished;
   protected BaseResultsBlock _exceptionBlock;
 
-  public BaseStreamBlockCombineOperator(ResultBlockMerger<T> combineFunction, List<Operator> operators,
+  public BaseStreamingCombineOperator(ResultsBlockMerger<T> resultsBlockMerger, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
     super(operators, queryContext, executorService);
-    _combineFunction = combineFunction;
-    _numOperatorsFinished = 0;
-    _exceptionBlock = null;
+    _resultsBlockMerger = resultsBlockMerger;
   }
 
   @Override
   protected BaseResultsBlock getNextBlock() {
     long endTimeMs = _queryContext.getEndTimeMs();
+    // TODO: Early terminate when query is satisfied
     while (_exceptionBlock == null && _numOperatorsFinished < _numOperators) {
       try {
         BaseResultsBlock resultsBlock =
@@ -74,8 +74,9 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
         if (resultsBlock == null) {
           // Query times out, skip streaming the remaining results blocks
           LOGGER.error("Timed out while polling results block (query: {})", _queryContext);
-          _exceptionBlock = new ExceptionResultsBlock(QueryException.getException(
-              QueryException.EXECUTION_TIMEOUT_ERROR, new TimeoutException("Timed out while polling results block")));
+          _exceptionBlock = new ExceptionResultsBlock(
+              QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
+                  new TimeoutException("Timed out while polling results block")));
           return _exceptionBlock;
         }
         if (resultsBlock.getProcessingExceptions() != null) {
@@ -105,22 +106,19 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
     return finalBlock;
   }
 
-  /**
-   * Executes query on one or more segments in a worker thread.
-   */
   @Override
   protected void processSegments() {
     int operatorId;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
-      Operator operator = _operators.get(operatorId);
-      T resultsBlock;
+      Operator<T> operator = _operators.get(operatorId);
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
-        while ((resultsBlock = (T) operator.nextBlock()) != null) {
-          if (shouldFinishStream(resultsBlock) || _combineFunction.isQuerySatisfied(resultsBlock)) {
-            // Query is satisfied, skip processing the remaining segments
+        T resultsBlock;
+        while ((resultsBlock = operator.nextBlock()) != null) {
+          // TODO: When query is satisfied, skip processing all the remaining operators instead of just the current one
+          if (shouldFinishStream(resultsBlock) || _resultsBlockMerger.isQuerySatisfied(resultsBlock)) {
             _blockingQueue.offer(resultsBlock);
             break;
           } else {
@@ -137,16 +135,12 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
     }
   }
 
-  /**
-   * Invoked when {@link #processSegments()} throws exception/error.
-   */
+  @Override
   protected void onProcessSegmentsException(Throwable t) {
     _blockingQueue.offer(new ExceptionResultsBlock(t));
   }
 
-  /**
-   * Invoked when {@link #processSegments()} is finished (called in the finally block).
-   */
+  @Override
   protected void onProcessSegmentsFinish() {
   }
 
@@ -158,12 +152,6 @@ public abstract class BaseStreamBlockCombineOperator<T extends BaseResultsBlock>
    */
   protected boolean shouldFinishStream(T resultsBlock) {
     return resultsBlock == null;
-  }
-
-  @Override
-  protected BaseResultsBlock mergeResults()
-      throws Exception {
-    throw new UnsupportedOperationException("Streaming combine operator doesn't support merge results.");
   }
 
   public void start() {

@@ -23,11 +23,11 @@ import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-public class DistinctResultBlockMerger implements ResultBlockMerger<DistinctResultsBlock> {
+public class DistinctResultsBlockMerger implements ResultsBlockMerger<DistinctResultsBlock> {
   private final QueryContext _queryContext;
   private final boolean _hasOrderBy;
 
-  public DistinctResultBlockMerger(QueryContext queryContext) {
+  public DistinctResultsBlockMerger(QueryContext queryContext) {
     _queryContext = queryContext;
     _hasOrderBy = queryContext.getOrderByExpressions() != null;
   }
