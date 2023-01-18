@@ -42,8 +42,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Implementation of {@link SegmentDirectoryLoader} that can move segments across data dirs configured as storage tiers.
  */
-@SegmentLoader(name = "tierBased")
+@SegmentLoader(name = TierBasedSegmentDirectoryLoader.DIRECTORY_LOADER_NAME)
 public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
+  public static final String DIRECTORY_LOADER_NAME = "tierBased";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(TierBasedSegmentDirectoryLoader.class);
   private static final String SEGMENT_TIER_TRACK_FILE_SUFFIX = ".tier";
   private static final int TRACK_FILE_VERSION = 1;

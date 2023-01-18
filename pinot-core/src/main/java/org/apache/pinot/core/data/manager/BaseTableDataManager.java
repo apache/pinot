@@ -61,6 +61,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.loader.TierBasedSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -376,8 +377,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         SegmentDirectory segmentDirectory =
             initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
         // We should first try to reuse existing segment directory
-        if ((StringUtils.equals(zkMetadata.getTier(), segmentTier)) && !ImmutableSegmentLoader.needPreprocess(
-            segmentDirectory, indexLoadingConfig, schema)) {
+        if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig,
+            schema)) {
           LOGGER.info("Reloading segment: {} of table: {} using existing segment directory as no reprocessing needed",
               segmentName, _tableNameWithType);
           // No reprocessing needed, reuse the same segment
@@ -416,6 +417,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
       throw reloadFailureException;
     }
+  }
+
+  public boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata,
+      String currentSegmentTier, SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+      Schema schema)
+      throws Exception {
+    boolean tierMigrationNeeded = indexLoadingConfig.getSegmentDirectoryLoader()
+        .equalsIgnoreCase(TierBasedSegmentDirectoryLoader.DIRECTORY_LOADER_NAME) && !StringUtils.equals(
+        segmentZKMetadata.getTier(), currentSegmentTier);
+    return !tierMigrationNeeded && !ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
   }
 
   @Override
