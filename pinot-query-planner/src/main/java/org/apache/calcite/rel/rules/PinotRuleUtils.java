@@ -29,7 +29,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 
 
-public class PinotRuleUtils {
+class PinotRuleUtils {
   private static final RelBuilder.Config DEFAULT_CONFIG =
       RelBuilder.Config.DEFAULT.withAggregateUnique(true).withPushJoinCondition(true);
 
