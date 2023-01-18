@@ -367,7 +367,7 @@ export default function CustomizedTables({
         />
       );
     }
-    if (str.toLowerCase() === 'consuming' || str.toLocaleLowerCase() === "partial") {
+    if (str.toLowerCase() === 'consuming' || str.toLocaleLowerCase() === "partial" || str.toLocaleLowerCase() === "updating" ) {
       return (
         <StyledChip
           label={str}

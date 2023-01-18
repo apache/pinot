@@ -84,7 +84,7 @@ const getSegmentStatus = (idealStateObj, externalViewObj) => {
     })
   }
 
-  if(tableStatus === DISPLAY_SEGMENT_STATUS.PARTIAL) {
+  if(tableStatus === DISPLAY_SEGMENT_STATUS.UPDATING) {
     return ({
       value: tableStatus,
       tooltip: "One or more segments in this table are in updating state. Click the status to view more details.",
@@ -339,8 +339,8 @@ export const getDisplayTableStatus = (idealStateObj, externalViewObj): DISPLAY_S
   if(segmentStatusArr.includes(DISPLAY_SEGMENT_STATUS.BAD)) {
     return DISPLAY_SEGMENT_STATUS.BAD;
   }
-  if(segmentStatusArr.includes(DISPLAY_SEGMENT_STATUS.PARTIAL)) {
-    return DISPLAY_SEGMENT_STATUS.PARTIAL;
+  if(segmentStatusArr.includes(DISPLAY_SEGMENT_STATUS.UPDATING)) {
+    return DISPLAY_SEGMENT_STATUS.UPDATING;
   }
   return DISPLAY_SEGMENT_STATUS.GOOD;
 }
@@ -366,11 +366,11 @@ export const getDisplaySegmentStatus = (idealState, externalView): DISPLAY_SEGME
   // If EV is empty or EV state is OFFLINE and does not matches IS then segment is in Partial state.
   // PARTIAL state can also be interpreted as we're waiting for segments to converge
   if(externalViewStatesArray.length === 0 || externalViewStatesArray.includes(SEGMENT_STATUS.OFFLINE) && !isEqual(idealState, externalView)) {
-    return DISPLAY_SEGMENT_STATUS.PARTIAL;
+    return DISPLAY_SEGMENT_STATUS.UPDATING;
   }
 
   // does not match any condition -> assume PARTIAL state as we are waiting for segments to converge 
-  return DISPLAY_SEGMENT_STATUS.PARTIAL;
+  return DISPLAY_SEGMENT_STATUS.UPDATING;
 }
 
 export default {
