@@ -109,7 +109,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  public List<MultiStageOperator> getMultiStageChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of();
   }
 

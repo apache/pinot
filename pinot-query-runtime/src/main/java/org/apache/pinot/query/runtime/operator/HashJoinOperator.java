@@ -115,7 +115,7 @@ public class HashJoinOperator extends MultiStageOperator {
 
   // TODO: Separate left and right table operator.
   @Override
-  public List<MultiStageOperator> getMultiStageChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_leftTableOperator, _rightTableOperator);
   }
 

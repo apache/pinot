@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.slf4j.LoggerFactory;
@@ -30,17 +29,15 @@ public abstract class MultiStageOperator extends BaseOperator<TransferableBlock>
 
   // TODO: use the API public List<? extends Operator> getChildOperators() to merge two APIs.
   @Override
-  public List<Operator> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     throw new UnsupportedOperationException();
   }
-
-  abstract List<MultiStageOperator> getMultiStageChildOperators();
 
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
   @Override
   public void close() {
-    for (MultiStageOperator op : getMultiStageChildOperators()) {
+    for (MultiStageOperator op : getChildOperators()) {
       try {
         op.close();
       } catch (Exception e) {
