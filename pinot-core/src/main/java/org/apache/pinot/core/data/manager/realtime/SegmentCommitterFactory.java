@@ -49,7 +49,7 @@ public class SegmentCommitterFactory {
   /**
    *
    * @param isSplitCommit Indicates if the controller has enabled split commit
-   * @param params
+   * @param params Parameters to use in the Segment completion request
    * @param controllerVipUrl Unused,
    * @return
    * @throws URISyntaxException
@@ -60,9 +60,21 @@ public class SegmentCommitterFactory {
     if (!isSplitCommit) {
       return new DefaultSegmentCommitter(_logger, _protocolHandler, params);
     }
-    SegmentUploader segmentUploader = new PinotFSSegmentUploader(_indexLoadingConfig.getSegmentStoreURI(),
-        PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
-    return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader,
-        _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
+    SegmentUploader segmentUploader;
+    String peerSegmentDownloadScheme;
+
+    if (_tableConfig.getValidationConfig().isSplitCommitDisabled()) { // if there is a table-level override to disable split commit
+      segmentUploader = new Server2ControllerSegmentUploader(_logger, _protocolHandler.getFileUploadDownloadClient(),
+          _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), params.getSegmentName(),
+          ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics,
+          _protocolHandler.getAuthProvider());
+      peerSegmentDownloadScheme = null;
+    } else {
+      segmentUploader = new PinotFSSegmentUploader(_indexLoadingConfig.getSegmentStoreURI(),
+          PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
+      peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
+    }
+
+    return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader, peerSegmentDownloadScheme);
   }
 }

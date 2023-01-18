@@ -49,6 +49,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
 
+  private boolean _splitCommitDisabled = false;
+
   // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.
   private String _replicasPerPartition;
   public String getSegmentAssignmentStrategy() {
@@ -57,6 +59,14 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
     _segmentAssignmentStrategy = segmentAssignmentStrategy;
+  }
+
+  public boolean isSplitCommitDisabled() {
+    return _splitCommitDisabled;
+  }
+
+  public void setSplitCommitDisabled(boolean splitCommitDisabled) {
+    _splitCommitDisabled = splitCommitDisabled;
   }
 
   public String getTimeColumnName() {
