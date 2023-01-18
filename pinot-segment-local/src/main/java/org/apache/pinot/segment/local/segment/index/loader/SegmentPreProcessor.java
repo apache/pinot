@@ -207,11 +207,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
     // There are existing star-trees, but if they match the builder configs exactly,
     // then there is no need to generate the star-trees
-    if (starTreeMetadataList != null && !StarTreeBuilderUtils
-        .shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
-      return false;
-    }
-    return !starTreeBuilderConfigs.isEmpty();
+    return StarTreeBuilderUtils.existingStarTreesNeedChange(starTreeBuilderConfigs, starTreeMetadataList);
   }
 
   private void processStarTrees(File indexDir)
@@ -225,7 +221,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
       if (starTreeMetadataList != null) {
         // There are existing star-trees
-        if (StarTreeBuilderUtils.shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
+        if (StarTreeBuilderUtils.existingStarTreesNeedChange(starTreeBuilderConfigs, starTreeMetadataList)) {
           // Remove the existing star-trees
           LOGGER.info("Removing star-trees from segment: {}", _segmentMetadata.getName());
           StarTreeBuilderUtils.removeStarTrees(indexDir);
