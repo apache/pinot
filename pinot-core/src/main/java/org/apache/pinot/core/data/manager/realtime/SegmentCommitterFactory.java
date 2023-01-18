@@ -63,7 +63,9 @@ public class SegmentCommitterFactory {
     SegmentUploader segmentUploader;
     String peerSegmentDownloadScheme;
 
-    if (_tableConfig.getValidationConfig().isSplitCommitDisabled()) { // if there is a table-level override to disable split commit
+    if (_tableConfig.getValidationConfig().isSplitCommitDisabled()) {
+      // if there is a table-level override to disable split commit, use controller segment upload and disallow peer
+      // download scheme
       segmentUploader = new Server2ControllerSegmentUploader(_logger, _protocolHandler.getFileUploadDownloadClient(),
           _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), params.getSegmentName(),
           ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics,
