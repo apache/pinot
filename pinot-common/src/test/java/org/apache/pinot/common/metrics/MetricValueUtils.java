@@ -106,23 +106,18 @@ public class MetricValueUtils {
 
   private static PinotMetric extractMetric(AbstractMetrics metrics, String metricName) {
     String metricPrefix;
-    Class metricClass;
     if (metrics instanceof ControllerMetrics) {
       metricPrefix = "pinot.controller.";
-      metricClass = ControllerMetrics.class;
     } else if (metrics instanceof BrokerMetrics) {
       metricPrefix = "pinot.broker.";
-      metricClass = BrokerMetrics.class;
     } else if (metrics instanceof ServerMetrics) {
       metricPrefix = "pinot.server.";
-      metricClass = ServerMetrics.class;
     } else if (metrics instanceof MinionMetrics) {
       metricPrefix = "pinot.minion.";
-      metricClass = MinionMetrics.class;
     } else {
-      throw new RuntimeException("unsupported AbstractMetrics type");
+      throw new RuntimeException(String.format("unsupported AbstractMetrics type: %s", metrics.getClass().toString()));
     }
     return metrics.getMetricsRegistry().allMetrics()
-        .get(new YammerMetricName(new MetricName(metricClass, metricPrefix + metricName)));
+        .get(new YammerMetricName(new MetricName(metrics.getClass(), metricPrefix + metricName)));
   }
 }
