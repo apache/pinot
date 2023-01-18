@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.segment.local.function;
+package org.apache.pinot.core.query.reduce.function;
 
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.spi.annotations.ScalarFunction;
