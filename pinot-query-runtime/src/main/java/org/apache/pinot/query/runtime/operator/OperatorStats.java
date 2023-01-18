@@ -45,11 +45,15 @@ public class OperatorStats {
   }
 
   public void startTimer() {
-    _executeStopwatch.start();
+    if(!_executeStopwatch.isRunning()){
+      _executeStopwatch.start();
+    }
   }
 
   public void endTimer() {
-    _executeStopwatch.stop();
+    if(_executeStopwatch.isRunning()) {
+      _executeStopwatch.stop();
+    }
   }
 
   public void recordInput(int numBlock, int numRows) {
