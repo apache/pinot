@@ -24,7 +24,7 @@ public class InMemoryDimensionTable implements DimensionTable{
     int numCols = columnNames.length;
     for(int i = 0; i < numRows; ++i){
       for(int j = 0; j < numCols; ++j){
-        
+
       }
     }
   }
