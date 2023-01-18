@@ -210,11 +210,14 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set group-by query options
     if (QueryContextUtils.isAggregationQuery(queryContext) && queryContext.getGroupByExpressions() != null) {
       // Set maxInitialResultHolderCapacity
-      Integer initResultCap = QueryOptionsUtils.getMaxInitResultCap(queryOptions);
-      int maxInitialResultHolderCapacity = initResultCap == null ? _maxInitialResultHolderCapacity : initResultCap;
-      queryContext.setMaxInitialResultHolderCapacity(maxInitialResultHolderCapacity);
+      Integer initResultCap = QueryOptionsUtils.getMaxInitialResultHolderCapacity(queryOptions);
+      if (initResultCap != null) {
+        queryContext.setMaxInitialResultHolderCapacity(initResultCap);
+      } else {
+        queryContext.setMaxInitialResultHolderCapacity(_maxInitialResultHolderCapacity);
+      }
       // Set numGroupsLimit
-      Integer numGroupsLimit = QueryOptionsUtils.getNumGroupLimit(queryOptions);
+      Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(queryOptions);
       if (numGroupsLimit != null) {
         queryContext.setNumGroupsLimit(numGroupsLimit);
       } else {
@@ -233,7 +236,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
           minServerGroupTrimSizeFromQuery != null ? minServerGroupTrimSizeFromQuery : _minServerGroupTrimSize;
       queryContext.setMinServerGroupTrimSize(minServerGroupTrimSize);
       // Set groupTrimThreshold
-      Integer groupTrimThreshold = QueryOptionsUtils.getGroupByTrimThreshold(queryOptions);
+      Integer groupTrimThreshold = QueryOptionsUtils.getGroupTrimThreshold(queryOptions);
       if (groupTrimThreshold != null) {
         queryContext.setGroupTrimThreshold(groupTrimThreshold);
       } else {
