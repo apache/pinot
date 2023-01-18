@@ -355,10 +355,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     try {
-      boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
       // Download segment from deep store if CRC changes or forced to download;
       // otherwise, copy backup directory back to the original index directory.
       // And then continue to load the segment from the index directory.
+      boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
       if (shouldDownload && allowDownload(segmentName, zkMetadata)) {
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
@@ -374,29 +374,26 @@ public abstract class BaseTableDataManager implements TableDataManager {
             TierConfigUtils.normalizeTierName(segmentTier));
         SegmentDirectory segmentDirectory =
             initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
-        if ((zkMetadata.getTier().equals(segmentTier))) {
-          // We should first try to reuse existing segment directory
-          boolean needReprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
-          if (!needReprocess) {
-            LOGGER.info(
-                "Reloading segment : {} of table : {} using existing segment directory as no reprocessing needed",
-                segmentName, _tableNameWithType);
-            // No reprocessing needed, reuse the same segment
-            ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
-            addSegment(segment);
-            return;
-          } else {
-            LOGGER.info("Segment : {} of table : {} requires reprocessing before reloading", segmentName,
-                _tableNameWithType);
-          }
+        // We should first try to reuse existing segment directory
+        if (zkMetadata.getTier().equals(segmentTier) && !ImmutableSegmentLoader.needPreprocess(segmentDirectory,
+            indexLoadingConfig, schema)) {
+          LOGGER.info("Reloading segment : {} of table : {} using existing segment directory as no reprocessing needed",
+              segmentName, _tableNameWithType);
+          // No reprocessing needed, reuse the same segment
+          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
+          addSegment(segment);
+          return;
         }
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
         // The indexDir is empty after calling createBackup, as it's renamed to a backup directory.
         // The SegmentDirectory should initialize accordingly. Like for SegmentLocalFSDirectory, it
         // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
-        segmentDirectory.copyTo(indexDir);
-        segmentDirectory.close();
+        try {
+          segmentDirectory.copyTo(indexDir);
+        } finally {
+          segmentDirectory.close();
+        }
       }
 
       // Load from indexDir and replace the old segment in memory. What's inside indexDir
