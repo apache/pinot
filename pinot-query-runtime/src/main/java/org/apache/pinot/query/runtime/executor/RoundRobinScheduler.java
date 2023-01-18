@@ -115,6 +115,9 @@ public class RoundRobinScheduler implements OpChainScheduler {
 
   @Override
   public boolean hasNext() {
+    if (!_ready.isEmpty()) {
+      return true;
+    }
     computeReady();
     return !_ready.isEmpty();
   }
