@@ -424,13 +424,6 @@ public class QueryContext {
         + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
   }
 
-  public DataTable getInMemoryTable(String tableName){
-
-  }
-
-  public HashMap<Key, List<Object[]>> getInMemoryTableHash(String tableName, String hashKeyCOl){
-    DataTable InMemoryTable = _cachedTable.getOrDefault(_cachedTable, getInMemoryTable(tableName));
-  }
   public static class Builder {
     private String _tableName;
     private QueryContext _subquery;

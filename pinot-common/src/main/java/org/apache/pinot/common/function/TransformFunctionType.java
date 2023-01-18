@@ -112,6 +112,7 @@ public enum TransformFunctionType {
   // special functions
   INIDSET("inIdSet"),
   LOOKUP("lookUp"),
+  LOOKUPJOIN("lookUpJoin"),
   GROOVY("groovy"),
 
   // Regexp functions

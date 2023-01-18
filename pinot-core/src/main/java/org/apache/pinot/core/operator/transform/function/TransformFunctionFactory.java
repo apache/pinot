@@ -131,7 +131,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.MAPVALUE, MapValueTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.INIDSET, InIdSetTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
-
+    typeToImplementation.put(TransformFunctionType.LOOKUPJOIN, LookupJoinTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.EXTRACT, ExtractTransformFunction.class);
 
     // Regexp functions

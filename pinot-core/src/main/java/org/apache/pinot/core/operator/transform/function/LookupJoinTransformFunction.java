@@ -4,7 +4,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -15,28 +14,20 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
+
 public class LookupJoinTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "lookUpJoin";
 
-  private static final byte[] EMPTY_BYTES = new byte[0];
-  private static final int[] EMPTY_INTS = new int[0];
-  private static final long[] EMPTY_LONGS = new long[0];
-  private static final float[] EMPTY_FLOATS = new float[0];
-  private static final double[] EMPTY_DOUBLES = new double[0];
-  private static final String[] EMPTY_STRINGS = new String[0];
-
-  private String _dimColumnName;
   private final List<String> _joinKeys = new ArrayList<>();
   private final List<FieldSpec> _joinValueFieldSpecs = new ArrayList<>();
   private final List<TransformFunction> _joinValueFunctions = new ArrayList<>();
 
   private DimensionTableDataManager _dataManager;
-  private FieldSpec _lookupColumnFieldSpec;
+  private String _filterFunc;
 
-  private int _nullIntValue;
-  private long _nullLongValue;
-  private float _nullFloatValue;
-  private double _nullDoubleValue;
+  private TransformFunction _condCol1;
+
+  private String _condCol2;
 
   @Override
   public String getName() {
@@ -46,35 +37,33 @@ public class LookupJoinTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are correct number of arguments
-    Preconditions.checkArgument(arguments.size() >= 5,
-        "At least 5 arguments are required for LOOKUP transform function: "
-            + "LOOKUPJOIN(tbl1, tbl2, joinKey1, joinKey2, joinCond)");
+    Preconditions.checkArgument(arguments.size() >= 4,
+        "At least 4 arguments are required for LOOKUP transform function: "
+            + "LOOKUPJOIN(tbl2, joinKey1, joinKey2, filterFunc, condCol1, condCol2)");
 
     TransformFunction dimTableNameFunction = arguments.get(0);
     Preconditions.checkArgument(dimTableNameFunction instanceof LiteralTransformFunction,
-        "First argument must be a literal(string) representing the dimension table name");
+        "Second argument must be a literal(string) representing the dimension table name");
     // Lookup parameters
     String dimTableName =
         TableNameBuilder.OFFLINE.tableNameWithType(((LiteralTransformFunction) dimTableNameFunction).getLiteral());
 
-    TransformFunction dimColumnFunction = arguments.get(1);
-    Preconditions.checkArgument(dimColumnFunction instanceof LiteralTransformFunction,
-        "Second argument must be a literal(string) representing the column name from dimension table to lookup");
-    _dimColumnName = ((LiteralTransformFunction) dimColumnFunction).getLiteral();
-
-    List<TransformFunction> joinArguments = arguments.subList(2, arguments.size());
+    // Only one join key is allowed.
+    List<TransformFunction> joinArguments = arguments.subList(1, 3);
+    System.out.println("liuyao joinArguments size:" + joinArguments.size());
     int numJoinArguments = joinArguments.size();
     for (int i = 0; i < numJoinArguments / 2; i++) {
-      TransformFunction dimJoinKeyFunction = joinArguments.get((i * 2));
-      Preconditions.checkArgument(dimJoinKeyFunction instanceof LiteralTransformFunction,
-          "JoinKey argument must be a literal(string) representing the primary key for the dimension table");
-      _joinKeys.add(((LiteralTransformFunction) dimJoinKeyFunction).getLiteral());
-
-      TransformFunction factJoinValueFunction = joinArguments.get((i * 2) + 1);
+      TransformFunction factJoinValueFunction = joinArguments.get((i * 2));
       TransformResultMetadata factJoinValueFunctionResultMetadata = factJoinValueFunction.getResultMetadata();
       Preconditions.checkArgument(factJoinValueFunctionResultMetadata.isSingleValue(),
           "JoinValue argument must be a single value expression");
       _joinValueFunctions.add(factJoinValueFunction);
+      TransformFunction dimJoinKeyFunction = joinArguments.get((i * 2 + 1));
+      Preconditions.checkArgument(dimJoinKeyFunction instanceof LiteralTransformFunction,
+          "JoinKey argument must be a literal(string) representing the primary key for the dimension table");
+      _joinKeys.add(((LiteralTransformFunction) dimJoinKeyFunction).getLiteral());
+      System.out.println("liuyao dimJoinKeyFunction:" + ((LiteralTransformFunction) dimJoinKeyFunction).getLiteral());
+      System.out.println("liuyao joinKeys size" +_joinKeys.size());
     }
 
     // Validate lookup table and relevant columns
@@ -82,11 +71,6 @@ public class LookupJoinTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(_dataManager != null, "Dimension table does not exist: %s", dimTableName);
 
     Preconditions.checkArgument(_dataManager.isPopulated(), "Dimension table is not populated: %s", dimTableName);
-
-    _lookupColumnFieldSpec = _dataManager.getColumnFieldSpec(_dimColumnName);
-    Preconditions
-        .checkArgument(_lookupColumnFieldSpec != null, "Column does not exist in dimension table: %s:%s", dimTableName,
-            _dimColumnName);
 
     for (String joinKey : _joinKeys) {
       FieldSpec pkColumnSpec = _dataManager.getColumnFieldSpec(joinKey);
@@ -99,27 +83,38 @@ public class LookupJoinTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(_joinKeys.equals(tablePrimaryKeyColumns),
         "Provided join keys (%s) must be the same as table primary keys: %s", _joinKeys, tablePrimaryKeyColumns);
 
-    Object defaultNullValue = _lookupColumnFieldSpec.getDefaultNullValue();
-    if (defaultNullValue instanceof Number) {
-      _nullIntValue = ((Number) defaultNullValue).intValue();
-      _nullLongValue = ((Number) defaultNullValue).longValue();
-      _nullFloatValue = ((Number) defaultNullValue).floatValue();
-      _nullDoubleValue = ((Number) defaultNullValue).intValue();
-    }
+    _filterFunc = ((LiteralTransformFunction) arguments.get(3)).getLiteral();
+
+    _condCol1 = arguments.get(4);
+
+    System.out.println("liuyao:" + _condCol1);
+
+    _condCol2 = ((LiteralTransformFunction) arguments.get(5)).getLiteral();
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return new TransformResultMetadata(_lookupColumnFieldSpec.getDataType(),
-        _lookupColumnFieldSpec.isSingleValueField(), false);
+    return BOOLEAN_SV_NO_DICTIONARY_METADATA;
   }
 
-  @FunctionalInterface
-  private interface ValueAcceptor {
-    void accept(int index, @Nullable Object value);
+  private boolean isCondSatisfied(String condFunc, double arg1, double arg2) {
+    if (condFunc.equals("GreaterThan")) {
+      return arg1 > arg2;
+    }
+    if (condFunc.equals("SmallerThan")){
+      return arg1 < arg2;
+    }
+    throw new IllegalStateException("Unknown condFunc:" + condFunc);
   }
 
-  private void lookup(ProjectionBlock projectionBlock, ValueAcceptor valueAcceptor) {
+  @Override
+  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+
+    int numDocs = projectionBlock.getNumDocs();
+    if (_intValuesSV == null) {
+      _intValuesSV = new int[numDocs];
+    }
+    // Get primary key
     int numPkColumns = _joinKeys.size();
     int numDocuments = projectionBlock.getNumDocs();
     Object[] pkColumns = new Object[numPkColumns];
@@ -150,6 +145,30 @@ public class LookupJoinTransformFunction extends BaseTransformFunction {
       }
     }
 
+    double[] condCol1 = new double[numDocs];
+    // Get filter variable
+    FieldSpec.DataType storedType = _condCol1.getResultMetadata().getDataType().getStoredType();
+    System.out.println("condCol1: colm:" + ((IdentifierTransformFunction) _condCol1).getColumnName());
+    switch (storedType) {
+//      case INT:
+//        condCol1 = _condCol1.transformToIntValuesSV(projectionBlock);
+//        break;
+//      case LONG:
+//        condCol1 = _condCol1.transformToLongValuesSV(projectionBlock);
+//        break;
+//      case FLOAT:
+//        condCol1 = _condCol1.transformToFloatValuesSV(projectionBlock);
+//        break;
+      case DOUBLE:
+        condCol1 = _condCol1.transformToDoubleValuesSV(projectionBlock);
+        break;
+//      case STRING:
+//        condCol1 = _condCol1.transformToStringValuesSV(projectionBlock);
+//        break;
+      default:
+        throw new IllegalStateException("Unknown supported type for condCol1");
+    }
+
     Object[] pkValues = new Object[numPkColumns];
     PrimaryKey primaryKey = new PrimaryKey(pkValues);
     for (int i = 0; i < numDocuments; i++) {
@@ -171,239 +190,16 @@ public class LookupJoinTransformFunction extends BaseTransformFunction {
       }
       // lookup
       GenericRow row = _dataManager.lookupRowByPrimaryKey(primaryKey);
-      Object value = row == null ? null : row.getValue(_dimColumnName);
-      valueAcceptor.accept(i, value);
-    }
-  }
+      _intValuesSV[i] = 0;
+      if (row != null) {
+        Object condConl2 = row.getValue(_condCol2);
+        System.out.println("liuyao primaryKey:" + primaryKey + " condCol1:" + condCol1[i] + "  condConl2:" + condConl2);
 
-  @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.INT) {
-      return super.transformToIntValuesSV(projectionBlock);
+        if (isCondSatisfied(_filterFunc, condCol1[i], ((Number) condConl2).doubleValue())) {
+          _intValuesSV[i] = 1;
+        }
+      }
     }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
-    lookup(projectionBlock, this::setIntSV);
     return _intValuesSV;
-  }
-
-  @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.LONG) {
-      return super.transformToLongValuesSV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[numDocs];
-    }
-    lookup(projectionBlock, this::setLongSV);
-    return _longValuesSV;
-  }
-
-  @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.FLOAT) {
-      return super.transformToFloatValuesSV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[numDocs];
-    }
-    lookup(projectionBlock, this::setFloatSV);
-    return _floatValuesSV;
-  }
-
-  @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.DOUBLE) {
-      return super.transformToDoubleValuesSV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[numDocs];
-    }
-    lookup(projectionBlock, this::setDoubleSV);
-    return _doubleValuesSV;
-  }
-
-  @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.STRING) {
-      return super.transformToStringValuesSV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[numDocs];
-    }
-    lookup(projectionBlock, this::setStringSV);
-    return _stringValuesSV;
-  }
-
-  @Override
-  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.BYTES) {
-      return super.transformToBytesValuesSV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_bytesValuesSV == null) {
-      _bytesValuesSV = new byte[numDocs][];
-    }
-    lookup(projectionBlock, this::setBytesSV);
-    return _bytesValuesSV;
-  }
-
-  @Override
-  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.INT) {
-      return super.transformToIntValuesMV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_intValuesMV == null) {
-      _intValuesMV = new int[numDocs][];
-    }
-    lookup(projectionBlock, this::setIntMV);
-    return _intValuesMV;
-  }
-
-  @Override
-  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.LONG) {
-      return super.transformToLongValuesMV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_longValuesMV == null) {
-      _longValuesMV = new long[numDocs][];
-    }
-    lookup(projectionBlock, this::setLongMV);
-    return _longValuesMV;
-  }
-
-  @Override
-  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.FLOAT) {
-      return super.transformToFloatValuesMV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_floatValuesMV == null) {
-      _floatValuesMV = new float[numDocs][];
-    }
-    lookup(projectionBlock, this::setFloatMV);
-    return _floatValuesMV;
-  }
-
-  @Override
-  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.DOUBLE) {
-      return super.transformToDoubleValuesMV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_doubleValuesMV == null) {
-      _doubleValuesMV = new double[numDocs][];
-    }
-    lookup(projectionBlock, this::setDoubleMV);
-    return _doubleValuesMV;
-  }
-
-  @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != FieldSpec.DataType.STRING) {
-      return super.transformToStringValuesMV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_stringValuesMV == null) {
-      _stringValuesMV = new String[numDocs][];
-    }
-    lookup(projectionBlock, this::setStringMV);
-    return _stringValuesMV;
-  }
-
-  private void setIntSV(int index, Object value) {
-    if (value instanceof Number) {
-      _intValuesSV[index] = ((Number) value).intValue();
-    } else {
-      _intValuesSV[index] = _nullIntValue;
-    }
-  }
-
-  private void setLongSV(int index, Object value) {
-    if (value instanceof Number) {
-      _longValuesSV[index] = ((Number) value).longValue();
-    } else {
-      _longValuesSV[index] = _nullLongValue;
-    }
-  }
-
-  private void setFloatSV(int index, Object value) {
-    if (value instanceof Number) {
-      _floatValuesSV[index] = ((Number) value).floatValue();
-    } else {
-      _floatValuesSV[index] = _nullFloatValue;
-    }
-  }
-
-  private void setDoubleSV(int index, Object value) {
-    if (value instanceof Number) {
-      _doubleValuesSV[index] = ((Number) value).doubleValue();
-    } else {
-      _doubleValuesSV[index] = _nullDoubleValue;
-    }
-  }
-
-  private void setStringSV(int index, Object value) {
-    if (value != null) {
-      _stringValuesSV[index] = String.valueOf(value);
-    } else {
-      _stringValuesSV[index] = _lookupColumnFieldSpec.getDefaultNullValueString();
-    }
-  }
-
-  private void setBytesSV(int index, Object value) {
-    if (value instanceof byte[]) {
-      _bytesValuesSV[index] = (byte[]) value;
-    } else {
-      _bytesValuesSV[index] = EMPTY_BYTES;
-    }
-  }
-
-  private void setIntMV(int index, Object value) {
-    if (value instanceof int[]) {
-      _intValuesMV[index] = (int[]) value;
-    } else {
-      _intValuesMV[index] = EMPTY_INTS;
-    }
-  }
-
-  private void setLongMV(int index, Object value) {
-    if (value instanceof long[]) {
-      _longValuesMV[index] = (long[]) value;
-    } else {
-      _longValuesMV[index] = EMPTY_LONGS;
-    }
-  }
-
-  private void setFloatMV(int index, Object value) {
-    if (value instanceof float[]) {
-      _floatValuesMV[index] = (float[]) value;
-    } else {
-      _floatValuesMV[index] = EMPTY_FLOATS;
-    }
-  }
-
-  private void setDoubleMV(int index, Object value) {
-    if (value instanceof double[]) {
-      _doubleValuesMV[index] = (double[]) value;
-    } else {
-      _doubleValuesMV[index] = EMPTY_DOUBLES;
-    }
-  }
-
-  private void setStringMV(int index, Object value) {
-    if (value instanceof String[]) {
-      _stringValuesMV[index] = (String[]) value;
-    } else {
-      _stringValuesMV[index] = EMPTY_STRINGS;
-    }
   }
 }

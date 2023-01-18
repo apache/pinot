@@ -1,0 +1,122 @@
+package org.apache.pinot.core.operator.transform.function;
+
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+import java.util.Arrays;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.testng.annotations.BeforeSuite;
+import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+
+public class LookupJoinTransformFunctionTest extends BaseTransformFunctionTest {
+  private static final String TABLE_NAME = "baseballTeams_OFFLINE";
+  private DimensionTableDataManager _tableManager;
+
+  @BeforeSuite
+  public void setUp()
+      throws Exception {
+    super.setUp();
+
+    createTestableTableManager();
+  }
+
+  private void createTestableTableManager() {
+    _tableManager = mock(DimensionTableDataManager.class);
+    DimensionTableDataManager.registerDimensionTable(TABLE_NAME, _tableManager);
+
+    // Creating a mock table which looks like:
+    // TeamID (PK, str) | TeamName(str) | TeamName_MV(str[]) | TeamInteger(int) | TeamInteger_MV(int[]) | TeamFloat
+    // (float) | ...
+    //
+    // All values are dynamically created to be variations of the primary key.
+    // e.g
+    // lookupRowByPrimaryKey(['FOO']) -> (TeamID: 'foo', TeamName: 'teamName_for_foo', TeamInteger: hashCode(['foo'])
+    // , ...
+    //
+    when(_tableManager.getPrimaryKeyColumns()).thenReturn(Arrays.asList("teamID"));
+    when(_tableManager.isPopulated()).thenReturn(true);
+    when(_tableManager.getColumnFieldSpec("teamID"))
+        .thenReturn(new DimensionFieldSpec("teamID", FieldSpec.DataType.STRING, true));
+    when(_tableManager.getColumnFieldSpec("teamName"))
+        .thenReturn(new DimensionFieldSpec("teamName", FieldSpec.DataType.STRING, true));
+    when(_tableManager.getColumnFieldSpec("teamName_MV"))
+        .thenReturn(new DimensionFieldSpec("teamName_MV", FieldSpec.DataType.STRING, false));
+    when(_tableManager.getColumnFieldSpec("teamInteger"))
+        .thenReturn(new DimensionFieldSpec("teamInteger", FieldSpec.DataType.INT, true));
+    when(_tableManager.getColumnFieldSpec("teamInteger_MV"))
+        .thenReturn(new DimensionFieldSpec("teamInteger_MV", FieldSpec.DataType.INT, false));
+    when(_tableManager.getColumnFieldSpec("teamFloat"))
+        .thenReturn(new DimensionFieldSpec("teamFloat", FieldSpec.DataType.FLOAT, true));
+    when(_tableManager.getColumnFieldSpec("teamFloat_MV"))
+        .thenReturn(new DimensionFieldSpec("teamFloat_MV", FieldSpec.DataType.FLOAT, false));
+    when(_tableManager.getColumnFieldSpec("teamDouble"))
+        .thenReturn(new DimensionFieldSpec("teamDouble", FieldSpec.DataType.DOUBLE, true));
+    when(_tableManager.getColumnFieldSpec("teamDouble_MV"))
+        .thenReturn(new DimensionFieldSpec("teamDouble_MV", FieldSpec.DataType.DOUBLE, false));
+    when(_tableManager.getColumnFieldSpec("teamLong"))
+        .thenReturn(new DimensionFieldSpec("teamLong", FieldSpec.DataType.LONG, true));
+    when(_tableManager.getColumnFieldSpec("teamLong_MV"))
+        .thenReturn(new DimensionFieldSpec("teamLong_MV", FieldSpec.DataType.LONG, false));
+    when(_tableManager.getColumnFieldSpec("teamBytes"))
+        .thenReturn(new DimensionFieldSpec("teamNameBytes", FieldSpec.DataType.BYTES, true));
+    when(_tableManager.lookupRowByPrimaryKey(any(PrimaryKey.class))).thenAnswer(invocation -> {
+      PrimaryKey key = invocation.getArgument(0);
+      GenericRow row = new GenericRow();
+      row.putValue("teamName", "teamName_for_" + key.toString());
+      row.putValue("teamName_MV",
+          new String[]{"teamName_for_" + key.toString() + "_1", "teamName_for_" + key.toString() + "_2"});
+      row.putValue("teamInteger", key.hashCode());
+      row.putValue("teamInteger_MV", new int[]{key.hashCode(), key.hashCode()});
+      row.putValue("teamFloat", (float) key.hashCode());
+      row.putValue("teamFloat_MV", new float[]{(float) key.hashCode(), (float) key.hashCode()});
+      row.putValue("teamDouble", (double) key.hashCode());
+      row.putValue("teamDouble_MV", new double[]{(double) key.hashCode(), (double) key.hashCode()});
+      row.putValue("teamLong", (long) key.hashCode());
+      row.putValue("teamLong_MV", new long[]{(long) key.hashCode(), (long) key.hashCode()});
+      row.putValue("teamBytes", ("teamBytes_for_" + key.toString()).getBytes());
+      return row;
+    });
+  }
+
+  @Test
+  public void basicLookupTests()
+      throws Exception {
+    // Lookup col: StringSV
+    // PK: [String]
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("lookUpJoin('baseballTeams',intSV, 'teamID','GreaterThan', doubleSV, 'teamDouble')"));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    int[] expectedIntValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedIntValues[i] = 0;
+    }
+   testTransformFunction(transformFunction, expectedIntValues);
+  }
+}
