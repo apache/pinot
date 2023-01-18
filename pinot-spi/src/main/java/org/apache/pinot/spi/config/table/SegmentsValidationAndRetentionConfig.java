@@ -51,7 +51,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.
   private String _replicasPerPartition;
-
   public String getSegmentAssignmentStrategy() {
     return _segmentAssignmentStrategy;
   }

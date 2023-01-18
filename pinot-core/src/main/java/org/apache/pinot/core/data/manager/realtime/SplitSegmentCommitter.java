@@ -20,9 +20,12 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.net.URI;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 
 
@@ -34,14 +37,22 @@ public class SplitSegmentCommitter implements SegmentCommitter {
   private final SegmentCompletionProtocol.Request.Params _params;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final SegmentUploader _segmentUploader;
+  private final String _peerDownloadScheme;
   private final Logger _segmentLogger;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
+      SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader,
+      @Nullable String peerDownloadScheme) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
     _params = new SegmentCompletionProtocol.Request.Params(params);
     _segmentUploader = segmentUploader;
+    _peerDownloadScheme = peerDownloadScheme;
+  }
+
+  public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
+      SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
+    this(segmentLogger, protocolHandler, params, segmentUploader, null);
   }
 
   @Override
@@ -78,6 +89,10 @@ public class SplitSegmentCommitter implements SegmentCommitter {
     URI segmentLocation = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(params.getSegmentName()));
     if (segmentLocation != null) {
       return segmentLocation.toString();
+    }
+    if (_peerDownloadScheme != null) {
+        return StringUtil.join("/", CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME,
+            params.getSegmentName());
     }
     return null;
   }
