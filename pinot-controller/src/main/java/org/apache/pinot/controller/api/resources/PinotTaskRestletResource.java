@@ -33,6 +33,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -465,11 +466,12 @@ public class PinotTaskRestletResource {
   public String getSubtaskWithGivenStateProgress(@Context HttpHeaders httpHeaders,
       @ApiParam(value = "Subtask state (UNKNOWN,IN_PROGRESS,SUCCEEDED,CANCELLED,ERROR)", required = true)
       @PathParam("subTaskState") String subTaskState,
-      @ApiParam(value = "Minion work IDs separated by comma") @QueryParam("minionWorkerIds") @Nullable
+      @ApiParam(value = "Minion worker IDs separated by comma") @QueryParam("minionWorkerIds") @Nullable
           String minionWorkerIds) {
     Set<String> selectedMinionWorkers = new HashSet<>();
     if (StringUtils.isNotEmpty(minionWorkerIds)) {
-      Collections.addAll(selectedMinionWorkers, StringUtils.split(minionWorkerIds, ','));
+      selectedMinionWorkers.addAll(
+          Arrays.stream(StringUtils.split(minionWorkerIds, ',')).map(String::trim).collect(Collectors.toList()));
     }
     // Relying on original schema that was used to query the controller
     String scheme = _uriInfo.getRequestUri().getScheme();

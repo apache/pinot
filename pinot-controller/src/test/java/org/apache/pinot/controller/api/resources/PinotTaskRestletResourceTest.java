@@ -82,8 +82,9 @@ public class PinotTaskRestletResourceTest {
   @Test
   public void testGetSubtaskWithGivenStateProgressWhenAllMinionWorkerIdsAreSpecified()
       throws JsonProcessingException {
+    // use minion worker ids with spaces ensure they will be trimmed.
     Map<String, String> minionWorkerEndpoints
-        = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints("minion1,minion2");
+        = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints(" minion1 , minion2 ");
     assertEquals(minionWorkerEndpoints,
         ImmutableMap.of("minion1", "http://minion1:9514", "minion2", "http://minion2:9514"));
   }
