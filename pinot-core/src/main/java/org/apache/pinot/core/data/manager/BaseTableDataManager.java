@@ -377,7 +377,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // We should first try to reuse existing segment directory
         if (zkMetadata.getTier().equals(segmentTier) && !ImmutableSegmentLoader.needPreprocess(segmentDirectory,
             indexLoadingConfig, schema)) {
-          LOGGER.info("Reloading segment : {} of table : {} using existing segment directory as no reprocessing needed",
+          LOGGER.info("Reloading segment: {} of table: {} using existing segment directory as no reprocessing needed",
               segmentName, _tableNameWithType);
           // No reprocessing needed, reuse the same segment
           ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
