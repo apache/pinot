@@ -45,6 +45,12 @@ public interface OpChainScheduler {
   void onDataAvailable(MailboxIdentifier mailbox);
 
   /**
+   * This method is called when scheduler is terminating. It should clean up all of the resources if there are any.
+   * register() and onDataAvailable() shouldn't be called anymore after shutDown is called.
+   */
+  void shutDown();
+
+  /**
    * @return whether or not there is any work for the scheduler to do
    */
   boolean hasNext();

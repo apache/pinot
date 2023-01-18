@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,7 +28,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  *  When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
  *  When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
-public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
+public class MailboxReceiveOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
 
@@ -116,9 +116,8 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+  public List<MultiStageOperator> getChildOperators() {
+    return ImmutableList.of();
   }
 
   @Nullable

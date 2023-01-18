@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.executor;
 
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.common.util.concurrent.Monitor;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.util.trace.TraceRunnable;
@@ -43,6 +44,8 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainSchedulerService.class);
 
+  private static final int TERMINATION_TIMEOUT_SEC = 60;
+
   private final OpChainScheduler _scheduler;
   private final ExecutorService _workerPool;
   private final long _pollIntervalMs;
@@ -56,6 +59,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     }
   };
 
+  // Note that workerPool is shut down in this class.
   public OpChainSchedulerService(OpChainScheduler scheduler, ExecutorService workerPool) {
     this(scheduler, workerPool, -1);
   }
@@ -72,6 +76,10 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     // this will just notify all waiters that the scheduler is shutting down
     _monitor.enter();
     _monitor.leave();
+    if (!MoreExecutors.shutdownAndAwaitTermination(_workerPool, TERMINATION_TIMEOUT_SEC, TimeUnit.SECONDS)) {
+      LOGGER.error("Failed to shut down and terminate OpChainScheduler.");
+    }
+    _scheduler.shutDown();
   }
 
   @Override
@@ -111,8 +119,10 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                   } else {
                     LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
                   }
+                  operatorChain.close();
                 }
               } catch (Exception e) {
+                operatorChain.close();
                 LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
               }
             }
@@ -142,9 +152,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   public final void register(OpChain operatorChain) {
     register(operatorChain, true);
     LOGGER.debug("({}): Scheduler is now handling operator chain listening to mailboxes {}. "
-            + "There are a total of {} chains awaiting execution.",
-        operatorChain,
-        operatorChain.getReceivingMailbox(),
+            + "There are a total of {} chains awaiting execution.", operatorChain, operatorChain.getReceivingMailbox(),
         _scheduler.size());
 
     // we want to track the time that it takes from registering
@@ -156,8 +164,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
   public final void register(OpChain operatorChain, boolean isNew) {
     _monitor.enter();
     try {
-      LOGGER.trace("({}): Registered operator chain (new: {}). Total: {}",
-          operatorChain, isNew, _scheduler.size());
+      LOGGER.trace("({}): Registered operator chain (new: {}). Total: {}", operatorChain, isNew, _scheduler.size());
 
       _scheduler.register(operatorChain, isNew);
       operatorChain.getStats().queued();

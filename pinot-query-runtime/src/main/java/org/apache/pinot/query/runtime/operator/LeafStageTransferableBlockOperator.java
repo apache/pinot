@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -31,8 +32,6 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -56,7 +55,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  *       thus requires canonicalization.</li>
  * </ul>
  */
-public class LeafStageTransferableBlockOperator extends BaseOperator<TransferableBlock> {
+public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
 
   private final InstanceResponseBlock _errorBlock;
@@ -72,8 +71,8 @@ public class LeafStageTransferableBlockOperator extends BaseOperator<Transferabl
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    return null;
+  public List<MultiStageOperator> getChildOperators() {
+    return ImmutableList.of();
   }
 
   @Nullable

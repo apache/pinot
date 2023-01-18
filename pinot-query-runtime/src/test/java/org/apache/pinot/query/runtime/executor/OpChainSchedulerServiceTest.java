@@ -24,18 +24,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.clearInvocations;
 
 
 public class OpChainSchedulerServiceTest {
@@ -44,9 +45,9 @@ public class OpChainSchedulerServiceTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private Operator<TransferableBlock> _operatorA;
+  private MultiStageOperator _operatorA;
   @Mock
-  private Operator<TransferableBlock> _operatorB;
+  private MultiStageOperator _operatorB;
   @Mock
   private OpChainScheduler _scheduler;
 
@@ -61,16 +62,18 @@ public class OpChainSchedulerServiceTest {
     _mocks.close();
   }
 
-  @AfterMethod
-  public void afterMethod() {
-    _executor.shutdownNow();
+  @BeforeMethod
+  public void beforeMethod() {
+    clearInvocations(_scheduler);
+    clearInvocations(_operatorA);
+    clearInvocations(_operatorB);
   }
 
   private void initExecutor(int numThreads) {
     _executor = Executors.newFixedThreadPool(numThreads);
   }
 
-  private OpChain getChain(Operator<TransferableBlock> operator) {
+  private OpChain getChain(MultiStageOperator operator) {
     return new OpChain(operator, ImmutableList.of(), 123, 1);
   }
 
@@ -132,8 +135,7 @@ public class OpChainSchedulerServiceTest {
     OpChainSchedulerService scheduler = new OpChainSchedulerService(_scheduler, _executor);
 
     CountDownLatch latch = new CountDownLatch(1);
-    Mockito.when(_operatorA.nextBlock())
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
+    Mockito.when(_operatorA.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
         .thenAnswer(inv -> {
           latch.countDown();
           return TransferableBlockUtils.getEndOfStreamTransferableBlock();
@@ -155,9 +157,7 @@ public class OpChainSchedulerServiceTest {
     // Given:
     initExecutor(1);
     Mockito.when(_scheduler.hasNext()).thenReturn(true);
-    Mockito.when(_scheduler.next())
-        .thenReturn(getChain(_operatorA))
-        .thenReturn(getChain(_operatorB))
+    Mockito.when(_scheduler.next()).thenReturn(getChain(_operatorA)).thenReturn(getChain(_operatorB))
         .thenReturn(getChain(_operatorA));
     OpChainSchedulerService scheduler = new OpChainSchedulerService(_scheduler, _executor);
 
@@ -209,6 +209,7 @@ public class OpChainSchedulerServiceTest {
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected hasNext to be called");
     scheduler.stopAsync().awaitTerminated();
+
     Mockito.verify(_scheduler, Mockito.never()).next();
   }
 
@@ -237,5 +238,30 @@ public class OpChainSchedulerServiceTest {
     // Then:
     Assert.assertTrue(secondHasNext.await(10, TimeUnit.SECONDS), "expected hasNext to be called again");
     scheduler.stopAsync().awaitTerminated();
+  }
+
+  @Test
+  public void shouldCallCloseOnOperators()
+      throws InterruptedException {
+    // Given:
+    initExecutor(1);
+    Mockito.when(_scheduler.hasNext()).thenReturn(true).thenReturn(false);
+    Mockito.when(_scheduler.next()).thenReturn(getChain(_operatorA));
+    OpChainSchedulerService scheduler = new OpChainSchedulerService(_scheduler, _executor);
+
+    CountDownLatch latch = new CountDownLatch(1);
+    Mockito.when(_operatorA.nextBlock()).thenAnswer(inv -> {
+      latch.countDown();
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    });
+
+    // When:
+    scheduler.startAsync().awaitRunning();
+    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1));
+
+    // Then:
+    Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
+    scheduler.stopAsync().awaitTerminated();
+    Mockito.verify(_operatorA, Mockito.times(1)).close();
   }
 }

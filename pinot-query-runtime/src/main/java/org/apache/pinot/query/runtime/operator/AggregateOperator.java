@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,9 +31,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Key;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -53,10 +52,10 @@ import org.apache.pinot.spi.data.FieldSpec;
  * Note: This class performs aggregation over the double value of input.
  * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  */
-public class AggregateOperator extends BaseOperator<TransferableBlock> {
+public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
 
-  private final Operator<TransferableBlock> _inputOperator;
+  private final MultiStageOperator _inputOperator;
   // TODO: Deal with the case where _aggCalls is empty but we have groupSet setup, which means this is a Distinct call.
   private final List<RexExpression.FunctionCall> _aggCalls;
   private final List<RexExpression> _groupSet;
@@ -73,13 +72,13 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   // aggCalls has to be a list of FunctionCall and cannot be null
   // groupSet has to be a list of InputRef and cannot be null
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
-  public AggregateOperator(Operator<TransferableBlock> inputOperator, DataSchema dataSchema,
+  public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet) {
     this(inputOperator, dataSchema, aggCalls, groupSet, AggregateOperator.Accumulator.MERGERS);
   }
 
   @VisibleForTesting
-  AggregateOperator(Operator<TransferableBlock> inputOperator, DataSchema dataSchema,
+  AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet, Map<String, Merger> mergers) {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
@@ -107,9 +106,8 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+  public List<MultiStageOperator> getChildOperators() {
+    return ImmutableList.of(_inputOperator);
   }
 
   @Nullable
