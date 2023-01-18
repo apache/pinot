@@ -151,7 +151,7 @@ public class SortOperator extends MultiStageOperator {
         _operatorStats.endTimer();
         block = _upstreamOperator.nextBlock();
         _operatorStats.startTimer();
-        _operatorStats.recordInput(1, block.getNumRows());
+        _operatorStats.recordInput(1, container.size());
       }
     }
   }
