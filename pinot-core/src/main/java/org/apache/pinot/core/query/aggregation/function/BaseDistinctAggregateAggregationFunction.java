@@ -272,7 +272,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + storedType);
+        throw new IllegalStateException(
+            "Illegal data type for " + _functionType.getName() + " aggregation function: " + storedType);
     }
   }
 
@@ -412,7 +413,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + storedType);
+        throw new IllegalStateException(
+            "Illegal data type for " + _functionType.getName() + " aggregation function: " + storedType);
     }
   }
 
@@ -560,7 +562,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         }
         break;
       default:
-        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_MV aggregation function: " + storedType);
+        throw new IllegalStateException(
+            "Illegal data type for " + _functionType.getName() + " aggregation function: " + storedType);
     }
   }
 

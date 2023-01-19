@@ -29,7 +29,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
- * Aggregation function to compute the sum of distinct values for an SV column.
+ * Aggregation function to compute the sum of distinct values for an MV column.
  */
 public class DistinctSumMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
