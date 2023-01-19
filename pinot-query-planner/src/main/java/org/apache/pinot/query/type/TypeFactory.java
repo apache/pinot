@@ -31,7 +31,7 @@ import org.apache.pinot.spi.data.Schema;
  * Extends Java-base TypeFactory from Calcite.
  *
  * <p>{@link JavaTypeFactoryImpl} is used here because we are not overriding much of the TypeFactory methods
- * required by Calcite. We will start extending {@link SqlTypeFactoryImpl} or even {@link RelDataTypeFactory}
+ * required by Calcite. We will start extending {@link org.apache.calcite.sql.type.SqlTypeFactoryImpl}
  * when necessary for Pinot to override such mechanism.
  *
  * <p>Noted that {@link JavaTypeFactoryImpl} is subject to change. Please pay extra attention to this class when
@@ -54,23 +54,23 @@ public class TypeFactory extends JavaTypeFactoryImpl {
   private RelDataType toRelDataType(FieldSpec fieldSpec) {
     switch (fieldSpec.getDataType()) {
       case INT:
-        return createSqlType(SqlTypeName.INTEGER);
+        return createTypeWithNullability(createSqlType(SqlTypeName.INTEGER), true);
       case LONG:
-        return createSqlType(SqlTypeName.BIGINT);
+        return createTypeWithNullability(createSqlType(SqlTypeName.BIGINT), true);
       case FLOAT:
-        return createSqlType(SqlTypeName.FLOAT);
+        return createTypeWithNullability(createSqlType(SqlTypeName.FLOAT), true);
       case DOUBLE:
-        return createSqlType(SqlTypeName.DOUBLE);
+        return createTypeWithNullability(createSqlType(SqlTypeName.DOUBLE), true);
       case BOOLEAN:
-        return createSqlType(SqlTypeName.BOOLEAN);
+        return createTypeWithNullability(createSqlType(SqlTypeName.BOOLEAN), true);
       case TIMESTAMP:
-        return createSqlType(SqlTypeName.TIMESTAMP);
+        return createTypeWithNullability(createSqlType(SqlTypeName.TIMESTAMP), true);
       case STRING:
-        return createSqlType(SqlTypeName.VARCHAR);
+        return createTypeWithNullability(createSqlType(SqlTypeName.VARCHAR), true);
       case BYTES:
-        return createSqlType(SqlTypeName.VARBINARY);
+        return createTypeWithNullability(createSqlType(SqlTypeName.VARBINARY), true);
       case BIG_DECIMAL:
-        return createSqlType(SqlTypeName.DECIMAL);
+        return createTypeWithNullability(createSqlType(SqlTypeName.DECIMAL), true);
       case JSON:
         // TODO: support JSON, JSON should be supported using a special RelDataType as it is not a simple String,
         // nor can it be easily parsed as a STRUCT.
