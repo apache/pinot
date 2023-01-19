@@ -22,6 +22,7 @@ import java.util.Collections;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -104,34 +105,38 @@ public class StorageQuotaCheckerTest {
     // No response from server, should pass without updating metrics
     mockTableSizeResult(-1, 0);
     assertTrue(isSegmentWithinQuota());
-    assertEquals(
-        controllerMetrics.getValueOfTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 0);
+    assertFalse(
+        MetricValueUtils.tableGaugeExists(controllerMetrics, OFFLINE_TABLE_NAME,
+            ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE));
 
     // Within quota but with missing segments, should pass without updating metrics
     mockTableSizeResult(4 * 1024, 1);
     assertTrue(isSegmentWithinQuota());
-    assertEquals(
-        controllerMetrics.getValueOfTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 0);
+    assertFalse(
+        MetricValueUtils.tableGaugeExists(controllerMetrics, OFFLINE_TABLE_NAME,
+            ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE));
+
 
     // Exceed quota and with missing segments, should fail without updating metrics
     mockTableSizeResult(8 * 1024, 1);
     assertFalse(isSegmentWithinQuota());
-    assertEquals(
-        controllerMetrics.getValueOfTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 0);
+    assertFalse(
+        MetricValueUtils.tableGaugeExists(controllerMetrics, OFFLINE_TABLE_NAME,
+            ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE));
 
     // Within quota without missing segments, should pass and update metrics
     mockTableSizeResult(3 * 1024, 0);
     assertTrue(isSegmentWithinQuota());
     assertEquals(
-        controllerMetrics.getValueOfTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE),
-        3 * 1024);
+        MetricValueUtils.getTableGaugeValue(controllerMetrics, OFFLINE_TABLE_NAME,
+            ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 3 * 1024);
 
     // Exceed quota without missing segments, should fail and update metrics
     mockTableSizeResult(4 * 1024, 0);
     assertFalse(isSegmentWithinQuota());
     assertEquals(
-        controllerMetrics.getValueOfTableGauge(OFFLINE_TABLE_NAME, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE),
-        4 * 1024);
+        MetricValueUtils.getTableGaugeValue(controllerMetrics, OFFLINE_TABLE_NAME,
+            ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 4 * 1024);
   }
 
   private boolean isSegmentWithinQuota()

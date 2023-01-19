@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.core.transport.QueryResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
@@ -96,14 +97,14 @@ public class ConnectionFailureDetectorTest {
       int numRetries = _listener._retryUnhealthyServerCalled.get();
       if (numRetries < Broker.FailureDetector.DEFAULT_MAX_RETIRES) {
         assertEquals(_failureDetector.getUnhealthyServers(), Collections.singleton(INSTANCE_ID));
-        assertEquals(_brokerMetrics.getValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS), 1);
+        assertEquals(MetricValueUtils.getGlobalGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS), 1);
         return false;
       }
       assertEquals(numRetries, Broker.FailureDetector.DEFAULT_MAX_RETIRES);
       // There might be a small delay between the last retry and removing failed server from the unhealthy servers.
       // Perform a check instead of an assertion.
       return _failureDetector.getUnhealthyServers().isEmpty()
-          && _brokerMetrics.getValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS) == 0
+          && MetricValueUtils.getGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS.getGaugeName()) == 0
           && _listener._notifyUnhealthyServerCalled.get() == 1 && _listener._notifyHealthyServerCalled.get() == 1;
     }, 5_000L, "Failed to get 10 retires");
 
@@ -113,7 +114,8 @@ public class ConnectionFailureDetectorTest {
   private void verify(Set<String> expectedUnhealthyServers, int expectedNotifyUnhealthyServerCalled,
       int expectedNotifyHealthyServerCalled) {
     assertEquals(_failureDetector.getUnhealthyServers(), expectedUnhealthyServers);
-    assertEquals(_brokerMetrics.getValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS), expectedUnhealthyServers.size());
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS),
+        expectedUnhealthyServers.size());
     assertEquals(_listener._notifyUnhealthyServerCalled.get(), expectedNotifyUnhealthyServerCalled);
     assertEquals(_listener._notifyHealthyServerCalled.get(), expectedNotifyHealthyServerCalled);
   }
