@@ -24,16 +24,17 @@ import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.Optionality;
 
 
-public class PinotBoolOrAggregateFunction extends SqlAggFunction {
+public class PinotFourthMomentAggregateFunction extends SqlAggFunction {
 
-  public static final PinotBoolOrAggregateFunction INSTANCE = new PinotBoolOrAggregateFunction();
+  public static final PinotFourthMomentAggregateFunction INSTANCE = new PinotFourthMomentAggregateFunction();
 
-  private PinotBoolOrAggregateFunction() {
-    super("BOOL_OR", null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN,
-        null, OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+  public PinotFourthMomentAggregateFunction() {
+    super("FOURTHMOMENT", null, SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(SqlTypeName.OTHER),
+        null, OperandTypes.NUMERIC, SqlFunctionCategory.USER_DEFINED_FUNCTION,
         false, false, Optionality.FORBIDDEN);
   }
 }

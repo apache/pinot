@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -35,6 +35,7 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -73,13 +74,14 @@ public class AggregateOperator extends MultiStageOperator {
   // groupSet has to be a list of InputRef and cannot be null
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
   public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
-      List<RexExpression> aggCalls, List<RexExpression> groupSet) {
-    this(inputOperator, dataSchema, aggCalls, groupSet, AggregateOperator.Accumulator.MERGERS);
+      List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema inputSchema) {
+    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.Accumulator.MERGERS);
   }
 
   @VisibleForTesting
   AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
-      List<RexExpression> aggCalls, List<RexExpression> groupSet, Map<String, Merger> mergers) {
+      List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema inputSchema, Map<String,
+      Function<DataSchema.ColumnDataType, Merger>> mergers) {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _upstreamErrorBlock = null;
@@ -96,7 +98,7 @@ public class AggregateOperator extends MultiStageOperator {
       if (!mergers.containsKey(functionName)) {
         throw new IllegalStateException("Unexpected value: " + functionName);
       }
-      _accumulators[i] = new Accumulator(agg, mergers.get(functionName));
+      _accumulators[i] = new Accumulator(agg, mergers, functionName, inputSchema);
     }
 
     _groupByKeyHolder = new HashMap<>();
@@ -184,6 +186,14 @@ public class AggregateOperator extends MultiStageOperator {
     return false;
   }
 
+  private static Key extraRowKey(Object[] row, List<RexExpression> groupSet) {
+    Object[] keyElements = new Object[groupSet.size()];
+    for (int i = 0; i < groupSet.size(); i++) {
+      keyElements[i] = row[((RexExpression.InputRef) groupSet.get(i)).getIndex()];
+    }
+    return new Key(keyElements);
+  }
+
   private static Object mergeSum(Object left, Object right) {
     return ((Number) left).doubleValue() + ((Number) right).doubleValue();
   }
@@ -209,37 +219,81 @@ public class AggregateOperator extends MultiStageOperator {
     return ((Boolean) left) || ((Boolean) right);
   }
 
-  private static Key extraRowKey(Object[] row, List<RexExpression> groupSet) {
-    Object[] keyElements = new Object[groupSet.size()];
-    for (int i = 0; i < groupSet.size(); i++) {
-      keyElements[i] = row[((RexExpression.InputRef) groupSet.get(i)).getIndex()];
+  // NOTE: the below two classes are needed depending on where the
+  // fourth moment is being executed - if the leaf stage gets a
+  // fourth moment pushed down to it, it will return a PinotFourthMoment
+  // as the result of the aggregation. If it is not possible (e.g. the
+  // input to the aggregate requires the result of a JOIN - such as
+  // FOURTHMOMENT(t1.a + t2.a)) then the input to the aggregate in the
+  // intermediate stage is a numeric.
+
+  private static class MergeFourthMomentNumeric implements Merger {
+
+    @Override
+    public Object merge(Object left, Object right) {
+      ((PinotFourthMoment) left).increment(((Number) right).doubleValue());
+      return left;
     }
-    return new Key(keyElements);
+
+    @Override
+    public Object initialize(Object other) {
+      PinotFourthMoment moment = new PinotFourthMoment();
+      moment.increment(((Number) other).doubleValue());
+      return moment;
+    }
   }
 
-  interface Merger extends BiFunction<Object, Object, Object> {
+  private static class MergeFourthMomentObject implements Merger {
+
+    @Override
+    public Object merge(Object left, Object right) {
+      PinotFourthMoment agg = (PinotFourthMoment) left;
+      agg.combine((PinotFourthMoment) right);
+      return agg;
+    }
+  }
+
+  interface Merger {
+    /**
+     * Initializes the merger based on the first input
+     */
+    default Object initialize(Object other) {
+      return other;
+    }
+
+    /**
+     * Merges the existing aggregate (the result of {@link #initialize(Object)}) with
+     * the new value coming in (which may be an aggregate in and of itself).
+     */
+    Object merge(Object agg, Object value);
   }
 
   private static class Accumulator {
 
-    private static final Map<String, Merger> MERGERS = ImmutableMap
-        .<String, Merger>builder()
-        .put("SUM", AggregateOperator::mergeSum)
-        .put("$SUM", AggregateOperator::mergeSum)
-        .put("$SUM0", AggregateOperator::mergeSum)
-        .put("MIN", AggregateOperator::mergeMin)
-        .put("$MIN", AggregateOperator::mergeMin)
-        .put("$MIN0", AggregateOperator::mergeMin)
-        .put("MAX", AggregateOperator::mergeMax)
-        .put("$MAX", AggregateOperator::mergeMax)
-        .put("$MAX0", AggregateOperator::mergeMax)
-        .put("COUNT", AggregateOperator::mergeCount)
-        .put("BOOL_AND", AggregateOperator::mergeBoolAnd)
-        .put("$BOOL_AND", AggregateOperator::mergeBoolAnd)
-        .put("$BOOL_AND0", AggregateOperator::mergeBoolAnd)
-        .put("BOOL_OR", AggregateOperator::mergeBoolOr)
-        .put("$BOOL_OR", AggregateOperator::mergeBoolOr)
-        .put("$BOOL_OR0", AggregateOperator::mergeBoolOr)
+    private static final Map<String, Function<DataSchema.ColumnDataType, Merger>> MERGERS = ImmutableMap
+        .<String, Function<DataSchema.ColumnDataType, Merger>>builder()
+        .put("SUM", cdt -> AggregateOperator::mergeSum)
+        .put("$SUM", cdt -> AggregateOperator::mergeSum)
+        .put("$SUM0", cdt -> AggregateOperator::mergeSum)
+        .put("MIN", cdt -> AggregateOperator::mergeMin)
+        .put("$MIN", cdt -> AggregateOperator::mergeMin)
+        .put("$MIN0", cdt -> AggregateOperator::mergeMin)
+        .put("MAX", cdt -> AggregateOperator::mergeMax)
+        .put("$MAX", cdt -> AggregateOperator::mergeMax)
+        .put("$MAX0", cdt -> AggregateOperator::mergeMax)
+        .put("COUNT", cdt -> AggregateOperator::mergeCount)
+        .put("BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
+        .put("$BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
+        .put("$BOOL_AND0", cdt -> AggregateOperator::mergeBoolAnd)
+        .put("BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
+        .put("$BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
+        .put("$BOOL_OR0", cdt -> AggregateOperator::mergeBoolOr)
+        .put("FOURTHMOMENT", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
+            ? new MergeFourthMomentObject() : new MergeFourthMomentNumeric())
+        .put("$FOURTHMOMENT", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
+            ? new MergeFourthMomentObject() : new MergeFourthMomentNumeric())
+        .put("$FOURTHMOMENT0", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
+            ? new MergeFourthMomentObject() : new MergeFourthMomentNumeric())
         .build();
 
     final int _inputRef;
@@ -247,17 +301,21 @@ public class AggregateOperator extends MultiStageOperator {
     final Map<Key, Object> _results = new HashMap<>();
     final Merger _merger;
 
-    Accumulator(RexExpression.FunctionCall aggCall, Merger merger) {
-      _merger = merger;
+    Accumulator(RexExpression.FunctionCall aggCall, Map<String, Function<DataSchema.ColumnDataType, Merger>> merger,
+        String functionName, DataSchema inputSchema) {
       // agg function operand should either be a InputRef or a Literal
+      DataSchema.ColumnDataType dataType;
       RexExpression rexExpression = toAggregationFunctionOperand(aggCall);
       if (rexExpression instanceof RexExpression.InputRef) {
         _inputRef = ((RexExpression.InputRef) rexExpression).getIndex();
         _literal = null;
+        dataType = inputSchema.getColumnDataType(_inputRef);
       } else {
         _inputRef = -1;
         _literal = ((RexExpression.Literal) rexExpression).getValue();
+        dataType = DataSchema.ColumnDataType.fromDataType(rexExpression.getDataType(), false);
       }
+      _merger = merger.get(functionName).apply(dataType);
     }
 
     void accumulate(Key key, Object[] row) {
@@ -268,9 +326,9 @@ public class AggregateOperator extends MultiStageOperator {
       Object value = _inputRef == -1 ? _literal : row[_inputRef];
 
       if (currentRes == null) {
-        keys.put(key, value);
+        keys.put(key, _merger.initialize(value));
       } else {
-        Object mergedResult = _merger.apply(currentRes, value);
+        Object mergedResult = _merger.merge(currentRes, value);
         _results.put(key, mergedResult);
       }
     }

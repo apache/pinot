@@ -27,13 +27,14 @@ import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.util.Optionality;
 
 
-public class PinotBoolOrAggregateFunction extends SqlAggFunction {
+public class PinotKurtosisAggregateFunction extends SqlAggFunction {
 
-  public static final PinotBoolOrAggregateFunction INSTANCE = new PinotBoolOrAggregateFunction();
+  public static final String KURTOSIS = "KURTOSIS";
+  public static final PinotKurtosisAggregateFunction INSTANCE = new PinotKurtosisAggregateFunction();
 
-  private PinotBoolOrAggregateFunction() {
-    super("BOOL_OR", null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN,
-        null, OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+  public PinotKurtosisAggregateFunction() {
+    super(KURTOSIS, null, SqlKind.OTHER_FUNCTION, ReturnTypes.DOUBLE,
+        null, OperandTypes.NUMERIC, SqlFunctionCategory.USER_DEFINED_FUNCTION,
         false, false, Optionality.FORBIDDEN);
   }
 }

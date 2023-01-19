@@ -17,23 +17,29 @@
  * under the License.
  */
 
-package org.apache.calcite.sql.fun;
+package org.apache.pinot.core.query.reduce.function;
 
-import org.apache.calcite.sql.SqlAggFunction;
-import org.apache.calcite.sql.SqlFunctionCategory;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.type.OperandTypes;
-import org.apache.calcite.sql.type.ReturnTypes;
-import org.apache.calcite.util.Optionality;
+import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-public class PinotBoolOrAggregateFunction extends SqlAggFunction {
+/**
+ * This class contains functions that are necessary for the multistage engine
+ * aggregations that need to be reduced after the initial aggregation to get
+ * the final result.
+ */
+public class InternalReduceFunctions {
 
-  public static final PinotBoolOrAggregateFunction INSTANCE = new PinotBoolOrAggregateFunction();
+  private InternalReduceFunctions() {
+  }
 
-  private PinotBoolOrAggregateFunction() {
-    super("BOOL_OR", null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN,
-        null, OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-        false, false, Optionality.FORBIDDEN);
+  @ScalarFunction
+  public static double skewnessReduce(PinotFourthMoment fourthMoment) {
+    return fourthMoment.skew();
+  }
+
+  @ScalarFunction
+  public static double kurtosisReduce(PinotFourthMoment fourthMoment) {
+    return fourthMoment.kurtosis();
   }
 }

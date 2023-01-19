@@ -82,6 +82,7 @@ public class PinotQueryRuleSets {
           CoreRules.AGGREGATE_UNION_AGGREGATE,
 
           // reduce aggregate functions like AVG, STDDEV_POP etc.
+          PinotReduceAggregateFunctionsRule.INSTANCE,
           CoreRules.AGGREGATE_REDUCE_FUNCTIONS,
 
           // remove unnecessary sort rule

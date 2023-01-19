@@ -17,23 +17,27 @@
  * under the License.
  */
 
-package org.apache.calcite.sql.fun;
+package org.apache.pinot.common;
 
-import org.apache.calcite.sql.SqlAggFunction;
-import org.apache.calcite.sql.SqlFunctionCategory;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.type.OperandTypes;
-import org.apache.calcite.sql.type.ReturnTypes;
-import org.apache.calcite.util.Optionality;
+import java.nio.ByteBuffer;
 
 
-public class PinotBoolOrAggregateFunction extends SqlAggFunction {
+public class CustomObject {
+  public static final int NULL_TYPE_VALUE = 100;
 
-  public static final PinotBoolOrAggregateFunction INSTANCE = new PinotBoolOrAggregateFunction();
+  private final int _type;
+  private final ByteBuffer _buffer;
 
-  private PinotBoolOrAggregateFunction() {
-    super("BOOL_OR", null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN,
-        null, OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-        false, false, Optionality.FORBIDDEN);
+  public CustomObject(int type, ByteBuffer buffer) {
+    _type = type;
+    _buffer = buffer;
+  }
+
+  public int getType() {
+    return _type;
+  }
+
+  public ByteBuffer getBuffer() {
+    return _buffer;
   }
 }

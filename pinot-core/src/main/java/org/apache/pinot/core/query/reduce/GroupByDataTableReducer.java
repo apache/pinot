@@ -30,6 +30,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -318,7 +319,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       break;
                     case OBJECT:
                       // TODO: Move ser/de into AggregationFunction interface
-                      DataTable.CustomObject customObject = dataTable.getCustomObject(rowId, colId);
+                      CustomObject customObject = dataTable.getCustomObject(rowId, colId);
                       if (customObject != null) {
                         values[colId] = ObjectSerDeUtils.deserialize(customObject);
                       }
