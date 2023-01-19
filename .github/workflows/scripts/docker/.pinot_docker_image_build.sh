@@ -31,9 +31,17 @@ if [ -z "${BUILD_PLATFORM}" ]; then
   BUILD_PLATFORM="linux/arm64,linux/amd64"
 fi
 
+# Get pinot commit id
+ROOT_DIR=`pwd`
+rm -rf /tmp/pinot
+git clone -b ${PINOT_BRANCH} --single-branch ${PINOT_GIT_URL} /tmp/pinot
+cd /tmp/pinot
 COMMIT_ID=`git rev-parse --short HEAD`
-DATE=`date +%Y%m%d`
 VERSION=`mvn help:evaluate -Dexpression=project.version -q -DforceStdout`
+rm -rf /tmp/pinot
+DATE=`date +%Y%m%d`
+cd ${ROOT_DIR}
+
 tags=()
 if [ -z "${TAGS}" ]; then
   tags=("${VERSION}-${COMMIT_ID}-${DATE}")
