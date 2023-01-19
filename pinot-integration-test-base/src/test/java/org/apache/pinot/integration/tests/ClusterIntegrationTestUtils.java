@@ -560,6 +560,10 @@ public class ClusterIntegrationTestUtils {
     testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, null);
   }
 
+  /**
+   *  Compare # of rows in pinot and H2 only. Succeed if # of rows matches. Note this only applies to non-aggregation
+   *  query.
+   */
   static void testQueryWithMatchingRowCount(String pinotQuery, String brokerUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
@@ -577,7 +581,7 @@ public class ClusterIntegrationTestUtils {
       @Nullable Map<String, String> extraJsonProperties) {
     try {
       testQueryInternal(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, extraJsonProperties,
-           false);
+          false);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, "Caught exception while testing query!", e);
     }
@@ -623,10 +627,12 @@ public class ClusterIntegrationTestUtils {
       List<String> expectedOrderByValues = new ArrayList<>();
       int h2NumRows = getH2ExpectedValues(expectedValues, expectedOrderByValues, h2ResultSet, h2ResultSet.getMetaData(),
           orderByColumns);
-      System.out.println("Pinot numRows:" + numRows);
-      System.out.println("H2 numRows:" + h2NumRows);
-      if(matchingRowCount && numRows != h2NumRows){
-        throw new RuntimeException("Pinot # of rows " + numRows  + " doesn't match h2 # of rows " + h2NumRows);
+      if (matchingRowCount) {
+        if (numRows != h2NumRows) {
+          throw new RuntimeException("Pinot # of rows " + numRows + " doesn't match h2 # of rows " + h2NumRows);
+        } else {
+          return;
+        }
       }
       comparePinotResultsWithExpectedValues(expectedValues, expectedOrderByValues, resultTableResultSet, orderByColumns,
           pinotQuery, h2Query, h2NumRows, pinotNumRecordsSelected);
