@@ -18,18 +18,41 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
+
 /**
- * Aggregation function to compute the average of distinct values.
+ * Aggregation function to compute the average of distinct values for an SV column.
  */
 public class DistinctAvgAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
   public DistinctAvgAggregationFunction(ExpressionContext expression) {
     super(expression, AggregationFunctionType.DISTINCTAVG);
+  }
+
+  @Override
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    svAggregate(length, aggregationResultHolder, blockValSetMap);
+  }
+
+  @Override
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    svAggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    svAggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
   }
 
   @Override

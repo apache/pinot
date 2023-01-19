@@ -21,7 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -29,39 +29,45 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
- * Aggregation function to compute the average of distinct values for an SV column
+ * Aggregation function to compute the sum of distinct values for an MV column.
  */
-public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
+public class DistinctSumMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
-  public DistinctCountAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTCOUNT);
+  public DistinctSumMVAggregationFunction(ExpressionContext expression) {
+    super(expression, AggregationFunctionType.DISTINCTSUMMV);
   }
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    svAggregate(length, aggregationResultHolder, blockValSetMap);
+    mvAggregate(length, aggregationResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    svAggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
+    mvAggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    svAggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
+    mvAggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
   }
 
   @Override
-  public ColumnDataType getFinalResultColumnType() {
-    return ColumnDataType.INT;
+  public DataSchema.ColumnDataType getFinalResultColumnType() {
+    return DataSchema.ColumnDataType.DOUBLE;
   }
 
   @Override
-  public Integer extractFinalResult(Set intermediateResult) {
-    return intermediateResult.size();
+  public Double extractFinalResult(Set intermediateResult) {
+    Double distinctSum = 0.0;
+
+    for (Object obj : intermediateResult) {
+      distinctSum += ((Number) obj).doubleValue();
+    }
+
+    return distinctSum;
   }
 }
