@@ -66,6 +66,7 @@ public class OperatorStats {
     _numOutputRows += numRows;
   }
 
+  // TODO: Return the string as a JSON string.
   @Override
   public String toString() {
     return String.format(
