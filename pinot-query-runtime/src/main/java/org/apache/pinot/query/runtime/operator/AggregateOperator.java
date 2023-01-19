@@ -88,16 +88,14 @@ public class AggregateOperator extends MultiStageOperator {
 
   @VisibleForTesting
   AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
-      List<RexExpression> groupSet, DataSchema inputSchema, Map<String, Function<DataSchema.ColumnDataType, Merger>> mergers,
-      long requestId, int stageId) {
+      List<RexExpression> groupSet, DataSchema inputSchema,
+      Map<String, Function<DataSchema.ColumnDataType, Merger>> mergers, long requestId, int stageId) {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _upstreamErrorBlock = null;
 
     // we expect all agg calls to be aggregate function calls
-    _aggCalls = aggCalls.stream()
-        .map(RexExpression.FunctionCall.class::cast)
-        .collect(Collectors.toList());
+    _aggCalls = aggCalls.stream().map(RexExpression.FunctionCall.class::cast).collect(Collectors.toList());
 
     _accumulators = new Accumulator[_aggCalls.size()];
     for (int i = 0; i < _aggCalls.size(); i++) {
@@ -291,31 +289,25 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   private static class Accumulator {
-  private static final Map<String, Function<DataSchema.ColumnDataType, Merger>> MERGERS = ImmutableMap
-        .<String, Function<DataSchema.ColumnDataType, Merger>>builder()
-        .put("SUM", cdt -> AggregateOperator::mergeSum)
-        .put("$SUM", cdt -> AggregateOperator::mergeSum)
-        .put("$SUM0", cdt -> AggregateOperator::mergeSum)
-        .put("MIN", cdt -> AggregateOperator::mergeMin)
-        .put("$MIN", cdt -> AggregateOperator::mergeMin)
-        .put("$MIN0", cdt -> AggregateOperator::mergeMin)
-        .put("MAX", cdt -> AggregateOperator::mergeMax)
-        .put("$MAX", cdt -> AggregateOperator::mergeMax)
-        .put("$MAX0", cdt -> AggregateOperator::mergeMax)
-        .put("COUNT", cdt -> AggregateOperator::mergeCount)
-        .put("BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
-        .put("$BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
-        .put("$BOOL_AND0", cdt -> AggregateOperator::mergeBoolAnd)
-        .put("BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
-        .put("$BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
-        .put("$BOOL_OR0", cdt -> AggregateOperator::mergeBoolOr)
-        .put("FOURTHMOMENT", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
-            ? new MergeFourthMomentObject() : new MergeFourthMomentNumeric())
-        .put("$FOURTHMOMENT", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
-            ? new MergeFourthMomentObject() : new MergeFourthMomentNumeric())
-        .put("$FOURTHMOMENT0", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
-            ? new MergeFourthMomentObject() : new MergeFourthMomentNumeric())
-        .build();
+    private static final Map<String, Function<DataSchema.ColumnDataType, Merger>> MERGERS =
+        ImmutableMap.<String, Function<DataSchema.ColumnDataType, Merger>>builder()
+            .put("SUM", cdt -> AggregateOperator::mergeSum).put("$SUM", cdt -> AggregateOperator::mergeSum)
+            .put("$SUM0", cdt -> AggregateOperator::mergeSum).put("MIN", cdt -> AggregateOperator::mergeMin)
+            .put("$MIN", cdt -> AggregateOperator::mergeMin).put("$MIN0", cdt -> AggregateOperator::mergeMin)
+            .put("MAX", cdt -> AggregateOperator::mergeMax).put("$MAX", cdt -> AggregateOperator::mergeMax)
+            .put("$MAX0", cdt -> AggregateOperator::mergeMax).put("COUNT", cdt -> AggregateOperator::mergeCount)
+            .put("BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
+            .put("$BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
+            .put("$BOOL_AND0", cdt -> AggregateOperator::mergeBoolAnd)
+            .put("BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
+            .put("$BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
+            .put("$BOOL_OR0", cdt -> AggregateOperator::mergeBoolOr).put("FOURTHMOMENT",
+                cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
+                    : new MergeFourthMomentNumeric()).put("$FOURTHMOMENT",
+                cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
+                    : new MergeFourthMomentNumeric()).put("$FOURTHMOMENT0",
+                cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
+                    : new MergeFourthMomentNumeric()).build();
 
     final int _inputRef;
     final Object _literal;
@@ -357,8 +349,7 @@ public class AggregateOperator extends MultiStageOperator {
     private RexExpression toAggregationFunctionOperand(RexExpression.FunctionCall rexExpression) {
       List<RexExpression> functionOperands = rexExpression.getFunctionOperands();
       Preconditions.checkState(functionOperands.size() < 2, "aggregate functions cannot have more than one operand");
-      return functionOperands.size() > 0
-          ? functionOperands.get(0)
+      return functionOperands.size() > 0 ? functionOperands.get(0)
           : new RexExpression.Literal(FieldSpec.DataType.INT, 1);
     }
   }
