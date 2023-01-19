@@ -143,6 +143,9 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
         "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable_OFFLINE LIMIT 10000000"
     });
 
+    // select only with early termination
+    entries.add(new Object[]{"SELECT * FROM mytable_OFFLINE LIMIT 10"});
+
     // aggregate
     entries.add(new Object[]{"SELECT count(*) FROM mytable_OFFLINE"});
     entries.add(new Object[]{"SELECT SUM(ArrTime) FROM mytable_OFFLINE"});

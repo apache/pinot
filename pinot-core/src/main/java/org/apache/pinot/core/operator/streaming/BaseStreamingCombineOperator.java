@@ -116,8 +116,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         T resultsBlock;
-        while ((resultsBlock = operator.nextBlock()) != null) {
-          // TODO: When query is satisfied, skip processing all the remaining operators instead of just the current one
+        while (!shouldFinishOperators() && (resultsBlock = operator.nextBlock()) != null) {
           if (shouldFinishStream(resultsBlock) || _resultsBlockMerger.isQuerySatisfied(resultsBlock)) {
             _blockingQueue.offer(resultsBlock);
             break;
@@ -145,13 +144,22 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
   }
 
   /**
-   * Determine if an upstream result block should finish the stream.
+   * Determine if a result block should finish the stream.
    *
    * @param resultsBlock the result block returned from operator
-   * @return true if no more getNextBlock() should be called on the upstream operator.
+   * @return true if no more getNextBlock() should be called this particular upstream operator.
    */
   protected boolean shouldFinishStream(T resultsBlock) {
     return resultsBlock == null;
+  }
+
+  /**
+   * Determine if the aggregated condition of the all the streams should early terminate the operators entirely.
+   *
+   * @return true if we should not schedule any additional {@link Operator#nextBlock()}
+   */
+  protected boolean shouldFinishOperators() {
+    return false;
   }
 
   public void start() {
