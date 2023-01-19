@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
@@ -296,7 +297,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext queryContext) {
     int argSize = arguments.size();
     Preconditions.checkArgument(argSize > 0, "COALESCE needs to have at least one argument.");
     _transformFunctions = new TransformFunction[argSize];

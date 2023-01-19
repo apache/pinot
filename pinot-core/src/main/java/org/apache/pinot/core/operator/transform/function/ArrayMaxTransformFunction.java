@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -47,7 +48,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
       throw new IllegalArgumentException("Exactly 1 argument is required for ArrayMax transform function");

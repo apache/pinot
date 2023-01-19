@@ -1,21 +1,19 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.data.manager.offline.InMemoryTable;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
@@ -23,9 +21,11 @@ public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
 
   private final List<String> _joinKeys = new ArrayList<>();
   private final List<FieldSpec> _joinValueFieldSpecs = new ArrayList<>();
-  private final List<TransformFunction> _joinValueFunctions = new ArrayList<>();
+  private TransformFunction _joinValueFunctions = null;
 
   private HashMap<PrimaryKey, Object[]> _keyValuesMap;
+
+  private  InMemoryTable _inMemoryTable;
   private String _filterFunc;
 
   private TransformFunction _condCol1;
@@ -48,38 +48,14 @@ public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(inMemoryTableFunc instanceof LiteralTransformFunction,
         "First argument must be a literal(string) representing the dimension table name");
     // Lookup parameters
-    InMemoryTable inMemoryTable = context.getInMemoryTable(((LiteralTransformFunction) inMemoryTableFunc).getLiteral());
-
+    _inMemoryTable = context.getInMemoryTable(((LiteralTransformFunction) inMemoryTableFunc).getLiteral());
     // Only one join key is allowed.
-    List<TransformFunction> joinArguments = arguments.subList(1, 3);
-    System.out.println("liuyao joinArguments size:" + joinArguments.size());
-    int numJoinArguments = joinArguments.size();
-    for (int i = 0; i < numJoinArguments / 2; i++) {
-      TransformFunction factJoinValueFunction = joinArguments.get((i * 2));
-      TransformResultMetadata factJoinValueFunctionResultMetadata = factJoinValueFunction.getResultMetadata();
-      Preconditions.checkArgument(factJoinValueFunctionResultMetadata.isSingleValue(),
-          "JoinValue argument must be a single value expression");
-      _joinValueFunctions.add(factJoinValueFunction);
-      TransformFunction inMemoryJoinKey = joinArguments.get((i * 2 + 1));
-      Preconditions.checkArgument(inMemoryJoinKey instanceof LiteralTransformFunction,
-          "JoinKey argument must be a literal(string)");
-      _joinKeys.add(((LiteralTransformFunction) dimJoinKeyFunction).getLiteral());
-      System.out.println("liuyao dimJoinKeyFunction:" + ((LiteralTransformFunction) dimJoinKeyFunction).getLiteral());
-      System.out.println("liuyao joinKeys size" +_joinKeys.size());
-    }
-
-    // Validate lookup table and relevant columns
-
-    for (String joinKey : _joinKeys) {
-      FieldSpec pkColumnSpec = _dataManager.getColumnFieldSpec(joinKey);
-      Preconditions.checkArgument(pkColumnSpec != null, "Primary key column doesn't exist in dimension table: %s:%s",
-          dimTableName, joinKey);
-      _joinValueFieldSpecs.add(pkColumnSpec);
-    }
-
-    List<String> tablePrimaryKeyColumns = _dataManager.getPrimaryKeyColumns();
-    Preconditions.checkArgument(_joinKeys.equals(tablePrimaryKeyColumns),
-        "Provided join keys (%s) must be the same as table primary keys: %s", _joinKeys, tablePrimaryKeyColumns);
+    _joinValueFunctions  = arguments.get(1);
+    TransformFunction inMemoryJoinKey = arguments.get(2);
+    Preconditions.checkArgument(inMemoryJoinKey instanceof LiteralTransformFunction,
+        "JoinKey argument must be a literal(string)");
+    _keyValuesMap =
+        _inMemoryTable.getHashMap(ImmutableList.of(((LiteralTransformFunction) inMemoryJoinKey).getLiteral()));
 
     _filterFunc = ((LiteralTransformFunction) arguments.get(3)).getLiteral();
 
@@ -112,36 +88,31 @@ public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
     if (_intValuesSV == null) {
       _intValuesSV = new int[numDocs];
     }
-    // Get primary key
-    int numPkColumns = _joinKeys.size();
-    int numDocuments = projectionBlock.getNumDocs();
-    Object[] pkColumns = new Object[numPkColumns];
-    for (int c = 0; c < numPkColumns; c++) {
-      FieldSpec.DataType storedType = _joinValueFieldSpecs.get(c).getDataType().getStoredType();
-      TransformFunction tf = _joinValueFunctions.get(c);
-      switch (storedType) {
+
+    Object leftJoinKeys = null;
+    FieldSpec.DataType resultDataType = _joinValueFunctions.getResultMetadata().getDataType();
+    switch (resultDataType.getStoredType()) {
         case INT:
-          pkColumns[c] = tf.transformToIntValuesSV(projectionBlock);
+          leftJoinKeys = _joinValueFunctions.transformToIntValuesSV(projectionBlock);
           break;
         case LONG:
-          pkColumns[c] = tf.transformToLongValuesSV(projectionBlock);
+          leftJoinKeys = _joinValueFunctions.transformToLongValuesSV(projectionBlock);
           break;
         case FLOAT:
-          pkColumns[c] = tf.transformToFloatValuesSV(projectionBlock);
+          leftJoinKeys= _joinValueFunctions.transformToFloatValuesSV(projectionBlock);
           break;
         case DOUBLE:
-          pkColumns[c] = tf.transformToDoubleValuesSV(projectionBlock);
+          leftJoinKeys = _joinValueFunctions.transformToDoubleValuesSV(projectionBlock);
           break;
         case STRING:
-          pkColumns[c] = tf.transformToStringValuesSV(projectionBlock);
+          leftJoinKeys = _joinValueFunctions.transformToStringValuesSV(projectionBlock);
           break;
         case BYTES:
-          pkColumns[c] = tf.transformToBytesValuesSV(projectionBlock);
+          leftJoinKeys = _joinValueFunctions.transformToBytesValuesSV(projectionBlock);
           break;
         default:
           throw new IllegalStateException("Unknown column type for primary key");
       }
-    }
 
     double[] condCol1 = new double[numDocs];
     // Get filter variable
@@ -167,27 +138,25 @@ public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
         throw new IllegalStateException("Unknown supported type for condCol1");
     }
 
-    Object[] pkValues = new Object[numPkColumns];
-    PrimaryKey primaryKey = new PrimaryKey(pkValues);
-    for (int i = 0; i < numDocuments; i++) {
-      // prepare pk
-      for (int c = 0; c < numPkColumns; c++) {
-        if (pkColumns[c] instanceof int[]) {
-          pkValues[c] = ((int[]) pkColumns[c])[i];
-        } else if (pkColumns[c] instanceof long[]) {
-          pkValues[c] = ((long[]) pkColumns[c])[i];
-        } else if (pkColumns[c] instanceof String[]) {
-          pkValues[c] = ((String[]) pkColumns[c])[i];
-        } else if (pkColumns[c] instanceof float[]) {
-          pkValues[c] = ((float[]) pkColumns[c])[i];
-        } else if (pkColumns[c] instanceof double[]) {
-          pkValues[c] = ((double[]) pkColumns[c])[i];
-        } else if (pkColumns[c] instanceof byte[][]) {
-          pkValues[c] = new ByteArray(((byte[][]) pkColumns[c])[i]);
-        }
+    for (int i = 0; i < numDocs; i++) {
+      // prepare joinKey
+      Object[] joinKeyValue = new Object[1];
+      if (leftJoinKeys instanceof int[]) {
+        joinKeyValue[0] = ((int[]) leftJoinKeys)[i];
+      } else if (leftJoinKeys instanceof long[]) {
+        joinKeyValue[0]  = ((long[]) leftJoinKeys)[i];
+      } else if (leftJoinKeys instanceof String[]) {
+        joinKeyValue[0]  = ((String[]) leftJoinKeys)[i];
+      } else if (leftJoinKeys instanceof float[]) {
+        joinKeyValue[0]  = ((float[]) leftJoinKeys)[i];
+      } else if (leftJoinKeys instanceof double[]) {
+        joinKeyValue[0]  = ((double[]) leftJoinKeys)[i];
+      } else if (leftJoinKeys instanceof byte[][]) {
+        joinKeyValue[0]  = new ByteArray(((byte[][]) leftJoinKeys)[i]);
       }
+      PrimaryKey key = new PrimaryKey(joinKeyValue);
       // lookup
-      GenericRow row = _dataManager.lookupRowByPrimaryKey(primaryKey);
+      Object[] row = _keyValuesMap.getOrDefault(key, null);
       _intValuesSV[i] = 0;
       if (row != null) {
         Object condConl2 = row.getValue(_condCol2);
