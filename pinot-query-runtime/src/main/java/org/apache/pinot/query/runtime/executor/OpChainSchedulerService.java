@@ -119,7 +119,7 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                         result.getDataBlock().getExceptions());
                   } else {
                     operatorChain.getRoot().toExplainString();
-                    LOGGER.error("({}): Completed {}", operatorChain, operatorChain.getStats());
+                    LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
                   }
                   operatorChain.close();
                 }

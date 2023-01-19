@@ -45,13 +45,13 @@ public class OperatorStats {
   }
 
   public void startTimer() {
-    if(!_executeStopwatch.isRunning()){
+    if (!_executeStopwatch.isRunning()) {
       _executeStopwatch.start();
     }
   }
 
   public void endTimer() {
-    if(_executeStopwatch.isRunning()) {
+    if (_executeStopwatch.isRunning()) {
       _executeStopwatch.stop();
     }
   }
