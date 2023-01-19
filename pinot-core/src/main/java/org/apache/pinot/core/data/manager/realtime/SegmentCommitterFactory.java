@@ -60,20 +60,22 @@ public class SegmentCommitterFactory {
     if (!isSplitCommit) {
       return new DefaultSegmentCommitter(_logger, _protocolHandler, params);
     }
+    SegmentUploader segmentUploader;
 
-    SegmentUploader segmentUploader = new Server2ControllerSegmentUploader(_logger,
-        _protocolHandler.getFileUploadDownloadClient(),
-        _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), params.getSegmentName(),
-        ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics,
-        _protocolHandler.getAuthProvider());
     boolean uploadToFs = _tableConfig.getValidationConfig().isUploadToFileSystem();
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
-
     // TODO: exists for backwards compatibility. remove peerDownloadScheme non-null check once users have migrated
     if (uploadToFs || peerSegmentDownloadScheme != null) {
       segmentUploader = new PinotFSSegmentUploader(_indexLoadingConfig.getSegmentStoreURI(),
           PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
+    } else {
+      segmentUploader = new Server2ControllerSegmentUploader(_logger,
+          _protocolHandler.getFileUploadDownloadClient(),
+          _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), params.getSegmentName(),
+          ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics,
+          _protocolHandler.getAuthProvider());
     }
+
     return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader, peerSegmentDownloadScheme);
   }
 }
