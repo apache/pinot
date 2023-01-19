@@ -24,7 +24,6 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -41,7 +40,7 @@ import org.testng.annotations.Test;
 public class FilterOperatorTest {
   private AutoCloseable _mocks;
   @Mock
-  private Operator<TransferableBlock> _upstreamOperator;
+  private MultiStageOperator _upstreamOperator;
 
   @BeforeMethod
   public void setUp() {

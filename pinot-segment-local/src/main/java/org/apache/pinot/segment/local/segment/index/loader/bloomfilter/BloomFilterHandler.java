@@ -306,8 +306,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
       case DOUBLE:
         return new DoubleDictionary(dictionaryBuffer, cardinality);
       case STRING:
-        return new StringDictionary(dictionaryBuffer, cardinality, columnMetadata.getColumnMaxLength(),
-            (byte) columnMetadata.getPaddingCharacter());
+        return new StringDictionary(dictionaryBuffer, cardinality, columnMetadata.getColumnMaxLength());
       case BYTES:
         return new BytesDictionary(dictionaryBuffer, cardinality, columnMetadata.getColumnMaxLength());
       default:

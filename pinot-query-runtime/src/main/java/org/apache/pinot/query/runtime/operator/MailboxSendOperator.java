@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.List;
@@ -27,8 +28,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -45,7 +44,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This {@code MailboxSendOperator} is created to send {@link TransferableBlock}s to the receiving end.
  */
-public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
+public class MailboxSendOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
 
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
@@ -53,7 +52,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
       ImmutableSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
           RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED);
 
-  private final Operator<TransferableBlock> _dataTableBlockBaseOperator;
+  private final MultiStageOperator _dataTableBlockBaseOperator;
   private final BlockExchange _exchange;
 
   @VisibleForTesting
@@ -68,7 +67,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   }
 
   public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
-      Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
+      MultiStageOperator dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
       long jobId, int stageId) {
     this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
@@ -77,7 +76,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
   @VisibleForTesting
   MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
-      Operator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
+      MultiStageOperator dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory) {
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
@@ -110,9 +109,8 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+  public List<MultiStageOperator> getChildOperators() {
+    return ImmutableList.of();
   }
 
   @Nullable

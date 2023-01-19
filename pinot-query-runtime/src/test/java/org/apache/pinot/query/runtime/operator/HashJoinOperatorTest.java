@@ -27,7 +27,6 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
@@ -47,10 +46,10 @@ public class HashJoinOperatorTest {
   private AutoCloseable _mocks;
 
   @Mock
-  private Operator<TransferableBlock> _leftOperator;
+  private MultiStageOperator _leftOperator;
 
   @Mock
-  private Operator<TransferableBlock> _rightOperator;
+  private MultiStageOperator _rightOperator;
 
   @BeforeMethod
   public void setUp() {

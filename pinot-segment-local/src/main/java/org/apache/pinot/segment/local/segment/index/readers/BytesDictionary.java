@@ -32,7 +32,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 public class BytesDictionary extends BaseImmutableDictionary {
 
   public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
-    super(dataBuffer, length, numBytesPerValue, (byte) 0);
+    super(dataBuffer, length, numBytesPerValue);
   }
 
   @Override

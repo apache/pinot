@@ -34,6 +34,7 @@ import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -147,7 +148,7 @@ public class QueryDispatcher {
         for (int colId = 0; colId < numColumns; colId++) {
           nullBitmaps[colId] = dataBlock.getNullRowIds(colId);
         }
-        List<Object[]> rawRows = DataBlockUtils.extractRows(dataBlock);
+        List<Object[]> rawRows = DataBlockUtils.extractRows(dataBlock, ObjectSerDeUtils::deserialize);
         int rowId = 0;
         for (Object[] rawRow : rawRows) {
           Object[] row = new Object[numColumns];

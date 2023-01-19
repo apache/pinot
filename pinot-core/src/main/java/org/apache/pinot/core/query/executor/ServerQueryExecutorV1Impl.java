@@ -408,7 +408,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     Map<Integer, HashSet<Integer>> uniquePlanNodeHashCodes = new HashMap<>();
 
     // Obtain the list of all possible segment plans after the combine root node
-    List<Operator> children = root.getChildOperators();
+    List<? extends Operator> children = root.getChildOperators();
     for (Operator child : children) {
       int[] operatorId = {3};
       ExplainPlanRows explainPlanRows = new ExplainPlanRows();
@@ -483,7 +483,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   public static InstanceResponseBlock executeExplainQuery(Plan queryPlan, QueryContext queryContext) {
     ExplainResultsBlock explainResults = new ExplainResultsBlock();
-    List<Operator> childOperators = queryPlan.getPlanNode().run().getChildOperators();
+    List<? extends Operator> childOperators = queryPlan.getPlanNode().run().getChildOperators();
     assert childOperators.size() == 1;
     Operator root = childOperators.get(0);
     Map<Integer, List<ExplainPlanRows>> operatorDepthToRowDataMap;

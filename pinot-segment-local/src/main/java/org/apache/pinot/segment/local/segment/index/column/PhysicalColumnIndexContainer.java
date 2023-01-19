@@ -134,8 +134,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
 
     // Setting the 'fwdIndexBuffer' to null if forward index is disabled
-    PinotDataBuffer fwdIndexBuffer = segmentReader.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)
-        ? segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX) : null;
+    PinotDataBuffer fwdIndexBuffer =
+        segmentReader.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX) ? segmentReader.getIndexFor(columnName,
+            ColumnIndexType.FORWARD_INDEX) : null;
 
     if (metadata.hasDictionary()) {
       // Dictionary-based index
@@ -260,9 +261,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
             : new BigDecimalDictionary(dictionaryBuffer, length, numBytesPerValue);
       case STRING:
         numBytesPerValue = metadata.getColumnMaxLength();
-        byte paddingByte = (byte) metadata.getPaddingCharacter();
-        return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
-            : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+        return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue)
+            : new StringDictionary(dictionaryBuffer, length, numBytesPerValue);
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();
         return loadOnHeap ? new OnHeapBytesDictionary(dictionaryBuffer, length, numBytesPerValue)

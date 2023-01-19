@@ -165,6 +165,8 @@ public final class RelToStageConverter {
       case CHAR:
       case VARCHAR:
         return DataSchema.ColumnDataType.STRING;
+      case OTHER:
+        return DataSchema.ColumnDataType.OBJECT;
       case BINARY:
       case VARBINARY:
         return DataSchema.ColumnDataType.BYTES;
@@ -174,7 +176,11 @@ public final class RelToStageConverter {
   }
 
   public static FieldSpec.DataType convertToFieldSpecDataType(RelDataType relDataType) {
-    return convertToColumnDataType(relDataType).toDataType();
+    DataSchema.ColumnDataType columnDataType = convertToColumnDataType(relDataType);
+    if (columnDataType == DataSchema.ColumnDataType.OBJECT) {
+      return FieldSpec.DataType.BYTES;
+    }
+    return columnDataType.toDataType();
   }
 
   public static PinotDataType convertToPinotDataType(RelDataType relDataType) {

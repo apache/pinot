@@ -42,7 +42,7 @@ public interface Operator<T extends Block> {
   T nextBlock();
 
   /** @return List of {@link Operator}s that this operator depends upon. */
-  List<Operator> getChildOperators();
+  List<? extends Operator> getChildOperators();
 
   /** @return Explain Plan description if available; otherwise, null. */
   @Nullable

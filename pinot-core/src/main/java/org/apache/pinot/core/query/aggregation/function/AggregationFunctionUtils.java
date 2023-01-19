@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -142,7 +143,7 @@ public class AggregationFunctionUtils {
       case DOUBLE:
         return dataTable.getDouble(rowId, colId);
       case OBJECT:
-        DataTable.CustomObject customObject = dataTable.getCustomObject(rowId, colId);
+        CustomObject customObject = dataTable.getCustomObject(rowId, colId);
         return customObject != null ? ObjectSerDeUtils.deserialize(customObject) : null;
       default:
         throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);

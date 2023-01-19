@@ -25,8 +25,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class StringDictionary extends BaseImmutableDictionary {
 
-  public StringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
-    super(dataBuffer, length, numBytesPerValue, paddingByte);
+  public StringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
+    super(dataBuffer, length, numBytesPerValue);
   }
 
   @Override
