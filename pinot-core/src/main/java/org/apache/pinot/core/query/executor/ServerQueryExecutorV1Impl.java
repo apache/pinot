@@ -92,8 +92,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
   private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
 
-  private static final String PARTITIONED_JOIN = "PartitionedJoin";
-
   private InstanceDataManager _instanceDataManager;
   private ServerMetrics _serverMetrics;
   private SegmentPrunerService _segmentPrunerService;
@@ -534,9 +532,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (filter != null) {
       handleSubquery(filter, indexSegments, timerContext, executorService, queryContext.getEndTimeMs());
     }
-    if(QueryOptionsUtils.usePartitionedJoin(queryContext.getQueryOptions())){
-
-    }
   }
 
   /**
@@ -602,8 +597,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       function.setFunctionName(TransformFunctionType.INIDSET.name());
       arguments.set(1,
           ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, ((IdSet) result).toBase64String()));
-    } else if (StringUtils.remove(function.getFunctionName(), '_').equalsIgnoreCase(PARTITIONED_JOIN)) {
-
     } else {
       for (ExpressionContext argument : arguments) {
         handleSubquery(argument, indexSegments, timerContext, executorService, endTimeMs);

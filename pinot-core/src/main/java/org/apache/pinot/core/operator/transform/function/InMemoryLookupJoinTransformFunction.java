@@ -1,8 +1,25 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,13 +36,12 @@ import org.apache.pinot.spi.utils.ByteArray;
 public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "InMemoryLookUpJoin";
 
-  private final List<String> _joinKeys = new ArrayList<>();
-  private final List<FieldSpec> _joinValueFieldSpecs = new ArrayList<>();
   private TransformFunction _joinValueFunctions = null;
 
   private HashMap<PrimaryKey, Object[]> _keyValuesMap;
 
-  private  InMemoryTable _inMemoryTable;
+  private HashMap<String, Integer> _keyIndexMap;
+
   private String _filterFunc;
 
   private TransformFunction _condCol1;
@@ -48,15 +64,19 @@ public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(inMemoryTableFunc instanceof LiteralTransformFunction,
         "First argument must be a literal(string) representing the dimension table name");
     // Lookup parameters
-    _inMemoryTable = context.getInMemoryTable(((LiteralTransformFunction) inMemoryTableFunc).getLiteral());
+    String inMemoryTableName = ((LiteralTransformFunction) inMemoryTableFunc).getLiteral();
+    InMemoryTable inMemoryTable = context.getInMemoryTable(inMemoryTableName);
+    Preconditions.checkArgument(inMemoryTable != null, "InMemoryTable cannot be null:" + inMemoryTableName);
     // Only one join key is allowed.
-    _joinValueFunctions  = arguments.get(1);
+    _joinValueFunctions = arguments.get(1);
     TransformFunction inMemoryJoinKey = arguments.get(2);
     Preconditions.checkArgument(inMemoryJoinKey instanceof LiteralTransformFunction,
         "JoinKey argument must be a literal(string)");
+    _keyIndexMap = inMemoryTable.getColumnIndex();
+    Preconditions.checkArgument(_keyValuesMap.containsKey(inMemoryJoinKey),
+        "joinKey:" + inMemoryJoinKey + " doesn't exist in in memory table");
     _keyValuesMap =
-        _inMemoryTable.getHashMap(ImmutableList.of(((LiteralTransformFunction) inMemoryJoinKey).getLiteral()));
-
+        inMemoryTable.getHashMap(ImmutableList.of(((LiteralTransformFunction) inMemoryJoinKey).getLiteral()));
     _filterFunc = ((LiteralTransformFunction) arguments.get(3)).getLiteral();
 
     _condCol1 = arguments.get(4);
@@ -75,7 +95,7 @@ public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
     if (condFunc.equals("GreaterThan")) {
       return arg1 > arg2;
     }
-    if (condFunc.equals("SmallerThan")){
+    if (condFunc.equals("SmallerThan")) {
       return arg1 < arg2;
     }
     throw new IllegalStateException("Unknown condFunc:" + condFunc);
@@ -89,32 +109,32 @@ public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
       _intValuesSV = new int[numDocs];
     }
 
-    Object leftJoinKeys = null;
+    Object leftJoinKeys;
     FieldSpec.DataType resultDataType = _joinValueFunctions.getResultMetadata().getDataType();
     switch (resultDataType.getStoredType()) {
-        case INT:
-          leftJoinKeys = _joinValueFunctions.transformToIntValuesSV(projectionBlock);
-          break;
-        case LONG:
-          leftJoinKeys = _joinValueFunctions.transformToLongValuesSV(projectionBlock);
-          break;
-        case FLOAT:
-          leftJoinKeys= _joinValueFunctions.transformToFloatValuesSV(projectionBlock);
-          break;
-        case DOUBLE:
-          leftJoinKeys = _joinValueFunctions.transformToDoubleValuesSV(projectionBlock);
-          break;
-        case STRING:
-          leftJoinKeys = _joinValueFunctions.transformToStringValuesSV(projectionBlock);
-          break;
-        case BYTES:
-          leftJoinKeys = _joinValueFunctions.transformToBytesValuesSV(projectionBlock);
-          break;
-        default:
-          throw new IllegalStateException("Unknown column type for primary key");
-      }
+      case INT:
+        leftJoinKeys = _joinValueFunctions.transformToIntValuesSV(projectionBlock);
+        break;
+      case LONG:
+        leftJoinKeys = _joinValueFunctions.transformToLongValuesSV(projectionBlock);
+        break;
+      case FLOAT:
+        leftJoinKeys = _joinValueFunctions.transformToFloatValuesSV(projectionBlock);
+        break;
+      case DOUBLE:
+        leftJoinKeys = _joinValueFunctions.transformToDoubleValuesSV(projectionBlock);
+        break;
+      case STRING:
+        leftJoinKeys = _joinValueFunctions.transformToStringValuesSV(projectionBlock);
+        break;
+      case BYTES:
+        leftJoinKeys = _joinValueFunctions.transformToBytesValuesSV(projectionBlock);
+        break;
+      default:
+        throw new IllegalStateException("Unknown column type for primary key");
+    }
 
-    double[] condCol1 = new double[numDocs];
+    double[] condCol1;
     // Get filter variable
     FieldSpec.DataType storedType = _condCol1.getResultMetadata().getDataType().getStoredType();
     System.out.println("condCol1: colm:" + ((IdentifierTransformFunction) _condCol1).getColumnName());
@@ -144,24 +164,22 @@ public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
       if (leftJoinKeys instanceof int[]) {
         joinKeyValue[0] = ((int[]) leftJoinKeys)[i];
       } else if (leftJoinKeys instanceof long[]) {
-        joinKeyValue[0]  = ((long[]) leftJoinKeys)[i];
+        joinKeyValue[0] = ((long[]) leftJoinKeys)[i];
       } else if (leftJoinKeys instanceof String[]) {
-        joinKeyValue[0]  = ((String[]) leftJoinKeys)[i];
+        joinKeyValue[0] = ((String[]) leftJoinKeys)[i];
       } else if (leftJoinKeys instanceof float[]) {
-        joinKeyValue[0]  = ((float[]) leftJoinKeys)[i];
+        joinKeyValue[0] = ((float[]) leftJoinKeys)[i];
       } else if (leftJoinKeys instanceof double[]) {
-        joinKeyValue[0]  = ((double[]) leftJoinKeys)[i];
+        joinKeyValue[0] = ((double[]) leftJoinKeys)[i];
       } else if (leftJoinKeys instanceof byte[][]) {
-        joinKeyValue[0]  = new ByteArray(((byte[][]) leftJoinKeys)[i]);
+        joinKeyValue[0] = new ByteArray(((byte[][]) leftJoinKeys)[i]);
       }
       PrimaryKey key = new PrimaryKey(joinKeyValue);
       // lookup
       Object[] row = _keyValuesMap.getOrDefault(key, null);
       _intValuesSV[i] = 0;
       if (row != null) {
-        Object condConl2 = row.getValue(_condCol2);
-        System.out.println("liuyao primaryKey:" + primaryKey + " condCol1:" + condCol1[i] + "  condConl2:" + condConl2);
-
+        Object condConl2 = row[_keyIndexMap.get(_condCol2)];
         if (isCondSatisfied(_filterFunc, condCol1[i], ((Number) condConl2).doubleValue())) {
           _intValuesSV[i] = 1;
         }

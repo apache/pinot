@@ -19,6 +19,8 @@
 package org.apache.pinot.core.query.request.context;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,7 +33,7 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.datatable.DataTableImplV4;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -39,11 +41,12 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.offline.InMemoryTable;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -74,6 +77,8 @@ import org.apache.pinot.core.util.MemoizedClassAssociation;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class QueryContext {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryContext.class);
+
   private final String _tableName;
   private final QueryContext _subquery;
   private final List<ExpressionContext> _selectExpressions;
@@ -427,7 +432,7 @@ public class QueryContext {
         + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
   }
 
-  public InMemoryTable getInMemoryTable(String tableName){
+  public InMemoryTable getInMemoryTable(String tableName) {
     return _inMemoryTableHashMap.get(tableName);
   }
 
@@ -527,8 +532,23 @@ public class QueryContext {
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);
       extractColumns(queryContext);
-
+      deserializeInMemoryTable(queryContext);
       return queryContext;
+    }
+
+    private void deserializeInMemoryTable(QueryContext queryContext) {
+      String inMemoryTableName = QueryOptionsUtils.getInMemoryTableName(_queryOptions);
+      if (inMemoryTableName != null) {
+        String inMemoryTableString = QueryOptionsUtils.getInMemoryTableString(_queryOptions, inMemoryTableName);
+        if (inMemoryTableString != null) {
+          try {
+            DataTable dataTable = DataTableFactory.getDataTable(inMemoryTableString.getBytes(StandardCharsets.UTF_8));
+            queryContext._inMemoryTableHashMap.put(inMemoryTableString, new InMemoryTable(dataTable));
+          } catch (IOException e) {
+            LOGGER.error("Got exception while deserializing data table:" + e);
+          }
+        }
+      }
     }
 
     /**

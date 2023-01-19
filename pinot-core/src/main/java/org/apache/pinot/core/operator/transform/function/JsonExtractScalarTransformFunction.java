@@ -32,6 +32,7 @@ import java.util.Map;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.evaluator.json.JsonPathEvaluator;
 import org.apache.pinot.segment.spi.evaluator.json.JsonPathEvaluators;
@@ -81,7 +82,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
     // Check that there are exactly 3 or 4 arguments
     if (arguments.size() < 3 || arguments.size() > 4) {
       throw new IllegalArgumentException(

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
@@ -59,7 +60,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
     Preconditions.checkArgument(arguments.size() == 3,
         "3 arguments are required for MAP_VALUE transform function: keyColumn, keyValue, valueColumn, e.g. MAP_VALUE"
             + "(key, 'myKey', value)");

@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.PeekableIntIterator;
@@ -39,7 +40,7 @@ public class IsNotNullTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
     Preconditions.checkArgument(arguments.size() == 1,
         "Exact 1 argument is required for IS_NOT_NULL operator function");
     TransformFunction transformFunction = arguments.get(0);

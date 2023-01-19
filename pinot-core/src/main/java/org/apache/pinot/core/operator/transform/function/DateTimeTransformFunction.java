@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.joda.time.Chronology;
@@ -46,7 +47,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
     Preconditions.checkArgument(!arguments.isEmpty() && arguments.size() <= 2, "%s takes one or two arguments", _name);
     _timestampsFunction = arguments.get(0);
     if (arguments.size() == 2) {

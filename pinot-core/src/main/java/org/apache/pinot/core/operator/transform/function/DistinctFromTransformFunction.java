@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
@@ -79,8 +80,8 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    super.init(arguments, dataSourceMap);
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
+    super.init(arguments, dataSourceMap, context);
     if (!(_leftTransformFunction instanceof IdentifierTransformFunction)
         || !(_rightTransformFunction instanceof IdentifierTransformFunction)) {
       throw new IllegalArgumentException("Only column names are supported in DistinctFrom transformation.");

@@ -297,7 +297,8 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext queryContext) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap,
+      QueryContext queryContext) {
     int argSize = arguments.size();
     Preconditions.checkArgument(argSize > 0, "COALESCE needs to have at least one argument.");
     _transformFunctions = new TransformFunction[argSize];

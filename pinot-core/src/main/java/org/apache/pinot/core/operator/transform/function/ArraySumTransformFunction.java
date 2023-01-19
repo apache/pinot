@@ -45,7 +45,8 @@ public class ArraySumTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext queryContext) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap,
+      QueryContext queryContext) {
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
       throw new IllegalArgumentException("Exactly 1 argument is required for ArraySum transform function");

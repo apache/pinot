@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToEpoc
 import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToSDFTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToEpochTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 
@@ -90,7 +91,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
     // Check that there are exactly 4 arguments
     if (arguments.size() != 4) {
       throw new IllegalArgumentException("Exactly 4 arguments are required for DATE_TIME_CONVERT transform function");

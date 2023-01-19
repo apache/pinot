@@ -20,20 +20,19 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.data.manager.offline.InMemoryTable;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -63,8 +62,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * Above example joins the dimension table 'baseballTeams' into regular table 'baseballStats' on 'teamID' key.
  * Lookup function returns the value of the column 'teamName'.
  */
-public class LookupTransformFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "lookUp";
+public class InMemoryLookupTransformFunction extends BaseTransformFunction {
+  public static final String FUNCTION_NAME = "InMemoryLookUp";
 
   private static final byte[] EMPTY_BYTES = new byte[0];
   private static final int[] EMPTY_INTS = new int[0];
@@ -73,13 +72,15 @@ public class LookupTransformFunction extends BaseTransformFunction {
   private static final double[] EMPTY_DOUBLES = new double[0];
   private static final String[] EMPTY_STRINGS = new String[0];
 
-  private String _dimColumnName;
-  private final List<String> _joinKeys = new ArrayList<>();
-  private final List<FieldSpec> _joinValueFieldSpecs = new ArrayList<>();
-  private final List<TransformFunction> _joinValueFunctions = new ArrayList<>();
+  private int _inMemoryColIdx;
+  private String _inMemoryColName;
 
-  private DimensionTableDataManager _dataManager;
-  private FieldSpec _lookupColumnFieldSpec;
+  private DataSchema.ColumnDataType _lookupDataType;
+
+  private HashMap<PrimaryKey, Object[]> _keyValuesMap;
+
+  private HashMap<String, Integer> _keyIndexMap;
+  private final List<TransformFunction> _joinValueFunctions = new ArrayList<>();
 
   private int _nullIntValue;
   private long _nullLongValue;
@@ -97,28 +98,35 @@ public class LookupTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(arguments.size() >= 4,
         "At least 4 arguments are required for LOOKUP transform function: "
             + "LOOKUP(TableName, ColumnName, JoinKey, JoinValue [, JoinKey2, JoinValue2 ...])");
-    Preconditions
-        .checkArgument(arguments.size() % 2 == 0, "Should have the same number of JoinKey and JoinValue arguments");
+    Preconditions.checkArgument(arguments.size() % 2 == 0,
+        "Should have the same number of JoinKey and JoinValue arguments");
 
-    TransformFunction dimTableNameFunction = arguments.get(0);
-    Preconditions.checkArgument(dimTableNameFunction instanceof LiteralTransformFunction,
-        "First argument must be a literal(string) representing the dimension table name");
+    TransformFunction inMemoryTableNameFunction = arguments.get(0);
+    Preconditions.checkArgument(inMemoryTableNameFunction instanceof LiteralTransformFunction,
+        "First argument must be a literal(string) representing the in memory table name");
+    String inMemoryTableName = ((LiteralTransformFunction) inMemoryTableNameFunction).getLiteral();
+    InMemoryTable inMemoryTable = context.getInMemoryTable(inMemoryTableName);
+    Preconditions.checkArgument(inMemoryTable != null, "InMemoryTable cannot be null:" + inMemoryTableName);
+    _keyIndexMap = inMemoryTable.getColumnIndex();
+
     // Lookup parameters
-    String dimTableName =
-        TableNameBuilder.OFFLINE.tableNameWithType(((LiteralTransformFunction) dimTableNameFunction).getLiteral());
+    TransformFunction inMemoryColName = arguments.get(1);
+    Preconditions.checkArgument(inMemoryColName instanceof LiteralTransformFunction,
+        "Second argument must be a literal(string) representing the column name from in memory table to lookup");
+    _inMemoryColName = ((LiteralTransformFunction) inMemoryColName).getLiteral();
+    Preconditions.checkArgument(_keyIndexMap.containsKey(_inMemoryColName),
+        "Lookup column:" + _inMemoryColName + " doesn't exist in in memory table");
+    _inMemoryColIdx = _keyIndexMap.get(_inMemoryColName);
+    _lookupDataType = inMemoryTable.getDataType(_inMemoryColIdx);
 
-    TransformFunction dimColumnFunction = arguments.get(1);
-    Preconditions.checkArgument(dimColumnFunction instanceof LiteralTransformFunction,
-        "Second argument must be a literal(string) representing the column name from dimension table to lookup");
-    _dimColumnName = ((LiteralTransformFunction) dimColumnFunction).getLiteral();
-
+    List<String> joinKeys = new ArrayList<>();
     List<TransformFunction> joinArguments = arguments.subList(2, arguments.size());
     int numJoinArguments = joinArguments.size();
     for (int i = 0; i < numJoinArguments / 2; i++) {
-      TransformFunction dimJoinKeyFunction = joinArguments.get((i * 2));
-      Preconditions.checkArgument(dimJoinKeyFunction instanceof LiteralTransformFunction,
+      TransformFunction inMemoryKeyFunc = joinArguments.get((i * 2));
+      Preconditions.checkArgument(inMemoryKeyFunc instanceof LiteralTransformFunction,
           "JoinKey argument must be a literal(string) representing the primary key for the dimension table");
-      _joinKeys.add(((LiteralTransformFunction) dimJoinKeyFunction).getLiteral());
+      joinKeys.add(((LiteralTransformFunction) inMemoryKeyFunc).getLiteral());
 
       TransformFunction factJoinValueFunction = joinArguments.get((i * 2) + 1);
       TransformResultMetadata factJoinValueFunctionResultMetadata = factJoinValueFunction.getResultMetadata();
@@ -127,29 +135,13 @@ public class LookupTransformFunction extends BaseTransformFunction {
       _joinValueFunctions.add(factJoinValueFunction);
     }
 
-    // Validate lookup table and relevant columns
-    _dataManager = DimensionTableDataManager.getInstanceByTableName(dimTableName);
-    Preconditions.checkArgument(_dataManager != null, "Dimension table does not exist: %s", dimTableName);
-
-    Preconditions.checkArgument(_dataManager.isPopulated(), "Dimension table is not populated: %s", dimTableName);
-
-    _lookupColumnFieldSpec = _dataManager.getColumnFieldSpec(_dimColumnName);
-    Preconditions
-        .checkArgument(_lookupColumnFieldSpec != null, "Column does not exist in dimension table: %s:%s", dimTableName,
-            _dimColumnName);
-
-    for (String joinKey : _joinKeys) {
-      FieldSpec pkColumnSpec = _dataManager.getColumnFieldSpec(joinKey);
-      Preconditions.checkArgument(pkColumnSpec != null, "Primary key column doesn't exist in dimension table: %s:%s",
-          dimTableName, joinKey);
-      _joinValueFieldSpecs.add(pkColumnSpec);
+    for (String joinKey : joinKeys) {
+      Preconditions.checkArgument(_keyIndexMap.containsKey(joinKey),
+          "joinKey:" + joinKey + " doesn't exist in in memory table");
     }
+    _keyValuesMap = inMemoryTable.getHashMap(joinKeys);
 
-    List<String> tablePrimaryKeyColumns = _dataManager.getPrimaryKeyColumns();
-    Preconditions.checkArgument(_joinKeys.equals(tablePrimaryKeyColumns),
-        "Provided join keys (%s) must be the same as table primary keys: %s", _joinKeys, tablePrimaryKeyColumns);
-
-    Object defaultNullValue = _lookupColumnFieldSpec.getDefaultNullValue();
+    Object defaultNullValue = _lookupDataType.getNullPlaceholder();
     if (defaultNullValue instanceof Number) {
       _nullIntValue = ((Number) defaultNullValue).intValue();
       _nullLongValue = ((Number) defaultNullValue).longValue();
@@ -160,8 +152,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return new TransformResultMetadata(_lookupColumnFieldSpec.getDataType(),
-        _lookupColumnFieldSpec.isSingleValueField(), false);
+    return new TransformResultMetadata(_lookupDataType.toDataType(), true, false);
   }
 
   @FunctionalInterface
@@ -170,11 +161,11 @@ public class LookupTransformFunction extends BaseTransformFunction {
   }
 
   private void lookup(ProjectionBlock projectionBlock, ValueAcceptor valueAcceptor) {
-    int numPkColumns = _joinKeys.size();
+    int numPkColumns = _joinValueFunctions.size();
     int numDocuments = projectionBlock.getNumDocs();
     Object[] pkColumns = new Object[numPkColumns];
     for (int c = 0; c < numPkColumns; c++) {
-      DataType storedType = _joinValueFieldSpecs.get(c).getDataType().getStoredType();
+      DataType storedType = _joinValueFunctions.get(c).getResultMetadata().getDataType().getStoredType();
       TransformFunction tf = _joinValueFunctions.get(c);
       switch (storedType) {
         case INT:
@@ -220,15 +211,16 @@ public class LookupTransformFunction extends BaseTransformFunction {
         }
       }
       // lookup
-      GenericRow row = _dataManager.lookupRowByPrimaryKey(primaryKey);
-      Object value = row == null ? null : row.getValue(_dimColumnName);
+      Object[] row = _keyValuesMap.getOrDefault(primaryKey, null);
+
+      Object value = row == null ? null : row[_inMemoryColIdx];
       valueAcceptor.accept(i, value);
     }
   }
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.INT) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesSV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -241,7 +233,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.LONG) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesSV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -254,7 +246,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.FLOAT) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesSV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -267,7 +259,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.DOUBLE) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -280,7 +272,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.STRING) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesSV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -293,7 +285,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.BYTES) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.BYTES) {
       return super.transformToBytesValuesSV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -306,7 +298,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.INT) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.INT) {
       return super.transformToIntValuesMV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -319,7 +311,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.LONG) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.LONG) {
       return super.transformToLongValuesMV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -332,7 +324,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.FLOAT) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.FLOAT) {
       return super.transformToFloatValuesMV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -345,7 +337,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.DOUBLE) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -358,7 +350,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.STRING) {
+    if (_lookupDataType.toDataType().getStoredType() != DataType.STRING) {
       return super.transformToStringValuesMV(projectionBlock);
     }
     int numDocs = projectionBlock.getNumDocs();
@@ -405,7 +397,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
     if (value != null) {
       _stringValuesSV[index] = String.valueOf(value);
     } else {
-      _stringValuesSV[index] = _lookupColumnFieldSpec.getDefaultNullValueString();
+      _stringValuesSV[index] = _lookupDataType.getNullPlaceholder().toString();
     }
   }
 

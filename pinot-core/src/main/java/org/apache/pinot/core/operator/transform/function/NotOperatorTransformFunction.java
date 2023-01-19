@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -48,7 +49,7 @@ public class NotOperatorTransformFunction extends BaseTransformFunction {
   private TransformFunction _argument;
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
     Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument1 is required for not transform function");
     TransformResultMetadata argumentMetadata = arguments.get(0).getResultMetadata();
     Preconditions.checkState(

@@ -304,6 +304,8 @@ public class CommonConstants {
         public static final String RESPONSE_FORMAT = "responseFormat";
         @Deprecated
         public static final String GROUP_BY_MODE = "groupByMode";
+
+        public static final String IN_MEMORY_TABLE_NAME = "inMemoryTableName";
       }
 
       public static class QueryOptionValue {

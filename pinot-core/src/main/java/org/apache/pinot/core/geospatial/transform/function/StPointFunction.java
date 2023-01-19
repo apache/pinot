@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.utils.BooleanUtils;
 
@@ -47,7 +48,7 @@ public class StPointFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
     Preconditions.checkArgument(arguments.size() == 2 || arguments.size() == 3,
         "2 or 3 arguments are required for transform function: %s", getName());
     TransformFunction transformFunction = arguments.get(0);

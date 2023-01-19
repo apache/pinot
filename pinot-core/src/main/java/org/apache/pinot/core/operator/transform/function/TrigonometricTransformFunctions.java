@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -38,7 +39,7 @@ public class TrigonometricTransformFunctions {
     }
 
     @Override
-    public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+    public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
       // Check that there are more than 1 arguments
       if (arguments.size() != 2) {
         throw new IllegalArgumentException("Exactly 2 arguments are required for Atan2 transform function");
