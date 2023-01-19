@@ -19,8 +19,18 @@
 
 name: Pinot Dependencies
 on:
-  schedule:
-    - cron: '30 21 * * *'
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "**/pom.xml"
+      - "**/package.json"
+      - "**/package-lock.json"
+      - "docker/images/pinot/**"
+      - ".github/workflows/**"
 jobs:
   verify-docker:
     if: github.repository == 'apache/pinot'
