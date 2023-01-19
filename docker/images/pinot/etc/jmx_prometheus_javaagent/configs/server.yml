@@ -66,7 +66,7 @@ rules:
     tableType: "$2"
     topic: "$3"
     partition: "$4"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeIngestionDelayMs.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeIngestionDelayMs.(\\S+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_realtimeIngestionDelayMs_$4"
   cache: true
   labels:
@@ -85,7 +85,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeConsumptionExceptions\"><>(\\w+)"
   name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.(\\S+)\"><>(\\w+)"
   name: "pinot_server_realtime_offheapMemoryUsed_$2"
   cache: true
   labels:
@@ -107,7 +107,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.nettyConnection(\\w+)\"><>(\\w+)"
   name: "pinot_server_nettyConnection_$1_$2"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeSegmentNumPartitions.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeSegmentNumPartitions.(\\S+)\"><>(\\w+)"
   name: "pinot_server_realtimeSegmentNumPartitions_$2"
   cache: true
   labels:

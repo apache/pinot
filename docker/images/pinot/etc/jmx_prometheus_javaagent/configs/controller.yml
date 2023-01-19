@@ -77,36 +77,36 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.offlineTableCount\"><>(\\w+)"
   name: "pinot_controller_offlineTableCount_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ValidationMetrics\", name=\"pinot.controller.(\\w+)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ValidationMetrics\", name=\"pinot.controller.(\\S+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_validateion_$2_$3"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.cronSchedulerJobScheduled.(\\w+)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.cronSchedulerJobScheduled.(\\S+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerJobScheduled_$3"
   cache: true
   labels:
     table: "$1"
     taskType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(\\w+)\\.(\\w+).cronSchedulerTriggered\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(\\S+)\\.(\\w+).cronSchedulerTriggered\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerTriggered_$3"
   cache: true
   labels:
     table: "$1"
     taskType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(\\w+)\\.(\\w+).cronSchedulerSkipped\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(\\S+)\\.(\\w+).cronSchedulerSkipped\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerSkipped_$3"
   cache: true
   labels:
     table: "$1"
     taskType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(\\w+)\\.(\\w+).cronSchedulerJobExecutionTimeMs\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(\\S+)\\.(\\w+).cronSchedulerJobExecutionTimeMs\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerJobExecutionTimeMs_$3"
   cache: true
   labels:
     table: "$1"
     taskType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.taskStatus.(\\w+)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.taskStatus.(\\S+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_taskStatus_$3"
   cache: true
   labels:
@@ -148,7 +148,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.pinotLeadControllerResourceEnabled\"><>(\\w+)"
   name: "pinot_controller_pinotLeadControllerResourceEnabled_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.offlineTableEstimatedSize.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.offlineTableEstimatedSize.(\\S+)\"><>(\\w+)"
   name: "pinot_controller_offlineTableEstimatedSize_$2"
   cache: true
   labels:
