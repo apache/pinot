@@ -209,27 +209,39 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
     // Set group-by query options
     if (QueryContextUtils.isAggregationQuery(queryContext) && queryContext.getGroupByExpressions() != null) {
-
       // Set maxInitialResultHolderCapacity
-      queryContext.setMaxInitialResultHolderCapacity(_maxInitialResultHolderCapacity);
-
+      Integer initResultCap = QueryOptionsUtils.getMaxInitialResultHolderCapacity(queryOptions);
+      if (initResultCap != null) {
+        queryContext.setMaxInitialResultHolderCapacity(initResultCap);
+      } else {
+        queryContext.setMaxInitialResultHolderCapacity(_maxInitialResultHolderCapacity);
+      }
       // Set numGroupsLimit
-      queryContext.setNumGroupsLimit(_numGroupsLimit);
-
+      Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(queryOptions);
+      if (numGroupsLimit != null) {
+        queryContext.setNumGroupsLimit(numGroupsLimit);
+      } else {
+        queryContext.setNumGroupsLimit(_numGroupsLimit);
+      }
       // Set minSegmentGroupTrimSize
       Integer minSegmentGroupTrimSizeFromQuery = QueryOptionsUtils.getMinSegmentGroupTrimSize(queryOptions);
-      int minSegmentGroupTrimSize =
-          minSegmentGroupTrimSizeFromQuery != null ? minSegmentGroupTrimSizeFromQuery : _minSegmentGroupTrimSize;
-      queryContext.setMinSegmentGroupTrimSize(minSegmentGroupTrimSize);
-
+      if (minSegmentGroupTrimSizeFromQuery != null) {
+        queryContext.setMinSegmentGroupTrimSize(minSegmentGroupTrimSizeFromQuery);
+      } else {
+        queryContext.setMinSegmentGroupTrimSize(_minSegmentGroupTrimSize);
+      }
       // Set minServerGroupTrimSize
       Integer minServerGroupTrimSizeFromQuery = QueryOptionsUtils.getMinServerGroupTrimSize(queryOptions);
       int minServerGroupTrimSize =
           minServerGroupTrimSizeFromQuery != null ? minServerGroupTrimSizeFromQuery : _minServerGroupTrimSize;
       queryContext.setMinServerGroupTrimSize(minServerGroupTrimSize);
-
       // Set groupTrimThreshold
-      queryContext.setGroupTrimThreshold(_groupByTrimThreshold);
+      Integer groupTrimThreshold = QueryOptionsUtils.getGroupTrimThreshold(queryOptions);
+      if (groupTrimThreshold != null) {
+        queryContext.setGroupTrimThreshold(groupTrimThreshold);
+      } else {
+        queryContext.setGroupTrimThreshold(_groupByTrimThreshold);
+      }
     }
   }
 

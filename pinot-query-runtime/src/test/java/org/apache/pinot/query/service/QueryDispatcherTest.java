@@ -78,7 +78,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
-    int reducerStageId = dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 10_000L);
+    int reducerStageId = dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 10_000L, new HashMap<>());
     Assert.assertTrue(PlannerUtils.isRootStage(reducerStageId));
     dispatcher.shutdown();
   }
