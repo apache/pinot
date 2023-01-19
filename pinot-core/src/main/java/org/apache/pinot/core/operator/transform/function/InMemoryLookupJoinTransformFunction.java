@@ -2,11 +2,14 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
+import org.apache.pinot.core.data.manager.offline.InMemoryTable;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -15,14 +18,14 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-public class LookupJoinTransformFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "lookUpJoin";
+public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
+  public static final String FUNCTION_NAME = "InMemoryLookUpJoin";
 
   private final List<String> _joinKeys = new ArrayList<>();
   private final List<FieldSpec> _joinValueFieldSpecs = new ArrayList<>();
   private final List<TransformFunction> _joinValueFunctions = new ArrayList<>();
 
-  private DimensionTableDataManager _dataManager;
+  private HashMap<PrimaryKey, Object[]> _keyValuesMap;
   private String _filterFunc;
 
   private TransformFunction _condCol1;
@@ -35,18 +38,17 @@ public class LookupJoinTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
     // Check that there are correct number of arguments
     Preconditions.checkArgument(arguments.size() >= 4,
         "At least 4 arguments are required for LOOKUP transform function: "
-            + "LOOKUPJOIN(tbl2, joinKey1, joinKey2, filterFunc, condCol1, condCol2)");
+            + "LOOKUPJOIN(inMemoryTableName, joinKey1, joinKey2, filterFunc, condCol1, condCol2)");
 
-    TransformFunction dimTableNameFunction = arguments.get(0);
-    Preconditions.checkArgument(dimTableNameFunction instanceof LiteralTransformFunction,
-        "Second argument must be a literal(string) representing the dimension table name");
+    TransformFunction inMemoryTableFunc = arguments.get(0);
+    Preconditions.checkArgument(inMemoryTableFunc instanceof LiteralTransformFunction,
+        "First argument must be a literal(string) representing the dimension table name");
     // Lookup parameters
-    String dimTableName =
-        TableNameBuilder.OFFLINE.tableNameWithType(((LiteralTransformFunction) dimTableNameFunction).getLiteral());
+    InMemoryTable inMemoryTable = context.getInMemoryTable(((LiteralTransformFunction) inMemoryTableFunc).getLiteral());
 
     // Only one join key is allowed.
     List<TransformFunction> joinArguments = arguments.subList(1, 3);
@@ -58,19 +60,15 @@ public class LookupJoinTransformFunction extends BaseTransformFunction {
       Preconditions.checkArgument(factJoinValueFunctionResultMetadata.isSingleValue(),
           "JoinValue argument must be a single value expression");
       _joinValueFunctions.add(factJoinValueFunction);
-      TransformFunction dimJoinKeyFunction = joinArguments.get((i * 2 + 1));
-      Preconditions.checkArgument(dimJoinKeyFunction instanceof LiteralTransformFunction,
-          "JoinKey argument must be a literal(string) representing the primary key for the dimension table");
+      TransformFunction inMemoryJoinKey = joinArguments.get((i * 2 + 1));
+      Preconditions.checkArgument(inMemoryJoinKey instanceof LiteralTransformFunction,
+          "JoinKey argument must be a literal(string)");
       _joinKeys.add(((LiteralTransformFunction) dimJoinKeyFunction).getLiteral());
       System.out.println("liuyao dimJoinKeyFunction:" + ((LiteralTransformFunction) dimJoinKeyFunction).getLiteral());
       System.out.println("liuyao joinKeys size" +_joinKeys.size());
     }
 
     // Validate lookup table and relevant columns
-    _dataManager = DimensionTableDataManager.getInstanceByTableName(dimTableName);
-    Preconditions.checkArgument(_dataManager != null, "Dimension table does not exist: %s", dimTableName);
-
-    Preconditions.checkArgument(_dataManager.isPopulated(), "Dimension table is not populated: %s", dimTableName);
 
     for (String joinKey : _joinKeys) {
       FieldSpec pkColumnSpec = _dataManager.getColumnFieldSpec(joinKey);

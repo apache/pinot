@@ -38,6 +38,7 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.data.manager.offline.InMemoryTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -127,6 +128,8 @@ public class QueryContext {
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
   private boolean _serverReturnFinalResult;
+
+  private HashMap<String, InMemoryTable> _inMemoryTableHashMap;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, List<String> aliasList, @Nullable FilterContext filter,
@@ -422,6 +425,10 @@ public class QueryContext {
         + _groupByExpressions + ", _havingFilter=" + _havingFilter + ", _orderByExpressions=" + _orderByExpressions
         + ", _limit=" + _limit + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions
         + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
+  }
+
+  public InMemoryTable getInMemoryTable(String tableName){
+    return _inMemoryTableHashMap.get(tableName);
   }
 
   public static class Builder {
