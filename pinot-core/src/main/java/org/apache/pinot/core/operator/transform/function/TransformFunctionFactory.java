@@ -131,7 +131,8 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.MAPVALUE, MapValueTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.INIDSET, InIdSetTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
-
+    typeToImplementation.put(TransformFunctionType.IN_MEMORY_LOOKUP_JOIN, InMemoryLookupJoinTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IN_MEMORY_LOOKUP, InMemoryLookupTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.EXTRACT, ExtractTransformFunction.class);
 
     // Regexp functions
@@ -312,7 +313,7 @@ public class TransformFunctionFactory {
           transformFunctionArguments.add(TransformFunctionFactory.get(queryContext, argument, dataSourceMap));
         }
         try {
-          transformFunction.init(transformFunctionArguments, dataSourceMap);
+          transformFunction.init(transformFunctionArguments, dataSourceMap, queryContext);
         } catch (Exception e) {
           throw new BadQueryRequestException("Caught exception while initializing transform function: " + functionName,
               e);

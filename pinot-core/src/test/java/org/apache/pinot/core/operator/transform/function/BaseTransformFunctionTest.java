@@ -210,6 +210,7 @@ public abstract class BaseTransformFunctionTest {
     Set<String> columnNames = indexSegment.getPhysicalColumnNames();
     _dataSourceMap = new HashMap<>(columnNames.size());
     for (String columnName : columnNames) {
+      System.out.println("columnName:" + columnName);
       _dataSourceMap.put(columnName, indexSegment.getDataSource(columnName));
     }
 

@@ -25,6 +25,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.transformer.timeunit.TimeUnitTransformer;
 import org.apache.pinot.core.operator.transform.transformer.timeunit.TimeUnitTransformerFactory;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -40,7 +41,7 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext context) {
     // Check that there are exactly 3 arguments
     if (arguments.size() != 3) {
       throw new IllegalArgumentException("Exactly 3 arguments are required for TIME_CONVERT transform function");

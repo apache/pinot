@@ -26,6 +26,7 @@ import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.joda.time.DateTimeField;
 
@@ -96,7 +97,8 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap,
+      QueryContext queryContext) {
     Preconditions.checkArgument(arguments.size() >= 2 && arguments.size() <= 5,
         "Between two to five arguments are required, example: %s", EXAMPLE_INVOCATION);
     String unit = ((LiteralTransformFunction) arguments.get(0)).getLiteral().toLowerCase();

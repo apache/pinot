@@ -293,6 +293,8 @@ public class CommonConstants {
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
 
+        public static final String PARTITIONED_JOIN = "PartitionedJoin";
+
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
@@ -302,6 +304,8 @@ public class CommonConstants {
         public static final String RESPONSE_FORMAT = "responseFormat";
         @Deprecated
         public static final String GROUP_BY_MODE = "groupByMode";
+
+        public static final String IN_MEMORY_TABLE_NAME = "inMemoryTableName";
       }
 
       public static class QueryOptionValue {

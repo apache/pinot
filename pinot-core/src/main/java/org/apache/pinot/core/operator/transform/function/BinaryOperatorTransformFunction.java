@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -82,7 +83,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap,
+      QueryContext queryContext) {
     // Check that there are exact 2 arguments
     Preconditions.checkArgument(arguments.size() == 2,
         "Exact 2 arguments are required for binary operator transform function");

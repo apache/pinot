@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -50,7 +51,8 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap,
+      QueryContext queryContext) {
     Preconditions.checkArgument(arguments.size() == 2,
         "2 arguments are required for IN_ID_SET transform function: expression, base64 encoded IdSet");
     Preconditions.checkArgument(arguments.get(0).getResultMetadata().isSingleValue(),

@@ -36,7 +36,6 @@ public class QueryOptionsUtils {
   private QueryOptionsUtils() {
   }
 
-
   private static final Map<String, String> CONFIG_RESOLVER;
   private static final RuntimeException CLASS_LOAD_ERROR;
 
@@ -126,6 +125,10 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }
 
+  public static boolean usePartitionedJoin(Map<String, String> queryOptions) {
+    return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.PARTITIONED_JOIN));
+  }
+
   @Nullable
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
     String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
@@ -165,5 +168,15 @@ public class QueryOptionsUtils {
   @Nullable
   public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
     return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
+  }
+
+  public static String getInMemoryTableName(Map<String, String> queryOptions) {
+    String inMemoryTableName = queryOptions.get(QueryOptionKey.IN_MEMORY_TABLE_NAME);
+    return inMemoryTableName;
+  }
+
+  public static String getInMemoryTableString(Map<String, String> queryOptions, String tableName) {
+    String inMemoryTableString = queryOptions.get(tableName);
+    return inMemoryTableString;
   }
 }

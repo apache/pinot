@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
@@ -46,7 +47,7 @@ public interface TransformFunction {
    * @param arguments Arguments for the transform function
    * @param dataSourceMap Map from column to data source
    */
-  void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap);
+  void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap, QueryContext queryContext);
 
   /**
    * Returns the metadata for the result of the transform function.
