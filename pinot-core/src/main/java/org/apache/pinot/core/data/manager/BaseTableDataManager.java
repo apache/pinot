@@ -40,7 +40,6 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationConverter;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -61,7 +60,6 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.loader.TierBasedSegmentDirectoryLoader;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -423,10 +421,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       String currentSegmentTier, SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
       Schema schema)
       throws Exception {
-    boolean tierMigrationNeeded = indexLoadingConfig.getSegmentDirectoryLoader()
-        .equalsIgnoreCase(TierBasedSegmentDirectoryLoader.DIRECTORY_LOADER_NAME) && !StringUtils.equals(
-        segmentZKMetadata.getTier(), currentSegmentTier);
-    return !tierMigrationNeeded && !ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
+    SegmentDirectoryLoader segmentDirectoryLoader =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
+    return !segmentDirectoryLoader.needsTierMigration(segmentZKMetadata.getTier(), currentSegmentTier)
+        && !ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
   }
 
   @Override

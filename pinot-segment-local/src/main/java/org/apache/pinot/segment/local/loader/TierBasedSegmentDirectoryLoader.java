@@ -26,6 +26,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -42,10 +43,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Implementation of {@link SegmentDirectoryLoader} that can move segments across data dirs configured as storage tiers.
  */
-@SegmentLoader(name = TierBasedSegmentDirectoryLoader.DIRECTORY_LOADER_NAME)
+@SegmentLoader(name = "tierBased")
 public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
-  public static final String DIRECTORY_LOADER_NAME = "tierBased";
-
   private static final Logger LOGGER = LoggerFactory.getLogger(TierBasedSegmentDirectoryLoader.class);
   private static final String SEGMENT_TIER_TRACK_FILE_SUFFIX = ".tier";
   private static final int TRACK_FILE_VERSION = 1;
@@ -217,5 +216,10 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
           tableNameWithType, segmentTier, e.getMessage());
       return null;
     }
+  }
+
+  @Override
+  public boolean needsTierMigration(String zkTier, String currentTier) {
+    return !StringUtils.equals(zkTier, currentTier);
   }
 }

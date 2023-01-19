@@ -26,7 +26,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
  * Interface for creating and loading the {@link SegmentDirectory} instance using provided config
  */
 public interface SegmentDirectoryLoader {
-
   /**
    * Creates the {@link SegmentDirectory} instance
    * @param indexDir index directory
@@ -41,5 +40,14 @@ public interface SegmentDirectoryLoader {
    */
   default void delete(SegmentDirectoryLoaderContext segmentDirectoryLoaderContext)
       throws Exception {
+  }
+
+  /**
+   * Based on the zkMetadata's and current segment tier, checks whether or not tier migration is needed
+   * @param zkTier segment's ZKMetadata's tier
+   * @param currentTier Current segment tier
+   */
+  default boolean needsTierMigration(String zkTier, String currentTier) {
+    return false;
   }
 }
