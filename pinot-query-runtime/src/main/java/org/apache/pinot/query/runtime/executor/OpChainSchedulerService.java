@@ -114,15 +114,18 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
                   register(operatorChain, false);
                 } else {
                   if (result.isErrorBlock()) {
+                    operatorChain.getRoot().toExplainString();
                     LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
                         result.getDataBlock().getExceptions());
                   } else {
+                    operatorChain.getRoot().toExplainString();
                     LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
                   }
                   operatorChain.close();
                 }
               } catch (Exception e) {
                 operatorChain.close();
+                operatorChain.getRoot().toExplainString();
                 LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
               }
             }
@@ -154,11 +157,6 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
     LOGGER.debug("({}): Scheduler is now handling operator chain listening to mailboxes {}. "
             + "There are a total of {} chains awaiting execution.", operatorChain, operatorChain.getReceivingMailbox(),
         _scheduler.size());
-
-    // we want to track the time that it takes from registering
-    // an operator chain to when it completes, so make sure to
-    // start the timer here
-    operatorChain.getStats().startExecutionTimer();
   }
 
   public final void register(OpChain operatorChain, boolean isNew) {
@@ -167,8 +165,8 @@ public class OpChainSchedulerService extends AbstractExecutionThreadService {
       LOGGER.trace("({}): Registered operator chain (new: {}). Total: {}", operatorChain, isNew, _scheduler.size());
 
       _scheduler.register(operatorChain, isNew);
-      operatorChain.getStats().queued();
     } finally {
+      operatorChain.getStats().queued();
       _monitor.leave();
     }
   }

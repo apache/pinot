@@ -46,12 +46,16 @@ import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.roaringbitmap.RoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * {@code QueryDispatcher} dispatch a query to different workers.
  */
 public class QueryDispatcher {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
+
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
 
   public QueryDispatcher() {
@@ -69,8 +73,14 @@ public class QueryDispatcher {
         reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
         mailboxService.getMailboxPort(), timeoutMs);
     List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs);
-    return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
+    mailboxReceiveOperator.toExplainString();
+    long toResultTableStartTime = System.currentTimeMillis();
+    ResultTable resultTable = toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
         queryPlan.getQueryStageMap().get(0).getDataSchema());
+    LOGGER.debug(
+        "RequestId:" + requestId + " StageId: 0 Broker toResultTable processing time:" + (System.currentTimeMillis()
+            - toResultTableStartTime) + " ms");
+    return resultTable;
   }
 
   public int submit(long requestId, QueryPlan queryPlan, long timeoutMs)

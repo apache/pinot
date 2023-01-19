@@ -54,6 +54,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   private final MultiStageOperator _dataTableBlockBaseOperator;
   private final BlockExchange _exchange;
+  private OperatorStats _operatorStats;
 
   @VisibleForTesting
   interface BlockExchangeFactory {
@@ -71,14 +72,14 @@ public class MailboxSendOperator extends MultiStageOperator {
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
       long jobId, int stageId) {
     this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
-        server -> toMailboxId(server, jobId, stageId, hostName, port), BlockExchange::getExchange);
+        server -> toMailboxId(server, jobId, stageId, hostName, port), BlockExchange::getExchange, jobId, stageId);
   }
 
   @VisibleForTesting
   MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
       MultiStageOperator dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
-      MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory) {
+      MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, long jobId, int stageId) {
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
 
     List<MailboxIdentifier> receivingMailboxes;
@@ -106,6 +107,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
         String.format("Exchange type '%s' is not supported yet", exchangeType));
+    _operatorStats = new OperatorStats(jobId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -116,22 +118,30 @@ public class MailboxSendOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    _dataTableBlockBaseOperator.toExplainString();
+    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
+    _operatorStats.startTimer();
     TransferableBlock transferableBlock;
     try {
+      _operatorStats.endTimer();
       transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+      _operatorStats.startTimer();
       while (!transferableBlock.isNoOpBlock()) {
         _exchange.send(transferableBlock);
-
+        _operatorStats.recordInput(1, transferableBlock.getNumRows());
+        // The # of output block is not accurate because we may do a split in exchange send.
+        _operatorStats.recordOutput(1, transferableBlock.getNumRows());
         if (transferableBlock.isEndOfStreamBlock()) {
           return transferableBlock;
         }
-
+        _operatorStats.endTimer();
         transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+        _operatorStats.startTimer();
       }
     } catch (final Exception e) {
       // ideally, MailboxSendOperator doesn't ever throw an exception because
@@ -143,8 +153,9 @@ public class MailboxSendOperator extends MultiStageOperator {
       } catch (Exception e2) {
         LOGGER.error("Exception while sending block to mailbox.", e2);
       }
+    } finally {
+      _operatorStats.endTimer();
     }
-
     return transferableBlock;
   }
 

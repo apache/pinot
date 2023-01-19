@@ -52,6 +52,7 @@ public class OpChain implements AutoCloseable {
     return _receivingMailbox;
   }
 
+  // TODO: Move OperatorStats here.
   public OpChainStats getStats() {
     return _stats;
   }

@@ -90,7 +90,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
-    HashJoinOperator joinOnString = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator joinOnString = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
 
     TransferableBlock result = joinOnString.nextBlock();
     while (result.isNoOpBlock()) {
@@ -127,7 +127,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
-    HashJoinOperator joinOnInt = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator joinOnInt = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
     TransferableBlock result = joinOnInt.nextBlock();
     while (result.isNoOpBlock()) {
       result = joinOnInt.nextBlock();
@@ -161,7 +161,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node = new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(new ArrayList<>(), new ArrayList<>()),
         joinClauses);
-    HashJoinOperator joinOnInt = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator joinOnInt = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
     TransferableBlock result = joinOnInt.nextBlock();
     while (result.isNoOpBlock()) {
       result = joinOnInt.nextBlock();
@@ -202,7 +202,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.LEFT, getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -236,7 +236,7 @@ public class HashJoinOperatorTest {
     List<RexExpression> joinClauses = new ArrayList<>();
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -267,7 +267,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.LEFT, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -301,7 +301,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -339,7 +339,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node = new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(new ArrayList<>(), new ArrayList<>()),
         joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
       result = join.nextBlock();
@@ -377,7 +377,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node = new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(new ArrayList<>(), new ArrayList<>()),
         joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
       result = join.nextBlock();
@@ -411,7 +411,7 @@ public class HashJoinOperatorTest {
     });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.RIGHT, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
-    HashJoinOperator joinOnNum = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator joinOnNum = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
     TransferableBlock result = joinOnNum.nextBlock();
     while (result.isNoOpBlock()) {
       result = joinOnNum.nextBlock();
@@ -438,8 +438,7 @@ public class HashJoinOperatorTest {
     Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*SEMI is not "
-      + "supported.*")
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*SEMI is not supported.*")
   public void shouldThrowOnSemiJoin() {
     DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
@@ -461,7 +460,7 @@ public class HashJoinOperatorTest {
     });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.SEMI, getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
   }
 
   @Test
@@ -485,7 +484,7 @@ public class HashJoinOperatorTest {
     });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.FULL, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
       result = join.nextBlock();
@@ -537,7 +536,7 @@ public class HashJoinOperatorTest {
     });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.ANTI, getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
   }
 
   @Test
@@ -562,7 +561,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -595,7 +594,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
 
     TransferableBlock result = join.nextBlock();
     while (result.isNoOpBlock()) {
@@ -631,7 +630,7 @@ public class HashJoinOperatorTest {
         });
     JoinNode node =
         new JoinNode(1, resultSchema, JoinRelType.INNER, getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
-    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node);
+    HashJoinOperator join = new HashJoinOperator(_leftOperator, _rightOperator, leftSchema, node, 1, 2);
 
     TransferableBlock result = join.nextBlock(); // first no-op consumes first right data block.
     Assert.assertTrue(result.isNoOpBlock());

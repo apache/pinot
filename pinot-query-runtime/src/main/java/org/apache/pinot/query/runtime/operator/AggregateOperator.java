@@ -37,6 +37,8 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -55,8 +57,10 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
 
   private final MultiStageOperator _inputOperator;
+
   // TODO: Deal with the case where _aggCalls is empty but we have groupSet setup, which means this is a Distinct call.
   private final List<RexExpression.FunctionCall> _aggCalls;
   private final List<RexExpression> _groupSet;
@@ -69,27 +73,29 @@ public class AggregateOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _hasReturnedAggregateBlock;
 
+  // TODO: Move to OperatorContext class.
+  private OperatorStats _operatorStats;
+
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
   // aggCalls has to be a list of FunctionCall and cannot be null
   // groupSet has to be a list of InputRef and cannot be null
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
-  public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
-      List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema inputSchema) {
-    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.Accumulator.MERGERS);
+  public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
+      List<RexExpression> groupSet, DataSchema inputSchema, long requestId, int stageId) {
+    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.Accumulator.MERGERS, requestId,
+        stageId);
   }
 
   @VisibleForTesting
-  AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema,
-      List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema inputSchema, Map<String,
-      Function<DataSchema.ColumnDataType, Merger>> mergers) {
+  AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
+      List<RexExpression> groupSet, DataSchema inputSchema,
+      Map<String, Function<DataSchema.ColumnDataType, Merger>> mergers, long requestId, int stageId) {
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _upstreamErrorBlock = null;
 
     // we expect all agg calls to be aggregate function calls
-    _aggCalls = aggCalls.stream()
-        .map(RexExpression.FunctionCall.class::cast)
-        .collect(Collectors.toList());
+    _aggCalls = aggCalls.stream().map(RexExpression.FunctionCall.class::cast).collect(Collectors.toList());
 
     _accumulators = new Accumulator[_aggCalls.size()];
     for (int i = 0; i < _aggCalls.size(); i++) {
@@ -105,6 +111,7 @@ public class AggregateOperator extends MultiStageOperator {
     _resultSchema = dataSchema;
     _readyToConstruct = false;
     _hasReturnedAggregateBlock = false;
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -115,11 +122,15 @@ public class AggregateOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
+    // TODO: move to close call;
+    _inputOperator.toExplainString();
+    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
+    _operatorStats.startTimer();
     try {
       if (!_readyToConstruct && !consumeInputBlocks()) {
         return TransferableBlockUtils.getNoOpTransferableBlock();
@@ -132,10 +143,13 @@ public class AggregateOperator extends MultiStageOperator {
       if (!_hasReturnedAggregateBlock) {
         return produceAggregatedBlock();
       } else {
+        // TODO: Move to close call.
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
+    } finally {
+      _operatorStats.endTimer();
     }
   }
 
@@ -154,6 +168,7 @@ public class AggregateOperator extends MultiStageOperator {
     if (rows.size() == 0) {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } else {
+      _operatorStats.recordOutput(1, rows.size());
       return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
     }
   }
@@ -162,7 +177,9 @@ public class AggregateOperator extends MultiStageOperator {
    * @return whether or not the operator is ready to move on (EOS or ERROR)
    */
   private boolean consumeInputBlocks() {
+    _operatorStats.endTimer();
     TransferableBlock block = _inputOperator.nextBlock();
+    _operatorStats.startTimer();
     while (!block.isNoOpBlock()) {
       // setting upstream error block
       if (block.isErrorBlock()) {
@@ -181,7 +198,10 @@ public class AggregateOperator extends MultiStageOperator {
           _accumulators[i].accumulate(key, row);
         }
       }
+      _operatorStats.recordInput(1, container.size());
+      _operatorStats.endTimer();
       block = _inputOperator.nextBlock();
+      _operatorStats.startTimer();
     }
     return false;
   }
@@ -269,32 +289,25 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   private static class Accumulator {
-
-    private static final Map<String, Function<DataSchema.ColumnDataType, Merger>> MERGERS = ImmutableMap
-        .<String, Function<DataSchema.ColumnDataType, Merger>>builder()
-        .put("SUM", cdt -> AggregateOperator::mergeSum)
-        .put("$SUM", cdt -> AggregateOperator::mergeSum)
-        .put("$SUM0", cdt -> AggregateOperator::mergeSum)
-        .put("MIN", cdt -> AggregateOperator::mergeMin)
-        .put("$MIN", cdt -> AggregateOperator::mergeMin)
-        .put("$MIN0", cdt -> AggregateOperator::mergeMin)
-        .put("MAX", cdt -> AggregateOperator::mergeMax)
-        .put("$MAX", cdt -> AggregateOperator::mergeMax)
-        .put("$MAX0", cdt -> AggregateOperator::mergeMax)
-        .put("COUNT", cdt -> AggregateOperator::mergeCount)
-        .put("BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
-        .put("$BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
-        .put("$BOOL_AND0", cdt -> AggregateOperator::mergeBoolAnd)
-        .put("BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
-        .put("$BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
-        .put("$BOOL_OR0", cdt -> AggregateOperator::mergeBoolOr)
-        .put("FOURTHMOMENT", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
-            ? new MergeFourthMomentObject() : new MergeFourthMomentNumeric())
-        .put("$FOURTHMOMENT", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
-            ? new MergeFourthMomentObject() : new MergeFourthMomentNumeric())
-        .put("$FOURTHMOMENT0", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
-            ? new MergeFourthMomentObject() : new MergeFourthMomentNumeric())
-        .build();
+    private static final Map<String, Function<DataSchema.ColumnDataType, Merger>> MERGERS =
+        ImmutableMap.<String, Function<DataSchema.ColumnDataType, Merger>>builder()
+            .put("SUM", cdt -> AggregateOperator::mergeSum).put("$SUM", cdt -> AggregateOperator::mergeSum)
+            .put("$SUM0", cdt -> AggregateOperator::mergeSum).put("MIN", cdt -> AggregateOperator::mergeMin)
+            .put("$MIN", cdt -> AggregateOperator::mergeMin).put("$MIN0", cdt -> AggregateOperator::mergeMin)
+            .put("MAX", cdt -> AggregateOperator::mergeMax).put("$MAX", cdt -> AggregateOperator::mergeMax)
+            .put("$MAX0", cdt -> AggregateOperator::mergeMax).put("COUNT", cdt -> AggregateOperator::mergeCount)
+            .put("BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
+            .put("$BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
+            .put("$BOOL_AND0", cdt -> AggregateOperator::mergeBoolAnd)
+            .put("BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
+            .put("$BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
+            .put("$BOOL_OR0", cdt -> AggregateOperator::mergeBoolOr).put("FOURTHMOMENT",
+                cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
+                    : new MergeFourthMomentNumeric()).put("$FOURTHMOMENT",
+                cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
+                    : new MergeFourthMomentNumeric()).put("$FOURTHMOMENT0",
+                cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
+                    : new MergeFourthMomentNumeric()).build();
 
     final int _inputRef;
     final Object _literal;
@@ -336,8 +349,7 @@ public class AggregateOperator extends MultiStageOperator {
     private RexExpression toAggregationFunctionOperand(RexExpression.FunctionCall rexExpression) {
       List<RexExpression> functionOperands = rexExpression.getFunctionOperands();
       Preconditions.checkState(functionOperands.size() < 2, "aggregate functions cannot have more than one operand");
-      return functionOperands.size() > 0
-          ? functionOperands.get(0)
+      return functionOperands.size() > 0 ? functionOperands.get(0)
           : new RexExpression.Literal(FieldSpec.DataType.INT, 1);
     }
   }
