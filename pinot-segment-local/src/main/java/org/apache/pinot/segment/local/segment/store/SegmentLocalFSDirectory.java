@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -38,6 +37,7 @@ import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.store.SegmentIndexType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
@@ -64,6 +64,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   private final ReadMode _readMode;
   private SegmentMetadataImpl _segmentMetadata;
   private ColumnIndexDirectory _columnIndexDirectory;
+  private StarTreeIndexReader _starTreeIndexReader;
   private String _tier;
 
   // Create an empty SegmentLocalFSDirectory object mainly used to
@@ -248,25 +249,26 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   private synchronized void loadData()
       throws IOException {
-    if (_columnIndexDirectory != null) {
-      return;
+    if (_columnIndexDirectory == null) {
+      switch (_segmentMetadata.getVersion()) {
+        case v1:
+        case v2:
+          _columnIndexDirectory = new FilePerIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
+          break;
+        case v3:
+          try {
+            _columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
+          } catch (ConfigurationException e) {
+            LOGGER.error("Failed to create columnar index directory", e);
+            throw new RuntimeException(e);
+          }
+          break;
+        default:
+          break;
+      }
     }
-
-    switch (_segmentMetadata.getVersion()) {
-      case v1:
-      case v2:
-        _columnIndexDirectory = new FilePerIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
-        break;
-      case v3:
-        try {
-          _columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
-        } catch (ConfigurationException e) {
-          LOGGER.error("Failed to create columnar index directory", e);
-          throw new RuntimeException(e);
-        }
-        break;
-      default:
-        break;
+    if (_starTreeIndexReader == null && _segmentMetadata.getStarTreeV2MetadataList() != null) {
+      _starTreeIndexReader = new StarTreeIndexReader(_segmentDirectory, _segmentMetadata, _readMode);
     }
   }
 
@@ -279,6 +281,10 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         _columnIndexDirectory.close();
         _columnIndexDirectory = null;
       }
+      if (_starTreeIndexReader != null) {
+        _starTreeIndexReader.close();
+      }
+      _starTreeIndexReader = null;
     }
   }
 
@@ -349,6 +355,42 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       return _columnIndexDirectory.hasIndexFor(column, type);
     }
 
+    public boolean hasSegmentIndex(SegmentIndexType type) {
+      if (type != SegmentIndexType.STARTREE_INDEX) {
+        throw new IllegalArgumentException("Unknown SegmentIndexType: " + type);
+      }
+      return _starTreeIndexReader != null;
+    }
+
+    public SegmentDirectory.Reader getSegmentIndexReaderFor(String indexName, SegmentIndexType type) {
+      if (type != SegmentIndexType.STARTREE_INDEX) {
+        throw new IllegalArgumentException("Unknown SegmentIndexType: " + type);
+      }
+      return new SegmentDirectory.Reader() {
+        @Override
+        public PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
+            throws IOException {
+          return _starTreeIndexReader.getBuffer(indexName, column, type);
+        }
+
+        @Override
+        public boolean hasIndexFor(String column, ColumnIndexType type) {
+          return _starTreeIndexReader.hasIndexFor(indexName, column, type);
+        }
+
+        @Override
+        public String toString() {
+          return _starTreeIndexReader.toString() + " for " + indexName;
+        }
+
+        @Override
+        public void close()
+            throws IOException {
+          // Noop as _starTreeIndexReader is owned by the top level Reader
+        }
+      };
+    }
+
     @Override
     public void close() {
       // do nothing here
@@ -358,18 +400,6 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     @Override
     public String toString() {
       return _segmentDirectory.toString();
-    }
-
-    @Override
-    public PinotDataBuffer getStarTreeIndex()
-        throws IOException {
-      return _columnIndexDirectory.getStarTreeIndex();
-    }
-
-    @Override
-    public InputStream getStarTreeIndexMap()
-        throws IOException {
-      return _columnIndexDirectory.getStarTreeIndexMap();
     }
   }
 

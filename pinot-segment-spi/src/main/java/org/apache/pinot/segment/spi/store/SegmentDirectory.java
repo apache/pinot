@@ -21,7 +21,6 @@ package org.apache.pinot.segment.spi.store;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Set;
@@ -181,24 +180,28 @@ public abstract class SegmentDirectory implements Closeable {
 
     public abstract boolean hasIndexFor(String column, ColumnIndexType type);
 
+    public boolean hasSegmentIndex(SegmentIndexType type) {
+      return false;
+    }
+
+    /**
+     * Segment index types like StarTree index is modelled like those single-column indices kept in columns.psf and
+     * index_map file, so access to their index data can be abstracted with SegmentDirectory.Reader interface too.
+     *
+     * @param indexName to look for a specific index instance to access, e.g. the StarTree index can contain multiple
+     *                  index instances, each one of them has a tree and a set of fwd indices referred to by the tree.
+     * @param type      like today's StarTree index or other segment index types e.g. materialized views.
+     * @return SegmentDirectory.Reader object to access the index buffers inside the specified segment index.
+     */
+    public Reader getSegmentIndexReaderFor(String indexName, SegmentIndexType type) {
+      return null;
+    }
+
     public SegmentDirectory toSegmentDirectory() {
       return SegmentDirectory.this;
     }
 
     public abstract String toString();
-
-    public PinotDataBuffer getStarTreeIndex()
-        throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    /**
-     * The caller should close the input stream.
-     */
-    public InputStream getStarTreeIndexMap()
-        throws IOException {
-      throw new UnsupportedOperationException();
-    }
   }
 
   /**

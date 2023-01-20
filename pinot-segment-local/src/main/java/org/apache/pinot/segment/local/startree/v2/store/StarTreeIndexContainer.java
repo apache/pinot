@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.startree.v2.store;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
@@ -38,11 +37,7 @@ public class StarTreeIndexContainer implements Closeable {
   public StarTreeIndexContainer(SegmentDirectory.Reader segmentReader, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> indexContainerMap)
       throws IOException {
-    try (InputStream inputStream = segmentReader.getStarTreeIndexMap()) {
-      _starTrees = StarTreeLoaderUtils.loadStarTreeV2(segmentReader.getStarTreeIndex(),
-          StarTreeIndexMapUtils.loadFromInputStream(inputStream, segmentMetadata.getStarTreeV2MetadataList().size()),
-          segmentMetadata, indexContainerMap);
-    }
+    _starTrees = StarTreeLoaderUtils.loadStarTreeV2(segmentReader, segmentMetadata, indexContainerMap);
   }
 
   public List<StarTreeV2> getStarTrees() {
