@@ -46,10 +46,12 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.PinotOperatorTable;
 import org.apache.calcite.sql.util.PinotChainedSqlOperatorTable;
+import org.apache.calcite.sql2rel.RelFieldTrimmer;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
+import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
@@ -215,7 +217,9 @@ public class QueryEnvironment {
     // 4. optimize relNode
     // TODO: add support for traits, cost factory.
     try {
-      plannerContext.getRelOptPlanner().setRoot(relRoot.rel);
+      RelRoot trimmedRelRoot = relRoot.withRel(
+          new RelFieldTrimmer(plannerContext.getValidator(), RelBuilder.create(_config)).trim(relRoot.rel));
+      plannerContext.getRelOptPlanner().setRoot(trimmedRelRoot.rel);
       return plannerContext.getRelOptPlanner().findBestExp();
     } catch (Exception e) {
       throw new UnsupportedOperationException(

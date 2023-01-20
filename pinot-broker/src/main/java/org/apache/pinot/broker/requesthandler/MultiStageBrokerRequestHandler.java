@@ -158,7 +158,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           break;
       }
     } catch (Exception e) {
-      LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.error(String.format("Caught exception while compiling SQL request %s: %s", requestId, query), e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
