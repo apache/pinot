@@ -68,11 +68,11 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   private TransferableBlock _upstreamErrorBlock;
   private OperatorStats _operatorStats;
 
-  private static MailboxIdentifier toMailboxId(VirtualServer fromInstance, long jobId, long stageId,
+  private static MailboxIdentifier toMailboxId(VirtualServer sender, long jobId, long stageId,
       VirtualServerAddress receiver) {
     return new JsonMailboxIdentifier(
         String.format("%s_%s", jobId, stageId),
-        new VirtualServerAddress(fromInstance.getHostname(), fromInstance.getQueryMailboxPort(), fromInstance.getVirtualId()),
+        new VirtualServerAddress(sender),
         receiver);
   }
 

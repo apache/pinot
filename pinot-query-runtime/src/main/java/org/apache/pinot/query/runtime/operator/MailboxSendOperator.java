@@ -70,8 +70,8 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
       MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, VirtualServerAddress sendingServer,
-      long jobId, int stageId) {
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
+      VirtualServerAddress sendingServer, long jobId, int stageId) {
     this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
         server -> toMailboxId(server, jobId, stageId, sendingServer), BlockExchange::getExchange, jobId, stageId);
   }
@@ -165,6 +165,6 @@ public class MailboxSendOperator extends MultiStageOperator {
     return new JsonMailboxIdentifier(
         String.format("%s_%s", jobId, stageId),
         sender,
-        new VirtualServerAddress(destination.getHostname(), destination.getQueryMailboxPort(), destination.getVirtualId()));
+        new VirtualServerAddress(destination));
   }
 }

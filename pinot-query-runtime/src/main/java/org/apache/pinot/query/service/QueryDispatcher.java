@@ -71,8 +71,8 @@ public class QueryDispatcher {
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
-        reduceNode.getSenderStageId(), reduceNode.getDataSchema(), new VirtualServerAddress(mailboxService.getHostname(),
-        mailboxService.getMailboxPort(), 0), timeoutMs);
+        reduceNode.getSenderStageId(), reduceNode.getDataSchema(),
+        new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0), timeoutMs);
     List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs);
     mailboxReceiveOperator.toExplainString();
     long toResultTableStartTime = System.currentTimeMillis();
