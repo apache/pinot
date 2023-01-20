@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -267,7 +268,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
           break;
       }
     }
-    if (_starTreeIndexReader == null && _segmentMetadata.getStarTreeV2MetadataList() != null) {
+    if (_starTreeIndexReader == null && CollectionUtils.isNotEmpty(_segmentMetadata.getStarTreeV2MetadataList())) {
       _starTreeIndexReader = new StarTreeIndexReader(_segmentDirectory, _segmentMetadata, _readMode);
     }
   }
@@ -283,8 +284,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       }
       if (_starTreeIndexReader != null) {
         _starTreeIndexReader.close();
+        _starTreeIndexReader = null;
       }
-      _starTreeIndexReader = null;
     }
   }
 
@@ -443,8 +444,8 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       _segmentLock.unlock();
       if (_columnIndexDirectory != null) {
         _columnIndexDirectory.close();
+        _columnIndexDirectory = null;
       }
-      _columnIndexDirectory = null;
     }
 
     @Override
