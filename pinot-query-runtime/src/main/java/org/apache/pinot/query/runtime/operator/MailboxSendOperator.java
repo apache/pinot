@@ -29,9 +29,10 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
+import org.apache.pinot.query.mailbox.ServerAddress;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -159,9 +160,11 @@ public class MailboxSendOperator extends MultiStageOperator {
     return transferableBlock;
   }
 
-  private static StringMailboxIdentifier toMailboxId(
-      ServerInstance serverInstance, long jobId, int stageId, String serverHostName, int serverPort) {
-    return new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHostName, serverPort,
-        serverInstance.getHostname(), serverInstance.getQueryMailboxPort());
+  private static JsonMailboxIdentifier toMailboxId(
+      ServerInstance destination, long jobId, int stageId, String sender, int senderPort) {
+    return new JsonMailboxIdentifier(
+        String.format("%s_%s", jobId, stageId),
+        new ServerAddress(sender, senderPort),
+        new ServerAddress(destination.getHostname(), destination.getQueryMailboxPort()));
   }
 }

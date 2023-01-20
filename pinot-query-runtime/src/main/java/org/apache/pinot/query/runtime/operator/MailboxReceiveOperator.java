@@ -30,10 +30,11 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
+import org.apache.pinot.query.mailbox.ServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.service.QueryConfig;
@@ -69,8 +70,10 @@ public class MailboxReceiveOperator extends MultiStageOperator {
 
   private static MailboxIdentifier toMailboxId(ServerInstance fromInstance, long jobId, long stageId,
       String receiveHostName, int receivePort) {
-    return new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), fromInstance.getHostname(),
-        fromInstance.getQueryMailboxPort(), receiveHostName, receivePort);
+    return new JsonMailboxIdentifier(
+        String.format("%s_%s", jobId, stageId),
+        new ServerAddress(fromInstance.getHostname(), fromInstance.getQueryMailboxPort()),
+        new ServerAddress(receiveHostName, receivePort));
   }
 
   // TODO: Move deadlineInNanoSeconds to OperatorContext.

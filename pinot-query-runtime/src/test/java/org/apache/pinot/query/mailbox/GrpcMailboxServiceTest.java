@@ -74,8 +74,10 @@ public class GrpcMailboxServiceTest {
   public void testHappyPath()
       throws Exception {
     // Given:
-    StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
-        "happypath", "localhost", _mailboxService1.getMailboxPort(), "localhost", _mailboxService2.getMailboxPort());
+    JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
+        "happypath",
+        new ServerAddress("localhost", _mailboxService1.getMailboxPort()),
+        new ServerAddress("localhost", _mailboxService2.getMailboxPort()));
     SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId);
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);
@@ -104,8 +106,10 @@ public class GrpcMailboxServiceTest {
   public void testGrpcException()
       throws Exception {
     // Given:
-    StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
-        "exception", "localhost", _mailboxService1.getMailboxPort(), "localhost", _mailboxService2.getMailboxPort());
+    JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
+        "exception",
+        new ServerAddress("localhost", _mailboxService1.getMailboxPort()),
+        new ServerAddress("localhost", _mailboxService2.getMailboxPort()));
     SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId);
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);

@@ -49,7 +49,7 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
       throw new IllegalStateException("Failed to insert into in-memory mailbox "
           + _mailboxId);
     }
-    _gotMailCallback.accept(new StringMailboxIdentifier(_mailboxId));
+    _gotMailCallback.accept(JsonMailboxIdentifier.parse(_mailboxId));
   }
 
   @Override

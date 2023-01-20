@@ -31,8 +31,8 @@ import javax.annotation.concurrent.GuardedBy;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.GrpcReceivingMailbox;
+import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +71,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private ReadWriteLock _errorLock = new ReentrantReadWriteLock();
   @GuardedBy("_errorLock")
   private Mailbox.MailboxContent _errorContent = null;
-  private StringMailboxIdentifier _mailboxId;
+  private JsonMailboxIdentifier _mailboxId;
   private Consumer<MailboxIdentifier> _gotMailCallback;
 
   private void updateMaxBufferSize() {
@@ -132,7 +132,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   @Override
   public void onNext(Mailbox.MailboxContent mailboxContent) {
-    _mailboxId = new StringMailboxIdentifier(mailboxContent.getMailboxId());
+    _mailboxId = JsonMailboxIdentifier.parse(mailboxContent.getMailboxId());
 
     GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
     _gotMailCallback = receivingMailbox.init(this);
