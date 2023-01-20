@@ -129,14 +129,16 @@ public class PinotUpsertRestletResource {
     // Estimated value space, it contains <segmentName, DocId, ComparisonValue(timestamp)> and overhead.
     // Here we only calculate the map content size. TODO: Add the map entry size and the array size within the map.
     int bytesPerValue = 60;
-    String comparisonColumn = tableConfig.getUpsertConfig().getComparisonColumn();
-    if (comparisonColumn != null) {
-      FieldSpec.DataType dt = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      if (!dt.isFixedWidth()) {
-        String msg = "Not support data types for the comparison column";
-        throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST);
-      } else {
-        bytesPerValue = 52 + dt.size();
+    List<String> comparisonColumns = tableConfig.getUpsertConfig().getComparisonColumns();
+    if (!comparisonColumns.isEmpty()) {
+      for (String columnName : comparisonColumns) {
+        FieldSpec.DataType dt = schema.getFieldSpecFor(columnName).getDataType();
+        if (!dt.isFixedWidth()) {
+          String msg = "Not support data types for the comparison column";
+          throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST);
+        } else {
+          bytesPerValue = 52 + dt.size();
+        }
       }
     }
 

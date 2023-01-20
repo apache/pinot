@@ -18,16 +18,19 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import java.util.HashMap;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-@SuppressWarnings("rawtypes")
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class RecordInfo {
   private final PrimaryKey _primaryKey;
   private final int _docId;
   private final Comparable _comparisonValue;
 
-  public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
+  public RecordInfo(PrimaryKey primaryKey, int docId, @Nullable Comparable comparisonValue) {
     _primaryKey = primaryKey;
     _docId = docId;
     _comparisonValue = comparisonValue;
@@ -42,6 +45,39 @@ public class RecordInfo {
   }
 
   public Comparable getComparisonValue() {
+    if (_comparisonValue instanceof ComparisonColumns) {
+      return mergeComparisonColumnValues();
+    }
     return _comparisonValue;
+  }
+
+  private ComparisonColumns mergeComparisonColumnValues() {
+    // first, we'll merge the values of this new row with the comparison values from any previous upsert
+    ComparisonColumns inboundColumnValues = (ComparisonColumns) _comparisonValue;
+    ComparisonColumns existingColumnValues = inboundColumnValues.getOther();
+    if (existingColumnValues == null) {
+      return inboundColumnValues;
+    }
+
+    Map<String, ComparisonColumn> mergedComparisonColumns = existingColumnValues.getComparisonColumns();
+
+    for (Map.Entry<String, ComparisonColumn> columnEntry : inboundColumnValues.getComparisonColumns().entrySet()) {
+      ComparisonColumn inboundValue = columnEntry.getValue();
+      ComparisonColumn existingValue = mergedComparisonColumns.get(inboundValue.columnName);
+
+      if (existingValue == null) {
+        mergedComparisonColumns.put(inboundValue.columnName,
+            new ComparisonColumn(inboundValue.columnName, inboundValue.comparisonValue, inboundValue.isNull));
+        continue;
+      }
+
+      int comparisonResult = inboundValue.comparisonValue.compareTo(existingValue.comparisonValue);
+      Comparable comparisonValue = comparisonResult >= 0 ? inboundValue.comparisonValue : existingValue.comparisonValue;
+
+      mergedComparisonColumns.put(inboundValue.columnName,
+          new ComparisonColumn(inboundValue.columnName, comparisonValue));
+
+    }
+    return new ComparisonColumns(mergedComparisonColumns);
   }
 }

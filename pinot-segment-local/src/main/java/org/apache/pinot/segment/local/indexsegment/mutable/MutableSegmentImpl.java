@@ -62,6 +62,8 @@ import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.segment.local.upsert.ComparisonColumn;
+import org.apache.pinot.segment.local.upsert.ComparisonColumns;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
@@ -163,7 +165,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
 
   private final UpsertConfig.Mode _upsertMode;
-  private final String _upsertComparisonColumn;
+  private final List<String> _upsertComparisonColumns;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
@@ -408,12 +410,13 @@ public class MutableSegmentImpl implements MutableSegment {
           "Metrics aggregation and upsert cannot be enabled together");
       _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
-      String upsertComparisonColumn = config.getUpsertComparisonColumn();
-      _upsertComparisonColumn = upsertComparisonColumn != null ? upsertComparisonColumn : _timeColumnName;
+      List<String> upsertComparisonColumns = config.getUpsertComparisonColumns();
+      _upsertComparisonColumns =
+          upsertComparisonColumns != null ? upsertComparisonColumns : Collections.singletonList(_timeColumnName);
     } else {
       _partitionUpsertMetadataManager = null;
       _validDocIds = null;
-      _upsertComparisonColumn = null;
+      _upsertComparisonColumns = null;
     }
   }
 
@@ -558,10 +561,18 @@ public class MutableSegmentImpl implements MutableSegment {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
 
     if (isUpsertEnabled()) {
-      Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
-      Preconditions.checkState(upsertComparisonValue instanceof Comparable,
-          "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
-      return new RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue);
+      Map<String, ComparisonColumn> comparisonColumns = new HashMap<>();
+
+      for (String columnName : _upsertComparisonColumns) {
+        Object comparisonValue = row.getValue(columnName);
+
+        Preconditions.checkState(comparisonValue instanceof Comparable,
+            "Upsert comparison column: %s must be comparable", columnName);
+
+        comparisonColumns.put(columnName,
+            new ComparisonColumn(columnName, (Comparable) comparisonValue, row.isNullValue(columnName)));
+      }
+      return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonColumns));
     }
 
     return new RecordInfo(primaryKey, docId, null);

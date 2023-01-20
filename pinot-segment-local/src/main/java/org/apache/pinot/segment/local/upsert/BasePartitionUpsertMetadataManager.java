@@ -54,7 +54,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final String _tableNameWithType;
   protected final int _partitionId;
   protected final List<String> _primaryKeyColumns;
-  protected final String _comparisonColumn;
+  protected final List<String> _comparisonColumns;
   protected final HashFunction _hashFunction;
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
@@ -72,12 +72,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected int _numOutOfOrderEvents = 0;
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
-      List<String> primaryKeyColumns, String comparisonColumn, HashFunction hashFunction,
+      List<String> primaryKeyColumns, List<String> comparisonColumns, HashFunction hashFunction,
       @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
-    _comparisonColumn = comparisonColumn;
+    _comparisonColumns = comparisonColumns;
     _hashFunction = hashFunction;
     _partialUpsertHandler = partialUpsertHandler;
     _enableSnapshot = enableSnapshot;
@@ -132,7 +132,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
 
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
-        _comparisonColumn)) {
+        _comparisonColumns)) {
       Iterator<RecordInfo> recordInfoIterator;
       if (validDocIds != null) {
         recordInfoIterator = UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds);
@@ -226,7 +226,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
 
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
-        _comparisonColumn)) {
+        _comparisonColumns)) {
       Iterator<RecordInfo> recordInfoIterator =
           UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
       replaceSegment(segment, null, recordInfoIterator, oldSegment);

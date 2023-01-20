@@ -21,8 +21,11 @@ package org.apache.pinot.segment.local.upsert;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -77,17 +80,16 @@ public class UpsertUtils {
 
   public static class RecordInfoReader implements Closeable {
     public final PrimaryKeyReader _primaryKeyReader;
-    public final PinotSegmentColumnReader _comparisonColumnReader;
+    public final ComparisonColumnReader _comparisonColumnReader;
 
-    public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns, String comparisonColumn) {
+    public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns, List<String> comparisonColumns) {
       _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
-      _comparisonColumnReader = new PinotSegmentColumnReader(segment, comparisonColumn);
+      _comparisonColumnReader = new ComparisonColumnReader(segment, comparisonColumns);
     }
 
     public RecordInfo getRecordInfo(int docId) {
       PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
-      Comparable comparisonValue = (Comparable) getValue(_comparisonColumnReader, docId);
-      return new RecordInfo(primaryKey, docId, comparisonValue);
+      return new RecordInfo(primaryKey, docId, _comparisonColumnReader.getComparisonColumns(docId));
     }
 
     @Override
@@ -130,6 +132,39 @@ public class UpsertUtils {
         throws IOException {
       for (PinotSegmentColumnReader primaryKeyColumnReader : _primaryKeyColumnReaders) {
         primaryKeyColumnReader.close();
+      }
+    }
+  }
+
+  public static class ComparisonColumnReader implements Closeable {
+    public final Map<String, PinotSegmentColumnReader> _comparisonColumnReaders;
+
+    public ComparisonColumnReader(IndexSegment segment, List<String> comparisonColumns) {
+      _comparisonColumnReaders = new HashMap<>();
+      for (String comparisonColumn : comparisonColumns) {
+        _comparisonColumnReaders.put(comparisonColumn, new PinotSegmentColumnReader(segment, comparisonColumn));
+      }
+    }
+
+    public ComparisonColumns getComparisonColumns(int docId) {
+      Map<String, ComparisonColumn> comparisonColumns = new HashMap<>();
+
+      for (String comparisonColumnName : _comparisonColumnReaders.keySet()) {
+        PinotSegmentColumnReader columnReader = _comparisonColumnReaders.get(comparisonColumnName);
+        Comparable comparisonValue = (Comparable) getValue(columnReader, docId);
+
+        comparisonColumns.put(comparisonColumnName,
+            new ComparisonColumn(comparisonColumnName, comparisonValue, columnReader.isNull(docId)));
+
+      }
+      return new ComparisonColumns(comparisonColumns);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      for (PinotSegmentColumnReader comparisonColumnReader : _comparisonColumnReaders.values()) {
+        comparisonColumnReader.close();
       }
     }
   }

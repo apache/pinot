@@ -21,7 +21,9 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
@@ -51,8 +53,8 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("default upsert strategy for partial mode")
   private Strategy _defaultPartialUpsertStrategy;
 
-  @JsonPropertyDescription("Column for upsert comparison, default to time column")
-  private String _comparisonColumn;
+  @JsonPropertyDescription("Columns for upsert comparison, default to time column")
+  private List<String> _comparisonColumns;
 
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
@@ -67,7 +69,7 @@ public class UpsertConfig extends BaseJsonConfig {
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
       @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
       @JsonProperty("defaultPartialUpsertStrategy") @Nullable Strategy defaultPartialUpsertStrategy,
-      @JsonProperty("comparisonColumn") @Nullable String comparisonColumn,
+      @JsonProperty("comparisonColumns") @Nullable List<String> comparisonColumns,
       @JsonProperty("hashFunction") @Nullable HashFunction hashFunction) {
     Preconditions.checkArgument(mode != null, "Upsert mode must be configured");
     _mode = mode;
@@ -81,7 +83,7 @@ public class UpsertConfig extends BaseJsonConfig {
       _defaultPartialUpsertStrategy = null;
     }
 
-    _comparisonColumn = comparisonColumn;
+    _comparisonColumns = comparisonColumns;
     _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
   }
 
@@ -110,8 +112,8 @@ public class UpsertConfig extends BaseJsonConfig {
     return _defaultPartialUpsertStrategy;
   }
 
-  public String getComparisonColumn() {
-    return _comparisonColumn;
+  public List<String> getComparisonColumns() {
+    return _comparisonColumns;
   }
 
   public boolean isEnableSnapshot() {
@@ -154,10 +156,18 @@ public class UpsertConfig extends BaseJsonConfig {
    * same primary key, the record with the larger value of the time column is picked as the
    * latest update.
    * However, there are cases when users need to use another column to determine the order.
-   * In such case, you can use option comparisonColumn to override the column used for comparison.
+   * In such case, you can use option comparisonColumn to override the column used for comparison. When using
+   * multiple comparison columns, typically in the case of partial upserts, it is expected that input documents will
+   * each only have a singular non-null comparisonColumn. Multiple non-null values in an input document _will_ result
+   * in undefined behaviour. Typically, one comparisonColumn is allocated per distinct producer application of data
+   * in the case where there are multiple producers sinking to the same table.
    */
+  public void setComparisonColumn(List<String> comparisonColumns) {
+    _comparisonColumns = comparisonColumns;
+  }
+
   public void setComparisonColumn(String comparisonColumn) {
-    _comparisonColumn = comparisonColumn;
+    _comparisonColumns = Collections.singletonList(comparisonColumn);
   }
 
   public void setEnableSnapshot(boolean enableSnapshot) {

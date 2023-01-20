@@ -570,9 +570,11 @@ public final class TableConfigUtils {
           "The upsert table cannot have star-tree index.");
 
       // comparison column exists
-      if (tableConfig.getUpsertConfig().getComparisonColumn() != null) {
-        String comparisonCol = tableConfig.getUpsertConfig().getComparisonColumn();
-        Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
+      if (tableConfig.getUpsertConfig().getComparisonColumns() != null) {
+        List<String> comparisonCols = tableConfig.getUpsertConfig().getComparisonColumns();
+        for (String comparisonCol : comparisonCols) {
+          Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
+        }
       }
     }
     validateAggregateMetricsForUpsertConfig(tableConfig);
@@ -641,8 +643,8 @@ public final class TableConfigUtils {
       UpsertConfig.Strategy columnStrategy = entry.getValue();
       Preconditions.checkState(!primaryKeyColumns.contains(column), "Merger cannot be applied to primary key columns");
 
-      if (upsertConfig.getComparisonColumn() != null) {
-        Preconditions.checkState(!upsertConfig.getComparisonColumn().equals(column),
+      if (upsertConfig.getComparisonColumns() != null) {
+        Preconditions.checkState(!upsertConfig.getComparisonColumns().contains(column),
             "Merger cannot be applied to comparison column");
       } else {
         Preconditions.checkState(!tableConfig.getValidationConfig().getTimeColumnName().equals(column),
