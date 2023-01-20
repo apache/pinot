@@ -119,7 +119,5 @@ public class SegmentCommitterFactoryTest {
     Assert.assertNotNull(committer);
     Assert.assertTrue(committer instanceof SplitSegmentCommitter);
     Assert.assertTrue(((SplitSegmentCommitter) committer).getSegmentUploader() instanceof PinotFSSegmentUploader);
-
   }
-
 }
