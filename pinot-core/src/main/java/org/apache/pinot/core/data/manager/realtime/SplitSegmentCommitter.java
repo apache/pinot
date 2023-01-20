@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.net.URI;
 import javax.annotation.Nullable;
@@ -48,6 +49,11 @@ public class SplitSegmentCommitter implements SegmentCommitter {
     _params = new SegmentCompletionProtocol.Request.Params(params);
     _segmentUploader = segmentUploader;
     _peerDownloadScheme = peerDownloadScheme;
+  }
+
+  @VisibleForTesting
+  SegmentUploader getSegmentUploader() {
+    return _segmentUploader;
   }
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
