@@ -23,7 +23,7 @@ import java.util.List;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -40,7 +40,7 @@ public class InMemoryMailboxServiceTest {
       throws Exception {
     InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
     final JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
-        "happyPathJob", new ServerAddress("localhost", 0, 0), new ServerAddress("localhost", 0, 0));
+        "happyPathJob", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 0, 0));
     InMemoryReceivingMailbox receivingMailbox = (InMemoryReceivingMailbox) mailboxService.getReceivingMailbox(
         mailboxId);
     InMemorySendingMailbox sendingMailbox = (InMemorySendingMailbox) mailboxService.getSendingMailbox(mailboxId);
@@ -76,7 +76,7 @@ public class InMemoryMailboxServiceTest {
   public void testNonLocalMailboxId() {
     InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
     final JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
-        "happyPathJob", new ServerAddress("localhost", 0, 0), new ServerAddress("localhost", 1, 0));
+        "happyPathJob", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 1, 0));
 
     // Test getReceivingMailbox
     try {

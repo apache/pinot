@@ -22,20 +22,30 @@ package org.apache.pinot.query.routing;
 import java.util.Objects;
 
 
-public class ServerAddress {
+/**
+ * Represents the address of a {@link VirtualServer} containing
+ * both the ID of the specific virtualized server and the physical
+ * internet address in id@hostname:port format.
+ *
+ * <p>This is needed in addition to {@code VirtualServer} because there
+ * are some parts of the code that don't have enough information to
+ * construct the full {@code VirtualServer} and only require the
+ * hostname, port and virtualId.</p>
+ */
+public class VirtualServerAddress {
 
   private final String _hostname;
   private final int _port;
-  private final int _partition;
+  private final int _virtualId;
 
-  public ServerAddress(String hostname, int port, int partition) {
+  public VirtualServerAddress(String hostname, int port, int virtualId) {
     _hostname = hostname;
     _port = port;
-    _partition = partition;
+    _virtualId = virtualId;
   }
 
-  public ServerAddress(VirtualServer server) {
-    this(server.getHostname(), server.getPort(), server.getId());
+  public VirtualServerAddress(VirtualServer server) {
+    this(server.getHostname(), server.getPort(), server.getVirtualId());
   }
 
   /**
@@ -45,14 +55,10 @@ public class ServerAddress {
    * @param address the serialized string
    * @return the deserialized form
    */
-  public static ServerAddress parse(String address) {
-    String[] split = address.split(":");
-    if (split.length == 3) {
-      return new ServerAddress(split[0], Integer.parseInt(split[1]), Integer.parseInt(split[2]));
-    } else {
-      // this is here for backwards compatibility
-      return new ServerAddress(split[0], Integer.parseInt(split[1]), 0);
-    }
+  public static VirtualServerAddress parse(String address) {
+    String[] split = address.split("@");
+    String[] hostSplit = split[1].split(":");
+    return new VirtualServerAddress(hostSplit[0], Integer.parseInt(hostSplit[1]), Integer.parseInt(split[0]));
   }
 
   /**
@@ -69,8 +75,8 @@ public class ServerAddress {
     return _port;
   }
 
-  public int partition() {
-    return _partition;
+  public int virtualId() {
+    return _virtualId;
   }
 
   @Override
@@ -81,19 +87,19 @@ public class ServerAddress {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    ServerAddress that = (ServerAddress) o;
+    VirtualServerAddress that = (VirtualServerAddress) o;
     return _port == that._port
-        && _partition == that._partition
+        && _virtualId == that._virtualId
         && Objects.equals(_hostname, that._hostname);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_hostname, _port, _partition);
+    return Objects.hash(_hostname, _port, _virtualId);
   }
 
   @Override
   public String toString() {
-    return _hostname + ":" + _port + ":" + _partition;
+    return _virtualId + "@" + _hostname + ":" + _port;
   }
 }

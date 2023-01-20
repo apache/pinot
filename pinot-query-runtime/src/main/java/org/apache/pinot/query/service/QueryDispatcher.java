@@ -39,7 +39,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -71,7 +71,7 @@ public class QueryDispatcher {
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
-        reduceNode.getSenderStageId(), reduceNode.getDataSchema(), new ServerAddress(mailboxService.getHostname(),
+        reduceNode.getSenderStageId(), reduceNode.getDataSchema(), new VirtualServerAddress(mailboxService.getHostname(),
         mailboxService.getMailboxPort(), 0), timeoutMs);
     List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs);
     mailboxReceiveOperator.toExplainString();
@@ -196,7 +196,7 @@ public class QueryDispatcher {
 
   @VisibleForTesting
   public static MailboxReceiveOperator createReduceStageOperator(MailboxService<TransferableBlock> mailboxService,
-      List<VirtualServer> sendingInstances, long jobId, int stageId, DataSchema dataSchema, ServerAddress server,
+      List<VirtualServer> sendingInstances, long jobId, int stageId, DataSchema dataSchema, VirtualServerAddress server,
       long timeoutMs) {
     // timeout is set for reduce stage
     MailboxReceiveOperator mailboxReceiveOperator =

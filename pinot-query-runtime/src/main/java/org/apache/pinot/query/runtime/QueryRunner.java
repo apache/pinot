@@ -43,7 +43,7 @@ import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -83,7 +83,7 @@ public class QueryRunner {
   private MailboxService<TransferableBlock> _mailboxService;
   private String _hostname;
   private int _port;
-  private ServerAddress _rootServer;
+  private VirtualServerAddress _rootServer;
   private OpChainSchedulerService _scheduler;
 
   /**
@@ -97,7 +97,7 @@ public class QueryRunner {
         CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceName;
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
     // always use 0 for root server ID as all data is processed by one node at the global root
-    _rootServer = new ServerAddress(_hostname, _port, 0);
+    _rootServer = new VirtualServerAddress(_hostname, _port, 0);
     _helixManager = helixManager;
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,

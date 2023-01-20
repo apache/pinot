@@ -32,7 +32,7 @@ import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -70,7 +70,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
       MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, ServerAddress sendingServer,
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, VirtualServerAddress sendingServer,
       long jobId, int stageId) {
     this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
         server -> toMailboxId(server, jobId, stageId, sendingServer), BlockExchange::getExchange, jobId, stageId);
@@ -161,10 +161,10 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private static JsonMailboxIdentifier toMailboxId(
-      VirtualServer destination, long jobId, int stageId, ServerAddress sender) {
+      VirtualServer destination, long jobId, int stageId, VirtualServerAddress sender) {
     return new JsonMailboxIdentifier(
         String.format("%s_%s", jobId, stageId),
         sender,
-        new ServerAddress(destination.getHostname(), destination.getQueryMailboxPort(), destination.getId()));
+        new VirtualServerAddress(destination.getHostname(), destination.getQueryMailboxPort(), destination.getVirtualId()));
   }
 }

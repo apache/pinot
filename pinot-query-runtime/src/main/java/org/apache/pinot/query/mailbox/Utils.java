@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 
 
 public final class Utils {
@@ -29,7 +29,7 @@ public final class Utils {
 
   public static String constructChannelId(String mailboxId) {
     MailboxIdentifier mailboxIdentifier = toMailboxIdentifier(mailboxId);
-    ServerAddress dest = mailboxIdentifier.getToHost();
+    VirtualServerAddress dest = mailboxIdentifier.getToHost();
     return dest.toString();
   }
 

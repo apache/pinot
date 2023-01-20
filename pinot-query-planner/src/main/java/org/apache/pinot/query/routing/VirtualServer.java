@@ -32,19 +32,19 @@ import org.apache.pinot.core.transport.ServerInstance;
 public class VirtualServer {
 
   private final ServerInstance _server;
-  private final int _id;
+  private final int _virtualId;
 
-  public VirtualServer(ServerInstance server, int id) {
+  public VirtualServer(ServerInstance server, int virtualId) {
     _server = server;
-    _id = id;
+    _virtualId = virtualId;
   }
 
   public ServerInstance getServer() {
     return _server;
   }
 
-  public int getId() {
-    return _id;
+  public int getVirtualId() {
+    return _virtualId;
   }
 
   public String getHostname() {
@@ -69,6 +69,6 @@ public class VirtualServer {
 
   @Override
   public String toString() {
-    return _id + "@" + _server.getInstanceId();
+    return _virtualId + "@" + _server.getInstanceId();
   }
 }

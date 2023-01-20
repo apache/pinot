@@ -24,7 +24,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.spi.config.table.TableType;
@@ -42,7 +42,7 @@ public class ServerPlanRequestContext extends PlanRequestContext {
   protected InstanceRequest _instanceRequest;
 
   public ServerPlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      long timeoutMs, ServerAddress server, Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery,
+      long timeoutMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery,
       TableType tableType, TimeBoundaryInfo timeBoundaryInfo) {
     super(mailboxService, requestId, stageId, timeoutMs, server, metadataMap);
     _pinotQuery = pinotQuery;

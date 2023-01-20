@@ -48,7 +48,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.service.QueryConfig;
@@ -105,7 +105,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     pinotQuery.setExplain(false);
     ServerPlanRequestContext context =
         new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs,
-            new ServerAddress(stagePlan.getServer()), stagePlan.getMetadataMap(), pinotQuery, tableType,
+            new VirtualServerAddress(stagePlan.getServer()), stagePlan.getMetadataMap(), pinotQuery, tableType,
             timeBoundaryInfo);
 
     // visit the plan and create query physical plan.

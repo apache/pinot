@@ -28,7 +28,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -60,7 +60,7 @@ public class MailboxReceiveOperatorTest {
   @Mock
   private VirtualServer _server2;
 
-  private final ServerAddress _testAddr = new ServerAddress("test", 123, 0);
+  private final VirtualServerAddress _testAddr = new VirtualServerAddress("test", 123, 0);
 
   @BeforeMethod
   public void setUp() {
@@ -152,7 +152,7 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.SINGLETON, toAddress, jobId, stageId, null);
@@ -180,11 +180,11 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(serverHost, server2port, 0),
+            new VirtualServerAddress(serverHost, server2port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(true);
@@ -214,11 +214,11 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(serverHost, server2port, 0),
+            new VirtualServerAddress(serverHost, server2port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
@@ -250,11 +250,11 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(serverHost, server2port, 0),
+            new VirtualServerAddress(serverHost, server2port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
@@ -285,11 +285,11 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(serverHost, server2port, 0),
+            new VirtualServerAddress(serverHost, server2port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
@@ -324,11 +324,11 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(serverHost, server2port, 0),
+            new VirtualServerAddress(serverHost, server2port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
@@ -359,18 +359,18 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId1 =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(server1Host, server1Port, 0),
+            new VirtualServerAddress(server1Host, server1Port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(true);
 
     JsonMailboxIdentifier expectedMailboxId2 =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(server2Host, server2Port, 0),
+            new VirtualServerAddress(server2Host, server2Port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
@@ -402,11 +402,11 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     JsonMailboxIdentifier expectedMailboxId1 =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(server1Host, server1Port, 0),
+            new VirtualServerAddress(server1Host, server1Port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
@@ -414,7 +414,7 @@ public class MailboxReceiveOperatorTest {
 
     JsonMailboxIdentifier expectedMailboxId2 =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(server2Host, server2Port, 0),
+            new VirtualServerAddress(server2Host, server2Port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
@@ -446,12 +446,12 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
     JsonMailboxIdentifier expectedMailboxId1 =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(server1Host, server1Port, 0),
+            new VirtualServerAddress(server1Host, server1Port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
@@ -464,7 +464,7 @@ public class MailboxReceiveOperatorTest {
     Object[] expRow3 = new Object[]{3, 3};
     JsonMailboxIdentifier expectedMailboxId2 =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(server2Host, server2Port, 0),
+            new VirtualServerAddress(server2Host, server2Port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
@@ -506,12 +506,12 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
     JsonMailboxIdentifier expectedMailboxId1 =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(server1Host, server1Port, 0),
+            new VirtualServerAddress(server1Host, server1Port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
@@ -521,7 +521,7 @@ public class MailboxReceiveOperatorTest {
     Object[] expRow3 = new Object[]{3, 3};
     JsonMailboxIdentifier expectedMailboxId2 =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(server2Host, server2Port, 0),
+            new VirtualServerAddress(server2Host, server2Port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
@@ -552,12 +552,12 @@ public class MailboxReceiveOperatorTest {
     int stageId = 0;
     int toPort = 8888;
     String toHost = "toHost";
-    ServerAddress toAddress = new ServerAddress(toHost, toPort, 0);
+    VirtualServerAddress toAddress = new VirtualServerAddress(toHost, toPort, 0);
 
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
     JsonMailboxIdentifier expectedMailboxId1 =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(server1Host, server1Port, 0),
+            new VirtualServerAddress(server1Host, server1Port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
@@ -566,7 +566,7 @@ public class MailboxReceiveOperatorTest {
     Object[] expRow3 = new Object[]{3, 3};
     JsonMailboxIdentifier expectedMailboxId2 =
         new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
-            new ServerAddress(server2Host, server2Port, 0),
+            new VirtualServerAddress(server2Host, server2Port, 0),
             toAddress);
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);

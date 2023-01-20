@@ -25,7 +25,7 @@ import java.util.Map;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
@@ -34,13 +34,13 @@ public class PlanRequestContext {
   protected final long _requestId;
   protected final int _stageId;
   private final long _timeoutMs;
-  protected final ServerAddress _server;
+  protected final VirtualServerAddress _server;
   protected final Map<Integer, StageMetadata> _metadataMap;
   protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
 
 
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      long timeoutMs, ServerAddress server, Map<Integer, StageMetadata> metadataMap) {
+      long timeoutMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
@@ -61,7 +61,7 @@ public class PlanRequestContext {
     return _timeoutMs;
   }
 
-  public ServerAddress getServer() {
+  public VirtualServerAddress getServer() {
     return _server;
   }
 

@@ -33,7 +33,7 @@ import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -69,16 +69,16 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   private OperatorStats _operatorStats;
 
   private static MailboxIdentifier toMailboxId(VirtualServer fromInstance, long jobId, long stageId,
-      ServerAddress receiver) {
+      VirtualServerAddress receiver) {
     return new JsonMailboxIdentifier(
         String.format("%s_%s", jobId, stageId),
-        new ServerAddress(fromInstance.getHostname(), fromInstance.getQueryMailboxPort(), fromInstance.getId()),
+        new VirtualServerAddress(fromInstance.getHostname(), fromInstance.getQueryMailboxPort(), fromInstance.getVirtualId()),
         receiver);
   }
 
   // TODO: Move deadlineInNanoSeconds to OperatorContext.
   public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService,
-      List<VirtualServer> sendingStageInstances, RelDistribution.Type exchangeType, ServerAddress receiver,
+      List<VirtualServer> sendingStageInstances, RelDistribution.Type exchangeType, VirtualServerAddress receiver,
       long jobId, int stageId, Long timeoutMs) {
     _mailboxService = mailboxService;
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),

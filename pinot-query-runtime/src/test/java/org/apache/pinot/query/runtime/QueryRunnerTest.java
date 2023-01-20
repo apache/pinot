@@ -33,7 +33,7 @@ import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
@@ -191,7 +191,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
             Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)),
             reduceNode.getSenderStageId(), reduceNode.getDataSchema(),
-            new ServerAddress("localhost", _reducerGrpcPort, 0),
+            new VirtualServerAddress("localhost", _reducerGrpcPort, 0),
             Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)));
       } else {
         for (VirtualServer serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
