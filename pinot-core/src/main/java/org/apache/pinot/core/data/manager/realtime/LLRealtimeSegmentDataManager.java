@@ -292,6 +292,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final ConsumptionRateLimiter _rateLimiter;
 
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
+  private final CompletionMode _segmentCompletionMode;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -686,8 +687,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               break;
             case KEEP:
               _state = State.RETAINING;
-              CompletionMode segmentCompletionMode = getSegmentCompletionMode();
-              switch (segmentCompletionMode) {
+              switch (_segmentCompletionMode) {
                 case DOWNLOAD:
                   _state = State.DISCARDED;
                   break;
@@ -762,19 +762,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       }
     }
-  }
-
-  /**
-   * Fetches the completion mode for the segment completion for the given realtime table
-   */
-  private CompletionMode getSegmentCompletionMode() {
-    CompletionConfig completionConfig = _tableConfig.getValidationConfig().getCompletionConfig();
-    if (completionConfig != null) {
-      if (CompletionMode.DOWNLOAD.toString().equalsIgnoreCase(completionConfig.getCompletionMode())) {
-        return CompletionMode.DOWNLOAD;
-      }
-    }
-    return CompletionMode.DEFAULT;
   }
 
   @VisibleForTesting
@@ -1153,11 +1140,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         case CATCHING_UP:
         case HOLDING:
         case INITIAL_CONSUMING:
-          CompletionMode segmentCompletionMode = getSegmentCompletionMode();
-          switch (segmentCompletionMode) {
+          switch (_segmentCompletionMode) {
             case DOWNLOAD:
               _segmentLogger.info("State {}. CompletionMode {}. Downloading to replace", _state.toString(),
-                  segmentCompletionMode);
+                  _segmentCompletionMode);
               downloadSegmentAndReplace(segmentZKMetadata);
               break;
             case DEFAULT:
@@ -1290,6 +1276,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_tableNameWithType);
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverMetrics, _tableNameWithType);
+    CompletionConfig completionConfig = _tableConfig.getValidationConfig().getCompletionConfig();
+    _segmentCompletionMode = completionConfig != null
+        && CompletionMode.DOWNLOAD.toString().equalsIgnoreCase(completionConfig.getCompletionMode())
+        ? CompletionMode.DOWNLOAD : CompletionMode.DEFAULT;
 
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     // TODO Validate configs
