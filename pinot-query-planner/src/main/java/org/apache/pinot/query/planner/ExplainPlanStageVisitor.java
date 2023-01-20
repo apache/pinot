@@ -191,7 +191,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
         .append(_queryPlan.getStageMetadataMap()
             .get(node.getStageId())
             .getServerInstanceToSegmentsMap()
-            .get(context._host))
+            .get(context._host.getServer()))
         .append('\n');
   }
 
