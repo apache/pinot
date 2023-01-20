@@ -49,27 +49,15 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
 
-  // Indicates if the segment should be uploaded to the deep store's file system or to the controller during the
-  // segment commit protocol. By default, segment is uploaded to the controller during commit.
-  // If this flag is set to true, the segment is uploaded to deep store.
-  private boolean _uploadToFileSystem = false;
-
   // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.
   private String _replicasPerPartition;
+
   public String getSegmentAssignmentStrategy() {
     return _segmentAssignmentStrategy;
   }
 
   public void setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
     _segmentAssignmentStrategy = segmentAssignmentStrategy;
-  }
-
-  public boolean isUploadToFileSystem() {
-    return _uploadToFileSystem;
-  }
-
-  public void setUploadToFileSystem(boolean uploadToFileSystem) {
-    _uploadToFileSystem = uploadToFileSystem;
   }
 
   public String getTimeColumnName() {

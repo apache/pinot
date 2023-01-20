@@ -24,6 +24,8 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 
 
@@ -34,6 +36,7 @@ public class SegmentCommitterFactory {
   private static Logger _logger;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final TableConfig _tableConfig;
+  private final StreamConfig _streamConfig;
   private final ServerMetrics _serverMetrics;
   private final IndexLoadingConfig _indexLoadingConfig;
 
@@ -42,6 +45,8 @@ public class SegmentCommitterFactory {
     _logger = segmentLogger;
     _protocolHandler = protocolHandler;
     _tableConfig = tableConfig;
+    _streamConfig = new StreamConfig(_tableConfig.getTableName(),
+        IngestionConfigUtils.getStreamConfigMap(_tableConfig));
     _indexLoadingConfig = indexLoadingConfig;
     _serverMetrics = serverMetrics;
   }
@@ -62,7 +67,7 @@ public class SegmentCommitterFactory {
     }
     SegmentUploader segmentUploader;
 
-    boolean uploadToFs = _tableConfig.getValidationConfig().isUploadToFileSystem();
+    boolean uploadToFs = _streamConfig.isServerUploadToDeepStore();
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     // TODO: exists for backwards compatibility. remove peerDownloadScheme non-null check once users have migrated
     if (uploadToFs || peerSegmentDownloadScheme != null) {

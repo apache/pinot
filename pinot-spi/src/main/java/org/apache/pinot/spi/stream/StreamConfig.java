@@ -50,6 +50,7 @@ public class StreamConfig {
   public static final long DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS = TimeUnit.MILLISECONDS.convert(6, TimeUnit.HOURS);
   public static final long DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024; // 200M
   public static final int DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS = 100_000;
+  public static final String DEFAULT_SERVER_UPLOAD_TO_DEEPSTORE = "false";
 
   public static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING =
       "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory";
@@ -88,6 +89,11 @@ public class StreamConfig {
 
   // Allow overriding it to use different offset criteria
   private OffsetCriteria _offsetCriteria;
+
+  // Indicates if the segment should be uploaded to the deep store's file system or to the controller during the
+  // segment commit protocol. By default, segment is uploaded to the controller during commit.
+  // If this flag is set to true, the segment is uploaded to deep store.
+  private boolean _serverUploadToDeepStore;
 
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config
@@ -191,6 +197,9 @@ public class StreamConfig {
     _flushThresholdRows = extractFlushThresholdRows(streamConfigMap);
     _flushThresholdTimeMillis = extractFlushThresholdTimeMillis(streamConfigMap);
     _flushThresholdSegmentSizeBytes = extractFlushThresholdSegmentSize(streamConfigMap);
+    _serverUploadToDeepStore = Boolean.parseBoolean(
+        streamConfigMap.getOrDefault(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE,
+        DEFAULT_SERVER_UPLOAD_TO_DEEPSTORE));
 
     int autotuneInitialRows = 0;
     String initialRowsValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS);
@@ -212,6 +221,10 @@ public class StreamConfig {
     _topicConsumptionRateLimit = rate != null ? Double.parseDouble(rate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
 
     _streamConfigMap.putAll(streamConfigMap);
+  }
+
+  public boolean isServerUploadToDeepStore() {
+    return _serverUploadToDeepStore;
   }
 
   private long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {
