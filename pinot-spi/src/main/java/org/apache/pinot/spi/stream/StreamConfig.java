@@ -93,7 +93,7 @@ public class StreamConfig {
   // Indicates if the segment should be uploaded to the deep store's file system or to the controller during the
   // segment commit protocol. By default, segment is uploaded to the controller during commit.
   // If this flag is set to true, the segment is uploaded to deep store.
-  private boolean _serverUploadToDeepStore;
+  private final boolean _serverUploadToDeepStore;
 
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config
@@ -391,7 +391,8 @@ public class StreamConfig {
         + ", _flushSegmentDesiredSizeBytes=" + _flushThresholdSegmentSizeBytes + ", _flushAutotuneInitialRows="
         + _flushAutotuneInitialRows + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties="
         + _decoderProperties + ", _groupId='" + _groupId + "', _topicConsumptionRateLimit=" + _topicConsumptionRateLimit
-        + ", _tableNameWithType='" + _tableNameWithType + '}';
+        + ", _tableNameWithType='" + _tableNameWithType + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore
+        + "}";
   }
 
   @Override
@@ -418,7 +419,8 @@ public class StreamConfig {
         that._decoderClass) && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties)
         && EqualityUtils.isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_tableNameWithType,
         that._tableNameWithType) && EqualityUtils.isEqual(_topicConsumptionRateLimit, that._topicConsumptionRateLimit)
-        && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
+        && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap)
+        && _serverUploadToDeepStore == that._serverUploadToDeepStore;
   }
 
   @Override
@@ -441,6 +443,7 @@ public class StreamConfig {
     result = EqualityUtils.hashCodeOf(result, _topicConsumptionRateLimit);
     result = EqualityUtils.hashCodeOf(result, _streamConfigMap);
     result = EqualityUtils.hashCodeOf(result, _tableNameWithType);
+    result = EqualityUtils.hashCodeOf(result, _serverUploadToDeepStore);
     return result;
   }
 }
