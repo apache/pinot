@@ -357,14 +357,14 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     public boolean hasSegmentIndex(SegmentIndexType type) {
-      if (type != SegmentIndexType.STARTREE_INDEX) {
+      if (type != SegmentIndexType.STAR_TREE_INDEX) {
         throw new IllegalArgumentException("Unknown SegmentIndexType: " + type);
       }
       return _starTreeIndexReader != null;
     }
 
     public SegmentDirectory.Reader getSegmentIndexReaderFor(String indexName, SegmentIndexType type) {
-      if (type != SegmentIndexType.STARTREE_INDEX) {
+      if (type != SegmentIndexType.STAR_TREE_INDEX) {
         throw new IllegalArgumentException("Unknown SegmentIndexType: " + type);
       }
       return new SegmentDirectory.Reader() {

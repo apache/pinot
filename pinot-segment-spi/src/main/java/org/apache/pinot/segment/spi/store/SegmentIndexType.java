@@ -22,7 +22,7 @@ package org.apache.pinot.segment.spi.store;
  * Different from column index, segment level index involves multiple columns like StarTree index.
  */
 public enum SegmentIndexType {
-  STARTREE_INDEX("startree_index");
+  STAR_TREE_INDEX("star_tree_index");
 
   private final String _indexName;
 

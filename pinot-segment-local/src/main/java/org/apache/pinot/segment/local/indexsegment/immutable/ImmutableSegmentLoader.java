@@ -201,7 +201,7 @@ public class ImmutableSegmentLoader {
 
     // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
-    if (segmentReader.hasSegmentIndex(SegmentIndexType.STARTREE_INDEX)) {
+    if (segmentReader.hasSegmentIndex(SegmentIndexType.STAR_TREE_INDEX)) {
       starTreeIndexContainer = new StarTreeIndexContainer(segmentReader, segmentMetadata, indexContainerMap);
     }
 

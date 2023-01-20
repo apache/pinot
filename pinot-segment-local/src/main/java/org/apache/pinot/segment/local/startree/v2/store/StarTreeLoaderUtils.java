@@ -62,7 +62,7 @@ public class StarTreeLoaderUtils {
     for (int i = 0; i < numStarTrees; i++) {
       String indexName = String.valueOf(i);
       SegmentDirectory.Reader indexReader =
-          segmentReader.getSegmentIndexReaderFor(indexName, SegmentIndexType.STARTREE_INDEX);
+          segmentReader.getSegmentIndexReaderFor(indexName, SegmentIndexType.STAR_TREE_INDEX);
       // Load star-tree index
       StarTree starTree = new OffHeapStarTree(indexReader.getIndexFor(indexName, ColumnIndexType.INVERTED_INDEX));
 
