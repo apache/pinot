@@ -35,11 +35,12 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
+import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
@@ -70,8 +71,8 @@ public class QueryDispatcher {
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
-        reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
-        mailboxService.getMailboxPort(), timeoutMs);
+        reduceNode.getSenderStageId(), reduceNode.getDataSchema(), new ServerAddress(mailboxService.getHostname(),
+        mailboxService.getMailboxPort(), 0), timeoutMs);
     List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs);
     mailboxReceiveOperator.toExplainString();
     long toResultTableStartTime = System.currentTimeMillis();
@@ -92,8 +93,8 @@ public class QueryDispatcher {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         reduceStageId = stageId;
       } else {
-        List<ServerInstance> serverInstances = stage.getValue().getServerInstances();
-        for (ServerInstance serverInstance : serverInstances) {
+        List<VirtualServer> serverInstances = stage.getValue().getServerInstances();
+        for (VirtualServer serverInstance : serverInstances) {
           String host = serverInstance.getHostname();
           int servicePort = serverInstance.getQueryServicePort();
           DispatchClient client = getOrCreateDispatchClient(host, servicePort);
@@ -120,7 +121,7 @@ public class QueryDispatcher {
   }
 
   public static DistributedStagePlan constructDistributedStagePlan(QueryPlan queryPlan, int stageId,
-      ServerInstance serverInstance) {
+      VirtualServer serverInstance) {
     return new DistributedStagePlan(stageId, serverInstance, queryPlan.getQueryStageMap().get(stageId),
         queryPlan.getStageMetadataMap());
   }
@@ -195,12 +196,12 @@ public class QueryDispatcher {
 
   @VisibleForTesting
   public static MailboxReceiveOperator createReduceStageOperator(MailboxService<TransferableBlock> mailboxService,
-      List<ServerInstance> sendingInstances, long jobId, int stageId, DataSchema dataSchema, String hostname,
-      int port, long timeoutMs) {
+      List<VirtualServer> sendingInstances, long jobId, int stageId, DataSchema dataSchema, ServerAddress server,
+      long timeoutMs) {
     // timeout is set for reduce stage
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(mailboxService, sendingInstances,
-            RelDistribution.Type.RANDOM_DISTRIBUTED, hostname, port, jobId, stageId, timeoutMs);
+            RelDistribution.Type.RANDOM_DISTRIBUTED, server, jobId, stageId, timeoutMs);
     return mailboxReceiveOperator;
   }
 

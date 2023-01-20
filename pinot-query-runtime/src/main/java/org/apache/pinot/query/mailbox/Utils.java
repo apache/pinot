@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import org.apache.pinot.query.routing.ServerAddress;
+
+
 public final class Utils {
 
   private Utils() {

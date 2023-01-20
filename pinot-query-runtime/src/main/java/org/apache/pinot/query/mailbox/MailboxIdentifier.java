@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import org.apache.pinot.query.routing.ServerAddress;
+
+
 /**
  * {@link MailboxIdentifier} uniquely identify the mailbox that pairs a sender and a receiver.
  *

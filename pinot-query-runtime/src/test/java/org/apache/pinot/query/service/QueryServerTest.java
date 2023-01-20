@@ -35,6 +35,7 @@ import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
@@ -166,7 +167,7 @@ public class QueryServerTest extends QueryTestSet {
   }
 
   private Worker.QueryRequest getQueryRequest(QueryPlan queryPlan, int stageId) {
-    ServerInstance serverInstance = queryPlan.getStageMetadataMap().get(stageId).getServerInstances().get(0);
+    VirtualServer serverInstance = queryPlan.getStageMetadataMap().get(stageId).getServerInstances().get(0);
 
     return Worker.QueryRequest.newBuilder().setStagePlan(QueryPlanSerDeUtils.serialize(
             QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance)))

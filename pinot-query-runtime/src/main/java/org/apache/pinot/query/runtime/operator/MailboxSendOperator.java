@@ -28,12 +28,12 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.mailbox.ServerAddress;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.routing.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -65,20 +65,20 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @VisibleForTesting
   interface MailboxIdGenerator {
-    MailboxIdentifier generate(ServerInstance server);
+    MailboxIdentifier generate(VirtualServer server);
   }
 
   public MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
-      MultiStageOperator dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
+      MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, ServerAddress sendingServer,
       long jobId, int stageId) {
     this(mailboxService, dataTableBlockBaseOperator, receivingStageInstances, exchangeType, keySelector,
-        server -> toMailboxId(server, jobId, stageId, hostName, port), BlockExchange::getExchange, jobId, stageId);
+        server -> toMailboxId(server, jobId, stageId, sendingServer), BlockExchange::getExchange, jobId, stageId);
   }
 
   @VisibleForTesting
   MailboxSendOperator(MailboxService<TransferableBlock> mailboxService,
-      MultiStageOperator dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
+      MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, long jobId, int stageId) {
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
@@ -86,8 +86,8 @@ public class MailboxSendOperator extends MultiStageOperator {
     List<MailboxIdentifier> receivingMailboxes;
     if (exchangeType == RelDistribution.Type.SINGLETON) {
       // TODO: this logic should be moved into SingletonExchange
-      ServerInstance singletonInstance = null;
-      for (ServerInstance serverInstance : receivingStageInstances) {
+      VirtualServer singletonInstance = null;
+      for (VirtualServer serverInstance : receivingStageInstances) {
         if (serverInstance.getHostname().equals(mailboxService.getHostname())
             && serverInstance.getQueryMailboxPort() == mailboxService.getMailboxPort()) {
           Preconditions.checkState(singletonInstance == null, "multiple instance found for singleton exchange type!");
@@ -161,10 +161,10 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private static JsonMailboxIdentifier toMailboxId(
-      ServerInstance destination, long jobId, int stageId, String sender, int senderPort) {
+      VirtualServer destination, long jobId, int stageId, ServerAddress sender) {
     return new JsonMailboxIdentifier(
         String.format("%s_%s", jobId, stageId),
-        new ServerAddress(sender, senderPort),
-        new ServerAddress(destination.getHostname(), destination.getQueryMailboxPort()));
+        sender,
+        new ServerAddress(destination.getHostname(), destination.getQueryMailboxPort(), destination.getId()));
   }
 }

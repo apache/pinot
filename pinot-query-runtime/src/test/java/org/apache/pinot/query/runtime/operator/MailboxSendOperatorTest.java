@@ -23,10 +23,10 @@ import java.util.Arrays;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -48,7 +48,7 @@ public class MailboxSendOperatorTest {
   @Mock
   private MailboxService<TransferableBlock> _mailboxService;
   @Mock
-  private ServerInstance _server;
+  private VirtualServer _server;
   @Mock
   private KeySelector<Object[], Object[]> _selector;
   @Mock

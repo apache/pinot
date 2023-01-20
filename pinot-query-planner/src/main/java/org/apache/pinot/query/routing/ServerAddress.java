@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.query.mailbox;
+package org.apache.pinot.query.routing;
 
 import java.util.Objects;
 
@@ -26,10 +26,16 @@ public class ServerAddress {
 
   private final String _hostname;
   private final int _port;
+  private final int _partition;
 
-  public ServerAddress(String hostname, int port) {
+  public ServerAddress(String hostname, int port, int partition) {
     _hostname = hostname;
     _port = port;
+    _partition = partition;
+  }
+
+  public ServerAddress(VirtualServer server) {
+    this(server.getHostname(), server.getPort(), server.getId());
   }
 
   /**
@@ -41,7 +47,12 @@ public class ServerAddress {
    */
   public static ServerAddress parse(String address) {
     String[] split = address.split(":");
-    return new ServerAddress(split[0], Integer.parseInt(split[1]));
+    if (split.length == 3) {
+      return new ServerAddress(split[0], Integer.parseInt(split[1]), Integer.parseInt(split[2]));
+    } else {
+      // this is here for backwards compatibility
+      return new ServerAddress(split[0], Integer.parseInt(split[1]), 0);
+    }
   }
 
   /**
@@ -58,6 +69,10 @@ public class ServerAddress {
     return _port;
   }
 
+  public int partition() {
+    return _partition;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -67,16 +82,18 @@ public class ServerAddress {
       return false;
     }
     ServerAddress that = (ServerAddress) o;
-    return _port == that._port && Objects.equals(_hostname, that._hostname);
+    return _port == that._port
+        && _partition == that._partition
+        && Objects.equals(_hostname, that._hostname);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_hostname, _port);
+    return Objects.hash(_hostname, _port, _partition);
   }
 
   @Override
   public String toString() {
-    return _hostname + ":" + _port;
+    return _hostname + ":" + _port + ":" + _partition;
   }
 }
