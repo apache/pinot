@@ -111,7 +111,7 @@ public class LookupJoinTransformFunctionTest extends BaseTransformFunctionTest {
     // Lookup col: StringSV
     // PK: [String]
     ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("lookUpJoin('baseballTeams',intSV, 'teamID','GreaterThan', doubleSV, 'teamDouble')"));
+        String.format("inMemoryLookupJoin('baseballTeams',intSV, 'teamID','GreaterThan', doubleSV, 'teamDouble')"));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedIntValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {

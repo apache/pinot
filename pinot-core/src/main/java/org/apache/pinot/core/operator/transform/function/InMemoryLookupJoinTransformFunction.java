@@ -58,7 +58,7 @@ public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
     // Check that there are correct number of arguments
     Preconditions.checkArgument(arguments.size() >= 4,
         "At least 4 arguments are required for LOOKUP transform function: "
-            + "LOOKUPJOIN(inMemoryTableName, joinKey1, joinKey2, filterFunc, condCol1, condCol2)");
+            + "inMemoryLookupJoin(inMemoryTableName, joinKey1, joinKey2, filterFunc, condCol1, condCol2)");
 
     TransformFunction inMemoryTableFunc = arguments.get(0);
     Preconditions.checkArgument(inMemoryTableFunc instanceof LiteralTransformFunction,
@@ -80,8 +80,6 @@ public class InMemoryLookupJoinTransformFunction extends BaseTransformFunction {
     _filterFunc = ((LiteralTransformFunction) arguments.get(3)).getLiteral();
 
     _condCol1 = arguments.get(4);
-
-    System.out.println("liuyao:" + _condCol1);
 
     _condCol2 = ((LiteralTransformFunction) arguments.get(5)).getLiteral();
   }
