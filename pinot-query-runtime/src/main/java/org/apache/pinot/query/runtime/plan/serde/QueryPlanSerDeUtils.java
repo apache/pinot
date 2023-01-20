@@ -21,7 +21,8 @@ package org.apache.pinot.query.runtime.plan.serde;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -59,16 +60,26 @@ public class QueryPlanSerDeUtils {
         .putAllStageMetadata(stageMetadataMapToProtoMap(distributedStagePlan.getMetadataMap())).build();
   }
 
+  private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
+      "(?<virtualid>[0-9]+)@(?<host>[^:]+):(?<port>[0-9]+)\\((?<grpc>[0-9]+):(?<service>[0-9]+):(?<mailbox>[0-9]+)\\)");
+
   public static VirtualServer stringToInstance(String serverInstanceString) {
-    String[] s = StringUtils.split(serverInstanceString, '_');
+    Matcher matcher = VIRTUAL_SERVER_PATTERN.matcher(serverInstanceString);
+    if (!matcher.matches()) {
+      throw new IllegalArgumentException("Unexpected serverInstanceString '" + serverInstanceString + "'. This might "
+          + "happen if you are upgrading from an old version of the multistage engine to the current one in a rolling "
+          + "fashion.");
+    }
+
     // Skipped netty and grpc port as they are not used in worker instance.
-    return new VirtualServer(new WorkerInstance(s[0], Integer.parseInt(s[1]), Integer.parseInt(s[2]),
-        Integer.parseInt(s[3]), Integer.parseInt(s[4])), 0);
+    return new VirtualServer(new WorkerInstance(matcher.group("host"), Integer.parseInt(matcher.group("port")),
+        Integer.parseInt(matcher.group("grpc")), Integer.parseInt(matcher.group("service")),
+        Integer.parseInt(matcher.group("mailbox"))), Integer.parseInt(matcher.group("virtualid")));
   }
 
   public static String instanceToString(VirtualServer serverInstance) {
-    return StringUtils.join(serverInstance.getHostname(), '_', serverInstance.getPort(), '_',
-        serverInstance.getGrpcPort(), '_', serverInstance.getQueryServicePort(), '_',
+    return String.format("%s@%s:%s(%s:%s:%s)", serverInstance.getVirtualId(), serverInstance.getHostname(),
+        serverInstance.getPort(), serverInstance.getGrpcPort(), serverInstance.getQueryServicePort(),
         serverInstance.getQueryMailboxPort());
   }
 
