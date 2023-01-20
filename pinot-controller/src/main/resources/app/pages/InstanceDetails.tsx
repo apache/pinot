@@ -118,7 +118,8 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
       host: instanceHost,
       port: instanceDetails.port,
       type: instanceType,
-      tags: instanceDetails.tags
+      tags: instanceDetails.tags,
+      pools: instanceDetails.pools,
     };
     setState({enabled: instanceDetails.enabled});
     setInstanceDetails(JSON.stringify(instancePutObj, null, 2));
