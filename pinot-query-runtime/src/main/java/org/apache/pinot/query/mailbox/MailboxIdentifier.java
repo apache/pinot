@@ -32,28 +32,14 @@ public interface MailboxIdentifier {
   String getJobId();
 
   /**
-   * get the sender host.
-   * @return sender host
+   * @return the sender address
    */
-  String getFromHost();
+  ServerAddress getFromHost();
 
   /**
-   * get the sender port.
-   * @return sender port
+   * @return the destination address
    */
-  int getFromPort();
-
-  /**
-   * get the receiver host.
-   * @return receiver host
-   */
-  String getToHost();
-
-  /**
-   * get the receiver port.
-   * @return receiver port
-   */
-  int getToPort();
+  ServerAddress getToHost();
 
   /**
    * Checks whether sender and receiver are in the same JVM.

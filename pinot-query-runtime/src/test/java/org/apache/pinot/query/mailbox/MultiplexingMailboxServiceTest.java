@@ -24,10 +24,10 @@ import org.testng.annotations.Test;
 
 
 public class MultiplexingMailboxServiceTest {
-  private static final StringMailboxIdentifier LOCAL_MAILBOX_ID = new StringMailboxIdentifier(
-      "localJobId", "localhost", 0, "localhost", 0);
-  private static final StringMailboxIdentifier NON_LOCAL_MAILBOX_ID = new StringMailboxIdentifier(
-      "localJobId", "localhost", 0, "localhost", 1);
+  private static final JsonMailboxIdentifier LOCAL_MAILBOX_ID = new JsonMailboxIdentifier(
+      "localJobId", new ServerAddress("localhost", 0), new ServerAddress("localhost", 0));
+  private static final JsonMailboxIdentifier NON_LOCAL_MAILBOX_ID = new JsonMailboxIdentifier(
+      "localJobId", new ServerAddress("localhost", 0), new ServerAddress("localhost", 1));
 
   @Test
   public void testHappyPath() {

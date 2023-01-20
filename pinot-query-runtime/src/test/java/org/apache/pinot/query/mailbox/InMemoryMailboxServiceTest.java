@@ -38,8 +38,8 @@ public class InMemoryMailboxServiceTest {
   public void testHappyPath()
       throws Exception {
     InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
-    final StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
-        "happyPathJob", "localhost", 0, "localhost", 0);
+    final JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
+        "happyPathJob", new ServerAddress("localhost", 0), new ServerAddress("localhost", 0));
     InMemoryReceivingMailbox receivingMailbox = (InMemoryReceivingMailbox) mailboxService.getReceivingMailbox(
         mailboxId);
     InMemorySendingMailbox sendingMailbox = (InMemorySendingMailbox) mailboxService.getSendingMailbox(mailboxId);
@@ -74,8 +74,8 @@ public class InMemoryMailboxServiceTest {
   @Test
   public void testNonLocalMailboxId() {
     InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
-    final StringMailboxIdentifier mailboxId = new StringMailboxIdentifier(
-        "happyPathJob", "localhost", 0, "localhost", 1);
+    final JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
+        "happyPathJob", new ServerAddress("localhost", 0), new ServerAddress("localhost", 1));
 
     // Test getReceivingMailbox
     try {

@@ -26,9 +26,10 @@ import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
+import org.apache.pinot.query.mailbox.ServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.mockito.Mock;
@@ -177,8 +178,10 @@ public class MailboxReceiveOperatorTest {
     int toPort = 8888;
     String toHost = "toHost";
 
-    StringMailboxIdentifier expectedMailboxId =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(serverHost, server2port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(true);
     MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
@@ -208,8 +211,10 @@ public class MailboxReceiveOperatorTest {
     int toPort = 8888;
     String toHost = "toHost";
 
-    StringMailboxIdentifier expectedMailboxId =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(serverHost, server2port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     // Receive null mailbox during timeout.
@@ -241,8 +246,10 @@ public class MailboxReceiveOperatorTest {
     int toPort = 8888;
     String toHost = "toHost";
 
-    StringMailboxIdentifier expectedMailboxId =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(serverHost, server2port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Mockito.when(_mailbox.receive()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
@@ -273,8 +280,10 @@ public class MailboxReceiveOperatorTest {
     int toPort = 8888;
     String toHost = "toHost";
 
-    StringMailboxIdentifier expectedMailboxId =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(serverHost, server2port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Object[] expRow = new Object[]{1, 1};
@@ -309,8 +318,10 @@ public class MailboxReceiveOperatorTest {
     int toPort = 8888;
     String toHost = "toHost";
 
-    StringMailboxIdentifier expectedMailboxId =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), serverHost, server2port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(serverHost, server2port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Exception e = new Exception("errorBlock");
@@ -341,13 +352,17 @@ public class MailboxReceiveOperatorTest {
     int toPort = 8888;
     String toHost = "toHost";
 
-    StringMailboxIdentifier expectedMailboxId1 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server1Host, server1Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId1 =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(server1Host, server1Port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(true);
 
-    StringMailboxIdentifier expectedMailboxId2 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server2Host, server2Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId2 =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(server2Host, server2Port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Object[] expRow = new Object[]{1, 1};
@@ -379,14 +394,18 @@ public class MailboxReceiveOperatorTest {
     int toPort = 8888;
     String toHost = "toHost";
 
-    StringMailboxIdentifier expectedMailboxId1 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server1Host, server1Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId1 =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(server1Host, server1Port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Mockito.when(_mailbox.receive()).thenReturn(null);
 
-    StringMailboxIdentifier expectedMailboxId2 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server2Host, server2Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId2 =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(server2Host, server2Port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Object[] expRow = new Object[]{1, 1};
@@ -419,8 +438,10 @@ public class MailboxReceiveOperatorTest {
     String toHost = "toHost";
 
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    StringMailboxIdentifier expectedMailboxId1 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server1Host, server1Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId1 =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(server1Host, server1Port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Object[] expRow1 = new Object[]{1, 1};
@@ -430,8 +451,10 @@ public class MailboxReceiveOperatorTest {
             TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     Object[] expRow3 = new Object[]{3, 3};
-    StringMailboxIdentifier expectedMailboxId2 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server2Host, server2Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId2 =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(server2Host, server2Port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
@@ -474,16 +497,20 @@ public class MailboxReceiveOperatorTest {
     String toHost = "toHost";
 
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    StringMailboxIdentifier expectedMailboxId1 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server1Host, server1Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId1 =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(server1Host, server1Port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Mockito.when(_mailbox.receive())
         .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("mailboxError")));
 
     Object[] expRow3 = new Object[]{3, 3};
-    StringMailboxIdentifier expectedMailboxId2 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server2Host, server2Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId2 =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(server2Host, server2Port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
@@ -515,15 +542,19 @@ public class MailboxReceiveOperatorTest {
     String toHost = "toHost";
 
     DataSchema inSchema = new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-    StringMailboxIdentifier expectedMailboxId1 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server1Host, server1Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId1 =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(server1Host, server1Port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId1)).thenReturn(_mailbox);
     Mockito.when(_mailbox.isClosed()).thenReturn(false);
     Mockito.when(_mailbox.receive()).thenThrow(new Exception("mailboxError"));
 
     Object[] expRow3 = new Object[]{3, 3};
-    StringMailboxIdentifier expectedMailboxId2 =
-        new StringMailboxIdentifier(String.format("%s_%s", jobId, stageId), server2Host, server2Port, toHost, toPort);
+    JsonMailboxIdentifier expectedMailboxId2 =
+        new JsonMailboxIdentifier(String.format("%s_%s", jobId, stageId),
+            new ServerAddress(server2Host, server2Port),
+            new ServerAddress(toHost, toPort));
     Mockito.when(_mailboxService.getReceivingMailbox(expectedMailboxId2)).thenReturn(_mailbox2);
     Mockito.when(_mailbox2.isClosed()).thenReturn(false);
     Mockito.when(_mailbox2.receive()).thenReturn(OperatorTestUtil.block(inSchema, expRow3));
