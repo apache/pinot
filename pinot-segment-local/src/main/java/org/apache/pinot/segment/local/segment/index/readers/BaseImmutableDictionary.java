@@ -27,7 +27,6 @@ import org.apache.pinot.segment.local.io.util.ValueReader;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.utils.ByteArray;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -212,7 +211,6 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     byte[] utf8 = value.getBytes(UTF_8);
     while (low <= high) {
       int mid = (low + high) >>> 1;
-      // method requires zero padding byte, not safe to call in nonzero padding byte branch below
       int compareResult = _valueReader.compareUtf8Bytes(mid, _numBytesPerValue, utf8);
       if (compareResult < 0) {
         low = mid + 1;
@@ -228,11 +226,9 @@ public abstract class BaseImmutableDictionary implements Dictionary {
   protected int binarySearch(byte[] value) {
     int low = 0;
     int high = _length - 1;
-
     while (low <= high) {
       int mid = (low + high) >>> 1;
-      byte[] midValue = _valueReader.getBytes(mid, _numBytesPerValue);
-      int compareResult = ByteArray.compare(midValue, value);
+      int compareResult = _valueReader.compareBytes(mid, _numBytesPerValue, value);
       if (compareResult < 0) {
         low = mid + 1;
       } else if (compareResult > 0) {
