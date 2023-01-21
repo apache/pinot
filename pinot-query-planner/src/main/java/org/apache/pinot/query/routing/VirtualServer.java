@@ -19,6 +19,7 @@
 
 package org.apache.pinot.query.routing;
 
+import java.util.Objects;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
@@ -65,6 +66,23 @@ public class VirtualServer {
 
   public int getGrpcPort() {
     return _server.getGrpcPort();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    VirtualServer that = (VirtualServer) o;
+    return _virtualId == that._virtualId && Objects.equals(_server, that._server);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_server, _virtualId);
   }
 
   @Override
