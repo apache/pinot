@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.combine.merger.SelectionOrderByResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -35,7 +34,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
 
   public StreamingSelectionOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(new SelectionOrderByResultsBlockMerger(queryContext), operators, queryContext, executorService);
+    super(operators, queryContext, executorService);
   }
 
   @Override
@@ -44,7 +43,7 @@ public class StreamingSelectionOrderByCombineOperator extends BaseStreamingCombi
   }
 
   @Override
-  protected boolean shouldFinishStream(SelectionResultsBlock resultsBlock) {
+  protected boolean isOperatorSatisfied(SelectionResultsBlock resultsBlock) {
     return true;
   }
 }

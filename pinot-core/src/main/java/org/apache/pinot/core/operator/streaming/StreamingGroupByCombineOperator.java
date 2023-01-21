@@ -87,7 +87,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
 
   public StreamingGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
+    super(operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
     int minTrimSize = queryContext.getMinServerGroupTrimSize();
     if (minTrimSize > 0) {

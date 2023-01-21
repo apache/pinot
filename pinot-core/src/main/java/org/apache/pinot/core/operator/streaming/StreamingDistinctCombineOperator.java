@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.operator.combine.merger.DistinctResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -35,7 +34,7 @@ public class StreamingDistinctCombineOperator extends BaseStreamingCombineOperat
 
   public StreamingDistinctCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(new DistinctResultsBlockMerger(queryContext), operators, queryContext, executorService);
+    super(operators, queryContext, executorService);
   }
 
   @Override
@@ -44,7 +43,8 @@ public class StreamingDistinctCombineOperator extends BaseStreamingCombineOperat
   }
 
   @Override
-  protected boolean shouldFinishStream(DistinctResultsBlock resultsBlock) {
+  protected boolean isOperatorSatisfied(DistinctResultsBlock resultsBlock) {
+    // DistinctResultsBlock is produced once per segment, thus operator is always satisfied after the first block
     return true;
   }
 }

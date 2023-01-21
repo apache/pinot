@@ -32,7 +32,6 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
-import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.slf4j.Logger;
@@ -51,15 +50,13 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
 
   // Use a BlockingQueue to store the intermediate results blocks
   protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
-  protected final ResultsBlockMerger<T> _resultsBlockMerger;
 
   protected int _numOperatorsFinished;
   protected BaseResultsBlock _exceptionBlock;
 
-  public BaseStreamingCombineOperator(ResultsBlockMerger<T> resultsBlockMerger, List<Operator> operators,
+  public BaseStreamingCombineOperator(List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
     super(operators, queryContext, executorService);
-    _resultsBlockMerger = resultsBlockMerger;
   }
 
   @Override
@@ -111,22 +108,26 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
     int operatorId;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator<T> operator = _operators.get(operatorId);
-      try {
-        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
-          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
-        }
-        T resultsBlock;
-        while (!shouldFinishOperators() && (resultsBlock = operator.nextBlock()) != null) {
-          if (shouldFinishStream(resultsBlock) || _resultsBlockMerger.isQuerySatisfied(resultsBlock)) {
-            _blockingQueue.offer(resultsBlock);
-            break;
-          } else {
-            _blockingQueue.offer(resultsBlock);
+      // If the combine operator indicates it should finish all its operator tasks. Then skip acquiring the
+      // segments entirely.
+      if (!shouldFinishOperators()) {
+        try {
+          if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+            ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
           }
-        }
-      } finally {
-        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
-          ((AcquireReleaseColumnsSegmentOperator) operator).release();
+          T resultsBlock;
+          while ((resultsBlock = operator.nextBlock()) != null) {
+            if (isOperatorSatisfied(resultsBlock)) {
+              _blockingQueue.offer(resultsBlock);
+              break;
+            } else {
+              _blockingQueue.offer(resultsBlock);
+            }
+          }
+        } finally {
+          if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+            ((AcquireReleaseColumnsSegmentOperator) operator).release();
+          }
         }
       }
       // offer the LAST_RESULTS_BLOCK indicate finish of the current operator.
@@ -144,19 +145,19 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
   }
 
   /**
-   * Determine if a result block should finish the stream.
+   * Determine if a returned result block from operator sub-task has already satisfied the query requirement.
    *
-   * @param resultsBlock the result block returned from operator
-   * @return true if no more getNextBlock() should be called this particular upstream operator.
+   * @param resultsBlock the result block returned from operator run in sub-task
+   * @return true if no more getNextBlock() should be called this particular operator.
    */
-  protected boolean shouldFinishStream(T resultsBlock) {
+  protected boolean isOperatorSatisfied(T resultsBlock) {
     return resultsBlock == null;
   }
 
   /**
-   * Determine if the aggregated condition of the all the streams should early terminate the operators entirely.
+   * Determine if the aggregated condition of the all the operator sub-tasks has satisfied the query requirement.
    *
-   * @return true if we should not schedule any additional {@link Operator#nextBlock()}
+   * @return true if we should not schedule any additional {@link Operator#nextBlock()}.
    */
   protected boolean shouldFinishOperators() {
     return false;

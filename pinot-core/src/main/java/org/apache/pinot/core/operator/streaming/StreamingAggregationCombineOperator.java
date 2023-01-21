@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
-import org.apache.pinot.core.operator.combine.merger.AggregationResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -35,7 +34,7 @@ public class StreamingAggregationCombineOperator extends BaseStreamingCombineOpe
 
   public StreamingAggregationCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(new AggregationResultsBlockMerger(queryContext), operators, queryContext, executorService);
+    super(operators, queryContext, executorService);
   }
 
   @Override
@@ -44,7 +43,8 @@ public class StreamingAggregationCombineOperator extends BaseStreamingCombineOpe
   }
 
   @Override
-  protected boolean shouldFinishStream(AggregationResultsBlock resultsBlock) {
+  protected boolean isOperatorSatisfied(AggregationResultsBlock resultsBlock) {
+    // AggregateResultBlock is produced once per segment, thus operator is always satisfied after the first block
     return true;
   }
 }
