@@ -78,12 +78,12 @@ public class IngestionDelayTracker {
 
   // Class to wrap supported timestamps collected for an ingested event
   private static class IngestionTimestamps {
-    IngestionTimestamps(long ingestionTimesMs, long creationTimeMs) {
+    IngestionTimestamps(long ingestionTimesMs, long firstStreamIngestionTimeMs) {
       _ingestionTimeMs = ingestionTimesMs;
-      _creationTimeMs = creationTimeMs;
+      _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
     }
     public final long _ingestionTimeMs;
-    public final long _creationTimeMs;
+    public final long _firstStreamIngestionTimeMs;
   }
   // Sleep interval for timer thread that triggers read of ideal state
   private static final int TIMER_THREAD_TICK_INTERVAL_MS = 300000; // 5 minutes +/- precision in timeouts
@@ -151,6 +151,9 @@ public class IngestionDelayTracker {
    * @param ingestionTimeMs original ingestion time in milliseconds.
    */
   private long getIngestionDelayMs(long ingestionTimeMs) {
+    if (ingestionTimeMs < 0) {
+      return 0;
+    }
     // Compute aged delay for current partition
     long agedIngestionDelayMs = _clock.millis() - ingestionTimeMs;
     // Correct to zero for any time shifts due to NTP or time reset.
@@ -217,7 +220,7 @@ public class IngestionDelayTracker {
       // First time we start tracking a partition we should start tracking it via metric
       _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
           ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelayMs(partitionGroupId));
-      if (creationTimeMs != Long.MIN_VALUE) {
+      if (creationTimeMs >= 0) {
         // Only publish this metric when creation time is supported by the underlying stream
         // When this timestamp is not supported it always returns the value Long.MIN_VALUE
         _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
@@ -316,7 +319,7 @@ public class IngestionDelayTracker {
     if (currentMeasure == null) {
       return 0;
     }
-    return getIngestionDelayMs(currentMeasure._creationTimeMs);
+    return getIngestionDelayMs(currentMeasure._firstStreamIngestionTimeMs);
   }
 
   /*

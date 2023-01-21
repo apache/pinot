@@ -39,8 +39,8 @@ public interface RowMetadata {
 
   /**
    * Returns the timestamp associated with the record. This typically refers to the time it was ingested into the
-   * upstream source. In some cases, it may be the time at which the record was created, aka event time (eg. in kafka,
-   * a topic may be configured to use record `CreateTime` instead of `LogAppendTime`).
+   * (last) upstream source. In some cases, it may be the time at which the record was created, aka event time
+   * (eg. in kafka, a topic may be configured to use record `CreateTime` instead of `LogAppendTime`).
    *
    * Expected to be used for stream-based sources.
    *
@@ -50,15 +50,18 @@ public interface RowMetadata {
   long getRecordIngestionTimeMs();
 
   /**
-   * Returns the creation timestamp associated with the record. In cases where the upstream ingestion pipeline is
-   * simple this timestamp matches the result of getRecordIngestionTimeMs();
+   * When supported by the underlying stream, this method returns the timestamp in milliseconds associated with
+   * the ingestion of the record in the first stream.
    *
-   * Expected to be used for stream-based sources.
+   * Complex ingestion pipelines may be composed of multiple streams:
+   * (EventCreation) -> {First Stream} -> ... -> {Last Stream}
    *
-   * @return timestamp (epoch in milliseconds) when the row was initially created and ingested upstream for the first
-   *         time Long.MIN_VALUE if not available
+   * @return timestamp (epoch in milliseconds) when the row was initially ingested upstream for the first
+   *         time Long.MIN_VALUE if not supported by the underlying stream.
    */
-  long getRecordCreationTimeMs();
+  default long getFirstStreamRecordIngestionTimeMs() {
+    return Long.MIN_VALUE;
+  }
 
   /**
    * Returns the stream message headers
