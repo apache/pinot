@@ -45,7 +45,7 @@ public class VirtualServerAddress {
   }
 
   public VirtualServerAddress(VirtualServer server) {
-    this(server.getHostname(), server.getPort(), server.getVirtualId());
+    this(server.getHostname(), server.getQueryMailboxPort(), server.getVirtualId());
   }
 
   /**
