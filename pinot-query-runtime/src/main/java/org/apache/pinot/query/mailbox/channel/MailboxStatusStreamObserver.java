@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.stub.StreamObserver;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.proto.Mailbox;
@@ -30,32 +31,20 @@ import org.slf4j.LoggerFactory;
  * {@code MailboxStatusStreamObserver} is used by the SendingMailbox to send data over the wire.
  *
  * <p>Once {@link org.apache.pinot.query.mailbox.GrpcSendingMailbox#init()} is called, one instances of this class is
- * created based on the opened GRPC connection returned {@link StreamObserver}. From this point, the sending mailbox
- * can use the {@link MailboxStatusStreamObserver#send(Mailbox.MailboxContent)} API to send data packet to the receiving
+ * created based on the opened GRPC connection returned {@link StreamObserver}.
  * end.
  */
 public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.MailboxStatus> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxStatusStreamObserver.class);
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
   private final AtomicInteger _bufferSize = new AtomicInteger(5);
-  private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
 
-  private StreamObserver<Mailbox.MailboxContent> _mailboxContentStreamObserver;
+  private CountDownLatch _finishLatch;
 
-  public MailboxStatusStreamObserver() {
+  public MailboxStatusStreamObserver(CountDownLatch finishLatch) {
+    _finishLatch = finishLatch;
   }
 
-  public void init(StreamObserver<Mailbox.MailboxContent> mailboxContentStreamObserver) {
-    _mailboxContentStreamObserver = mailboxContentStreamObserver;
-  }
-
-  public void send(Mailbox.MailboxContent mailboxContent) {
-    _mailboxContentStreamObserver.onNext(mailboxContent);
-  }
-
-  public void complete() {
-    _mailboxContentStreamObserver.onCompleted();
-  }
 
   @Override
   public void onNext(Mailbox.MailboxStatus mailboxStatus) {
@@ -72,17 +61,13 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
 
   @Override
   public void onError(Throwable e) {
-    _isCompleted.set(true);
-    shutdown();
+    _finishLatch.countDown();
+    LOGGER.error("Receiving error msg from grpc mailbox status stream:", e);
     throw new RuntimeException(e);
-  }
-
-  private void shutdown() {
   }
 
   @Override
   public void onCompleted() {
-    _isCompleted.set(true);
-    shutdown();
+    _finishLatch.countDown();
   }
 }

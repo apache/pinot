@@ -57,7 +57,6 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
         .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build();
   }
 
-  private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
   private final GrpcMailboxService _mailboxService;
   private final StreamObserver<Mailbox.MailboxStatus> _responseObserver;
   private final boolean _isEnabledFeedback;
@@ -183,7 +182,6 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
       _errorLock.writeLock().lock();
       _errorContent = createErrorContent(e);
       _gotMailCallback.accept(_mailboxId);
-      // TODO: close the stream.
       throw new RuntimeException(e);
     } catch (IOException ioe) {
       throw new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);

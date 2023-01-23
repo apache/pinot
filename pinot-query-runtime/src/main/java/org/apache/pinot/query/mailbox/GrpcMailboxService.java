@@ -98,7 +98,7 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    */
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
     return _receivingMailboxMap.computeIfAbsent(
-        mailboxId.toString(), (mId) -> new GrpcReceivingMailbox(mId, this, _gotMailCallback));
+        mailboxId.toString(), (mId) -> new GrpcReceivingMailbox(mId, _gotMailCallback));
   }
 
   public ManagedChannel getChannel(String mailboxId) {

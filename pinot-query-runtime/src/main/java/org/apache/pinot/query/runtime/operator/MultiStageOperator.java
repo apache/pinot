@@ -46,4 +46,10 @@ public abstract class MultiStageOperator extends BaseOperator<TransferableBlock>
       }
     }
   }
+
+  public void cancel(Throwable e) {
+
+
+  }
+
 }

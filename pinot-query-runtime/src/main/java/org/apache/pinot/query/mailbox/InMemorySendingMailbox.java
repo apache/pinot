@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -54,5 +55,12 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
 
   @Override
   public void complete() {
+  }
+
+  @Override
+  public void waitForFinish(long timeout, TimeUnit unit) throws InterruptedException {  }
+
+  @Override
+  public void cancel(Throwable t) {
   }
 }
