@@ -133,4 +133,8 @@ public class MinionConstants {
     public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
         "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
   }
+
+  public static class CompactionTask {
+    public static final String TASK_TYPE = "CompactionTask";
+  }
 }
