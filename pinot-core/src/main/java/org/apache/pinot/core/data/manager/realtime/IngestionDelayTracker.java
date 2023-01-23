@@ -82,8 +82,8 @@ public class IngestionDelayTracker {
       _ingestionTimeMs = ingestionTimesMs;
       _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
     }
-    public final long _ingestionTimeMs;
-    public final long _firstStreamIngestionTimeMs;
+    private final long _ingestionTimeMs;
+    private final long _firstStreamIngestionTimeMs;
   }
   // Sleep interval for timer thread that triggers read of ideal state
   private static final int TIMER_THREAD_TICK_INTERVAL_MS = 300000; // 5 minutes +/- precision in timeouts
