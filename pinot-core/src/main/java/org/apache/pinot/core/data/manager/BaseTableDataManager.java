@@ -417,7 +417,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  public boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata,
+  private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata,
       String currentSegmentTier, SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
       Schema schema)
       throws Exception {

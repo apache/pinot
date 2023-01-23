@@ -219,7 +219,7 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
   }
 
   @Override
-  public boolean needsTierMigration(String zkTier, String currentTier) {
-    return !StringUtils.equals(zkTier, currentTier);
+  public boolean needsTierMigration(String targetTier, String currentTier) {
+    return !StringUtils.equals(targetTier, currentTier);
   }
 }
