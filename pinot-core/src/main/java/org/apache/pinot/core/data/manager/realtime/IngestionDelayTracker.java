@@ -205,22 +205,22 @@ public class IngestionDelayTracker {
    * Called by LLRealTimeSegmentDataManagers to post ingestion time updates to this tracker class.
    *
    * @param ingestionTimeMs ingestion time being recorded.
-   * @param creationTimeMs event creation time.
+   * @param firstStreamIngestionTimeMs time the event was ingested in the first stage of the ingestion pipeline.
    * @param partitionGroupId partition ID for which this ingestion time is being recorded.
    */
-  public void updateIngestionDelay(long ingestionTimeMs, long creationTimeMs, int partitionGroupId) {
+  public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
     if (!_isServerReadyToServeQueries.get()) {
       // Do not update the ingestion delay metrics during server startup period
       return;
     }
     IngestionTimestamps previousMeasure = _partitionToIngestionTimestampsMap.put(partitionGroupId,
-        new IngestionTimestamps(ingestionTimeMs, creationTimeMs));
+        new IngestionTimestamps(ingestionTimeMs, firstStreamIngestionTimeMs));
     if (previousMeasure == null) {
       // First time we start tracking a partition we should start tracking it via metric
       _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
           ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelayMs(partitionGroupId));
-      if (creationTimeMs >= 0) {
+      if (firstStreamIngestionTimeMs >= 0) {
         // Only publish this metric when creation time is supported by the underlying stream
         // When this timestamp is not supported it always returns the value Long.MIN_VALUE
         _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
