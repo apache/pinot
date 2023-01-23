@@ -300,7 +300,7 @@ public class IngestionDelayTracker {
   public long getPartitionIngestionDelayMs(int partitionGroupId) {
     // Not protected as this will only be invoked when metric is installed which happens after server ready
     IngestionTimestamps currentMeasure = _partitionToIngestionTimestampsMap.get(partitionGroupId);
-    if (currentMeasure == null) {
+    if (currentMeasure == null) { // Guard just in case we read the metric without initializing it
       return 0;
     }
     return getIngestionDelayMs(currentMeasure._ingestionTimeMs);
@@ -316,7 +316,7 @@ public class IngestionDelayTracker {
   public long getPartitionEndToEndIngestionDelayMs(int partitionGroupId) {
     // Not protected as this will only be invoked when metric is installed which happens after server ready
     IngestionTimestamps currentMeasure = _partitionToIngestionTimestampsMap.get(partitionGroupId);
-    if (currentMeasure == null) {
+    if (currentMeasure == null) { // Guard just in case we read the metric without initializing it
       return 0;
     }
     return getIngestionDelayMs(currentMeasure._firstStreamIngestionTimeMs);
