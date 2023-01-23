@@ -93,12 +93,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
-        new WorkerManager(_reducerHostname, _reducerPort, routingManager));
+        new WorkerManager(_reducerHostname, _reducerPort, routingManager), _tableCache);
     _queryDispatcher = new QueryDispatcher();
 
     // it is OK to ignore the onDataAvailable callback because the broker top-level operators
     // always run in-line (they don't have any scheduler)
-    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config, ignored -> { });
+    _mailboxService = MultiplexingMailboxService.newInstance(_reducerHostname, _reducerPort, config, ignored -> {
+    });
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
@@ -165,7 +166,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     ResultTable queryResults;
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs);
+      queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
+          sqlNodeAndOptions.getOptions());
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
@@ -175,8 +177,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long executionEndTimeNs = System.nanoTime();
 
     // Set total query processing time
-    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(sqlNodeAndOptions.getParseTimeNs()
-        + (executionEndTimeNs - compilationStartTimeNs));
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
+        sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
     requestContext.setQueryProcessingTime(totalTimeMs);

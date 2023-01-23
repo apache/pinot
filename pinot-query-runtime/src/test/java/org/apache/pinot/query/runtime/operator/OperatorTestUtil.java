@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.testutils.MockDataBlockOperatorFactory;
 
@@ -51,7 +50,7 @@ public class OperatorTestUtil {
   private OperatorTestUtil() {
   }
 
-  public static BaseOperator<TransferableBlock> getOperator(String operatorName) {
+  public static MultiStageOperator getOperator(String operatorName) {
     return MOCK_OPERATOR_FACTORY.buildMockOperator(operatorName);
   }
 

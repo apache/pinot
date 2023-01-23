@@ -78,8 +78,6 @@ public interface ColumnMetadata {
 
   int getColumnMaxLength();
 
-  char getPaddingCharacter();
-
   int getBitsPerElement();
 
   int getMaxNumberOfMultiValues();

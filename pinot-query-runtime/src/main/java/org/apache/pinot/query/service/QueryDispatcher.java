@@ -34,6 +34,7 @@ import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -45,22 +46,26 @@ import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.roaringbitmap.RoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * {@code QueryDispatcher} dispatch a query to different workers.
  */
 public class QueryDispatcher {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
+
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
 
   public QueryDispatcher() {
   }
 
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
-      MailboxService<TransferableBlock> mailboxService, long timeoutMs)
+      MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
     // submit all the distributed stages.
-    int reduceStageId = submit(requestId, queryPlan, timeoutMs);
+    int reduceStageId = submit(requestId, queryPlan, timeoutMs, queryOptions);
     // run reduce stage and return result.
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
@@ -68,11 +73,17 @@ public class QueryDispatcher {
         reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
         mailboxService.getMailboxPort(), timeoutMs);
     List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs);
-    return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
+    mailboxReceiveOperator.toExplainString();
+    long toResultTableStartTime = System.currentTimeMillis();
+    ResultTable resultTable = toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
         queryPlan.getQueryStageMap().get(0).getDataSchema());
+    LOGGER.debug(
+        "RequestId:" + requestId + " StageId: 0 Broker toResultTable processing time:" + (System.currentTimeMillis()
+            - toResultTableStartTime) + " ms");
+    return resultTable;
   }
 
-  public int submit(long requestId, QueryPlan queryPlan, long timeoutMs)
+  public int submit(long requestId, QueryPlan queryPlan, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
     int reduceStageId = -1;
     for (Map.Entry<Integer, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
@@ -89,7 +100,9 @@ public class QueryDispatcher {
           Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
                   QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
               .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
-              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs)).build());
+              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
+              .putAllMetadata(queryOptions).build());
+
           if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
             throw new RuntimeException(
                 String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", stageId,
@@ -147,7 +160,7 @@ public class QueryDispatcher {
         for (int colId = 0; colId < numColumns; colId++) {
           nullBitmaps[colId] = dataBlock.getNullRowIds(colId);
         }
-        List<Object[]> rawRows = DataBlockUtils.extractRows(dataBlock);
+        List<Object[]> rawRows = DataBlockUtils.extractRows(dataBlock, ObjectSerDeUtils::deserialize);
         int rowId = 0;
         for (Object[] rawRow : rawRows) {
           Object[] row = new Object[numColumns];

@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /*
@@ -45,38 +46,51 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
     3) All boolean scalar functions we have that take tranformOperand.
     Note: Scalar functions are the ones we have in v1 engine and only do function name and arg # matching.
  */
-public class FilterOperator extends BaseOperator<TransferableBlock> {
+public class FilterOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "FILTER";
-  private final Operator<TransferableBlock> _upstreamOperator;
+  private final MultiStageOperator _upstreamOperator;
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public FilterOperator(Operator<TransferableBlock> upstreamOperator, DataSchema dataSchema, RexExpression filter) {
+  // TODO: Move to OperatorContext class.
+  private OperatorStats _operatorStats;
+
+  public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
+      long requestId, int stageId) {
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);
     _upstreamErrorBlock = null;
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+  public List<MultiStageOperator> getChildOperators() {
+    return ImmutableList.of(_upstreamOperator);
   }
 
   @Nullable
   @Override
   public String toExplainString() {
+    _upstreamOperator.toExplainString();
+    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
+    _operatorStats.startTimer();
     try {
-      return transform(_upstreamOperator.nextBlock());
+      _operatorStats.endTimer();
+      TransferableBlock block = _upstreamOperator.nextBlock();
+      _operatorStats.startTimer();
+      return transform(block);
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
+    } finally {
+      _operatorStats.endTimer();
     }
   }
 
@@ -99,6 +113,8 @@ public class FilterOperator extends BaseOperator<TransferableBlock> {
         resultRows.add(row);
       }
     }
+    _operatorStats.recordInput(1, container.size());
+    _operatorStats.recordOutput(1, resultRows.size());
     return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW);
   }
 }

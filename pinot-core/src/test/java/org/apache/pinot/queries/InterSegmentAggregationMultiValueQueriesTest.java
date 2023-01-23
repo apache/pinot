@@ -121,7 +121,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   public void testMaxMV() {
     String query = "SELECT MAXMV(column6) AS value FROM testTable";
 
-    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
     ResultTable expectedResultTable =
@@ -148,7 +149,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   public void testMinMV() {
     String query = "SELECT MINMV(column6) AS value FROM testTable";
 
-    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
     Object[] expectedResults = new Object[]{1001.0};
@@ -245,7 +247,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   public void testMinMaxRangeMV() {
     String query = "SELECT MINMAXRANGEMV(column6) AS value FROM testTable";
 
-    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
     Object[] expectedResults = new Object[]{2147482646.0};
@@ -277,7 +280,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   public void testDistinctCountMV() {
     String query = "SELECT DISTINCTCOUNTMV(column6) AS value FROM testTable";
 
-    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.INT});
     Object[] expectedResults = new Object[]{18499};
@@ -306,10 +310,77 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   }
 
   @Test
+  public void testDistinctSumMV() {
+    String query = "SELECT DISTINCTSUMMV(column6) AS value FROM testTable";
+
+    // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
+    Object[] expectedResults = new Object[]{24592775810.0};
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 0L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResults[0] = 2578123532.0;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 455552L, 62480L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + SV_GROUP_BY);
+    expectedResults[0] = 6304833321.0;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + SV_GROUP_BY);
+    expectedResults[0] = 2578123532.0;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 455552L, 124960L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + MV_GROUP_BY);
+    expectedResults[0] = 8999975927.0;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + MV_GROUP_BY);
+    expectedResults[0] = 2478539095.0;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 455552L, 124960L, 400000L, expectedResultTable);
+  }
+
+  @Test
+  public void testDistinctAvgMV() {
+    String query = "SELECT DISTINCTAVGMV(column6) AS value FROM testTable";
+
+    // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
+    Object[] expectedResults = new Object[]{1329411.0930320558};
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 0L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResults[0] = 2173797.244519393;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 455552L, 62480L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + SV_GROUP_BY);
+    expectedResults[0] = 2147483647.0;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + SV_GROUP_BY);
+    expectedResults[0] = 2147483647.0;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 455552L, 124960L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + MV_GROUP_BY);
+    expectedResults[0] = 2147483647.0;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + MV_GROUP_BY);
+    expectedResults[0] = 2147483647.0;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 455552L, 124960L, 400000L, expectedResultTable);
+  }
+
+  @Test
   public void testDistinctCountHLLMV() {
     String query = "SELECT DISTINCTCOUNTHLLMV(column6) AS value FROM testTable";
 
-    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{20039L};
@@ -343,7 +414,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     Function<Object, Object> cardinalityExtractor =
         value -> ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) value)).cardinality();
 
-    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // Without filter, query should be answered by NonScanBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    // for dictionary based columns.
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.LONG});
     Object[] expectedResults = new Object[]{20039L};

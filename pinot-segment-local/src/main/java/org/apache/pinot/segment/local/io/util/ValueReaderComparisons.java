@@ -24,7 +24,6 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 public class ValueReaderComparisons {
-
   private ValueReaderComparisons() {
   }
 
@@ -61,16 +60,8 @@ public class ValueReaderComparisons {
     int mismatchPosition = mismatch(dataBuffer, startOffset, length, buffer);
     if (mismatchPosition == -1) {
       if (padded && bytes.length < length) {
-        // need to figure out whether the unpadded string is longer than the parameter or not
-        if (bytes.length == 0) {
-          // just need nonzero first byte
-          return dataBuffer.getByte(startOffset) == 0 ? 0 : 1;
-        } else if (bytes[bytes.length - 1] == 0) {
-          return -1;
-        } else {
-          // check if the stored string continues beyond the length of the parameter
-          return dataBuffer.getByte(startOffset + bytes.length) == 0 ? 0 : 1;
-        }
+        // check if the stored string continues beyond the length of the parameter
+        return dataBuffer.getByte(startOffset + bytes.length) == 0 ? 0 : 1;
       } else {
         // then we know the length precisely or know that the parameter is at least as long as we can store
         return length - bytes.length;

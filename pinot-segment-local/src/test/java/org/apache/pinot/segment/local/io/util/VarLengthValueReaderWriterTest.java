@@ -80,7 +80,7 @@ public class VarLengthValueReaderWriterTest {
       try (VarLengthValueReader reader = new VarLengthValueReader(dataBuffer)) {
         assertEquals(reader.getNumValues(), 1);
         byte[] buffer = new byte[MAX_STRING_LENGTH];
-        assertEquals(reader.getUnpaddedString(0, MAX_STRING_LENGTH, (byte) 0, buffer), value);
+        assertEquals(reader.getUnpaddedString(0, MAX_STRING_LENGTH, buffer), value);
         assertEquals(reader.getBytes(0, MAX_STRING_LENGTH), valueBytes);
       }
     }
@@ -108,7 +108,7 @@ public class VarLengthValueReaderWriterTest {
         assertEquals(reader.getNumValues(), NUM_VALUES);
         byte[] buffer = new byte[MAX_STRING_LENGTH];
         for (int i = 0; i < NUM_VALUES; i++) {
-          assertEquals(reader.getUnpaddedString(i, MAX_STRING_LENGTH, (byte) 0, buffer), values[i]);
+          assertEquals(reader.getUnpaddedString(i, MAX_STRING_LENGTH, buffer), values[i]);
           assertEquals(reader.getBytes(i, MAX_STRING_LENGTH), valueBytesArray[i]);
         }
       }

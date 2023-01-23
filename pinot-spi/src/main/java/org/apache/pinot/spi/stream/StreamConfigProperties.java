@@ -112,6 +112,11 @@ public class StreamConfigProperties {
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "realtime.segment.commit.timeoutSeconds";
 
   /**
+   * Config used to indicate whether server should by-pass controller and directly upload the segment to the deep store
+   */
+  public static final String SERVER_UPLOAD_TO_DEEPSTORE = "realtime.segment.serverUploadToDeepStore";
+
+  /**
    * Helper method to create a stream specific property
    */
   public static String constructStreamProperty(String streamType, String property) {

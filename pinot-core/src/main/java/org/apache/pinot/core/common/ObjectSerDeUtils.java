@@ -59,7 +59,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
@@ -1244,7 +1244,7 @@ public class ObjectSerDeUtils {
     return SER_DES[objectTypeValue].serialize(value);
   }
 
-  public static <T> T deserialize(DataTable.CustomObject customObject) {
+  public static <T> T deserialize(CustomObject customObject) {
     return (T) SER_DES[customObject.getType()].deserialize(customObject.getBuffer());
   }
 

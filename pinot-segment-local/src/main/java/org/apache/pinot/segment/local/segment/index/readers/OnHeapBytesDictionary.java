@@ -42,7 +42,7 @@ public class OnHeapBytesDictionary extends BaseImmutableDictionary {
   private final ByteArray[] _dictIdToVal;
 
   public OnHeapBytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
-    super(dataBuffer, length, numBytesPerValue, (byte) 0);
+    super(dataBuffer, length, numBytesPerValue);
 
     _valToDictId = new Object2IntOpenHashMap<>(length);
     _valToDictId.defaultReturnValue(Dictionary.NULL_VALUE_INDEX);

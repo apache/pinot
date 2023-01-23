@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -77,7 +78,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
       int numColumns = dataSchema.size();
       if (numColumns == 1 && dataSchema.getColumnDataType(0) == ColumnDataType.OBJECT) {
         // DistinctTable is still being returned as a single object
-        DataTable.CustomObject customObject = dataTable.getCustomObject(0, 0);
+        CustomObject customObject = dataTable.getCustomObject(0, 0);
         assert customObject != null;
         DistinctTable distinctTable = ObjectSerDeUtils.deserialize(customObject);
         if (!distinctTable.isEmpty()) {

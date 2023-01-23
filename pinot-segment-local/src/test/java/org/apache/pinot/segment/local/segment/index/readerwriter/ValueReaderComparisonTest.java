@@ -43,6 +43,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class ValueReaderComparisonTest {
+
   @DataProvider
   public static Object[] text() {
     return Stream.of(Pair.of(ByteOrder.BIG_ENDIAN, true), Pair.of(ByteOrder.LITTLE_ENDIAN, true),
@@ -109,7 +110,6 @@ public class ValueReaderComparisonTest {
     void testCommonPrefixParameterLonger(ValueReader reader, int numBytesPerValue, String... strings) {
       for (int i = 0; i < strings.length; i++) {
         assertUtf8Comparison(reader, i, numBytesPerValue, strings[i] + "a", -1);
-        assertUtf8Comparison(reader, i, numBytesPerValue, strings[i] + "\0", -1);
         assertUtf8Comparison(reader, i, numBytesPerValue, strings[i] + fromHex("efbfbdd8"), -1);
         assertUtf8Comparison(reader, i, numBytesPerValue, strings[i] + "\uD841\uDF0E", -1);
       }
@@ -156,22 +156,27 @@ public class ValueReaderComparisonTest {
     void testConsistent(ValueReader reader, int numBytesPerValue, int numValuesToCompare) {
       for (int i = 0; i < numValuesToCompare; i++) {
         byte[] bytes = new byte[ThreadLocalRandom.current().nextInt(numBytesPerValue * 2)];
-        assertConsistentUtf8Comparison(reader, i, numBytesPerValue, new String(bytes, StandardCharsets.UTF_8));
-        for (int j = 0; j < 128; j++) {
+
+        for (int j = 1; j < 128; j++) {
           Arrays.fill(bytes, (byte) j);
           assertConsistentUtf8Comparison(reader, i, numBytesPerValue, new String(bytes, StandardCharsets.UTF_8));
         }
+
         byte[] utf8 = "ß".getBytes(StandardCharsets.UTF_8);
         for (int j = 0; j + 1 < bytes.length; j += 2) {
           bytes[j] = utf8[0];
           bytes[j + 1] = utf8[1];
         }
+        assertConsistentUtf8Comparison(reader, i, numBytesPerValue, new String(bytes, StandardCharsets.UTF_8));
+
         utf8 = "道".getBytes(StandardCharsets.UTF_8);
         for (int j = 0; j + 2 < bytes.length; j += 3) {
           bytes[j] = utf8[0];
           bytes[j + 1] = utf8[1];
           bytes[j + 2] = utf8[2];
         }
+        assertConsistentUtf8Comparison(reader, i, numBytesPerValue, new String(bytes, StandardCharsets.UTF_8));
+
         utf8 = "\uD841\uDF0E".getBytes(StandardCharsets.UTF_8);
         for (int j = 0; j + 3 < bytes.length; j += 4) {
           bytes[j] = utf8[0];
@@ -180,6 +185,7 @@ public class ValueReaderComparisonTest {
           bytes[j + 3] = utf8[3];
         }
         assertConsistentUtf8Comparison(reader, i, numBytesPerValue, new String(bytes, StandardCharsets.UTF_8));
+
         ThreadLocalRandom.current().nextBytes(bytes);
         for (int j = 0; j < bytes.length; j++) {
           if (bytes[j] == 0) {
@@ -187,6 +193,7 @@ public class ValueReaderComparisonTest {
           }
         }
         assertConsistentUtf8Comparison(reader, i, numBytesPerValue, new String(bytes, StandardCharsets.UTF_8));
+
         assertConsistentUtf8Comparison(reader, i, numBytesPerValue, fromHex("efbfbdd8"));
         assertConsistentUtf8Comparison(reader, i, numBytesPerValue, fromHex("7fbfbdd8"));
         assertConsistentUtf8Comparison(reader, i, numBytesPerValue, fromHex("7f818181"));
@@ -301,19 +308,19 @@ public class ValueReaderComparisonTest {
   private static void assertUtf8Comparison(ValueReader readerWriter, int index, int numBytesPerValue, String string,
       int signum) {
     byte[] value = string.getBytes(StandardCharsets.UTF_8);
-    String stored = readerWriter.getUnpaddedString(index, numBytesPerValue, (byte) 0, new byte[numBytesPerValue]);
+    String stored = readerWriter.getUnpaddedString(index, numBytesPerValue, new byte[numBytesPerValue]);
     String error = stored + " " + string;
     int comparisonViaMaterialization = stored.compareTo(string);
-    assertEquals(signum, Integer.compare(comparisonViaMaterialization, 0), error);
+    assertEquals(Integer.compare(comparisonViaMaterialization, 0), signum, error);
     int utf8Comparison = readerWriter.compareUtf8Bytes(index, numBytesPerValue, value);
-    assertEquals(signum, Integer.compare(utf8Comparison, 0), error);
+    assertEquals(Integer.compare(utf8Comparison, 0), signum, error);
   }
 
   private static void assertConsistentUtf8Comparison(ValueReader readerWriter, int index, int numBytesPerValue,
       String string) {
     byte[] value = string.getBytes(StandardCharsets.UTF_8);
     int utf8Comparison = readerWriter.compareUtf8Bytes(index, numBytesPerValue, value);
-    String stored = readerWriter.getUnpaddedString(index, numBytesPerValue, (byte) 0, new byte[numBytesPerValue]);
+    String stored = readerWriter.getUnpaddedString(index, numBytesPerValue, new byte[numBytesPerValue]);
     int comparisonViaMaterialization = stored.compareTo(string);
     assertTrue(
         (utf8Comparison == comparisonViaMaterialization) || (utf8Comparison < 0 && comparisonViaMaterialization < 0)

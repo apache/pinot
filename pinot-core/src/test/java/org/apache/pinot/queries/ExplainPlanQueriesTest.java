@@ -108,6 +108,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   private final static String COL1_SORTED_INDEX = "sortedIndexCol1";
   private final static String COL1_JSON_INDEX = "jsonIndexCol1";
   private final static String COL1_TEXT_INDEX = "textIndexCol1";
+  private final static String MV_COL1_RAW = "mvRawCol1";
+  private final static String MV_COL1_NO_INDEX = "mvNoIndexCol1";
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
       .addSingleValueDimension(COL1_RAW, FieldSpec.DataType.INT)
@@ -123,14 +125,16 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(COL3_RANGE_INDEX, FieldSpec.DataType.INT)
       .addSingleValueDimension(COL1_SORTED_INDEX, FieldSpec.DataType.DOUBLE)
       .addSingleValueDimension(COL1_JSON_INDEX, FieldSpec.DataType.JSON)
-      .addSingleValueDimension(COL1_TEXT_INDEX, FieldSpec.DataType.STRING).build();
+      .addSingleValueDimension(COL1_TEXT_INDEX, FieldSpec.DataType.STRING)
+      .addMultiValueDimension(MV_COL1_RAW, FieldSpec.DataType.INT)
+      .addMultiValueDimension(MV_COL1_NO_INDEX, FieldSpec.DataType.INT).build();
 
   private static final DataSchema DATA_SCHEMA = new DataSchema(new String[]{"Operator", "Operator_Id", "Parent_Id"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
           DataSchema.ColumnDataType.INT});
 
   private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(Arrays.asList(COL1_RAW))
+      new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(Arrays.asList(COL1_RAW, MV_COL1_RAW))
           .setTableName(RAW_TABLE_NAME).build();
 
   private IndexSegment _indexSegment;
@@ -159,7 +163,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   GenericRow createMockRecord(int noIndexCol1, int noIndexCol2, int noIndexCol3,
       boolean noIndexCol4, double invertedIndexCol1, int invertedIndexCol2, String intervedIndexCol3,
       double rangeIndexCol1, int rangeIndexCol2, int rangeIndexCol3, double sortedIndexCol1, String jsonIndexCol1,
-      String textIndexCol1, int rawCol1) {
+      String textIndexCol1, int rawCol1, Object[] mvRawCol1, Object[] mvNoIndexCol1) {
 
     GenericRow record = new GenericRow();
     record.putValue(COL1_RAW, rawCol1);
@@ -181,6 +185,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     record.putValue(COL1_JSON_INDEX, jsonIndexCol1);
     record.putValue(COL1_TEXT_INDEX, textIndexCol1);
+
+    record.putValue(MV_COL1_RAW, mvRawCol1);
+    record.putValue(MV_COL1_NO_INDEX, mvNoIndexCol1);
 
     return record;
   }
@@ -232,38 +239,49 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
     records.add(createMockRecord(1, 2, 3, true, 1.1, 2, "daffy", 10.1, 20, 30, 100.1,
-        "{\"first\": \"daffy\", \"last\": " + "\"duck\"}", "daffy", 1));
+        "{\"first\": \"daffy\", \"last\": " + "\"duck\"}", "daffy", 1, new Object[]{1, 2, 3}, new Object[]{1, 2, 3}));
     records.add(createMockRecord(0, 1, 2, false, 0.1, 1, "mickey", 0.1, 10, 20, 100.2,
-        "{\"first\": \"mickey\", \"last\": " + "\"mouse\"}", "mickey", 0));
+        "{\"first\": \"mickey\", \"last\": " + "\"mouse\"}", "mickey", 0, new Object[]{2, 3, 4},
+        new Object[]{2, 3, 4}));
     records.add(createMockRecord(3, 4, 5, true, 2.1, 3, "mickey", 20.1, 30, 40, 100.3,
-        "{\"first\": \"mickey\", \"last\": " + "\"mouse\"}", "mickey", 3));
+        "{\"first\": \"mickey\", \"last\": " + "\"mouse\"}", "mickey", 3, new Object[]{3, 4, 5},
+        new Object[]{3, 4, 5}));
     ImmutableSegment immutableSegment1 = createImmutableSegment(records, SEGMENT_NAME_1);
 
     List<GenericRow> records2 = new ArrayList<>(NUM_RECORDS);
     records2.add(createMockRecord(5, 2, 3, true, 1.1, 2, "pluto", 10.1, 20, 30, 100.1,
-        "{\"first\": \"pluto\", \"last\": " + "\"dog\"}", "pluto", 5));
+        "{\"first\": \"pluto\", \"last\": " + "\"dog\"}", "pluto", 5, new Object[]{100, 200, 300},
+        new Object[]{100, 200, 300}));
     records2.add(createMockRecord(6, 1, 2, false, 0.1, 1, "pluto", 0.1, 10, 20, 100.2,
-        "{\"first\": \"pluto\", \"last\": " + "\"dog\"}", "pluto", 6));
+        "{\"first\": \"pluto\", \"last\": " + "\"dog\"}", "pluto", 6, new Object[]{200, 300, 400},
+        new Object[]{200, 300, 400}));
     records2.add(createMockRecord(8, 4, 5, true, 2.1, 3, "pluto", 20.1, 30, 40, 100.3,
-        "{\"first\": \"pluto\", \"last\": " + "\"dog\"}", "pluto", 8));
+        "{\"first\": \"pluto\", \"last\": " + "\"dog\"}", "pluto", 8, new Object[]{300, 400, 500},
+        new Object[]{300, 400, 500}));
     ImmutableSegment immutableSegment2 = createImmutableSegment(records2, SEGMENT_NAME_2);
 
     List<GenericRow> records3 = new ArrayList<>(NUM_RECORDS);
     records3.add(createMockRecord(5, 2, 3, true, 1.5, 2, "donald", 10.1, 20, 30, 100.1,
-        "{\"first\": \"donald\", \"last\": " + "\"duck\"}", "donald", 1));
+        "{\"first\": \"donald\", \"last\": " + "\"duck\"}", "donald", 1, new Object[]{100, 200, 300},
+        new Object[]{100, 200, 300}));
     records3.add(createMockRecord(6, 1, 2, false, 0.1, 1, "goofy", 0.1, 10, 20, 100.2,
-        "{\"first\": \"goofy\", \"last\": " + "\"dog\"}", "goofy", 1));
+        "{\"first\": \"goofy\", \"last\": " + "\"dog\"}", "goofy", 1, new Object[]{100, 200, 300},
+        new Object[]{100, 200, 300}));
     records3.add(createMockRecord(7, 4, 5, true, 2.1, 3, "minnie", 20.1, 30, 40, 100.3,
-        "{\"first\": \"minnie\", \"last\": " + "\"mouse\"}", "minnie", 1));
+        "{\"first\": \"minnie\", \"last\": " + "\"mouse\"}", "minnie", 1, new Object[]{1000, 2000, 3000},
+        new Object[]{1000, 2000, 3000}));
     ImmutableSegment immutableSegment3 = createImmutableSegment(records3, SEGMENT_NAME_3);
 
     List<GenericRow> records4 = new ArrayList<>(NUM_RECORDS);
     records4.add(createMockRecord(5, 2, 3, true, 1.1, 2, "tweety", 10.1, 20, 30, 100.1,
-        "{\"first\": \"tweety\", \"last\": " + "\"bird\"}", "tweety", 5));
+        "{\"first\": \"tweety\", \"last\": " + "\"bird\"}", "tweety", 5, new Object[]{100, 200, 300},
+        new Object[]{100, 200, 300}));
     records4.add(createMockRecord(6, 1, 2, false, 0.1, 1, "bugs", 0.1, 10, 20, 100.2,
-        "{\"first\": \"bugs\", \"last\": " + "\"bunny\"}", "bugs", 6));
+        "{\"first\": \"bugs\", \"last\": " + "\"bunny\"}", "bugs", 6, new Object[]{100, 200, 300},
+        new Object[]{100, 200, 300}));
     records4.add(createMockRecord(7, 4, 5, true, 2.1, 3, "sylvester", 20.1, 30, 40, 100.3,
-        "{\"first\": \"sylvester\", \"last\": " + "\"cat\"}", "sylvester", 7));
+        "{\"first\": \"sylvester\", \"last\": " + "\"cat\"}", "sylvester", 7, new Object[]{1000, 2000, 3000},
+        new Object[]{1000, 2000, 3000}));
     ImmutableSegment immutableSegment4 = createImmutableSegment(records4, SEGMENT_NAME_4);
 
     _indexSegment = immutableSegment1;
@@ -371,15 +389,16 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result1.add(new Object[]{
-        "SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, "
-            + "noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, "
-            + "rawCol1, sortedIndexCol1, textIndexCol1)", 3, 2});
+        "SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, mvNoIndexCol1, "
+            + "mvRawCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, "
+            + "rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1)", 3, 2});
     result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, "
-        + "jsonIndexCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, "
-        + "rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1)", 4, 3});
-    result1.add(new Object[]{"PROJECT(noIndexCol4, rawCol1, sortedIndexCol1, noIndexCol3, rangeIndexCol1, "
-        + "rangeIndexCol2, invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, rangeIndexCol3, "
-        + "textIndexCol1, jsonIndexCol1, invertedIndexCol3)", 5, 4});
+        + "jsonIndexCol1, mvNoIndexCol1, mvRawCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, "
+        + "rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1)", 4, 3});
+    result1.add(new Object[]{"PROJECT(noIndexCol4, rawCol1, sortedIndexCol1, noIndexCol3, mvNoIndexCol1"
+        + ", rangeIndexCol1, rangeIndexCol2, invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, "
+        + "rangeIndexCol3, textIndexCol1, mvRawCol1, jsonIndexCol1, invertedIndexCol3)", 5, 4
+    });
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
@@ -435,15 +454,19 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result1.add(new Object[]{
-        "SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, "
-            + "noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, "
-            + "rawCol1, sortedIndexCol1, textIndexCol1)", 3, 2});
+        "SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, mvNoIndexCol1, "
+            + "mvRawCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, "
+            + "rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1)", 3, 2
+    });
     result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, "
-        + "jsonIndexCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, "
-        + "rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1)", 4, 3});
-    result1.add(new Object[]{"PROJECT(noIndexCol4, rawCol1, sortedIndexCol1, noIndexCol3, rangeIndexCol1, "
-        + "rangeIndexCol2, invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, rangeIndexCol3, "
-        + "textIndexCol1, jsonIndexCol1, invertedIndexCol3)", 5, 4});
+        + "jsonIndexCol1, mvNoIndexCol1, mvRawCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, "
+        + "rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1)", 4, 3
+    });
+    result1.add(new Object[]{
+        "PROJECT(noIndexCol4, rawCol1, sortedIndexCol1, noIndexCol3, mvNoIndexCol1, "
+            + "rangeIndexCol1, rangeIndexCol2, invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, "
+            + "rangeIndexCol3, textIndexCol1, mvRawCol1, jsonIndexCol1, invertedIndexCol3)", 5, 4
+    });
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
@@ -1703,19 +1726,42 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result5.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
     check(query5, new ResultTable(DATA_SCHEMA, result5));
 
-    // Full scan required for distinctavg as the column does not have a dictionary.
-    String query6 = "EXPLAIN PLAN FOR SELECT DISTINCTAVG(rawCol1) FROM testTable";
+    String query6 = "EXPLAIN PLAN FOR SELECT DISTINCTSUMMV(mvNoIndexCol1) FROM testTable";
     List<Object[]> result6 = new ArrayList<>();
     result6.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
     result6.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
-    result6.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
-        ExplainPlanRows.PLAN_START_IDS});
-    result6.add(new Object[]{"AGGREGATE(aggregations:distinctAvg(rawCol1))", 3, 2});
-    result6.add(new Object[]{"TRANSFORM_PASSTHROUGH(rawCol1)", 4, 3});
-    result6.add(new Object[]{"PROJECT(rawCol1)", 5, 4});
-    result6.add(new Object[]{"DOC_ID_SET", 6, 5});
-    result6.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
+    result6.add(new Object[]{
+        "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
+    });
+    result6.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
     check(query6, new ResultTable(DATA_SCHEMA, result6));
+
+    // Full scan required for distinctavg as the column does not have a dictionary.
+    String query7 = "EXPLAIN PLAN FOR SELECT DISTINCTAVG(rawCol1) FROM testTable";
+    List<Object[]> result7 = new ArrayList<>();
+    result7.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
+    result7.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
+    result7.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
+        ExplainPlanRows.PLAN_START_IDS});
+    result7.add(new Object[]{"AGGREGATE(aggregations:distinctAvg(rawCol1))", 3, 2});
+    result7.add(new Object[]{"TRANSFORM_PASSTHROUGH(rawCol1)", 4, 3});
+    result7.add(new Object[]{"PROJECT(rawCol1)", 5, 4});
+    result7.add(new Object[]{"DOC_ID_SET", 6, 5});
+    result7.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
+    check(query7, new ResultTable(DATA_SCHEMA, result7));
+
+    String query8 = "EXPLAIN PLAN FOR SELECT DISTINCTAVGMV(mvRawCol1) FROM testTable";
+    List<Object[]> result8 = new ArrayList<>();
+    result8.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
+    result8.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
+    result8.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS,
+        ExplainPlanRows.PLAN_START_IDS});
+    result8.add(new Object[]{"AGGREGATE(aggregations:distinctAvgMV(mvRawCol1))", 3, 2});
+    result8.add(new Object[]{"TRANSFORM_PASSTHROUGH(mvRawCol1)", 4, 3});
+    result8.add(new Object[]{"PROJECT(mvRawCol1)", 5, 4});
+    result8.add(new Object[]{"DOC_ID_SET", 6, 5});
+    result8.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
+    check(query8, new ResultTable(DATA_SCHEMA, result8));
   }
 
 

@@ -99,7 +99,7 @@ export const SegmentStatusRenderer = ({
 
         break;
       }
-      case DISPLAY_SEGMENT_STATUS.PARTIAL: {
+      case DISPLAY_SEGMENT_STATUS.UPDATING: {
         setStatusColor(StatusColor.Warning);
         setStatusTooltipTitle("External view is OFFLINE or missing for one or more servers of this segment");
 

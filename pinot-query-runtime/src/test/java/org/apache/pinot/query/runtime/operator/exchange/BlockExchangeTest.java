@@ -26,10 +26,10 @@ import java.util.function.BiFunction;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
-import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -45,8 +45,8 @@ import org.testng.annotations.Test;
 
 public class BlockExchangeTest {
 
-  private static final MailboxIdentifier MAILBOX_1 = new StringMailboxIdentifier("1:host:1:host:1");
-  private static final MailboxIdentifier MAILBOX_2 = new StringMailboxIdentifier("1:host:1:host:2");
+  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1", "host:1", "host:1");
+  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1", "host:1", "host:2");
 
   private AutoCloseable _mocks;
 

@@ -34,13 +34,14 @@ public class OpChainStats {
 
   // use memoized supplier so that the timing doesn't start until the
   // first time we get the timer
-  private final Supplier<ThreadResourceUsageProvider> _exTimer
-      = Suppliers.memoize(ThreadResourceUsageProvider::new)::get;
+  private final Supplier<ThreadResourceUsageProvider> _exTimer =
+      Suppliers.memoize(ThreadResourceUsageProvider::new)::get;
 
   // this is used to make sure that toString() doesn't have side
   // effects (accidentally starting the timer)
   private volatile boolean _exTimerStarted = false;
 
+  private final Stopwatch _executeStopwatch = Stopwatch.createUnstarted();
   private final Stopwatch _queuedStopwatch = Stopwatch.createUnstarted();
   private final AtomicLong _queuedCount = new AtomicLong();
 
@@ -62,20 +63,23 @@ public class OpChainStats {
     if (!_queuedStopwatch.isRunning()) {
       _queuedStopwatch.start();
     }
+    if (_executeStopwatch.isRunning()) {
+      _executeStopwatch.stop();
+    }
   }
 
   public void startExecutionTimer() {
     _exTimerStarted = true;
     _exTimer.get();
+    if (!_executeStopwatch.isRunning()) {
+      _executeStopwatch.start();
+    }
   }
 
   @Override
   public String toString() {
-    return String.format("(%s) Queued Count: %s, Executing Time: %sms, Queued Time: %sms",
-        _id,
-        _queuedCount.get(),
-        _exTimerStarted ? TimeUnit.NANOSECONDS.toMillis(_exTimer.get().getThreadTimeNs()) : 0,
-        _queuedStopwatch.elapsed(TimeUnit.MILLISECONDS)
-    );
+    return String.format("(%s) Queued Count: %s, Executing Time: %sms, Queued Time: %sms", _id, _queuedCount.get(),
+        _exTimerStarted ? _executeStopwatch.elapsed(TimeUnit.MILLISECONDS) : 0,
+        _queuedStopwatch.elapsed(TimeUnit.MILLISECONDS));
   }
 }

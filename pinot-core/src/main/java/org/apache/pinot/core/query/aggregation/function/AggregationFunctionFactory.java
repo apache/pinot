@@ -266,6 +266,10 @@ public class AggregationFunctionFactory {
             return new DistinctCountHLLMVAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLLMV:
             return new DistinctCountRawHLLMVAggregationFunction(arguments);
+          case DISTINCTSUMMV:
+            return new DistinctSumMVAggregationFunction(firstArgument);
+          case DISTINCTAVGMV:
+            return new DistinctAvgMVAggregationFunction(firstArgument);
           case DISTINCT:
             return new DistinctAggregationFunction(arguments, queryContext.getOrderByExpressions(),
                 queryContext.getLimit());
@@ -293,6 +297,8 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.SKEWNESS);
           case KURTOSIS:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
+          case FOURTHMOMENT:
+            return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.MOMENT);
           default:
             throw new IllegalArgumentException();
         }

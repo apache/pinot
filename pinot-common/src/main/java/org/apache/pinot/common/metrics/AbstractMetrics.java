@@ -414,7 +414,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(value));
-          addCallbackGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
+          setOrUpdateGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
         } else {
           _gaugeValues.get(gaugeName).set(value);
         }
@@ -438,13 +438,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(unitCount));
-          addCallbackGauge(gaugeName, new Callable<Long>() {
-            @Override
-            public Long call()
-                throws Exception {
-              return _gaugeValues.get(gaugeName).get();
-            }
-          });
+          setOrUpdateGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
         } else {
           _gaugeValues.get(gaugeName).addAndGet(unitCount);
         }
@@ -452,20 +446,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     } else {
       gaugeValue.addAndGet(unitCount);
     }
-  }
-
-  @VisibleForTesting
-  public long getValueOfGlobalGauge(final G gauge) {
-    String gaugeName = gauge.getGaugeName();
-    AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
-    return gaugeValue == null ? 0 : gaugeValue.get();
-  }
-
-  @VisibleForTesting
-  public long getValueOfGlobalGauge(final G gauge, String suffix) {
-    String fullGaugeName = composeGlobalGaugeName(suffix, gauge);
-    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
-    return gaugeValue == null ? 0 : gaugeValue.get();
   }
 
   /**
@@ -479,20 +459,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
     AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
     return gaugeValue == null ? 0 : gaugeValue.get();
-  }
-
-  /**
-   * Gets the value of a table partition gauge.
-   *
-   * @param tableName The table name
-   * @param partitionId The partition name
-   * @param gauge The gauge to use
-   */
-  public long getValueOfPartitionGauge(final String tableName, final int partitionId, final G gauge) {
-    final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
-
-    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
-    return gaugeValue == null ? -1 : gaugeValue.get();
   }
 
   /**

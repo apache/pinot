@@ -28,13 +28,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
-import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
-import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -45,7 +42,6 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -57,7 +53,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
-import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -73,9 +68,6 @@ import static org.testng.Assert.assertTrue;
 public class LoaderTest {
   private static final File INDEX_DIR = new File(LoaderTest.class.getName());
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static final String PADDING_OLD = "data/paddingOld.tar.gz";
-  private static final String PADDING_PERCENT = "data/paddingPercent.tar.gz";
-  private static final String PADDING_NULL = "data/paddingNull.tar.gz";
 
   private static final String TEXT_INDEX_COL_NAME = "column5";
   private static final String FST_INDEX_COL_NAME = "column5";
@@ -220,77 +212,6 @@ public class LoaderTest {
     Assert.assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.DOCID));
     Assert.assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.HOSTNAME));
     Assert.assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.SEGMENTNAME));
-  }
-
-  @Test
-  public void testPadding()
-      throws Exception {
-    // Old Format
-    URL resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_OLD);
-    Assert.assertNotNull(resourceUrl);
-    File segmentDirectory =
-        TarGzCompressionUtils.untar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR).get(0);
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
-    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor("name");
-    Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
-    SegmentDirectory segmentDir = _localSegmentDirectoryLoader.load(segmentDirectory.toURI(),
-        new SegmentDirectoryLoaderContext.Builder().setSegmentName(segmentMetadata.getName())
-            .setSegmentDirectoryConfigs(_pinotConfiguration).build());
-    SegmentDirectory.Reader reader = segmentDir.createReader();
-    PinotDataBuffer dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
-    StringDictionary dict =
-        new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
-            (byte) columnMetadata.getPaddingCharacter());
-    Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
-    Assert.assertEquals(dict.getStringValue(1), "lynda");
-    Assert.assertEquals(dict.get(0), "lynda 2.0");
-    Assert.assertEquals(dict.get(1), "lynda");
-    Assert.assertEquals(dict.indexOf("lynda%"), 1);
-    Assert.assertEquals(dict.indexOf("lynda%%"), 1);
-
-    // New Format Padding character %
-    resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_PERCENT);
-    Assert.assertNotNull(resourceUrl);
-    segmentDirectory =
-        TarGzCompressionUtils.untar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR).get(0);
-    segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
-    columnMetadata = segmentMetadata.getColumnMetadataFor("name");
-    Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
-    segmentDir = _localSegmentDirectoryLoader.load(segmentDirectory.toURI(),
-        new SegmentDirectoryLoaderContext.Builder().setSegmentName(segmentMetadata.getName())
-            .setSegmentDirectoryConfigs(_pinotConfiguration).build());
-    reader = segmentDir.createReader();
-    dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
-    dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
-        (byte) columnMetadata.getPaddingCharacter());
-    Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
-    Assert.assertEquals(dict.getStringValue(1), "lynda");
-    Assert.assertEquals(dict.get(0), "lynda 2.0");
-    Assert.assertEquals(dict.get(1), "lynda");
-    Assert.assertEquals(dict.indexOf("lynda%"), 1);
-    Assert.assertEquals(dict.indexOf("lynda%%"), 1);
-
-    // New Format Padding character Null
-    resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_NULL);
-    Assert.assertNotNull(resourceUrl);
-    segmentDirectory =
-        TarGzCompressionUtils.untar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR).get(0);
-    segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
-    columnMetadata = segmentMetadata.getColumnMetadataFor("name");
-    Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
-    segmentDir = _localSegmentDirectoryLoader.load(segmentDirectory.toURI(),
-        new SegmentDirectoryLoaderContext.Builder().setSegmentName(segmentMetadata.getName())
-            .setSegmentDirectoryConfigs(_pinotConfiguration).build());
-    reader = segmentDir.createReader();
-    dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
-    dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
-        (byte) columnMetadata.getPaddingCharacter());
-    Assert.assertEquals(dict.getStringValue(0), "lynda");
-    Assert.assertEquals(dict.getStringValue(1), "lynda 2.0");
-    Assert.assertEquals(dict.get(0), "lynda");
-    Assert.assertEquals(dict.get(1), "lynda 2.0");
-    Assert.assertEquals(dict.insertionIndexOf("lynda\0"), -2);
-    Assert.assertEquals(dict.insertionIndexOf("lynda\0\0"), -2);
   }
 
   /**

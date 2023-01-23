@@ -295,6 +295,11 @@ public class CommonConstants {
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
+        public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
+        public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
+        public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
+        public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
+
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
         public static final String PRESERVE_TYPE = "preserveType";

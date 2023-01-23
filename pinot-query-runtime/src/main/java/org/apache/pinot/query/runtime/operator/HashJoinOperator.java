@@ -1,5 +1,3 @@
-
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,9 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Key;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
@@ -42,6 +39,9 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * This basic {@code BroadcastJoinOperator} implement a basic broadcast join algorithm.
@@ -56,8 +56,10 @@ import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
  * The output is in the format of [left_row, right_row]
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
-public class HashJoinOperator extends BaseOperator<TransferableBlock> {
+public class HashJoinOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
+
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES =
       ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL);
 
@@ -68,8 +70,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   // TODO: Replace hashset with rolling bit map.
   private final HashMap<Key, HashSet<Integer>> _matchedRightRows;
 
-  private final Operator<TransferableBlock> _leftTableOperator;
-  private final Operator<TransferableBlock> _rightTableOperator;
+  private final MultiStageOperator _leftTableOperator;
+  private final MultiStageOperator _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
   private final int _leftRowSize;
@@ -85,8 +87,10 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
-  public HashJoinOperator(Operator<TransferableBlock> leftTableOperator, Operator<TransferableBlock> rightTableOperator,
-      DataSchema leftSchema, JoinNode node) {
+  private OperatorStats _operatorStats;
+
+  public HashJoinOperator(MultiStageOperator leftTableOperator, MultiStageOperator rightTableOperator,
+      DataSchema leftSchema, JoinNode node, long requestId, int stageId) {
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
     _joinType = node.getJoinRelType();
@@ -114,22 +118,27 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       _matchedRightRows = null;
     }
     _upstreamErrorBlock = null;
+    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
+  // TODO: Separate left and right table operator.
   @Override
-  public List<Operator> getChildOperators() {
-    // WorkerExecutor doesn't use getChildOperators, returns null here.
-    return null;
+  public List<MultiStageOperator> getChildOperators() {
+    return ImmutableList.of(_leftTableOperator, _rightTableOperator);
   }
 
   @Nullable
   @Override
   public String toExplainString() {
+    _leftTableOperator.toExplainString();
+    _rightTableOperator.toExplainString();
+    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
+    _operatorStats.startTimer();
     try {
       if (_isTerminated) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
@@ -143,15 +152,22 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       } else if (!_isHashTableBuilt) {
         return TransferableBlockUtils.getNoOpTransferableBlock();
       }
+      _operatorStats.endTimer();
+      TransferableBlock leftBlock = _leftTableOperator.nextBlock();
+      _operatorStats.startTimer();
       // JOIN each left block with the right block.
-      return buildJoinedDataBlock(_leftTableOperator.nextBlock());
+      return buildJoinedDataBlock(leftBlock);
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
+    } finally {
+      _operatorStats.endTimer();
     }
   }
 
   private void buildBroadcastHashTable() {
+    _operatorStats.endTimer();
     TransferableBlock rightBlock = _rightTableOperator.nextBlock();
+    _operatorStats.startTimer();
     while (!rightBlock.isNoOpBlock()) {
       if (rightBlock.isErrorBlock()) {
         _upstreamErrorBlock = rightBlock;
@@ -168,8 +184,10 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
             _broadcastRightTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>());
         hashCollection.add(row);
       }
-
+      _operatorStats.recordInput(1, container.size());
+      _operatorStats.endTimer();
       rightBlock = _rightTableOperator.nextBlock();
+      _operatorStats.startTimer();
     }
   }
 
@@ -199,6 +217,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         }
       }
       _isTerminated = true;
+      _operatorStats.recordOutput(1, returnRows.size());
       return new TransferableBlock(returnRows, _resultSchema, DataBlock.Type.ROW);
     }
     List<Object[]> rows = new ArrayList<>();
@@ -233,6 +252,8 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         rows.add(joinRow(leftRow, null));
       }
     }
+    _operatorStats.recordInput(1, container.size());
+    _operatorStats.recordOutput(1, rows.size());
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
   }
 

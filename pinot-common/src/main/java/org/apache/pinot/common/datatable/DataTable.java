@@ -21,10 +21,10 @@ package org.apache.pinot.common.datatable;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -88,26 +88,6 @@ public interface DataTable {
   DataTable toMetadataOnlyDataTable();
 
   DataTable toDataOnlyDataTable();
-
-  class CustomObject {
-    public static final int NULL_TYPE_VALUE = 100;
-
-    private final int _type;
-    private final ByteBuffer _buffer;
-
-    public CustomObject(int type, ByteBuffer buffer) {
-      _type = type;
-      _buffer = buffer;
-    }
-
-    public int getType() {
-      return _type;
-    }
-
-    public ByteBuffer getBuffer() {
-      return _buffer;
-    }
-  }
 
   enum MetadataValueType {
     INT, LONG, STRING
