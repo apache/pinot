@@ -166,7 +166,7 @@ public class QueryRunner {
       StageNode stageRoot = distributedStagePlan.getStageRoot();
       OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
           new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs,
-              _rootServer, distributedStagePlan.getMetadataMap()));
+              new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap()));
       _scheduler.register(rootOperator);
     }
   }

@@ -168,7 +168,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     List<VirtualServer> servers = _queryPlan.getStageMetadataMap().get(receiverStageId).getServerInstances();
     context._builder.append("->");
     String receivers = servers.stream()
-        .map(s -> s.getHostname() + ':' + s.getPort())
+        .map(VirtualServer::toString)
         .map(s -> "[" + receiverStageId + "]@" + s)
         .collect(Collectors.joining(",", "{", "}"));
     return context._builder.append(receivers);
