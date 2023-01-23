@@ -121,6 +121,11 @@ public class AggregateOperator extends MultiStageOperator {
     return ImmutableList.of(_inputOperator);
   }
 
+  @Override
+  public void cancel(Throwable e) {
+
+  }
+
   @Nullable
   @Override
   public String toExplainString() {
