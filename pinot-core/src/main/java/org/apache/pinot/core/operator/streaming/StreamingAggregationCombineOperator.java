@@ -20,25 +20,21 @@ package org.apache.pinot.core.operator.streaming;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
- * Combine operator for selection queries with streaming response.
+ * Combine operator for aggregation queries with streaming response.
  */
 @SuppressWarnings("rawtypes")
-public class StreamingSelectionOnlyCombineOperator extends BaseStreamingCombineOperator<SelectionResultsBlock> {
-  private static final String EXPLAIN_NAME = "STREAMING_COMBINE_SELECT";
-  private final int _limit;
-  private final AtomicLong _numRowsCollected = new AtomicLong();
+public class StreamingAggregationCombineOperator extends BaseStreamingCombineOperator<AggregationResultsBlock> {
+  private static final String EXPLAIN_NAME = "STREAMING_COMBINE_AGGREGATE";
 
-  public StreamingSelectionOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
+  public StreamingAggregationCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
     super(operators, queryContext, executorService);
-    _limit = queryContext.getLimit();
   }
 
   @Override
@@ -47,13 +43,8 @@ public class StreamingSelectionOnlyCombineOperator extends BaseStreamingCombineO
   }
 
   @Override
-  protected boolean isOperatorSatisfied(SelectionResultsBlock resultsBlock) {
-    long numRowsCollected = _numRowsCollected.addAndGet(resultsBlock.getNumRows());
-    return numRowsCollected >= _limit;
-  }
-
-  @Override
-  protected boolean shouldFinishOperators() {
-    return _numRowsCollected.get() > _limit;
+  protected boolean isOperatorSatisfied(AggregationResultsBlock resultsBlock) {
+    // AggregateResultBlock is produced once per segment, thus operator is always satisfied after the first block
+    return true;
   }
 }
