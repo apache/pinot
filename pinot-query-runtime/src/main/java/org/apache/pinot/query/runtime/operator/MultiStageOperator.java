@@ -78,6 +78,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   }
 
   public void cancel(Throwable e) {
+<<<<<<< HEAD
     for (MultiStageOperator op : getChildOperators()) {
       try {
         op.cancel(e);
@@ -87,4 +88,10 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       }
     }
   }
+=======
+
+
+  }
+
+>>>>>>> 3378f01568 (cancel)
 }

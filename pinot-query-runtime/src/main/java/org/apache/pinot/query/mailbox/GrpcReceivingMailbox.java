@@ -92,8 +92,12 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   }
 
   @Override
+<<<<<<< HEAD
   public void cancel(Throwable e) {
   }
+=======
+  public void cancel(Throwable e) {}
+>>>>>>> 3378f01568 (cancel)
 
   private boolean waitForInitialize()
       throws Exception {
