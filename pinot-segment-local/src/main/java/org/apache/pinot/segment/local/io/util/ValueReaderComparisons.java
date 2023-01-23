@@ -54,6 +54,17 @@ public class ValueReaderComparisons {
     return -1;
   }
 
+  static int compareBytes(PinotDataBuffer dataBuffer, long startOffset, int length, byte[] bytes) {
+    // can use MethodHandles.byteArrayViewVarHandle here after dropping JDK8
+    ByteBuffer buffer = ByteBuffer.wrap(bytes);
+    int mismatchPosition = mismatch(dataBuffer, startOffset, length, buffer);
+    if (mismatchPosition == -1) {
+      return length - bytes.length;
+    }
+    // can use Byte.compareUnsigned here after dropping JDK8
+    return (dataBuffer.getByte(startOffset + mismatchPosition) & 0xFF) - (bytes[mismatchPosition] & 0xFF);
+  }
+
   static int compareUtf8Bytes(PinotDataBuffer dataBuffer, long startOffset, int length, boolean padded, byte[] bytes) {
     // can use MethodHandles.byteArrayViewVarHandle here after dropping JDK8
     ByteBuffer buffer = ByteBuffer.wrap(bytes);
