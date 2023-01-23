@@ -244,8 +244,8 @@ public class DistinctTable {
     if (hasOrderBy()) {
       for (Record record : distinctTable._records) {
         addWithOrderBy(record);
+        LoopUtils.sampleAndCheckInterruptionPeriodically(mergedRecords);
         mergedRecords++;
-        LoopUtils.checkMergePhaseInterruption(mergedRecords);
       }
     } else {
       if (_recordSet.size() < _limit) {
@@ -253,8 +253,8 @@ public class DistinctTable {
           if (addWithoutOrderBy(record)) {
             return;
           }
+          LoopUtils.sampleAndCheckInterruptionPeriodically(mergedRecords);
           mergedRecords++;
-          LoopUtils.checkMergePhaseInterruption(mergedRecords);
         }
       }
     }

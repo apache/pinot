@@ -174,7 +174,7 @@ public class QueryRouter {
     _serverChannels.shutDown();
   }
 
-  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
+  long receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
     long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
@@ -183,6 +183,8 @@ public class QueryRouter {
     if (asyncQueryResponse != null) {
       asyncQueryResponse.receiveDataTable(serverRoutingInstance, dataTable, responseSize, deserializationTimeMs);
     }
+
+    return requestId;
   }
 
   void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {

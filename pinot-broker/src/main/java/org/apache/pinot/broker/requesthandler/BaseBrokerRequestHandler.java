@@ -83,6 +83,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -257,6 +258,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       RequestContext requestContext)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
+
+    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
 
     long compilationStartTimeNs;
     PinotQuery pinotQuery;
@@ -686,6 +689,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryLogger.log(
         new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, numUnavailableSegments, serverStats,
             brokerResponse, totalTimeMs, requesterIdentity));
+
+    Tracing.ThreadAccountantOps.clear();
+
     return brokerResponse;
   }
 

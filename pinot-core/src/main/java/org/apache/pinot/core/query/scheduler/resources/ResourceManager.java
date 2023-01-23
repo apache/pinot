@@ -95,7 +95,7 @@ public abstract class ResourceManager {
     _queryWorkers =
         MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory));
 
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(_numQueryRunnerThreads, _numQueryWorkerThreads, config);
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(config);
   }
 
   public void stop() {

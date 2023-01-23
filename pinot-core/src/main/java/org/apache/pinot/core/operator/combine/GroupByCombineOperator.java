@@ -187,16 +187,16 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
                 values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
               }
               _indexedTable.upsert(new Key(keys), new Record(values));
+              LoopUtils.sampleAndCheckInterruptionPeriodically(mergedKeys);
               mergedKeys++;
-              LoopUtils.checkMergePhaseInterruption(mergedKeys);
             }
           }
         } else {
           for (IntermediateRecord intermediateResult : intermediateRecords) {
             //TODO: change upsert api so that it accepts intermediateRecord directly
             _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+            LoopUtils.sampleAndCheckInterruptionPeriodically(mergedKeys);
             mergedKeys++;
-            LoopUtils.checkMergePhaseInterruption(mergedKeys);
           }
         }
       } finally {

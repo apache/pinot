@@ -25,6 +25,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,13 +62,15 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
+    Tracing.ThreadAccountantOps.setThreadResourceUsageProvider();
     int responseSize = msg.readableBytes();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_RECEIVED, responseSize);
     try {
       long deserializationStartTimeMs = System.currentTimeMillis();
       DataTable dataTable = DataTableFactory.getDataTable(msg.nioBuffer());
-      _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
+      long requestID = _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
           (int) (System.currentTimeMillis() - deserializationStartTimeMs));
+      Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(String.valueOf(requestID));
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);
