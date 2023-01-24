@@ -23,9 +23,9 @@ import org.apache.pinot.spi.trace.Tracing;
 
 
 public class LoopUtils {
-
   private LoopUtils() {
   }
+
   public static final int MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK = 0b1_1111_1111_1111;
 
   // Check for thread interruption, every time after merging 8192 keys

@@ -16,30 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.combine;
+package org.apache.pinot.core.operator.combine.merger;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
-import org.apache.pinot.core.operator.combine.merger.AggregationResultsBlockMerger;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Combine operator for aggregation queries.
- */
-@SuppressWarnings({"rawtypes"})
-public class AggregationCombineOperator extends BaseSingleBlockCombineOperator<AggregationResultsBlock> {
-  private static final String EXPLAIN_NAME = "COMBINE_AGGREGATE";
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class AggregationResultsBlockMerger implements ResultsBlockMerger<AggregationResultsBlock> {
 
-  public AggregationCombineOperator(List<Operator> operators, QueryContext queryContext,
-      ExecutorService executorService) {
-    super(new AggregationResultsBlockMerger(queryContext), operators, queryContext, executorService);
+  public AggregationResultsBlockMerger(QueryContext queryContext) {
   }
 
   @Override
-  public String toExplainString() {
-    return EXPLAIN_NAME;
+  public void mergeResultsBlocks(AggregationResultsBlock mergedBlock, AggregationResultsBlock blockToMerge) {
+    AggregationFunction[] aggregationFunctions = mergedBlock.getAggregationFunctions();
+    List<Object> mergedResults = mergedBlock.getResults();
+    List<Object> resultsToMerge = blockToMerge.getResults();
+    assert aggregationFunctions != null && mergedResults != null && resultsToMerge != null;
+
+    int numAggregationFunctions = aggregationFunctions.length;
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      mergedResults.set(i, aggregationFunctions[i].merge(mergedResults.get(i), resultsToMerge.get(i)));
+    }
   }
 }

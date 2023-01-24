@@ -22,10 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteOrder;
@@ -43,7 +41,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -87,9 +84,6 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private final File _indexFile;
   private final Map<IndexKey, IndexEntry> _columnEntries;
   private final List<PinotDataBuffer> _allocBuffers;
-  // Different from the other column-index entries, starTree index is multi-column index and has its own index map,
-  // thus manage it separately.
-  private PinotDataBuffer _starTreeIndexDataBuffer;
 
   // For V3 segment format, the index cleanup consists of two steps: mark and sweep.
   // The removeIndex() method marks an index to be removed; and the index info is
@@ -213,21 +207,6 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       throws IOException, ConfigurationException {
     loadMap();
     mapBufferEntries();
-    if (_segmentMetadata.getStarTreeV2MetadataList() != null) {
-      loadStarTreeIndex();
-    }
-  }
-
-  private void loadStarTreeIndex()
-      throws IOException {
-    File indexFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
-    if (_readMode == ReadMode.heap) {
-      _starTreeIndexDataBuffer =
-          PinotDataBuffer.loadFile(indexFile, 0, indexFile.length(), ByteOrder.BIG_ENDIAN, "Star-tree V2 data buffer");
-    } else {
-      _starTreeIndexDataBuffer = PinotDataBuffer.mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.BIG_ENDIAN,
-          "Star-tree V2 data buffer");
-    }
   }
 
   private void loadMap()
@@ -367,9 +346,6 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     for (PinotDataBuffer buf : _allocBuffers) {
       buf.close();
     }
-    if (_starTreeIndexDataBuffer != null) {
-      _starTreeIndexDataBuffer.close();
-    }
     // Cleanup removed indices after closing and flushing buffers, so
     // that potential index updates can be persisted across cleanups.
     if (_shouldCleanupRemovedIndices) {
@@ -414,20 +390,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getStarTreeIndex()
-      throws IOException {
-    return _starTreeIndexDataBuffer;
-  }
-
-  @Override
-  public InputStream getStarTreeIndexMap()
-      throws IOException {
-    return new FileInputStream(new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
-  }
-
-  @Override
   public String toString() {
-    return _segmentDirectory.toString() + "/" + _indexFile.toString();
+    return _indexFile.toString();
   }
 
   /**

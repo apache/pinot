@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.combine;
+package org.apache.pinot.core.operator.streaming;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,6 +28,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -42,11 +43,17 @@ import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
+import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.LoopUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,11 +65,11 @@ import org.slf4j.LoggerFactory;
  *       all threads
  */
 @SuppressWarnings("rawtypes")
-public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
+public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperator<GroupByResultsBlock> {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
-  private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamingGroupByCombineOperator.class);
+  private static final String EXPLAIN_NAME = "STREAMING_COMBINE_GROUP_BY";
 
   private final int _trimSize;
   private final int _trimThreshold;
@@ -73,12 +80,14 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
+  private boolean _opCompleted;
 
   private volatile IndexedTable _indexedTable;
   private volatile boolean _numGroupsLimitReached;
 
-  public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
-    super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
+  public StreamingGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
+      ExecutorService executorService) {
+    super(operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
     int minTrimSize = queryContext.getMinServerGroupTrimSize();
     if (minTrimSize > 0) {
@@ -105,6 +114,38 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
+    _opCompleted = false;
+  }
+
+  @Override
+  protected BaseResultsBlock getNextBlock() {
+    while (_exceptionBlock == null && !_opCompleted) {
+      try {
+        // This guarantees final result block is reduced
+        BaseResultsBlock resultsBlock = getFinalResult();
+        if (resultsBlock instanceof ExceptionResultsBlock) {
+          _exceptionBlock = resultsBlock;
+          return _exceptionBlock;
+        } else {
+          return resultsBlock;
+        }
+      } catch (InterruptedException | EarlyTerminationException e) {
+        Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
+        _exceptionBlock = new ExceptionResultsBlock(new QueryCancelledException(
+            "result block stream cancelled" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg), e));
+        return _exceptionBlock;
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
+        _exceptionBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+        return _exceptionBlock;
+      }
+    }
+    // Setting the execution stats for the final return
+    BaseResultsBlock finalBlock = new MetadataResultsBlock();
+    int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    CombineOperatorUtils.setExecutionStatistics(finalBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
+        numServerThreads);
+    return finalBlock;
   }
 
   /**
@@ -127,7 +168,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
    * Executes query on one segment in a worker thread and merges the results into the indexed table.
    */
   @Override
-  protected void processSegments() {
+  public void processSegments() {
     int operatorId;
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator operator = _operators.get(operatorId);
@@ -207,35 +248,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
   }
 
-  @Override
-  public void onProcessSegmentsException(Throwable t) {
-    _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, t));
-  }
-
-  @Override
-  public void onProcessSegmentsFinish() {
-    _operatorLatch.countDown();
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Combines intermediate selection result blocks from underlying operators and returns a merged one.
-   * <ul>
-   *   <li>
-   *     Merges multiple intermediate selection result blocks as a merged one.
-   *   </li>
-   *   <li>
-   *     Set all exceptions encountered during execution into the merged result block
-   *   </li>
-   * </ul>
-   */
-  @Override
-  public BaseResultsBlock mergeResults()
+  // TODO: combine this with the single block group by combine operator
+  private BaseResultsBlock getFinalResult()
       throws Exception {
     long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
-    boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
-    if (!opCompleted) {
+    _opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+    if (!_opCompleted) {
       // If this happens, the broker side should already timed out, just log the error and return
       String errorMessage =
           String.format("Timed out while combining group-by order-by results after %dms, queryContext = %s", timeoutMs,
@@ -259,7 +277,16 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     if (!_mergedProcessingExceptions.isEmpty()) {
       mergedBlock.setProcessingExceptions(new ArrayList<>(_mergedProcessingExceptions));
     }
-
     return mergedBlock;
+  }
+
+  @Override
+  public void onProcessSegmentsException(Throwable t) {
+    _mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, t));
+  }
+
+  @Override
+  public void onProcessSegmentsFinish() {
+    _operatorLatch.countDown();
   }
 }
