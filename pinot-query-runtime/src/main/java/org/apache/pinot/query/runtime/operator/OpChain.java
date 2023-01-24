@@ -70,6 +70,7 @@ public class OpChain implements AutoCloseable {
   }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   /**
    * cancel() is called when execution runs into error.
    * @param e
@@ -78,6 +79,9 @@ public class OpChain implements AutoCloseable {
 =======
   public void cancel(Throwable e){
 >>>>>>> 3378f01568 (cancel)
+=======
+  public void cancel(Throwable e) {
+>>>>>>> 36aa71d778 (clean up)
     _root.cancel(e);
   }
 }

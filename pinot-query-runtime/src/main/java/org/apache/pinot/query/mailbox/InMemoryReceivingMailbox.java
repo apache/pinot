@@ -67,8 +67,11 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
   @Override
   public void cancel(Throwable e) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 3378f01568 (cancel)
+=======
+>>>>>>> 36aa71d778 (clean up)
   }
 }
