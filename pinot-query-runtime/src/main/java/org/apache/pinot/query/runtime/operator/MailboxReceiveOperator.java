@@ -125,11 +125,6 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     return ImmutableList.of();
   }
 
-  @Override
-  public void cancel(Throwable e) {
-
-  }
-
   @Nullable
   @Override
   public String toExplainString() {

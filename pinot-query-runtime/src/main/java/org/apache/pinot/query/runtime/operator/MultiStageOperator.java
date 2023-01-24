@@ -40,7 +40,11 @@ public abstract class MultiStageOperator extends BaseOperator<TransferableBlock>
       try {
         op.close();
       } catch (Exception e) {
+<<<<<<< HEAD
         LOGGER.error("Failed to close operator: " + op + " with exception:" + e);
+=======
+        LOGGER.error("Failed to close operator:" + op + " with exception:" + e);
+>>>>>>> 36aa71d778 (clean up)
         // Continue processing because even one operator failed to be close, we should still close the rest.
       }
     }
@@ -48,6 +52,9 @@ public abstract class MultiStageOperator extends BaseOperator<TransferableBlock>
 
   public void cancel(Throwable e) {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 36aa71d778 (clean up)
     for (MultiStageOperator op : getChildOperators()) {
       try {
         op.cancel(e);
@@ -56,6 +63,7 @@ public abstract class MultiStageOperator extends BaseOperator<TransferableBlock>
         // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
       }
     }
+<<<<<<< HEAD
   }
 =======
 
@@ -63,4 +71,7 @@ public abstract class MultiStageOperator extends BaseOperator<TransferableBlock>
   }
 
 >>>>>>> 3378f01568 (cancel)
+=======
+  }
+>>>>>>> 36aa71d778 (clean up)
 }

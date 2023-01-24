@@ -71,11 +71,6 @@ public class FilterOperator extends MultiStageOperator {
     return ImmutableList.of(_upstreamOperator);
   }
 
-  @Override
-  public void cancel(Throwable e) {
-
-  }
-
   @Nullable
   @Override
   public String toExplainString() {
