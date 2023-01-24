@@ -69,7 +69,7 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
   public void acquire() {
     // do not acquire if interrupted (similar to the check inside the nextBlock())
     if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
+      throw new EarlyTerminationException("Interrupted while acquiring segment");
     }
     _indexSegment.acquire(_fetchContext);
   }
@@ -80,7 +80,6 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
   public void release() {
     _indexSegment.release(_fetchContext);
   }
-
 
   @Override
   public String toExplainString() {

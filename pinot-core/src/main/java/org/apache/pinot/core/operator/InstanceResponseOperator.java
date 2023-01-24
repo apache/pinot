@@ -119,7 +119,8 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     } catch (EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
       return new ExceptionResultsBlock(new QueryCancelledException(
-          "Cancelled while combining results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg)));
+          "Cancelled while combining results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg),
+          e));
     } finally {
       releaseAll();
     }

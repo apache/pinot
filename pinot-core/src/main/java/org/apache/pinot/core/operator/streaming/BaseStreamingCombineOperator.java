@@ -97,7 +97,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
         _querySatisfied = isQuerySatisfied((T) resultsBlock, querySatisfiedTracker);
         return resultsBlock;
       } catch (InterruptedException e) {
-        throw new EarlyTerminationException();
+        throw new EarlyTerminationException("Interrupted while streaming results blocks", e);
       } catch (Exception e) {
         LOGGER.error("Caught exception while streaming results blocks (query: {})", _queryContext, e);
         return new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));

@@ -31,8 +31,8 @@ public class LoopUtils {
   // Check for thread interruption, every time after merging 8192 keys
   public static void checkMergePhaseInterruption(int mergedKeys) {
     if ((mergedKeys & MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0
-        && (Tracing.ThreadAccountantOps.isInterrupted())) {
-      throw new EarlyTerminationException();
+        && Tracing.ThreadAccountantOps.isInterrupted()) {
+      throw new EarlyTerminationException("Interrupted while merging records");
     }
   }
 }

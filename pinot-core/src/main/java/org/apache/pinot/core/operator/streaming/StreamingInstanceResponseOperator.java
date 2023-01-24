@@ -74,8 +74,8 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
     } catch (EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
       return new InstanceResponseBlock(new ExceptionResultsBlock(new QueryCancelledException(
-          "Cancelled while streaming results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg))),
-          _queryContext);
+          "Cancelled while streaming results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg),
+          e)), _queryContext);
     } catch (Exception e) {
       return new InstanceResponseBlock(new ExceptionResultsBlock(QueryException.DATA_TABLE_SERIALIZATION_ERROR, e),
           _queryContext);
