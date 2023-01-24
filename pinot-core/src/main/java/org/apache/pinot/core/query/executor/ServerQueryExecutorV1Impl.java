@@ -47,6 +47,7 @@ import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -476,6 +477,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       if (node instanceof MatchAllFilterOperator) {
         explainPlanRows.setHasMatchAllFilter(true);
       }
+    }
+
+    if (node instanceof AcquireReleaseColumnsSegmentOperator) {
+      ((AcquireReleaseColumnsSegmentOperator) node).materializeChildOperator();
     }
 
     List<Operator> children = node.getChildOperators();

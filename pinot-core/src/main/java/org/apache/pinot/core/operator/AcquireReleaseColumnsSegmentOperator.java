@@ -54,12 +54,16 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
     _fetchContext = fetchContext;
   }
 
+  public void materializeChildOperator() {
+    _childOperator = (Operator<BaseResultsBlock>) _planNode.run();
+  }
+
   /**
    * Runs the planNode to get the childOperator, and then proceeds with execution.
    */
   @Override
   protected BaseResultsBlock getNextBlock() {
-    _childOperator = (Operator<BaseResultsBlock>) _planNode.run();
+    materializeChildOperator();
     return _childOperator.nextBlock();
   }
 
