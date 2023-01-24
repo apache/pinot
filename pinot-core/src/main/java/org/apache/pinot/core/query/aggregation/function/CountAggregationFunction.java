@@ -49,8 +49,9 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
 
   public CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
-    // Consider null values only when null handling is enabled and function is not COUNT(*)
-    _nullHandlingEnabled = nullHandlingEnabled && !expression.getIdentifier().equals("*");
+    // Consider null values only when null handling is enabled and function is not COUNT(*).
+    // Note that expressions where identifier is a literal like COUNT(1) are equivalent to COUNT(*).
+    _nullHandlingEnabled = nullHandlingEnabled && !expression.getIdentifier().equals("*") && !expression.getType().equals(ExpressionContext.Type.LITERAL);
   }
 
   @Override
