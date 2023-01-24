@@ -457,7 +457,7 @@ public class PinotTaskRestletResource {
   }
 
   @GET
-  @Path("/tasks/subtask/state/{subTaskState}/progress")
+  @Path("/tasks/subtask/workers/progress")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get progress of all subtasks with specified state tracked by minion worker in memory")
   @ApiResponses(value = {
@@ -465,7 +465,7 @@ public class PinotTaskRestletResource {
   })
   public String getSubtaskWithGivenStateProgress(@Context HttpHeaders httpHeaders,
       @ApiParam(value = "Subtask state (UNKNOWN,IN_PROGRESS,SUCCEEDED,CANCELLED,ERROR)", required = true)
-      @PathParam("subTaskState") String subTaskState,
+      @QueryParam("subTaskState") String subTaskState,
       @ApiParam(value = "Minion worker IDs separated by comma") @QueryParam("minionWorkerIds") @Nullable
           String minionWorkerIds) {
     Set<String> selectedMinionWorkers = new HashSet<>();
