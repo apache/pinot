@@ -67,7 +67,7 @@ public class OpChain implements AutoCloseable {
     _root.close();
   }
 
-  public void cancel(Throwable e){
+  public void cancel(Throwable e) {
     _root.cancel(e);
   }
 }

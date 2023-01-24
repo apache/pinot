@@ -127,11 +127,6 @@ public class HashJoinOperator extends MultiStageOperator {
     return ImmutableList.of(_leftTableOperator, _rightTableOperator);
   }
 
-  @Override
-  public void cancel(Throwable e) {
-
-  }
-
   @Nullable
   @Override
   public String toExplainString() {

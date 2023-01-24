@@ -20,7 +20,6 @@ package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.proto.Mailbox;
 import org.slf4j.Logger;
@@ -45,15 +44,14 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
     _finishLatch = finishLatch;
   }
 
-
   @Override
   public void onNext(Mailbox.MailboxStatus mailboxStatus) {
     // when received a mailbox status from the receiving end, sending end update the known buffer size available
     // so we can make better throughput send judgement. here is a simple example.
     // TODO: this feedback info is not used to throttle the send speed. it is currently being discarded.
     if (mailboxStatus.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY)) {
-      _bufferSize.set(Integer.parseInt(
-          mailboxStatus.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY)));
+      _bufferSize.set(
+          Integer.parseInt(mailboxStatus.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY)));
     } else {
       _bufferSize.set(DEFAULT_MAILBOX_QUEUE_CAPACITY); // DEFAULT_AVAILABILITY;
     }

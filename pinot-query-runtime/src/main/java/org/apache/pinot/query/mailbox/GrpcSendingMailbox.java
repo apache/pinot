@@ -49,7 +49,6 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
 
   private StreamObserver<MailboxContent> _mailboxContentStreamObserver;
 
-
   public GrpcSendingMailbox(String mailboxId, GrpcMailboxService mailboxService) {
     _mailboxService = mailboxService;
     _mailboxId = mailboxId;
@@ -63,10 +62,8 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
     _mailboxContentStreamObserver = stub.open(new MailboxStatusStreamObserver(_finishLatch));
     // TODO: Replace init call with metadata.
     // send a begin-of-stream message.
-    _mailboxContentStreamObserver.onNext(MailboxContent.newBuilder()
-        .setMailboxId(_mailboxId)
-        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true")
-        .build());
+    _mailboxContentStreamObserver.onNext(MailboxContent.newBuilder().setMailboxId(_mailboxId)
+        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true").build());
     _initialized.set(true);
   }
 
@@ -100,7 +97,6 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
 
   @Override
   public void cancel(Throwable t) {
-
   }
 
   private MailboxContent toMailboxContent(DataBlock dataBlock) {

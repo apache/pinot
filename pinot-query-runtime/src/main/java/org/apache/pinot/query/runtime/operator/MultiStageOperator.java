@@ -41,15 +41,20 @@ public abstract class MultiStageOperator extends BaseOperator<TransferableBlock>
       try {
         op.close();
       } catch (Exception e) {
-        LOGGER.error("Failed to close operator:" + op);
+        LOGGER.error("Failed to close operator:" + op + " with exception:" + e);
         // Continue processing because even one operator failed to be close, we should still close the rest.
       }
     }
   }
 
   public void cancel(Throwable e) {
-
-
+    for (MultiStageOperator op : getChildOperators()) {
+      try {
+        op.cancel(e);
+      } catch (Exception e2) {
+        LOGGER.error("Failed to cancel operator:" + op + "with error:" + e + " with exception:" + e2);
+        // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
+      }
+    }
   }
-
 }

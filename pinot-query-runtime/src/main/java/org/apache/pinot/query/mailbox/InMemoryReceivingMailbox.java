@@ -66,6 +66,5 @@ public class InMemoryReceivingMailbox implements ReceivingMailbox<TransferableBl
 
   @Override
   public void cancel(Throwable e) {
-
   }
 }

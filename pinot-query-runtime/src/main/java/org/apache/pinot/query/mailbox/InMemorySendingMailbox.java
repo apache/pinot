@@ -47,8 +47,7 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
     if (!_queue.offer(data)) {
       // this should never happen, since we use a LinkedBlockingQueue
       // which does not have capacity bounds
-      throw new IllegalStateException("Failed to insert into in-memory mailbox "
-          + _mailboxId);
+      throw new IllegalStateException("Failed to insert into in-memory mailbox " + _mailboxId);
     }
     _gotMailCallback.accept(new StringMailboxIdentifier(_mailboxId));
   }
@@ -58,7 +57,9 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   }
 
   @Override
-  public void waitForFinish(long timeout, TimeUnit unit) throws InterruptedException {  }
+  public void waitForFinish(long timeout, TimeUnit unit)
+      throws InterruptedException {
+  }
 
   @Override
   public void cancel(Throwable t) {
