@@ -41,7 +41,7 @@ public abstract class MultiStageOperator extends BaseOperator<TransferableBlock>
       try {
         op.close();
       } catch (Exception e) {
-        LOGGER.error("Failed to close operator:" + op + " with exception:" + e);
+        LOGGER.error("Failed to close operator: " + op + " with exception:" + e);
         // Continue processing because even one operator failed to be close, we should still close the rest.
       }
     }
