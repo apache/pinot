@@ -301,15 +301,6 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     return mergedBlock;
   }
 
-  @Override
-  protected void onProcessSegmentsException(Throwable t) {
-    _blockingQueue.offer(new ExceptionResultsBlock(t));
-  }
-
-  @Override
-  protected void onProcessSegmentsFinish() {
-  }
-
   protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
     DataSchema mergedDataSchema = mergedBlock.getDataSchema();
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();

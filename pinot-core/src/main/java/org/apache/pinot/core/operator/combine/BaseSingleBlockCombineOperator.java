@@ -25,7 +25,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
@@ -35,8 +34,6 @@ import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.exception.QueryCancelledException;
-import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,11 +68,8 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
     try {
       startProcess();
       mergedBlock = mergeResults();
-    } catch (InterruptedException | EarlyTerminationException e) {
-      Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
-      throw new QueryCancelledException(
-          "Cancelled while merging results blocks" + (killedErrorMsg == null ? StringUtils.EMPTY
-              : " " + killedErrorMsg), e);
+    } catch (InterruptedException e) {
+      throw new EarlyTerminationException();
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
       mergedBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
@@ -111,13 +105,11 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-
+      _blockingQueue.offer(resultsBlock);
+      // When query is satisfied, skip processing the remaining segments
       if (_resultsBlockMerger.isQuerySatisfied(resultsBlock)) {
-        // Query is satisfied, skip processing the remaining segments
-        _blockingQueue.offer(resultsBlock);
+        _nextOperatorId.set(_numOperators);
         return;
-      } else {
-        _blockingQueue.offer(resultsBlock);
       }
     }
   }

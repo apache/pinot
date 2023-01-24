@@ -41,7 +41,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -117,7 +116,7 @@ public class CombineSlowOperatorsTest {
     queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
     SelectionOnlyCombineOperator combineOperator =
         new SelectionOnlyCombineOperator(operators, queryContext, _executorService);
-    testCancelCombineOperator(combineOperator, ready, "Cancelled while merging results blocks");
+    testCancelCombineOperator(combineOperator, ready);
   }
 
   @Test
@@ -128,7 +127,7 @@ public class CombineSlowOperatorsTest {
     queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
     SelectionOrderByCombineOperator combineOperator =
         new SelectionOrderByCombineOperator(operators, queryContext, _executorService);
-    testCancelCombineOperator(combineOperator, ready, "Cancelled while merging results blocks");
+    testCancelCombineOperator(combineOperator, ready);
   }
 
   @Test
@@ -148,7 +147,7 @@ public class CombineSlowOperatorsTest {
     queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
     MinMaxValueBasedSelectionOrderByCombineOperator combineOperator =
         new MinMaxValueBasedSelectionOrderByCombineOperator(operators, queryContext, _executorService);
-    testCancelCombineOperator(combineOperator, ready, "Cancelled while merging results blocks");
+    testCancelCombineOperator(combineOperator, ready);
   }
 
   @Test
@@ -159,7 +158,7 @@ public class CombineSlowOperatorsTest {
     queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
     AggregationCombineOperator combineOperator =
         new AggregationCombineOperator(operators, queryContext, _executorService);
-    testCancelCombineOperator(combineOperator, ready, "Cancelled while merging results blocks");
+    testCancelCombineOperator(combineOperator, ready);
   }
 
   @Test
@@ -170,10 +169,10 @@ public class CombineSlowOperatorsTest {
         QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable GROUP BY column");
     queryContext.setEndTimeMs(System.currentTimeMillis() + 10000);
     GroupByCombineOperator combineOperator = new GroupByCombineOperator(operators, queryContext, _executorService);
-    testCancelCombineOperator(combineOperator, ready, "Cancelled while merging results blocks");
+    testCancelCombineOperator(combineOperator, ready);
   }
 
-  private void testCancelCombineOperator(BaseCombineOperator combineOperator, CountDownLatch ready, String errMsg) {
+  private void testCancelCombineOperator(BaseCombineOperator combineOperator, CountDownLatch ready) {
     AtomicReference<Exception> exp = new AtomicReference<>();
     ExecutorService combineExecutor = Executors.newSingleThreadExecutor();
     try {
@@ -194,9 +193,8 @@ public class CombineSlowOperatorsTest {
     } finally {
       combineExecutor.shutdownNow();
     }
-    TestUtils.waitForCondition((aVoid) -> exp.get() instanceof QueryCancelledException, 10_000,
+    TestUtils.waitForCondition((aVoid) -> exp.get() instanceof EarlyTerminationException, 10_000,
         "Should have been cancelled");
-    assertEquals(exp.get().getMessage(), errMsg);
   }
 
   /**
