@@ -38,7 +38,6 @@ import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.segment.spi.store.SegmentIndexType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
@@ -250,25 +249,26 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
 
   private synchronized void loadData()
       throws IOException {
-    if (_columnIndexDirectory == null) {
-      switch (_segmentMetadata.getVersion()) {
-        case v1:
-        case v2:
-          _columnIndexDirectory = new FilePerIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
-          break;
-        case v3:
-          try {
-            _columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
-          } catch (ConfigurationException e) {
-            LOGGER.error("Failed to create columnar index directory", e);
-            throw new RuntimeException(e);
-          }
-          break;
-        default:
-          break;
-      }
+    if (_columnIndexDirectory != null) {
+      return;
     }
-    if (_starTreeIndexReader == null && CollectionUtils.isNotEmpty(_segmentMetadata.getStarTreeV2MetadataList())) {
+    switch (_segmentMetadata.getVersion()) {
+      case v1:
+      case v2:
+        _columnIndexDirectory = new FilePerIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
+        break;
+      case v3:
+        try {
+          _columnIndexDirectory = new SingleFileIndexDirectory(_segmentDirectory, _segmentMetadata, _readMode);
+        } catch (ConfigurationException e) {
+          LOGGER.error("Failed to create columnar index directory", e);
+          throw new RuntimeException(e);
+        }
+        break;
+      default:
+        break;
+    }
+    if (CollectionUtils.isNotEmpty(_segmentMetadata.getStarTreeV2MetadataList())) {
       _starTreeIndexReader = new StarTreeIndexReader(_segmentDirectory, _segmentMetadata, _readMode);
     }
   }
@@ -356,32 +356,28 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       return _columnIndexDirectory.hasIndexFor(column, type);
     }
 
-    public boolean hasSegmentIndex(SegmentIndexType type) {
-      if (type != SegmentIndexType.STAR_TREE_INDEX) {
-        throw new IllegalArgumentException("Unknown SegmentIndexType: " + type);
-      }
+    @Override
+    public boolean hasStarTreeIndex() {
       return _starTreeIndexReader != null;
     }
 
-    public SegmentDirectory.Reader getSegmentIndexReaderFor(String indexName, SegmentIndexType type) {
-      if (type != SegmentIndexType.STAR_TREE_INDEX) {
-        throw new IllegalArgumentException("Unknown SegmentIndexType: " + type);
-      }
+    @Override
+    public SegmentDirectory.Reader getStarTreeIndexReader(int starTreeId) {
       return new SegmentDirectory.Reader() {
         @Override
         public PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
             throws IOException {
-          return _starTreeIndexReader.getBuffer(indexName, column, type);
+          return _starTreeIndexReader.getBuffer(starTreeId, column, type);
         }
 
         @Override
         public boolean hasIndexFor(String column, ColumnIndexType type) {
-          return _starTreeIndexReader.hasIndexFor(indexName, column, type);
+          return _starTreeIndexReader.hasIndexFor(starTreeId, column, type);
         }
 
         @Override
         public String toString() {
-          return _starTreeIndexReader.toString() + " for " + indexName;
+          return _starTreeIndexReader.toString() + " for " + starTreeId;
         }
 
         @Override
@@ -445,6 +441,10 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       if (_columnIndexDirectory != null) {
         _columnIndexDirectory.close();
         _columnIndexDirectory = null;
+      }
+      if (_starTreeIndexReader != null) {
+        _starTreeIndexReader.close();
+        _starTreeIndexReader = null;
       }
     }
 

@@ -46,7 +46,6 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.segment.spi.store.SegmentIndexType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -201,7 +200,7 @@ public class ImmutableSegmentLoader {
 
     // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
-    if (segmentReader.hasSegmentIndex(SegmentIndexType.STAR_TREE_INDEX)) {
+    if (segmentReader.hasStarTreeIndex()) {
       starTreeIndexContainer = new StarTreeIndexContainer(segmentReader, segmentMetadata, indexContainerMap);
     }
 

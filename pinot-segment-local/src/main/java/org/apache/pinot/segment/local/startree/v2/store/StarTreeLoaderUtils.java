@@ -40,7 +40,6 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.segment.spi.store.SegmentIndexType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -60,11 +59,10 @@ public class StarTreeLoaderUtils {
     int numStarTrees = starTreeMetadataList.size();
     List<StarTreeV2> starTrees = new ArrayList<>(numStarTrees);
     for (int i = 0; i < numStarTrees; i++) {
-      String indexName = String.valueOf(i);
-      SegmentDirectory.Reader indexReader =
-          segmentReader.getSegmentIndexReaderFor(indexName, SegmentIndexType.STAR_TREE_INDEX);
+      SegmentDirectory.Reader indexReader = segmentReader.getStarTreeIndexReader(i);
       // Load star-tree index
-      StarTree starTree = new OffHeapStarTree(indexReader.getIndexFor(indexName, ColumnIndexType.INVERTED_INDEX));
+      StarTree starTree =
+          new OffHeapStarTree(indexReader.getIndexFor(String.valueOf(i), ColumnIndexType.INVERTED_INDEX));
 
       StarTreeV2Metadata starTreeMetadata = starTreeMetadataList.get(i);
       int numDocs = starTreeMetadata.getNumDocs();

@@ -127,44 +127,44 @@ public class StarTreeIndexReaderTest {
 
     try (StarTreeIndexReader reader = new StarTreeIndexReader(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       // Check the bytes of the 1st ST index
-      assertTrue(reader.hasIndexFor("0", "0", ColumnIndexType.INVERTED_INDEX));
-      PinotDataBuffer buf = reader.getBuffer("0", "0", ColumnIndexType.INVERTED_INDEX);
+      assertTrue(reader.hasIndexFor(0, "0", ColumnIndexType.INVERTED_INDEX));
+      PinotDataBuffer buf = reader.getBuffer(0, "0", ColumnIndexType.INVERTED_INDEX);
       assertEquals(buf.size(), 1);
       assertEquals(buf.getByte(0), 0);
 
-      assertTrue(reader.hasIndexFor("0", "dim0", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer("0", "dim0", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(0, "dim0", ColumnIndexType.FORWARD_INDEX));
+      buf = reader.getBuffer(0, "dim0", ColumnIndexType.FORWARD_INDEX);
       assertEquals(buf.size(), 1);
       assertEquals(buf.getByte(0), 1);
 
-      assertTrue(reader.hasIndexFor("0", "dim1", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer("0", "dim1", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(0, "dim1", ColumnIndexType.FORWARD_INDEX));
+      buf = reader.getBuffer(0, "dim1", ColumnIndexType.FORWARD_INDEX);
       assertEquals(buf.size(), 1);
       assertEquals(buf.getByte(0), 2);
 
-      assertTrue(reader.hasIndexFor("0", "count__*", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer("0", "count__*", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(0, "count__*", ColumnIndexType.FORWARD_INDEX));
+      buf = reader.getBuffer(0, "count__*", ColumnIndexType.FORWARD_INDEX);
       assertEquals(buf.size(), 1);
       assertEquals(buf.getByte(0), 3);
 
       // Check the bytes of the 2nd ST index
-      assertTrue(reader.hasIndexFor("1", "1", ColumnIndexType.INVERTED_INDEX));
-      buf = reader.getBuffer("1", "1", ColumnIndexType.INVERTED_INDEX);
+      assertTrue(reader.hasIndexFor(1, "1", ColumnIndexType.INVERTED_INDEX));
+      buf = reader.getBuffer(1, "1", ColumnIndexType.INVERTED_INDEX);
       assertEquals(buf.size(), 3);
       assertEquals(buf.getByte(2), 12);
 
-      assertTrue(reader.hasIndexFor("1", "dimX", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer("1", "dimX", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(1, "dimX", ColumnIndexType.FORWARD_INDEX));
+      buf = reader.getBuffer(1, "dimX", ColumnIndexType.FORWARD_INDEX);
       assertEquals(buf.size(), 3);
       assertEquals(buf.getByte(2), 15);
 
-      assertTrue(reader.hasIndexFor("1", "dimY", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer("1", "dimY", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(1, "dimY", ColumnIndexType.FORWARD_INDEX));
+      buf = reader.getBuffer(1, "dimY", ColumnIndexType.FORWARD_INDEX);
       assertEquals(buf.size(), 3);
       assertEquals(buf.getByte(2), 18);
 
-      assertTrue(reader.hasIndexFor("1", "sum__dimX", ColumnIndexType.FORWARD_INDEX));
-      buf = reader.getBuffer("1", "sum__dimX", ColumnIndexType.FORWARD_INDEX);
+      assertTrue(reader.hasIndexFor(1, "sum__dimX", ColumnIndexType.FORWARD_INDEX));
+      buf = reader.getBuffer(1, "sum__dimX", ColumnIndexType.FORWARD_INDEX);
       assertEquals(buf.size(), 3);
       assertEquals(buf.getByte(2), 21);
     }

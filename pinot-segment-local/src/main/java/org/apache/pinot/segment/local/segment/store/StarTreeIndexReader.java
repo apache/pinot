@@ -54,7 +54,7 @@ public class StarTreeIndexReader implements Closeable {
   private final int _numStarTrees;
 
   // StarTree index can contain multiple index instances, identified by ids like 0, 1, etc.
-  private final Map<String, Map<IndexKey, StarTreeIndexEntry>> _indexColumnEntries;
+  private final Map<Integer, Map<IndexKey, StarTreeIndexEntry>> _indexColumnEntries;
   private PinotDataBuffer _dataBuffer;
 
   /**
@@ -102,12 +102,11 @@ public class StarTreeIndexReader implements Closeable {
 
   private void mapBufferEntries(int starTreeId,
       Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue> indexMap) {
-    String idxName = String.valueOf(starTreeId);
     Map<IndexKey, StarTreeIndexEntry> columnEntries =
-        _indexColumnEntries.computeIfAbsent(idxName, k -> new HashMap<>());
+        _indexColumnEntries.computeIfAbsent(starTreeId, k -> new HashMap<>());
     // Load star-tree index. The index tree doesn't have corresponding column name or column index type to create an
     // IndexKey. As it's a kind of inverted index, we uniquely identify it with index id and inverted index type.
-    columnEntries.computeIfAbsent(new IndexKey(idxName, ColumnIndexType.INVERTED_INDEX),
+    columnEntries.computeIfAbsent(new IndexKey(String.valueOf(starTreeId), ColumnIndexType.INVERTED_INDEX),
         k -> new StarTreeIndexEntry(indexMap.get(StarTreeIndexMapUtils.STAR_TREE_INDEX_KEY), _dataBuffer,
             ByteOrder.LITTLE_ENDIAN));
     List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
@@ -129,12 +128,12 @@ public class StarTreeIndexReader implements Closeable {
     }
   }
 
-  public PinotDataBuffer getBuffer(String indexName, String column, ColumnIndexType type)
+  public PinotDataBuffer getBuffer(int starTreeId, String column, ColumnIndexType type)
       throws IOException {
-    Map<IndexKey, StarTreeIndexEntry> columnEntries = _indexColumnEntries.get(indexName);
+    Map<IndexKey, StarTreeIndexEntry> columnEntries = _indexColumnEntries.get(starTreeId);
     if (columnEntries == null) {
       throw new RuntimeException(
-          String.format("Could not find StarTree index: %s in segment: %s", indexName, _segmentDirectory.toString()));
+          String.format("Could not find StarTree index: %s in segment: %s", starTreeId, _segmentDirectory.toString()));
     }
     StarTreeIndexEntry entry = columnEntries.get(new IndexKey(column, type));
     if (entry != null && entry._buffer != null) {
@@ -142,11 +141,11 @@ public class StarTreeIndexReader implements Closeable {
     }
     throw new RuntimeException(
         String.format("Could not find index for column: %s, type: %s in StarTree index: %s in segment: %s", column,
-            type, indexName, _segmentDirectory.toString()));
+            type, starTreeId, _segmentDirectory.toString()));
   }
 
-  public boolean hasIndexFor(String indexName, String column, ColumnIndexType type) {
-    Map<IndexKey, StarTreeIndexEntry> columnEntries = _indexColumnEntries.get(indexName);
+  public boolean hasIndexFor(int starTreeId, String column, ColumnIndexType type) {
+    Map<IndexKey, StarTreeIndexEntry> columnEntries = _indexColumnEntries.get(starTreeId);
     if (columnEntries == null) {
       return false;
     }
