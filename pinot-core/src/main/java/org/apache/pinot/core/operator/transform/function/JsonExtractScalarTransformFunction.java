@@ -99,19 +99,23 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     _jsonPathString = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
     String resultsType = ((LiteralTransformFunction) arguments.get(2)).getLiteral().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
+    DataType dataType;
     try {
-      DataType dataType =
-          DataType.valueOf(isSingleValue ? resultsType : resultsType.substring(0, resultsType.length() - 6));
-      if (arguments.size() == 4) {
-        _defaultValue = dataType.convert(((LiteralTransformFunction) arguments.get(3)).getLiteral());
-      }
-      _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
-      _jsonPathEvaluator = JsonPathEvaluators.create(_jsonPathString, _defaultValue);
+      dataType = DataType.valueOf(isSingleValue ? resultsType : resultsType.substring(0, resultsType.length() - 6));
     } catch (Exception e) {
-      throw new IllegalStateException(String.format(
+      throw new IllegalArgumentException(String.format(
           "Unsupported results type: %s for jsonExtractScalar function. Supported types are: "
               + "INT/LONG/FLOAT/DOUBLE/BOOLEAN/BIG_DECIMAL/TIMESTAMP/STRING/INT_ARRAY/LONG_ARRAY/FLOAT_ARRAY"
               + "/DOUBLE_ARRAY/STRING_ARRAY", resultsType));
+    }
+    if (arguments.size() == 4) {
+      _defaultValue = dataType.convert(((LiteralTransformFunction) arguments.get(3)).getLiteral());
+    }
+    _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
+    try {
+      _jsonPathEvaluator = JsonPathEvaluators.create(_jsonPathString, _defaultValue);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Invalid json path: " + _jsonPathString, e);
     }
   }
 
