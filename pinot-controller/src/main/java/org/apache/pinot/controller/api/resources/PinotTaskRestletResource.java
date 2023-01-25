@@ -463,7 +463,7 @@ public class PinotTaskRestletResource {
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
-  public String getSubtaskWithGivenStateProgress(@Context HttpHeaders httpHeaders,
+  public String getSubtaskOnWorkerProgress(@Context HttpHeaders httpHeaders,
       @ApiParam(value = "Subtask state (UNKNOWN,IN_PROGRESS,SUCCEEDED,CANCELLED,ERROR)", required = true)
       @QueryParam("subTaskState") String subTaskState,
       @ApiParam(value = "Minion worker IDs separated by comma") @QueryParam("minionWorkerIds") @Nullable
@@ -489,7 +489,7 @@ public class PinotTaskRestletResource {
     int timeoutMs = _controllerConf.getMinionAdminRequestTimeoutSeconds() * 1000;
     try {
       Map<String, Object> minionWorkerIdSubtaskProgressMap =
-          _pinotHelixTaskResourceManager.getSubtaskWithGivenStateProgress(subTaskState, _executor, _connectionManager,
+          _pinotHelixTaskResourceManager.getSubtaskOnWorkerProgress(subTaskState, _executor, _connectionManager,
               selectedMinionWorkerEndpoints, requestHeaders, timeoutMs);
       return JsonUtils.objectToString(minionWorkerIdSubtaskProgressMap);
     } catch (Exception e) {

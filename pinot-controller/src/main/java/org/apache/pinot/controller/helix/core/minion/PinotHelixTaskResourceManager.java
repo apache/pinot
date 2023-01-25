@@ -631,17 +631,17 @@ public class PinotHelixTaskResourceManager {
    * @param timeoutMs timeout (in millisecond) for requests sent to minion workers
    * @return a map of minion worker id to subtask progress
    */
-  public synchronized Map<String, Object> getSubtaskWithGivenStateProgress(String subtaskState,
+  public synchronized Map<String, Object> getSubtaskOnWorkerProgress(String subtaskState,
       Executor executor, HttpConnectionManager connMgr, Map<String, String> selectedMinionWorkerEndpoints,
       Map<String, String> requestHeaders, int timeoutMs)
       throws JsonProcessingException {
-    return getSubtaskWithGivenStateProgress(subtaskState,
+    return getSubtaskOnWorkerProgress(subtaskState,
         new CompletionServiceHelper(executor, connMgr, HashBiMap.create(0)), selectedMinionWorkerEndpoints,
         requestHeaders, timeoutMs);
   }
 
   @VisibleForTesting
-  Map<String, Object> getSubtaskWithGivenStateProgress(String subtaskState,
+  Map<String, Object> getSubtaskOnWorkerProgress(String subtaskState,
       CompletionServiceHelper completionServiceHelper, Map<String, String> selectedMinionWorkerEndpoints,
       Map<String, String> requestHeaders, int timeoutMs)
       throws JsonProcessingException {
@@ -651,7 +651,7 @@ public class PinotHelixTaskResourceManager {
     }
     Map<String, String> minionWorkerUrlToWorkerIdMap = selectedMinionWorkerEndpoints.entrySet().stream()
         .collect(Collectors.toMap(
-            entry -> String.format("%s/tasks/subtask/state/%s/progress", entry.getValue(), subtaskState),
+            entry -> String.format("%s/tasks/subtask/state/progress?subTaskState=%s", entry.getValue(), subtaskState),
             Map.Entry::getKey));
     List<String> workerUrls = new ArrayList<>(minionWorkerUrlToWorkerIdMap.keySet());
     LOGGER.debug("Getting task progress with workerUrls: {}", workerUrls);

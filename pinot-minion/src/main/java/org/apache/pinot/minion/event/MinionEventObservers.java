@@ -113,6 +113,14 @@ public class MinionEventObservers {
   }
 
   /**
+   * Gets all {@link MinionEventObserver}s
+   * @return a map of subtask ID to {@link MinionEventObserver}
+   */
+  public Map<String, MinionEventObserver> getMinionEventObservers() {
+    return _taskEventObservers;
+  }
+
+  /**
    * Gets all {@link MinionEventObserver}s with the given {@link MinionTaskState}
    * @param taskState the {@link MinionTaskState} to match
    * @return a map of subtask ID to {@link MinionEventObserver}

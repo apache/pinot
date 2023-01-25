@@ -20,6 +20,7 @@ package org.apache.pinot.minion.api.resources;
 
 import java.io.IOException;
 import java.util.Map;
+import javax.ws.rs.WebApplicationException;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.event.MinionProgressObserver;
@@ -28,12 +29,13 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 public class PinotTaskProgressResourceTest {
 
   @Test
-  public void testGetSubtaskWithGivenStateProgress()
+  public void testGetGivenSubtaskOrStateProgress()
       throws IOException {
     MinionEventObserver observer1 = new MinionProgressObserver();
     observer1.notifyTaskStart(null);
@@ -48,30 +50,45 @@ public class PinotTaskProgressResourceTest {
     MinionEventObservers.getInstance().addMinionEventObserver("t03", observer3);
 
     PinotTaskProgressResource pinotTaskProgressResource = new PinotTaskProgressResource();
+
+    // get all sub task progress
+    String allSubTaskProgress = pinotTaskProgressResource.getSubtaskProgress(null, null);
+    Map<String, Object> subtaskProgressMap = JsonUtils.stringToObject(allSubTaskProgress, Map.class);
+    assertEquals(subtaskProgressMap.size(), 3);
+
+    // get subtasks with given state
     String subtaskWithInProgressState =
-        pinotTaskProgressResource.getSubtaskWithGivenStateProgress(MinionTaskState.IN_PROGRESS.toString());
+        pinotTaskProgressResource.getSubtaskProgress(null, MinionTaskState.IN_PROGRESS.toString());
     assertInProgressSubtasks(subtaskWithInProgressState);
 
     String subtaskWithUndefinedState =
-        pinotTaskProgressResource.getSubtaskWithGivenStateProgress("Undefined");
+        pinotTaskProgressResource.getSubtaskProgress(null, "Undefined");
     assertInProgressSubtasks(subtaskWithUndefinedState);
 
     String subtaskWithSucceededState =
-        pinotTaskProgressResource.getSubtaskWithGivenStateProgress(MinionTaskState.SUCCEEDED.toString());
-    Map<String, Object> subtaskProgressMap = JsonUtils.stringToObject(subtaskWithSucceededState, Map.class);
+        pinotTaskProgressResource.getSubtaskProgress(null, MinionTaskState.SUCCEEDED.toString());
+    subtaskProgressMap = JsonUtils.stringToObject(subtaskWithSucceededState, Map.class);
     assertEquals(subtaskProgressMap.size(), 1);
 
     String subtaskWithUnknownState =
-        pinotTaskProgressResource.getSubtaskWithGivenStateProgress(MinionTaskState.UNKNOWN.toString());
+        pinotTaskProgressResource.getSubtaskProgress(null, MinionTaskState.UNKNOWN.toString());
     assertNoSubtaskWithTheGivenState(subtaskWithUnknownState);
 
     String subtaskWithCancelledState =
-        pinotTaskProgressResource.getSubtaskWithGivenStateProgress(MinionTaskState.UNKNOWN.toString());
+        pinotTaskProgressResource.getSubtaskProgress(null, MinionTaskState.CANCELLED.toString());
     assertNoSubtaskWithTheGivenState(subtaskWithCancelledState);
 
     String subtaskWithErrorState =
-        pinotTaskProgressResource.getSubtaskWithGivenStateProgress(MinionTaskState.UNKNOWN.toString());
+        pinotTaskProgressResource.getSubtaskProgress(null, MinionTaskState.ERROR.toString());
     assertNoSubtaskWithTheGivenState(subtaskWithErrorState);
+
+    // get subtasks with given name
+    String subTasksWithGivenNamesProgress = pinotTaskProgressResource.getSubtaskProgress(" t01 , t02 ", null);
+    assertInProgressSubtasks(subTasksWithGivenNamesProgress);
+
+    // get subtasks with given names and state
+    assertThrows(WebApplicationException.class,
+        () -> pinotTaskProgressResource.getSubtaskProgress(" t01 , t02 ", MinionTaskState.IN_PROGRESS.toString()));
   }
 
   private void assertInProgressSubtasks(String subtaskWithInProgressState)

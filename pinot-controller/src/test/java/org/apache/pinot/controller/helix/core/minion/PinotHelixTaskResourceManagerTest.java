@@ -215,7 +215,7 @@ public class PinotHelixTaskResourceManagerTest {
     // No worker to run subtasks.
     Map<String, String> selectedMinionWorkerEndpoints = new HashMap<>();
     Map<String, Object> progress =
-        mgr.getSubtaskWithGivenStateProgress("IN_PROGRESS", httpHelper,
+        mgr.getSubtaskOnWorkerProgress("IN_PROGRESS", httpHelper,
             selectedMinionWorkerEndpoints, Collections.emptyMap(), 1000);
     assertTrue(progress.isEmpty());
     verify(httpHelper, Mockito.never()).doMultiGetRequest(any(), any(), anyBoolean(), any(), anyInt());
@@ -241,7 +241,8 @@ public class PinotHelixTaskResourceManagerTest {
       subtaskIds[2 * i + 1] = taskIdPrefix + "_" + (2 * i + 1);
       // Notice that for testing purpose, we map subtask names to empty strings. In reality, subtask names will be
       // mapped to jsonized org.apache.pinot.minion.event.MinionEventObserver
-      httpResp._httpResponses.put(String.format("%s/tasks/subtask/state/IN_PROGRESS/progress", workerEndpoint),
+      httpResp._httpResponses.put(
+          String.format("%s/tasks/subtask/state/progress?subTaskState=IN_PROGRESS", workerEndpoint),
           JsonUtils.objectToString(ImmutableMap.of(subtaskIds[2 * i], "", subtaskIds[2 * i + 1], "")));
     }
     httpResp._failedResponseCount = 1;
@@ -253,11 +254,12 @@ public class PinotHelixTaskResourceManagerTest {
         new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), mock(TaskDriver.class));
 
     Map<String, Object> progress =
-        mgr.getSubtaskWithGivenStateProgress("IN_PROGRESS", httpHelper, selectedMinionWorkerEndpoints,
+        mgr.getSubtaskOnWorkerProgress("IN_PROGRESS", httpHelper, selectedMinionWorkerEndpoints,
             Collections.emptyMap(), 1000);
     List<String> value = workerEndpointCaptor.getValue();
     Set<String> expectedWorkerUrls = selectedMinionWorkerEndpoints.values().stream()
-        .map(workerEndpoint -> String.format("%s/tasks/subtask/state/IN_PROGRESS/progress", workerEndpoint))
+        .map(workerEndpoint
+            -> String.format("%s/tasks/subtask/state/progress?subTaskState=IN_PROGRESS", workerEndpoint))
         .collect(Collectors.toSet());
     assertEquals(new HashSet<>(value), expectedWorkerUrls);
     assertEquals(progress.size(), 3);

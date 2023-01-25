@@ -107,11 +107,11 @@ public class PinotTaskRestletResourceTest {
     HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
     when(httpHeaders.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
     ArgumentCaptor<Map<String, String>> minionWorkerEndpointsCaptor = ArgumentCaptor.forClass(Map.class);
-    when(_pinotHelixTaskResourceManager.getSubtaskWithGivenStateProgress(anyString(), any(), any(),
+    when(_pinotHelixTaskResourceManager.getSubtaskOnWorkerProgress(anyString(), any(), any(),
         minionWorkerEndpointsCaptor.capture(), anyMap(), anyInt()))
         .thenReturn(Collections.emptyMap());
     String progress =
-        _pinotTaskRestletResource.getSubtaskWithGivenStateProgress(httpHeaders, "IN_PROGRESS", minionWorkerIds);
+        _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", minionWorkerIds);
     assertEquals(progress, "{}");
     return minionWorkerEndpointsCaptor.getValue();
   }
@@ -131,9 +131,9 @@ public class PinotTaskRestletResourceTest {
     HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
     when(httpHeaders.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
     when(_pinotHelixTaskResourceManager
-        .getSubtaskWithGivenStateProgress(anyString(), any(), any(), anyMap(), anyMap(), anyInt()))
+        .getSubtaskOnWorkerProgress(anyString(), any(), any(), anyMap(), anyMap(), anyInt()))
         .thenThrow(new RuntimeException());
     assertThrows(ControllerApplicationException.class,
-        () -> _pinotTaskRestletResource.getSubtaskWithGivenStateProgress(httpHeaders, "IN_PROGRESS", null));
+        () -> _pinotTaskRestletResource.getSubtaskOnWorkerProgress(httpHeaders, "IN_PROGRESS", null));
   }
 }
