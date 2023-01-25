@@ -34,6 +34,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.routing.VirtualServer;
 
 
 /**
@@ -59,7 +60,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     }
 
     // the root of a query plan always only has a single node
-    ServerInstance rootServer = queryPlan.getStageMetadataMap().get(0).getServerInstances().get(0);
+    VirtualServer rootServer = queryPlan.getStageMetadataMap().get(0).getServerInstances().get(0);
     return explainFrom(queryPlan, queryPlan.getQueryStageMap().get(0), rootServer);
   }
 
@@ -75,7 +76,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
    *
    * @return a query plan associated with
    */
-  public static String explainFrom(QueryPlan queryPlan, StageNode node, ServerInstance rootServer) {
+  public static String explainFrom(QueryPlan queryPlan, StageNode node, VirtualServer rootServer) {
     final ExplainPlanStageVisitor visitor = new ExplainPlanStageVisitor(queryPlan);
     return node
         .visit(visitor, new Context(rootServer, "", "", new StringBuilder()))
@@ -133,9 +134,9 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     StageMetadata metadata = _queryPlan.getStageMetadataMap().get(senderStageId);
     Map<ServerInstance, Map<String, List<String>>> segments = metadata.getServerInstanceToSegmentsMap();
 
-    Iterator<ServerInstance> iterator = metadata.getServerInstances().iterator();
+    Iterator<VirtualServer> iterator = metadata.getServerInstances().iterator();
     while (iterator.hasNext()) {
-      ServerInstance serverInstance = iterator.next();
+      VirtualServer serverInstance = iterator.next();
       if (segments.containsKey(serverInstance)) {
         // always print out leaf stages
         sender.visit(this, context.next(iterator.hasNext(), serverInstance));
@@ -164,10 +165,10 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
     appendInfo(node, context);
 
     int receiverStageId = node.getReceiverStageId();
-    List<ServerInstance> servers = _queryPlan.getStageMetadataMap().get(receiverStageId).getServerInstances();
+    List<VirtualServer> servers = _queryPlan.getStageMetadataMap().get(receiverStageId).getServerInstances();
     context._builder.append("->");
     String receivers = servers.stream()
-        .map(s -> s.getHostname() + ':' + s.getPort())
+        .map(VirtualServer::toString)
         .map(s -> "[" + receiverStageId + "]@" + s)
         .collect(Collectors.joining(",", "{", "}"));
     return context._builder.append(receivers);
@@ -190,7 +191,7 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
         .append(_queryPlan.getStageMetadataMap()
             .get(node.getStageId())
             .getServerInstanceToSegmentsMap()
-            .get(context._host))
+            .get(context._host.getServer()))
         .append('\n');
   }
 
@@ -200,19 +201,19 @@ public class ExplainPlanStageVisitor implements StageNodeVisitor<StringBuilder, 
   }
 
   static class Context {
-    final ServerInstance _host;
+    final VirtualServer _host;
     final String _prefix;
     final String _childPrefix;
     final StringBuilder _builder;
 
-    Context(ServerInstance host, String prefix, String childPrefix, StringBuilder builder) {
+    Context(VirtualServer host, String prefix, String childPrefix, StringBuilder builder) {
       _host = host;
       _prefix = prefix;
       _childPrefix = childPrefix;
       _builder = builder;
     }
 
-    Context next(boolean hasMoreChildren, ServerInstance host) {
+    Context next(boolean hasMoreChildren, VirtualServer host) {
       return new Context(
           host,
           hasMoreChildren ? _childPrefix + "├── " : _childPrefix + "└── ",

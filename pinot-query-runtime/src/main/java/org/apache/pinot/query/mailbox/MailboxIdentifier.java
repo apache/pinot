@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import org.apache.pinot.query.routing.VirtualServerAddress;
+
+
 /**
  * {@link MailboxIdentifier} uniquely identify the mailbox that pairs a sender and a receiver.
  *
@@ -34,12 +37,12 @@ public interface MailboxIdentifier {
   /**
    * @return the sender address
    */
-  ServerAddress getFromHost();
+  VirtualServerAddress getFromHost();
 
   /**
    * @return the destination address
    */
-  ServerAddress getToHost();
+  VirtualServerAddress getToHost();
 
   /**
    * Checks whether sender and receiver are in the same JVM.

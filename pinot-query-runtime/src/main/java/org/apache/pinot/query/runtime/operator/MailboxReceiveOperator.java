@@ -29,12 +29,12 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.mailbox.ServerAddress;
+import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.service.QueryConfig;
@@ -68,18 +68,18 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   private TransferableBlock _upstreamErrorBlock;
   private OperatorStats _operatorStats;
 
-  private static MailboxIdentifier toMailboxId(ServerInstance fromInstance, long jobId, long stageId,
-      String receiveHostName, int receivePort) {
+  private static MailboxIdentifier toMailboxId(VirtualServer sender, long jobId, long stageId,
+      VirtualServerAddress receiver) {
     return new JsonMailboxIdentifier(
         String.format("%s_%s", jobId, stageId),
-        new ServerAddress(fromInstance.getHostname(), fromInstance.getQueryMailboxPort()),
-        new ServerAddress(receiveHostName, receivePort));
+        new VirtualServerAddress(sender),
+        receiver);
   }
 
   // TODO: Move deadlineInNanoSeconds to OperatorContext.
   public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService,
-      List<ServerInstance> sendingStageInstances, RelDistribution.Type exchangeType, String receiveHostName,
-      int receivePort, long jobId, int stageId, Long timeoutMs) {
+      List<VirtualServer> sendingStageInstances, RelDistribution.Type exchangeType, VirtualServerAddress receiver,
+      long jobId, int stageId, Long timeoutMs) {
     _mailboxService = mailboxService;
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
         "Exchange/Distribution type: " + exchangeType + " is not supported!");
@@ -88,8 +88,8 @@ public class MailboxReceiveOperator extends MultiStageOperator {
 
     _exchangeType = exchangeType;
     if (_exchangeType == RelDistribution.Type.SINGLETON) {
-      ServerInstance singletonInstance = null;
-      for (ServerInstance serverInstance : sendingStageInstances) {
+      VirtualServer singletonInstance = null;
+      for (VirtualServer serverInstance : sendingStageInstances) {
         if (serverInstance.getHostname().equals(_mailboxService.getHostname())
             && serverInstance.getQueryMailboxPort() == _mailboxService.getMailboxPort()) {
           Preconditions.checkState(singletonInstance == null, "multiple instance found for singleton exchange type!");
@@ -103,12 +103,12 @@ public class MailboxReceiveOperator extends MultiStageOperator {
         _sendingMailbox = Collections.emptyList();
       } else {
         _sendingMailbox =
-            Collections.singletonList(toMailboxId(singletonInstance, jobId, stageId, receiveHostName, receivePort));
+            Collections.singletonList(toMailboxId(singletonInstance, jobId, stageId, receiver));
       }
     } else {
       _sendingMailbox = new ArrayList<>(sendingStageInstances.size());
-      for (ServerInstance instance : sendingStageInstances) {
-        _sendingMailbox.add(toMailboxId(instance, jobId, stageId, receiveHostName, receivePort));
+      for (VirtualServer instance : sendingStageInstances) {
+        _sendingMailbox.add(toMailboxId(instance, jobId, stageId, receiver));
       }
     }
     _upstreamErrorBlock = null;

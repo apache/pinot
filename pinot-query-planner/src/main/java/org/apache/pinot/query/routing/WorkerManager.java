@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -93,26 +94,31 @@ public class WorkerManager {
               "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
         }
       }
-      stageMetadata.setServerInstances(new ArrayList<>(serverInstanceToSegmentsMap.keySet()));
+      stageMetadata.setServerInstances(new ArrayList<>(
+          serverInstanceToSegmentsMap.keySet()
+              .stream()
+              .map(server -> new VirtualServer(server, 0)) // for now, only use single virtual server
+              .collect(Collectors.toList())));
       stageMetadata.setServerInstanceToSegmentsMap(serverInstanceToSegmentsMap);
     } else if (PlannerUtils.isRootStage(stageId)) {
       // ROOT stage doesn't have a QueryServer as it is strictly only reducing results.
       // here we simply assign the worker instance with identical server/mailbox port number.
-      stageMetadata.setServerInstances(Lists.newArrayList(new WorkerInstance(_hostName, _port, _port, _port, _port)));
+      stageMetadata.setServerInstances(Lists.newArrayList(
+          new VirtualServer(new WorkerInstance(_hostName, _port, _port, _port, _port), 0)));
     } else {
       stageMetadata.setServerInstances(filterServers(_routingManager.getEnabledServerInstanceMap().values()));
     }
   }
 
-  private static List<ServerInstance> filterServers(Collection<ServerInstance> servers) {
-    List<ServerInstance> serverInstances = new ArrayList<>();
+  private static List<VirtualServer> filterServers(Collection<ServerInstance> servers) {
+    List<VirtualServer> serverInstances = new ArrayList<>();
     for (ServerInstance server : servers) {
       String hostname = server.getHostname();
       if (server.getQueryServicePort() > 0 && server.getQueryMailboxPort() > 0
           && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
           && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)
           && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
-        serverInstances.add(server);
+        serverInstances.add(new VirtualServer(server, 0));
       }
     }
     return serverInstances;

@@ -28,12 +28,13 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
+import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -189,13 +190,14 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
             Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)),
-            reduceNode.getSenderStageId(), reduceNode.getDataSchema(), "localhost", _reducerGrpcPort,
+            reduceNode.getSenderStageId(), reduceNode.getDataSchema(),
+            new VirtualServerAddress("localhost", _reducerGrpcPort, 0),
             Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)));
       } else {
-        for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
+        for (VirtualServer serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedStagePlan distributedStagePlan =
               QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
+          _servers.get(serverInstance.getServer()).processQuery(distributedStagePlan, requestMetadataMap);
         }
       }
     }

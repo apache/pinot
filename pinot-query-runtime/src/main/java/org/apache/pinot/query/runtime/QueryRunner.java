@@ -38,12 +38,13 @@ import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.MultiplexingMailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.StageNode;
+import org.apache.pinot.query.routing.VirtualServer;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
@@ -82,6 +83,7 @@ public class QueryRunner {
   private MailboxService<TransferableBlock> _mailboxService;
   private String _hostname;
   private int _port;
+  private VirtualServerAddress _rootServer;
   private OpChainSchedulerService _scheduler;
 
   /**
@@ -94,6 +96,8 @@ public class QueryRunner {
     _hostname = instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE) ? instanceName.substring(
         CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceName;
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
+    // always use 0 for root server ID as all data is processed by one node at the global root
+    _rootServer = new VirtualServerAddress(_hostname, _port, 0);
     _helixManager = helixManager;
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
@@ -150,7 +154,7 @@ public class QueryRunner {
       MailboxSendOperator mailboxSendOperator = new MailboxSendOperator(_mailboxService,
           new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), requestId,
               sendNode.getStageId()), receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
-          sendNode.getPartitionKeySelector(), _hostname, _port, serverQueryRequests.get(0).getRequestId(),
+          sendNode.getPartitionKeySelector(), _rootServer, serverQueryRequests.get(0).getRequestId(),
           sendNode.getStageId());
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
@@ -161,8 +165,8 @@ public class QueryRunner {
       long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
       StageNode stageRoot = distributedStagePlan.getStageRoot();
       OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
-          new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs, _hostname, _port,
-              distributedStagePlan.getMetadataMap()));
+          new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs,
+              new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap()));
       _scheduler.register(rootOperator);
     }
   }
@@ -175,7 +179,7 @@ public class QueryRunner {
         "Server request for V2 engine should only have 1 scan table per request.");
     String rawTableName = stageMetadata.getScannedTables().get(0);
     Map<String, List<String>> tableToSegmentListMap =
-        stageMetadata.getServerInstanceToSegmentsMap().get(distributedStagePlan.getServerInstance());
+        stageMetadata.getServerInstanceToSegmentsMap().get(distributedStagePlan.getServer().getServer());
     List<ServerPlanRequestContext> requests = new ArrayList<>();
     for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
       String tableType = tableEntry.getKey();
@@ -219,9 +223,9 @@ public class QueryRunner {
 
   private boolean isLeafStage(DistributedStagePlan distributedStagePlan) {
     int stageId = distributedStagePlan.getStageId();
-    ServerInstance serverInstance = distributedStagePlan.getServerInstance();
+    VirtualServer serverInstance = distributedStagePlan.getServer();
     StageMetadata stageMetadata = distributedStagePlan.getMetadataMap().get(stageId);
-    Map<String, List<String>> segments = stageMetadata.getServerInstanceToSegmentsMap().get(serverInstance);
+    Map<String, List<String>> segments = stageMetadata.getServerInstanceToSegmentsMap().get(serverInstance.getServer());
     return segments != null && segments.size() > 0;
   }
 }

@@ -34,8 +34,8 @@ import org.testng.annotations.Test;
 
 public class RoundRobinSchedulerTest {
 
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1_1", "foo:2", "bar:3");
-  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1_2", "foo:2", "bar:3");
+  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1_1", "0@foo:2", "0@bar:3");
+  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1_2", "0@foo:2", "0@bar:3");
 
   @Mock
   private MultiStageOperator _operator;

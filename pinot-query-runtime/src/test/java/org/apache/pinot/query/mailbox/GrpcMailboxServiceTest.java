@@ -27,6 +27,7 @@ import java.util.function.Consumer;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -76,8 +77,8 @@ public class GrpcMailboxServiceTest {
     // Given:
     JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
         "happypath",
-        new ServerAddress("localhost", _mailboxService1.getMailboxPort()),
-        new ServerAddress("localhost", _mailboxService2.getMailboxPort()));
+        new VirtualServerAddress("localhost", _mailboxService1.getMailboxPort(), 0),
+        new VirtualServerAddress("localhost", _mailboxService2.getMailboxPort(), 0));
     SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId);
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);
@@ -108,8 +109,8 @@ public class GrpcMailboxServiceTest {
     // Given:
     JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
         "exception",
-        new ServerAddress("localhost", _mailboxService1.getMailboxPort()),
-        new ServerAddress("localhost", _mailboxService2.getMailboxPort()));
+        new VirtualServerAddress("localhost", _mailboxService1.getMailboxPort(), 0),
+        new VirtualServerAddress("localhost", _mailboxService2.getMailboxPort(), 0));
     SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId);
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);

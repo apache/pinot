@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -45,6 +44,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -298,9 +298,9 @@ public class GreedyShuffleRewriteVisitor
    * 2. Servers assigned to the join-stage are a superset of S.
    */
   private boolean canServerAssignmentAllowShuffleSkip(int currentStageId, int leftStageId, int rightStageId) {
-    Set<ServerInstance> leftServerInstances = new HashSet<>(_stageMetadataMap.get(leftStageId).getServerInstances());
-    List<ServerInstance> rightServerInstances = _stageMetadataMap.get(rightStageId).getServerInstances();
-    List<ServerInstance> currentServerInstances = _stageMetadataMap.get(currentStageId).getServerInstances();
+    Set<VirtualServer> leftServerInstances = new HashSet<>(_stageMetadataMap.get(leftStageId).getServerInstances());
+    List<VirtualServer> rightServerInstances = _stageMetadataMap.get(rightStageId).getServerInstances();
+    List<VirtualServer> currentServerInstances = _stageMetadataMap.get(currentStageId).getServerInstances();
     return leftServerInstances.containsAll(rightServerInstances)
         && leftServerInstances.size() == rightServerInstances.size()
         && currentServerInstances.containsAll(leftServerInstances);

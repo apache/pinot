@@ -27,6 +27,7 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
+import org.apache.pinot.query.routing.VirtualServer;
 
 
 /**
@@ -43,9 +44,11 @@ public class StageMetadata implements Serializable {
   private List<String> _scannedTables;
 
   // used for assigning server/worker nodes.
-  private List<ServerInstance> _serverInstances;
+  private List<VirtualServer> _serverInstances;
 
-  // used for table scan stage.
+  // used for table scan stage - we use ServerInstance instead of VirtualServer
+  // here because all virtual servers that share a server instance will have the
+  // same segments on them
   private Map<ServerInstance, Map<String, List<String>>> _serverInstanceToSegmentsMap;
 
   // time boundary info
@@ -82,11 +85,11 @@ public class StageMetadata implements Serializable {
     _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
   }
 
-  public List<ServerInstance> getServerInstances() {
+  public List<VirtualServer> getServerInstances() {
     return _serverInstances;
   }
 
-  public void setServerInstances(List<ServerInstance> serverInstances) {
+  public void setServerInstances(List<VirtualServer> serverInstances) {
     _serverInstances = serverInstances;
   }
 

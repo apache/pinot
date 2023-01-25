@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.plan;
 
 import java.util.List;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
@@ -32,6 +31,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
@@ -62,10 +62,10 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
 
   @Override
   public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
-    List<ServerInstance> sendingInstances = context.getMetadataMap().get(node.getSenderStageId()).getServerInstances();
+    List<VirtualServer> sendingInstances = context.getMetadataMap().get(node.getSenderStageId()).getServerInstances();
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(context.getMailboxService(), sendingInstances,
-            node.getExchangeType(), context.getHostName(), context.getPort(),
+            node.getExchangeType(), context.getServer(),
             context.getRequestId(), node.getSenderStageId(), context.getTimeoutMs());
     context.addReceivingMailboxes(mailboxReceiveOperator.getSendingMailbox());
     return mailboxReceiveOperator;
@@ -77,7 +77,7 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
     return new MailboxSendOperator(context.getMailboxService(), nextOperator,
         receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
-        context.getHostName(), context.getPort(), context.getRequestId(), node.getStageId());
+        context.getServer(), context.getRequestId(), node.getStageId());
   }
 
   @Override
