@@ -124,7 +124,7 @@ public class AggregateOperator extends MultiStageOperator {
   public String toExplainString() {
     // TODO: move to close call;
     _inputOperator.toExplainString();
-    LOGGER.error(_operatorStats.toString());
+    LOGGER.info(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 

@@ -57,7 +57,7 @@ public class LiteralValueOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    LOGGER.error(_operatorStats.toString());
+    LOGGER.info(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 

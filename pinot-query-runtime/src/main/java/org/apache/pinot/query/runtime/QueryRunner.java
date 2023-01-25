@@ -149,7 +149,7 @@ public class QueryRunner {
         serverQueryResults.add(processServerQuery(request, _scheduler.getWorkerPool()));
       }
       if (shouldLogOpStats) {
-        LOGGER.error("RequestId:" + requestId + " StageId:" + distributedStagePlan.getStageId()
+        LOGGER.info("RequestId:" + requestId + " StageId:" + distributedStagePlan.getStageId()
             + " Leaf stage v1 processing time:" + (System.currentTimeMillis() - leafStageStartMillis) + " ms");
       }
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
