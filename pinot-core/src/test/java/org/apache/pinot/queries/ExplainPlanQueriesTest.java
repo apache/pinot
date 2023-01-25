@@ -2098,21 +2098,21 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     // Segment 2 is pruned because 'mickey' is not within range (and all values in that segment are 'pluto')
     // Segments 3 and 4 don't contain 'mickey' but 'mickey' is within range so they return EmptyFilterOperator
     // Segment 1 contains 'mickey' so the FILTER_SORTED_INDEX plan is returned for it
-//    String query1 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE "
-//        + "invertedIndexCol3 = 'mickey'";
-//    List<Object[]> result1 = new ArrayList<>();
-//    result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
-//    result1.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
-//    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
-//        ExplainPlanRows.PLAN_START_IDS});
-//    result1.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
-//    result1.add(new Object[]{"FILTER_EMPTY", 4, 3});
-//    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
-//        ExplainPlanRows.PLAN_START_IDS});
-//    result1.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
-//    result1.add(new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 "
-//        + "= 'mickey')", 4, 3});
-//    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    String query1 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE "
+        + "invertedIndexCol3 = 'mickey'";
+    List<Object[]> result1 = new ArrayList<>();
+    result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
+    result1.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
+    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS,
+        ExplainPlanRows.PLAN_START_IDS});
+    result1.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
+    result1.add(new Object[]{"FILTER_EMPTY", 4, 3});
+    result1.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
+        ExplainPlanRows.PLAN_START_IDS});
+    result1.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
+    result1.add(new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 "
+        + "= 'mickey')", 4, 3});
+    check(query1, new ResultTable(DATA_SCHEMA, result1));
 
     // Segment 2 is pruned because 'mickey' is not within range (and all values in that segment are 'pluto')
     // Segments 3 and 4 don't contain 'mickey' but 'mickey' is within range so they return EmptyFilterOperator
@@ -2122,8 +2122,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<Object[]> result2 = new ArrayList<>();
     result2.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
     result2.add(new Object[]{"COMBINE_AGGREGATE", 2, 1});
-    result2.add(new Object[]{
-        "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
+    result2.add(new Object[]{"PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS,
         ExplainPlanRows.PLAN_START_IDS});
     result2.add(new Object[]{"AGGREGATE(aggregations:sum(noIndexCol2))", 3, 2});
     result2.add(new Object[]{"TRANSFORM_PASSTHROUGH(noIndexCol2)", 4, 3});
