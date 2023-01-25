@@ -83,7 +83,7 @@ public class QueryDispatcher {
     ResultTable resultTable = toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
         queryPlan.getQueryStageMap().get(0).getDataSchema());
     if (shouldLogStats) {
-      LOGGER.error(
+      LOGGER.info(
           "RequestId:" + requestId + " StageId: 0 Broker toResultTable processing time:" + (System.currentTimeMillis()
               - toResultTableStartTime) + " ms");
     }
