@@ -20,18 +20,14 @@ package org.apache.pinot.query;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
@@ -61,11 +57,9 @@ import static org.mockito.Mockito.when;
  * multi-stage query communication.
  */
 public class QueryServerEnclosure {
-  private static final int DEFAULT_EXECUTOR_THREAD_NUM = 5;
   private static final String TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE/";
   private static final String SCHEMAS_PREFIX = "/SCHEMAS/";
 
-  private final OpChainSchedulerService _scheduler;
   private final int _queryRunnerPort;
   private final Map<String, Object> _runnerConfig = new HashMap<>();
   private final InstanceDataManager _instanceDataManager;
@@ -83,10 +77,6 @@ public class QueryServerEnclosure {
           String.format("Server_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME));
       _runnerConfig.put(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS, 100);
       _queryRunner = new QueryRunner();
-      _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(),
-          Executors.newFixedThreadPool(
-              DEFAULT_EXECUTOR_THREAD_NUM,
-              new NamedThreadFactory("test_query_server_enclosure_on_" + _queryRunnerPort + "_port")));
     } catch (Exception e) {
       throw new RuntimeException("Test Failed!", e);
     }
@@ -125,13 +115,11 @@ public class QueryServerEnclosure {
     _queryRunner = new QueryRunner();
     _queryRunner.init(configuration, _instanceDataManager, _helixManager, mockServiceMetrics());
     _queryRunner.start();
-    _scheduler.startAsync().awaitRunning();
   }
 
   public void shutDown() {
     try {
       _queryRunner.shutDown();
-      _scheduler.stopAsync().awaitTerminated();
     } catch (TimeoutException e) {
       throw new RuntimeException(e);
     }
