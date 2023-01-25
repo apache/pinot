@@ -194,7 +194,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     try {
       String value = getString(columnIndex);
-      return wasNull() ? null : new BigDecimal(value).setScale(scale);
+      return value == null ? null : new BigDecimal(value).setScale(scale);
     } catch (Exception e) {
       throw new SQLException("Unable to fetch BigDecimal value", e);
     }
@@ -205,7 +205,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     validateColumn(columnIndex);
     String value = getString(columnIndex);
-    return wasNull() ? false : Boolean.parseBoolean(value);
+    return value == null ? false : Boolean.parseBoolean(value);
   }
 
   @Override
@@ -213,7 +213,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     try {
       String value = getString(columnIndex);
-      return wasNull() ? null : Hex.decodeHex(value.toCharArray());
+      return value == null ? null : Hex.decodeHex(value.toCharArray());
     } catch (Exception e) {
       throw new SQLException(String.format("Unable to fetch value for column %d", columnIndex), e);
     }
@@ -232,7 +232,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     try {
       String value = getString(columnIndex);
-      return wasNull() ? null : DateTimeUtils.getDateFromString(value, cal);
+      return value == null ? null : DateTimeUtils.getDateFromString(value, cal);
     } catch (Exception e) {
       throw new SQLException("Unable to fetch date", e);
     }
@@ -243,7 +243,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     validateColumn(columnIndex);
     String value = getString(columnIndex);
-    return wasNull() ? 0.0 : Double.parseDouble(value);
+    return value == null ? 0.0 : Double.parseDouble(value);
   }
 
   @Override
@@ -251,7 +251,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     validateColumn(columnIndex);
     String value = getString(columnIndex);
-    return wasNull() ? 0.0f : Float.parseFloat(value);
+    return value == null ? 0.0f : Float.parseFloat(value);
   }
 
   @Override
@@ -259,7 +259,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     validateColumn(columnIndex);
     String value = getString(columnIndex);
-    return wasNull() ? 0 : Integer.parseInt(value);
+    return value == null ? 0 : Integer.parseInt(value);
   }
 
   @Override
@@ -267,7 +267,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     validateColumn(columnIndex);
     String value = getString(columnIndex);
-    return wasNull() ? 0 : Long.parseLong(value);
+    return value == null ? 0 : Long.parseLong(value);
   }
 
   @Override
@@ -359,7 +359,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     try {
       String value = getString(columnIndex);
-      return wasNull() ? null : DateTimeUtils.getTimeFromString(value, cal);
+      return value == null ? null : DateTimeUtils.getTimeFromString(value, cal);
     } catch (Exception e) {
       throw new SQLException("Unable to fetch date", e);
     }
@@ -370,7 +370,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     try {
       String value = getString(columnIndex);
-      return wasNull() ? null : DateTimeUtils.getTimestampFromString(value, cal);
+      return value == null ? null : DateTimeUtils.getTimestampFromString(value, cal);
     } catch (Exception e) {
       throw new SQLException("Unable to fetch date", e);
     }

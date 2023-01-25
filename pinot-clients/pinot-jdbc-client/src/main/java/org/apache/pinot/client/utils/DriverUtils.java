@@ -41,6 +41,7 @@ import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,8 +51,6 @@ public class DriverUtils {
   public static final String DRIVER = "pinot";
   public static final Logger LOG = LoggerFactory.getLogger(DriverUtils.class);
   private static final String LIMIT_STATEMENT_REGEX = "\\s(limit)\\s";
-
-  public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
 
   // SSL Properties
   public static final String PINOT_JDBC_TLS_PREFIX = "pinot.jdbc.tls";
@@ -221,13 +220,13 @@ public class DriverUtils {
     return matcher.find();
   }
 
-  public static String checkEnableNullHandling(PinotConnection connection, String query) {
-    if (query.contains(ENABLE_NULL_HANDLING)) {
+  public static String enableNullHandling(PinotConnection connection, String query) {
+    if (query.contains(QueryOptionKey.ENABLE_NULL_HANDLING)) {
       return query;
     }
 
     return connection.isNullHandlingEnabled()
-      ? String.format("%s option(%s=true)", query, ENABLE_NULL_HANDLING)
+      ? String.format("SET %s = true; %s", QueryOptionKey.ENABLE_NULL_HANDLING, query)
       : query;
   }
 }
