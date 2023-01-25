@@ -25,14 +25,18 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,6 +62,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskPartitionState;
@@ -419,7 +424,7 @@ public class PinotTaskRestletResource {
   @GET
   @Path("/tasks/subtask/{taskName}/progress")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation("Get progress of specified sub tasks for the given task tracked by worker in memory")
+  @ApiOperation("Get progress of specified sub tasks for the given task tracked by minion worker in memory")
   public String getSubtaskProgress(@Context HttpHeaders httpHeaders,
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") @Nullable
@@ -448,6 +453,49 @@ public class PinotTaskRestletResource {
       throw new ControllerApplicationException(LOGGER, String
           .format("Failed to get worker side progress for task: %s due to error: %s", taskName,
               ExceptionUtils.getStackTrace(e)), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @GET
+  @Path("/tasks/subtask/workers/progress")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get progress of all subtasks with specified state tracked by minion worker in memory")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getSubtaskOnWorkerProgress(@Context HttpHeaders httpHeaders,
+      @ApiParam(value = "Subtask state (UNKNOWN,IN_PROGRESS,SUCCEEDED,CANCELLED,ERROR)", required = true)
+      @QueryParam("subTaskState") String subTaskState,
+      @ApiParam(value = "Minion worker IDs separated by comma") @QueryParam("minionWorkerIds") @Nullable
+          String minionWorkerIds) {
+    Set<String> selectedMinionWorkers = new HashSet<>();
+    if (StringUtils.isNotEmpty(minionWorkerIds)) {
+      selectedMinionWorkers.addAll(
+          Arrays.stream(StringUtils.split(minionWorkerIds, ',')).map(String::trim).collect(Collectors.toList()));
+    }
+    // Relying on original schema that was used to query the controller
+    String scheme = _uriInfo.getRequestUri().getScheme();
+    List<InstanceConfig> allMinionWorkerInstanceConfigs = _pinotHelixResourceManager.getAllMinionInstanceConfigs();
+    Map<String, String> selectedMinionWorkerEndpoints = new HashMap<>();
+    for (InstanceConfig worker : allMinionWorkerInstanceConfigs) {
+      if (selectedMinionWorkers.isEmpty() || selectedMinionWorkers.contains(worker.getId())) {
+        selectedMinionWorkerEndpoints.put(worker.getId(),
+            String.format("%s://%s:%d", scheme, worker.getHostName(), Integer.parseInt(worker.getPort())));
+      }
+    }
+    Map<String, String> requestHeaders = new HashMap<>();
+    httpHeaders.getRequestHeaders().keySet().forEach(header ->
+        requestHeaders.put(header, httpHeaders.getHeaderString(header)));
+    int timeoutMs = _controllerConf.getMinionAdminRequestTimeoutSeconds() * 1000;
+    try {
+      Map<String, Object> minionWorkerIdSubtaskProgressMap =
+          _pinotHelixTaskResourceManager.getSubtaskOnWorkerProgress(subTaskState, _executor, _connectionManager,
+              selectedMinionWorkerEndpoints, requestHeaders, timeoutMs);
+      return JsonUtils.objectToString(minionWorkerIdSubtaskProgressMap);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to get minion worker side progress for subtasks with state %s due to error: %s",
+              subTaskState, ExceptionUtils.getStackTrace(e)), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 

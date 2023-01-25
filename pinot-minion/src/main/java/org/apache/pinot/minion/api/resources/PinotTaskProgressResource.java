@@ -27,8 +27,12 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -37,9 +41,10 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
+import org.apache.pinot.minion.event.MinionTaskState;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -81,6 +86,59 @@ public class PinotTaskProgressResource {
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
           String.format("Failed to get task progress for subtasks: %s due to error: %s", subtaskNames, e.getMessage()))
+          .build());
+    }
+  }
+
+  @GET
+  @Path("/tasks/subtask/state/progress")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get finer grained task progress tracked in memory for given subtasks or given state")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getSubtaskProgress(
+      @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") @Nullable String subtaskNames,
+      @ApiParam(value = "Subtask state", required = true) @QueryParam("subTaskState") @Nullable String subTaskState) {
+    try {
+      Map<String, MinionEventObserver> progress = new HashMap<>();
+      if (StringUtils.isEmpty(subtaskNames) && StringUtils.isEmpty(subTaskState)) {
+        LOGGER.debug("Getting progress of all subtasks");
+        progress.putAll(MinionEventObservers.getInstance().getMinionEventObservers());
+      } else if (!StringUtils.isEmpty(subtaskNames) && !StringUtils.isEmpty(subTaskState)) {
+        throw new Exception("Subtask names and state should not be specified at the same time");
+      } else if (!StringUtils.isEmpty(subTaskState)) {
+        MinionTaskState minionTaskState = MinionTaskState.IN_PROGRESS;
+        try {
+          minionTaskState = MinionTaskState.valueOf(subTaskState.toUpperCase());
+        } catch (IllegalArgumentException e) {
+          LOGGER.warn("{} is not a valid subtask state, defaulting to IN_PROGRESS", subTaskState);
+          subTaskState = MinionTaskState.IN_PROGRESS.toString();
+        }
+        LOGGER.debug("Getting progress for subtasks with state {}", subTaskState);
+        progress.putAll(MinionEventObservers.getInstance().getMinionEventObserverWithGivenState(minionTaskState));
+      } else {
+        // !StringUtils.isEmpty(subtaskNames) is true
+        LOGGER.debug("Getting progress for subtasks: {}", subtaskNames);
+        List<String> subTaskNames =
+            Arrays.stream(StringUtils.split(subtaskNames, CommonConstants.Minion.TASK_LIST_SEPARATOR))
+                .map(String::trim)
+                .collect(Collectors.toList());
+        for (String subtaskName : subTaskNames) {
+          MinionEventObserver observer = MinionEventObservers.getInstance().getMinionEventObserver(subtaskName);
+          if (observer != null) {
+            progress.put(subtaskName, observer);
+          }
+        }
+      }
+      LOGGER.debug("Got subtasks progress: {}", progress);
+      return JsonUtils.objectToString(progress);
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
+              String.format("Failed to get task progress for subtasks %s with state %s due to error: %s",
+                  StringUtils.isEmpty(subtaskNames) ? "NOT_SPECIFIED" : subtaskNames,
+                  StringUtils.isEmpty(subTaskState) ? "NOT_SPECIFIED" : subTaskState,
+                  e.getMessage()))
           .build());
     }
   }
