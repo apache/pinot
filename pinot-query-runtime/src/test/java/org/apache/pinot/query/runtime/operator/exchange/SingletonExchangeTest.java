@@ -34,7 +34,7 @@ import org.testng.annotations.Test;
 
 
 public class SingletonExchangeTest {
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1", "host:1", "host:1");
+  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1", "0@host:1", "0@host:1");
 
   private AutoCloseable _mocks;
 

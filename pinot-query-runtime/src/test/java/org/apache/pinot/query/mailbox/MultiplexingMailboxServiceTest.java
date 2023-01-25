@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -25,9 +26,9 @@ import org.testng.annotations.Test;
 
 public class MultiplexingMailboxServiceTest {
   private static final JsonMailboxIdentifier LOCAL_MAILBOX_ID = new JsonMailboxIdentifier(
-      "localJobId", new ServerAddress("localhost", 0), new ServerAddress("localhost", 0));
+      "localJobId", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 0, 0));
   private static final JsonMailboxIdentifier NON_LOCAL_MAILBOX_ID = new JsonMailboxIdentifier(
-      "localJobId", new ServerAddress("localhost", 0), new ServerAddress("localhost", 1));
+      "localJobId", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 1, 0));
 
   @Test
   public void testHappyPath() {

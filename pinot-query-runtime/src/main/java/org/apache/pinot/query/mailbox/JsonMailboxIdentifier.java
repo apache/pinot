@@ -20,12 +20,15 @@ package org.apache.pinot.query.mailbox;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Objects;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class JsonMailboxIdentifier implements MailboxIdentifier {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -34,8 +37,8 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
   private final String _from;
   private final String _to;
 
-  private final ServerAddress _fromAddress;
-  private final ServerAddress _toAddress;
+  private final VirtualServerAddress _fromAddress;
+  private final VirtualServerAddress _toAddress;
 
   @JsonCreator
   public JsonMailboxIdentifier(
@@ -46,14 +49,14 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
     _jobId = jobId;
     _from = from;
     _to = to;
-    _fromAddress = ServerAddress.parse(_from);
-    _toAddress = ServerAddress.parse(_to);
+    _fromAddress = VirtualServerAddress.parse(_from);
+    _toAddress = VirtualServerAddress.parse(_to);
   }
 
   public JsonMailboxIdentifier(
       String jobId,
-      ServerAddress from,
-      ServerAddress to
+      VirtualServerAddress from,
+      VirtualServerAddress to
   ) {
     _jobId = jobId;
     _from = from.toString();
@@ -83,7 +86,7 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
 
   @JsonIgnore
   @Override
-  public ServerAddress getFromHost() {
+  public VirtualServerAddress getFromHost() {
     return _fromAddress;
   }
 
@@ -93,7 +96,7 @@ public class JsonMailboxIdentifier implements MailboxIdentifier {
 
   @JsonIgnore
   @Override
-  public ServerAddress getToHost() {
+  public VirtualServerAddress getToHost() {
     return _toAddress;
   }
 

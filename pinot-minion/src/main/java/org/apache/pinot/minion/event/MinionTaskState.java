@@ -16,28 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.mailbox;
+package org.apache.pinot.minion.event;
 
-import org.apache.pinot.query.routing.VirtualServerAddress;
-
-
-public final class Utils {
-
-  private Utils() {
-    // do not instantiate.
-  }
-
-  public static String constructChannelId(String mailboxId) {
-    MailboxIdentifier mailboxIdentifier = toMailboxIdentifier(mailboxId);
-    VirtualServerAddress dest = mailboxIdentifier.getToHost();
-    return dest.toString();
-  }
-
-  public static MailboxIdentifier toMailboxIdentifier(String mailboxId) {
-    return JsonMailboxIdentifier.parse(mailboxId);
-  }
-
-  public static String fromMailboxIdentifier(MailboxIdentifier mailboxId) {
-    return mailboxId.toString();
-  }
+/**
+ * MinionTaskState represent a minion task state
+ */
+public enum MinionTaskState {
+  /**
+   * No state is reported / unknown
+   */
+  UNKNOWN,
+  /**
+   * The minion task is in progress
+   */
+  IN_PROGRESS,
+  /**
+   * The minion task succeeded
+   */
+  SUCCEEDED,
+  /**
+   * The minion task is cancelled
+   */
+  CANCELLED,
+  /**
+   * The minion task encounters error
+   */
+  ERROR
 }

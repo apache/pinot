@@ -569,41 +569,13 @@ public abstract class BaseDataBlock implements DataBlock {
   public String toString() {
     if (_dataSchema == null) {
       return _metadata.toString();
+    } else {
+      StringBuilder stringBuilder = new StringBuilder();
+      stringBuilder.append("resultSchema:").append('\n');
+      stringBuilder.append(_dataSchema).append('\n');
+      stringBuilder.append("numRows: ").append(_numRows).append('\n');
+      stringBuilder.append("metadata: ").append(_metadata.toString()).append('\n');
+      return stringBuilder.toString();
     }
-
-    StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append(_dataSchema).append('\n');
-    stringBuilder.append("numRows: ").append(_numRows).append('\n');
-
-    DataSchema.ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
-    _fixedSizeData.position(0);
-    for (int rowId = 0; rowId < _numRows; rowId++) {
-      for (int colId = 0; colId < _numColumns; colId++) {
-        switch (storedColumnDataTypes[colId]) {
-          case INT:
-            stringBuilder.append(_fixedSizeData.getInt());
-            break;
-          case LONG:
-            stringBuilder.append(_fixedSizeData.getLong());
-            break;
-          case FLOAT:
-            stringBuilder.append(_fixedSizeData.getFloat());
-            break;
-          case DOUBLE:
-            stringBuilder.append(_fixedSizeData.getDouble());
-            break;
-          case STRING:
-            stringBuilder.append(_fixedSizeData.getInt());
-            break;
-          // Object and array.
-          default:
-            stringBuilder.append(String.format("(%s:%s)", _fixedSizeData.getInt(), _fixedSizeData.getInt()));
-            break;
-        }
-        stringBuilder.append("\t");
-      }
-      stringBuilder.append("\n");
-    }
-    return stringBuilder.toString();
   }
 }
