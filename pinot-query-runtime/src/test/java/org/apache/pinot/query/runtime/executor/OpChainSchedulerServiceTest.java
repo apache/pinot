@@ -74,7 +74,7 @@ public class OpChainSchedulerServiceTest {
   }
 
   private OpChain getChain(MultiStageOperator operator) {
-    return new OpChain(operator, ImmutableList.of(), 123, 1);
+    return new OpChain(operator, ImmutableList.of(), 123, 1, false);
   }
 
   @Test
@@ -94,7 +94,7 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1));
+    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1, false));
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
@@ -117,7 +117,7 @@ public class OpChainSchedulerServiceTest {
     });
 
     // When:
-    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1));
+    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1, false));
     scheduler.startAsync().awaitRunning();
 
     // Then:
@@ -143,7 +143,7 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1));
+    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1, false));
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
@@ -182,8 +182,8 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1));
-    scheduler.register(new OpChain(_operatorB, ImmutableList.of(), 123, 1));
+    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1, false));
+    scheduler.register(new OpChain(_operatorB, ImmutableList.of(), 123, 1, false));
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
@@ -257,7 +257,7 @@ public class OpChainSchedulerServiceTest {
 
     // When:
     scheduler.startAsync().awaitRunning();
-    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1));
+    scheduler.register(new OpChain(_operatorA, ImmutableList.of(), 123, 1, false));
 
     // Then:
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");

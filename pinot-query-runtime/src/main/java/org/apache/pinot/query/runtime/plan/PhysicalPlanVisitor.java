@@ -57,7 +57,9 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
 
   public static OpChain build(StageNode node, PlanRequestContext context) {
     MultiStageOperator root = node.visit(INSTANCE, context);
-    return new OpChain(root, context.getReceivingMailboxes(), context.getRequestId(), context.getStageId());
+    // TODO: build and pass in OpChain context;
+    return new OpChain(root, context.getReceivingMailboxes(), context.getRequestId(), context.getStageId(),
+        context.shouldLogOpStats());
   }
 
   @Override

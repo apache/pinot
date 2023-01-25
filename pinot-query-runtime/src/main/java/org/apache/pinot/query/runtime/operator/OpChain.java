@@ -31,17 +31,20 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  * by send/receive stages.
  */
 public class OpChain implements AutoCloseable {
-
   private final MultiStageOperator _root;
   private final Set<MailboxIdentifier> _receivingMailbox;
   private final OpChainStats _stats;
   private final String _id;
 
-  public OpChain(MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes, long requestId, int stageId) {
+  private final boolean _shouldLogOpStats;
+
+  public OpChain(MultiStageOperator root, List<MailboxIdentifier> receivingMailboxes, long requestId, int stageId,
+      boolean shouldLogOpStats) {
     _root = root;
     _receivingMailbox = new HashSet<>(receivingMailboxes);
     _id = String.format("%s_%s", requestId, stageId);
     _stats = new OpChainStats(_id);
+    _shouldLogOpStats = shouldLogOpStats;
   }
 
   public Operator<TransferableBlock> getRoot() {
@@ -55,6 +58,10 @@ public class OpChain implements AutoCloseable {
   // TODO: Move OperatorStats here.
   public OpChainStats getStats() {
     return _stats;
+  }
+
+  public boolean shouldLogOpStats() {
+    return _shouldLogOpStats;
   }
 
   @Override

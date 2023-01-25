@@ -34,6 +34,7 @@ import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -74,13 +75,18 @@ public class QueryDispatcher {
         reduceNode.getSenderStageId(), reduceNode.getDataSchema(),
         new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0), timeoutMs);
     List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs);
-    mailboxReceiveOperator.toExplainString();
+    boolean shouldLogStats = QueryOptionsUtils.shouldLogMultistageOperatorStats(queryOptions);
+    if (shouldLogStats) {
+      mailboxReceiveOperator.toExplainString();
+    }
     long toResultTableStartTime = System.currentTimeMillis();
     ResultTable resultTable = toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
         queryPlan.getQueryStageMap().get(0).getDataSchema());
-    LOGGER.debug(
-        "RequestId:" + requestId + " StageId: 0 Broker toResultTable processing time:" + (System.currentTimeMillis()
-            - toResultTableStartTime) + " ms");
+    if (shouldLogStats) {
+      LOGGER.error(
+          "RequestId:" + requestId + " StageId: 0 Broker toResultTable processing time:" + (System.currentTimeMillis()
+              - toResultTableStartTime) + " ms");
+    }
     return resultTable;
   }
 

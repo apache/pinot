@@ -132,7 +132,7 @@ public class HashJoinOperator extends MultiStageOperator {
   public String toExplainString() {
     _leftTableOperator.toExplainString();
     _rightTableOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 

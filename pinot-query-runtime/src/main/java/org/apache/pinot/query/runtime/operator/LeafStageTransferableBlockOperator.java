@@ -86,7 +86,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    LOGGER.debug(_operatorStats.toString());
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 

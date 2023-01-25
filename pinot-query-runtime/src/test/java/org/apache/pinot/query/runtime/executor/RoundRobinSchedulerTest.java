@@ -56,7 +56,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldScheduleNewOpChainsImmediately() {
     // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1, false);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
@@ -70,7 +70,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldNotScheduleRescheduledOpChainsImmediately() {
     // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1, false);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
@@ -83,8 +83,8 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldScheduleRescheduledOpChainOnDataAvailable() {
     // Given:
-    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
-    OpChain chain2 = new OpChain(_operator, ImmutableList.of(MAILBOX_2), 123, 1);
+    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1, false);
+    OpChain chain2 = new OpChain(_operator, ImmutableList.of(MAILBOX_2), 123, 1, false);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
@@ -101,7 +101,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldScheduleRescheduledOpChainAfterTimeout() {
     // Given:
-    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain1 = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1, false);
     AtomicLong ticker = new AtomicLong(0);
     RoundRobinScheduler scheduler = new RoundRobinScheduler(100, ticker::get);
 
@@ -117,7 +117,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldScheduleRescheduledOpChainOnDataAvailableBeforeRegister() {
     // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1, false);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
@@ -132,7 +132,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldNotScheduleRescheduledOpChainOnDataAvailableForDifferentMailbox() {
     // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1), 123, 1, false);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:
@@ -146,7 +146,7 @@ public class RoundRobinSchedulerTest {
   @Test
   public void shouldScheduleRescheduledOpChainOnDataAvailableForAnyMailbox() {
     // Given:
-    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1, MAILBOX_2), 123, 1);
+    OpChain chain = new OpChain(_operator, ImmutableList.of(MAILBOX_1, MAILBOX_2), 123, 1, false);
     RoundRobinScheduler scheduler = new RoundRobinScheduler();
 
     // When:

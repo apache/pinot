@@ -134,8 +134,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Override
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
+    pinotQuery = "SET logMultistageOperatorStats=true;" + pinotQuery;
     ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
-        getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+        getH2Connection(), null,
+        ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
   }
 
   @AfterClass

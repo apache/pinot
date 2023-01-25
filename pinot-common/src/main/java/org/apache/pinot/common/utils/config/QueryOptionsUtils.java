@@ -36,7 +36,6 @@ public class QueryOptionsUtils {
   private QueryOptionsUtils() {
   }
 
-
   private static final Map<String, String> CONFIG_RESOLVER;
   private static final RuntimeException CLASS_LOAD_ERROR;
 
@@ -189,5 +188,9 @@ public class QueryOptionsUtils {
   public static Integer getGroupTrimThreshold(Map<String, String> queryOptions) {
     String groupByTrimThreshold = queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
     return groupByTrimThreshold != null ? Integer.parseInt(groupByTrimThreshold) : null;
+  }
+
+  public static boolean shouldLogMultistageOperatorStats(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_MULTI_STAGE_OPERATOR_LOGGING));
   }
 }

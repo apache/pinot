@@ -75,7 +75,7 @@ public class FilterOperator extends MultiStageOperator {
   @Override
   public String toExplainString() {
     _upstreamOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
+    LOGGER.error(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 

@@ -103,10 +103,12 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     }
     LOGGER.debug("QueryID" + requestId + " leafNodeLimit:" + leafNodeLimit);
     pinotQuery.setExplain(false);
+    // TODO: Pass in the whole query option.
+    boolean shouldLogOpStats = QueryOptionsUtils.shouldLogMultistageOperatorStats(requestMetadataMap);
     ServerPlanRequestContext context =
         new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs,
             new VirtualServerAddress(stagePlan.getServer()), stagePlan.getMetadataMap(), pinotQuery, tableType,
-            timeBoundaryInfo);
+            timeBoundaryInfo, shouldLogOpStats);
 
     // visit the plan and create query physical plan.
     ServerRequestPlanVisitor.walkStageNode(stagePlan.getStageRoot(), context);

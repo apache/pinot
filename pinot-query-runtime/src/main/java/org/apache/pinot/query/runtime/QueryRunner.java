@@ -33,6 +33,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
@@ -103,8 +104,7 @@ public class QueryRunner {
     try {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
           QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
-      _executorService = Executors.newFixedThreadPool(
-          ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
+      _executorService = Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
           new NamedThreadFactory("query_worker_on_" + _port + "_port"));
       _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs), _executorService, releaseMs);
       _mailboxService = MultiplexingMailboxService.newInstance(_hostname, _port, config, _scheduler::onDataAvailable);
@@ -132,6 +132,7 @@ public class QueryRunner {
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
     long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
+    boolean shouldLogOpStats = QueryOptionsUtils.shouldLogMultistageOperatorStats(requestMetadataMap);
     if (isLeafStage(distributedStagePlan)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
       // and package it here for return. But we should really use a MailboxSendOperator directly put into the
@@ -147,9 +148,10 @@ public class QueryRunner {
             new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), System.currentTimeMillis());
         serverQueryResults.add(processServerQuery(request, _scheduler.getWorkerPool()));
       }
-      LOGGER.debug(
-          "RequestId:" + requestId + " StageId:" + distributedStagePlan.getStageId() + " Leaf stage v1 processing time:"
-              + (System.currentTimeMillis() - leafStageStartMillis) + " ms");
+      if (shouldLogOpStats) {
+        LOGGER.error("RequestId:" + requestId + " StageId:" + distributedStagePlan.getStageId()
+            + " Leaf stage v1 processing time:" + (System.currentTimeMillis() - leafStageStartMillis) + " ms");
+      }
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator = new MailboxSendOperator(_mailboxService,
@@ -161,13 +163,16 @@ public class QueryRunner {
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
-      mailboxSendOperator.toExplainString();
+      if (shouldLogOpStats) {
+        mailboxSendOperator.toExplainString();
+      }
     } else {
       long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
       StageNode stageRoot = distributedStagePlan.getStageRoot();
       OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
           new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs,
-              new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap()));
+              new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap(),
+              shouldLogOpStats));
       _scheduler.register(rootOperator);
     }
   }

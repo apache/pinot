@@ -35,18 +35,21 @@ public class PlanRequestContext {
   protected final int _stageId;
   private final long _timeoutMs;
   protected final VirtualServerAddress _server;
+
+  private final boolean _shouldLogOpStats;
+
   protected final Map<Integer, StageMetadata> _metadataMap;
   protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
 
-
   public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      long timeoutMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
+      long timeoutMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap, boolean shouldLogOpStats) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
     _timeoutMs = timeoutMs;
     _server = server;
     _metadataMap = metadataMap;
+    _shouldLogOpStats = shouldLogOpStats;
   }
 
   public long getRequestId() {
@@ -63,6 +66,10 @@ public class PlanRequestContext {
 
   public VirtualServerAddress getServer() {
     return _server;
+  }
+
+  public boolean shouldLogOpStats() {
+    return _shouldLogOpStats;
   }
 
   public Map<Integer, StageMetadata> getMetadataMap() {

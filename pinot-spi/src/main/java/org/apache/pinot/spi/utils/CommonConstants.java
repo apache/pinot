@@ -300,6 +300,8 @@ public class CommonConstants {
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
 
+        public static final String ENABLE_MULTI_STAGE_OPERATOR_LOGGING = "logMultistageOperatorStats";
+
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
         public static final String PRESERVE_TYPE = "preserveType";
