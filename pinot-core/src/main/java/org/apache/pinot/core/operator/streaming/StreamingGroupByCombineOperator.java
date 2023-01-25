@@ -28,7 +28,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -52,8 +51,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.exception.QueryCancelledException;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.LoopUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,7 +84,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
 
   public StreamingGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
+    super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
     int minTrimSize = queryContext.getMinServerGroupTrimSize();
     if (minTrimSize > 0) {
@@ -119,25 +116,14 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
 
   @Override
   protected BaseResultsBlock getNextBlock() {
-    while (_exceptionBlock == null && !_opCompleted) {
+    if (!_opCompleted) {
       try {
-        // This guarantees final result block is reduced
-        BaseResultsBlock resultsBlock = getFinalResult();
-        if (resultsBlock instanceof ExceptionResultsBlock) {
-          _exceptionBlock = resultsBlock;
-          return _exceptionBlock;
-        } else {
-          return resultsBlock;
-        }
-      } catch (InterruptedException | EarlyTerminationException e) {
-        Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
-        _exceptionBlock = new ExceptionResultsBlock(new QueryCancelledException(
-            "result block stream cancelled" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg), e));
-        return _exceptionBlock;
+        return getFinalResult();
+      } catch (InterruptedException e) {
+        throw new EarlyTerminationException("Interrupted while merging results blocks", e);
       } catch (Exception e) {
         LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
-        _exceptionBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
-        return _exceptionBlock;
+        return new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
       }
     }
     // Setting the execution stats for the final return
@@ -250,7 +236,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
 
   // TODO: combine this with the single block group by combine operator
   private BaseResultsBlock getFinalResult()
-      throws Exception {
+      throws InterruptedException {
     long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
     _opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!_opCompleted) {

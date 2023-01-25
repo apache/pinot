@@ -23,6 +23,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Server;
@@ -36,6 +37,9 @@ import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 public class StreamingInstanceResponseOperator extends InstanceResponseOperator {
@@ -67,6 +71,11 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
       }
       // Return a metadata-only block
       return new InstanceResponseBlock(resultsBlock, _queryContext);
+    } catch (EarlyTerminationException e) {
+      Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
+      return new InstanceResponseBlock(new ExceptionResultsBlock(new QueryCancelledException(
+          "Cancelled while streaming results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg),
+          e)), _queryContext);
     } catch (Exception e) {
       return new InstanceResponseBlock(new ExceptionResultsBlock(QueryException.DATA_TABLE_SERIALIZATION_ERROR, e),
           _queryContext);

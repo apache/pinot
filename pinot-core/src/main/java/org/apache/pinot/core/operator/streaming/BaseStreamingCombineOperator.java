@@ -32,8 +32,10 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
+import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,37 +52,41 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
 
   // Use a BlockingQueue to store the intermediate results blocks
   protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
+  protected final ResultsBlockMerger<T> _resultsBlockMerger;
 
   protected int _numOperatorsFinished;
-  protected BaseResultsBlock _exceptionBlock;
+  protected boolean _querySatisfied;
 
-  public BaseStreamingCombineOperator(List<Operator> operators,
+  public BaseStreamingCombineOperator(ResultsBlockMerger<T> resultsBlockMerger, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
     super(operators, queryContext, executorService);
+    _resultsBlockMerger = resultsBlockMerger;
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * When all the results blocks are returned, returns a final metadata block. Caller shouldn't call this method after
+   * it returns the metadata block or exception block.
+   */
   @Override
   protected BaseResultsBlock getNextBlock() {
     long endTimeMs = _queryContext.getEndTimeMs();
-    // TODO: Early terminate when query is satisfied
-    while (_exceptionBlock == null && _numOperatorsFinished < _numOperators) {
+    Object querySatisfiedTracker = createQuerySatisfiedTracker();
+    while (!_querySatisfied && _numOperatorsFinished < _numOperators) {
       try {
         BaseResultsBlock resultsBlock =
             _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-
         if (resultsBlock == null) {
           // Query times out, skip streaming the remaining results blocks
           LOGGER.error("Timed out while polling results block (query: {})", _queryContext);
-          _exceptionBlock = new ExceptionResultsBlock(
-              QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
-                  new TimeoutException("Timed out while polling results block")));
-          return _exceptionBlock;
+          return new ExceptionResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
+              new TimeoutException("Timed out while polling results block")));
         }
         if (resultsBlock.getProcessingExceptions() != null) {
           // Caught exception while processing segment, skip streaming the remaining results blocks and directly return
           // the exception
-          _exceptionBlock = resultsBlock;
-          return _exceptionBlock;
+          return resultsBlock;
         }
         if (resultsBlock == LAST_RESULTS_BLOCK) {
           // Caught LAST_RESULTS_BLOCK from a specific task, indicated it has finished.
@@ -88,11 +94,13 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
           _numOperatorsFinished++;
           continue;
         }
+        _querySatisfied = isQuerySatisfied((T) resultsBlock, querySatisfiedTracker);
         return resultsBlock;
+      } catch (InterruptedException e) {
+        throw new EarlyTerminationException("Interrupted while streaming results blocks", e);
       } catch (Exception e) {
-        LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
-        _exceptionBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
-        return _exceptionBlock;
+        LOGGER.error("Caught exception while streaming results blocks (query: {})", _queryContext, e);
+        return new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
       }
     }
     // Setting the execution stats for the final return
@@ -106,28 +114,35 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
   @Override
   protected void processSegments() {
     int operatorId;
+    Object tracker = createQuerySatisfiedTracker();
     while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator<T> operator = _operators.get(operatorId);
-      // If the combine operator indicates it should finish all its operator tasks. Then skip acquiring the
-      // segments entirely.
-      if (!shouldFinishOperators()) {
-        try {
-          if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
-            ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
+      try {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
+        }
+        if (isChildOperatorSingleBlock()) {
+          T resultsBlock = operator.nextBlock();
+          _blockingQueue.offer(resultsBlock);
+          // When query is satisfied, skip processing the remaining segments
+          if (isQuerySatisfied(resultsBlock, tracker)) {
+            _nextOperatorId.set(_numOperators);
+            return;
           }
+        } else {
           T resultsBlock;
           while ((resultsBlock = operator.nextBlock()) != null) {
-            if (isOperatorSatisfied(resultsBlock)) {
-              _blockingQueue.offer(resultsBlock);
-              break;
-            } else {
-              _blockingQueue.offer(resultsBlock);
+            _blockingQueue.offer(resultsBlock);
+            // When query is satisfied, skip processing the remaining segments
+            if (isQuerySatisfied(resultsBlock, tracker)) {
+              _nextOperatorId.set(_numOperators);
+              return;
             }
           }
-        } finally {
-          if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
-            ((AcquireReleaseColumnsSegmentOperator) operator).release();
-          }
+        }
+      } finally {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
       // offer the LAST_RESULTS_BLOCK indicate finish of the current operator.
@@ -145,22 +160,24 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock>
   }
 
   /**
-   * Determine if a returned result block from operator sub-task has already satisfied the query requirement.
-   *
-   * @param resultsBlock the result block returned from operator run in sub-task
-   * @return true if no more getNextBlock() should be called this particular operator.
+   * Returns whether the child operator returns only a single block.
    */
-  protected boolean isOperatorSatisfied(T resultsBlock) {
-    return resultsBlock == null;
+  protected boolean isChildOperatorSingleBlock() {
+    return true;
   }
 
   /**
-   * Determine if the aggregated condition of the all the operator sub-tasks has satisfied the query requirement.
-   *
-   * @return true if we should not schedule any additional {@link Operator#nextBlock()}.
+   * Creates a tracker object to track if the query is satisfied.
    */
-  protected boolean shouldFinishOperators() {
-    return false;
+  protected Object createQuerySatisfiedTracker() {
+    return null;
+  }
+
+  /**
+   * Returns {@code true} if the query is already satisfied with the results block.
+   */
+  protected boolean isQuerySatisfied(T resultsBlock, Object tracker) {
+    return _resultsBlockMerger.isQuerySatisfied(resultsBlock);
   }
 
   public void start() {

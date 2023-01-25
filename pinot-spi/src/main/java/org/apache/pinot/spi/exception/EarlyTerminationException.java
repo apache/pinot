@@ -23,7 +23,16 @@ package org.apache.pinot.spi.exception;
  * terminated (interrupted).
  */
 public class EarlyTerminationException extends RuntimeException {
+
   public EarlyTerminationException() {
     super();
+  }
+
+  public EarlyTerminationException(String message) {
+    super(message);
+  }
+
+  public EarlyTerminationException(String message, Throwable cause) {
+    super(message, cause);
   }
 }

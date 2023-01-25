@@ -37,7 +37,7 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
        itself will cancel all worker's futures. Therefore, the worker will interrupt even if we only kill the runner
        thread. */
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      throw new EarlyTerminationException();
+      throw new EarlyTerminationException("Interrupted while processing next block");
     }
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       return getNextBlock();
