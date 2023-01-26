@@ -41,7 +41,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // Query validation phase.
   UNKNOWN_COLUMN_EXCEPTIONS("exceptions", false),
   // Queries preempted by accountant
-  QUERIES_PREEMPTED("query", true),
+  QUERIES_KILLED("query", true),
   // Scatter phase.
   NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
   REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS("exceptions", false),

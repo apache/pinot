@@ -537,20 +537,20 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         switch (_instanceType) {
           case SERVER:
             _metrics = ServerMetrics.get();
-            _queryPreemptedMeter = ServerMeter.QUERIES_PREEMPTED;
+            _queryPreemptedMeter = ServerMeter.QUERIES_KILLED;
             _memoryUsageGauge = ServerGauge.JVM_HEAP_USED_BYTES;
             _heapMemoryCriticalExceedMeter = ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
             break;
           case BROKER:
             _metrics = BrokerMetrics.get();
-            _queryPreemptedMeter = BrokerMeter.QUERIES_PREEMPTED;
+            _queryPreemptedMeter = BrokerMeter.QUERIES_KILLED;
             _memoryUsageGauge = BrokerGauge.JVM_HEAP_USED_BYTES;
             _heapMemoryCriticalExceedMeter = BrokerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
             break;
           default:
             LOGGER.error("instanceType: {} not supported, using server metrics", _instanceType);
             _metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-            _queryPreemptedMeter = ServerMeter.QUERIES_PREEMPTED;
+            _queryPreemptedMeter = ServerMeter.QUERIES_KILLED;
             _memoryUsageGauge = ServerGauge.JVM_HEAP_USED_BYTES;
             _heapMemoryCriticalExceedMeter = ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
             break;

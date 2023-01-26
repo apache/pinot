@@ -79,7 +79,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   READINESS_CHECK_OK_CALLS("readinessCheck", true),
   READINESS_CHECK_BAD_CALLS("readinessCheck", true),
-  QUERIES_PREEMPTED("query", true),
+  QUERIES_KILLED("query", true),
   HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
 
   // Netty connection metrics
