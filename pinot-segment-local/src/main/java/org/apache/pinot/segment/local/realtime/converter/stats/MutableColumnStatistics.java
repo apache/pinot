@@ -189,6 +189,11 @@ public class MutableColumnStatistics implements ColumnStatistics {
   }
 
   @Override
+  public int getMaxRowLengthInBytes() {
+    return _dataSource.getDataSourceMetadata().getMaxRowLengthInBytes();
+  }
+
+  @Override
   public int getNumPartitions() {
     PartitionFunction partitionFunction = _dataSource.getDataSourceMetadata().getPartitionFunction();
     if (partitionFunction != null) {

@@ -92,7 +92,8 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
   protected List<String> getNoDictionaryColumns() {
     // Randomly set time column as no dictionary column.
     if (new Random().nextInt(2) == 0) {
-      return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime", "DaysSinceEpoch");
+      return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime", "RandomAirports",
+          "DivTotalGTimes", "DaysSinceEpoch");
     } else {
       return super.getNoDictionaryColumns();
     }
