@@ -378,6 +378,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
         try (SegmentDirectory segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()),
             indexLoadingConfig)) {
+          if (segmentDirectory.isDirectoryMatchingWithLatestConfigs()) {
+            // The segment directory is already in sync with latest configs
+            ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema);
+            addSegment(segment);
+            removeBackup(indexDir);
+            return;
+          }
           segmentDirectory.copyTo(indexDir);
         }
       }
