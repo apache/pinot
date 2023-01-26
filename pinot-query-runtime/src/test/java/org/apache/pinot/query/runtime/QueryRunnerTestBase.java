@@ -112,6 +112,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
 
   protected List<Object[]> queryH2(String sql)
       throws Exception {
+    int firstSemi = sql.indexOf(';');
+    if (firstSemi > 0 && firstSemi != sql.length() - 1) {
+      // trim off any SET statements for H2
+      sql = sql.substring(firstSemi + 1);
+    }
     Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     h2statement.execute(sql);
     ResultSet h2ResultSet = h2statement.getResultSet();
