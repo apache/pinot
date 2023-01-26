@@ -39,6 +39,8 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.EmptyIndexConf;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -154,9 +156,9 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(segmentName);
     _invertedIndexColumns = Arrays.asList("column3", "column6", "column7", "column8", "column9");
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(_invertedIndexColumns);
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), EmptyIndexConf.INSTANCE, _invertedIndexColumns);
     _forwardIndexDisabledColumns = new ArrayList<>(Arrays.asList("column6", "column7"));
-    segmentGeneratorConfig.setForwardIndexDisabledColumns(_forwardIndexDisabledColumns);
+    segmentGeneratorConfig.disableIndexOn(StandardIndexes.forward(), _forwardIndexDisabledColumns);
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data

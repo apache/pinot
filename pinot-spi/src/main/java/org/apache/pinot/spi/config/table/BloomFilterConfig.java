@@ -26,6 +26,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 public class BloomFilterConfig extends BaseJsonConfig {
   public static final double DEFAULT_FPP = 0.05;
+  private static final BloomFilterConfig DEFAULT = new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false);
 
   private final double _fpp;
   private final int _maxSizeInBytes;
@@ -43,6 +44,10 @@ public class BloomFilterConfig extends BaseJsonConfig {
     }
     _maxSizeInBytes = maxSizeInBytes;
     _loadOnHeap = loadOnHeap;
+  }
+
+  public static BloomFilterConfig createDefault() {
+    return DEFAULT;
   }
 
   public double getFpp() {

@@ -27,9 +27,15 @@ import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.inverted.InvertedIndexType;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.EmptyIndexConf;
+import org.apache.pinot.segment.spi.index.FstIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -75,9 +81,8 @@ public class RealtimeSegmentConverter {
     // realtime segment generation
     genConfig.setSegmentTimeValueCheck(false);
     if (_columnIndicesForRealtimeTable.getInvertedIndexColumns() != null) {
-      for (String column : _columnIndicesForRealtimeTable.getInvertedIndexColumns()) {
-        genConfig.createInvertedIndexForColumn(column);
-      }
+      genConfig.setIndexOn(InvertedIndexType.INSTANCE, EmptyIndexConf.INSTANCE,
+          _columnIndicesForRealtimeTable.getInvertedIndexColumns());
     }
 
     if (_columnIndicesForRealtimeTable.getVarLengthDictionaryColumns() != null) {
@@ -90,8 +95,12 @@ public class RealtimeSegmentConverter {
     genConfig.setTableName(_tableName);
     genConfig.setOutDir(_outputPath);
     genConfig.setSegmentName(_segmentName);
-    genConfig.setTextIndexCreationColumns(_columnIndicesForRealtimeTable.getTextIndexColumns());
-    genConfig.setFSTIndexCreationColumns(_columnIndicesForRealtimeTable.getFstIndexColumns());
+    TextIndexConfig textConfig = new TextIndexConfigBuilder(genConfig.getFSTIndexType()).build();
+    genConfig.setIndexOn(StandardIndexes.text(), textConfig, _columnIndicesForRealtimeTable.getTextIndexColumns());
+
+    FstIndexConfig fstConfig = new FstIndexConfig(genConfig.getFSTIndexType());
+    genConfig.setIndexOn(StandardIndexes.fst(), fstConfig, _columnIndicesForRealtimeTable.getFstIndexColumns());
+
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);

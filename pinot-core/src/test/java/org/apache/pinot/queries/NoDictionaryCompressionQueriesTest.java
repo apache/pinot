@@ -124,7 +124,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     indexColumns.addAll(RAW_ZSTANDARD_INDEX_COLUMNS);
     indexColumns.addAll(RAW_LZ4_INDEX_COLUMNS);
 
-    indexLoadingConfig.getNoDictionaryColumns().addAll(indexColumns);
+    indexLoadingConfig.addNoDictionaryColumns(indexColumns);
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;

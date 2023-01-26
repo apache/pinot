@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.IOException;
-import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -27,7 +26,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  * Forward index creator for dictionary-encoded single and multi-value columns with forward index disabled.
  * This is a no-op.
  */
-public class NoOpForwardIndexCreator implements ForwardIndexCreator {
+public class NoOpForwardIndexCreator extends AbstractForwardIndexCreator {
   private final boolean _isSingleValue;
 
   public NoOpForwardIndexCreator(boolean isSingleValue) {

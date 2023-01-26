@@ -37,6 +37,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.EmptyIndexConf;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -98,7 +100,8 @@ public class IntermediateSegmentTest {
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(Arrays.asList("column6", "column7"));
+    segmentGeneratorConfig.setIndexOn(
+        StandardIndexes.inverted(), EmptyIndexConf.INSTANCE, Arrays.asList("column6", "column7"));
 
     IndexSegment segmentFromIntermediateSegment = buildSegmentFromIntermediateSegment(segmentGeneratorConfig);
     IndexSegment segmentFromAvroRecordReader = buildSegmentFromAvroRecordReader(segmentGeneratorConfig);

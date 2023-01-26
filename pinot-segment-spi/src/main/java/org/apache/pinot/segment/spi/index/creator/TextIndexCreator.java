@@ -18,14 +18,22 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
-import java.io.Closeable;
 import java.io.IOException;
+import org.apache.pinot.segment.spi.index.IndexCreator;
 
 
 /**
- * Index creator for text index.
+ * Index creator for both text and FST indexes.
+ *
+ * This abstraction is not great. Text and FST indexes are quite different and in fact they way they are created is not
+ * compatible. These incompatibilities between indexes affect this shared creator itself, breaking SOLID in at least the
+ * Liskov substitution principle and Dependency inversion principle.
+ * For example, while Text indexes are created as normal indexes adding new entries for each row, FST indexes are built
+ * using the sorted set of unique values that is precalculated. Therefore there is nothing in common between these
+ * indexes (apart from dealing with Strings) and they ideally should not share a common interface for the same reason
+ * BloomFilterCreator does not implement this interface.
  */
-public interface TextIndexCreator extends Closeable {
+public interface TextIndexCreator extends IndexCreator {
 
   /**
    * Adds the next document.

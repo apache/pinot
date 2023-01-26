@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.segment.spi.creator;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,11 +37,13 @@ import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
-import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -78,13 +80,6 @@ public class SegmentGeneratorConfig implements Serializable {
   private final Set<String> _rawIndexCreationColumns = new HashSet<>();
   private final Map<String, ChunkCompressionType> _rawIndexCompressionType = new HashMap<>();
   private final List<String> _invertedIndexCreationColumns = new ArrayList<>();
-  private final List<String> _bloomFilterCreationColumns = new ArrayList<>();
-  private final List<String> _rangeIndexCreationColumns = new ArrayList<>();
-  private final List<String> _textIndexCreationColumns = new ArrayList<>();
-  private final List<String> _fstIndexCreationColumns = new ArrayList<>();
-  private final Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
-  private final List<String> _forwardIndexDisabledColumns = new ArrayList<>();
-  private final Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private final List<String> _columnSortOrder = new ArrayList<>();
   private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _inputFilePath = null;
@@ -123,6 +118,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _optimizeDictionary = false;
   private boolean _optimizeDictionaryForMetrics = false;
   private double _noDictionarySizeRatioThreshold = DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
+  private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
 
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
@@ -194,31 +190,6 @@ public class SegmentGeneratorConfig implements Serializable {
         }
       }
 
-      if (indexingConfig.getBloomFilterColumns() != null) {
-        _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterColumns());
-      }
-
-      if (indexingConfig.getBloomFilterConfigs() != null) {
-        _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
-      }
-
-      if (indexingConfig.getRangeIndexColumns() != null) {
-        _rangeIndexCreationColumns.addAll(indexingConfig.getRangeIndexColumns());
-      }
-
-      // Ignore jsonIndexColumns when jsonIndexConfigs is configured
-      Map<String, JsonIndexConfig> jsonIndexConfigs = indexingConfig.getJsonIndexConfigs();
-      if (jsonIndexConfigs != null) {
-        _jsonIndexConfigs.putAll(jsonIndexConfigs);
-      } else {
-        List<String> jsonIndexColumns = indexingConfig.getJsonIndexColumns();
-        if (jsonIndexColumns != null) {
-          for (String jsonIndexColumn : jsonIndexColumns) {
-            _jsonIndexConfigs.put(jsonIndexColumn, new JsonIndexConfig());
-          }
-        }
-      }
-
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
       if (fieldConfigList != null) {
         for (FieldConfig fieldConfig : fieldConfigList) {
@@ -226,11 +197,7 @@ public class SegmentGeneratorConfig implements Serializable {
         }
       }
 
-      extractTextIndexColumnsFromTableConfig(tableConfig);
-      extractFSTIndexColumnsFromTableConfig(tableConfig);
-      extractH3IndexConfigsFromTableConfig(tableConfig);
       extractCompressionCodecConfigsFromTableConfig(tableConfig);
-      extractForwardIndexDisabledColumnsFromTableConfig(tableConfig);
 
       _fstTypeForFSTIndex = indexingConfig.getFSTIndexType();
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
@@ -246,6 +213,8 @@ public class SegmentGeneratorConfig implements Serializable {
       _rowTimeValueCheck = ingestionConfig.isRowTimeValueCheck();
       _segmentTimeValueCheck = ingestionConfig.isSegmentTimeValueCheck();
     }
+
+    _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema, true);
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {
@@ -266,48 +235,6 @@ public class SegmentGeneratorConfig implements Serializable {
     }
   }
 
-  /**
-   * Text index creation info for each column is specified
-   * using {@link FieldConfig} model of indicating per column
-   * encoding and indexing information. Since SegmentGeneratorConfig
-   * is created from TableConfig, we extract the text index info
-   * from fieldConfigList in TableConfig.
-   * @param tableConfig table config
-   */
-  private void extractTextIndexColumnsFromTableConfig(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          _textIndexCreationColumns.add(fieldConfig.getName());
-        }
-      }
-    }
-  }
-
-  private void extractFSTIndexColumnsFromTableConfig(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.FST) {
-          _fstIndexCreationColumns.add(fieldConfig.getName());
-        }
-      }
-    }
-  }
-
-  private void extractH3IndexConfigsFromTableConfig(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.H3) {
-          //noinspection ConstantConditions
-          _h3IndexConfigs.put(fieldConfig.getName(), new H3IndexConfig(fieldConfig.getProperties()));
-        }
-      }
-    }
-  }
-
   private void extractCompressionCodecConfigsFromTableConfig(TableConfig tableConfig) {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
@@ -317,31 +244,6 @@ public class SegmentGeneratorConfig implements Serializable {
           _rawIndexCreationColumns.add(fieldConfig.getName());
           _rawIndexCompressionType.put(fieldConfig.getName(),
               ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name()));
-        }
-      }
-    }
-  }
-
-  /**
-   * Forward index disabled info for each column is specified
-   * using {@link FieldConfig} model of indicating per column
-   * encoding and indexing information. Since SegmentGeneratorConfig
-   * is created from TableConfig, we extract the forward index disabled info
-   * from fieldConfigList in TableConfig via the properties bag.
-   * @param tableConfig table config
-   */
-  private void extractForwardIndexDisabledColumnsFromTableConfig(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
-        if (fieldConfigProperties != null) {
-          boolean forwardIndexDisabled = Boolean.parseBoolean(
-              fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
-                  FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
-          if (forwardIndexDisabled) {
-            _forwardIndexDisabledColumns.add(fieldConfig.getName());
-          }
         }
       }
     }
@@ -388,91 +290,73 @@ public class SegmentGeneratorConfig implements Serializable {
     return _invertedIndexCreationColumns;
   }
 
-  public List<String> getBloomFilterCreationColumns() {
-    return _bloomFilterCreationColumns;
-  }
-
-  public List<String> getRangeIndexCreationColumns() {
-    return _rangeIndexCreationColumns;
-  }
-
-  /**
-   * Used by org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator
-   * to get the list of text index columns.
-   * @return list of text index columns.
-   */
-  public List<String> getTextIndexCreationColumns() {
-    return _textIndexCreationColumns;
-  }
-
-  public List<String> getFSTIndexCreationColumns() {
-    return _fstIndexCreationColumns;
-  }
-
-  public Map<String, JsonIndexConfig> getJsonIndexConfigs() {
-    return _jsonIndexConfigs;
-  }
-
-  public List<String> getForwardIndexDisabledColumns() {
-    return _forwardIndexDisabledColumns;
-  }
-
-  public Map<String, H3IndexConfig> getH3IndexConfigs() {
-    return _h3IndexConfigs;
-  }
-
   public List<String> getColumnSortOrder() {
     return _columnSortOrder;
   }
 
+  /**
+   * Even when this method looks like a setter, it is in fact an adder.
+   */
   public void setRawIndexCreationColumns(List<String> rawIndexCreationColumns) {
     Preconditions.checkNotNull(rawIndexCreationColumns);
     _rawIndexCreationColumns.addAll(rawIndexCreationColumns);
   }
 
-  // NOTE: Should always be extracted from the table config
-  @Deprecated
-  public void setInvertedIndexCreationColumns(List<String> indexCreationColumns) {
-    Preconditions.checkNotNull(indexCreationColumns);
-    _invertedIndexCreationColumns.addAll(indexCreationColumns);
+  public <C> void disableIndexOn(IndexType<C, ?, ?> indexType, List<String> columns) {
+    for (String column : columns) {
+      _indexConfigsByColName.compute(column, (key, old) -> {
+        FieldIndexConfigs.Builder builder;
+        if (old == null) {
+          builder = new FieldIndexConfigs.Builder();
+        } else if (!old.getConfig(indexType).isEnabled()) {
+          return old;
+        } else {
+          builder = new FieldIndexConfigs.Builder(old);
+        }
+        return builder.addDeclaration(indexType, IndexDeclaration.declaredDisabled())
+            .build();
+      });
+    }
+  }
+
+  public <C> void disableIndexOn(IndexType<C, ?, ?> indexType, String... columns) {
+    disableIndexOn(indexType, Arrays.asList(columns));
+  }
+
+  public <C> void setIndexOn(IndexType<C, ?, ?> indexType, C config, String... columns) {
+    setIndexOn(indexType, IndexDeclaration.declared(config), columns);
+  }
+
+  public <C> void setIndexOn(IndexType<C, ?, ?> indexType, C config, @Nullable Iterable<String> columns) {
+    setIndexOn(indexType, IndexDeclaration.declared(config), columns);
+  }
+
+  public <C> void setIndexOn(IndexType<C, ?, ?> indexType, IndexDeclaration<C> declaration, String... columns) {
+    setIndexOn(indexType, declaration, Arrays.asList(columns));
+  }
+
+  public <C> void setIndexOn(IndexType<C, ?, ?> indexType, IndexDeclaration<C> declaration,
+      @Nullable Iterable<String> columns) {
+    if (columns == null) {
+      return;
+    }
+    for (String column : columns) {
+      _indexConfigsByColName.compute(column, (key, old) -> {
+        FieldIndexConfigs.Builder builder;
+        if (old == null) {
+          builder = new FieldIndexConfigs.Builder();
+        } else {
+          builder = new FieldIndexConfigs.Builder(old);
+        }
+        return builder.addDeclaration(indexType, declaration)
+            .build();
+      });
+    }
   }
 
   /**
-   * Used by org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter
-   * and text search functional tests
-   * @param textIndexCreationColumns list of columns with text index creation enabled
+   * Even when this method looks like a setter, it is in fact an adder.
    */
-  public void setTextIndexCreationColumns(List<String> textIndexCreationColumns) {
-    if (textIndexCreationColumns != null) {
-      _textIndexCreationColumns.addAll(textIndexCreationColumns);
-    }
-  }
-
-  @VisibleForTesting
-  public void setRangeIndexCreationColumns(List<String> rangeIndexCreationColumns) {
-    if (rangeIndexCreationColumns != null) {
-      _rangeIndexCreationColumns.addAll(rangeIndexCreationColumns);
-    }
-  }
-
-  @VisibleForTesting
-  public void setForwardIndexDisabledColumns(List<String> forwardIndexDisabledColumns) {
-    if (forwardIndexDisabledColumns != null) {
-      _forwardIndexDisabledColumns.addAll(forwardIndexDisabledColumns);
-    }
-  }
-
-  @VisibleForTesting
-  public void setColumnProperties(Map<String, Map<String, String>> columnProperties) {
-    _columnProperties = columnProperties;
-  }
-
-  public void setFSTIndexCreationColumns(List<String> fstIndexCreationColumns) {
-    if (fstIndexCreationColumns != null) {
-      _fstIndexCreationColumns.addAll(fstIndexCreationColumns);
-    }
-  }
-
   public void setColumnSortOrder(List<String> sortOrder) {
     Preconditions.checkNotNull(sortOrder);
     _columnSortOrder.addAll(sortOrder);
@@ -484,28 +368,6 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
     _varLengthDictionaryColumns = varLengthDictionaryColumns;
-  }
-
-  public void createInvertedIndexForColumn(String column) {
-    Preconditions.checkNotNull(column);
-    if (_schema != null && _schema.getFieldSpecFor(column) == null) {
-      LOGGER.warn("Cannot find column {} in schema, will not create inverted index.", column);
-      return;
-    }
-    if (_schema == null) {
-      LOGGER.warn("Schema has not been set, column {} might not exist in schema after all.", column);
-    }
-    _invertedIndexCreationColumns.add(column);
-  }
-
-  public void createInvertedIndexForAllColumns() {
-    if (_schema == null) {
-      LOGGER.warn("Schema has not been set, will not create inverted index for all columns.");
-      return;
-    }
-    for (FieldSpec spec : _schema.getAllFieldSpecs()) {
-      _invertedIndexCreationColumns.add(spec.getName());
-    }
   }
 
   public String getInputFilePath() {
@@ -660,6 +522,15 @@ public class SegmentGeneratorConfig implements Serializable {
     _segmentVersion = segmentVersion;
   }
 
+  /**
+   * Returns the {@link TableConfig} that was used to initialize this object.
+   *
+   * Remember that this object is mutable. Therefore it may have modified since the object was created. Changes on this
+   * object may or may not modify the initial table config, so the object returned by this method may not contain the
+   * same information stored on this SegmentGeneratorConfig. For example, if someone called
+   * {@link #setFSTIndexType(FSTType)} on the SegmentGeneratorConfig, the TableConfig returned by this method
+   * will not be modified accordingly.
+   */
   public TableConfig getTableConfig() {
     return _tableConfig;
   }
@@ -870,5 +741,9 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public void setSegmentZKPropsConfig(SegmentZKPropsConfig segmentZKPropsConfig) {
     _segmentZKPropsConfig = segmentZKPropsConfig;
+  }
+
+  public Map<String, FieldIndexConfigs> getIndexConfigsByColName() {
+    return _indexConfigsByColName;
   }
 }

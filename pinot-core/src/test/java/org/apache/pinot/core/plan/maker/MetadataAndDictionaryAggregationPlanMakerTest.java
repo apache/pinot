@@ -21,7 +21,6 @@ package org.apache.pinot.core.plan.maker;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -42,6 +41,8 @@ import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadat
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.EmptyIndexConf;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -113,8 +114,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(
-        Arrays.asList("column6", "column7", "column11", "column17", "column18"));
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), EmptyIndexConf.INSTANCE,
+        "column6", "column7", "column11", "column17", "column18");
 
     // Build the index segment.
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();

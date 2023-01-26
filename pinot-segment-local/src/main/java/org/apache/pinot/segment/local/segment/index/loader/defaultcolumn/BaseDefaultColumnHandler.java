@@ -50,6 +50,8 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreI
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -58,11 +60,11 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -331,8 +333,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     String segmentName = _segmentMetadata.getName();
     LOGGER.info("Removing default column: {} from segment: {}", column, segmentName);
     // Delete existing dictionary and forward index
-    _segmentWriter.removeIndex(column, ColumnIndexType.DICTIONARY);
-    _segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
+    _segmentWriter.removeIndex(column, StandardIndexes.dictionary());
+    _segmentWriter.removeIndex(column, StandardIndexes.forward());
     // Remove the column metadata
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
     LOGGER.info("Removed default column: {} from segment: {}", column, segmentName);
@@ -365,7 +367,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
               return false;
             }
             // TODO: Support creation of derived columns from forward index disabled columns
-            if (!_segmentWriter.hasIndexFor(argument, ColumnIndexType.FORWARD_INDEX)) {
+            if (!_segmentWriter.hasIndexFor(argument, StandardIndexes.forward())) {
               throw new UnsupportedOperationException(String.format("Operation not supported! Cannot create a derived "
                   + "column %s because argument: %s does not have a forward index. Enable forward index and "
                   + "refresh/backfill the segments to create a derived column from source column %s", column, argument,
@@ -543,7 +545,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     if (_indexLoadingConfig.getTableConfig() != null
         && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
         && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled()) {
-      if (!_segmentWriter.hasIndexFor(column, ColumnIndexType.NULLVALUE_VECTOR)) {
+      if (!_segmentWriter.hasIndexFor(column, StandardIndexes.nullValueVector())) {
         try (NullValueVectorCreator nullValueVectorCreator =
             new NullValueVectorCreator(_indexDir, fieldSpec.getName())) {
           for (int docId = 0; docId < totalDocs; docId++) {
@@ -809,9 +811,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     ValueReader(ColumnMetadata columnMetadata)
         throws IOException {
-      _forwardIndexReader = LoaderUtils.getForwardIndexReader(_segmentWriter, columnMetadata);
+      _forwardIndexReader = ForwardIndexType.INSTANCE.read(_segmentWriter, columnMetadata);
       if (columnMetadata.hasDictionary()) {
-        _dictionary = LoaderUtils.getDictionary(_segmentWriter, columnMetadata);
+        _dictionary = DictionaryIndexType.INSTANCE.read(_segmentWriter, columnMetadata);
       } else {
         _dictionary = null;
       }

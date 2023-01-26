@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.converter;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -27,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
@@ -36,12 +38,14 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -150,22 +154,23 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
       // for each dictionary and each fwdIndex, copy that to newDirectory buffer
       Set<String> allColumns = v2Metadata.getAllColumns();
+      List<IndexType<?, ?, ?>> specialIndexTypes = Lists.newArrayList(StandardIndexes.dictionary(),
+          StandardIndexes.forward(), StandardIndexes.nullValueVector());
       try (SegmentDirectory.Reader v2DataReader = v2Segment.createReader();
           SegmentDirectory.Writer v3DataWriter = v3Segment.createWriter()) {
         for (String column : allColumns) {
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.DICTIONARY);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.FORWARD_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.NULLVALUE_VECTOR);
+          for (IndexType<?, ?, ?> specialIndexType : specialIndexTypes) {
+            copyIndexIfExists(v2DataReader, v3DataWriter, column, specialIndexType);
+          }
         }
 
         // Other indexes are intentionally stored at the end of the single file
         for (String column : allColumns) {
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.INVERTED_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.FST_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.JSON_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.H3_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.RANGE_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.BLOOM_FILTER);
+          for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
+            if (!specialIndexTypes.contains(index) && index.storedAsBuffer()) {
+              copyIndexIfExists(v2DataReader, v3DataWriter, column, index);
+            }
+          }
         }
 
         v3DataWriter.save();
@@ -176,7 +181,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   }
 
   private void copyIndexIfExists(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
-      ColumnIndexType indexType)
+      IndexType indexType)
       throws IOException {
     if (reader.hasIndexFor(column, indexType)) {
       readCopyBuffers(reader, writer, column, indexType);
@@ -194,7 +199,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   }
 
   private void readCopyBuffers(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
-      ColumnIndexType indexType)
+      IndexType indexType)
       throws IOException {
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
     long oldBufferSize = oldBuffer.size();

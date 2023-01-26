@@ -24,15 +24,17 @@ import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteOrder;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
-import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -44,7 +46,7 @@ import org.slf4j.LoggerFactory;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-public class SegmentDictionaryCreator implements Closeable {
+public class SegmentDictionaryCreator implements IndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDictionaryCreator.class);
 
   private final String _columnName;
@@ -62,8 +64,19 @@ public class SegmentDictionaryCreator implements Closeable {
   public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir, boolean useVarLengthDictionary) {
     _columnName = fieldSpec.getName();
     _storedType = fieldSpec.getDataType().getStoredType();
-    _dictionaryFile = new File(indexDir, _columnName + V1Constants.Dict.FILE_EXTENSION);
+    _dictionaryFile = new File(indexDir, _columnName + DictionaryIndexType.INSTANCE.getFileExtension());
     _useVarLengthDictionary = useVarLengthDictionary;
+  }
+  @Override
+  public void addSingleValueCell(@Nonnull Object value, int dictId)
+      throws IOException {
+    throw new UnsupportedOperationException("Dictionary indexes should not be build as a normal index");
+  }
+
+  @Override
+  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds)
+      throws IOException {
+    throw new UnsupportedOperationException("Dictionary indexes should not be build as a normal index");
   }
 
   public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir) {
@@ -329,6 +342,11 @@ public class SegmentDictionaryCreator implements Closeable {
     _floatValueToIndexMap = null;
     _doubleValueToIndexMap = null;
     _objectValueToIndexMap = null;
+  }
+
+  @Override
+  public void seal() {
+    postIndexingCleanup();
   }
 
   @Override

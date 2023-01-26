@@ -24,7 +24,6 @@ import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWrit
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -32,7 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * Forward index creator for raw (non-dictionary-encoded) single-value column of fixed length data type (INT, LONG,
  * FLOAT, DOUBLE).
  */
-public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator {
+public class SingleValueFixedByteRawIndexCreator extends AbstractForwardIndexCreator {
   private static final int NUM_DOCS_PER_CHUNK = 1000; // TODO: Auto-derive this based on metadata.
 
   private final FixedByteChunkSVForwardIndexWriter _indexWriter;

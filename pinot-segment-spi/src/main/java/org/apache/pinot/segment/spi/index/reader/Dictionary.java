@@ -19,9 +19,9 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
-import java.io.Closeable;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -31,7 +31,7 @@ import org.apache.pinot.spi.utils.ByteArray;
  * supported. Type conversion between STRING and BYTES via Hex encoding/decoding should be supported.
  */
 @SuppressWarnings("rawtypes")
-public interface Dictionary extends Closeable {
+public interface Dictionary extends IndexReader {
   int NULL_VALUE_INDEX = -1;
 
   /**

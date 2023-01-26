@@ -28,17 +28,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
+import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.Container;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
@@ -46,7 +48,7 @@ import org.roaringbitmap.RoaringBitmapWriter;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-public class NativeTextIndexCreator implements TextIndexCreator {
+public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   private static final String TEMP_DIR_SUFFIX = ".nativetext.idx.tmp";
   private static final String FST_FILE_NAME = "native.fst";
   private static final String INVERTED_INDEX_FILE_NAME = "inverted.index.buf";
@@ -73,8 +75,10 @@ public class NativeTextIndexCreator implements TextIndexCreator {
   private int _fstDataSize;
   private int _numBitMaps;
 
-  public NativeTextIndexCreator(String column, File indexDir)
+  public NativeTextIndexCreator(String column, File indexDir,
+      @Nullable Object rawValueForTextIndex, FieldSpec fieldSpec)
       throws IOException {
+    super(rawValueForTextIndex, fieldSpec);
     _columnName = column;
     _fstBuilder = new FSTBuilder();
     _indexFile = new File(indexDir, column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION);

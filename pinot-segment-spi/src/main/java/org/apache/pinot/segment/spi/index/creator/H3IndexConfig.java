@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +32,12 @@ public class H3IndexConfig {
 
   private final H3IndexResolution _resolution;
 
+  @JsonCreator
+  public H3IndexConfig(H3IndexResolution resolution) {
+    _resolution = resolution;
+  }
+
+  // Used to read from older configs
   public H3IndexConfig(Map<String, String> properties) {
     Preconditions.checkArgument(properties != null && properties.containsKey(RESOLUTIONS_KEY),
         "Properties must contain H3 resolutions");

@@ -35,11 +35,15 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.range.RangeIndexType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.EmptyIndexConf;
+import org.apache.pinot.segment.spi.index.RangeIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -185,9 +189,10 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(segmentName);
     _invertedIndexColumns = Arrays.asList("column8", "column9");
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(_invertedIndexColumns);
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), EmptyIndexConf.INSTANCE, _invertedIndexColumns);
     segmentGeneratorConfig.setRawIndexCreationColumns(_noDictionaryColumns);
-    segmentGeneratorConfig.setRangeIndexCreationColumns(_rangeIndexColumns);
+    RangeIndexConfig config = new RangeIndexConfig(RangeIndexType.DEFAULT_RANGE_INDEX_VERSION);
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.range(), config, _rangeIndexColumns);
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data
@@ -744,15 +749,15 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     invertedIndexEnabledColumns.add("column2");
     invertedIndexEnabledColumns.add("column7");
     indexLoadingConfig.setInvertedIndexColumns(invertedIndexEnabledColumns);
-    indexLoadingConfig.getInvertedIndexColumns().remove("column9");
+    indexLoadingConfig.removeInvertedIndexColumns("column9");
     Set<String> noDictionaryColumns = new HashSet<>(_noDictionaryColumns);
     indexLoadingConfig.setNoDictionaryColumns(noDictionaryColumns);
-    indexLoadingConfig.getNoDictionaryColumns().remove("column2");
-    indexLoadingConfig.getNoDictionaryColumns().remove("column3");
-    indexLoadingConfig.getNoDictionaryColumns().remove("column7");
-    indexLoadingConfig.getNoDictionaryColumns().remove("column10");
-    indexLoadingConfig.getNoDictionaryColumns().add("column6");
-    indexLoadingConfig.getNoDictionaryColumns().add("column9");
+    indexLoadingConfig.removeNoDictionaryColumns("column2");
+    indexLoadingConfig.removeNoDictionaryColumns("column3");
+    indexLoadingConfig.removeNoDictionaryColumns("column7");
+    indexLoadingConfig.removeNoDictionaryColumns("column10");
+    indexLoadingConfig.addNoDictionaryColumns("column6");
+    indexLoadingConfig.addNoDictionaryColumns("column9");
     Set<String> rangeIndexColumns = new HashSet<>(_rangeIndexColumns);
     indexLoadingConfig.setRangeIndexColumns(rangeIndexColumns);
     indexLoadingConfig.setReadMode(ReadMode.heap);

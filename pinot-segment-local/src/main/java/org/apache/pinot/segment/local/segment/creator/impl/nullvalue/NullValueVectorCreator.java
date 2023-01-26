@@ -19,12 +19,14 @@
 package org.apache.pinot.segment.local.segment.creator.impl.nullvalue;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -32,9 +34,21 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 /**
  * Used to persist the null bitmap on disk. This is used by SegmentCreator while indexing rows.
  */
-public class NullValueVectorCreator implements Closeable {
+public class NullValueVectorCreator implements IndexCreator {
   private final MutableRoaringBitmap _nullBitmap = new MutableRoaringBitmap();
   private final File _nullValueVectorFile;
+
+  @Override
+  public void addSingleValueCell(@Nonnull Object value, int dictId)
+      throws IOException {
+    throw new UnsupportedOperationException("NullValueVector should not be build as a normal index");
+  }
+
+  @Override
+  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds)
+      throws IOException {
+    throw new UnsupportedOperationException("NullValueVector should not be build as a normal index");
+  }
 
   public NullValueVectorCreator(File indexDir, String columnName) {
     _nullValueVectorFile = new File(indexDir, columnName + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);

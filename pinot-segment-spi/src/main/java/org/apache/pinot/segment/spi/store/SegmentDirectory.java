@@ -27,6 +27,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.segment.spi.FetchContext;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
@@ -42,9 +43,9 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
  *     SegmentDirectory.Writer writer =
  *          segmentDir.createWriter();
  *     try {
- *       writer.getIndexFor("column1", ColumnIndexType.FORWARD_INDEX);
+ *       writer.getIndexFor("column1", StandardIndexes.forward());
  *       PinotDataBufferOld buffer =
- *           writer.newIndexFor("column1", ColumnIndexType.FORWARD_INDEX, 1024);
+ *           writer.newIndexFor("column1", StandardIndexes.forward(), 1024);
  *       // write value 87 at index 512
  *       buffer.putLong(512, 87L);
  *       writer.saveAndClose();
@@ -55,7 +56,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
  *     SegmentDirectory.Reader reader =
  *           segmentDir.createReader();
  *     try {
- *       PinotDataBufferOld col1Dictionary = reader.getIndexFor("col1Dictionary", ColumnIndexType.DICTIONARY);
+ *       PinotDataBufferOld col1Dictionary = reader.getIndexFor("col1Dictionary", DictoionaryIndexType.INSTANCE);
  *     } catch (Exception e) {
  *       // handle error
  *     } finally {
@@ -115,7 +116,7 @@ public abstract class SegmentDirectory implements Closeable {
    * Get the columns with specific index type, in this local segment directory.
    * @return a set of columns with such index type.
    */
-  public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
+  public abstract Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type);
 
   /**
    * This is a hint to the segment directory, to begin prefetching buffers for given context.
@@ -175,10 +176,10 @@ public abstract class SegmentDirectory implements Closeable {
      * @return a bytebuffer-like buffer holding index data
      * @throws IOException
      */
-    public abstract PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
+    public abstract PinotDataBuffer getIndexFor(String column, IndexType<?, ?, ?> type)
         throws IOException;
 
-    public abstract boolean hasIndexFor(String column, ColumnIndexType type);
+    public abstract boolean hasIndexFor(String column, IndexType<?, ?, ?> type);
 
     public boolean hasStarTreeIndex() {
       return false;
@@ -221,10 +222,10 @@ public abstract class SegmentDirectory implements Closeable {
      * @return PinotDataBufferOld that writers can update
      * @throws IOException
      */
-    // NOTE: an interface like readFrom(File f, String column, ColumnIndexType, int sizeBytes) will be safe
+    // NOTE: an interface like readFrom(File f, String column, IndexType<?, ?, ?>, int sizeBytes) will be safe
     // but it can lead to potential endianness issues. Endianness used to create data may not be
     // same as PinotDataBufferOld
-    public abstract PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes)
+    public abstract PinotDataBuffer newIndexFor(String columnName, IndexType<?, ?, ?> indexType, long sizeBytes)
         throws IOException;
 
     /**
@@ -232,7 +233,7 @@ public abstract class SegmentDirectory implements Closeable {
      * @param columnName column name
      * @param indexType column index type
      */
-    public abstract void removeIndex(String columnName, ColumnIndexType indexType);
+    public abstract void removeIndex(String columnName, IndexType<?, ?, ?> indexType);
 
     public abstract void save()
         throws IOException;

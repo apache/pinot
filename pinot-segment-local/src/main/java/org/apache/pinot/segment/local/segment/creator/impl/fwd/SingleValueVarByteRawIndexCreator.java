@@ -28,7 +28,6 @@ import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexW
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -36,7 +35,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * Forward index creator for raw (non-dictionary-encoded) single-value column of variable length data type (BIG_DECIMAL,
  * STRING, BYTES).
  */
-public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
+public class SingleValueVarByteRawIndexCreator extends AbstractForwardIndexCreator {
   private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 

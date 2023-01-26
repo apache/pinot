@@ -21,11 +21,14 @@ package org.apache.pinot.segment.local.segment.creator.impl.inv.text;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,6 +69,11 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
     }
   }
 
+  public LuceneFSTIndexCreator(IndexCreationContext context)
+      throws IOException {
+    this(context.getIndexDir(), context.getFieldSpec().getName(), (String[]) context.getSortedUniqueElementsArray());
+  }
+
   // Expects dictionary entries in sorted order.
   @Override
   public void add(String document) {
@@ -80,6 +88,18 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
   @Override
   public void add(String[] documents, int length) {
     throw new UnsupportedOperationException("Multiple values not supported");
+  }
+
+  @Override
+  public void addSingleValueCell(@Nonnull Object value, int dictId)
+      throws IOException {
+    // This method should do nothing
+  }
+
+  @Override
+  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds)
+      throws IOException {
+    // This method should do nothing
   }
 
   @Override
