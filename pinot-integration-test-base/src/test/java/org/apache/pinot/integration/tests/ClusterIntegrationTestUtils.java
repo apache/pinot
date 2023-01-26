@@ -286,7 +286,7 @@ public class ClusterIntegrationTestUtils {
       org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
       throws Exception {
     // Test segment with space and special character in the file name
-    buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex + "_", segmentDir, tarDir);
+    buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex + " %", segmentDir, tarDir);
   }
 
   /**

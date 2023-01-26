@@ -26,6 +26,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
  * Interface for creating and loading the {@link SegmentDirectory} instance using provided config
  */
 public interface SegmentDirectoryLoader {
+
   /**
    * Creates the {@link SegmentDirectory} instance
    * @param indexDir index directory
