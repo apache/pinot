@@ -48,10 +48,8 @@ public class MutableDataSource extends BaseDataSource {
       @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector, int maxRowLengthInBytes) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, cardinality,
-            partitionFunction,
-            partitions, minValue, maxValue, maxRowLengthInBytes), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex,
-        fstIndex,
-        jsonIndex, h3Index, bloomFilter, nullValueVector);
+            partitionFunction, partitions, minValue, maxValue, maxRowLengthInBytes), forwardIndex, dictionary,
+        invertedIndex, rangeIndex, textIndex, fstIndex, jsonIndex, h3Index, bloomFilter, nullValueVector);
   }
 
   private static class MutableDataSourceMetadata implements DataSourceMetadata {
@@ -140,6 +138,8 @@ public class MutableDataSource extends BaseDataSource {
       return _cardinality;
     }
 
-    public int getMaxRowLengthInBytes() { return _maxRowLengthInBytes; }
+    public int getMaxRowLengthInBytes() {
+      return _maxRowLengthInBytes;
+    }
   }
 }

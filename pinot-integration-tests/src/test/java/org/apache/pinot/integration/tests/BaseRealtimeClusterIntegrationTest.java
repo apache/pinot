@@ -95,7 +95,8 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
       return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime", "RandomAirports",
           "DivTotalGTimes", "DaysSinceEpoch");
     } else {
-      return super.getNoDictionaryColumns();
+      return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime", "RandomAirports",
+          "DivTotalGTimes");
     }
   }
 

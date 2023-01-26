@@ -1267,6 +1267,7 @@ public class MutableSegmentImpl implements MutableSegment {
      * https://github.com/apache/pinot/issues/10127 for more details.
      */
     void updateVarByteMVMaxRowLengthInBytes(Object entry, DataType dataType) {
+      // MV support for BigDecimal is not available.
       if (dataType != STRING && dataType != BYTES) {
         return;
       }
@@ -1298,7 +1299,6 @@ public class MutableSegmentImpl implements MutableSegment {
         default:
           throw new IllegalStateException("Invalid type=" + dataType);
       }
-
     }
   }
 

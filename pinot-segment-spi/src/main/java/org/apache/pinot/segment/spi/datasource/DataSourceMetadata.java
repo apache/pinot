@@ -105,5 +105,7 @@ public interface DataSourceMetadata {
    * Returns the max row length in bytes for a var byte MV column. {@code -1} if not applicable.
    * @return
    */
-  default int getMaxRowLengthInBytes() { return -1; }
+  default int getMaxRowLengthInBytes() {
+    return -1;
+  }
 }
