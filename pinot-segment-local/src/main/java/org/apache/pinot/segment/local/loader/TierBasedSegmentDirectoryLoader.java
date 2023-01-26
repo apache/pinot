@@ -26,6 +26,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -215,5 +216,10 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
           tableNameWithType, segmentTier, e.getMessage());
       return null;
     }
+  }
+
+  @Override
+  public boolean needsTierMigration(String targetTier, String currentTier) {
+    return !StringUtils.equals(targetTier, currentTier);
   }
 }
