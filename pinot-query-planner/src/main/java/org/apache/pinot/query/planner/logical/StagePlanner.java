@@ -61,10 +61,9 @@ public class StagePlanner {
    * Construct the dispatchable plan from relational logical plan.
    *
    * @param relRoot relational plan root.
-   * @param options configured per-query options that affect planning
    * @return dispatchable plan.
    */
-  public QueryPlan makePlan(RelRoot relRoot, Map<String, String> options) {
+  public QueryPlan makePlan(RelRoot relRoot) {
     RelNode relRootNode = relRoot.rel;
     // Stage ID starts with 1, 0 will be reserved for ROOT stage.
     _stageIdCounter = 1;
@@ -86,7 +85,7 @@ public class StagePlanner {
 
     // assign workers to each stage.
     for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
-      _workerManager.assignWorkerToStage(e.getKey(), e.getValue(), _requestId, options);
+      _workerManager.assignWorkerToStage(e.getKey(), e.getValue(), _requestId, _plannerContext.getOptions());
     }
 
     // Run physical optimizations
