@@ -32,10 +32,10 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -220,7 +220,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       metadataProperties = createForwardIndexForMVColumn();
     }
 
-    LoaderUtils.writeIndexToV3Format(_segmentWriter, _columnName, _forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+    LoaderUtils.writeIndexToV3Format(_segmentWriter, _columnName, _forwardIndexFile, StandardIndexes.forward());
 
     try {
       // Update the metadata even for temporary forward index as other IndexHandlers may rely on the updated metadata
@@ -247,7 +247,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         LOGGER.info("Clean up indexes no longer needed or which need to be rewritten for segment: {}, column: {}",
             segmentName, _columnName);
         // Delete the dictionary
-        _segmentWriter.removeIndex(_columnName, ColumnIndexType.DICTIONARY);
+        _segmentWriter.removeIndex(_columnName, StandardIndexes.dictionary());
 
         // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
         // handler will take care of recreating the index.

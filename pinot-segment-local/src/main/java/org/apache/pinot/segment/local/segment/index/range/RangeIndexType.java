@@ -19,6 +19,8 @@
 
 package org.apache.pinot.segment.local.segment.index.range;
 
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -44,6 +46,11 @@ public class RangeIndexType implements IndexType<Object, IndexReader, IndexCreat
   @Override
   public String getIndexName() {
     return "range_index";
+  }
+
+  @Override
+  public String getFileExtension(ColumnMetadata columnMetadata) {
+    return V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
   }
 
   @Override

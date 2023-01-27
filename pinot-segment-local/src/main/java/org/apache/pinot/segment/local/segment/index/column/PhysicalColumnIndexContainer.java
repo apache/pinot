@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.segment.index.readers.OnHeapLongDictionary
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapStringDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -52,7 +53,6 @@ import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.provider.IndexReaderProvider;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.slf4j.Logger;
@@ -88,15 +88,15 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     boolean loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
     BloomFilterConfig bloomFilterConfig = indexLoadingConfig.getBloomFilterConfigs().get(columnName);
 
-    if (segmentReader.hasIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR)) {
-      PinotDataBuffer nullValueVectorBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR);
+    if (segmentReader.hasIndexFor(columnName, StandardIndexes.nullValueVector())) {
+      PinotDataBuffer nullValueVectorBuffer = segmentReader.getIndexFor(columnName, StandardIndexes.nullValueVector());
       _nullValueVectorReader = new NullValueVectorReaderImpl(nullValueVectorBuffer);
     } else {
       _nullValueVectorReader = null;
     }
 
     if (loadTextIndex && segmentIndexDir != null) {
-      Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.TEXT_INDEX));
+      Preconditions.checkState(segmentReader.hasIndexFor(columnName, StandardIndexes.text()));
       Map<String, Map<String, String>> columnProperties = indexLoadingConfig.getColumnProperties();
       _textIndex = indexReaderProvider.newTextIndexReader(segmentIndexDir, metadata, columnProperties.get(columnName));
     } else {
@@ -104,30 +104,30 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
 
     if (loadJsonIndex) {
-      Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.JSON_INDEX));
-      PinotDataBuffer jsonIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.JSON_INDEX);
+      Preconditions.checkState(segmentReader.hasIndexFor(columnName, StandardIndexes.json()));
+      PinotDataBuffer jsonIndexBuffer = segmentReader.getIndexFor(columnName, StandardIndexes.json());
       _jsonIndex = indexReaderProvider.newJsonIndexReader(jsonIndexBuffer, metadata);
     } else {
       _jsonIndex = null;
     }
 
     if (loadH3Index) {
-      Preconditions.checkState(segmentReader.hasIndexFor(columnName, ColumnIndexType.H3_INDEX));
-      PinotDataBuffer h3IndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.H3_INDEX);
+      Preconditions.checkState(segmentReader.hasIndexFor(columnName, StandardIndexes.h3()));
+      PinotDataBuffer h3IndexBuffer = segmentReader.getIndexFor(columnName, StandardIndexes.h3());
       _h3Index = indexReaderProvider.newGeospatialIndexReader(h3IndexBuffer, metadata);
     } else {
       _h3Index = null;
     }
 
     if (bloomFilterConfig != null) {
-      PinotDataBuffer bloomFilterBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.BLOOM_FILTER);
+      PinotDataBuffer bloomFilterBuffer = segmentReader.getIndexFor(columnName, StandardIndexes.bloomFilter());
       _bloomFilter = indexReaderProvider.newBloomFilterReader(bloomFilterBuffer, bloomFilterConfig.isLoadOnHeap());
     } else {
       _bloomFilter = null;
     }
 
     if (loadRangeIndex && !metadata.isSorted()) {
-      PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX);
+      PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, StandardIndexes.range());
       _rangeIndex = indexReaderProvider.newRangeIndexReader(buffer, metadata);
     } else {
       _rangeIndex = null;
@@ -135,12 +135,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
     // Setting the 'fwdIndexBuffer' to null if forward index is disabled
     PinotDataBuffer fwdIndexBuffer =
-        segmentReader.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX) ? segmentReader.getIndexFor(columnName,
-            ColumnIndexType.FORWARD_INDEX) : null;
+        segmentReader.hasIndexFor(columnName, StandardIndexes.forward()) ? segmentReader.getIndexFor(columnName,
+            StandardIndexes.forward()) : null;
 
     if (metadata.hasDictionary()) {
       // Dictionary-based index
-      _dictionary = loadDictionary(segmentReader.getIndexFor(columnName, ColumnIndexType.DICTIONARY), metadata,
+      _dictionary = loadDictionary(segmentReader.getIndexFor(columnName, StandardIndexes.dictionary()), metadata,
           loadOnHeapDictionary);
       if (metadata.isSingleValue()) {
         // Single-value
@@ -162,13 +162,13 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
       if (loadInvertedIndex) {
         _invertedIndex = indexReaderProvider.newInvertedIndexReader(
-            segmentReader.getIndexFor(columnName, ColumnIndexType.INVERTED_INDEX), metadata);
+            segmentReader.getIndexFor(columnName, StandardIndexes.inverted()), metadata);
       } else {
         _invertedIndex = null;
       }
 
       if (loadFSTIndex) {
-        PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FST_INDEX);
+        PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, StandardIndexes.fst());
         _fstIndex = indexReaderProvider.newFSTIndexReader(buffer, metadata);
       } else {
         _fstIndex = null;

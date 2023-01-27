@@ -40,10 +40,11 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -127,27 +128,27 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getBuffer(String column, ColumnIndexType type)
+  public PinotDataBuffer getBuffer(String column, IndexType<?, ?, ?> type)
       throws IOException {
     return checkAndGetIndexBuffer(column, type);
   }
 
   @Override
-  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
+  public PinotDataBuffer newBuffer(String column, IndexType<?, ?, ?> type, long sizeBytes)
       throws IOException {
-    return allocNewBufferInternal(column, type, sizeBytes, type.name().toLowerCase() + ".create");
+    return allocNewBufferInternal(column, type, sizeBytes, type.getIndexName().toLowerCase() + ".create");
   }
 
   @Override
-  public boolean hasIndexFor(String column, ColumnIndexType type) {
-    if (type == ColumnIndexType.TEXT_INDEX) {
+  public boolean hasIndexFor(String column, IndexType<?, ?, ?> type) {
+    if (type.equals(StandardIndexes.text())) {
       return TextIndexUtils.hasTextIndex(_segmentDirectory, column);
     }
     IndexKey key = new IndexKey(column, type);
     return _columnEntries.containsKey(key);
   }
 
-  private PinotDataBuffer checkAndGetIndexBuffer(String column, ColumnIndexType type) {
+  private PinotDataBuffer checkAndGetIndexBuffer(String column, IndexType<?, ?, ?> type) {
     IndexKey key = new IndexKey(column, type);
     IndexEntry entry = _columnEntries.get(key);
     if (entry == null || entry._buffer == null) {
@@ -159,7 +160,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   // This is using extra resources right now which can be changed.
-  private PinotDataBuffer allocNewBufferInternal(String column, ColumnIndexType indexType, long size, String context)
+  private PinotDataBuffer allocNewBufferInternal(String column, IndexType<?, ?, ?> indexType, long size, String context)
       throws IOException {
 
     IndexKey key = new IndexKey(column, indexType);
@@ -217,7 +218,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
     for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
       String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _segmentDirectory.getPath());
-      IndexKey indexKey = new IndexKey(parsedKeys[0], ColumnIndexType.getValue(parsedKeys[1]));
+      IndexKey indexKey = IndexKey.fromIndexName(parsedKeys[0], parsedKeys[1]);
       IndexEntry entry = _columnEntries.get(indexKey);
       if (entry == null) {
         entry = new IndexEntry(indexKey);
@@ -356,9 +357,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public void removeIndex(String columnName, ColumnIndexType indexType) {
+  public void removeIndex(String columnName, IndexType<?, ?, ?> indexType) {
     // Text index is kept in its own files, thus can be removed directly.
-    if (indexType == ColumnIndexType.TEXT_INDEX) {
+    if (indexType.equals(StandardIndexes.text())) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
       return;
     }
@@ -370,10 +371,10 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public Set<String> getColumnsWithIndex(ColumnIndexType type) {
+  public Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type) {
     Set<String> columns = new HashSet<>();
     // TEXT_INDEX is not tracked via _columnEntries, so handled separately.
-    if (type == ColumnIndexType.TEXT_INDEX) {
+    if (type.equals(StandardIndexes.text())) {
       for (String column : _segmentMetadata.getAllColumns()) {
         if (TextIndexUtils.hasTextIndex(_segmentDirectory, column)) {
           columns.add(column);

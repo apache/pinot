@@ -19,6 +19,8 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -38,6 +40,11 @@ public class DictionaryIndexType implements IndexType<Object, IndexReader, Index
   @Override
   public String getIndexName() {
     return "dictionary";
+  }
+
+  @Override
+  public String getFileExtension(ColumnMetadata columnMetadata) {
+    return V1Constants.Dict.FILE_EXTENSION;
   }
 
   @Override

@@ -19,6 +19,8 @@
 
 package org.apache.pinot.segment.local.segment.index.fst;
 
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -39,6 +41,12 @@ public class FstIndexType implements IndexType<Object, IndexReader, IndexCreator
   public String getIndexName() {
     return "fst_index";
   }
+
+  @Override
+  public String getFileExtension(ColumnMetadata columnMetadata) {
+    return V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+  }
+
   @Override
   public String toString() {
     return getId();

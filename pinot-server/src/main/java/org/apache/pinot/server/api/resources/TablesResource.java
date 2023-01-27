@@ -82,8 +82,8 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -259,7 +259,7 @@ public class TablesResource {
               int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
-            for (Map.Entry<ColumnIndexType, Long> entry : columnMetadata.getIndexSizeMap().entrySet()) {
+            for (Map.Entry<IndexType<?, ?, ?>, Long> entry : columnMetadata.getIndexSizeMap().entrySet()) {
               String indexName = entry.getKey().getIndexName();
               Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
               Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + entry.getValue();

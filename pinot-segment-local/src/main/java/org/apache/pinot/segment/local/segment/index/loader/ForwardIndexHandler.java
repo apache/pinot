@@ -51,11 +51,12 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -87,8 +88,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(ForwardIndexHandler.class);
 
   // This should contain a list of all indexes that need to be rewritten if the dictionary is enabled or disabled
-  private static final List<ColumnIndexType> DICTIONARY_BASED_INDEXES_TO_REWRITE =
-      Arrays.asList(ColumnIndexType.RANGE_INDEX, ColumnIndexType.FST_INDEX, ColumnIndexType.INVERTED_INDEX);
+  private static final List<IndexType<?, ?, ?>> DICTIONARY_BASED_INDEXES_TO_REWRITE =
+      Arrays.asList(StandardIndexes.range(), StandardIndexes.fst(), StandardIndexes.inverted());
 
   private final Schema _schema;
 
@@ -141,7 +142,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           // forward index here which is dictionary based and allow the post deletion step handle the actual deletion
           // of the forward index.
           createDictBasedForwardIndex(column, segmentWriter, indexCreatorProvider);
-          if (!segmentWriter.hasIndexFor(column, ColumnIndexType.FORWARD_INDEX)) {
+          if (!segmentWriter.hasIndexFor(column, StandardIndexes.forward())) {
             throw new IOException(String.format("Temporary forward index was not created for column: %s", column));
           }
           _tmpForwardIndexColumns.add(column);
@@ -149,7 +150,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         case ENABLE_FORWARD_INDEX_FOR_DICT_COLUMN: {
           createForwardIndexIfNeeded(segmentWriter, column, indexCreatorProvider, false);
-          if (!segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
+          if (!segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
             throw new IOException(
                 String.format("Dictionary should still exist after rebuilding forward index for dictionary column: %s",
                     column));
@@ -158,7 +159,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         case ENABLE_FORWARD_INDEX_FOR_RAW_COLUMN: {
           createForwardIndexIfNeeded(segmentWriter, column, indexCreatorProvider, false);
-          if (segmentWriter.hasIndexFor(column, ColumnIndexType.DICTIONARY)) {
+          if (segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
             throw new IOException(
                 String.format("Dictionary should not exist after rebuilding forward index for raw column: %s", column));
           }
@@ -195,7 +196,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // From existing column config.
     Set<String> existingAllColumns = _segmentDirectory.getSegmentMetadata().getAllColumns();
     Set<String> existingDictColumns =
-        segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.DICTIONARY);
+        segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.dictionary());
     Set<String> existingNoDictColumns = new HashSet<>();
     for (String column : existingAllColumns) {
       if (!existingDictColumns.contains(column)) {
@@ -205,7 +206,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     // Get list of columns with forward index and those without forward index
     Set<String> existingForwardIndexColumns =
-        segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.FORWARD_INDEX);
+        segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.forward());
     Set<String> existingForwardIndexDisabledColumns = new HashSet<>();
     for (String column : existingAllColumns) {
       if (!existingForwardIndexColumns.contains(column)) {
@@ -385,8 +386,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // anymore. Note that removeIndex() will only mark an index for removal and remove the in-memory state. The
     // actual cleanup from columns.psf file will happen when singleFileIndexDirectory.cleanupRemovedIndices() is
     // called during segmentWriter.close().
-    segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
-    LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, ColumnIndexType.FORWARD_INDEX);
+    segmentWriter.removeIndex(column, StandardIndexes.forward());
+    LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
 
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
@@ -734,7 +735,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         getStatsCollector(column, existingColMetadata.getDataType().getStoredType());
     SegmentDictionaryCreator dictionaryCreator =
         buildDictionary(column, existingColMetadata, segmentWriter, statsCollector);
-    LoaderUtils.writeIndexToV3Format(segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
+    LoaderUtils.writeIndexToV3Format(segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
 
     LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
         segmentName, column);
@@ -745,8 +746,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // anymore. Note that removeIndex() will only mark an index for removal and remove the in-memory state. The
     // actual cleanup from columns.psf file will happen when singleFileIndexDirectory.cleanupRemovedIndices() is
     // called during segmentWriter.close().
-    segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
-    LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, ColumnIndexType.FORWARD_INDEX);
+    segmentWriter.removeIndex(column, StandardIndexes.forward());
+    LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
 
     LOGGER.info("Created forwardIndex. Updating metadata properties for segment={} and column={}", segmentName, column);
     Map<String, String> metadataProperties = new HashMap<>();
@@ -853,9 +854,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     rewriteDictToRawForwardIndex(column, existingColMetadata, segmentWriter, indexDir, indexCreatorProvider);
 
     // Remove dictionary and forward index
-    segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
-    segmentWriter.removeIndex(column, ColumnIndexType.DICTIONARY);
-    LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, ColumnIndexType.FORWARD_INDEX);
+    segmentWriter.removeIndex(column, StandardIndexes.forward());
+    segmentWriter.removeIndex(column, StandardIndexes.dictionary());
+    LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
 
     LOGGER.info("Created raw forwardIndex. Updating metadata properties for segment={} and column={}", segmentName,
         column);

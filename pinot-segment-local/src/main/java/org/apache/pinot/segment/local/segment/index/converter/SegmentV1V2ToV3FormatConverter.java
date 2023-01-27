@@ -36,12 +36,13 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -153,19 +154,19 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       try (SegmentDirectory.Reader v2DataReader = v2Segment.createReader();
           SegmentDirectory.Writer v3DataWriter = v3Segment.createWriter()) {
         for (String column : allColumns) {
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.DICTIONARY);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.FORWARD_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.NULLVALUE_VECTOR);
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, StandardIndexes.dictionary());
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, StandardIndexes.forward());
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, StandardIndexes.nullValueVector());
         }
 
         // Other indexes are intentionally stored at the end of the single file
         for (String column : allColumns) {
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.INVERTED_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.FST_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.JSON_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.H3_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.RANGE_INDEX);
-          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.BLOOM_FILTER);
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, StandardIndexes.inverted());
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, StandardIndexes.fst());
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, StandardIndexes.json());
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, StandardIndexes.h3());
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, StandardIndexes.range());
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, StandardIndexes.bloomFilter());
         }
 
         v3DataWriter.save();
@@ -176,7 +177,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   }
 
   private void copyIndexIfExists(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
-      ColumnIndexType indexType)
+      IndexType indexType)
       throws IOException {
     if (reader.hasIndexFor(column, indexType)) {
       readCopyBuffers(reader, writer, column, indexType);
@@ -194,7 +195,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   }
 
   private void readCopyBuffers(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
-      ColumnIndexType indexType)
+      IndexType indexType)
       throws IOException {
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
     long oldBufferSize = oldBuffer.size();

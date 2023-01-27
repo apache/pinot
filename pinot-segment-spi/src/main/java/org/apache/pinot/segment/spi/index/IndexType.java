@@ -151,9 +151,7 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
     throw new UnsupportedOperationException();
   }
 
-  default String getFileExtension(ColumnMetadata columnMetadata) {
-    throw new UnsupportedOperationException();
-  }
+  String getFileExtension(ColumnMetadata columnMetadata);
 
   /**
    * Returns whether the index is stored as a buffer or not.

@@ -47,12 +47,13 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
@@ -376,7 +377,7 @@ public class SegmentPreProcessorTest {
         Collections.emptyList());
     checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
         true, 0, DataType.STRING, 100000);
-    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_INT_COL_RAW, 42242, 16, _schema, false, false, false, 0, true,
+    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, 42242, 16, _schema, false, false, false, 0, true,
         0, ChunkCompressionType.LZ4, false, DataType.INT, 100000);
 
     // Convert the segment to V3.
@@ -433,9 +434,9 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.getTextIndexColumns().add(EXISTING_STRING_COL_RAW);
     checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, null, true, 0,
         DataType.STRING, 100000);
-    validateIndex(ColumnIndexType.INVERTED_INDEX, EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, true,
+    validateIndex(StandardIndexes.inverted(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, true,
         0, null, false, DataType.STRING, 100000);
-    validateIndex(ColumnIndexType.TEXT_INDEX, EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, true, 0,
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, true, 0,
         null, false, DataType.STRING, 100000);
 
     // TEST 2: EXISTING_STRING_COL_RAW. Enable dictionary on a raw column that already has text index.
@@ -444,13 +445,13 @@ public class SegmentPreProcessorTest {
     constructV1Segment(Collections.emptyList(), textIndexCols, Collections.emptyList(),
         Collections.emptyList());
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
-    validateIndex(ColumnIndexType.TEXT_INDEX, EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true, 0,
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true, 0,
         null, false, DataType.STRING, 100000);
 
     // At this point, the segment has text index. Now, the reload path should create a dictionary.
     checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, null, true, 0,
         DataType.STRING, 100000);
-    validateIndex(ColumnIndexType.TEXT_INDEX, EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, true, 0,
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, true, 0,
         null, false, DataType.STRING, 100000);
     // Add it back so that this column is not rewritten for the other tests below.
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_RAW);
@@ -460,22 +461,22 @@ public class SegmentPreProcessorTest {
     rangeIndexCols.add(EXISTING_INT_COL_RAW);
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), rangeIndexCols, Collections.emptyList());
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW, 42242, 16, _schema, false, false, false, 0, true,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16, _schema, false, false, false, 0, true,
         0, ChunkCompressionType.LZ4, false, DataType.INT, 100000);
     long oldRangeIndexSize =
         new SegmentMetadataImpl(_indexDir).getColumnMetadataFor(EXISTING_INT_COL_RAW).getIndexSizeMap()
-            .get(ColumnIndexType.RANGE_INDEX);
+            .get(StandardIndexes.range());
     // At this point, the segment has range index. Now the reload path should create a dictionary and rewrite the
     // range index.
     _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_INT_COL_RAW);
     _indexLoadingConfig.getRangeIndexColumns().add(EXISTING_INT_COL_RAW);
     checkForwardIndexCreation(EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, null, true, 0,
         DataType.INT, 100000);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, true, 0,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, true, 0,
         null, false, DataType.INT, 100000);
     long newRangeIndexSize =
         new SegmentMetadataImpl(_indexDir).getColumnMetadataFor(EXISTING_INT_COL_RAW).getIndexSizeMap()
-            .get(ColumnIndexType.RANGE_INDEX);
+            .get(StandardIndexes.range());
     assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
     // Add it back so that this column is not rewritten for the other tests below.
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW);
@@ -497,9 +498,9 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.getRangeIndexColumns().add(EXISTING_INT_COL_RAW_MV);
     checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
         DataType.INT, 106688);
-    validateIndex(ColumnIndexType.INVERTED_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
+    validateIndex(StandardIndexes.inverted(), EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
         false, 13, null, false, DataType.INT, 106688);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
         false, 13, null, false, DataType.INT, 106688);
 
     // TEST 2: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column that already has range index.
@@ -507,16 +508,16 @@ public class SegmentPreProcessorTest {
     rangeIndexCols.add(EXISTING_INT_COL_RAW_MV);
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), rangeIndexCols, Collections.emptyList());
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
-    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
         false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
         false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
 
     // Enable dictionary.
     _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_INT_COL_RAW_MV);
     checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
         DataType.INT, 106688);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
         false, 13, null, false, DataType.INT, 106688);
   }
 
@@ -528,7 +529,7 @@ public class SegmentPreProcessorTest {
         Collections.emptyList());
     checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26, null, true, 0,
         DataType.STRING, 100000);
-    validateIndex(ColumnIndexType.FORWARD_INDEX, COLUMN10_NAME, 3960, 12, _schema, false, true, false, 0, true, 0, null,
+    validateIndex(StandardIndexes.forward(), COLUMN10_NAME, 3960, 12, _schema, false, true, false, 0, true, 0, null,
         false, DataType.INT, 100000);
 
     // Convert the segment to V3.
@@ -570,33 +571,33 @@ public class SegmentPreProcessorTest {
     rangeIndexCols.add(COLUMN10_NAME);
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), rangeIndexCols, Collections.emptyList());
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
-    validateIndex(ColumnIndexType.FORWARD_INDEX, COLUMN10_NAME, 3960, 12, _schema, false, true, false, 0, true, 0, null,
+    validateIndex(StandardIndexes.forward(), COLUMN10_NAME, 3960, 12, _schema, false, true, false, 0, true, 0, null,
         false, DataType.INT, 100000);
-    validateIndex(ColumnIndexType.RANGE_INDEX, COLUMN10_NAME, 3960, 12, _schema, false, true, false, 0, true, 0, null,
+    validateIndex(StandardIndexes.range(), COLUMN10_NAME, 3960, 12, _schema, false, true, false, 0, true, 0, null,
         false, DataType.INT, 100000);
     long oldRangeIndexSize = new SegmentMetadataImpl(_indexDir).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeMap()
-        .get(ColumnIndexType.RANGE_INDEX);
+        .get(StandardIndexes.range());
 
 
     _indexLoadingConfig.getNoDictionaryColumns().add(COLUMN10_NAME);
     _indexLoadingConfig.getRangeIndexColumns().add(COLUMN10_NAME);
     checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4, true,
         0, DataType.INT, 100000);
-    validateIndex(ColumnIndexType.RANGE_INDEX, COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, true, 0,
+    validateIndex(StandardIndexes.range(), COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, true, 0,
         ChunkCompressionType.LZ4, false, DataType.INT, 100000);
     long newRangeIndexSize = new SegmentMetadataImpl(_indexDir).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeMap()
-        .get(ColumnIndexType.RANGE_INDEX);
+        .get(StandardIndexes.range());
     assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
 
     // TEST4: Disable dictionary but add text index.
-    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26, true,
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26, true,
         0, null, false, DataType.STRING, 100000);
 
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_STRING_COL_DICT);
     _indexLoadingConfig.getTextIndexColumns().add(EXISTING_STRING_COL_DICT);
     checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
         true, 0, DataType.STRING, 100000);
-    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, true,
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, true,
         0, null, false, DataType.STRING, 100000);
   }
 
@@ -612,29 +613,29 @@ public class SegmentPreProcessorTest {
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
     checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
         DataType.INT, 106688);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0,
         false, 13, null, false, DataType.INT, 106688);
 
     // TEST 1: Disable dictionary on a column where range index is already enabled.
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_INT_COL_RAW_MV);
     checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0, null, false, 13,
         DataType.INT, 106688);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0,
         false, 13, null, false, DataType.INT, 106688);
 
     // TEST 2. Disable dictionary on a column where inverted index is enabled. Should be a no-op.
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
         Collections.emptyList());
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
-    validateIndex(ColumnIndexType.FORWARD_INDEX, COLUMN7_NAME, 359, 9, _newColumnsSchemaWithForwardIndexDisabled, false,
+    validateIndex(StandardIndexes.forward(), COLUMN7_NAME, 359, 9, _newColumnsSchemaWithForwardIndexDisabled, false,
         true, false, 0, false, 24, null, false, DataType.INT, 134090);
-    validateIndex(ColumnIndexType.INVERTED_INDEX, COLUMN7_NAME, 359, 9, _newColumnsSchemaWithForwardIndexDisabled,
+    validateIndex(StandardIndexes.inverted(), COLUMN7_NAME, 359, 9, _newColumnsSchemaWithForwardIndexDisabled,
         false, true, false, 0, false, 24, null, false, DataType.INT, 134090);
 
     _indexLoadingConfig.getNoDictionaryColumns().add(COLUMN7_NAME);
     checkForwardIndexCreation(COLUMN7_NAME, 359, 9, _schema, false, true, false, 0, null, false, 24, DataType.INT,
         134090);
-    validateIndex(ColumnIndexType.INVERTED_INDEX, COLUMN7_NAME, 359, 9, _newColumnsSchemaWithForwardIndexDisabled,
+    validateIndex(StandardIndexes.inverted(), COLUMN7_NAME, 359, 9, _newColumnsSchemaWithForwardIndexDisabled,
         false, true, false, 0, false, 24, null, false, DataType.INT, 134090);
 
     // TEST 3: Disable dictionary and disable inverted index on column7.
@@ -682,7 +683,7 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
     assertNotNull(columnMetadata);
     checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0);
-    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
         0, newCompressionType, false, DataType.STRING, 100000);
 
     // Test4: Change compression on RAW index column. Change another index on another column. Check correctness.
@@ -699,7 +700,7 @@ public class SegmentPreProcessorTest {
     // Check FST index
     checkFSTIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _newColumnsSchemaWithFST, false, false, 26);
     // Check forward index.
-    validateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
         0, newCompressionType, false, DataType.STRING, 100000);
 
     // Test5: Change compressionType for an MV column
@@ -816,14 +817,14 @@ public class SegmentPreProcessorTest {
   private void checkFSTIndexCreation(String column, int cardinality, int bits, Schema schema, boolean isAutoGenerated,
       boolean isSorted, int dictionaryElementSize)
       throws Exception {
-    createAndValidateIndex(ColumnIndexType.FST_INDEX, column, cardinality, bits, schema, isAutoGenerated, true,
+    createAndValidateIndex(StandardIndexes.fst(), column, cardinality, bits, schema, isAutoGenerated, true,
         isSorted, dictionaryElementSize, true, 0, null, false, DataType.STRING, 100000);
   }
 
   private void checkTextIndexCreation(String column, int cardinality, int bits, Schema schema, boolean isAutoGenerated,
       boolean hasDictionary, boolean isSorted, int dictionaryElementSize)
       throws Exception {
-    createAndValidateIndex(ColumnIndexType.TEXT_INDEX, column, cardinality, bits, schema, isAutoGenerated,
+    createAndValidateIndex(StandardIndexes.text(), column, cardinality, bits, schema, isAutoGenerated,
         hasDictionary, isSorted, dictionaryElementSize, true, 0, null, false, DataType.STRING, 100000);
   }
 
@@ -831,7 +832,7 @@ public class SegmentPreProcessorTest {
       boolean hasDictionary, boolean isSorted, int dictionaryElementSize, boolean isSingleValue,
       int maxNumberOfMultiValues)
       throws Exception {
-    createAndValidateIndex(ColumnIndexType.TEXT_INDEX, column, cardinality, bits, schema, isAutoGenerated,
+    createAndValidateIndex(StandardIndexes.text(), column, cardinality, bits, schema, isAutoGenerated,
         hasDictionary, isSorted, dictionaryElementSize, isSingleValue, maxNumberOfMultiValues, null, false,
         DataType.STRING, 100000);
   }
@@ -841,12 +842,12 @@ public class SegmentPreProcessorTest {
       ChunkCompressionType expectedCompressionType, boolean isSingleValue, int maxNumberOfMultiValues,
       DataType dataType, int totalNumberOfEntries)
       throws Exception {
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, column, cardinality, bits, schema, isAutoGenerated,
+    createAndValidateIndex(StandardIndexes.forward(), column, cardinality, bits, schema, isAutoGenerated,
         hasDictionary, isSorted, dictionaryElementSize, isSingleValue, maxNumberOfMultiValues, expectedCompressionType,
         false, dataType, totalNumberOfEntries);
   }
 
-  private void createAndValidateIndex(ColumnIndexType indexType, String column, int cardinality, int bits,
+  private void createAndValidateIndex(IndexType<?, ?, ?> indexType, String column, int cardinality, int bits,
       Schema schema, boolean isAutoGenerated, boolean hasDictionary, boolean isSorted, int dictionaryElementSize,
       boolean isSingleValued, int maxNumberOfMultiValues, ChunkCompressionType expectedCompressionType,
       boolean forwardIndexDisabled, DataType dataType, int totalNumberOfEntries)
@@ -863,7 +864,7 @@ public class SegmentPreProcessorTest {
     }
   }
 
-  private void validateIndex(ColumnIndexType indexType, String column, int cardinality, int bits, Schema schema,
+  private void validateIndex(IndexType<?, ?, ?> indexType, String column, int cardinality, int bits, Schema schema,
       boolean isAutoGenerated, boolean hasDictionary, boolean isSorted, int dictionaryElementSize,
       boolean isSingleValued, int maxNumberOfMultiValues, ChunkCompressionType expectedCompressionType,
       boolean forwardIndexDisabled, DataType dataType, int totalNumberOfEntries)
@@ -885,21 +886,21 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(),
             new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
         SegmentDirectory.Reader reader = segmentDirectory1.createReader()) {
-      if (indexType != ColumnIndexType.FORWARD_INDEX || !forwardIndexDisabled) {
+      if (indexType != StandardIndexes.forward() || !forwardIndexDisabled) {
         assertTrue(reader.hasIndexFor(column, indexType));
       }
       if (isSingleValued && isSorted && forwardIndexDisabled) {
         // Disabling the forward index for sorted columns should be a no-op
-        assertTrue(reader.hasIndexFor(column, ColumnIndexType.FORWARD_INDEX));
-        assertFalse(reader.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX));
+        assertTrue(reader.hasIndexFor(column, StandardIndexes.forward()));
+        assertFalse(reader.hasIndexFor(column, StandardIndexes.inverted()));
       } else if (forwardIndexDisabled) {
         if (segmentMetadata.getVersion() == SegmentVersion.v3 || isAutoGenerated) {
-          assertFalse(reader.hasIndexFor(column, ColumnIndexType.FORWARD_INDEX));
-          assertTrue(reader.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX));
-          assertTrue(reader.hasIndexFor(column, ColumnIndexType.DICTIONARY));
+          assertFalse(reader.hasIndexFor(column, StandardIndexes.forward()));
+          assertTrue(reader.hasIndexFor(column, StandardIndexes.inverted()));
+          assertTrue(reader.hasIndexFor(column, StandardIndexes.dictionary()));
         } else {
           // Updating dictionary or forward index for existing columns not supported for v1 segments yet
-          assertTrue(reader.hasIndexFor(column, ColumnIndexType.FORWARD_INDEX));
+          assertTrue(reader.hasIndexFor(column, StandardIndexes.forward()));
         }
       }
 
@@ -932,14 +933,14 @@ public class SegmentPreProcessorTest {
       // if the text index is enabled on a new column with dictionary,
       // then dictionary should be created by the default column handler
       if (hasDictionary) {
-        assertTrue(reader.hasIndexFor(column, ColumnIndexType.DICTIONARY));
+        assertTrue(reader.hasIndexFor(column, StandardIndexes.dictionary()));
       } else {
-        assertFalse(reader.hasIndexFor(column, ColumnIndexType.DICTIONARY));
+        assertFalse(reader.hasIndexFor(column, StandardIndexes.dictionary()));
       }
     }
   }
 
-  private void validateIndexDoesNotExist(String column, ColumnIndexType indexType)
+  private void validateIndexDoesNotExist(String column, IndexType<?, ?, ?> indexType)
       throws Exception {
     try (SegmentDirectory segmentDirectory1 = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(_indexDir.toURI(),
@@ -1026,8 +1027,8 @@ public class SegmentPreProcessorTest {
             new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       // 8 bytes overhead is for checking integrity of the segment.
-      addedLength += reader.getIndexFor(COLUMN1_NAME, ColumnIndexType.INVERTED_INDEX).size() + 8;
-      addedLength += reader.getIndexFor(COLUMN13_NAME, ColumnIndexType.INVERTED_INDEX).size() + 8;
+      addedLength += reader.getIndexFor(COLUMN1_NAME, StandardIndexes.inverted()).size() + 8;
+      addedLength += reader.getIndexFor(COLUMN13_NAME, StandardIndexes.inverted()).size() + 8;
     }
     FileTime newLastModifiedTime = Files.getLastModifiedTime(singleFileIndex.toPath());
     assertTrue(newLastModifiedTime.compareTo(lastModifiedTime) > 0);
@@ -1050,15 +1051,15 @@ public class SegmentPreProcessorTest {
             new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       if (reCreate) {
-        assertTrue(reader.hasIndexFor(COLUMN1_NAME, ColumnIndexType.INVERTED_INDEX));
-        assertTrue(reader.hasIndexFor(COLUMN13_NAME, ColumnIndexType.INVERTED_INDEX));
-        assertTrue(reader.hasIndexFor(COLUMN7_NAME, ColumnIndexType.INVERTED_INDEX));
-        assertFalse(reader.hasIndexFor(NO_SUCH_COLUMN_NAME, ColumnIndexType.INVERTED_INDEX));
+        assertTrue(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.inverted()));
+        assertTrue(reader.hasIndexFor(COLUMN13_NAME, StandardIndexes.inverted()));
+        assertTrue(reader.hasIndexFor(COLUMN7_NAME, StandardIndexes.inverted()));
+        assertFalse(reader.hasIndexFor(NO_SUCH_COLUMN_NAME, StandardIndexes.inverted()));
       } else {
-        assertFalse(reader.hasIndexFor(COLUMN1_NAME, ColumnIndexType.INVERTED_INDEX));
-        assertTrue(reader.hasIndexFor(COLUMN7_NAME, ColumnIndexType.INVERTED_INDEX));
-        assertFalse(reader.hasIndexFor(COLUMN13_NAME, ColumnIndexType.INVERTED_INDEX));
-        assertFalse(reader.hasIndexFor(NO_SUCH_COLUMN_NAME, ColumnIndexType.INVERTED_INDEX));
+        assertFalse(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.inverted()));
+        assertTrue(reader.hasIndexFor(COLUMN7_NAME, StandardIndexes.inverted()));
+        assertFalse(reader.hasIndexFor(COLUMN13_NAME, StandardIndexes.inverted()));
+        assertFalse(reader.hasIndexFor(NO_SUCH_COLUMN_NAME, StandardIndexes.inverted()));
       }
     }
 
@@ -1073,10 +1074,10 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(),
             new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-      assertTrue(reader.hasIndexFor(COLUMN1_NAME, ColumnIndexType.INVERTED_INDEX));
-      assertTrue(reader.hasIndexFor(COLUMN13_NAME, ColumnIndexType.INVERTED_INDEX));
-      assertTrue(reader.hasIndexFor(COLUMN7_NAME, ColumnIndexType.INVERTED_INDEX));
-      assertFalse(reader.hasIndexFor(NO_SUCH_COLUMN_NAME, ColumnIndexType.INVERTED_INDEX));
+      assertTrue(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.inverted()));
+      assertTrue(reader.hasIndexFor(COLUMN13_NAME, StandardIndexes.inverted()));
+      assertTrue(reader.hasIndexFor(COLUMN7_NAME, StandardIndexes.inverted()));
+      assertFalse(reader.hasIndexFor(NO_SUCH_COLUMN_NAME, StandardIndexes.inverted()));
     }
   }
 
@@ -1248,27 +1249,27 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(),
             new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-      assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, ColumnIndexType.DICTIONARY));
-      assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX));
-      assertTrue(reader.hasIndexFor(NEW_LONG_METRIC_COLUMN_NAME, ColumnIndexType.DICTIONARY));
-      assertTrue(reader.hasIndexFor(NEW_LONG_METRIC_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX));
-      assertTrue(reader.hasIndexFor(NEW_FLOAT_METRIC_COLUMN_NAME, ColumnIndexType.DICTIONARY));
-      assertTrue(reader.hasIndexFor(NEW_FLOAT_METRIC_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX));
-      assertTrue(reader.hasIndexFor(NEW_DOUBLE_METRIC_COLUMN_NAME, ColumnIndexType.DICTIONARY));
-      assertTrue(reader.hasIndexFor(NEW_DOUBLE_METRIC_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX));
-      assertTrue(reader.hasIndexFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME, ColumnIndexType.DICTIONARY));
-      assertTrue(reader.hasIndexFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX));
-      assertTrue(reader.hasIndexFor(NEW_INT_SV_DIMENSION_COLUMN_NAME, ColumnIndexType.DICTIONARY));
-      assertTrue(reader.hasIndexFor(NEW_INT_SV_DIMENSION_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX));
-      assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, ColumnIndexType.DICTIONARY));
-      assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX));
+      assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, StandardIndexes.dictionary()));
+      assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, StandardIndexes.forward()));
+      assertTrue(reader.hasIndexFor(NEW_LONG_METRIC_COLUMN_NAME, StandardIndexes.dictionary()));
+      assertTrue(reader.hasIndexFor(NEW_LONG_METRIC_COLUMN_NAME, StandardIndexes.forward()));
+      assertTrue(reader.hasIndexFor(NEW_FLOAT_METRIC_COLUMN_NAME, StandardIndexes.dictionary()));
+      assertTrue(reader.hasIndexFor(NEW_FLOAT_METRIC_COLUMN_NAME, StandardIndexes.forward()));
+      assertTrue(reader.hasIndexFor(NEW_DOUBLE_METRIC_COLUMN_NAME, StandardIndexes.dictionary()));
+      assertTrue(reader.hasIndexFor(NEW_DOUBLE_METRIC_COLUMN_NAME, StandardIndexes.forward()));
+      assertTrue(reader.hasIndexFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME, StandardIndexes.dictionary()));
+      assertTrue(reader.hasIndexFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME, StandardIndexes.forward()));
+      assertTrue(reader.hasIndexFor(NEW_INT_SV_DIMENSION_COLUMN_NAME, StandardIndexes.dictionary()));
+      assertTrue(reader.hasIndexFor(NEW_INT_SV_DIMENSION_COLUMN_NAME, StandardIndexes.forward()));
+      assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, StandardIndexes.dictionary()));
+      assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, StandardIndexes.forward()));
 
-      assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
-      assertTrue(reader.hasIndexFor(NEW_LONG_METRIC_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
-      assertTrue(reader.hasIndexFor(NEW_FLOAT_METRIC_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
-      assertTrue(reader.hasIndexFor(NEW_DOUBLE_METRIC_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
-      assertTrue(reader.hasIndexFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
-      assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, ColumnIndexType.NULLVALUE_VECTOR));
+      assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, StandardIndexes.nullValueVector()));
+      assertTrue(reader.hasIndexFor(NEW_LONG_METRIC_COLUMN_NAME, StandardIndexes.nullValueVector()));
+      assertTrue(reader.hasIndexFor(NEW_FLOAT_METRIC_COLUMN_NAME, StandardIndexes.nullValueVector()));
+      assertTrue(reader.hasIndexFor(NEW_DOUBLE_METRIC_COLUMN_NAME, StandardIndexes.nullValueVector()));
+      assertTrue(reader.hasIndexFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME, StandardIndexes.nullValueVector()));
+      assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, StandardIndexes.nullValueVector()));
     }
 
     // Use the second schema and update default value again.
@@ -1485,11 +1486,11 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(),
             new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-      addedLength += reader.getIndexFor(strColumn, ColumnIndexType.INVERTED_INDEX).size() + 8;
-      addedLength += reader.getIndexFor(strColumn, ColumnIndexType.RANGE_INDEX).size() + 8;
-      addedLength += reader.getIndexFor(strColumn, ColumnIndexType.FST_INDEX).size() + 8;
-      addedLength += reader.getIndexFor(strColumn, ColumnIndexType.BLOOM_FILTER).size() + 8;
-      assertTrue(reader.hasIndexFor(strColumn, ColumnIndexType.TEXT_INDEX));
+      addedLength += reader.getIndexFor(strColumn, StandardIndexes.inverted()).size() + 8;
+      addedLength += reader.getIndexFor(strColumn, StandardIndexes.range()).size() + 8;
+      addedLength += reader.getIndexFor(strColumn, StandardIndexes.fst()).size() + 8;
+      addedLength += reader.getIndexFor(strColumn, StandardIndexes.bloomFilter()).size() + 8;
+      assertTrue(reader.hasIndexFor(strColumn, StandardIndexes.text()));
     }
     assertEquals(singleFileIndex.length(), initFileSize + addedLength);
 
@@ -1600,8 +1601,8 @@ public class SegmentPreProcessorTest {
         .load(_indexDir.toURI(),
             new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-      addedLength += reader.getIndexFor("newH3Col", ColumnIndexType.H3_INDEX).size() + 8;
-      addedLength += reader.getIndexFor("newJsonCol", ColumnIndexType.JSON_INDEX).size() + 8;
+      addedLength += reader.getIndexFor("newH3Col", StandardIndexes.h3()).size() + 8;
+      addedLength += reader.getIndexFor("newJsonCol", StandardIndexes.json()).size() + 8;
     }
     assertEquals(singleFileIndex.length(), initFileSize + addedLength);
 
@@ -1906,7 +1907,7 @@ public class SegmentPreProcessorTest {
 
     // Forward index is always going to be present for default SV columns with forward index disabled. This is because
     // such default columns are going to be sorted and the forwardIndexDisabled flag is a no-op for sorted columns
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
+    createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
         _newColumnsSchemaWithForwardIndexDisabled, true, true, true, 4, true, 0, null, true, DataType.STRING, 100000);
 
     // Create a segment in V1, add a column with no forward index enabled
@@ -1919,7 +1920,7 @@ public class SegmentPreProcessorTest {
 
     // Forward index is always going to be present for default SV columns with forward index disabled. This is because
     // such default columns are going to be sorted and the forwardIndexDisabled flag is a no-op for sorted columns
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
+    createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
         _newColumnsSchemaWithForwardIndexDisabled, true, true, true, 4, true, 0, null, true, DataType.STRING, 100000);
 
     // Add the column to the no dictionary column list
@@ -1934,7 +1935,7 @@ public class SegmentPreProcessorTest {
     assertNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
+      createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
           _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, false, DataType.STRING,
           100000);
       Assert.fail("Forward index cannot be disabled for dictionary disabled columns!");
@@ -1951,7 +1952,7 @@ public class SegmentPreProcessorTest {
     assertNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
+      createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
           _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, false, DataType.STRING,
           100000);
       Assert.fail("Forward index cannot be disabled for dictionary disabled columns!");
@@ -1976,7 +1977,7 @@ public class SegmentPreProcessorTest {
 
     // Column should be sorted and should be created successfully since for SV columns the forwardIndexDisabled flag
     // is a no-op
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX,
+    createAndValidateIndex(StandardIndexes.forward(),
         NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1, _newColumnsSchemaWithForwardIndexDisabled, true, true, true,
         4, true, 0, null, false, DataType.STRING, 100000);
 
@@ -1989,7 +1990,7 @@ public class SegmentPreProcessorTest {
 
     // Column should be sorted and should be created successfully since for SV columns the forwardIndexDisabled flag
     // is a no-op
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
+    createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
         _newColumnsSchemaWithForwardIndexDisabled, true, true, true, 4, true, 0, null, false, DataType.STRING, 100000);
 
     // Reset the sorted column list
@@ -2007,7 +2008,7 @@ public class SegmentPreProcessorTest {
     assertNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
+      createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
           _newColumnsSchemaWithForwardIndexDisabled, true, true, true, 4, true, 0, null, false, DataType.STRING,
           100000);
       Assert.fail("Forward index cannot be disabled without enabling the inverted index!");
@@ -2024,7 +2025,7 @@ public class SegmentPreProcessorTest {
     assertNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
+      createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
           _newColumnsSchemaWithForwardIndexDisabled, true, true, true, 4, true, 0, null, false, DataType.STRING,
           100000);
       Assert.fail("Should not be able to disable forward index without inverted index for column");
@@ -2057,9 +2058,9 @@ public class SegmentPreProcessorTest {
     assertNull(columnMetadata);
 
     // Validate that the forward index doesn't exist and that inverted index does exist
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
+    createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
         _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, true, DataType.STRING, 100000);
-    createAndValidateIndex(ColumnIndexType.INVERTED_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
+    createAndValidateIndex(StandardIndexes.inverted(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
         _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, true, DataType.STRING, 100000);
 
     // Create a segment in V1, add a column with no forward index enabled
@@ -2071,9 +2072,9 @@ public class SegmentPreProcessorTest {
     assertNull(columnMetadata);
 
     // Validate that the forward index doesn't exist and that inverted index does exist
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
+    createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
         _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, true, DataType.STRING, 100000);
-    createAndValidateIndex(ColumnIndexType.INVERTED_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
+    createAndValidateIndex(StandardIndexes.inverted(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
         _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, true, DataType.STRING, 100000);
 
     // Add the column to the no dictionary column list
@@ -2088,7 +2089,7 @@ public class SegmentPreProcessorTest {
     assertNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
+      createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
           _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, false, DataType.STRING,
           100000);
       Assert.fail("Should not be able to disable forward index for raw column");
@@ -2105,7 +2106,7 @@ public class SegmentPreProcessorTest {
     assertNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
+      createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
           _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, false, DataType.STRING,
           100000);
       Assert.fail("Should not be able to disable forward index for raw column");
@@ -2129,7 +2130,7 @@ public class SegmentPreProcessorTest {
     assertNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
+      createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
           _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, false, DataType.STRING,
           100000);
       Assert.fail("Should not be able to disable forward index for raw column");
@@ -2146,7 +2147,7 @@ public class SegmentPreProcessorTest {
     assertNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
+      createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
           _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, false, DataType.STRING,
           100000);
       Assert.fail("Should not be able to disable forward index for raw column");
@@ -2176,14 +2177,14 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_DICT);
     assertNotNull(columnMetadata);
 
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
         100000);
 
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
         Collections.emptyList());
 
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
         100000);
 
@@ -2196,7 +2197,7 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+      createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4,
           _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
           100000);
     } catch (IllegalStateException e) {
@@ -2215,7 +2216,7 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+      createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4,
           _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
           100000);
     } catch (IllegalStateException e) {
@@ -2240,10 +2241,10 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata2 = segmentMetadata.getColumnMetadataFor(COLUMN7_NAME);
     assertNotNull(columnMetadata2);
 
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, COLUMN7_NAME, 359, 9,
+    createAndValidateIndex(StandardIndexes.forward(), COLUMN7_NAME, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, true, DataType.INT,
         134090);
 
@@ -2265,19 +2266,19 @@ public class SegmentPreProcessorTest {
     columnMetadata2 = segmentMetadata.getColumnMetadataFor(COLUMN1_NAME);
     assertNotNull(columnMetadata2);
 
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
         100000);
-    createAndValidateIndex(ColumnIndexType.TEXT_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    createAndValidateIndex(StandardIndexes.text(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
         100000);
-    createAndValidateIndex(ColumnIndexType.FST_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    createAndValidateIndex(StandardIndexes.fst(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, COLUMN1_NAME, 51594, 16,
+    createAndValidateIndex(StandardIndexes.forward(), COLUMN1_NAME, 51594, 16,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
-    createAndValidateIndex(ColumnIndexType.RANGE_INDEX, COLUMN1_NAME, 51594, 16,
+    createAndValidateIndex(StandardIndexes.range(), COLUMN1_NAME, 51594, 16,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
 
@@ -2306,7 +2307,7 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
     assertNotNull(columnMetadata);
 
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_RAW, 5, 3,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 4, true, 0, null, true, DataType.STRING,
         100000);
 
@@ -2314,7 +2315,7 @@ public class SegmentPreProcessorTest {
         Collections.emptyList());
 
     // No dictionary is created nor is the forward index disabled since this is a v1 type segment
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_RAW, 5, 3,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, null, true, DataType.STRING,
         100000);
 
@@ -2327,7 +2328,7 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_RAW, 5, 3,
+      createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3,
           _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, null, true, DataType.STRING,
           100000);
     } catch (IllegalStateException e) {
@@ -2346,7 +2347,7 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata);
 
     try {
-      createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_RAW, 5, 3,
+      createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3,
           _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, null, true, DataType.STRING,
           100000);
     } catch (IllegalStateException e) {
@@ -2373,10 +2374,10 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata2 = segmentMetadata.getColumnMetadataFor(EXISTING_INT_COL_RAW_MV);
     assertNotNull(columnMetadata2);
 
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_RAW, 5, 3,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 4, true, 0, null, true, DataType.STRING,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_INT_COL_RAW_MV, 18499, 15,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, 18499, 15,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 13, null, true, DataType.INT,
         106688);
 
@@ -2400,19 +2401,19 @@ public class SegmentPreProcessorTest {
     columnMetadata2 = segmentMetadata.getColumnMetadataFor(EXISTING_INT_COL_RAW);
     assertNotNull(columnMetadata2);
 
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_RAW, 5, 3,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 4, true, 0, null, true, DataType.STRING,
         100000);
-    createAndValidateIndex(ColumnIndexType.TEXT_INDEX, EXISTING_STRING_COL_RAW, 5, 3,
+    createAndValidateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, 3,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 4, true, 0, null, true, DataType.STRING,
         100000);
-    createAndValidateIndex(ColumnIndexType.FST_INDEX, EXISTING_STRING_COL_RAW, 5, 3,
+    createAndValidateIndex(StandardIndexes.fst(), EXISTING_STRING_COL_RAW, 5, 3,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 4, true, 0, null, true, DataType.STRING,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_INT_COL_RAW, 42242, 16,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, 42242, 16,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
-    createAndValidateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW, 42242, 16,
+    createAndValidateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
 
@@ -2432,7 +2433,7 @@ public class SegmentPreProcessorTest {
     rangeIndexCols.add(EXISTING_INT_COL_RAW);
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), rangeIndexCols, Collections.emptyList());
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW, 42242, 16, _schema, false, false, false, 0, true,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16, _schema, false, false, false, 0, true,
         0, ChunkCompressionType.LZ4, false, DataType.INT, 100000);
 
     // At this point, the segment has range index. Now the reload path should disable the forward index create a
@@ -2443,10 +2444,10 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.getRangeIndexColumns().add(EXISTING_INT_COL_RAW);
     _indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
 
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_INT_COL_RAW, 42242, 16,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, 42242, 16,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_INT_COL_RAW, 42242, 16,
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
 
@@ -2475,7 +2476,7 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata);
 
     // Forward index should be disabled for column10
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
 
@@ -2484,13 +2485,13 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
 
     // Forward index should be enabled for column10 along with inverted index and dictionary
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    validateIndex(ColumnIndexType.DICTIONARY, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    validateIndex(StandardIndexes.dictionary(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    validateIndex(ColumnIndexType.INVERTED_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    validateIndex(StandardIndexes.inverted(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
 
@@ -2509,7 +2510,7 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata);
 
     // Forward index should be disabled for column10
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
 
@@ -2520,13 +2521,13 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.getInvertedIndexColumns().remove(EXISTING_FORWARD_INDEX_DISABLED_COL_SV);
 
     // Forward index should be enabled for column10 dictionary. Inverted index should be disabled.
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    validateIndex(ColumnIndexType.DICTIONARY, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    validateIndex(StandardIndexes.dictionary(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, ColumnIndexType.INVERTED_INDEX);
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, StandardIndexes.inverted());
 
     // Enable the forward index for two columns at once, one being a MV column
     forwardIndexDisabledColumns = new HashSet<>(Arrays.asList(EXISTING_FORWARD_INDEX_DISABLED_COL_SV,
@@ -2545,10 +2546,10 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata2);
 
     // Forward index should be disabled for column10 and column7
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, true, DataType.INT,
         134090);
 
@@ -2558,22 +2559,22 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
 
     // Forward index should be enabled for column10 and column7 along with inverted index and dictionary
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    validateIndex(ColumnIndexType.DICTIONARY, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    validateIndex(StandardIndexes.dictionary(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    validateIndex(ColumnIndexType.INVERTED_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    validateIndex(StandardIndexes.inverted(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, false, DataType.INT,
         134090);
-    validateIndex(ColumnIndexType.DICTIONARY, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    validateIndex(StandardIndexes.dictionary(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, false, DataType.INT,
         134090);
-    validateIndex(ColumnIndexType.INVERTED_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    validateIndex(StandardIndexes.inverted(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, false, DataType.INT,
         134090);
 
@@ -2597,13 +2598,13 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata3);
 
     // Forward index should be disabled for column10 and column7
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, true, DataType.INT,
         134090);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
         100000);
 
@@ -2618,41 +2619,41 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.getInvertedIndexColumns().remove(EXISTING_FORWARD_INDEX_DISABLED_COL_MV);
 
     // Forward index should be enabled for column10 and column7 along with inverted index and dictionary
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    validateIndex(ColumnIndexType.DICTIONARY, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    validateIndex(StandardIndexes.dictionary(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    validateIndex(ColumnIndexType.INVERTED_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    validateIndex(StandardIndexes.inverted(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    validateIndex(StandardIndexes.range(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, false, DataType.INT,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, false, DataType.INT,
         134090);
-    validateIndex(ColumnIndexType.DICTIONARY, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    validateIndex(StandardIndexes.dictionary(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, false, DataType.INT,
         134090);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_MV, ColumnIndexType.INVERTED_INDEX);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_MV, StandardIndexes.inverted());
+    validateIndex(StandardIndexes.range(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, false, DataType.INT,
         134090);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, false, DataType.STRING,
         100000);
-    validateIndex(ColumnIndexType.DICTIONARY, EXISTING_STRING_COL_DICT, 9, 4,
+    validateIndex(StandardIndexes.dictionary(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, false, DataType.STRING,
         100000);
-    validateIndex(ColumnIndexType.INVERTED_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    validateIndex(StandardIndexes.inverted(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, false, DataType.STRING,
         100000);
-    validateIndex(ColumnIndexType.TEXT_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, false, DataType.STRING,
         100000);
-    validateIndex(ColumnIndexType.FST_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    validateIndex(StandardIndexes.fst(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, false, DataType.STRING,
         100000);
 
@@ -2686,7 +2687,7 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata);
 
     // Forward index should be disabled for column10
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
 
@@ -2698,11 +2699,11 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_FORWARD_INDEX_DISABLED_COL_SV);
 
     // Forward index should be enabled for column10. Dictionary and inverted index shouldn't be present.
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, ChunkCompressionType.LZ4, false,
         DataType.INT, 100000);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, ColumnIndexType.DICTIONARY);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, ColumnIndexType.INVERTED_INDEX);
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, StandardIndexes.dictionary());
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, StandardIndexes.inverted());
 
     // Reset indexLoadingConfig
     _indexLoadingConfig.getNoDictionaryColumns().remove(EXISTING_FORWARD_INDEX_DISABLED_COL_SV);
@@ -2724,10 +2725,10 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata2);
 
     // Forward index should be disabled for column10 and column7
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, true, DataType.INT,
         134090);
 
@@ -2741,16 +2742,16 @@ public class SegmentPreProcessorTest {
         EXISTING_FORWARD_INDEX_DISABLED_COL_MV));
 
     // Forward index should be enabled for column10 and column7. No dictionary or inverted index should exist.
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, ChunkCompressionType.LZ4, false,
         DataType.INT, 100000);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, ColumnIndexType.DICTIONARY);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, ColumnIndexType.INVERTED_INDEX);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, StandardIndexes.dictionary());
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, StandardIndexes.inverted());
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, false, 24, ChunkCompressionType.LZ4, false,
         DataType.INT, 134090);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_MV, ColumnIndexType.DICTIONARY);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_MV, ColumnIndexType.INVERTED_INDEX);
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_MV, StandardIndexes.dictionary());
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_MV, StandardIndexes.inverted());
 
     // Reset indexLoadingConfig
     _indexLoadingConfig.getNoDictionaryColumns().removeAll(Arrays.asList(EXISTING_FORWARD_INDEX_DISABLED_COL_SV,
@@ -2773,10 +2774,10 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata2);
 
     // Forward index should be disabled for column10 and column7
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, true, DataType.INT,
         134090);
 
@@ -2788,18 +2789,18 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.getNoDictionaryColumns().add(EXISTING_FORWARD_INDEX_DISABLED_COL_SV);
 
     // Forward index should be enabled for column10 and column7. No dictionary or inverted index should exist.
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, ChunkCompressionType.LZ4, false,
         DataType.INT, 100000);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, ColumnIndexType.DICTIONARY);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, ColumnIndexType.INVERTED_INDEX);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, StandardIndexes.dictionary());
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, StandardIndexes.inverted());
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, false, DataType.INT,
         134090);
-    validateIndex(ColumnIndexType.DICTIONARY, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    validateIndex(StandardIndexes.dictionary(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, false, DataType.INT,
         134090);
-    validateIndex(ColumnIndexType.INVERTED_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    validateIndex(StandardIndexes.inverted(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, false, DataType.INT,
         134090);
 
@@ -2827,13 +2828,13 @@ public class SegmentPreProcessorTest {
     assertNotNull(columnMetadata3);
 
     // Forward index should be disabled for column10 and column7
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, true, 0, null, true, DataType.INT,
         100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 0, false, 24, null, true, DataType.INT,
         134090);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, true, false, 26, true, 0, null, true, DataType.STRING,
         100000);
 
@@ -2850,28 +2851,28 @@ public class SegmentPreProcessorTest {
         EXISTING_FORWARD_INDEX_DISABLED_COL_MV, EXISTING_STRING_COL_DICT));
 
     // Forward index should be enabled for column10 and column7. Dictionary and inverted index should not exist
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, ChunkCompressionType.LZ4, false,
         DataType.INT, 100000);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, ColumnIndexType.DICTIONARY);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, ColumnIndexType.INVERTED_INDEX);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, StandardIndexes.dictionary());
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_SV, StandardIndexes.inverted());
+    validateIndex(StandardIndexes.range(), EXISTING_FORWARD_INDEX_DISABLED_COL_SV, 3960, 12,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, ChunkCompressionType.LZ4, false,
         DataType.INT, 100000);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, false, 24, ChunkCompressionType.LZ4, false,
         DataType.INT, 134090);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_MV, ColumnIndexType.DICTIONARY);
-    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_MV, ColumnIndexType.INVERTED_INDEX);
-    validateIndex(ColumnIndexType.RANGE_INDEX, EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_MV, StandardIndexes.dictionary());
+    validateIndexDoesNotExist(EXISTING_FORWARD_INDEX_DISABLED_COL_MV, StandardIndexes.inverted());
+    validateIndex(StandardIndexes.range(), EXISTING_FORWARD_INDEX_DISABLED_COL_MV, 359, 9,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, false, 24, ChunkCompressionType.LZ4, false,
         DataType.INT, 134090);
-    createAndValidateIndex(ColumnIndexType.FORWARD_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    createAndValidateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, ChunkCompressionType.LZ4, false,
         DataType.STRING, 100000);
-    validateIndexDoesNotExist(EXISTING_STRING_COL_DICT, ColumnIndexType.DICTIONARY);
-    validateIndexDoesNotExist(EXISTING_STRING_COL_DICT, ColumnIndexType.INVERTED_INDEX);
-    validateIndex(ColumnIndexType.TEXT_INDEX, EXISTING_STRING_COL_DICT, 9, 4,
+    validateIndexDoesNotExist(EXISTING_STRING_COL_DICT, StandardIndexes.dictionary());
+    validateIndexDoesNotExist(EXISTING_STRING_COL_DICT, StandardIndexes.inverted());
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_DICT, 9, 4,
         _newColumnsSchemaWithForwardIndexDisabled, false, false, false, 0, true, 0, ChunkCompressionType.LZ4, false,
         DataType.STRING, 100000);
 

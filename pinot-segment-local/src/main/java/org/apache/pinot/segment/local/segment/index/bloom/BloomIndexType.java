@@ -19,6 +19,8 @@
 
 package org.apache.pinot.segment.local.segment.index.bloom;
 
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
@@ -35,6 +37,11 @@ public class BloomIndexType implements IndexType<Object, BloomFilterReader, Inde
   @Override
   public String getIndexName() {
     return "bloom_filter";
+  }
+
+  @Override
+  public String getFileExtension(ColumnMetadata columnMetadata) {
+    return V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
   }
 
   @Override

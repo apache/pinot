@@ -19,6 +19,8 @@
 
 package org.apache.pinot.segment.local.segment.index.h3;
 
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -39,6 +41,11 @@ public class H3IndexType implements IndexType<Object, IndexReader, IndexCreator>
   @Override
   public String getIndexName() {
     return "h3_index";
+  }
+
+  @Override
+  public String getFileExtension(ColumnMetadata columnMetadata) {
+    return V1Constants.Indexes.H3_INDEX_FILE_EXTENSION;
   }
 
   @Override

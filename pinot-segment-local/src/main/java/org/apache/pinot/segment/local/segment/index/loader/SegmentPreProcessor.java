@@ -34,10 +34,11 @@ import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
@@ -105,7 +106,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Update single-column indices, like inverted index, json index etc.
       IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
       List<IndexHandler> indexHandlers = new ArrayList<>();
-      for (ColumnIndexType type : ColumnIndexType.values()) {
+      for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
         IndexHandler handler =
             IndexHandlerFactory.getIndexHandler(type, _segmentDirectory, _indexLoadingConfig, _schema);
         indexHandlers.add(handler);
@@ -164,7 +165,7 @@ public class SegmentPreProcessor implements AutoCloseable {
         }
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
-      for (ColumnIndexType type : ColumnIndexType.values()) {
+      for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
         if (IndexHandlerFactory.getIndexHandler(type, _segmentDirectory, _indexLoadingConfig, _schema)
             .needUpdateIndices(segmentReader)) {
           LOGGER.info("Found index type: {} needs updates", type);

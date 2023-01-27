@@ -19,6 +19,8 @@
 
 package org.apache.pinot.segment.local.segment.index.text;
 
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -42,5 +44,10 @@ public class TextIndexType implements IndexType<Object, IndexReader, IndexCreato
   @Override
   public String toString() {
     return getId();
+  }
+
+  @Override
+  public String getFileExtension(ColumnMetadata columnMetadata) {
+    return V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
   }
 }

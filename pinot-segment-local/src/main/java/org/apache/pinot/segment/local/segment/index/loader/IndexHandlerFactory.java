@@ -26,7 +26,8 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.JsonInd
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.Schema;
 
@@ -50,27 +51,33 @@ public class IndexHandlerFactory {
     }
   };
 
-  public static IndexHandler getIndexHandler(ColumnIndexType type, SegmentDirectory segmentDirectory,
+  public static IndexHandler getIndexHandler(IndexType<?, ?, ?> type, SegmentDirectory segmentDirectory,
       IndexLoadingConfig indexLoadingConfig, Schema schema) {
-    switch (type) {
-      case INVERTED_INDEX:
-        return new InvertedIndexHandler(segmentDirectory, indexLoadingConfig);
-      case RANGE_INDEX:
-        return new RangeIndexHandler(segmentDirectory, indexLoadingConfig);
-      case TEXT_INDEX:
-        return new TextIndexHandler(segmentDirectory, indexLoadingConfig);
-      case FST_INDEX:
-        return new FSTIndexHandler(segmentDirectory, indexLoadingConfig);
-      case JSON_INDEX:
-        return new JsonIndexHandler(segmentDirectory, indexLoadingConfig);
-      case H3_INDEX:
-        return new H3IndexHandler(segmentDirectory, indexLoadingConfig);
-      case BLOOM_FILTER:
-        return new BloomFilterHandler(segmentDirectory, indexLoadingConfig);
-      case FORWARD_INDEX:
-        return new ForwardIndexHandler(segmentDirectory, indexLoadingConfig, schema);
-      default:
-        return NO_OP_HANDLER;
+    // TODO(index-spi): this will change once index handler creation is moved to IndexType
+    if (type.equals(StandardIndexes.inverted())) {
+      return new InvertedIndexHandler(segmentDirectory, indexLoadingConfig);
     }
+    if (type.equals(StandardIndexes.range())) {
+      return new RangeIndexHandler(segmentDirectory, indexLoadingConfig);
+    }
+    if (type.equals(StandardIndexes.text())) {
+      return new TextIndexHandler(segmentDirectory, indexLoadingConfig);
+    }
+    if (type.equals(StandardIndexes.fst())) {
+      return new FSTIndexHandler(segmentDirectory, indexLoadingConfig);
+    }
+    if (type.equals(StandardIndexes.json())) {
+      return new JsonIndexHandler(segmentDirectory, indexLoadingConfig);
+    }
+    if (type.equals(StandardIndexes.h3())) {
+      return new H3IndexHandler(segmentDirectory, indexLoadingConfig);
+    }
+    if (type.equals(StandardIndexes.bloomFilter())) {
+      return new BloomFilterHandler(segmentDirectory, indexLoadingConfig);
+    }
+    if (type.equals(StandardIndexes.forward())) {
+      return new ForwardIndexHandler(segmentDirectory, indexLoadingConfig, schema);
+    }
+    return NO_OP_HANDLER;
   }
 }

@@ -19,6 +19,8 @@
 
 package org.apache.pinot.segment.local.segment.index.nullvalue;
 
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -39,6 +41,11 @@ public class NullValueIndexType implements IndexType<Object, IndexReader, IndexC
   @Override
   public String getIndexName() {
     return "nullvalue_vector";
+  }
+
+  @Override
+  public String getFileExtension(ColumnMetadata columnMetadata) {
+    return V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
   }
 
   @Override

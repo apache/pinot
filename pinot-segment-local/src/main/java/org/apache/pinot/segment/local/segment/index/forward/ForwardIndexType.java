@@ -19,6 +19,8 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -39,6 +41,23 @@ public class ForwardIndexType implements IndexType<Object, IndexReader, IndexCre
   @Override
   public String getIndexName() {
     return "forward_index";
+  }
+
+  @Override
+  public String getFileExtension(ColumnMetadata columnMetadata) {
+    if (columnMetadata.isSingleValue()) {
+      if (!columnMetadata.hasDictionary()) {
+        return V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
+      } else if (columnMetadata.isSorted()) {
+        return V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+      } else {
+        return V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+      }
+    } else if (!columnMetadata.hasDictionary()) {
+      return V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
+    } else {
+      return V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
+    }
   }
 
   @Override

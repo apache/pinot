@@ -38,11 +38,11 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -290,7 +290,7 @@ public class LoaderTest {
         new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_pinotConfiguration).build());
     SegmentDirectory.Reader reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
-    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
+    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, StandardIndexes.fst()));
     indexSegment.destroy();
 
     // CASE 2: set the segment version to load in IndexLoadingConfig as V3
@@ -307,7 +307,7 @@ public class LoaderTest {
         new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_pinotConfiguration).build());
     reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
-    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
+    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, StandardIndexes.fst()));
     indexSegment.destroy();
 
     // Test for scenarios by creating on-disk segment in V1 and then loading
@@ -382,7 +382,7 @@ public class LoaderTest {
         new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_pinotConfiguration).build());
     reader = segmentDir.createReader();
     Assert.assertNotNull(reader);
-    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, ColumnIndexType.FST_INDEX));
+    Assert.assertTrue(reader.hasIndexFor(FST_INDEX_COL_NAME, StandardIndexes.fst()));
     indexSegment.destroy();
   }
 

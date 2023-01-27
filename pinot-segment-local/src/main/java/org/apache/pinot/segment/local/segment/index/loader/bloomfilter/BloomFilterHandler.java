@@ -40,12 +40,12 @@ import org.apache.pinot.segment.spi.creator.BloomFilterCreatorProvider;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -68,7 +68,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
-    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.bloomFilter());
     // Check if any existing bloomfilter need to be removed.
     for (String column : existingColumns) {
       if (!columnsToAddBF.remove(column)) {
@@ -93,11 +93,11 @@ public class BloomFilterHandler extends BaseIndexHandler {
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
     // Remove indices not set in table config any more.
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
-    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.BLOOM_FILTER);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.bloomFilter());
     for (String column : existingColumns) {
       if (!columnsToAddBF.remove(column)) {
         LOGGER.info("Removing existing bloom filter from segment: {}, column: {}", segmentName, column);
-        segmentWriter.removeIndex(column, ColumnIndexType.BLOOM_FILTER);
+        segmentWriter.removeIndex(column, StandardIndexes.bloomFilter());
         LOGGER.info("Removed existing bloom filter from segment: {}, column: {}", segmentName, column);
       }
     }
@@ -281,7 +281,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
 
     // For v3, write the generated bloom filter file into the single file and remove it.
     if (_segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, bloomFilterFile, ColumnIndexType.BLOOM_FILTER);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, bloomFilterFile, StandardIndexes.bloomFilter());
     }
 
     // Delete the marker file.
@@ -293,7 +293,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
       SegmentDirectory.Writer segmentWriter)
       throws IOException {
     PinotDataBuffer dictionaryBuffer =
-        segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
+        segmentWriter.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.dictionary());
     int cardinality = columnMetadata.getCardinality();
     DataType dataType = columnMetadata.getDataType();
     switch (dataType) {
