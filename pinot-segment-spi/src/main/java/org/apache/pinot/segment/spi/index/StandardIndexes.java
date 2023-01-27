@@ -19,21 +19,47 @@
 
 package org.apache.pinot.segment.spi.index;
 
-import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
-import org.apache.pinot.spi.config.table.BloomFilterConfig;
-
-
 public class StandardIndexes {
   private StandardIndexes() {
   }
 
-  // Other methods like bloomFilter() should be created for each index.
-  // This class may be changed in the future by adding a way to override index implementations in needed, like
-  // current IndexOverrides
+  public static IndexType<?, ?, ?> forward() {
+    return IndexService.getInstance().getIndexTypeByIdOrThrow("forward");
+  }
 
-  public static IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator> bloomFilter() {
-    return (IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator>)
-        IndexService.getInstance().getIndexTypeByIdOrThrow("bloom");
+  public static IndexType<?, ?, ?> dictionary() {
+    return IndexService.getInstance().getIndexTypeByIdOrThrow("dictionary");
+  }
+
+  public static IndexType<?, ?, ?> nullValueVector() {
+    return IndexService.getInstance().getIndexTypeByIdOrThrow("nullable");
+  }
+
+  public static IndexType<?, ?, ?> bloomFilter() {
+    return IndexService.getInstance().getIndexTypeByIdOrThrow("bloom");
+  }
+
+  public static IndexType<?, ?, ?> fst() {
+    return IndexService.getInstance().getIndexTypeByIdOrThrow("fst");
+  }
+
+  public static IndexType<?, ?, ?> inverted() {
+    return IndexService.getInstance().getIndexTypeByIdOrThrow("inverted");
+  }
+
+  public static IndexType<?, ?, ?> json() {
+    return IndexService.getInstance().getIndexTypeByIdOrThrow("json");
+  }
+
+  public static IndexType<?, ?, ?> range() {
+    return IndexService.getInstance().getIndexTypeByIdOrThrow("range");
+  }
+
+  public static IndexType<?, ?, ?> text() {
+    return IndexService.getInstance().getIndexTypeByIdOrThrow("text");
+  }
+
+  public static IndexType<?, ?, ?> h3() {
+    return IndexService.getInstance().getIndexTypeByIdOrThrow("h3");
   }
 }
