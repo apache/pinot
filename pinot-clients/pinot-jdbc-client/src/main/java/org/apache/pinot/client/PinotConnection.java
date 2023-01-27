@@ -30,6 +30,7 @@ import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +42,7 @@ public class PinotConnection extends AbstractBaseConnection {
   private boolean _closed;
   private String _controllerURL;
   private PinotControllerTransport _controllerTransport;
+  private final boolean _enableNullHandling;
   public static final String BROKER_LIST = "brokers";
 
   PinotConnection(String controllerURL, PinotClientTransport transport, String tenant,
@@ -64,10 +66,16 @@ public class PinotConnection extends AbstractBaseConnection {
       brokers = getBrokerList(controllerURL, tenant);
     }
     _session = new org.apache.pinot.client.Connection(properties, brokers, transport);
+
+    _enableNullHandling = Boolean.parseBoolean(properties.getProperty(QueryOptionKey.ENABLE_NULL_HANDLING));
   }
 
   public org.apache.pinot.client.Connection getSession() {
     return _session;
+  }
+
+  public boolean isNullHandlingEnabled() {
+    return _enableNullHandling;
   }
 
   private List<String> getBrokerList(String controllerURL, String tenant) {
