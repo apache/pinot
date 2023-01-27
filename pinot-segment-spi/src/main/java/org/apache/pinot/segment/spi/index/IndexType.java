@@ -162,8 +162,8 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
     return true;
   }
 
-  default IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
+  default IndexHandler createIndexHandler(SegmentDirectory segmentDirectory,
+      Map<String, FieldIndexConfigs> configsByCol, @Nullable Schema schema, @Nullable TableConfig tableConfig) {
     throw new UnsupportedOperationException();
   }
 }
