@@ -32,8 +32,8 @@ public class StandardIndexes {
   // This class may be changed in the future by adding a way to override index implementations in needed, like
   // current IndexOverrides
 
-  public static IndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator> bloomFilter() {
-    return (IndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator>)
+  public static IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator> bloomFilter() {
+    return (IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator>)
         IndexService.getInstance().getIndexTypeByIdOrThrow("bloom");
   }
 }
