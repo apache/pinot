@@ -63,7 +63,8 @@ public class LoaderUtils {
   public static BaseImmutableDictionary getDictionary(SegmentDirectory.Reader segmentReader,
       ColumnMetadata columnMetadata)
       throws IOException {
-    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.dictionary());
+    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(),
+        StandardIndexes.dictionary());
     return PhysicalColumnIndexContainer.loadDictionary(dataBuffer, columnMetadata, false);
   }
 
