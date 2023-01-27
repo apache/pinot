@@ -43,8 +43,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Common code for metrics implementations.
- * TODO: 1. With gauge updatable, we can remove _gaugeValues 2. Remove methods with callback in name since the callback
- *   function can not be updated.
  */
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter,
     G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
@@ -58,7 +56,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   private final Class _clazz;
 
   // The purpose of having _gaugeValues is to make gauge metric updatable.
-  // Since gauge metric itself is updatable now, we can deprecate it.
+  // Since gauge metric itself is updatable now (https://github.com/apache/pinot/pull/9961), we can deprecate it.
   @Deprecated
   private final Map<String, AtomicLong> _gaugeValues = new ConcurrentHashMap<String, AtomicLong>();
 
