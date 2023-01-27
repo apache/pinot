@@ -240,7 +240,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testSanitationTransformer() {
-    RecordTransformer transformer = new SanitizationTransformer(SCHEMA);
+    RecordTransformer transformer = new SanitizationTransformer(TABLE_CONFIG, SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);

@@ -27,6 +27,7 @@ import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -38,6 +39,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class TransformPipeline {
   private final RecordTransformer _recordTransformer;
   private final ComplexTypeTransformer _complexTypeTransformer;
+  private final IngestionConfig _ingestionConfig;
 
   /**
    * Constructs a transform pipeline with customized RecordTransformer and customized ComplexTypeTransformer
@@ -48,6 +50,7 @@ public class TransformPipeline {
       @Nullable ComplexTypeTransformer complexTypeTransformer) {
     _recordTransformer = recordTransformer;
     _complexTypeTransformer = complexTypeTransformer;
+    _ingestionConfig = null;
   }
 
   /**
@@ -61,6 +64,8 @@ public class TransformPipeline {
 
     // Create complex type transformer
     _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
+
+    _ingestionConfig = tableConfig.getIngestionConfig();
   }
 
   /**
@@ -95,7 +100,7 @@ public class TransformPipeline {
 
   private void processPlainRow(GenericRow plainRow, Result reusedResult) {
     GenericRow transformedRow = _recordTransformer.transform(plainRow);
-    if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+    if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow, _ingestionConfig)) {
       reusedResult.addTransformedRows(transformedRow);
       if (Boolean.TRUE.equals(transformedRow.getValue(GenericRow.INCOMPLETE_RECORD_KEY))) {
         reusedResult.incIncompleteRowCount();

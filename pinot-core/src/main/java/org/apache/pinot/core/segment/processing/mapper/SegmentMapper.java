@@ -123,13 +123,15 @@ public class SegmentMapper {
           //noinspection unchecked
           for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
             GenericRow transformedRow = _recordTransformer.transform(row);
-            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow,
+                _processorConfig.getTableConfig().getIngestionConfig())) {
               writeRecord(transformedRow);
             }
           }
         } else {
           GenericRow transformedRow = _recordTransformer.transform(reuse);
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow,
+              _processorConfig.getTableConfig().getIngestionConfig())) {
             writeRecord(transformedRow);
           }
         }

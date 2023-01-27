@@ -47,6 +47,7 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -81,6 +82,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final MutableSegmentImpl _realtimeSegment;
   private final String _tableStreamName;
   private final StreamConfig _streamConfig;
+  private final IngestionConfig _ingestionConfig;
 
   private final long _start = System.currentTimeMillis();
   private long _segmentEndTimeThreshold;
@@ -116,6 +118,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentName = segmentZKMetadata.getSegmentName();
     _tableNameWithType = tableConfig.getTableName();
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    _ingestionConfig = tableConfig.getIngestionConfig();
+
     Preconditions
         .checkNotNull(_timeColumnName, "Must provide valid timeColumnName in tableConfig for realtime table {}",
             _tableNameWithType);
@@ -243,7 +247,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               try {
                 GenericRow transformedRow = _recordTransformer.transform(consumedRow);
                 // FIXME: handle MULTIPLE_RECORDS_KEY for HLL
-                if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+                if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow, _ingestionConfig)) {
                   // we currently do not get ingestion data through stream-consumer
                   notFull = _realtimeSegment.index(transformedRow, null);
                   exceptionSleepMillis = 50L;
