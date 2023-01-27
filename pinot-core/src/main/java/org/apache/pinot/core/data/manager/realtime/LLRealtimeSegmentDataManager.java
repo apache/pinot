@@ -560,6 +560,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         realtimeRowsDroppedMeter =
             _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
                 realtimeRowsDroppedMeter);
+        _numRowsErrored++;
       } else {
         try {
           _transformPipeline.processRow(decodedRow.getResult(), reusedResult);
@@ -569,12 +570,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           reusedResult.getTransformedRows().clear();
           String errorMessage = String.format("Caught exception while transforming the record: %s", decodedRow);
           _segmentLogger.error(errorMessage, e);
-          _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-              new SegmentErrorInfo(now(), errorMessage, e));
+          _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         }
         if (reusedResult.getSkippedRowCount() > 0) {
           realtimeRowsDroppedMeter =
-              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED,
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_FILTERED,
                   reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
         }
         if (reusedResult.getIncompleteRowCount() > 0) {
