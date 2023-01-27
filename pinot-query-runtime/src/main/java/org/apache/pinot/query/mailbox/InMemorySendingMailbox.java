@@ -66,10 +66,7 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
   public void waitForFinish(long timeout, TimeUnit unit)
       throws InterruptedException {
   }
-<<<<<<< HEAD
-=======
 
->>>>>>> 36aa71d778 (clean up)
   @Override
   public void cancel(Throwable t) {
   }

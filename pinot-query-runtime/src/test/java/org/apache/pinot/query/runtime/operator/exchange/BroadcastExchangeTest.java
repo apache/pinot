@@ -44,6 +44,7 @@ public class BroadcastExchangeTest {
   @Mock
   private SendingMailbox<TransferableBlock> _mailbox2;
 
+
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
