@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.SqlResultComparator;
@@ -393,9 +394,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Check total tasks
     assertEquals(numTasks, 5);
 
-    assertTrue(_controllerStarter.getControllerMetrics()
-        .containsGauge("mergeRollupTaskDelayInNumBuckets.myTable1_OFFLINE.100days"));
-
+    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
+        "mergeRollupTaskDelayInNumBuckets.myTable1_OFFLINE.100days"));
     // Drop the table
     dropOfflineTable(SINGLE_LEVEL_CONCAT_TEST_TABLE);
 
@@ -506,8 +506,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Check total tasks
     assertEquals(numTasks, 5);
 
-    assertTrue(_controllerStarter.getControllerMetrics()
-        .containsGauge("mergeRollupTaskDelayInNumBuckets.myTable4_OFFLINE.100days"));
+    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
+        "mergeRollupTaskDelayInNumBuckets.myTable4_OFFLINE.100days"));
 
     // Drop the table
     dropOfflineTable(SINGLE_LEVEL_CONCAT_METADATA_TEST_TABLE);
@@ -624,8 +624,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Check total tasks
     assertEquals(numTasks, 3);
 
-    assertTrue(_controllerStarter.getControllerMetrics()
-        .containsGauge("mergeRollupTaskDelayInNumBuckets.myTable2_OFFLINE.150days"));
+    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
+        "mergeRollupTaskDelayInNumBuckets.myTable2_OFFLINE.150days"));
   }
 
   /**
@@ -765,10 +765,10 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Check total tasks
     assertEquals(numTasks, 8);
 
-    assertTrue(_controllerStarter.getControllerMetrics()
-        .containsGauge("mergeRollupTaskDelayInNumBuckets.myTable3_OFFLINE.45days"));
-    assertTrue(_controllerStarter.getControllerMetrics()
-        .containsGauge("mergeRollupTaskDelayInNumBuckets.myTable3_OFFLINE.90days"));
+    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
+        "mergeRollupTaskDelayInNumBuckets.myTable3_OFFLINE.45days"));
+    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
+        "mergeRollupTaskDelayInNumBuckets.myTable3_OFFLINE.90days"));
   }
 
   protected void verifyTableDelete(String tableNameWithType) {
@@ -892,8 +892,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Check total tasks
     assertEquals(numTasks, 5);
 
-    assertTrue(_controllerStarter.getControllerMetrics()
-        .containsGauge("mergeRollupTaskDelayInNumBuckets.myTable5_REALTIME.100days"));
+    assertTrue(MetricValueUtils.gaugeExists(_controllerStarter.getControllerMetrics(),
+        "mergeRollupTaskDelayInNumBuckets.myTable5_REALTIME.100days"));
 
     // Drop the table
     dropRealtimeTable(tableName);
