@@ -16,25 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.reader;
 
-import org.apache.pinot.segment.spi.index.IndexReader;
+package org.apache.pinot.segment.spi.index;
+
+import java.io.File;
+import java.io.IOException;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 
 
-/**
- * Interface for bloom filter reader.
- */
-public interface BloomFilterReader extends IndexReader {
-
-  /**
-   * Returns {@code true} if the given value might have been put in this bloom filer, {@code false} otherwise.
-   */
-  boolean mightContain(String value);
+public interface IndexReaderFactory<R extends IndexReader> {
 
   /**
-   * Returns {@code true} if the value with the given hash might have been put in this bloom filer, {@code false}
-   * otherwise.
-   * <p>This method is provided to prevent hashing the same value multiple times.
+   * @throws IndexReaderConstraintException if the constraints of the index reader are not matched. For example, some
+   * indexes may require the column to be dictionary based.
    */
-  boolean mightContain(long hash1, long hash2);
+  @Nullable
+  R read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata,
+      File segmentDir)
+      throws IOException, IndexReaderConstraintException;
 }
