@@ -17,24 +17,33 @@
  * under the License.
  */
 
-package org.apache.pinot.segment.local.segment.index.bloom;
+package org.apache.pinot.segment.local.segment.index.range;
 
 import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 
 
-public class BloomIndexType implements IndexType<Object, BloomFilterReader, IndexCreator> {
-  public static final BloomIndexType INSTANCE = new BloomIndexType();
+public class RangeIndexType implements IndexType<Object, IndexReader, IndexCreator> {
+
+  /**
+   * The default range index version used when not specified in the TableConfig.
+   *
+   * This value should be equal to the one used in {@link org.apache.pinot.spi.config.table.IndexingConfig}
+   */
+  public static final RangeIndexType INSTANCE = new RangeIndexType();
+
+  RangeIndexType() {
+  }
 
   @Override
   public String getId() {
-    return "bloom";
+    return "range";
   }
 
   @Override
   public String getIndexName() {
-    return "bloom_filter";
+    return "range_index";
   }
 
   @Override

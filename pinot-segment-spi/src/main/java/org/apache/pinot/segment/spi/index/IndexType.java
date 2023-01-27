@@ -59,7 +59,9 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
    */
   String getIndexName();
 
-  Class<C> getIndexConfigClass();
+  default Class<C> getIndexConfigClass() {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * The default config when it is not explicitly defined by the user.
@@ -126,13 +128,17 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
    *                cardinality or the total number of documents.
    * @param indexConfig The index specific configuration that should be used.
    */
-  IC createIndexCreator(IndexCreationContext context, C indexConfig)
-      throws Exception;
+  default IC createIndexCreator(IndexCreationContext context, C indexConfig)
+      throws Exception {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Returns the {@link IndexReaderFactory} that should be used to return readers for this type.
    */
-  IndexReaderFactory<IR> getReaderFactory();
+  default IndexReaderFactory<IR> getReaderFactory() {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * This method is used to extract a compatible reader from a given ColumnIndexContainer.
@@ -142,10 +148,12 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
    */
   @Nullable
   default IR getIndexReader(ColumnIndexContainer indexContainer) {
-    return indexContainer.getIndex(this);
+    throw new UnsupportedOperationException();
   }
 
-  String getFileExtension(ColumnMetadata columnMetadata);
+  default String getFileExtension(ColumnMetadata columnMetadata) {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Returns whether the index is stored as a buffer or not.
@@ -156,6 +164,8 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
     return true;
   }
 
-  IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig);
+  default IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
+      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
+    throw new UnsupportedOperationException();
+  }
 }

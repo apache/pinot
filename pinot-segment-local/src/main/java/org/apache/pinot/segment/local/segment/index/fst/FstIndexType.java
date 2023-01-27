@@ -17,26 +17,28 @@
  * under the License.
  */
 
-package org.apache.pinot.segment.local.segment.index.bloom;
+package org.apache.pinot.segment.local.segment.index.fst;
 
 import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 
 
-public class BloomIndexType implements IndexType<Object, BloomFilterReader, IndexCreator> {
-  public static final BloomIndexType INSTANCE = new BloomIndexType();
+public class FstIndexType implements IndexType<Object, IndexReader, IndexCreator> {
+  public static final FstIndexType INSTANCE = new FstIndexType();
+
+  private FstIndexType() {
+  }
 
   @Override
   public String getId() {
-    return "bloom";
+    return "fst";
   }
 
   @Override
   public String getIndexName() {
-    return "bloom_filter";
+    return "fst_index";
   }
-
   @Override
   public String toString() {
     return getId();

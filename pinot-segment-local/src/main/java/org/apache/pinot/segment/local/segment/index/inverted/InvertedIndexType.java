@@ -17,24 +17,28 @@
  * under the License.
  */
 
-package org.apache.pinot.segment.local.segment.index.bloom;
+package org.apache.pinot.segment.local.segment.index.inverted;
 
 import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 
 
-public class BloomIndexType implements IndexType<Object, BloomFilterReader, IndexCreator> {
-  public static final BloomIndexType INSTANCE = new BloomIndexType();
+public class InvertedIndexType
+    implements IndexType<Object, IndexReader, IndexCreator> {
+  public static final InvertedIndexType INSTANCE = new InvertedIndexType();
+
+  private InvertedIndexType() {
+  }
 
   @Override
   public String getId() {
-    return "bloom";
+    return "inverted";
   }
 
   @Override
   public String getIndexName() {
-    return "bloom_filter";
+    return "inverted_index";
   }
 
   @Override
