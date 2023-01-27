@@ -30,6 +30,8 @@ import java.util.concurrent.TimeUnit;
  */
 public interface SendingMailbox<T> {
 
+  void open();
+
   /**
    * get the unique identifier for the mailbox.
    *

@@ -25,15 +25,21 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock> {
-  private final BlockingQueue<TransferableBlock> _queue;
   private final Consumer<MailboxIdentifier> _gotMailCallback;
   private final String _mailboxId;
+
+  // TODO: changed to 2-way communication channel.
+  private BlockingQueue<TransferableBlock> _queue;
 
   public InMemorySendingMailbox(String mailboxId, BlockingQueue<TransferableBlock> queue,
       Consumer<MailboxIdentifier> gotMailCallback) {
     _mailboxId = mailboxId;
     _queue = queue;
     _gotMailCallback = gotMailCallback;
+  }
+
+  @Override
+  public void open() {
   }
 
   @Override
