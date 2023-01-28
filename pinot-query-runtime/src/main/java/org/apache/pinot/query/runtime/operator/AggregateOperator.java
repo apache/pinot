@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -168,11 +169,26 @@ public class AggregateOperator extends MultiStageOperator {
     }
     _hasReturnedAggregateBlock = true;
     if (rows.size() == 0) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      if (_groupSet.size() == 0) {
+        return constructEmptyAggResultBlock();
+      } else {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      }
     } else {
       _operatorStats.recordOutput(1, rows.size());
       return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
     }
+  }
+
+  /**
+   * @return an empty agg result block for non-group-by aggregation.
+   */
+  private TransferableBlock constructEmptyAggResultBlock() {
+    Object[] row = new Object[_aggCalls.size()];
+    for (int i = 0; i < _accumulators.length; i++) {
+      row[i] = _accumulators[i]._merger.initialize(null, _accumulators[i]._dataType);
+    }
+    return new TransferableBlock(Collections.singletonList(row), _resultSchema, DataBlock.Type.ROW);
   }
 
   /**
@@ -258,7 +274,7 @@ public class AggregateOperator extends MultiStageOperator {
     }
 
     @Override
-    public Object initialize(Object other) {
+    public Object initialize(Object other, DataSchema.ColumnDataType dataType) {
       PinotFourthMoment moment = new PinotFourthMoment();
       moment.increment(((Number) other).doubleValue());
       return moment;
@@ -285,7 +301,7 @@ public class AggregateOperator extends MultiStageOperator {
     }
 
     @Override
-    public Object initialize(Object other) {
+    public Object initialize(Object other, DataSchema.ColumnDataType dataType) {
       ObjectOpenHashSet<Object> set = new ObjectOpenHashSet<>();
       set.add(other);
       return set;
@@ -307,12 +323,12 @@ public class AggregateOperator extends MultiStageOperator {
     /**
      * Initializes the merger based on the first input
      */
-    default Object initialize(Object other) {
-      return other;
+    default Object initialize(Object other, DataSchema.ColumnDataType dataType) {
+      return other == null ? dataType.getNullPlaceholder() : other;
     }
 
     /**
-     * Merges the existing aggregate (the result of {@link #initialize(Object)}) with
+     * Merges the existing aggregate (the result of {@link #initialize(Object, DataSchema.ColumnDataType)}) with
      * the new value coming in (which may be an aggregate in and of itself).
      */
     Object merge(Object agg, Object value);
@@ -353,22 +369,22 @@ public class AggregateOperator extends MultiStageOperator {
     final Object _literal;
     final Map<Key, Object> _results = new HashMap<>();
     final Merger _merger;
+    final DataSchema.ColumnDataType _dataType;
 
     Accumulator(RexExpression.FunctionCall aggCall, Map<String, Function<DataSchema.ColumnDataType, Merger>> merger,
         String functionName, DataSchema inputSchema) {
       // agg function operand should either be a InputRef or a Literal
-      DataSchema.ColumnDataType dataType;
       RexExpression rexExpression = toAggregationFunctionOperand(aggCall);
       if (rexExpression instanceof RexExpression.InputRef) {
         _inputRef = ((RexExpression.InputRef) rexExpression).getIndex();
         _literal = null;
-        dataType = inputSchema.getColumnDataType(_inputRef);
+        _dataType = inputSchema.getColumnDataType(_inputRef);
       } else {
         _inputRef = -1;
         _literal = ((RexExpression.Literal) rexExpression).getValue();
-        dataType = DataSchema.ColumnDataType.fromDataType(rexExpression.getDataType(), false);
+        _dataType = DataSchema.ColumnDataType.fromDataType(rexExpression.getDataType(), true);
       }
-      _merger = merger.get(functionName).apply(dataType);
+      _merger = merger.get(functionName).apply(_dataType);
     }
 
     void accumulate(Key key, Object[] row) {
@@ -377,7 +393,7 @@ public class AggregateOperator extends MultiStageOperator {
       Object value = _inputRef == -1 ? _literal : row[_inputRef];
 
       if (currentRes == null) {
-        _results.put(key, _merger.initialize(value));
+        _results.put(key, _merger.initialize(value, _dataType));
       } else {
         Object mergedResult = _merger.merge(currentRes, value);
         _results.put(key, mergedResult);

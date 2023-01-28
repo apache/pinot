@@ -160,14 +160,10 @@
         "sql": "SELECT sum(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
       {
-        "ignored": true,
-        "comment": "count(*) returns empty [] instead of [0]",
         "description": "count empty input after filter with sub-query",
         "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
       {
-        "ignored": true,
-        "comment": "count(*) returns empty [] instead of [0]",
         "description": "count empty input after filter with sub-query",
         "sql": "SELECT count(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       }
