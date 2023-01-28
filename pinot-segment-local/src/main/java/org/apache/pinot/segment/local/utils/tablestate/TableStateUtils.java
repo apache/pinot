@@ -114,7 +114,7 @@ public class TableStateUtils {
       String actualState = currentStateMap.get(segmentName);
       if (!SegmentStateModel.ONLINE.equals(actualState)) {
         if (SegmentStateModel.ERROR.equals(actualState)) {
-          LOGGER.error("Found ERROR segment: {}, table: {}, expected: {}", segmentName, tableNameWithType,
+          LOGGER.error("Found segment: {}, table: {} in ERROR state, expected: {}", segmentName, tableNameWithType,
               SegmentStateModel.ONLINE);
           return false;
         } else {
