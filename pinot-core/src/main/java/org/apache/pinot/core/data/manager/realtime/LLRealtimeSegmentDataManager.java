@@ -404,7 +404,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (!_isReadyToConsumeData.getAsBoolean()) {
       do {
         //noinspection BusyWait
-        Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS);
+        Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
       } while (!_shouldStop && !endCriteriaReached() && _isReadyToConsumeData.getAsBoolean());
     }
 

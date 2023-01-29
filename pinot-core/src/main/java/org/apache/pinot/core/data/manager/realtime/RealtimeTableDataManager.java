@@ -114,7 +114,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // likely that we get fresh data each time instead of multiple copies of roughly same data.
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
-  public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS = TimeUnit.SECONDS.toNanos(5);
+  public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
 
   // TODO: Change it to BooleanSupplier
   private final Supplier<Boolean> _isServerReadyToServeQueries;
@@ -211,8 +211,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
     if (isDedupEnabled() || isPartialUpsertEnabled()) {
       _isTableReadyToConsumeData = new BooleanSupplier() {
-        volatile boolean _allSegmentsLoaded = false;
-        long _lastCheckTimeNs = Long.MIN_VALUE;
+        volatile boolean _allSegmentsLoaded;
+        long _lastCheckTimeMs;
 
         @Override
         public boolean getAsBoolean() {
@@ -223,11 +223,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
               if (_allSegmentsLoaded) {
                 return true;
               }
-              long currentTimeNs = System.nanoTime();
-              if (currentTimeNs - _lastCheckTimeNs <= READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS) {
+              long currentTimeMs = System.currentTimeMillis();
+              if (currentTimeMs - _lastCheckTimeMs <= READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS) {
                 return false;
               }
-              _lastCheckTimeNs = currentTimeNs;
+              _lastCheckTimeMs = currentTimeMs;
               _allSegmentsLoaded = TableStateUtils.isAllSegmentsLoaded(_helixManager, _tableNameWithType);
               return _allSegmentsLoaded;
             }
