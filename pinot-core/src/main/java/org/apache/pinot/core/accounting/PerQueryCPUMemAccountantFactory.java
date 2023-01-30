@@ -529,30 +529,30 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       // metrics class
       private final AbstractMetrics _metrics;
-      private final AbstractMetrics.Meter _queryPreemptedMeter;
-      private final AbstractMetrics.Meter _heapMemoryCriticalExceedMeter;
+      private final AbstractMetrics.Meter _queryKilledMeter;
+      private final AbstractMetrics.Meter _heapMemoryCriticalExceededMeter;
       private final AbstractMetrics.Gauge _memoryUsageGauge;
 
       WatcherTask() {
         switch (_instanceType) {
           case SERVER:
             _metrics = ServerMetrics.get();
-            _queryPreemptedMeter = ServerMeter.QUERIES_KILLED;
+            _queryKilledMeter = ServerMeter.QUERIES_KILLED;
             _memoryUsageGauge = ServerGauge.JVM_HEAP_USED_BYTES;
-            _heapMemoryCriticalExceedMeter = ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
+            _heapMemoryCriticalExceededMeter = ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
             break;
           case BROKER:
             _metrics = BrokerMetrics.get();
-            _queryPreemptedMeter = BrokerMeter.QUERIES_KILLED;
+            _queryKilledMeter = BrokerMeter.QUERIES_KILLED;
             _memoryUsageGauge = BrokerGauge.JVM_HEAP_USED_BYTES;
-            _heapMemoryCriticalExceedMeter = BrokerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
+            _heapMemoryCriticalExceededMeter = BrokerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
             break;
           default:
             LOGGER.error("instanceType: {} not supported, using server metrics", _instanceType);
             _metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-            _queryPreemptedMeter = ServerMeter.QUERIES_KILLED;
+            _queryKilledMeter = ServerMeter.QUERIES_KILLED;
             _memoryUsageGauge = ServerGauge.JVM_HEAP_USED_BYTES;
-            _heapMemoryCriticalExceedMeter = ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
+            _heapMemoryCriticalExceededMeter = ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
             break;
         }
       }
@@ -643,7 +643,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
         if (_usedBytes > _criticalLevel) {
           _triggeringLevel = TriggeringLevel.HeapMemoryCritical;
-          _metrics.addMeteredGlobalValue(_heapMemoryCriticalExceedMeter, 1);
+          _metrics.addMeteredGlobalValue(_heapMemoryCriticalExceededMeter, 1);
         } else if (_usedBytes > _alarmingLevel) {
           _sleepTime = _alarmingSleepTime;
           // For debugging
@@ -695,7 +695,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
               killedCount += 1;
             }
           }
-          _metrics.addMeteredGlobalValue(_queryPreemptedMeter, killedCount);
+          _metrics.addMeteredGlobalValue(_queryKilledMeter, killedCount);
           try {
             Thread.sleep(_normalSleepTime);
           } catch (InterruptedException ignored) {
@@ -780,7 +780,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       private void interruptRunnerThread(Thread thread) {
         thread.interrupt();
-        _metrics.addMeteredGlobalValue(_queryPreemptedMeter, 1);
+        _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
         _numQueriesKilledConsecutively += 1;
       }
     }
