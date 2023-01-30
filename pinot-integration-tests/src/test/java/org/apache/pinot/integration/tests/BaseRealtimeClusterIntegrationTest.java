@@ -19,7 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -90,14 +90,12 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
 
   @Override
   protected List<String> getNoDictionaryColumns() {
+    List<String> noDictionaryColumns = new ArrayList<>(super.getNoDictionaryColumns());
     // Randomly set time column as no dictionary column.
-    if (new Random().nextInt(2) == 0) {
-      return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime", "RandomAirports",
-          "DivTotalGTimes", "DaysSinceEpoch");
-    } else {
-      return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime", "RandomAirports",
-          "DivTotalGTimes");
+    if (new Random().nextBoolean()) {
+      noDictionaryColumns.add("DaysSinceEpoch");
     }
+    return noDictionaryColumns;
   }
 
   /**

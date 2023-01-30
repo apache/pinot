@@ -62,7 +62,7 @@ public class MutableDataSource extends BaseDataSource {
     final Set<Integer> _partitions;
     final Comparable _minValue;
     final Comparable _maxValue;
-    int _maxRowLengthInBytes = -1;
+    final int _maxRowLengthInBytes;
 
     MutableDataSourceMetadata(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
         int cardinality, @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions,
@@ -138,6 +138,7 @@ public class MutableDataSource extends BaseDataSource {
       return _cardinality;
     }
 
+    @Override
     public int getMaxRowLengthInBytes() {
       return _maxRowLengthInBytes;
     }
