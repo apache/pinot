@@ -380,9 +380,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex)
       throws IOException {
     int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
-    Object valueToStore = calculateActualValue(creatorsByIndex, IndexCreator::alternativeSingleValue, value);
+    Object alternative = calculateAlternativeValue(creatorsByIndex, IndexCreator::alternativeSingleValue, value);
     for (IndexCreator creator : creatorsByIndex.values()) {
-      creator.addSingleValueCell(valueToStore, dictId);
+      creator.addSingleValueCell(value, dictId, alternative);
     }
   }
 
@@ -390,13 +390,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex)
       throws IOException {
     int[] dictId = dictionaryCreator != null ? dictionaryCreator.indexOfMV(values) : null;
-    Object[] valuesToStore = calculateActualValue(creatorsByIndex, IndexCreator::alternativeMultiValue, values);
+    Object[] alternative = calculateAlternativeValue(creatorsByIndex, IndexCreator::alternativeMultiValue, values);
     for (IndexCreator creator : creatorsByIndex.values()) {
-      creator.addMultiValueCell(valuesToStore, dictId);
+      creator.addMultiValueCell(values, dictId, alternative);
     }
   }
 
-  private <E> E calculateActualValue(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
+  private <E> E calculateAlternativeValue(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
       BiFunction<IndexCreator, E, E> extractor, E originalValue) {
     E valueToStore = null;
     IndexType<?, ?, ?> indexChangingValue = null;

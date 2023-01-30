@@ -50,12 +50,12 @@ public abstract class AbstractTextIndexCreator implements TextIndexCreator {
   }
 
   @Override
-  public void addSingleValueCell(@Nonnull Object value, int dictId) {
+  public void addSingleValueCell(@Nonnull Object value, int dictId, Object alternative) {
     add((String) value);
   }
 
   @Override
-  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds, Object[] alternative) {
     int length = values.length;
     if (values instanceof String[]) {
       add((String[]) values, length);

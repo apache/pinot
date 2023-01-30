@@ -29,7 +29,8 @@ import javax.annotation.Nullable;
  * The interface used to create indexes.
  *
  * The lifecycle for an IndexCreator is to be created, receive one or more calls to either
- * {@link #addSingleValueCell(Object, int)} or {@link #addMultiValueCell(Object[], int[])} (but not mix them),
+ * {@link #addSingleValueCell(Object, int, Object)} or {@link #addMultiValueCell(Object[], int[], Object[])} (but not
+ * mix them),
  * a call to {@link #seal()} and finally be closed. Calls to add cell methods must be done in document id order,
  * starting from the first document id.
  */
@@ -72,7 +73,7 @@ public interface IndexCreator extends Closeable {
    * @param dictId An optional dictionary value of the cell. If there is no dictionary, -1 is received
    * @see #alternativeSingleValue(Object)
    */
-  void addSingleValueCell(@Nonnull Object value, int dictId)
+  void addSingleValueCell(@Nonnull Object value, int dictId, @Nullable Object alternative)
       throws IOException;
 
   /**
@@ -83,7 +84,7 @@ public interface IndexCreator extends Closeable {
    * @param values The nonnull value of the cell. In case the cell was actually null, an empty array is received instead
    * @param dictIds An optional array of dictionary values. If there is no dictionary, null is received.
    */
-  void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds)
+  void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds, @Nullable Object[] alternative)
       throws IOException;
 
   void seal()

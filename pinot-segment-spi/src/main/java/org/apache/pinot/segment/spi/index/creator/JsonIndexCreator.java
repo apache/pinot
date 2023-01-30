@@ -31,13 +31,13 @@ public interface JsonIndexCreator extends IndexCreator {
   char KEY_VALUE_SEPARATOR = '\0';
 
   @Override
-  default void addSingleValueCell(@Nonnull Object value, int dictId)
+  default void addSingleValueCell(@Nonnull Object value, int dictId, Object alternative)
       throws IOException {
     add((String) value);
   }
 
   @Override
-  default void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  default void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds, Object[] alternative) {
   }
 
   /**

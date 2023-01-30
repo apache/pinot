@@ -77,13 +77,13 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
   }
 
   @Override
-  public void addSingleValueCell(@Nonnull Object value, int dictId)
+  public void addSingleValueCell(@Nonnull Object value, int dictId, Object alternative)
       throws IOException {
     // This method should do nothing
   }
 
   @Override
-  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds)
+  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds, Object[] alternative)
       throws IOException {
     // This method should do nothing
   }
