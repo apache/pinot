@@ -100,7 +100,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           CPUMemThreadLevelAccountingObjects.ThreadEntry ret =
               new CPUMemThreadLevelAccountingObjects.ThreadEntry();
           _threadEntriesMap.put(Thread.currentThread(), ret);
-          LOGGER.debug("Adding thread to _threadLocalEntry: {}", Thread.currentThread().getName());
+          LOGGER.info("Adding thread to _threadLocalEntry: {}", Thread.currentThread().getName());
           return ret;
         }
     );
@@ -350,7 +350,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
         if (!thread.isAlive()) {
           _threadEntriesMap.remove(thread);
-          LOGGER.debug("Removing thread from _threadLocalEntry: {}", thread.getName());
+          LOGGER.info("Removing thread from _threadLocalEntry: {}", thread.getName());
         }
       }
 
