@@ -19,6 +19,7 @@
 
 package org.apache.pinot.core.query.reduce.function;
 
+import java.util.Set;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
@@ -41,5 +42,10 @@ public class InternalReduceFunctions {
   @ScalarFunction
   public static double kurtosisReduce(PinotFourthMoment fourthMoment) {
     return fourthMoment.kurtosis();
+  }
+
+  @ScalarFunction
+  public static int countDistinctReduce(Set<?> values) {
+    return values.size();
   }
 }

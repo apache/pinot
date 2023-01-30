@@ -54,6 +54,9 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
       ReturnTypes.DOUBLE, null, OperandTypes.BINARY, SqlFunctionCategory.USER_DEFINED_FUNCTION);
   public static final SqlFunction KURTOSIS_REDUCE = new SqlFunction("KURTOSIS_REDUCE", SqlKind.OTHER_FUNCTION,
       ReturnTypes.DOUBLE, null, OperandTypes.BINARY, SqlFunctionCategory.USER_DEFINED_FUNCTION);
+  public static final SqlFunction COUNT_DISTINCT_REDUCE = new SqlFunction("COUNT_DISTINCT_REDUCE",
+      SqlKind.OTHER_FUNCTION, ReturnTypes.INTEGER, null, OperandTypes.BINARY,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION);
 
   public static final SqlAggFunction BOOL_AND = PinotBoolAndAggregateFunction.INSTANCE;
   public static final SqlAggFunction BOOL_OR = PinotBoolOrAggregateFunction.INSTANCE;
