@@ -1,0 +1,1151 @@
+{
+  "window_function_planning_tests": {
+    "queries": [
+      {
+        "description": "single empty OVER() only",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER() FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$1])",
+          "\n  LogicalWindow(window#0=[window(aggs [SUM($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col3=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single empty OVER() and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER() FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], $1=[$2])",
+          "\n  LogicalWindow(window#0=[window(aggs [SUM($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single empty OVER() with default frame",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
+        "notes": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$1])",
+          "\n  LogicalWindow(window#0=[window(aggs [SUM($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col3=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single empty OVER() and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER() FROM a ORDER BY a.col2",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], dir0=[ASC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[2]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      LogicalProject(col1=[$2], EXPR$1=[$3], col2=[$0])",
+          "\n        LogicalWindow(window#0=[window(aggs [SUM($1)])])",
+          "\n          LogicalExchange(distribution=[hash])",
+          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single empty OVER() and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), SUM(a.col3) OVER() FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\n  LogicalWindow(window#0=[window(aggs [SUM($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col3=[$1], $1=[CONCAT($2, '-', $0)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single empty OVER() select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER() FROM a WHERE a.col3 > 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalFilter(condition=[>($1, 10)])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single empty OVER() with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), MIN(a.col3) OVER() FROM a where a.col1 IN ('foo', 'bar')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\n  LogicalWindow(window#0=[window(aggs [MIN($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col3=[$1], $1=[CONCAT($2, '-', $0)])",
+          "\n        LogicalFilter(condition=[OR(=($2, 'bar'), =($2, 'foo'))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple empty OVER()s only",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(), COUNT(a.col2) OVER() FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\n  LogicalWindow(window#0=[window(aggs [SUM($1), COUNT($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col2=[$0], col3=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple empty OVER()s and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(), COUNT(a.col2) OVER() FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$2], $1=[$3], $2=[$4])",
+          "\n  LogicalWindow(window#0=[window(aggs [SUM($1), COUNT($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple empty OVER()s with default frame on one but not the other",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING), MIN(a.col3) OVER() FROM a",
+        "notes": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$1], $1=[$2])",
+          "\n  LogicalWindow(window#0=[window(aggs [SUM($0), MIN($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col3=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple empty OVER()s and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(), COUNT(a.col2) OVER() FROM a ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[0]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalProject(col1=[$2], $1=[$3], $2=[$4])",
+          "\n        LogicalWindow(window#0=[window(aggs [SUM($1), COUNT($0)])])",
+          "\n          LogicalExchange(distribution=[hash])",
+          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple empty OVER()s and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), SUM(a.col3) OVER(), MAX(a.col3) OVER() FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$1], $1=[$2], $2=[$3])",
+          "\n  LogicalWindow(window#0=[window(aggs [SUM($0), MAX($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col3=[$1], $1=[CONCAT($2, '-', $0)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple empty OVER()s select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(), COUNT(a.col1) OVER() FROM a WHERE a.col3 > 100",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalFilter(condition=[>($1, 100)])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple empty OVER()s with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT LENGTH(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(), MAX(a.col3) OVER() FROM a where a.col1 NOT IN ('foo', 'bar', 'baz')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$1], $1=[$2], $2=[$3])",
+          "\n  LogicalWindow(window#0=[window(aggs [MIN($0), MAX($0)])])",
+          "\n    LogicalExchange(distribution=[hash])",
+          "\n      LogicalProject(col3=[$1], $1=[LENGTH(CONCAT($2, ' ', $0))])",
+          "\n        LogicalFilter(condition=[AND(<>($2, 'bar'), <>($2, 'baz'), <>($2, 'foo'))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY) only",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(PARTITION BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY) and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$2], EXPR$1=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY) with default frame",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
+        "notes": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {1} aggs [MAX($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY) and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, MIN(a.col3) OVER(PARTITION BY a.col1) FROM a ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], dir0=[ASC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[2]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      LogicalProject(col2=[$0], EXPR$1=[$3], col1=[$2])",
+          "\n        LogicalWindow(window#0=[window(partition {2} aggs [MIN($1)])])",
+          "\n          LogicalExchange(distribution=[hash[2]])",
+          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY) and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), COUNT(a.col2) OVER(PARTITION BY a.col3) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} aggs [COUNT($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], $2=[SUBSTR($2, 0, 2)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY) select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(PARTITION BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col2=[$0], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1])",
+          "\n        LogicalFilter(condition=[AND(>($1, 10), <=($1, 500))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY) with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), AVG(a.col3) OVER(PARTITION BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], $2=[CONCAT($2, '-', $0)])",
+          "\n        LogicalFilter(condition=[OR(AND(<>($2, 'bar'), <>($2, 'foo')), >=($1, 42))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY) with transform on partition key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY CONCAT(a.col1, '-', a.col2)) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST(/($2, $3)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {1} aggs [SUM($0), COUNT($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$1], $1=[CONCAT($2, '-', $0)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY)s on the same key only",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1), COUNT(a.col2) OVER(PARTITION BY a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {2} aggs [MAX($1), COUNT($0)])])",
+          "\n    LogicalExchange(distribution=[hash[2]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY)s on the same key and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1), MIN(a.col3) OVER(PARTITION BY a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {1} aggs [SUM($0), COUNT($0), MIN($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY)s on the same key with default frame for one and not the other",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(PARTITION BY a.col2 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING), MIN(a.col3) OVER(PARTITION BY a.col2) FROM a",
+        "notes": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [COUNT($1), MIN($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY)s on the same key and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(PARTITION BY a.col2, a.col1), AVG(a.col3) OVER(PARTITION BY a.col2, a.col1) FROM a ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[0]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalProject(col1=[$2], EXPR$1=[$3], EXPR$2=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n        LogicalWindow(window#0=[window(partition {0, 2} aggs [SUM($1), COUNT($1)])])",
+          "\n          LogicalExchange(distribution=[hash[0, 2]])",
+          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY)s on the same key and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), SUM(a.col3) OVER(PARTITION BY a.col2), MAX(a.col3) OVER(PARTITION BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[REVERSE($2)], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), MAX($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY)s on the same key select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1), COUNT(a.col1) OVER(PARTITION BY a.col1) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {1} aggs [SUM($0), COUNT($0), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalFilter(condition=[AND(>($1, 42), OR(=($2, 'chewbacca':VARCHAR(9)), =($2, 'vader':VARCHAR(9)), =($2, 'yoda':VARCHAR(9))))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY)s on the same key with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(PARTITION BY a.col1), MAX(a.col3) OVER(PARTITION BY a.col1) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {1} aggs [MIN($0), MAX($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2], $2=[REVERSE(CONCAT($2, ' ', $0))])",
+          "\n        LogicalFilter(condition=[AND(<>($0, 'bar'), <>($0, 'baz'), <>($0, 'foo'))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY) with transform on partition key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2))), COUNT(a.col1) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2))) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST(/($3, $4)):INTEGER NOT NULL], EXPR$1=[$5])",
+          "\n  LogicalWindow(window#0=[window(partition {2} aggs [SUM($0), COUNT($0), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash[2]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2], $2=[REVERSE(CONCAT($2, '-', $0))])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) only",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ORDER BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(ORDER BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$2], EXPR$1=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) with default frame",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(ORDER BY a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(order by [1] aggs [MAX($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, MIN(a.col3) OVER(ORDER BY a.col1 DESC) FROM a ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], dir0=[ASC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[2]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      LogicalProject(col2=[$0], EXPR$1=[$3], col1=[$2])",
+          "\n        LogicalWindow(window#0=[window(order by [2 DESC] aggs [MIN($1)])])",
+          "\n          LogicalSortExchange(distribution=[hash], collation=[[2 DESC]])",
+          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), COUNT(a.col2) OVER(ORDER BY a.col3) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [1] aggs [COUNT($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[1]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], $2=[SUBSTR($2, 0, 2)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(ORDER BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col2=[$0], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1])",
+          "\n        LogicalFilter(condition=[AND(>($1, 10), <=($1, 500))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), AVG(a.col3) OVER(ORDER BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], $2=[CONCAT($2, '-', $0)])",
+          "\n        LogicalFilter(condition=[OR(AND(<>($2, 'bar'), <>($2, 'foo')), >=($1, 42))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) with transform on partition key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST(/($2, $3)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(order by [1] aggs [SUM($0), COUNT($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[1]])",
+          "\n      LogicalProject(col3=[$1], $1=[CONCAT($2, '-', $0)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(ORDER BY)s on the same key only",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(ORDER BY a.col1), COUNT(a.col2) OVER(ORDER BY a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\n  LogicalWindow(window#0=[window(order by [2] aggs [MAX($1), COUNT($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[2]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(ORDER BY)s on the same key and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(ORDER BY a.col1), MIN(a.col3) OVER(ORDER BY a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(order by [1] aggs [SUM($0), COUNT($0), MIN($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(ORDER BY)s on the same key with default frame for one and not the other",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), MIN(a.col3) OVER(ORDER BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [COUNT($1), MIN($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(ORDER BY)s on the same key and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(ORDER BY a.col2, a.col1 DESC), AVG(a.col3) OVER(ORDER BY a.col2, a.col1 DESC) FROM a ORDER BY a.col1 DESC",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[DESC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[0 DESC]])",
+          "\n    LogicalSort(sort0=[$0], dir0=[DESC])",
+          "\n      LogicalProject(col1=[$2], EXPR$1=[$3], EXPR$2=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n        LogicalWindow(window#0=[window(order by [0, 2 DESC] aggs [SUM($1), COUNT($1)])])",
+          "\n          LogicalSortExchange(distribution=[hash], collation=[[0, 2 DESC]])",
+          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(ORDER BY)s on the same key and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), SUM(a.col3) OVER(ORDER BY a.col2), MAX(a.col3) OVER(ORDER BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[REVERSE($2)], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), MAX($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(ORDER BY)s on the same key select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(ORDER BY a.col1), COUNT(a.col1) OVER(ORDER BY a.col1) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(order by [1] aggs [SUM($0), COUNT($0), COUNT($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalFilter(condition=[AND(>($1, 42), OR(=($2, 'chewbacca':VARCHAR(9)), =($2, 'vader':VARCHAR(9)), =($2, 'yoda':VARCHAR(9))))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(ORDER BY)s on the same key with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(ORDER BY a.col1), MAX(a.col3) OVER(ORDER BY a.col1) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\n  LogicalWindow(window#0=[window(order by [1] aggs [MIN($0), MAX($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2], $2=[REVERSE(CONCAT($2, ' ', $0))])",
+          "\n        LogicalFilter(condition=[AND(<>($0, 'bar'), <>($0, 'baz'), <>($0, 'foo'))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(ORDER BY) with transform on partition key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))), COUNT(a.col1) OVER(ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST(/($3, $4)):INTEGER NOT NULL], EXPR$1=[$5])",
+          "\n  LogicalWindow(window#0=[window(order by [2] aggs [SUM($0), COUNT($0), COUNT($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[2]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2], $2=[REVERSE(CONCAT($2, '-', $0))])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) only",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$2], EXPR$1=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) with default frame",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [MAX($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], dir0=[ASC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[2]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      LogicalProject(col2=[$0], EXPR$1=[$3], col1=[$2])",
+          "\n        LogicalWindow(window#0=[window(partition {2} order by [2] aggs [MIN($1)])])",
+          "\n          LogicalExchange(distribution=[hash[2]])",
+          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), COUNT(a.col2) OVER(PARTITION BY a.col3 ORDER BY a.col3) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [COUNT($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], $2=[SUBSTR($2, 0, 2)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col2=[$0], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1])",
+          "\n        LogicalFilter(condition=[AND(>($1, 10), <=($1, 500))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], $2=[CONCAT($2, '-', $0)])",
+          "\n        LogicalFilter(condition=[OR(AND(<>($2, 'bar'), <>($2, 'foo')), >=($1, 42))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) with transform on partition key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST(/($2, $3)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($0), COUNT($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$1], $1=[CONCAT($2, '-', $0)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key only",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1), COUNT(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [2] aggs [MAX($1), COUNT($0)])])",
+          "\n    LogicalExchange(distribution=[hash[2]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($0), COUNT($0), MIN($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key with default frame for one and not the other",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [COUNT($1), MIN($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col2, a.col1), AVG(a.col3) OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col2, a.col1) FROM a ORDER BY a.col2, a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[ASC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[3, 0]])",
+          "\n    LogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[ASC])",
+          "\n      LogicalProject(col1=[$2], EXPR$1=[$3], EXPR$2=[CAST(/($3, $4)):INTEGER NOT NULL], col2=[$0])",
+          "\n        LogicalWindow(window#0=[window(partition {0, 2} order by [0, 2] aggs [SUM($1), COUNT($1)])])",
+          "\n          LogicalExchange(distribution=[hash[0, 2]])",
+          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2), MAX(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[REVERSE($2)], EXPR$1=[$3], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), MAX($1)])])",
+          "\n    LogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1), COUNT(a.col1) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], EXPR$1=[CAST(/($2, $3)):INTEGER NOT NULL], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($0), COUNT($0), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2])",
+          "\n        LogicalFilter(condition=[AND(>($1, 42), OR(=($2, 'chewbacca':VARCHAR(9)), =($2, 'vader':VARCHAR(9)), =($2, 'yoda':VARCHAR(9))))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [MIN($0), MAX($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2], $2=[REVERSE(CONCAT($2, ' ', $0))])",
+          "\n        LogicalFilter(condition=[AND(<>($0, 'bar'), <>($0, 'baz'), <>($0, 'foo'))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1) with transform on partition key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))), COUNT(a.col1) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST(/($3, $4)):INTEGER NOT NULL], EXPR$1=[$5])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [2] aggs [SUM($0), COUNT($0), COUNT($1)])])",
+          "\n    LogicalExchange(distribution=[hash[2]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2], $2=[REVERSE(CONCAT($2, '-', $0))])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) only",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash[0]], collation=[[2]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$2], EXPR$1=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash[0]], collation=[[2]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) with default frame",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [0] aggs [MAX($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash[2]], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], dir0=[ASC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[2]])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      LogicalProject(col2=[$0], EXPR$1=[$3], col1=[$2])",
+          "\n        LogicalWindow(window#0=[window(partition {2} order by [0] aggs [MIN($1)])])",
+          "\n          LogicalSortExchange(distribution=[hash[2]], collation=[[0]])",
+          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), COUNT(a.col2) OVER(PARTITION BY a.col3 ORDER BY a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [2] aggs [COUNT($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash[1]], collation=[[2]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2], $3=[SUBSTR($2, 0, 2)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col2=[$0], EXPR$1=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [0] aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash[2]], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalFilter(condition=[AND(>($1, 10), <=($1, 500))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[CAST(/($4, $5)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [SUM($1), COUNT($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash[0]], collation=[[2]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2], $3=[CONCAT($2, '-', $0)])",
+          "\n        LogicalFilter(condition=[OR(AND(<>($2, 'bar'), <>($2, 'foo')), >=($1, 42))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) with transform on partition key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY REVERSE(a.col2)) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [1] aggs [SUM($0), COUNT($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash[2]], collation=[[1]])",
+          "\n      LogicalProject(col3=[$1], $1=[REVERSE($0)], $2=[CONCAT($2, '-', $0)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s on the same key only (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3), COUNT(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [1] aggs [MAX($1), COUNT($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash[2]], collation=[[1]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s on the same key and select col (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$2], EXPR$1=[CAST(/($3, $4)):INTEGER NOT NULL], EXPR$2=[$5])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash[2]], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s on the same key with default frame for one and not the other (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [0] aggs [COUNT($1), MIN($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash[2]], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s on the same key and select col with global order by (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col3, a.col1), AVG(a.col3) OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col3, a.col1) FROM a ORDER BY a.col2, a.col1 DESC",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[DESC], offset=[0])",
+          "\n  LogicalSortExchange(distribution=[hash], collation=[[3, 0 DESC]])",
+          "\n    LogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[DESC])",
+          "\n      LogicalProject(col1=[$2], EXPR$1=[$3], EXPR$2=[CAST(/($3, $4)):INTEGER NOT NULL], col2=[$0])",
+          "\n        LogicalWindow(window#0=[window(partition {0, 2} order by [1, 2] aggs [SUM($1), COUNT($1)])])",
+          "\n          LogicalSortExchange(distribution=[hash[0, 2]], collation=[[1, 2]])",
+          "\n            LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s on the same key and transform col (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1), MAX(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4], $2=[$5])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [SUM($1), MAX($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash[0]], collation=[[2]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2], $3=[REVERSE($2)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s on the same key select col and filter (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2), COUNT(a.col1) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$2], EXPR$1=[CAST(/($3, $4)):INTEGER NOT NULL], EXPR$2=[$5])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [0] aggs [SUM($1), COUNT($1), COUNT($2)])])",
+          "\n    LogicalSortExchange(distribution=[hash[2]], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2])",
+          "\n        LogicalFilter(condition=[AND(>($1, 42), OR(=($2, 'chewbacca':VARCHAR(9)), =($2, 'vader':VARCHAR(9)), =($2, 'yoda':VARCHAR(9))))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s on the same key with select transform and filter (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4], $2=[$5])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [0] aggs [MIN($1), MAX($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash[2]], collation=[[0]])",
+          "\n      LogicalProject(col2=[$0], col3=[$1], col1=[$2], $3=[REVERSE(CONCAT($2, ' ', $0))])",
+          "\n        LogicalFilter(condition=[AND(<>($0, 'bar'), <>($0, 'baz'), <>($0, 'foo'))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2) with transform on partition key (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY CONCAT(a.col1, '-', a.col2)), COUNT(a.col1) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST(/($4, $5)):INTEGER NOT NULL], EXPR$1=[$6])",
+          "\n  LogicalWindow(window#0=[window(partition {3} order by [2] aggs [SUM($0), COUNT($0), COUNT($1)])])",
+          "\n    LogicalSortExchange(distribution=[hash[3]], collation=[[2]])",
+          "\n      LogicalProject(col3=[$1], col1=[$2], $2=[CONCAT($2, '-', $0)], $3=[REVERSE(CONCAT($2, '-', $0))])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Window function with JOIN example",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col1, SUM(a.col3) OVER (PARTITION BY a.col1) FROM a JOIN b ON a.col1 = b.col2",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], col10=[$2], $2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} aggs [SUM($0)])])",
+          "\n    LogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$0], col1=[$1], col10=[$3])",
+          "\n        LogicalJoin(condition=[=($1, $2)], joinType=[inner])",
+          "\n          LogicalExchange(distribution=[hash[1]])",
+          "\n            LogicalProject(col3=[$1], col1=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n          LogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col2=[$0], col1=[$2])",
+          "\n              LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "exception_throwing_window_function_planning_tests": {
+    "queries": [
+      {
+        "description": "unsupported window functions such as row_number()",
+        "notes": "not yet supported",
+        "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "unsupported custom frames",
+        "notes": "not yet supported",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3 ROWS BETWEEN 5 PRECEDING AND 10 FOLLOWING) FROM a WHERE a.col3 >= 0",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "unsupported custom frames",
+        "notes": "not yet supported",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "Multiple window groups",
+        "notes": "not yet supported",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "Using aggregation inside ORDER BY within OVER",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ORDER BY MAX(a.col3)) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "Using aggregation inside PARTITION BY within OVER",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(a.col1) OVER(PARTITION BY AVG(a.col3)) FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "Select an aggregate along with OVER()",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), COUNT(a.col1) OVER() FROM a",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "External group by clause",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col2) FROM a GROUP BY a.col2",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "Global order by aggregate",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a ORDER BY SUM(a.col3)",
+        "expectedException": "Error explain query plan for.*"
+      },
+      {
+        "description": "Wrong table",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(b.col3) OVER(PARTITION BY b.col1 ORDER BY b.col2) FROM a ORDER BY SUM(b.col3)",
+        "expectedException": "Error explain query plan for.*"
+      }
+    ]
+  }
+}

@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.query.planner.stage;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.hint.RelHint;
-import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
@@ -41,14 +39,11 @@ public class AggregateNode extends AbstractStageNode {
     super(stageId);
   }
 
-  public AggregateNode(int stageId, DataSchema dataSchema, List<AggregateCall> aggCalls, ImmutableBitSet groupSet,
+  public AggregateNode(int stageId, DataSchema dataSchema, List<AggregateCall> aggCalls, List<RexExpression> groupSet,
       List<RelHint> relHints) {
     super(stageId, dataSchema);
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
-    _groupSet = new ArrayList<>(groupSet.cardinality());
-    for (Integer integer : groupSet) {
-      _groupSet.add(new RexExpression.InputRef(integer));
-    }
+    _groupSet = groupSet;
     _relHints = relHints;
   }
 

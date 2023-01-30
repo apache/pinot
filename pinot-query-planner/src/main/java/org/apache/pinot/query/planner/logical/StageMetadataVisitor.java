@@ -34,6 +34,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.planner.stage.WindowNode;
 
 
 /**
@@ -63,6 +64,13 @@ public class StageMetadataVisitor implements StageNodeVisitor<Void, QueryPlan> {
 
   @Override
   public Void visitAggregate(AggregateNode node, QueryPlan context) {
+    node.getInputs().get(0).visit(this, context);
+    visit(node, context);
+    return null;
+  }
+
+  @Override
+  public Void visitWindow(WindowNode node, QueryPlan context) {
     node.getInputs().get(0).visit(this, context);
     visit(node, context);
     return null;
