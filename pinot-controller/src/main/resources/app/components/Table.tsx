@@ -281,7 +281,7 @@ export default function CustomizedTables({
   accordionToggleObject,
   tooltipData
 }: Props) {
-  // Separate the initial and final data into two separte state variables.
+  // Separate the initial and final data into two separated state variables.
   // This way we can filter and sort the data without affecting the original data.
   // If the component receives new data, we can simply set the new data to the initial data,
   // and the filters and sorts will be applied to the new data.
@@ -393,6 +393,9 @@ export default function CustomizedTables({
           variant="outlined"
         />
       );
+    }
+    if (str.search('\n') !== -1) {
+      return (<pre>{str.toString()}</pre>);
     }
     return (<span>{str.toString()}</span>);
   };
