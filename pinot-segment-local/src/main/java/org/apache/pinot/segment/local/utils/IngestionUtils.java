@@ -43,6 +43,7 @@ import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -306,12 +307,19 @@ public final class IngestionUtils {
    * 2. The ingestion config in the table config. The ingestion config (e.g. filter, complexType) can have fields which
    * are not in the schema.
    */
-  public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
+  public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig,
+      @Nullable UpsertConfig upsertConfig, Schema schema) {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
     extractFieldsFromIngestionConfig(ingestionConfig, fieldsForRecordExtractor);
     extractFieldsFromSchema(schema, fieldsForRecordExtractor);
+    extractFieldsFromUpsertConfig(upsertConfig, fieldsForRecordExtractor);
     fieldsForRecordExtractor = getFieldsToReadWithComplexType(fieldsForRecordExtractor, ingestionConfig);
     return fieldsForRecordExtractor;
+  }
+
+  //TODO: Remove this method
+  public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
+    return getFieldsForRecordExtractor(ingestionConfig, null, schema);
   }
 
   /**
@@ -348,6 +356,15 @@ public final class IngestionUtils {
         }
         fields.add(fieldSpec.getName());
       }
+    }
+  }
+
+  private static void extractFieldsFromUpsertConfig(@Nullable UpsertConfig upsertConfig, Set<String> fields) {
+    if (upsertConfig == null) {
+      return;
+    }
+    if (StringUtils.isNotEmpty(upsertConfig.getDeleteRecordKey())) {
+      fields.add(upsertConfig.getDeleteRecordKey());
     }
   }
 

@@ -216,6 +216,35 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         _primaryKeyToRecordLocationMap.size());
   }
 
+  //TODO: Doesn't handle the edge case when an older addRecord event arrives after removeRecord
+  @Override
+  public void removeRecord(RecordInfo recordInfo) {
+    _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+        (primaryKey, currentRecordLocation) -> {
+          if (currentRecordLocation != null) {
+            // Existing primary key
+
+            // Mark doc as invalid when the new comparison value is greater than or equal to the current value.
+            // Ignore the delete request otherwise
+            if (recordInfo.getComparisonValue().compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
+              IndexSegment currentSegment = currentRecordLocation.getSegment();
+              int currentDocId = currentRecordLocation.getDocId();
+              Objects.requireNonNull(currentSegment.getValidDocIds()).remove(currentDocId);
+              return null;
+            } else {
+              return currentRecordLocation;
+            }
+          } else {
+            _logger.warn("Cannot find upsert metadata for primary key: {}", recordInfo.getPrimaryKey().toString());
+            return null;
+          }
+        });
+
+    // Update metrics
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        _primaryKeyToRecordLocationMap.size());
+  }
+
   @Override
   public GenericRow updateRecord(GenericRow record, RecordInfo recordInfo) {
     // Directly return the record when partial-upsert is not enabled

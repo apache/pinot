@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -162,6 +163,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
 
   private final UpsertConfig.Mode _upsertMode;
+  private final String _upsertDeleteKey;
   private final String _upsertComparisonColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
@@ -399,7 +401,9 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     // init upsert-related data structure
-    _upsertMode = config.getUpsertMode();
+    _upsertMode = (config.getUpsertConfig() == null || config.getUpsertConfig().getMode() == null)
+        ? UpsertConfig.Mode.NONE : config.getUpsertConfig().getMode();
+    _upsertDeleteKey = config.getUpsertConfig() == null ? null : config.getUpsertConfig().getDeleteRecordKey();
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
 
     if (isUpsertEnabled()) {
@@ -508,6 +512,12 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     if (isUpsertEnabled()) {
+
+      if (StringUtils.isNotEmpty(_upsertDeleteKey) && row.getValue(_upsertDeleteKey) != null) {
+        _partitionUpsertMetadataManager.removeRecord(recordInfo);
+        return true;
+      }
+
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
       updateDictionary(updatedRow);
       addNewRow(numDocsIndexed, updatedRow);
