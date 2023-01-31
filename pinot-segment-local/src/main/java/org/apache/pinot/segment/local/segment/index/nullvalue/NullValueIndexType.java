@@ -82,7 +82,7 @@ public class NullValueIndexType implements IndexType<EmptyIndexConf, NullValueVe
 
   @Override
   public IndexReaderFactory<NullValueVectorReader> getReaderFactory() {
-    return new IndexReaderFactory<>() {
+    return new IndexReaderFactory<NullValueVectorReader>() {
       @Nullable
       @Override
       public NullValueVectorReader read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,

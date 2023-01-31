@@ -156,7 +156,7 @@ public class TextIndexType implements IndexType<TextIndexConfig, TextIndexReader
 
   @Override
   public IndexReaderFactory<TextIndexReader> getReaderFactory() {
-    return new IndexReaderFactory<>() {
+    return new IndexReaderFactory<TextIndexReader>() {
       @Nullable
       @Override
       public TextIndexReader read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,

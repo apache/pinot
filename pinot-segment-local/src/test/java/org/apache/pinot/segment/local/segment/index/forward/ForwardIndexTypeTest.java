@@ -79,7 +79,7 @@ public class ForwardIndexTypeTest {
         + "  ]\n"
         + "}", Schema.class);
     private TableConfig _tableConfig;
-    private final TypeReference<List<FieldConfig>> _fieldConfigListTypeRef = new TypeReference<>() {
+    private final TypeReference<List<FieldConfig>> _fieldConfigListTypeRef = new TypeReference<List<FieldConfig>>() {
     };
 
     public ConfTest() throws IOException {
