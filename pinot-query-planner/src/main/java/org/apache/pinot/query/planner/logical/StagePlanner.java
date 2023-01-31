@@ -85,7 +85,7 @@ public class StagePlanner {
 
     // assign workers to each stage.
     for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
-      _workerManager.assignWorkerToStage(e.getKey(), e.getValue(), _requestId);
+      _workerManager.assignWorkerToStage(e.getKey(), e.getValue(), _requestId, _plannerContext.getOptions());
     }
 
     // Run physical optimizations

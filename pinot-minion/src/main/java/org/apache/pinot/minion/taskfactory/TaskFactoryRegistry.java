@@ -94,22 +94,26 @@ public class TaskFactoryRegistry {
                 PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(_taskConfig);
                 tableName = pinotTaskConfig.getTableName();
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS, 1L);
                 if (tableName != null) {
                   _minionMetrics
                       .addTimedTableValue(tableName, taskType, MinionTimer.TASK_QUEUEING,
                           jobDequeueTimeMs - jobInQueueTimeMs, TimeUnit.MILLISECONDS);
                   _minionMetrics.addValueToTableGauge(tableName, MinionGauge.NUMBER_OF_TASKS, 1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS, 1L);
                 }
                 MinionEventObservers.getInstance().addMinionEventObserver(_taskConfig.getId(), _eventObserver);
                 return runInternal(pinotTaskConfig);
               } finally {
                 MinionEventObservers.getInstance().removeMinionEventObserver(_taskConfig.getId());
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS, -1L);
                 long executionTimeMs = System.currentTimeMillis() - jobDequeueTimeMs;
                 _minionMetrics
                     .addTimedValue(taskType, MinionTimer.TASK_EXECUTION, executionTimeMs, TimeUnit.MILLISECONDS);
                 if (tableName != null) {
                   _minionMetrics.addValueToTableGauge(tableName, MinionGauge.NUMBER_OF_TASKS, -1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS, -1L);
                   _minionMetrics
                       .addTimedTableValue(tableName, taskType, MinionTimer.TASK_EXECUTION,
                           executionTimeMs, TimeUnit.MILLISECONDS);

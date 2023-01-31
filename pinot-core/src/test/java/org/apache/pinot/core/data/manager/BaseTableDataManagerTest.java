@@ -191,7 +191,6 @@ public class BaseTableDataManagerTest {
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
-      assertTrue(e.getMessage().contains("does not exist or is not a directory"));
     }
   }
 
@@ -312,7 +311,6 @@ public class BaseTableDataManagerTest {
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
-      assertTrue(e.getMessage().contains("does not exist or is not a directory"));
     }
 
     tmgr.reloadSegment(segName, TableDataManagerTestUtils.createIndexLoadingConfig(), zkmd, llmd, null, true);

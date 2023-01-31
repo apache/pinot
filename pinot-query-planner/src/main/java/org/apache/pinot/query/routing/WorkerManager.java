@@ -59,7 +59,8 @@ public class WorkerManager {
     _routingManager = routingManager;
   }
 
-  public void assignWorkerToStage(int stageId, StageMetadata stageMetadata, long requestId) {
+  public void assignWorkerToStage(int stageId, StageMetadata stageMetadata, long requestId,
+      Map<String, String> options) {
     List<String> scannedTables = stageMetadata.getScannedTables();
     if (scannedTables.size() == 1) {
       // table scan stage, need to attach server as well as segment info for each physical table type.
@@ -97,7 +98,7 @@ public class WorkerManager {
       stageMetadata.setServerInstances(new ArrayList<>(
           serverInstanceToSegmentsMap.keySet()
               .stream()
-              .map(server -> new VirtualServer(server, 0)) // for now, only use single virtual server
+              .map(server -> new VirtualServer(server, 0)) // the leaf stage only has one server, so always use 0 here
               .collect(Collectors.toList())));
       stageMetadata.setServerInstanceToSegmentsMap(serverInstanceToSegmentsMap);
     } else if (PlannerUtils.isRootStage(stageId)) {
@@ -106,11 +107,14 @@ public class WorkerManager {
       stageMetadata.setServerInstances(Lists.newArrayList(
           new VirtualServer(new WorkerInstance(_hostName, _port, _port, _port, _port), 0)));
     } else {
-      stageMetadata.setServerInstances(filterServers(_routingManager.getEnabledServerInstanceMap().values()));
+      stageMetadata.setServerInstances(assignServers(_routingManager.getEnabledServerInstanceMap().values(), options));
     }
   }
 
-  private static List<VirtualServer> filterServers(Collection<ServerInstance> servers) {
+  private static List<VirtualServer> assignServers(Collection<ServerInstance> servers, Map<String, String> options) {
+    int stageParallelism = Integer.parseInt(
+        options.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.STAGE_PARALLELISM, "1"));
+
     List<VirtualServer> serverInstances = new ArrayList<>();
     for (ServerInstance server : servers) {
       String hostname = server.getHostname();
@@ -118,7 +122,9 @@ public class WorkerManager {
           && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
           && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)
           && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
-        serverInstances.add(new VirtualServer(server, 0));
+        for (int virtualId = 0; virtualId < stageParallelism; virtualId++) {
+          serverInstances.add(new VirtualServer(server, virtualId));
+        }
       }
     }
     return serverInstances;

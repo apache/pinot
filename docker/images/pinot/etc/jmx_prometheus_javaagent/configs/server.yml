@@ -1,23 +1,23 @@
 rules:
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.documentCount.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.documentCount.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_server_documentCount_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.segmentCount.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.segmentCount.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_server_segmentCount_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(.*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_$3_$4"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(.*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).realtimeRowsConsumed\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).realtimeRowsConsumed\"><>(\\w+)"
   name: "pinot_server_realtimeRowsConsumed_$5"
   cache: true
   labels:
@@ -31,7 +31,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.helixZookeeperReconnects\"><>(\\w+)"
   name: "pinot_server_helix_zookeeperReconnects_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestKafkaOffsetConsumed.(.*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestKafkaOffsetConsumed.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_highestKafkaOffsetConsumed_$5"
   cache: true
   labels:
@@ -39,7 +39,7 @@ rules:
     tableType: "$2"
     topic: "$3"
     partition: "$4"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestStreamOffsetConsumed.(.*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestStreamOffsetConsumed.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_highestStreamOffsetConsumed_$5"
   cache: true
   labels:
@@ -47,7 +47,7 @@ rules:
     tableType: "$2"
     topic: "$3"
     partition: "$4"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.lastRealtimeSegment(\\w+)Seconds.(.*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.lastRealtimeSegment(\\w+)Seconds.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_lastRealtimeSegment$1Seconds_$6"
   cache: true
   labels:
@@ -58,7 +58,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcControllerResponse(\\w+)\"><>(\\w+)"
   name: "pinot_server_llcControllerResponse_$1_$2"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcPartitionConsuming.(.*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcPartitionConsuming.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_llcPartitionConsuming_$5"
   cache: true
   labels:
@@ -66,7 +66,7 @@ rules:
     tableType: "$2"
     topic: "$3"
     partition: "$4"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeIngestionDelayMs.(.*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeIngestionDelayMs.([^\\.]*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_realtimeIngestionDelayMs_$4"
   cache: true
   labels:
@@ -85,7 +85,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeConsumptionExceptions\"><>(\\w+)"
   name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.(.*?)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.([^\\.]*?)\"><>(\\w+)"
   name: "pinot_server_realtime_offheapMemoryUsed_$2"
   cache: true
   labels:
@@ -107,18 +107,18 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.nettyConnection(\\w+)\"><>(\\w+)"
   name: "pinot_server_nettyConnection_$1_$2"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeSegmentNumPartitions.(.*?)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeSegmentNumPartitions.([^\\.]*?)\"><>(\\w+)"
   name: "pinot_server_realtimeSegmentNumPartitions_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.resizeTimeMs.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.resizeTimeMs.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_server_resizeTimeMs_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysCount.(.*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysCount.([^\\.]*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
   name: "pinot_server_upsertPrimaryKeysCount_$4"
   cache: true
   labels:

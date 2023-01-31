@@ -102,6 +102,7 @@ public class QueryEnvironment {
         .defaultSchema(_rootSchema.plus())
         .sqlToRelConverterConfig(SqlToRelConverter.config()
             .withHintStrategyTable(getHintStrategyTable())
+            .withTrimUnusedFields(true)
             // SUB-QUERY Threshold is useless as we are encoding all IN clause in-line anyway
             .withInSubQueryThreshold(Integer.MAX_VALUE)
             .addRelBuilderConfigTransform(c -> c.withPushJoinCondition(true))
@@ -210,7 +211,8 @@ public class QueryEnvironment {
     SqlToRelConverter sqlToRelConverter =
         new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
             StandardConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
-    return sqlToRelConverter.convertQuery(parsed, false, true);
+    RelRoot relRoot = sqlToRelConverter.convertQuery(parsed, false, true);
+    return relRoot.withRel(sqlToRelConverter.trimUnusedFields(false, relRoot.rel));
   }
 
   private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {

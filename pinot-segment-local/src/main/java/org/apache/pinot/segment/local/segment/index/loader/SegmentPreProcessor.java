@@ -220,9 +220,10 @@ public class SegmentPreProcessor implements AutoCloseable {
     List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
     // There are existing star-trees, but if they match the builder configs exactly,
     // then there is no need to generate the star-trees
-    if (starTreeMetadataList != null && !StarTreeBuilderUtils
-        .shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
-      return false;
+
+    // We need reprocessing if existing configs are to be removed, or new configs have been added
+    if (starTreeMetadataList != null) {
+      return StarTreeBuilderUtils.shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList);
     }
     return !starTreeBuilderConfigs.isEmpty();
   }
