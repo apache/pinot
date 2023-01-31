@@ -19,12 +19,13 @@
 package org.apache.pinot.common.response.broker;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.io.Serializable;
 
 
 /**
  * This class represents an exception using a message and an error code.
  */
-public class QueryProcessingException {
+public class QueryProcessingException implements Serializable {
   private int _errorCode;
   private String _message;
 

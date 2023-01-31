@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.response;
 
+import java.io.Serializable;
 import java.util.List;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -26,7 +27,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 /**
  * Interface for broker response.
  */
-public interface BrokerResponse {
+public interface BrokerResponse extends Serializable {
 
   /**
    * Set exceptions caught during request handling, into the broker response.

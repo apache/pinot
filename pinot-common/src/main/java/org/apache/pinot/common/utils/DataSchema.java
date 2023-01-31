@@ -46,7 +46,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * The <code>DataSchema</code> class describes the schema of {@link DataTable}.
  */
 @JsonPropertyOrder({"columnNames", "columnDataTypes"})
-public class DataSchema {
+public class DataSchema implements Serializable {
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
   private ColumnDataType[] _storedColumnDataTypes;
