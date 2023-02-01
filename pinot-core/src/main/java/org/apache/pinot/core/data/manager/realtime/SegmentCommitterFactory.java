@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.base.Strings;
 import java.net.URISyntaxException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -69,9 +70,11 @@ public class SegmentCommitterFactory {
 
     boolean uploadToFs = _streamConfig.isServerUploadToDeepStore();
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
-    // TODO: exists for backwards compatibility. remove peerDownloadScheme non-null check once users have migrated
-    if (uploadToFs || peerSegmentDownloadScheme != null) {
-      segmentUploader = new PinotFSSegmentUploader(_indexLoadingConfig.getSegmentStoreURI(),
+    String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();
+
+    if (!Strings.isNullOrEmpty(segmentStoreUri) // We seem to allow the server instance to come up without a valid segment store uri. Hence, this check is needed.
+        && (uploadToFs || peerSegmentDownloadScheme != null)) { // TODO: non-null check exists for backwards compatibility. remove peerDownloadScheme non-null check once users have migrated
+      segmentUploader = new PinotFSSegmentUploader(segmentStoreUri,
           PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
     } else {
       segmentUploader = new Server2ControllerSegmentUploader(_logger,
