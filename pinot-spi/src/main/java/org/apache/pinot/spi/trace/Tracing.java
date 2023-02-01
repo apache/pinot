@@ -271,7 +271,7 @@ public class Tracing {
         }
       } catch (Exception exception) {
         LOGGER.warn("Using default implementation of thread accountant, "
-            + "due to invalid thread accountant factory {} provided.", factoryName);
+            + "due to invalid thread accountant factory {} provided. Error {}", factoryName, exception);
       }
       Tracing.getThreadAccountant().startWatcherTask();
     }
