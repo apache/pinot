@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.spi.index;
 
-import java.io.File;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -33,7 +32,6 @@ public interface IndexReaderFactory<R extends IndexReader> {
    * indexes may require the column to be dictionary based.
    */
   @Nullable
-  R read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata,
-      File segmentDir)
+  R read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
       throws IOException, IndexReaderConstraintException;
 }
