@@ -43,8 +43,8 @@ import org.apache.pinot.spi.config.table.FieldConfig;
  * FieldIndexConfigs are a map like structure that relates index types with their configuration, providing a type safe
  * interface.
  *
- * This class can be serialized into a JSON object whose keys are the
- * {@link FieldIndexConfigs#getIndexes() the index type ids} using Jackson, but to be deserialized it is necessary to
+ * This class can be serialized into a JSON object whose keys are the index type ids using Jackson, but to be
+ * deserialized it is necessary to
  * call {@link FieldIndexConfigs#deserializeJsonNode(JsonNode, boolean)}. A custom Jackson deserializer could be
  * provided if needed.
  */
@@ -74,11 +74,6 @@ public class FieldIndexConfigs {
       return IndexDeclaration.notDeclared(indexType);
     }
     return config;
-  }
-
-  @JsonIgnore
-  public Set<IndexType> getIndexes() {
-    return _configMap.keySet();
   }
 
   /*
