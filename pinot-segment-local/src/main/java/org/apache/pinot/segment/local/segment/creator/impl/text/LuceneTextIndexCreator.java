@@ -42,7 +42,6 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -99,13 +98,6 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    */
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit,
       @Nullable List<String> stopWordsInclude, @Nullable List<String> stopWordsExclude) {
-    this(column, segmentIndexDir, commit, stopWordsInclude, stopWordsExclude, null, null);
-  }
-
-  public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit,
-      @Nullable List<String> stopWordsInclude, @Nullable List<String> stopWordsExclude,
-      @Nullable Object rawValueForTextIndex, FieldSpec fieldSpec) {
-    super(rawValueForTextIndex, fieldSpec);
     _textColumn = column;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
@@ -127,8 +119,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   public LuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
     this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(),
-        indexConfig.getStopWordsInclude(), indexConfig.getStopWordsExclude(), indexConfig.getRawValueForTextIndex(),
-        context.getFieldSpec());
+        indexConfig.getStopWordsInclude(), indexConfig.getStopWordsExclude());
   }
 
   public IndexWriter getIndexWriter() {

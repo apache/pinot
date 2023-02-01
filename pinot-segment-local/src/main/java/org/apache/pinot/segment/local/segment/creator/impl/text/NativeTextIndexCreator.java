@@ -78,7 +78,6 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   public NativeTextIndexCreator(String column, File indexDir,
       @Nullable Object rawValueForTextIndex, FieldSpec fieldSpec)
       throws IOException {
-    super(rawValueForTextIndex, fieldSpec);
     _columnName = column;
     _fstBuilder = new FSTBuilder();
     _indexFile = new File(indexDir, column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION);

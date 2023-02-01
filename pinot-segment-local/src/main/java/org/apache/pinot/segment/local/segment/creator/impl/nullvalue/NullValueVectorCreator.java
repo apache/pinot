@@ -39,13 +39,13 @@ public class NullValueVectorCreator implements IndexCreator {
   private final File _nullValueVectorFile;
 
   @Override
-  public void addSingleValueCell(@Nonnull Object value, int dictId, Object alternative)
+  public void addSingleValueCell(@Nonnull Object value, int dictId)
       throws IOException {
     throw new UnsupportedOperationException("NullValueVector should not be build as a normal index");
   }
 
   @Override
-  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds, Object[] alternative)
+  public void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds)
       throws IOException {
     throw new UnsupportedOperationException("NullValueVector should not be build as a normal index");
   }

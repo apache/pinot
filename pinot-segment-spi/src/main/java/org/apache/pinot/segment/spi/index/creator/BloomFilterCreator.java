@@ -31,7 +31,7 @@ public interface BloomFilterCreator extends IndexCreator {
   FieldSpec.DataType getDataType();
 
   @Override
-  default void addSingleValueCell(@Nonnull Object value, int dictId, Object alternative) {
+  default void addSingleValueCell(@Nonnull Object value, int dictId) {
     if (getDataType() == FieldSpec.DataType.BYTES) {
       add(BytesUtils.toHexString((byte[]) value));
     } else {
@@ -40,7 +40,7 @@ public interface BloomFilterCreator extends IndexCreator {
   }
 
   @Override
-  default void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds, Object[] alternative) {
+  default void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds) {
     if (getDataType() == FieldSpec.DataType.BYTES) {
       for (Object value : values) {
         add(BytesUtils.toHexString((byte[]) value));

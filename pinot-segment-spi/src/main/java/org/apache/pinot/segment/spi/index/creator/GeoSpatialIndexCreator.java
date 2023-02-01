@@ -33,13 +33,13 @@ public interface GeoSpatialIndexCreator extends IndexCreator {
   Geometry deserialize(byte[] bytes);
 
   @Override
-  default void addSingleValueCell(@Nonnull Object value, int dictId, Object alternative)
+  default void addSingleValueCell(@Nonnull Object value, int dictId)
       throws IOException {
     add(deserialize((byte[]) value));
   }
 
   @Override
-  default void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds, Object[] alternative)
+  default void addMultiValueCell(@Nonnull Object[] values, @Nullable int[] dictIds)
       throws IOException {
   }
 

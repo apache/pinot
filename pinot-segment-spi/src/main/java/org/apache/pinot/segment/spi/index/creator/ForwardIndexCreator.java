@@ -32,38 +32,37 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public interface ForwardIndexCreator extends IndexCreator {
 
   @Override
-  default void addSingleValueCell(@Nonnull Object cellValue, int dictId, @Nullable Object alternative) {
+  default void addSingleValueCell(@Nonnull Object cellValue, int dictId) {
     if (dictId >= 0) {
       putDictId(dictId);
     } else {
-      Object value = alternative == null ? cellValue : alternative;
       switch (getValueType()) {
         case INT:
-          putInt((int) value);
+          putInt((int) cellValue);
           break;
         case LONG:
-          putLong((long) value);
+          putLong((long) cellValue);
           break;
         case FLOAT:
-          putFloat((float) value);
+          putFloat((float) cellValue);
           break;
         case DOUBLE:
-          putDouble((double) value);
+          putDouble((double) cellValue);
           break;
         case BIG_DECIMAL:
-          putBigDecimal((BigDecimal) value);
+          putBigDecimal((BigDecimal) cellValue);
           break;
         case STRING:
-          putString((String) value);
+          putString((String) cellValue);
           break;
         case BYTES:
-          putBytes((byte[]) value);
+          putBytes((byte[]) cellValue);
           break;
         case JSON:
-          if (value instanceof String) {
-            putString((String) value);
-          } else if (value instanceof byte[]) {
-            putBytes((byte[]) value);
+          if (cellValue instanceof String) {
+            putString((String) cellValue);
+          } else if (cellValue instanceof byte[]) {
+            putBytes((byte[]) cellValue);
           }
           break;
         default:
@@ -73,13 +72,12 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addMultiValueCell(@Nonnull Object[] cellValues, @Nullable int[] dictIds, Object[] alternative)
+  default void addMultiValueCell(@Nonnull Object[] cellValues, @Nullable int[] dictIds)
       throws IOException {
     if (dictIds != null) {
       putDictIdMV(dictIds);
     } else {
-      Object[] values = alternative == null ? cellValues : alternative;
-      int length = values.length;
+      int length = cellValues.length;
       // TODO: The new int[], long[], etc objects are not actually used as arrays iterated again, so we could skip the
       //  array copy by calling an add(Object[]) method and having overloaded indexes for each type.
       // TODO: Longer methods are not optimized by C2 JIT. We should try to move each loop to a specific method.
@@ -87,49 +85,49 @@ public interface ForwardIndexCreator extends IndexCreator {
         case INT:
           int[] ints = new int[length];
           for (int i = 0; i < length; i++) {
-            ints[i] = (Integer) values[i];
+            ints[i] = (Integer) cellValues[i];
           }
           putIntMV(ints);
           break;
         case LONG:
           long[] longs = new long[length];
           for (int i = 0; i < length; i++) {
-            longs[i] = (Long) values[i];
+            longs[i] = (Long) cellValues[i];
           }
           putLongMV(longs);
           break;
         case FLOAT:
           float[] floats = new float[length];
           for (int i = 0; i < length; i++) {
-            floats[i] = (Float) values[i];
+            floats[i] = (Float) cellValues[i];
           }
           putFloatMV(floats);
           break;
         case DOUBLE:
           double[] doubles = new double[length];
           for (int i = 0; i < length; i++) {
-            doubles[i] = (Double) values[i];
+            doubles[i] = (Double) cellValues[i];
           }
           putDoubleMV(doubles);
           break;
         case STRING:
-          if (values instanceof String[]) {
-            putStringMV((String[]) values);
+          if (cellValues instanceof String[]) {
+            putStringMV((String[]) cellValues);
           } else {
             String[] strings = new String[length];
             for (int i = 0; i < length; i++) {
-              strings[i] = (String) values[i];
+              strings[i] = (String) cellValues[i];
             }
             putStringMV(strings);
           }
           break;
         case BYTES:
-          if (values instanceof byte[][]) {
-            putBytesMV((byte[][]) values);
+          if (cellValues instanceof byte[][]) {
+            putBytesMV((byte[][]) cellValues);
           } else {
             byte[][] bytesArray = new byte[length][];
             for (int i = 0; i < length; i++) {
-              bytesArray[i] = (byte[]) values[i];
+              bytesArray[i] = (byte[]) cellValues[i];
             }
             putBytesMV(bytesArray);
           }

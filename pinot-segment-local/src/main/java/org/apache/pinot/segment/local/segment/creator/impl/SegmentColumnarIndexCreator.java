@@ -23,16 +23,19 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiFunction;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.AbstractForwardIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.SameValueForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
@@ -45,12 +48,16 @@ import org.apache.pinot.segment.spi.creator.SegmentCreator;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.index.IndexDeclaration;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -152,7 +159,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       int rangeIndexVersion = _config.getTableConfig().getIndexingConfig().getRangeIndexVersion();
-      boolean forwardIndexDisabled = !fieldIndexConfigs.getConfig(StandardIndexes.forward()).isEnabled();
+      IndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator> forwardIdx = StandardIndexes.forward();
+      boolean forwardIndexDisabled = !fieldIndexConfigs.getConfig(forwardIdx).isEnabled();
 
       validateForwardIndexDisabledIndexCompatibility(fieldIndexConfigs, dictEnabledColumn,
           columnIndexCreationInfo, rangeIndexVersion, fieldSpec);
@@ -202,6 +210,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
         if (fieldIndexConfigs.getConfig(index).isEnabled()) {
           tryCreateCreator(creatorsByIndex, index, context, fieldIndexConfigs);
+        }
+      }
+      // TODO: Remove this when values stored as ForwardIndex stop depending on TextIndex config
+      IndexCreator oldFwdCreator = creatorsByIndex.get(forwardIdx);
+      if (oldFwdCreator instanceof AbstractForwardIndexCreator) { // this implies that oldFwdCreator != null
+        Object fakeForwardValue = calculateAlternativeValue(dictEnabledColumn, fieldIndexConfigs, fieldSpec);
+        if (fakeForwardValue != null) {
+          AbstractForwardIndexCreator castedOldFwdCreator = (AbstractForwardIndexCreator) oldFwdCreator;
+          SameValueForwardIndexCreator fakeValueFwdCreator =
+              new SameValueForwardIndexCreator(fakeForwardValue, castedOldFwdCreator);
+          creatorsByIndex.put(forwardIdx, fakeValueFwdCreator);
         }
       }
       _creatorsByColAndIndex.put(columnName, creatorsByIndex);
@@ -380,9 +399,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex)
       throws IOException {
     int dictId = dictionaryCreator != null ? dictionaryCreator.indexOfSV(value) : -1;
-    Object alternative = calculateAlternativeValue(creatorsByIndex, IndexCreator::alternativeSingleValue, value);
     for (IndexCreator creator : creatorsByIndex.values()) {
-      creator.addSingleValueCell(value, dictId, alternative);
+      creator.addSingleValueCell(value, dictId);
     }
   }
 
@@ -390,30 +408,39 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex)
       throws IOException {
     int[] dictId = dictionaryCreator != null ? dictionaryCreator.indexOfMV(values) : null;
-    Object[] alternative = calculateAlternativeValue(creatorsByIndex, IndexCreator::alternativeMultiValue, values);
     for (IndexCreator creator : creatorsByIndex.values()) {
-      creator.addMultiValueCell(values, dictId, alternative);
+      creator.addMultiValueCell(values, dictId);
     }
   }
 
-  private <E> E calculateAlternativeValue(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
-      BiFunction<IndexCreator, E, E> extractor, E originalValue) {
-    E valueToStore = null;
-    IndexType<?, ?, ?> indexChangingValue = null;
-    for (Map.Entry<IndexType<?, ?, ?>, IndexCreator> byIndexEntry : creatorsByIndex.entrySet()) {
-      E alternative = extractor.apply(byIndexEntry.getValue(), originalValue);
-      if (alternative != null) {
-        IndexType<?, ?, ?> currentIndex = byIndexEntry.getKey();
-        if (valueToStore == null) {
-          valueToStore = alternative;
-          indexChangingValue = currentIndex;
-        } else {
-          throw new IllegalStateException("Both " + indexChangingValue + " and " + currentIndex + " indexes are "
-              + "trying to change the value to store");
+  @Nullable
+  private Object calculateAlternativeValue(boolean dictEnabledColumn, FieldIndexConfigs configs, FieldSpec fieldSpec) {
+    if (dictEnabledColumn) {
+      return null;
+    }
+    IndexDeclaration<TextIndexConfig> textDeclaration = configs.getConfig(StandardIndexes.text());
+    if (!textDeclaration.isEnabled()) {
+      return null;
+    }
+
+    Object alternativeValue = textDeclaration.getEnabledConfig().getRawValueForTextIndex();
+
+    if (alternativeValue == null) {
+      return null;
+    } else if (!fieldSpec.isSingleValueField()) {
+      if (fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING) {
+        if (!(alternativeValue instanceof String[])) {
+          alternativeValue = new String[]{String.valueOf(alternativeValue)};
         }
+      } else if (fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
+        if (!(alternativeValue instanceof String[])) {
+          alternativeValue = new byte[][]{String.valueOf(alternativeValue).getBytes(StandardCharsets.UTF_8)};
+        }
+      } else {
+        throw new RuntimeException("Text Index is only supported for STRING and BYTES stored type");
       }
     }
-    return valueToStore != null ? valueToStore : originalValue;
+    return alternativeValue;
   }
 
   @Override
