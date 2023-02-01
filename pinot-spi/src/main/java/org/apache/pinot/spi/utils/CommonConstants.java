@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import java.io.File;
+import org.apache.pinot.spi.config.instance.InstanceType;
 
 
 public class CommonConstants {
@@ -268,6 +269,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.broker.logger.root.dir";
     public static final String CONFIG_OF_SWAGGER_BROKER_ENABLED = "pinot.broker.swagger.enabled";
     public static final boolean DEFAULT_SWAGGER_BROKER_ENABLED = true;
+    public static final String CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT
+        = "pinot.broker.instance.enableThreadCpuTimeMeasurement";
+    public static final String CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT
+        = "pinot.broker.instance.enableThreadAllocatedBytesMeasurement";
+    public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
+    public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
 
     public static class Request {
       public static final String SQL = "sql";
@@ -708,9 +715,11 @@ public class CommonConstants {
     public static final String CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST = "segmentsForceCommitted";
   }
 
+  // prefix for scheduler related features, e.g. query accountant
+  public static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
+
   public static class Accounting {
     public static final int ANCHOR_TASK_ID = -1;
-    public static final int IGNORED_TASK_ID = -2;
     public static final String CONFIG_OF_FACTORY_NAME = "accounting.factory.name";
 
     public static final String CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = "accounting.enable.thread.cpu.sampling";
@@ -725,6 +734,13 @@ public class CommonConstants {
     public static final String CONFIG_OF_PUBLISHING_JVM_USAGE = "accounting.publishing.jvm.heap.usage";
     public static final boolean DEFAULT_PUBLISHING_JVM_USAGE = false;
 
+    public static final String CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED = "accounting.cpu.time.based.killing.enabled";
+    public static final boolean DEFAULT_CPU_TIME_BASED_KILLING_ENABLED = false;
+
+    public static final String CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS =
+        "accounting.cpu.time.based.killing.threshold.ms";
+    public static final int DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS = 30_000;
+
     public static final String CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.panic.heap.usage.ratio";
     public static final float DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
 
@@ -734,7 +750,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.alarming.usage.ratio";
     public static final float DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO = 0.75f;
 
-    public static final String CONFIG_OF_HEAP_USAGE_PUBLISH_PERIOD = "accounting.heap.usage.publish.period";
+    public static final String CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD_MS = "accounting.heap.usage.publishing.period.ms";
     public static final int DEFAULT_HEAP_USAGE_PUBLISH_PERIOD = 5000;
 
     public static final String CONFIG_OF_SLEEP_TIME = "accounting.sleep.ms";
@@ -749,6 +765,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_GC_BACKOFF_COUNT = "accounting.gc.backoff.count";
     public static final int DEFAULT_GC_BACKOFF_COUNT = 5;
+
+    public static final String CONFIG_OF_INSTANCE_TYPE = "accounting.instance.type";
+    public static final InstanceType DEFAULT_CONFIG_OF_INSTANCE_TYPE = InstanceType.SERVER;
   }
 
   public static class ExecutorService {
