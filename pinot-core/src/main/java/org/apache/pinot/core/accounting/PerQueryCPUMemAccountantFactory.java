@@ -86,14 +86,20 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     private final PinotConfiguration _config;
 
+    // the map to track stats entry for each thread, the entry will automatically be added when one calls
+    // setThreadResourceUsageProvider on the thread, including but not limited to
+    // server worker thread, runner thread, broker jetty thread, or broker netty thread
     private final ConcurrentHashMap<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> _threadEntriesMap
         = new ConcurrentHashMap<>();
 
-    private final HashMap<String, Long> _finishedTaskCPUStatsAggregator = new HashMap<>();
-    private final HashMap<String, Long> _finishedTaskMemStatsAggregator = new HashMap<>();
-
+    // For one time concurrent update of stats. This is to provide stats collection for parts that are not
+    // performance sensitive and query_id is not known beforehand (e.g. broker inbound netty thread)
     private final ConcurrentHashMap<String, Long> _concurrentTaskCPUStatsAggregator = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> _concurrentTaskMemStatsAggregator = new ConcurrentHashMap<>();
+
+    // for stats aggregation of finished (worker) threads when the runner is still running
+    private final HashMap<String, Long> _finishedTaskCPUStatsAggregator = new HashMap<>();
+    private final HashMap<String, Long> _finishedTaskMemStatsAggregator = new HashMap<>();
 
     private final ThreadLocal<CPUMemThreadLevelAccountingObjects.ThreadEntry> _threadLocalEntry
         = ThreadLocal.withInitial(() -> {
@@ -519,7 +525,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       private final InstanceType _instanceType =
           InstanceType.valueOf(_config.getProperty(CommonConstants.Accounting.CONFIG_OF_INSTANCE_TYPE,
-          CommonConstants.Accounting.DEFAULT_CONFIG_OF_METRIC_TYPE.toString()));
+          CommonConstants.Accounting.DEFAULT_CONFIG_OF_INSTANCE_TYPE.toString()));
 
       private long _usedBytes;
       private int _sleepTime;
@@ -531,6 +537,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       private final AbstractMetrics _metrics;
       private final AbstractMetrics.Meter _queryKilledMeter;
       private final AbstractMetrics.Meter _heapMemoryCriticalExceededMeter;
+      private final AbstractMetrics.Meter _heapMemoryPanicExceededMeter;
       private final AbstractMetrics.Gauge _memoryUsageGauge;
 
       WatcherTask() {
@@ -540,12 +547,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             _queryKilledMeter = ServerMeter.QUERIES_KILLED;
             _memoryUsageGauge = ServerGauge.JVM_HEAP_USED_BYTES;
             _heapMemoryCriticalExceededMeter = ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
+            _heapMemoryPanicExceededMeter = ServerMeter.HEAP_PANIC_LEVEL_EXCEEDED;
             break;
           case BROKER:
             _metrics = BrokerMetrics.get();
             _queryKilledMeter = BrokerMeter.QUERIES_KILLED;
             _memoryUsageGauge = BrokerGauge.JVM_HEAP_USED_BYTES;
             _heapMemoryCriticalExceededMeter = BrokerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
+            _heapMemoryPanicExceededMeter = BrokerMeter.HEAP_PANIC_LEVEL_EXCEEDED;
             break;
           default:
             LOGGER.error("instanceType: {} not supported, using server metrics", _instanceType);
@@ -553,6 +562,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             _queryKilledMeter = ServerMeter.QUERIES_KILLED;
             _memoryUsageGauge = ServerGauge.JVM_HEAP_USED_BYTES;
             _heapMemoryCriticalExceededMeter = ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
+            _heapMemoryPanicExceededMeter = ServerMeter.HEAP_PANIC_LEVEL_EXCEEDED;
             break;
         }
       }
@@ -623,6 +633,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         if (_usedBytes >= _panicLevel) {
           killAllQueries();
           _triggeringLevel = TriggeringLevel.HeapMemoryPanic;
+          _metrics.addMeteredGlobalValue(_heapMemoryPanicExceededMeter, 1);
           LOGGER.error("Heap used bytes {}, greater than _panicLevel {}, Killed all queries and triggered gc!",
               _usedBytes, _panicLevel);
           // call aggregate here as will throw exception and

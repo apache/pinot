@@ -32,23 +32,25 @@ public class CPUMemThreadLevelAccountingObjects {
 
   /**
    * Entry to track the task execution status and usage stats of a Thread
+   * (including but not limited to server worker thread, runner thread, broker jetty thread, or broker netty thread)
    */
   public static class ThreadEntry {
     // current query_id, task_id of the thread; this field is accessed by the thread itself and the accountant
-    AtomicReference<TaskEntry> _currentThreadTaskStatus = new AtomicReference<>(null);
+    AtomicReference<TaskEntry> _currentThreadTaskStatus = new AtomicReference<>();
     // current sample of thread memory usage/cputime ; this field is accessed by the thread itself and the accountant
     volatile long _currentThreadCPUTimeSampleMS = 0;
     volatile long _currentThreadMemoryAllocationSampleBytes = 0;
 
     // previous query_id, task_id of the thread, this field should only be accessed by the accountant
     TaskEntry _previousThreadTaskStatus = null;
-    // previous query_id, task_id of the thread, this field should only be accessed by the accountant
+    // previous cpu time and memory allocation of the thread
+    // these fields should only be accessed by the accountant
     long _previousThreadCPUTimeSampleMS = 0;
     long _previousThreadMemoryAllocationSampleBytes = 0;
 
     // error message store per runner/worker thread,
     // will put preemption reasons in this for the killed thread to pickup
-    AtomicReference<Exception> _errorStatus = new AtomicReference<>(null);
+    AtomicReference<Exception> _errorStatus = new AtomicReference<>();
 
     /**
      * set the thread tracking info to null and usage samples to zero
@@ -76,6 +78,11 @@ public class CPUMemThreadLevelAccountingObjects {
     }
   }
 
+  /**
+   * Class to track the execution status of a thread. query_id is an instance level unique query_id,
+   * taskId is the worker thread id when we have a runner-worker thread model
+   * anchor thread refers to the runner in runner-worker thread model
+   */
   public static class TaskEntry implements ThreadExecutionContext {
     private final String _queryId;
     private final int _taskId;

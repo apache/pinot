@@ -145,6 +145,7 @@ public abstract class QueryScheduler {
   @Nullable
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
 
+    //Start instrumentation context. This must not be moved further below interspersed into the code.
     Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
 
     _latestQueryTime.accumulate(System.currentTimeMillis());

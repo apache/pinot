@@ -111,8 +111,8 @@ public class BrokerReduceService extends BaseReduceService {
           new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
               _groupByTrimThreshold), brokerMetrics);
     } catch (EarlyTerminationException e) {
-      brokerResponseNative.getProcessingExceptions()
-          .add(new QueryProcessingException(QueryException.QUERY_CANCELLATION_ERROR_CODE, e.toString()));
+      brokerResponseNative.addToExceptions(
+          new QueryProcessingException(QueryException.QUERY_CANCELLATION_ERROR_CODE, e.toString()));
     }
     QueryContext queryContext;
     if (brokerRequest == serverBrokerRequest) {

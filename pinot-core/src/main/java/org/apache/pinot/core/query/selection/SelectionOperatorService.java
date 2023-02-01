@@ -26,7 +26,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.spi.utils.LoopUtils;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -112,13 +112,13 @@ public class SelectionOperatorService {
             }
           }
           SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
-          LoopUtils.sampleAndCheckInterruptionPeriodically(rowId);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       } else {
         for (int rowId = 0; rowId < numRows; rowId++) {
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
           SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
-          LoopUtils.sampleAndCheckInterruptionPeriodically(rowId);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       }
     }

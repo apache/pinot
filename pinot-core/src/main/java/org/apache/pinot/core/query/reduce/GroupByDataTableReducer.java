@@ -61,7 +61,6 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.LoopUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -184,7 +183,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
         if (havingFilterHandler.isMatch(row)) {
           rows.add(row);
         }
-        LoopUtils.sampleAndCheckInterruptionPeriodically(processedRows);
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(processedRows);
         processedRows++;
       }
     } else {
@@ -200,7 +199,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
           }
         }
         rows.add(row);
-        LoopUtils.sampleAndCheckInterruptionPeriodically(i);
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
       }
     }
 
@@ -304,7 +303,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
                   // Terminate when thread is interrupted.
                   // This is expected when the query already fails in the main thread.
                   // The first check will always be performed when rowId = 0
-                  LoopUtils.sampleAndCheckInterruptionPeriodically(rowId);
+                  Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
                   Object[] values = new Object[_numColumns];
                   for (int colId = 0; colId < _numColumns; colId++) {
                     switch (storedColumnDataTypes[colId]) {

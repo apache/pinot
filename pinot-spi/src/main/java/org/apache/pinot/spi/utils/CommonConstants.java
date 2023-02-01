@@ -714,6 +714,7 @@ public class CommonConstants {
     public static final String CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST = "segmentsForceCommitted";
   }
 
+  // prefix for scheduler related features, e.g. query accountant
   public static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
 
   public static class Accounting {
@@ -748,7 +749,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.alarming.usage.ratio";
     public static final float DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO = 0.75f;
 
-    public static final String CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD = "accounting.heap.usage.publishing.period";
+    public static final String CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD_MS = "accounting.heap.usage.publishing.period.ms";
     public static final int DEFAULT_HEAP_USAGE_PUBLISH_PERIOD = 5000;
 
     public static final String CONFIG_OF_SLEEP_TIME = "accounting.sleep.ms";
@@ -765,7 +766,7 @@ public class CommonConstants {
     public static final int DEFAULT_GC_BACKOFF_COUNT = 5;
 
     public static final String CONFIG_OF_INSTANCE_TYPE = "accounting.instance.type";
-    public static final InstanceType DEFAULT_CONFIG_OF_METRIC_TYPE = InstanceType.SERVER;
+    public static final InstanceType DEFAULT_CONFIG_OF_INSTANCE_TYPE = InstanceType.SERVER;
   }
 
   public static class ExecutorService {

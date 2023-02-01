@@ -102,8 +102,8 @@ public class AggregationDataTableReducer implements DataTableReducer {
         } else {
           intermediateResults[i] = _aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
         }
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
       }
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
     }
     Object[] finalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {

@@ -235,6 +235,8 @@ public class Tracing {
    */
   public static class ThreadAccountantOps {
 
+    public static final int MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK = 0b1_1111_1111_1111;
+
     private ThreadAccountantOps() {
     }
 
@@ -293,6 +295,13 @@ public class Tracing {
 
     public static void setThreadResourceUsageProvider() {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
+    }
+
+    // Check for thread interruption, every time after merging 8192 keys
+    public static void sampleAndCheckInterruptionPeriodically(int mergedKeys) {
+      if ((mergedKeys & MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0) {
+        sampleAndCheckInterruption();
+      }
     }
   }
 }

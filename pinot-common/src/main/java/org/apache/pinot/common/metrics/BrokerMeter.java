@@ -54,6 +54,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // Reduce responses phase.
   RESPONSE_MERGE_EXCEPTIONS("exceptions", false),
   HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
+  HEAP_PANIC_LEVEL_EXCEEDED("count", true),
 
   // These metrics track the number of bad broker responses.
   // This metric track the number of broker responses with processing exceptions inside.

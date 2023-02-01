@@ -59,7 +59,7 @@ import org.testng.annotations.Test;
 /**
  * Integration test for heap size based broker query killing, this works only for xmx4G
  */
-public class OfflineClusterBrokerQueryKillingTest extends BaseClusterIntegrationTestSet {
+public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterIntegrationTestSet {
 
   public static final String STRING_DIM_SV1 = "stringDimSV1";
   public static final String STRING_DIM_SV2 = "stringDimSV2";
@@ -67,7 +67,7 @@ public class OfflineClusterBrokerQueryKillingTest extends BaseClusterIntegration
   public static final String LONG_DIM_SV1 = "longDimSV1";
   public static final String DOUBLE_DIM_SV1 = "doubleDimSV1";
   public static final String BOOLEAN_DIM_SV1 = "booleanDimSV1";
-  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterBrokerQueryKillingTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterMemBasedBrokerQueryKillingTest.class);
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 3;
   private static final String OOM_QUERY =
@@ -97,7 +97,7 @@ public class OfflineClusterBrokerQueryKillingTest extends BaseClusterIntegration
   public void setUp()
       throws Exception {
     // Setup logging and resource accounting
-    LogManager.getLogger(OfflineClusterBrokerQueryKillingTest.class).setLevel(Level.INFO);
+    LogManager.getLogger(OfflineClusterMemBasedBrokerQueryKillingTest.class).setLevel(Level.INFO);
     LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
         .setLevel(Level.INFO);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);

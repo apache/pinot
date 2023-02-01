@@ -58,8 +58,8 @@ import org.testng.annotations.Test;
 /**
  * Integration test for heap size based server query killing, this works only for xmx4G
  */
-public class OfflineClusterServerQueryKillingTest extends BaseClusterIntegrationTestSet {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterServerQueryKillingTest.class);
+public class OfflineClusterMemBasedServerQueryKilingTest extends BaseClusterIntegrationTestSet {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterMemBasedServerQueryKilingTest.class);
   public static final String STRING_DIM_SV1 = "stringDimSV1";
   public static final String STRING_DIM_SV2 = "stringDimSV2";
   public static final String INT_DIM_SV1 = "intDimSV1";
@@ -95,7 +95,7 @@ public class OfflineClusterServerQueryKillingTest extends BaseClusterIntegration
   public void setUp()
       throws Exception {
     // Setup logging and resource accounting
-    LogManager.getLogger(OfflineClusterServerQueryKillingTest.class).setLevel(Level.INFO);
+    LogManager.getLogger(OfflineClusterMemBasedServerQueryKilingTest.class).setLevel(Level.INFO);
     LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
         .setLevel(Level.INFO);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);

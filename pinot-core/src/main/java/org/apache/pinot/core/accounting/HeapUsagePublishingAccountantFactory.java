@@ -39,7 +39,7 @@ public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFac
 
   @Override
   public ThreadResourceUsageAccountant init(PinotConfiguration config) {
-    int period = config.getProperty(CommonConstants.Accounting.CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD,
+    int period = config.getProperty(CommonConstants.Accounting.CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD_MS,
         CommonConstants.Accounting.DEFAULT_HEAP_USAGE_PUBLISH_PERIOD);
     return new HeapUsagePublishingResourceUsageAccountant(period);
   }

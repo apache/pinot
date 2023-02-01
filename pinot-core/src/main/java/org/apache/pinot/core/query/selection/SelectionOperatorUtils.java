@@ -42,9 +42,9 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.LoopUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -202,7 +202,7 @@ public class SelectionOperatorUtils {
     int numMergedRows = 0;
     while (mergedRows.size() < selectionSize && iterator.hasNext()) {
       mergedRows.add(iterator.next());
-      LoopUtils.sampleAndCheckInterruptionPeriodically(numMergedRows);
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numMergedRows);
       numMergedRows++;
     }
   }
@@ -220,7 +220,7 @@ public class SelectionOperatorUtils {
     int numMergedRows = 0;
     for (Object[] row : rowsToMerge) {
       addToPriorityQueue(row, mergedRows, maxNumRows);
-      LoopUtils.sampleAndCheckInterruptionPeriodically(numMergedRows);
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numMergedRows);
       numMergedRows++;
     }
   }
@@ -465,7 +465,7 @@ public class SelectionOperatorUtils {
           } else {
             break;
           }
-          LoopUtils.sampleAndCheckInterruptionPeriodically(rowId);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       } else {
         for (int rowId = 0; rowId < numRows; rowId++) {
@@ -474,7 +474,7 @@ public class SelectionOperatorUtils {
           } else {
             break;
           }
-          LoopUtils.sampleAndCheckInterruptionPeriodically(rowId);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       }
     }
