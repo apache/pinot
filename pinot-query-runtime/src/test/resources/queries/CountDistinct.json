@@ -1,0 +1,48 @@
+{
+  "countDistinct": {
+    "tables": {
+      "tbl1": {
+        "schema": [
+          {"name": "groupingCol", "type": "STRING"},
+          {"name": "val", "type": "STRING"}
+        ],
+        "inputs": [
+          ["a", "foo"],
+          ["a", "foo"],
+          ["a", "bar"],
+          ["a", "bar"],
+          ["b", "foo"],
+          ["b", "foo"],
+          ["b", "foo"],
+          ["b", "baz"],
+          ["b", "baz"],
+          ["b", "baz"]
+        ]
+      },
+      "tbl2": {
+        "schema": [
+          {"name": "groupingCol", "type": "STRING"},
+          {"name": "val", "type": "STRING"}
+        ],
+        "inputs": [
+          ["a", "foo"],
+          ["a", "foo"],
+          ["a", "bar"],
+          ["a", "bingo"],
+          ["b", "foo"],
+          ["b", "foo"],
+          ["b", "foo"],
+          ["b", "baz"],
+          ["b", "baz"],
+          ["b", "ringo"]
+        ]
+      }
+    },
+    "queries": [
+      {"sql": "SELECT COUNT(DISTINCT val) FROM {tbl1}"},
+      {"sql": "SELECT groupingCol, COUNT(DISTINCT val) FROM {tbl1} GROUP BY groupingCol"},
+      {"sql": "SELECT l.groupingCol, COUNT(DISTINCT l.val), COUNT(DISTINCT r.val) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol"},
+      {"sql": "SELECT l.groupingCol, COUNT(DISTINCT CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol"}
+    ]
+  }
+}

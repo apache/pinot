@@ -35,6 +35,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -101,6 +102,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
         } else {
           intermediateResults[i] = _aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
         }
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
       }
     }
     Object[] finalResults = new Object[numAggregationFunctions];

@@ -24,7 +24,7 @@ import org.apache.pinot.common.Utils;
 public enum MinionMeter implements AbstractMetrics.Meter {
   HEALTH_CHECK_GOOD_CALLS("healthChecks", true),
   HEALTH_CHECK_BAD_CALLS("healthChecks", true),
-
+  NUMBER_TASKS("tasks", false),
   NUMBER_TASKS_EXECUTED("tasks", false),
   NUMBER_TASKS_COMPLETED("tasks", false),
   NUMBER_TASKS_CANCELLED("tasks", false),

@@ -38,6 +38,7 @@ import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -73,6 +74,8 @@ public class DistinctDataTableReducer implements DataTableReducer {
     // DataTable; if all returns are DataTable we can directly merge with priority queue (with dedup).
     List<DistinctTable> nonEmptyDistinctTables = new ArrayList<>(dataTableMap.size());
     for (DataTable dataTable : dataTableMap.values()) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+
       // Do not use the cached data schema because it might be either single object (legacy) or normal data table
       dataSchema = dataTable.getDataSchema();
       int numColumns = dataSchema.size();

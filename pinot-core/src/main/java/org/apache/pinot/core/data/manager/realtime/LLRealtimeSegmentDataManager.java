@@ -34,6 +34,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
@@ -232,6 +233,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
+  private final BooleanSupplier _isReadyToConsumeData;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset;
   private volatile State _state;
@@ -395,6 +397,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   protected boolean consumeLoop()
       throws Exception {
+    // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
+    // anymore. Remove the file if it exists.
+    removeSegmentFile();
+
+    if (!_isReadyToConsumeData.getAsBoolean()) {
+      do {
+        //noinspection BusyWait
+        Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+      } while (!_shouldStop && !endCriteriaReached() && !_isReadyToConsumeData.getAsBoolean());
+    }
+
     _numRowsErrored = 0;
     final long idlePipeSleepTimeMillis = 100;
     final long idleTimeoutMillis = _partitionLevelStreamConfig.getIdleTimeoutMillis();
@@ -403,9 +416,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     StreamPartitionMsgOffset lastUpdatedOffset = _streamPartitionMsgOffsetFactory
         .create(_currentOffset);  // so that we always update the metric when we enter this method.
-    // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
-    // anymore. Remove the file if it exists.
-    removeSegmentFile();
 
     _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     while (!_shouldStop && !endCriteriaReached()) {
@@ -560,6 +570,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         realtimeRowsDroppedMeter =
             _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
                 realtimeRowsDroppedMeter);
+        _numRowsErrored++;
       } else {
         try {
           _transformPipeline.processRow(decodedRow.getResult(), reusedResult);
@@ -569,12 +580,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           reusedResult.getTransformedRows().clear();
           String errorMessage = String.format("Caught exception while transforming the record: %s", decodedRow);
           _segmentLogger.error(errorMessage, e);
-          _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-              new SegmentErrorInfo(now(), errorMessage, e));
+          _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         }
         if (reusedResult.getSkippedRowCount() > 0) {
           realtimeRowsDroppedMeter =
-              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED,
+              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_FILTERED,
                   reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
         }
         if (reusedResult.getIncompleteRowCount() > 0) {
@@ -1263,7 +1273,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
       Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore,
       ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager) {
+      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isReadyToConsumeData) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -1273,6 +1283,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _serverMetrics = serverMetrics;
+    _isReadyToConsumeData = isReadyToConsumeData;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_tableNameWithType);
