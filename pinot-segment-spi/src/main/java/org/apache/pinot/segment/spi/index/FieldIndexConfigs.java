@@ -34,8 +34,8 @@ import javax.annotation.Nullable;
  */
 public class FieldIndexConfigs {
 
-  private final Map<IndexType, IndexDeclaration<?>> _configMap;
   public static final FieldIndexConfigs EMPTY = new FieldIndexConfigs(new HashMap<>());
+  private final Map<IndexType, IndexDeclaration<?>> _configMap;
 
   private FieldIndexConfigs(Map<IndexType, IndexDeclaration<?>> configMap) {
     _configMap = Collections.unmodifiableMap(configMap);
