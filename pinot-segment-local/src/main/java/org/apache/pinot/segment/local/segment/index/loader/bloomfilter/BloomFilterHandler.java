@@ -67,7 +67,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddBF = new HashSet<>(_bloomFilterConfigs.keySet());
-    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(BloomIndexType.INSTANCE);
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.bloomFilter());
     // Check if any existing bloomfilter need to be removed.
     for (String column : existingColumns) {
       if (!columnsToAddBF.remove(column)) {

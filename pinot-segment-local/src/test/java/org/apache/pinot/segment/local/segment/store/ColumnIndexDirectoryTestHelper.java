@@ -38,7 +38,7 @@ public class ColumnIndexDirectoryTestHelper {
   }
 
   private static final IndexType[] INDEX_TYPES = {
-      StandardIndexes.dictionary(), StandardIndexes.forward(), StandardIndexes.inverted(),
+     StandardIndexes.dictionary(), StandardIndexes.forward(), StandardIndexes.inverted(),
       StandardIndexes.bloomFilter(), StandardIndexes.nullValueVector()
   };
 

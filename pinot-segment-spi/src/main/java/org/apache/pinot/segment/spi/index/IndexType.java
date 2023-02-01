@@ -75,6 +75,8 @@ public interface IndexType<C, IR extends IndexReader, IC extends IndexCreator> {
    * This method is called to transform from a JSON node to a config object.
    *
    * This is usually used to deserialize {@link FieldConfig#getIndexes() fieldConfigLists.indexes.(indexId)}.
+   *
+   * @return The index config if the index is enabled or null if it disabled
    * @throws IOException
    */
   @Nullable
