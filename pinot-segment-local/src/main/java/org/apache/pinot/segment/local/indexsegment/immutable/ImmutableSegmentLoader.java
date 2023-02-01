@@ -181,7 +181,7 @@ public class ImmutableSegmentLoader {
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
       // FIXME: text-index only works with local SegmentDirectory
       indexContainerMap.put(entry.getKey(),
-          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, localIndexDir));
+          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
     }
 
     // Instantiate virtual columns

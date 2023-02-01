@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.segment.index.range;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -175,8 +174,7 @@ public class RangeIndexType implements IndexType<RangeIndexConfig, RangeIndexRea
     }
 
     @Override
-    protected RangeIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, RangeIndexConfig indexConfig,
-        File segmentDir)
+    protected RangeIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, RangeIndexConfig indexConfig)
         throws IndexReaderConstraintException {
       return read(dataBuffer, metadata);
     }

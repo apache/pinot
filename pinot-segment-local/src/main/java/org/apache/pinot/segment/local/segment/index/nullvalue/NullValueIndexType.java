@@ -86,7 +86,7 @@ public class NullValueIndexType implements IndexType<EmptyIndexConf, NullValueVe
       @Nullable
       @Override
       public NullValueVectorReader read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-          ColumnMetadata metadata, File segmentDir)
+          ColumnMetadata metadata)
           throws IOException {
         // For historical and test reasons, NullValueIndexType doesn't really care about its config
         // if there is a buffer for this index, it is read even if the config explicitly ask to disable it.

@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.segment.index.fst;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -172,8 +171,7 @@ public class FstIndexType implements IndexType<FstIndexConfig, TextIndexReader, 
     }
 
     @Override
-    protected TextIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, FstIndexConfig indexConfig,
-        File segmentDir)
+    protected TextIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, FstIndexConfig indexConfig)
         throws IndexReaderConstraintException, IOException {
       return read(dataBuffer, metadata);
     }

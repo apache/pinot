@@ -160,7 +160,7 @@ public class TextIndexType implements IndexType<TextIndexConfig, TextIndexReader
       @Nullable
       @Override
       public TextIndexReader read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-          ColumnMetadata metadata, File segmentDir)
+          ColumnMetadata metadata)
           throws IndexReaderConstraintException {
         if (fieldIndexConfigs == null) {
           return null;
@@ -169,6 +169,7 @@ public class TextIndexType implements IndexType<TextIndexConfig, TextIndexReader
           throw new IndexReaderConstraintException(metadata.getColumnName(), TextIndexType.INSTANCE,
               "Text index is currently only supported on STRING type columns");
         }
+        File segmentDir = segmentReader.toSegmentDirectory().getPath().toFile();
         FSTType textIndexFSTType = TextIndexUtils.getFSTTypeOfIndex(segmentDir, metadata.getColumnName());
         if (textIndexFSTType == FSTType.NATIVE) {
           // TODO: Support loading native text index from a PinotDataBuffer

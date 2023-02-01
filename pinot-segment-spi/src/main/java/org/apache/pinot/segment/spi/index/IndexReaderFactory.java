@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.spi.index;
 
-import java.io.File;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -34,20 +33,19 @@ public interface IndexReaderFactory<R extends IndexReader> {
    * indexes may require the column to be dictionary based.
    */
   @Nullable
-  R read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata,
-      File segmentDir)
+  R read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
       throws IOException, IndexReaderConstraintException;
 
   abstract class Default<C, R extends IndexReader> implements IndexReaderFactory<R> {
 
     protected abstract IndexType<C, R, ?> getIndexType();
 
-    protected abstract R read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, C indexConfig, File segmentDir)
+    protected abstract R read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, C indexConfig)
         throws IOException, IndexReaderConstraintException;
 
     @Override
     public R read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-        ColumnMetadata metadata, File segmentDir)
+        ColumnMetadata metadata)
         throws IOException, IndexReaderConstraintException {
       IndexType<C, R, ?> indexType = getIndexType();
       IndexDeclaration<C> declaration;
@@ -64,7 +62,7 @@ public interface IndexReaderFactory<R extends IndexReader> {
 
       PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), indexType);
       try {
-        return read(buffer, metadata, indexConf, segmentDir);
+        return read(buffer, metadata, indexConf);
       } catch (RuntimeException ex) {
         throw new RuntimeException(
             "Cannot read index " + indexType + " for column " + metadata.getColumnName(), ex);

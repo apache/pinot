@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.segment.index.json;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -142,8 +141,7 @@ public class JsonIndexType implements IndexType<JsonIndexConfig, JsonIndexReader
     }
 
     @Override
-    protected JsonIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, JsonIndexConfig indexConfig,
-        File segmentDir)
+    protected JsonIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, JsonIndexConfig indexConfig)
         throws IndexReaderConstraintException {
       return read(dataBuffer, metadata);
     }

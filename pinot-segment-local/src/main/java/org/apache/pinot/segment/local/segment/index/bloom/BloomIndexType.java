@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.segment.index.bloom;
 
-import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -117,7 +116,7 @@ public class BloomIndexType
 
       @Override
       protected BloomFilterReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-          BloomFilterConfig indexConfig, File segmentDir) {
+          BloomFilterConfig indexConfig) {
         return BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, indexConfig.isLoadOnHeap());
       }
     };

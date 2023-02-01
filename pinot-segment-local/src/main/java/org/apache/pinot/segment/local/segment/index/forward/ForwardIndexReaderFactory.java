@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
-import java.io.File;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
@@ -51,8 +50,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
   }
 
   @Override
-  protected ForwardIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, ForwardIndexConfig indexConfig,
-      File segmentDir)
+  protected ForwardIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, ForwardIndexConfig indexConfig)
       throws IndexReaderConstraintException {
     return read(dataBuffer, metadata);
   }

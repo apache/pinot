@@ -237,8 +237,7 @@ public class DictionaryIndexType
       }
 
       @Override
-      protected Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, DictionaryIndexConfig indexConfig,
-          File segmentDir)
+      protected Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, DictionaryIndexConfig indexConfig)
           throws IOException, IndexReaderConstraintException {
         return DictionaryIndexType.INSTANCE.read(dataBuffer, metadata, indexConfig);
       }

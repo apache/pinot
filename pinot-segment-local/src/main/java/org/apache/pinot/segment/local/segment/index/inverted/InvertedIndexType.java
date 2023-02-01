@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.segment.index.inverted;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -160,7 +159,7 @@ public class InvertedIndexType
   public static class ReaderFactory implements IndexReaderFactory<InvertedIndexReader> {
     @Override
     public InvertedIndexReader read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-        ColumnMetadata metadata, File segmentDir)
+        ColumnMetadata metadata)
         throws IOException {
       if (fieldIndexConfigs == null || !fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
         return null;

@@ -43,7 +43,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final Map<IndexType, IndexReader> _readersByIndex;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      IndexLoadingConfig indexLoadingConfig, File segmentIndexDir)
+      IndexLoadingConfig indexLoadingConfig)
       throws IOException {
     String columnName = metadata.getColumnName();
 
@@ -54,7 +54,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       if (segmentReader.hasIndexFor(columnName, indexType)) {
         IndexReaderFactory<?> readerProvider = indexType.getReaderFactory();
         try {
-          IndexReader reader = readerProvider.read(segmentReader, fieldIndexConfigs, metadata, segmentIndexDir);
+          IndexReader reader = readerProvider.read(segmentReader, fieldIndexConfigs, metadata);
           if (reader != null) {
             _readersByIndex.put(indexType, reader);
           }

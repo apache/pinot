@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.segment.index.h3;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -117,8 +116,7 @@ public class H3IndexType implements IndexType<H3IndexConfig, H3IndexReader, GeoS
       }
 
       @Override
-      protected H3IndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, H3IndexConfig indexConfig,
-          File segmentDir) {
+      protected H3IndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, H3IndexConfig indexConfig) {
         return new ImmutableH3IndexReader(dataBuffer);
       }
     };
