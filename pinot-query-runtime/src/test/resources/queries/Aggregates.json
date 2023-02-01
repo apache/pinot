@@ -21,9 +21,7 @@
     },
     "queries": [
       {
-        "ignored": true,
         "psql": "4.2.7",
-        "comments": "result error:average doesn't work because we round up but h2 round down for integer",
         "description": "average int",
         "sql": "SELECT avg(int_col) FROM {tbl}"
       },
@@ -173,16 +171,13 @@
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
         "description": "aggregate int column and filter by int column",
-        "comments": "rounding error",
-        "sql": "SELECT sum(1 /int_col) FROM {tbl} WHERE int_col > 0"
+        "sql": "SELECT sum(1 / int_col) FROM {tbl} WHERE int_col > 0"
       },
       {
         "psql": "4.2.7",
         "description": "aggregate double column and filter by double column",
-        "comments": "rounding error",
-        "sql": "SELECT sum(1 /double_col) FROM {tbl} WHERE double_col < 1"
+        "sql": "SELECT sum(1 / double_col) FROM {tbl} WHERE double_col < 1"
       },
       {
         "psql": "4.2.7",
