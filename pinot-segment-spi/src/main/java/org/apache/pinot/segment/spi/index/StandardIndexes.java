@@ -19,11 +19,11 @@
 
 package org.apache.pinot.segment.spi.index;
 
-import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 
 
+@SuppressWarnings("unchecked")
 public class StandardIndexes {
   private StandardIndexes() {
   }
