@@ -97,7 +97,7 @@ public final class RelToStageConverter {
 
   private static StageNode convertLogicalAggregate(LogicalAggregate node, int currentStageId) {
     return new AggregateNode(currentStageId, toDataSchema(node.getRowType()), node.getAggCallList(),
-        node.getGroupSet());
+        node.getGroupSet(), node.getHints());
   }
 
   private static StageNode convertLogicalProject(LogicalProject node, int currentStageId) {

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.planner.hints.PinotRelationalHints;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
@@ -72,10 +73,14 @@ public class StageMetadata implements Serializable {
       _scannedTables.add(((TableScanNode) stageNode).getTableName());
     }
     if (stageNode instanceof AggregateNode) {
-      _requiresSingletonInstance = ((AggregateNode) stageNode).getGroupSet().size() == 0;
+      AggregateNode aggNode = (AggregateNode) stageNode;
+      _requiresSingletonInstance = _requiresSingletonInstance || (aggNode.getGroupSet().size() == 0
+          && aggNode.getRelHints().contains(PinotRelationalHints.AGG_INTERMEDIATE_STAGE));
     }
     if (stageNode instanceof SortNode) {
-      _requiresSingletonInstance = ((SortNode) stageNode).getCollationKeys().size() > 0;
+      SortNode sortNode = (SortNode) stageNode;
+      _requiresSingletonInstance = _requiresSingletonInstance || (sortNode.getCollationKeys().size() > 0
+          && sortNode.getOffset() != -1);
     }
   }
 
