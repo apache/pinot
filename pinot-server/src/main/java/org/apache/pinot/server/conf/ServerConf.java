@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
@@ -44,8 +45,6 @@ public class ServerConf {
   private static final String PINOT_SERVER_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
   private static final String PINOT_SERVER_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
   private static final String PINOT_SERVER_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
-
-  public static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
 
   private PinotConfiguration _serverConf;
 
@@ -131,7 +130,7 @@ public class ServerConf {
   }
 
   public PinotConfiguration getSchedulerConfig() {
-    return _serverConf.subset(PINOT_QUERY_SCHEDULER_PREFIX);
+    return _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
   }
 
   /**

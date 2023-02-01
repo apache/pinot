@@ -22,10 +22,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -273,6 +275,34 @@ public class AggregateOperator extends MultiStageOperator {
     }
   }
 
+  private static class MergeCountDistinctScalars implements Merger {
+    @SuppressWarnings("unchecked")
+    @Override
+    public Object merge(Object agg, Object value) {
+      // TODO: this casts everything to `Set<?>` instead of using the primitive version (e.g. IntSet)
+      ((Set<Object>) agg).add(value);
+      return agg;
+    }
+
+    @Override
+    public Object initialize(Object other) {
+      ObjectOpenHashSet<Object> set = new ObjectOpenHashSet<>();
+      set.add(other);
+      return set;
+    }
+  }
+
+  private static class MergeCountDistinctSets implements Merger {
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Object merge(Object agg, Object value) {
+      // TODO: this casts everything to `Set<?>` instead of using the primitive version (e.g. IntSet)
+      ((Set<Object>) agg).addAll((Set<Object>) value);
+      return agg;
+    }
+  }
+
   interface Merger {
     /**
      * Initializes the merger based on the first input
@@ -301,13 +331,23 @@ public class AggregateOperator extends MultiStageOperator {
             .put("$BOOL_AND0", cdt -> AggregateOperator::mergeBoolAnd)
             .put("BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
             .put("$BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
-            .put("$BOOL_OR0", cdt -> AggregateOperator::mergeBoolOr).put("FOURTHMOMENT",
+            .put("$BOOL_OR0", cdt -> AggregateOperator::mergeBoolOr)
+            .put("FOURTHMOMENT",
                 cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
-                    : new MergeFourthMomentNumeric()).put("$FOURTHMOMENT",
+                    : new MergeFourthMomentNumeric())
+            .put("$FOURTHMOMENT",
                 cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
-                    : new MergeFourthMomentNumeric()).put("$FOURTHMOMENT0",
+                    : new MergeFourthMomentNumeric())
+            .put("$FOURTHMOMENT0",
                 cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
-                    : new MergeFourthMomentNumeric()).build();
+                    : new MergeFourthMomentNumeric())
+            .put("DISTINCTCOUNT", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
+                ? new MergeCountDistinctSets() : new MergeCountDistinctScalars())
+            .put("$DISTINCTCOUNT", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
+                ? new MergeCountDistinctSets() : new MergeCountDistinctScalars())
+            .put("$DISTINCTCOUNT0", cdt -> cdt == DataSchema.ColumnDataType.OBJECT
+                ? new MergeCountDistinctSets() : new MergeCountDistinctScalars())
+            .build();
 
     final int _inputRef;
     final Object _literal;
@@ -332,14 +372,12 @@ public class AggregateOperator extends MultiStageOperator {
     }
 
     void accumulate(Key key, Object[] row) {
-      Map<Key, Object> keys = _results;
-
       // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
-      Object currentRes = keys.get(key);
+      Object currentRes = _results.get(key);
       Object value = _inputRef == -1 ? _literal : row[_inputRef];
 
       if (currentRes == null) {
-        keys.put(key, _merger.initialize(value));
+        _results.put(key, _merger.initialize(value));
       } else {
         Object mergedResult = _merger.merge(currentRes, value);
         _results.put(key, mergedResult);
