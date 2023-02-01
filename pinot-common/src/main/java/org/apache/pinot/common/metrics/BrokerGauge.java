@@ -34,7 +34,8 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   REQUEST_SIZE("requestSize", false),
   RESIZE_TIME_MS("milliseconds", false),
   UNHEALTHY_SERVERS("servers", true),
-  TIME_BOUNDARY_DIFFERENCE("milliseconds", false);
+  TIME_BOUNDARY_DIFFERENCE("milliseconds", false),
+  JVM_HEAP_USED_BYTES("bytes", true);
 
   private final String _brokerGaugeName;
   private final String _unit;

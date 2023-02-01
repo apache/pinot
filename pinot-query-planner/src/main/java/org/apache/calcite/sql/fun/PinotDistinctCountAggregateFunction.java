@@ -16,23 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.utils;
 
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.Tracing;
+package org.apache.calcite.sql.fun;
+
+import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.calcite.sql.SqlFunctionCategory;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.Optionality;
 
 
-public class LoopUtils {
-  private LoopUtils() {
-  }
+public class PinotDistinctCountAggregateFunction extends SqlAggFunction {
 
-  public static final int MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK = 0b1_1111_1111_1111;
+  public static final PinotDistinctCountAggregateFunction INSTANCE = new PinotDistinctCountAggregateFunction();
 
-  // Check for thread interruption, every time after merging 8192 keys
-  public static void checkMergePhaseInterruption(int mergedKeys) {
-    if ((mergedKeys & MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0
-        && Tracing.ThreadAccountantOps.isInterrupted()) {
-      throw new EarlyTerminationException("Interrupted while merging records");
-    }
+  public PinotDistinctCountAggregateFunction() {
+    super("DISTINCTCOUNT", null, SqlKind.OTHER_FUNCTION, ReturnTypes.explicit(SqlTypeName.OTHER),
+        null, OperandTypes.ANY, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+        false, false, Optionality.FORBIDDEN);
   }
 }

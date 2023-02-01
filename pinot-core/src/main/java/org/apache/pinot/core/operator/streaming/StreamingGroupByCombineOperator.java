@@ -51,7 +51,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.utils.LoopUtils;
+import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -214,16 +214,16 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
                 values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
               }
               _indexedTable.upsert(new Key(keys), new Record(values));
+              Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
               mergedKeys++;
-              LoopUtils.checkMergePhaseInterruption(mergedKeys);
             }
           }
         } else {
           for (IntermediateRecord intermediateResult : intermediateRecords) {
             //TODO: change upsert api so that it accepts intermediateRecord directly
             _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
             mergedKeys++;
-            LoopUtils.checkMergePhaseInterruption(mergedKeys);
           }
         }
       } finally {
