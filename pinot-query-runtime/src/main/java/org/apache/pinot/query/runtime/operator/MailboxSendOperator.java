@@ -118,7 +118,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of();
+    return ImmutableList.of(_dataTableBlockBaseOperator);
   }
 
   @Nullable

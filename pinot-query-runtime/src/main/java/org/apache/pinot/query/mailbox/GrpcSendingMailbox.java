@@ -20,7 +20,10 @@ package org.apache.pinot.query.mailbox;
 
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -42,7 +45,9 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   private final AtomicBoolean _initialized = new AtomicBoolean(false);
   private final AtomicInteger _totalMsgSent = new AtomicInteger(0);
 
-  private MailboxStatusStreamObserver _statusStreamObserver;
+  private CountDownLatch _finishLatch = new CountDownLatch(1);
+
+  private StreamObserver<MailboxContent> _mailboxContentStreamObserver;
 
   public GrpcSendingMailbox(String mailboxId, GrpcMailboxService mailboxService) {
     _mailboxService = mailboxService;
@@ -54,13 +59,11 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
       throws UnsupportedOperationException {
     ManagedChannel channel = _mailboxService.getChannel(_mailboxId);
     PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
-    _statusStreamObserver = new MailboxStatusStreamObserver();
-    _statusStreamObserver.init(stub.open(_statusStreamObserver));
+    _mailboxContentStreamObserver = stub.open(new MailboxStatusStreamObserver(_finishLatch));
+    // TODO: Replace init call with metadata.
     // send a begin-of-stream message.
-    _statusStreamObserver.send(MailboxContent.newBuilder()
-        .setMailboxId(_mailboxId)
-        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true")
-        .build());
+    _mailboxContentStreamObserver.onNext(MailboxContent.newBuilder().setMailboxId(_mailboxId)
+        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true").build());
     _initialized.set(true);
   }
 
@@ -72,18 +75,28 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
       init();
     }
     MailboxContent data = toMailboxContent(block.getDataBlock());
-    _statusStreamObserver.send(data);
+    _mailboxContentStreamObserver.onNext(data);
     _totalMsgSent.incrementAndGet();
   }
 
   @Override
   public void complete() {
-    _statusStreamObserver.complete();
+    _mailboxContentStreamObserver.onCompleted();
   }
 
   @Override
   public String getMailboxId() {
     return _mailboxId;
+  }
+
+  @Override
+  public void waitForFinish(long timeout, TimeUnit unit)
+      throws InterruptedException {
+    _finishLatch.await(timeout, unit);
+  }
+
+  @Override
+  public void cancel(Throwable t) {
   }
 
   private MailboxContent toMailboxContent(DataBlock dataBlock) {

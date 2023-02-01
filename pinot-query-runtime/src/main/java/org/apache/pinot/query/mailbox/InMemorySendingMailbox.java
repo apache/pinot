@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -46,13 +47,21 @@ public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock>
     if (!_queue.offer(data)) {
       // this should never happen, since we use a LinkedBlockingQueue
       // which does not have capacity bounds
-      throw new IllegalStateException("Failed to insert into in-memory mailbox "
-          + _mailboxId);
+      throw new IllegalStateException("Failed to insert into in-memory mailbox " + _mailboxId);
     }
     _gotMailCallback.accept(JsonMailboxIdentifier.parse(_mailboxId));
   }
 
   @Override
   public void complete() {
+  }
+
+  @Override
+  public void waitForFinish(long timeout, TimeUnit unit)
+      throws InterruptedException {
+  }
+
+  @Override
+  public void cancel(Throwable t) {
   }
 }
