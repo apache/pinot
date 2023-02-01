@@ -30,8 +30,8 @@ public class QueryIdUtils {
   private QueryIdUtils() {
   }
 
-  private static final String OFFLINE_SUFFIX = "_O";
-  private static final String REALTIME_SUFFIX = "_R";
+  public static final String OFFLINE_SUFFIX = "_O";
+  public static final String REALTIME_SUFFIX = "_R";
 
   public static String getQueryId(String brokerId, long requestId, TableType tableType) {
     return brokerId + "_" + requestId + (tableType == TableType.OFFLINE ? OFFLINE_SUFFIX : REALTIME_SUFFIX);

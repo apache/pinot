@@ -42,9 +42,9 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.LoopUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -201,8 +201,8 @@ public class SelectionOperatorUtils {
     Iterator<Object[]> iterator = rowsToMerge.iterator();
     int numMergedRows = 0;
     while (mergedRows.size() < selectionSize && iterator.hasNext()) {
-      LoopUtils.checkMergePhaseInterruption(numMergedRows);
       mergedRows.add(iterator.next());
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numMergedRows);
       numMergedRows++;
     }
   }
@@ -219,8 +219,8 @@ public class SelectionOperatorUtils {
       int maxNumRows) {
     int numMergedRows = 0;
     for (Object[] row : rowsToMerge) {
-      LoopUtils.checkMergePhaseInterruption(numMergedRows);
       addToPriorityQueue(row, mergedRows, maxNumRows);
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numMergedRows);
       numMergedRows++;
     }
   }
@@ -460,21 +460,21 @@ public class SelectionOperatorUtils {
           nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
         }
         for (int rowId = 0; rowId < numRows; rowId++) {
-          LoopUtils.checkMergePhaseInterruption(rowId);
           if (rows.size() < limit) {
             rows.add(extractRowFromDataTableWithNullHandling(dataTable, rowId, nullBitmaps));
           } else {
             break;
           }
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       } else {
         for (int rowId = 0; rowId < numRows; rowId++) {
-          LoopUtils.checkMergePhaseInterruption(rowId);
           if (rows.size() < limit) {
             rows.add(extractRowFromDataTable(dataTable, rowId));
           } else {
             break;
           }
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       }
     }

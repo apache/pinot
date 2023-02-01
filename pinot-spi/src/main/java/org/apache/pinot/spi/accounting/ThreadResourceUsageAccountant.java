@@ -58,6 +58,13 @@ public interface ThreadResourceUsageAccountant {
   void sampleUsage();
 
   /**
+   * special interface to aggregate usage to the stats store only once, it is used for response
+   * ser/de threads where the thread execution context cannot be setup before hands as
+   * queryId/taskId is unknown and the execution process is hard to instrument
+   */
+  void updateQueryUsageConcurrently(String queryId);
+
+  /**
    * start the periodical task
    */
   void startWatcherTask();
