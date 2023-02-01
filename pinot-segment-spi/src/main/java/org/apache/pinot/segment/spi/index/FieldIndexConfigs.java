@@ -19,12 +19,10 @@
 
 package org.apache.pinot.segment.spi.index;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 
 
@@ -50,7 +48,6 @@ public class FieldIndexConfigs {
    * {@link IndexDeclaration#isEnabled()} not enabled} or an actual configuration object (which can be obtained with
    * {@link IndexDeclaration#getEnabledConfig()}.
    */
-  @JsonIgnore
   public <C, I extends IndexType<C, ?, ?>> IndexDeclaration<C> getConfig(I indexType) {
     @SuppressWarnings("unchecked")
     IndexDeclaration<C> config = (IndexDeclaration<C>) _configMap.get(indexType);
@@ -58,11 +55,6 @@ public class FieldIndexConfigs {
       return IndexDeclaration.notDeclared(indexType);
     }
     return config;
-  }
-
-  @JsonIgnore
-  public Set<IndexType> getIndexes() {
-    return _configMap.keySet();
   }
 
   public static class Builder {
