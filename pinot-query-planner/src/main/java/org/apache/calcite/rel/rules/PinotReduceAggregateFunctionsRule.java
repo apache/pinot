@@ -33,6 +33,7 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.fun.PinotDistinctCountAggregateFunction;
 import org.apache.calcite.sql.fun.PinotFourthMomentAggregateFunction;
 import org.apache.calcite.sql.fun.PinotKurtosisAggregateFunction;
 import org.apache.calcite.sql.fun.PinotOperatorTable;
@@ -76,7 +77,7 @@ public class PinotReduceAggregateFunctionsRule extends RelOptRule {
     if (call.rel(0) instanceof Aggregate) {
       Aggregate agg = call.rel(0);
       for (AggregateCall aggCall : agg.getAggCallList()) {
-        if (canReduce(aggCall)) {
+        if (shouldReduce(aggCall)) {
           return true;
         }
       }
@@ -133,12 +134,14 @@ public class PinotReduceAggregateFunctionsRule extends RelOptRule {
 
   private RexNode reduceAgg(Aggregate oldAggRel, AggregateCall oldCall, List<AggregateCall> newCalls,
       Map<AggregateCall, RexNode> aggCallMapping, List<RexNode> inputExprs) {
-    if (canReduce(oldCall)) {
+    if (shouldReduce(oldCall)) {
       switch (oldCall.getAggregation().getName()) {
         case PinotSkewnessAggregateFunction.SKEWNESS:
           return reduceFourthMoment(oldAggRel, oldCall, newCalls, aggCallMapping, false);
         case PinotKurtosisAggregateFunction.KURTOSIS:
           return reduceFourthMoment(oldAggRel, oldCall, newCalls, aggCallMapping, true);
+        case "COUNT":
+          return reduceCountDistinct(oldAggRel, oldCall, newCalls, aggCallMapping);
         default:
           throw new IllegalStateException("Unexpected aggregation name " + oldCall.getAggregation().getName());
       }
@@ -152,6 +155,33 @@ public class PinotReduceAggregateFunctionsRule extends RelOptRule {
           aggCallMapping,
           oldAggRel.getInput()::fieldIsNullable);
     }
+  }
+
+  private RexNode reduceCountDistinct(Aggregate oldAggRel, AggregateCall oldCall, List<AggregateCall> newCalls,
+      Map<AggregateCall, RexNode> aggCallMapping) {
+    final int nGroups = oldAggRel.getGroupCount();
+    final RexBuilder rexBuilder = oldAggRel.getCluster().getRexBuilder();
+    final AggregateCall countDistinctCall =
+        AggregateCall.create(PinotDistinctCountAggregateFunction.INSTANCE,
+            oldCall.isDistinct(),
+            oldCall.isApproximate(),
+            oldCall.ignoreNulls(),
+            oldCall.getArgList(),
+            oldCall.filterArg,
+            oldCall.distinctKeys,
+            oldCall.collation,
+            oldAggRel.getGroupCount(),
+            oldAggRel.getInput(),
+            null,
+            null);
+
+    RexNode countDistinctRef = rexBuilder.addAggCall(countDistinctCall, nGroups, newCalls,
+        aggCallMapping, oldAggRel.getInput()::fieldIsNullable);
+
+    final RexNode reduceRef = rexBuilder.makeCall(
+        PinotOperatorTable.COUNT_DISTINCT_REDUCE,
+        countDistinctRef);
+    return rexBuilder.makeCast(oldCall.getType(), reduceRef);
   }
 
   private RexNode reduceFourthMoment(Aggregate oldAggRel, AggregateCall oldCall, List<AggregateCall> newCalls,
@@ -181,8 +211,11 @@ public class PinotReduceAggregateFunctionsRule extends RelOptRule {
     return rexBuilder.makeCast(oldCall.getType(), skewRef);
   }
 
-  private boolean canReduce(AggregateCall call) {
-    return FUNCTIONS.contains(call.getAggregation().getName());
+  private boolean shouldReduce(AggregateCall call) {
+    String name = call.getAggregation().getName();
+    // special case COUNT because it should only be reduced when it's a
+    // COUNT DISTINCT
+    return name.equals("COUNT") ? call.isDistinct() : FUNCTIONS.contains(name);
   }
 
   protected void newAggregateRel(RelBuilder relBuilder,

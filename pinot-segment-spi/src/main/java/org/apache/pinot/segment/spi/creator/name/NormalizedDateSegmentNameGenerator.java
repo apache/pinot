@@ -87,14 +87,17 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
 
       // Parse input time format: 'EPOCH'/'TIMESTAMP' or 'SIMPLE_DATE_FORMAT' using pattern
       Preconditions.checkArgument(dateTimeFormatSpec != null,
-          "Must provide date time format spec for NormalizedDateSegmentNameGenerator");
+          "Must provide date time format spec for NormalizedDateSegmentNameGenerator. "
+              + "Common problems: missing timeColumnName in table config, missing schema for timeColumnName, "
+              + "timeColumnName is not a date time field, or missing format spec in timeColumnName schema");
       TimeFormat timeFormat = dateTimeFormatSpec.getTimeFormat();
       if (timeFormat == TimeFormat.EPOCH || timeFormat == TimeFormat.TIMESTAMP) {
         _inputTimeUnit = dateTimeFormatSpec.getColumnUnit();
         _inputSDF = null;
       } else {
         Preconditions.checkArgument(dateTimeFormatSpec.getSDFPattern() != null,
-            "Must provide pattern for SIMPLE_DATE_FORMAT for NormalizedDateSegmentNameGenerator");
+            "Must provide pattern for SIMPLE_DATE_FORMAT for NormalizedDateSegmentNameGenerator. Common problem: "
+                + "the format spec in timeColumnName schema is SIMPLE_DATE_FORMAT but pattern is missing");
         _inputTimeUnit = null;
         _inputSDF = new SimpleDateFormat(dateTimeFormatSpec.getSDFPattern());
         _inputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
