@@ -38,9 +38,9 @@ import org.slf4j.LoggerFactory;
 
 public class SortOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "SORT";
-  private final MultiStageOperator _upstreamOperator;
   private static final Logger LOGGER = LoggerFactory.getLogger(SortOperator.class);
 
+  private final MultiStageOperator _upstreamOperator;
   private final int _fetch;
   private final int _offset;
   private final DataSchema _dataSchema;
@@ -62,16 +62,14 @@ public class SortOperator extends MultiStageOperator {
   @VisibleForTesting
   SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      int maxHolderCapacity, long requestId, int stageId) {
+      int defaultHolderCapacity, long requestId, int stageId) {
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
     _offset = Math.max(offset, 0);
     _dataSchema = dataSchema;
     _upstreamErrorBlock = null;
     _isSortedBlockConstructed = false;
-    _numRowsToKeep = _fetch > 0
-        ? Math.min(maxHolderCapacity, _fetch + (Math.max(_offset, 0)))
-        : maxHolderCapacity;
+    _numRowsToKeep = _fetch > 0 ? _fetch + _offset : defaultHolderCapacity;
     _rows = new PriorityQueue<>(_numRowsToKeep,
         new SortComparator(collationKeys, collationDirections, dataSchema, false));
     _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
