@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import com.google.common.base.Strings;
 import java.net.URISyntaxException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -73,7 +73,7 @@ public class SegmentCommitterFactory {
     String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();
 
     // We seem to allow the server instance to come up without a valid segment store uri. Hence, this check is needed.
-    if (!Strings.isNullOrEmpty(segmentStoreUri)
+    if (!StringUtils.isEmpty(segmentStoreUri)
         && (uploadToFs || peerSegmentDownloadScheme != null)) {
       // TODO: non-null check exists for backwards compatibility. remove check once users have migrated
       segmentUploader = new PinotFSSegmentUploader(segmentStoreUri,
