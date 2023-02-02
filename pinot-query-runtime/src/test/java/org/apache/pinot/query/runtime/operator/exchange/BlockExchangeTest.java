@@ -24,9 +24,6 @@ import java.util.List;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -42,13 +39,8 @@ import org.testng.annotations.Test;
 
 
 public class BlockExchangeTest {
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1", "0@host:1", "0@host:1");
-  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1", "0@host:1", "0@host:2");
-
   private AutoCloseable _mocks;
 
-  @Mock
-  private MailboxService<TransferableBlock> _mailboxService;
   @Mock
   private SendingMailbox<TransferableBlock> _mailbox1;
   @Mock
@@ -57,8 +49,6 @@ public class BlockExchangeTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_mailboxService.getSendingMailbox(MAILBOX_1)).thenReturn(_mailbox1);
-    Mockito.when(_mailboxService.getSendingMailbox(MAILBOX_2)).thenReturn(_mailbox2);
   }
 
   @AfterMethod
@@ -70,7 +60,7 @@ public class BlockExchangeTest {
   @Test
   public void shouldSendEosBlockToAllDestinations() {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    List<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1, _mailbox2);
     BlockExchange exchange = new TestBlockExchange(destinations);
     // When:
     exchange.send(TransferableBlockUtils.getEndOfStreamTransferableBlock());
@@ -90,7 +80,7 @@ public class BlockExchangeTest {
   @Test
   public void shouldSendDataBlocksOnlyToTargetDestination() {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
+    List<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1);
     BlockExchange exchange = new TestBlockExchange(destinations);
     TransferableBlock block = new TransferableBlock(ImmutableList.of(new Object[]{"val"}),
         new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}), DataBlock.Type.ROW);
@@ -109,7 +99,7 @@ public class BlockExchangeTest {
   @Test
   public void shouldSplitBlocks() {
     // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
+    List<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1);
 
     DataSchema schema = new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING});
 
@@ -139,16 +129,16 @@ public class BlockExchangeTest {
   }
 
   private static class TestBlockExchange extends BlockExchange {
-    protected TestBlockExchange(List<SendingMailbox> destinations) {
+    protected TestBlockExchange(List<SendingMailbox<TransferableBlock>> destinations) {
       this(destinations, (block, type, size) -> Iterators.singletonIterator(block));
     }
 
-    protected TestBlockExchange(List<SendingMailbox> destinations, BlockSplitter splitter) {
+    protected TestBlockExchange(List<SendingMailbox<TransferableBlock>> destinations, BlockSplitter splitter) {
       super(destinations, splitter);
     }
 
     @Override
-    protected void route(List<SendingMailbox> destinations, TransferableBlock block) {
+    protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block) {
       for (SendingMailbox mailbox : destinations) {
         sendBlock(mailbox, block);
       }

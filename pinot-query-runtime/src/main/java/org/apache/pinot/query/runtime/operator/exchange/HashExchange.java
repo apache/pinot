@@ -36,14 +36,14 @@ class HashExchange extends BlockExchange {
   // TODO: ensure that server instance list is sorted using same function in sender.
   private final KeySelector<Object[], Object[]> _keySelector;
 
-  HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<Object[], Object[]> selector,
+  HashExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, KeySelector<Object[], Object[]> selector,
       BlockSplitter splitter) {
     super(sendingMailboxes, splitter);
     _keySelector = selector;
   }
 
   @Override
-  protected void route(List<SendingMailbox> destinations, TransferableBlock block) {
+  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block) {
     List<Object[]>[] destIdxToRows = new List[destinations.size()];
     for (Object[] row : block.getContainer()) {
       int partition = _keySelector.computeHash(row) % destinations.size();

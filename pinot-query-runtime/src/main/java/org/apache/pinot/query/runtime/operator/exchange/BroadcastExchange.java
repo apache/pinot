@@ -29,12 +29,12 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  */
 class BroadcastExchange extends BlockExchange {
 
-  protected BroadcastExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
+  protected BroadcastExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, BlockSplitter splitter) {
     super(sendingMailboxes, splitter);
   }
 
   @Override
-  protected void route(List<SendingMailbox> destinations, TransferableBlock block) {
+  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block) {
     for (SendingMailbox mailbox : destinations) {
       sendBlock(mailbox, block);
     }

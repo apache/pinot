@@ -39,13 +39,13 @@ public abstract class BlockExchange {
   // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
-  private final List<SendingMailbox> _sendingMailboxes;
+  private final List<SendingMailbox<TransferableBlock>> _sendingMailboxes;
   private final BlockSplitter _splitter;
 
   public static BlockExchange getExchange(MailboxService<TransferableBlock> mailboxService,
       List<MailboxIdentifier> destinations, RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> selector,
       BlockSplitter splitter) {
-    List<SendingMailbox> sendingMailboxes = new ArrayList<>();
+    List<SendingMailbox<TransferableBlock>> sendingMailboxes = new ArrayList<>();
     for (MailboxIdentifier mid : destinations) {
       sendingMailboxes.add(mailboxService.getSendingMailbox(mid));
     }
@@ -66,7 +66,7 @@ public abstract class BlockExchange {
     }
   }
 
-  protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
+  protected BlockExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, BlockSplitter splitter) {
     _sendingMailboxes = sendingMailboxes;
     _splitter = splitter;
   }
@@ -79,7 +79,7 @@ public abstract class BlockExchange {
     route(_sendingMailboxes, block);
   }
 
-  protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block) {
+  protected void sendBlock(SendingMailbox<TransferableBlock> sendingMailbox, TransferableBlock block) {
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);
       sendingMailbox.complete();
@@ -94,5 +94,5 @@ public abstract class BlockExchange {
     }
   }
 
-  protected abstract void route(List<SendingMailbox> destinations, TransferableBlock block);
+  protected abstract void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block);
 }

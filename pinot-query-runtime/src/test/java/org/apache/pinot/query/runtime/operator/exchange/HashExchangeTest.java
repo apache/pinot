@@ -23,9 +23,6 @@ import com.google.common.collect.Iterators;
 import java.util.Iterator;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -41,11 +38,6 @@ import org.testng.annotations.Test;
 
 
 public class HashExchangeTest {
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1", "0@host:1", "0@host:1");
-  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1", "0@host:1", "0@host:2");
-
-  @Mock
-  private MailboxService<TransferableBlock> _mailboxService;
   @Mock
   private SendingMailbox<TransferableBlock> _mailbox1;
   @Mock
@@ -59,8 +51,6 @@ public class HashExchangeTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_mailboxService.getSendingMailbox(MAILBOX_1)).thenReturn(_mailbox1);
-    Mockito.when(_mailboxService.getSendingMailbox(MAILBOX_2)).thenReturn(_mailbox2);
     Mockito.when(_block.getType()).thenReturn(DataBlock.Type.ROW);
     Mockito.when(_block.getDataSchema()).thenReturn(
         new DataSchema(new String[]{"col1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
@@ -77,7 +67,7 @@ public class HashExchangeTest {
     // Given:
     TestSelector selector = new TestSelector(Iterators.forArray(2, 0, 1));
     Mockito.when(_block.getContainer()).thenReturn(ImmutableList.of(new Object[]{0}, new Object[]{1}, new Object[]{2}));
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    ImmutableList<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 
     // When:
     new HashExchange(destinations, selector, TransferableBlockUtils::splitBlock).route(destinations, _block);

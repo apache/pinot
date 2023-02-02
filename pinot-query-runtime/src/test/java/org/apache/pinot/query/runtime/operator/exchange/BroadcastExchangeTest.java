@@ -20,9 +20,6 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -37,15 +34,10 @@ import org.testng.annotations.Test;
 
 
 public class BroadcastExchangeTest {
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1", "0@host:1", "0@host:1");
-  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1", "0@host:1", "0@host:2");
-
   private AutoCloseable _mocks;
 
   @Mock
   TransferableBlock _block;
-  @Mock
-  MailboxService<TransferableBlock> _mailboxService;
 
   @Mock
   private SendingMailbox<TransferableBlock> _mailbox1;
@@ -55,8 +47,6 @@ public class BroadcastExchangeTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_mailboxService.getSendingMailbox(MAILBOX_1)).thenReturn(_mailbox1);
-    Mockito.when(_mailboxService.getSendingMailbox(MAILBOX_2)).thenReturn(_mailbox2);
     Mockito.when(_block.getType()).thenReturn(DataBlock.Type.METADATA);
   }
 
@@ -69,7 +59,7 @@ public class BroadcastExchangeTest {
   @Test
   public void shouldBroadcast() {
     // Given:
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    ImmutableList<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 
     // When:
     new BroadcastExchange(destinations, TransferableBlockUtils::splitBlock).route(destinations, _block);
