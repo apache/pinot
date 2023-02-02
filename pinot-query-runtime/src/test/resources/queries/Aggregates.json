@@ -138,6 +138,34 @@
         "comment": "issue with converting data types:  Unexpected RelDataTypeField: ANY for column: EXPR$0",
         "description": "sum with inner function",
         "sql": "SELECT sum(pow(int_col, 2)) FROM {tbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "sum empty returns [0] instead of [null] at the moment",
+        "description": "sum empty input after filter",
+        "sql": "SELECT sum(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "count empty input after filter",
+        "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "count empty input after filter",
+        "sql": "SELECT count(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "ignored": true,
+        "comment": "sum empty returns [0] instead of [null] at the moment",
+        "description": "sum empty input after filter with subquery",
+        "sql": "SELECT sum(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "description": "count empty input after filter with sub-query",
+        "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "description": "count empty input after filter with sub-query",
+        "sql": "SELECT count(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       }
     ]
   },
