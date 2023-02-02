@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -65,23 +66,7 @@ public class QueryDispatcher {
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
       MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
-    // submit all the distributed stages.
-    int reduceStageId = submit(requestId, queryPlan, timeoutMs, queryOptions);
-    // run reduce stage and return result.
-    MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
-    MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
-        queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
-        reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(),
-        new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0), timeoutMs);
-    List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs);
-    mailboxReceiveOperator.toExplainString();
-    long toResultTableStartTime = System.currentTimeMillis();
-    ResultTable resultTable = toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
-        queryPlan.getQueryStageMap().get(0).getDataSchema());
-    LOGGER.debug(
-        "RequestId:" + requestId + " StageId: 0 Broker toResultTable processing time:" + (System.currentTimeMillis()
-            - toResultTableStartTime) + " ms");
-    return resultTable;
+    return submitAndReduce(requestId, queryPlan, mailboxService, timeoutMs, queryOptions, new HashMap<>());
   }
 
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
@@ -94,7 +79,7 @@ public class QueryDispatcher {
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
-        reduceNode.getSenderStageId(), reduceNode.getDataSchema(),
+        reduceNode.getSenderStageId(), reduceStageId, reduceNode.getDataSchema(),
         new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0), timeoutMs);
     List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs, stats);
     return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
