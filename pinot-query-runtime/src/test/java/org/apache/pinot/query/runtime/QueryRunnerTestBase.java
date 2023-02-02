@@ -87,15 +87,15 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     Map<String, String> requestMetadataMap =
         ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
     MailboxReceiveOperator mailboxReceiveOperator = null;
+    long deadlineNanos =
+        TimeUnit.MILLISECONDS.toNanos(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS) + System.nanoTime();
     for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
-        mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(
-            _mailboxService,
+        mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
             Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)), reduceNode.getSenderStageId(),
-            reduceNode.getDataSchema(), new VirtualServerAddress("localhost", _reducerGrpcPort, 0),
-            TimeUnit.MILLISECONDS.toNanos(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS) + System.nanoTime());
+            reduceNode.getDataSchema(), new VirtualServerAddress("localhost", _reducerGrpcPort, 0), deadlineNanos);
       } else {
         for (VirtualServer serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedStagePlan distributedStagePlan =
@@ -105,8 +105,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       }
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
-    return QueryDispatcher.toResultTable(
-        QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS),
+    return QueryDispatcher.toResultTable(QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, deadlineNanos),
         queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
   }
 

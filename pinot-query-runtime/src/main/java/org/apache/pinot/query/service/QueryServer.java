@@ -81,7 +81,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     // Deserialize the request
     DistributedStagePlan distributedStagePlan;
     Map<String, String> requestMetadataMap;
-    long deadlineNanos = Context.current().getDeadline().timeRemaining(TimeUnit.NANOSECONDS);
+    long deadlineNanos = Context.current().getDeadline().timeRemaining(TimeUnit.NANOSECONDS) + System.nanoTime();
     try {
       distributedStagePlan = QueryPlanSerDeUtils.deserialize(request.getStagePlan());
       requestMetadataMap = request.getMetadataMap();
