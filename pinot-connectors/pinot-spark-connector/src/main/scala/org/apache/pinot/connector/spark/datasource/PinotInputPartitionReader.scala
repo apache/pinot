@@ -30,10 +30,10 @@ import java.io.Closeable
  * Represents a spark partition, and receives data from specified pinot server-segment list.
  */
 class PinotInputPartitionReader(
-                                 schema: StructType,
-                                 partitionId: Int,
-                                 pinotSplit: PinotSplit,
-                                 dataSourceOptions: PinotDataSourceReadOptions)
+    schema: StructType,
+    partitionId: Int,
+    pinotSplit: PinotSplit,
+    dataSourceOptions: PinotDataSourceReadOptions)
   extends InputPartitionReader[InternalRow] {
 
   private val (responseIterator: Iterator[InternalRow], source: Closeable) = getIteratorAndSource()
