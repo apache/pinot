@@ -19,13 +19,13 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Iterator;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -34,18 +34,17 @@ import org.testng.annotations.Test;
 
 
 public class SingletonExchangeTest {
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1", "0@host:1", "0@host:1");
-
   private AutoCloseable _mocks;
 
   @Mock
   TransferableBlock _block;
   @Mock
-  MailboxService<TransferableBlock> _mailboxService;
+  private SendingMailbox<TransferableBlock> _mailbox1;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    Mockito.when(_block.getType()).thenReturn(DataBlock.Type.METADATA);
   }
 
   @AfterMethod
@@ -57,17 +56,15 @@ public class SingletonExchangeTest {
   @Test
   public void shouldRouteSingleton() {
     // Given:
-    ImmutableList<MailboxIdentifier> destinations = ImmutableList.of(MAILBOX_1);
+    ImmutableList<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1);
 
     // When:
-    Iterator<BlockExchange.RoutedBlock> route =
-        new SingletonExchange(_mailboxService, destinations, TransferableBlockUtils::splitBlock)
-            .route(destinations, _block);
+    new SingletonExchange(destinations, TransferableBlockUtils::splitBlock).route(destinations, _block);
 
     // Then:
-    BlockExchange.RoutedBlock routedBlock = route.next();
-    Assert.assertEquals(routedBlock._destination, MAILBOX_1);
-    Assert.assertEquals(routedBlock._block, _block);
-    Assert.assertFalse(route.hasNext(), "should be done with routing");
+    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    // Then:
+    Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
+    Assert.assertEquals(captor.getValue(), _block);
   }
 }

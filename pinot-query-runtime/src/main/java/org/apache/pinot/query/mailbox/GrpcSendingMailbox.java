@@ -19,7 +19,6 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.protobuf.ByteString;
-import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
@@ -30,9 +29,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
-import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
-import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
@@ -40,31 +37,19 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  * GRPC implementation of the {@link SendingMailbox}.
  */
 public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
-  private final GrpcMailboxService _mailboxService;
   private final String _mailboxId;
   private final AtomicBoolean _initialized = new AtomicBoolean(false);
   private final AtomicInteger _totalMsgSent = new AtomicInteger(0);
 
-  private CountDownLatch _finishLatch = new CountDownLatch(1);
+  private final CountDownLatch _finishLatch;
+  private final StreamObserver<MailboxContent> _mailboxContentStreamObserver;
 
-  private StreamObserver<MailboxContent> _mailboxContentStreamObserver;
-
-  public GrpcSendingMailbox(String mailboxId, GrpcMailboxService mailboxService) {
-    _mailboxService = mailboxService;
+  public GrpcSendingMailbox(String mailboxId, StreamObserver<MailboxContent> mailboxContentStreamObserver,
+      CountDownLatch latch) {
     _mailboxId = mailboxId;
+    _mailboxContentStreamObserver = mailboxContentStreamObserver;
+    _finishLatch = latch;
     _initialized.set(false);
-  }
-
-  public void init()
-      throws UnsupportedOperationException {
-    ManagedChannel channel = _mailboxService.getChannel(_mailboxId);
-    PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
-    _mailboxContentStreamObserver = stub.open(new MailboxStatusStreamObserver(_finishLatch));
-    // TODO: Replace init call with metadata.
-    // send a begin-of-stream message.
-    _mailboxContentStreamObserver.onNext(MailboxContent.newBuilder().setMailboxId(_mailboxId)
-        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true").build());
-    _initialized.set(true);
   }
 
   @Override
@@ -72,7 +57,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
       throws UnsupportedOperationException {
     if (!_initialized.get()) {
       // initialization is special
-      init();
+      open();
     }
     MailboxContent data = toMailboxContent(block.getDataBlock());
     _mailboxContentStreamObserver.onNext(data);
@@ -82,6 +67,15 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   @Override
   public void complete() {
     _mailboxContentStreamObserver.onCompleted();
+  }
+
+  @Override
+  public void open() {
+    // TODO: Get rid of init call.
+    // send a begin-of-stream message.
+    _mailboxContentStreamObserver.onNext(MailboxContent.newBuilder().setMailboxId(_mailboxId)
+        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true").build());
+    _initialized.set(true);
   }
 
   @Override
