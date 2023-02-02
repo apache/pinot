@@ -87,7 +87,6 @@ public abstract class BlockExchange {
     }
 
     DataBlock.Type type = block.getType();
-    // TODO: Move splitter into mailbox service.
     Iterator<TransferableBlock> splits = _splitter.split(block, type, MAX_MAILBOX_CONTENT_SIZE_BYTES);
     while (splits.hasNext()) {
       sendingMailbox.send(splits.next());
