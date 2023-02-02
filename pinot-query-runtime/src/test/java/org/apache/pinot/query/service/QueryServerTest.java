@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -129,7 +130,7 @@ public class QueryServerTest extends QueryTestSet {
                       stageMetadata, distributedStagePlan.getMetadataMap().get(stageId));
                 }), Mockito.argThat(requestMetadataMap -> requestIdStr.equals(
                     requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID))),
-                (long) (System.nanoTime() + (10 * 1e9)));
+                Mockito.anyLong());
             return true;
           } catch (Throwable t) {
             return false;
@@ -167,7 +168,7 @@ public class QueryServerTest extends QueryTestSet {
     int port = Integer.parseInt(queryRequest.getMetadataMap().get(KEY_OF_SERVER_INSTANCE_PORT));
     ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
     PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub stub = PinotQueryWorkerGrpc.newBlockingStub(channel);
-    Worker.QueryResponse resp = stub.submit(queryRequest);
+    Worker.QueryResponse resp = stub.withDeadlineAfter(10, TimeUnit.SECONDS).submit(queryRequest);
     // TODO: validate meaningful return value
     Assert.assertNotNull(resp.getMetadataMap().get(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK));
     channel.shutdown();
