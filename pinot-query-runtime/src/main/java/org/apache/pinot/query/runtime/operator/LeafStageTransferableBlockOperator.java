@@ -42,9 +42,9 @@ import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 
 /**
@@ -326,6 +326,4 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     }
     return true;
   }
-
-
 }

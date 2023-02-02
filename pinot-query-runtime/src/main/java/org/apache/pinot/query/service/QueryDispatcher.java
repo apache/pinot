@@ -85,7 +85,8 @@ public class QueryDispatcher {
   }
 
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
-      MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions, Map<String, String> stats)
+      MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions,
+      Map<String, String> stats)
       throws Exception {
     // submit all the distributed stages.
     int reduceStageId = submit(requestId, queryPlan, timeoutMs, queryOptions);
@@ -164,7 +165,8 @@ public class QueryDispatcher {
     throw new RuntimeException("Timed out while receiving from mailbox: " + QueryException.EXECUTION_TIMEOUT_ERROR);
   }
 
-  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs, Map<String, String> metadata) {
+  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs,
+      Map<String, String> metadata) {
     List<DataBlock> resultDataBlocks = new ArrayList<>();
     TransferableBlock transferableBlock;
     long timeoutWatermark = System.nanoTime() + timeoutMs * 1_000_000L;
