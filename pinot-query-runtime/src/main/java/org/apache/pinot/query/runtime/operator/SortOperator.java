@@ -65,7 +65,7 @@ public class SortOperator extends MultiStageOperator {
       int maxHolderCapacity, long requestId, int stageId) {
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
-    _offset = offset;
+    _offset = Math.max(offset, 0);
     _dataSchema = dataSchema;
     _upstreamErrorBlock = null;
     _isSortedBlockConstructed = false;
