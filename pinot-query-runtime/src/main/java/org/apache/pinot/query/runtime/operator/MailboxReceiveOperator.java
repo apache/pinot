@@ -37,7 +37,6 @@ import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +62,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   private final MailboxService<TransferableBlock> _mailboxService;
   private final RelDistribution.Type _exchangeType;
   private final List<MailboxIdentifier> _sendingMailbox;
-  private final long _deadlineTimestampNano;
+  private final long _deadlineNanos;
   private int _serverIdx;
   private TransferableBlock _upstreamErrorBlock;
 
@@ -78,13 +77,12 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   // TODO: Move deadlineInNanoSeconds to OperatorContext.
   public MailboxReceiveOperator(MailboxService<TransferableBlock> mailboxService,
       List<VirtualServer> sendingStageInstances, RelDistribution.Type exchangeType, VirtualServerAddress receiver,
-      long jobId, int stageId, Long timeoutMs) {
+      long jobId, int stageId, long deadlineNanos) {
     super(jobId, stageId);
     _mailboxService = mailboxService;
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
         "Exchange/Distribution type: " + exchangeType + " is not supported!");
-    long timeoutNano = (timeoutMs != null ? timeoutMs : QueryConfig.DEFAULT_MAILBOX_TIMEOUT_MS) * 1_000_000L;
-    _deadlineTimestampNano = timeoutNano + System.nanoTime();
+    _deadlineNanos = deadlineNanos;
 
     _exchangeType = exchangeType;
     if (_exchangeType == RelDistribution.Type.SINGLETON) {
@@ -134,7 +132,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock() {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
-    } else if (System.nanoTime() >= _deadlineTimestampNano) {
+    } else if (System.nanoTime() >= _deadlineNanos) {
       return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
     }
 

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.service;
 
+import io.grpc.Context;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -25,6 +26,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
@@ -79,6 +81,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     // Deserialize the request
     DistributedStagePlan distributedStagePlan;
     Map<String, String> requestMetadataMap;
+    long deadlineNanos = Context.current().getDeadline().timeRemaining(TimeUnit.NANOSECONDS);
     try {
       distributedStagePlan = QueryPlanSerDeUtils.deserialize(request.getStagePlan());
       requestMetadataMap = request.getMetadataMap();
@@ -90,7 +93,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
     // TODO: break this into parsing and execution, so that responseObserver can return upon compilation complete.
     // compilation complete indicates dispatch successful.
-    _executorService.submit(() -> _queryRunner.processQuery(distributedStagePlan, requestMetadataMap));
+    _executorService.submit(() -> _queryRunner.processQuery(distributedStagePlan, requestMetadataMap, deadlineNanos));
 
     responseObserver.onNext(Worker.QueryResponse.newBuilder()
         .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());

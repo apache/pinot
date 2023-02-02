@@ -126,6 +126,6 @@ public class QueryServerEnclosure {
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
-    _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+    _queryRunner.processQuery(distributedStagePlan, requestMetadataMap, (long) (System.nanoTime() + (10 * 1e9)));
   }
 }

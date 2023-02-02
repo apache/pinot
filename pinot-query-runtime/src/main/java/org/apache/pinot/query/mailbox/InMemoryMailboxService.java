@@ -64,7 +64,8 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
     return _mailboxPort;
   }
 
-  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
+  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineNanos) {
+    // TODO: handle mailbox deadline.
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
     // for now, we use an unbounded blocking queue as the means of communication between

@@ -44,7 +44,6 @@ import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.testutils.QueryTestUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -125,11 +124,12 @@ public class QueryServerTest extends QueryTestSet {
         TestUtils.waitForCondition(aVoid -> {
           try {
             Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
-              StageNode stageNode = queryPlan.getQueryStageMap().get(stageId);
-              return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot())
-                  && isMetadataMapsEqual(stageMetadata, distributedStagePlan.getMetadataMap().get(stageId));
-            }), Mockito.argThat(requestMetadataMap ->
-                requestIdStr.equals(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID))));
+                  StageNode stageNode = queryPlan.getQueryStageMap().get(stageId);
+                  return isStageNodesEqual(stageNode, distributedStagePlan.getStageRoot()) && isMetadataMapsEqual(
+                      stageMetadata, distributedStagePlan.getMetadataMap().get(stageId));
+                }), Mockito.argThat(requestMetadataMap -> requestIdStr.equals(
+                    requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID))),
+                (long) (System.nanoTime() + (10 * 1e9)));
             return true;
           } catch (Throwable t) {
             return false;
@@ -180,8 +180,6 @@ public class QueryServerTest extends QueryTestSet {
             QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
         // the default configurations that must exist.
         .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()))
-        .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
-            String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS))
         // extra configurations we want to test also parsed out correctly.
         .putMetadata(KEY_OF_SERVER_INSTANCE_HOST, serverInstance.getHostname())
         .putMetadata(KEY_OF_SERVER_INSTANCE_PORT, String.valueOf(serverInstance.getPort())).build();

@@ -64,20 +64,17 @@ import org.testng.annotations.Test;
  */
 public class QueryRunnerTest extends QueryRunnerTestBase {
   public static final Object[][] ROWS = new Object[][]{
-      new Object[]{"foo", "foo", 1},
-      new Object[]{"bar", "bar", 42},
-      new Object[]{"alice", "alice", 1},
-      new Object[]{"bob", "foo", 42},
-      new Object[]{"charlie", "bar", 1},
+      new Object[]{"foo", "foo", 1}, new Object[]{"bar", "bar", 42}, new Object[]{"alice", "alice", 1}, new Object[]{
+      "bob", "foo", 42
+  }, new Object[]{"charlie", "bar", 1},
   };
   public static final Schema.SchemaBuilder SCHEMA_BUILDER;
+
   static {
-    SCHEMA_BUILDER = new Schema.SchemaBuilder()
-        .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
+    SCHEMA_BUILDER = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
-        .addMetric("col3", FieldSpec.DataType.INT, 0)
-        .setSchemaName("defaultSchemaName");
+        .addMetric("col3", FieldSpec.DataType.INT, 0).setSchemaName("defaultSchemaName");
   }
 
   public static List<GenericRow> buildRows(String tableName) {
@@ -87,8 +84,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       row.putValue("col1", ROWS[i][0]);
       row.putValue("col2", ROWS[i][1]);
       row.putValue("col3", ROWS[i][2]);
-      row.putValue("ts", TableType.OFFLINE.equals(TableNameBuilder.getTableTypeFromTableName(tableName))
-          ? System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2) : System.currentTimeMillis());
+      row.putValue("ts",
+          TableType.OFFLINE.equals(TableNameBuilder.getTableTypeFromTableName(tableName)) ? System.currentTimeMillis()
+              - TimeUnit.DAYS.toMillis(2) : System.currentTimeMillis());
       rows.add(row);
     }
     return rows;
@@ -98,25 +96,21 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   public void setUp()
       throws Exception {
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
-        .addSegment("a_REALTIME", buildRows("a_REALTIME"))
-        .addSegment("a_REALTIME", buildRows("a_REALTIME"))
-        .addSegment("b_REALTIME", buildRows("b_REALTIME"))
-        .addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
-        .addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
-    MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
-        .addSegment("a_REALTIME", buildRows("a_REALTIME"))
-        .addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
-        .addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
-        .addSegment("d_OFFLINE", buildRows("d_OFFLINE"))
-        .addSegment("d_REALTIME", buildRows("d_REALTIME"));
+    MockInstanceDataManagerFactory factory1 =
+        new MockInstanceDataManagerFactory("server1").registerTable(SCHEMA_BUILDER.setSchemaName("a").build(),
+                "a_REALTIME").registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
+            .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
+            .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
+            .addSegment("a_REALTIME", buildRows("a_REALTIME")).addSegment("a_REALTIME", buildRows("a_REALTIME"))
+            .addSegment("b_REALTIME", buildRows("b_REALTIME")).addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
+            .addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
+    MockInstanceDataManagerFactory factory2 =
+        new MockInstanceDataManagerFactory("server2").registerTable(SCHEMA_BUILDER.setSchemaName("a").build(),
+                "a_REALTIME").registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
+            .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
+            .addSegment("a_REALTIME", buildRows("a_REALTIME")).addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
+            .addSegment("c_OFFLINE", buildRows("c_OFFLINE")).addSegment("d_OFFLINE", buildRows("d_OFFLINE"))
+            .addSegment("d_REALTIME", buildRows("d_REALTIME"));
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
     QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
 
@@ -134,13 +128,14 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerGrpcPort, new PinotConfiguration(reducerConfig),
-        ignored -> { });
+    _mailboxService =
+        new GrpcMailboxService(_reducerHostname, _reducerGrpcPort, new PinotConfiguration(reducerConfig), ignored -> {
+        });
     _mailboxService.start();
 
-    _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
-        server2.getPort(), factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(),
-        factory2.buildTableSegmentNameMap());
+    _queryEnvironment =
+        QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
+            factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap());
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
@@ -180,19 +175,16 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =
-        ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()),
-            QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
-            String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+        ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
     MailboxReceiveOperator mailboxReceiveOperator = null;
     for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
         mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)),
-            reduceNode.getSenderStageId(), reduceNode.getDataSchema(),
-            new VirtualServerAddress("localhost", _reducerGrpcPort, 0),
-            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)));
+            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)), reduceNode.getSenderStageId(),
+            reduceNode.getDataSchema(), new VirtualServerAddress("localhost", _reducerGrpcPort, 0),
+            TimeUnit.MILLISECONDS.toNanos(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS) + System.nanoTime());
       } else {
         for (VirtualServer serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedStagePlan distributedStagePlan =
@@ -207,14 +199,14 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
-      Assert.assertTrue(rte.getMessage().contains(exceptionMsg), "Exception should contain: " + exceptionMsg
-          + "! but found: " + rte.getMessage());
+      Assert.assertTrue(rte.getMessage().contains(exceptionMsg),
+          "Exception should contain: " + exceptionMsg + "! but found: " + rte.getMessage());
     }
   }
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
   private Object[][] provideTestSqlAndRowCount() {
-    return new Object[][] {
+    return new Object[][]{
         // using join clause
         new Object[]{"SELECT * FROM a JOIN b USING (col1)", 15},
 
@@ -223,49 +215,57 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // test dateTrunc
         //   - on leaf stage
-        new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 10},
-        new Object[]{"SELECT dateTrunc('DAY', CAST(col3 AS BIGINT)) FROM a LIMIT 10", 10},
+        new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 10}, new Object[]{
+        "SELECT dateTrunc('DAY', CAST" + "(col3 AS BIGINT)) FROM a LIMIT 10", 10
+    },
         //   - on intermediate stage
-        new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
-            + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
-        new Object[]{"SELECT dateTrunc('DAY', CAST(MAX(a.col3) AS BIGINT)) FROM a", 1},
+        new Object[]{
+            "SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b " + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15
+        }, new Object[]{"SELECT dateTrunc('DAY', CAST(MAX(a.col3) AS BIGINT)) FROM a", 1},
 
         // ScalarFunction
         // test function can be used in predicate/leaf/intermediate stage (using regexpLike)
         new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLike(a.col2, b.col1)", 9},
         new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexp_like(a.col2, b.col1)", 9},
-        new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
-        new Object[]{"SELECT regexp_like(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
+        new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39}, new Object[]{
+        "SELECT " + "regexp_like(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39
+    },
 
         // test function with @ScalarFunction annotation and alias works (using round_decimal)
-        new Object[]{"SELECT roundDecimal(col3) FROM a", 15},
-        new Object[]{"SELECT round_decimal(col3) FROM a", 15},
-        new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5},
-        new Object[]{"SELECT col1, round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
+        new Object[]{"SELECT roundDecimal(col3) FROM a", 15}, new Object[]{"SELECT round_decimal(col3) FROM a", 15},
+        new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5}, new Object[]{
+        "SELECT col1, " + "round_decimal(COUNT(*)) FROM a GROUP BY col1", 5
+    },
     };
   }
 
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
-    return new Object[][] {
+    return new Object[][]{
         // Timeout exception should occur with this option:
-        new Object[]{"SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
-            "timeout"},
+        new Object[]{
+            "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1", "timeout"
+        },
 
         // Function with incorrect argument signature should throw runtime exception when casting string to numeric
-        new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
-            "For input string:"},
+        new Object[]{
+            "SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1", "For input string:"
+        },
 
         // Scalar function that doesn't have a valid use should throw an exception on the leaf stage
         //   - predicate only functions:
-        new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"},
-        new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index"},
-        new Object[]{"SELECT * FROM a WHERE textContains(col1, 'f')", "supported only on native text index"},
-        new Object[]{"SELECT * FROM a WHERE text_contains(col1, 'f')", "supported only on native text index"},
+        new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"}, new Object[]{
+        "SELECT * FROM" + " a WHERE text_match(col1, 'f')", "without text index"
+    }, new Object[]{
+        "SELECT * FROM a WHERE textContains" + "(col1, 'f')", "supported only on native text index"
+    }, new Object[]{
+        "SELECT * FROM a WHERE text_contains" + "(col1, 'f')", "supported only on native text index"
+    },
 
         //  - transform only functions
-        new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"},
-        new Object[]{"SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String"},
+        new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"}, new Object[]{
+        "SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String"
+    },
 
         //  - PlaceholderScalarFunction registered will throw on intermediate stage, but works on leaf stage.
         //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.

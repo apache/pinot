@@ -44,8 +44,10 @@ public class GrpcMailboxServiceTest {
   private static final DataSchema TEST_DATA_SCHEMA = new DataSchema(new String[]{"foo", "bar"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
 
-  private final AtomicReference<Consumer<MailboxIdentifier>> _mail1GotData = new AtomicReference<>(ignored -> { });
-  private final AtomicReference<Consumer<MailboxIdentifier>> _mail2GotData = new AtomicReference<>(ignored -> { });
+  private final AtomicReference<Consumer<MailboxIdentifier>> _mail1GotData = new AtomicReference<>(ignored -> {
+  });
+  private final AtomicReference<Consumer<MailboxIdentifier>> _mail2GotData = new AtomicReference<>(ignored -> {
+  });
 
   private GrpcMailboxService _mailboxService1;
   private GrpcMailboxService _mailboxService2;
@@ -53,15 +55,15 @@ public class GrpcMailboxServiceTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    PinotConfiguration extraConfig = new PinotConfiguration(Collections.singletonMap(
-        QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 4_000_000));
+    PinotConfiguration extraConfig = new PinotConfiguration(
+        Collections.singletonMap(QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 4_000_000));
 
-    _mailboxService1 = new GrpcMailboxService(
-        "localhost", QueryTestUtils.getAvailablePort(), extraConfig, id -> _mail1GotData.get().accept(id));
+    _mailboxService1 = new GrpcMailboxService("localhost", QueryTestUtils.getAvailablePort(), extraConfig,
+        id -> _mail1GotData.get().accept(id));
     _mailboxService1.start();
 
-    _mailboxService2 = new GrpcMailboxService(
-        "localhost", QueryTestUtils.getAvailablePort(), extraConfig, id -> _mail2GotData.get().accept(id));
+    _mailboxService2 = new GrpcMailboxService("localhost", QueryTestUtils.getAvailablePort(), extraConfig,
+        id -> _mail2GotData.get().accept(id));
     _mailboxService2.start();
   }
 
@@ -75,11 +77,10 @@ public class GrpcMailboxServiceTest {
   public void testHappyPath()
       throws Exception {
     // Given:
-    JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
-        "happypath",
+    JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier("happypath",
         new VirtualServerAddress("localhost", _mailboxService1.getMailboxPort(), 0),
         new VirtualServerAddress("localhost", _mailboxService2.getMailboxPort(), 0));
-    SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId);
+    SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId, 1000000000);
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);
     _mail2GotData.set(ignored -> gotData.countDown());
@@ -107,11 +108,11 @@ public class GrpcMailboxServiceTest {
   public void testGrpcException()
       throws Exception {
     // Given:
-    JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
-        "exception",
+    JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier("exception",
         new VirtualServerAddress("localhost", _mailboxService1.getMailboxPort(), 0),
         new VirtualServerAddress("localhost", _mailboxService2.getMailboxPort(), 0));
-    SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId);
+    SendingMailbox<TransferableBlock> sendingMailbox =
+        _mailboxService1.getSendingMailbox(mailboxId, System.nanoTime() + 100000000);
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);
     _mail2GotData.set(ignored -> gotData.countDown());

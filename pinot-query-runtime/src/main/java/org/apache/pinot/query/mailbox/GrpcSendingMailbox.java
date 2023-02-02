@@ -42,7 +42,7 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
   private final AtomicInteger _totalMsgSent = new AtomicInteger(0);
 
   private final CountDownLatch _finishLatch;
-  private final StreamObserver<MailboxContent> _mailboxContentStreamObserver;
+  private StreamObserver<MailboxContent> _mailboxContentStreamObserver;
 
   public GrpcSendingMailbox(String mailboxId, StreamObserver<MailboxContent> mailboxContentStreamObserver,
       CountDownLatch latch) {

@@ -50,45 +50,46 @@ import org.apache.pinot.query.runtime.operator.TransformOperator;
  * this works only for the intermediate stage nodes, leaf stage nodes are expected to compile into
  * v1 operators at this point in time.
  *
- * <p>This class should be used statically via {@link #build(StageNode, PlanRequestContext)}
+ * <p>This class should be used statically via {@link #build(StageNode, OpChainContext)}
  */
-public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator, PlanRequestContext> {
+public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator, OpChainContext> {
 
   private static final PhysicalPlanVisitor INSTANCE = new PhysicalPlanVisitor();
 
-  public static OpChain build(StageNode node, PlanRequestContext context) {
+  public static OpChain build(StageNode node, OpChainContext context) {
     MultiStageOperator root = node.visit(INSTANCE, context);
     return new OpChain(root, context.getReceivingMailboxes(), context.getRequestId(), context.getStageId());
   }
 
   @Override
-  public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, PlanRequestContext context) {
+  public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, OpChainContext context) {
     List<VirtualServer> sendingInstances = context.getMetadataMap().get(node.getSenderStageId()).getServerInstances();
     MailboxReceiveOperator mailboxReceiveOperator =
         new MailboxReceiveOperator(context.getMailboxService(), sendingInstances,
             node.getExchangeType(), context.getServer(),
-            context.getRequestId(), node.getSenderStageId(), context.getTimeoutMs());
+            context.getRequestId(), node.getSenderStageId(), context.getDeadlineNanos());
     context.addReceivingMailboxes(mailboxReceiveOperator.getSendingMailbox());
     return mailboxReceiveOperator;
   }
 
   @Override
-  public MultiStageOperator visitMailboxSend(MailboxSendNode node, PlanRequestContext context) {
+  public MultiStageOperator visitMailboxSend(MailboxSendNode node, OpChainContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     StageMetadata receivingStageMetadata = context.getMetadataMap().get(node.getReceiverStageId());
     return new MailboxSendOperator(context.getMailboxService(), nextOperator,
         receivingStageMetadata.getServerInstances(), node.getExchangeType(), node.getPartitionKeySelector(),
-        context.getServer(), context.getRequestId(), node.getStageId());
+        context.getServer(), context.getRequestId(), node.getStageId(), context.getDeadlineNanos());
   }
 
   @Override
-  public MultiStageOperator visitAggregate(AggregateNode node, PlanRequestContext context) {
+  public MultiStageOperator visitAggregate(AggregateNode node, OpChainContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new AggregateOperator(nextOperator, node.getDataSchema(), node.getAggCalls(),
         node.getGroupSet(), node.getInputs().get(0).getDataSchema(), context._requestId, context._stageId);
   }
 
   @Override
+<<<<<<< HEAD
   public MultiStageOperator visitWindow(WindowNode node, PlanRequestContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     throw new UnsupportedOperationException("Window not yet supported!");
@@ -96,13 +97,16 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
 
   @Override
   public MultiStageOperator visitFilter(FilterNode node, PlanRequestContext context) {
+=======
+  public MultiStageOperator visitFilter(FilterNode node, OpChainContext context) {
+>>>>>>> 272fceaf85 (rpc deadline)
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new FilterOperator(nextOperator, node.getDataSchema(), node.getCondition(), context.getRequestId(),
         context.getStageId());
   }
 
   @Override
-  public MultiStageOperator visitJoin(JoinNode node, PlanRequestContext context) {
+  public MultiStageOperator visitJoin(JoinNode node, OpChainContext context) {
     StageNode left = node.getInputs().get(0);
     StageNode right = node.getInputs().get(1);
 
@@ -114,26 +118,26 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
   }
 
   @Override
-  public MultiStageOperator visitProject(ProjectNode node, PlanRequestContext context) {
+  public MultiStageOperator visitProject(ProjectNode node, OpChainContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new TransformOperator(nextOperator, node.getDataSchema(), node.getProjects(),
         node.getInputs().get(0).getDataSchema(), context.getRequestId(), context.getStageId());
   }
 
   @Override
-  public MultiStageOperator visitSort(SortNode node, PlanRequestContext context) {
+  public MultiStageOperator visitSort(SortNode node, OpChainContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new SortOperator(nextOperator, node.getCollationKeys(), node.getCollationDirections(),
         node.getFetch(), node.getOffset(), node.getDataSchema(), context.getRequestId(), context.getStageId());
   }
 
   @Override
-  public MultiStageOperator visitTableScan(TableScanNode node, PlanRequestContext context) {
+  public MultiStageOperator visitTableScan(TableScanNode node, OpChainContext context) {
     throw new UnsupportedOperationException("Stage node of type TableScanNode is not supported!");
   }
 
   @Override
-  public MultiStageOperator visitValue(ValueNode node, PlanRequestContext context) {
+  public MultiStageOperator visitValue(ValueNode node, OpChainContext context) {
     return new LiteralValueOperator(node.getDataSchema(), node.getLiteralRows(), context.getRequestId(),
         context.getStageId());
   }

@@ -22,6 +22,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
@@ -91,12 +92,13 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * Register a mailbox, mailbox needs to be registered before use.
    * @param mailboxId the id of the mailbox.
    */
-  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
+  public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId, long deadlineNanos) {
     ManagedChannel channel = getChannel(mailboxId.toString());
     PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
     CountDownLatch latch = new CountDownLatch(1);
     StreamObserver<Mailbox.MailboxContent> mailboxContentStreamObserver =
-        stub.open(new MailboxStatusStreamObserver(latch));
+        stub.withDeadlineAfter(deadlineNanos - System.nanoTime(), TimeUnit.NANOSECONDS)
+            .open(new MailboxStatusStreamObserver(latch));
     GrpcSendingMailbox mailbox = new GrpcSendingMailbox(mailboxId.toString(), mailboxContentStreamObserver, latch);
     return mailbox;
   }

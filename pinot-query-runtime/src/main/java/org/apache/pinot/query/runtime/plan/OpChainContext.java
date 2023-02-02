@@ -29,22 +29,23 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
-public class PlanRequestContext {
+public class OpChainContext {
   protected final MailboxService<TransferableBlock> _mailboxService;
   protected final long _requestId;
   protected final int _stageId;
-  private final long _timeoutMs;
+  private final long _deadlineNanos;
+
   protected final VirtualServerAddress _server;
   protected final Map<Integer, StageMetadata> _metadataMap;
   protected final List<MailboxIdentifier> _receivingMailboxes = new ArrayList<>();
 
 
-  public PlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      long timeoutMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
+  public OpChainContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
+      long deadlineNanos, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
-    _timeoutMs = timeoutMs;
+    _deadlineNanos = deadlineNanos;
     _server = server;
     _metadataMap = metadataMap;
   }
@@ -57,8 +58,8 @@ public class PlanRequestContext {
     return _stageId;
   }
 
-  public long getTimeoutMs() {
-    return _timeoutMs;
+  public long getDeadlineNanos() {
+    return _deadlineNanos;
   }
 
   public VirtualServerAddress getServer() {

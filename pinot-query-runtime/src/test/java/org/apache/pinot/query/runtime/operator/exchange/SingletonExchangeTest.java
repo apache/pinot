@@ -37,7 +37,8 @@ public class SingletonExchangeTest {
   private AutoCloseable _mocks;
 
   @Mock
-  TransferableBlock _block;
+  private TransferableBlock _block;
+
   @Mock
   private SendingMailbox<TransferableBlock> _mailbox1;
 

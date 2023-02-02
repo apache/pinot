@@ -53,8 +53,8 @@ import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperato
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.OpChainContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.query.runtime.plan.ServerRequestPlanVisitor;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.service.QueryConfig;
@@ -130,7 +130,8 @@ public class QueryRunner {
     _scheduler.stopAsync().awaitTerminated(30, TimeUnit.SECONDS);
   }
 
-  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
+  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap,
+      long deadlineNanos) {
     long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
     if (isLeafStage(distributedStagePlan)) {
       // TODO: make server query request return via mailbox, this is a hack to gather the non-streaming data table
@@ -138,7 +139,8 @@ public class QueryRunner {
       // server executor.
       long leafStageStartMillis = System.currentTimeMillis();
       List<ServerPlanRequestContext> serverQueryRequests =
-          constructServerQueryRequests(distributedStagePlan, requestMetadataMap, _helixPropertyStore, _mailboxService);
+          constructServerQueryRequests(distributedStagePlan, requestMetadataMap, _helixPropertyStore, _mailboxService,
+              deadlineNanos);
 
       // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
       List<InstanceResponseBlock> serverQueryResults = new ArrayList<>(serverQueryRequests.size());
@@ -156,19 +158,18 @@ public class QueryRunner {
           new LeafStageTransferableBlockOperator(serverQueryResults, sendNode.getDataSchema(), requestId,
               sendNode.getStageId()), receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
           sendNode.getPartitionKeySelector(), _rootServer, serverQueryRequests.get(0).getRequestId(),
-          sendNode.getStageId());
+          sendNode.getStageId(), deadlineNanos);
       int blockCounter = 0;
       while (!TransferableBlockUtils.isEndOfStream(mailboxSendOperator.nextBlock())) {
         LOGGER.debug("Acquired transferable block: {}", blockCounter++);
       }
       mailboxSendOperator.toExplainString();
     } else {
-      long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
       StageNode stageRoot = distributedStagePlan.getStageRoot();
-      OpChain rootOperator = PhysicalPlanVisitor.build(stageRoot,
-          new PlanRequestContext(_mailboxService, requestId, stageRoot.getStageId(), timeoutMs,
+      OpChain chain = PhysicalPlanVisitor.build(stageRoot,
+          new OpChainContext(_mailboxService, requestId, stageRoot.getStageId(), deadlineNanos,
               new VirtualServerAddress(distributedStagePlan.getServer()), distributedStagePlan.getMetadataMap()));
-      _scheduler.register(rootOperator);
+      _scheduler.register(chain);
     }
   }
 
@@ -178,7 +179,7 @@ public class QueryRunner {
 
   private static List<ServerPlanRequestContext> constructServerQueryRequests(DistributedStagePlan distributedStagePlan,
       Map<String, String> requestMetadataMap, ZkHelixPropertyStore<ZNRecord> helixPropertyStore,
-      MailboxService<TransferableBlock> mailboxService) {
+      MailboxService<TransferableBlock> mailboxService, long deadlineNanos) {
     StageMetadata stageMetadata = distributedStagePlan.getMetadataMap().get(distributedStagePlan.getStageId());
     Preconditions.checkState(stageMetadata.getScannedTables().size() == 1,
         "Server request for V2 engine should only have 1 scan table per request.");
@@ -198,7 +199,7 @@ public class QueryRunner {
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
         requests.add(
             ServerRequestPlanVisitor.build(mailboxService, distributedStagePlan, requestMetadataMap, tableConfig,
-                schema, stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, tableEntry.getValue()));
+                schema, stageMetadata.getTimeBoundaryInfo(), TableType.OFFLINE, tableEntry.getValue(), deadlineNanos));
       } else if (TableType.REALTIME.name().equals(tableType)) {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
@@ -206,7 +207,7 @@ public class QueryRunner {
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
         requests.add(
             ServerRequestPlanVisitor.build(mailboxService, distributedStagePlan, requestMetadataMap, tableConfig,
-                schema, stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, tableEntry.getValue()));
+                schema, stageMetadata.getTimeBoundaryInfo(), TableType.REALTIME, tableEntry.getValue(), deadlineNanos));
       } else {
         throw new IllegalArgumentException("Unsupported table type key: " + tableType);
       }

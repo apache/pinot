@@ -24,9 +24,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -37,9 +35,6 @@ import org.testng.annotations.Test;
 public class LiteralValueOperatorTest {
 
   private AutoCloseable _mocks;
-
-  @Mock
-  private PlanRequestContext _context;
 
   @BeforeMethod
   public void setUp() {

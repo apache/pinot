@@ -26,7 +26,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.plan.PlanRequestContext;
+import org.apache.pinot.query.runtime.plan.OpChainContext;
 import org.apache.pinot.spi.config.table.TableType;
 
 
@@ -34,7 +34,7 @@ import org.apache.pinot.spi.config.table.TableType;
  * Context class for converting a {@link org.apache.pinot.query.runtime.plan.DistributedStagePlan} into
  * {@link PinotQuery} to execute on server.
  */
-public class ServerPlanRequestContext extends PlanRequestContext {
+public class ServerPlanRequestContext extends OpChainContext {
   protected TableType _tableType;
   protected TimeBoundaryInfo _timeBoundaryInfo;
 
@@ -42,9 +42,9 @@ public class ServerPlanRequestContext extends PlanRequestContext {
   protected InstanceRequest _instanceRequest;
 
   public ServerPlanRequestContext(MailboxService<TransferableBlock> mailboxService, long requestId, int stageId,
-      long timeoutMs, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery,
+      long deadlineNanos, VirtualServerAddress server, Map<Integer, StageMetadata> metadataMap, PinotQuery pinotQuery,
       TableType tableType, TimeBoundaryInfo timeBoundaryInfo) {
-    super(mailboxService, requestId, stageId, timeoutMs, server, metadataMap);
+    super(mailboxService, requestId, stageId, deadlineNanos, server, metadataMap);
     _pinotQuery = pinotQuery;
     _tableType = tableType;
     _timeBoundaryInfo = timeBoundaryInfo;

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
@@ -91,10 +92,9 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
 
   public static ServerPlanRequestContext build(MailboxService<TransferableBlock> mailboxService,
       DistributedStagePlan stagePlan, Map<String, String> requestMetadataMap, TableConfig tableConfig, Schema schema,
-      TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList) {
+      TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList, long deadlineNanos) {
     // Before-visit: construct the ServerPlanRequestContext baseline
     long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
-    long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     PinotQuery pinotQuery = new PinotQuery();
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadataMap);
     if (leafNodeLimit != null) {
@@ -105,7 +105,7 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     LOGGER.debug("QueryID" + requestId + " leafNodeLimit:" + leafNodeLimit);
     pinotQuery.setExplain(false);
     ServerPlanRequestContext context =
-        new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), timeoutMs,
+        new ServerPlanRequestContext(mailboxService, requestId, stagePlan.getStageId(), deadlineNanos,
             new VirtualServerAddress(stagePlan.getServer()), stagePlan.getMetadataMap(), pinotQuery, tableType,
             timeBoundaryInfo);
 
@@ -123,8 +123,8 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
     QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
 
     // 2. set pinot query options according to requestMetadataMap
-    pinotQuery.setQueryOptions(
-        ImmutableMap.of(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, String.valueOf(timeoutMs)));
+    pinotQuery.setQueryOptions(ImmutableMap.of(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
+        String.valueOf(TimeUnit.NANOSECONDS.toMillis(deadlineNanos - System.nanoTime()))));
 
     // 3. wrapped around in broker request
     BrokerRequest brokerRequest = new BrokerRequest();

@@ -19,12 +19,14 @@
 package org.apache.pinot.query.service;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -65,6 +67,7 @@ public class QueryDispatcher {
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
       MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
+    long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
     // submit all the distributed stages.
     int reduceStageId = submit(requestId, queryPlan, timeoutMs, queryOptions);
     // run reduce stage and return result.
@@ -72,8 +75,8 @@ public class QueryDispatcher {
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(), requestId,
         reduceNode.getSenderStageId(), reduceNode.getDataSchema(),
-        new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0), timeoutMs);
-    List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutMs);
+        new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getMailboxPort(), 0), deadlineNanos);
+    List<DataBlock> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, deadlineNanos);
     mailboxReceiveOperator.toExplainString();
     long toResultTableStartTime = System.currentTimeMillis();
     ResultTable resultTable = toResultTable(resultDataBlocks, queryPlan.getQueryResultFields(),
@@ -84,9 +87,10 @@ public class QueryDispatcher {
     return resultTable;
   }
 
-  public int submit(long requestId, QueryPlan queryPlan, long timeoutMs, Map<String, String> queryOptions)
+  public int submit(long requestId, QueryPlan queryPlan, long deadlineNanos, Map<String, String> queryOptions)
       throws Exception {
     int reduceStageId = -1;
+    Deadline deadline = Deadline.after(deadlineNanos - System.nanoTime(), TimeUnit.NANOSECONDS);
     for (Map.Entry<Integer, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
       int stageId = stage.getKey();
       // stage rooting at a mailbox receive node means reduce stage.
@@ -100,9 +104,8 @@ public class QueryDispatcher {
           DispatchClient client = getOrCreateDispatchClient(host, servicePort);
           Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder().setStagePlan(
                   QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId, serverInstance)))
-              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
-              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
-              .putAllMetadata(queryOptions).build());
+              .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId)).putAllMetadata(queryOptions)
+              .build(), deadline);
 
           if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
             throw new RuntimeException(
@@ -126,11 +129,11 @@ public class QueryDispatcher {
         queryPlan.getStageMetadataMap());
   }
 
-  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutMs) {
+  public static List<DataBlock> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator,
+      long deadlineNanos) {
     List<DataBlock> resultDataBlocks = new ArrayList<>();
     TransferableBlock transferableBlock;
-    long timeoutWatermark = System.nanoTime() + timeoutMs * 1_000_000L;
-    while (System.nanoTime() < timeoutWatermark) {
+    while (System.nanoTime() < deadlineNanos) {
       transferableBlock = mailboxReceiveOperator.nextBlock();
       if (TransferableBlockUtils.isEndOfStream(transferableBlock) && transferableBlock.isErrorBlock()) {
         // TODO: we only received bubble up error from the execution stage tree.
@@ -197,11 +200,11 @@ public class QueryDispatcher {
   @VisibleForTesting
   public static MailboxReceiveOperator createReduceStageOperator(MailboxService<TransferableBlock> mailboxService,
       List<VirtualServer> sendingInstances, long jobId, int stageId, DataSchema dataSchema, VirtualServerAddress server,
-      long timeoutMs) {
+      long deadlineNanos) {
     // timeout is set for reduce stage
     MailboxReceiveOperator mailboxReceiveOperator =
-        new MailboxReceiveOperator(mailboxService, sendingInstances,
-            RelDistribution.Type.RANDOM_DISTRIBUTED, server, jobId, stageId, timeoutMs);
+        new MailboxReceiveOperator(mailboxService, sendingInstances, RelDistribution.Type.RANDOM_DISTRIBUTED, server,
+            jobId, stageId, deadlineNanos);
     return mailboxReceiveOperator;
   }
 
@@ -222,8 +225,8 @@ public class QueryDispatcher {
       _blockingStub = PinotQueryWorkerGrpc.newBlockingStub(_managedChannel);
     }
 
-    public Worker.QueryResponse submit(Worker.QueryRequest request) {
-      return _blockingStub.submit(request);
+    public Worker.QueryResponse submit(Worker.QueryRequest request, Deadline deadline) {
+      return _blockingStub.withDeadline(deadline).submit(request);
     }
   }
 }
