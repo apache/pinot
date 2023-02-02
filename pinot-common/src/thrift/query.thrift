@@ -65,6 +65,7 @@ union Literal {
   6: optional double doubleValue;
   7: optional string stringValue;
   8: optional binary binaryValue;
+  9: optional bool nullValue;
 }
 
 struct Function {
