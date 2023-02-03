@@ -20,6 +20,7 @@ package org.apache.pinot.query.mailbox;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
@@ -38,13 +39,15 @@ public class InMemoryMailboxServiceTest {
   @Test
   public void testHappyPath()
       throws Exception {
-    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
-    final JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
-        "happyPathJob", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 0, 0));
-    InMemoryReceivingMailbox receivingMailbox = (InMemoryReceivingMailbox) mailboxService.getReceivingMailbox(
-        mailboxId);
-    InMemorySendingMailbox sendingMailbox =
-        (InMemorySendingMailbox) mailboxService.getSendingMailbox(mailboxId, System.nanoTime() + 1000000000);
+    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> {
+    });
+    final JsonMailboxIdentifier mailboxId =
+        new JsonMailboxIdentifier("happyPathJob", new VirtualServerAddress("localhost", 0, 0),
+            new VirtualServerAddress("localhost", 0, 0));
+    InMemoryReceivingMailbox receivingMailbox =
+        (InMemoryReceivingMailbox) mailboxService.getReceivingMailbox(mailboxId);
+    InMemorySendingMailbox sendingMailbox = (InMemorySendingMailbox) mailboxService.getSendingMailbox(mailboxId,
+        System.nanoTime() + TimeUnit.SECONDS.toNanos(10));
 
     // Sends are non-blocking as long as channel capacity is not breached
     for (int i = 0; i < NUM_ENTRIES; i++) {
@@ -75,9 +78,11 @@ public class InMemoryMailboxServiceTest {
    */
   @Test
   public void testNonLocalMailboxId() {
-    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> { });
-    final JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier(
-        "happyPathJob", new VirtualServerAddress("localhost", 0, 0), new VirtualServerAddress("localhost", 1, 0));
+    InMemoryMailboxService mailboxService = new InMemoryMailboxService("localhost", 0, ignored -> {
+    });
+    final JsonMailboxIdentifier mailboxId =
+        new JsonMailboxIdentifier("happyPathJob", new VirtualServerAddress("localhost", 0, 0),
+            new VirtualServerAddress("localhost", 1, 0));
 
     // Test getReceivingMailbox
     try {

@@ -20,6 +20,7 @@ package org.apache.pinot.query;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -126,6 +127,7 @@ public class QueryServerEnclosure {
   }
 
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
-    _queryRunner.processQuery(distributedStagePlan, requestMetadataMap, (long) (System.nanoTime() + (10 * 1e9)));
+    _queryRunner.processQuery(distributedStagePlan, requestMetadataMap,
+        System.nanoTime() + TimeUnit.SECONDS.toNanos(10));
   }
 }
