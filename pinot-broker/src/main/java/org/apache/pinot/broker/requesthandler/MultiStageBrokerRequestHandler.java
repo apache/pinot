@@ -138,14 +138,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
+    long startTimeNanos = System.nanoTime();
     long compilationStartTimeNs;
-    long queryTimeoutMs;
+    long deadlineNanos;
     QueryPlan queryPlan;
     try {
       // Parse the request
       sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
-      queryTimeoutMs = timeoutMsFromQueryOption == null ? _defaultBrokerTimeoutMs : timeoutMsFromQueryOption;
+      deadlineNanos = startTimeNanos + TimeUnit.MILLISECONDS.toNanos(
+          timeoutMsFromQueryOption == null ? _defaultBrokerTimeoutMs : timeoutMsFromQueryOption);
       // Compile the request
       compilationStartTimeNs = System.nanoTime();
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
@@ -166,7 +168,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     ResultTable queryResults;
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
+      queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, deadlineNanos,
           sqlNodeAndOptions.getOptions());
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);

@@ -65,9 +65,8 @@ public class QueryDispatcher {
   }
 
   public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
-      MailboxService<TransferableBlock> mailboxService, long timeoutMs, Map<String, String> queryOptions)
+      MailboxService<TransferableBlock> mailboxService, long deadlineNanos, Map<String, String> queryOptions)
       throws Exception {
-    long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
     // submit all the distributed stages.
     int reduceStageId = submit(requestId, queryPlan, deadlineNanos, queryOptions);
     // run reduce stage and return result.
