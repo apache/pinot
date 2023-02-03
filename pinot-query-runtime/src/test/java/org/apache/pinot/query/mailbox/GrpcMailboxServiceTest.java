@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -80,7 +81,8 @@ public class GrpcMailboxServiceTest {
     JsonMailboxIdentifier mailboxId = new JsonMailboxIdentifier("happypath",
         new VirtualServerAddress("localhost", _mailboxService1.getMailboxPort(), 0),
         new VirtualServerAddress("localhost", _mailboxService2.getMailboxPort(), 0));
-    SendingMailbox<TransferableBlock> sendingMailbox = _mailboxService1.getSendingMailbox(mailboxId, 1000000000);
+    SendingMailbox<TransferableBlock> sendingMailbox =
+        _mailboxService1.getSendingMailbox(mailboxId, System.nanoTime() + TimeUnit.SECONDS.toNanos(10));
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);
     _mail2GotData.set(ignored -> gotData.countDown());
@@ -112,7 +114,7 @@ public class GrpcMailboxServiceTest {
         new VirtualServerAddress("localhost", _mailboxService1.getMailboxPort(), 0),
         new VirtualServerAddress("localhost", _mailboxService2.getMailboxPort(), 0));
     SendingMailbox<TransferableBlock> sendingMailbox =
-        _mailboxService1.getSendingMailbox(mailboxId, System.nanoTime() + 100000000);
+        _mailboxService1.getSendingMailbox(mailboxId, System.nanoTime() + TimeUnit.SECONDS.toNanos(10));
     ReceivingMailbox<TransferableBlock> receivingMailbox = _mailboxService2.getReceivingMailbox(mailboxId);
     CountDownLatch gotData = new CountDownLatch(1);
     _mail2GotData.set(ignored -> gotData.countDown());

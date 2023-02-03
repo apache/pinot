@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.query.QueryEnvironment;
@@ -44,8 +45,9 @@ import org.testng.annotations.Test;
 public class QueryDispatcherTest extends QueryTestSet {
   private static final Random RANDOM_REQUEST_ID_GEN = new Random();
   private static final int QUERY_SERVER_COUNT = 2;
-  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(
-      ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("QueryDispatcherTestExecutorService"));
+  private static final ExecutorService EXECUTOR_SERVICE =
+      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
+          new NamedThreadFactory("QueryDispatcherTestExecutorService"));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
@@ -58,7 +60,7 @@ public class QueryDispatcherTest extends QueryTestSet {
 
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
-      QueryRunner queryRunner = Mockito.mock(QueryRunner.class);;
+      QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
       Mockito.when(queryRunner.getExecutorService()).thenReturn(EXECUTOR_SERVICE);
       QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer.start();
@@ -86,7 +88,9 @@ public class QueryDispatcherTest extends QueryTestSet {
       throws Exception {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
-    int reducerStageId = dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, 10_000L, new HashMap<>());
+    int reducerStageId =
+        dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), queryPlan, System.nanoTime() + TimeUnit.SECONDS.toNanos(10),
+            new HashMap<>());
     Assert.assertTrue(PlannerUtils.isRootStage(reducerStageId));
     dispatcher.shutdown();
   }

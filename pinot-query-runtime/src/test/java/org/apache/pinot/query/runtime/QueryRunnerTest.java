@@ -196,7 +196,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Preconditions.checkNotNull(mailboxReceiveOperator);
 
     try {
-      QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
+      QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator,
+          System.nanoTime() + TimeUnit.MICROSECONDS.toNanos(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
       Assert.assertTrue(rte.getMessage().contains(exceptionMsg),
@@ -244,7 +245,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     return new Object[][]{
         // Timeout exception should occur with this option:
         new Object[]{
-            "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1", "timeout"
+            "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1", "Timed out"
         },
 
         // Function with incorrect argument signature should throw runtime exception when casting string to numeric
