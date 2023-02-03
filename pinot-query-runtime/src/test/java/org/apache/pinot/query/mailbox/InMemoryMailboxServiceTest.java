@@ -94,7 +94,7 @@ public class InMemoryMailboxServiceTest {
 
     // Test getSendingMailbox
     try {
-      mailboxService.getSendingMailbox(mailboxId, System.nanoTime() + 1000000000);
+      mailboxService.getSendingMailbox(mailboxId, System.nanoTime() + TimeUnit.SECONDS.toNanos(10));
       Assert.fail("Method call above should have failed");
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("non-local transport"));
