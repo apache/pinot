@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.manager.offline;
 
 import com.google.common.cache.LoadingCache;
+import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
@@ -35,6 +36,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 /**
@@ -75,10 +77,9 @@ public class TableDataManagerProvider {
         }
         break;
       case REALTIME:
-        if (tableDataManagerConfig.getTableConfig().getIndexingConfig() != null
-            && tableDataManagerConfig.getTableConfig().getIndexingConfig().getStreamConfigs() != null
-            && Boolean.parseBoolean(tableDataManagerConfig.getTableConfig().getIndexingConfig()
-            .getStreamConfigs().get(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE))
+        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(
+            tableDataManagerConfig.getTableConfig());
+        if (Boolean.parseBoolean(streamConfigMap.get(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE))
             && StringUtils.isEmpty(tableDataManagerConfig.getInstanceDataManagerConfig().getSegmentStoreUri())) {
           throw new IllegalStateException(String.format("Table has enabled %s config. But the server has not "
               + "configured the segmentstore uri. Configure the server config %s",
