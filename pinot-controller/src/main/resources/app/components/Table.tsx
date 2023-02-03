@@ -333,7 +333,8 @@ export default function CustomizedTables({
         }
         return false;
       });
-      setFinalData(filteredRescords);
+      let filteredData = {...initialData, records: filteredRescords};
+      setFinalData(Utils.tableFormat(filteredData));
     }
   }, [initialData, setFinalData]);
 
@@ -341,6 +342,9 @@ export default function CustomizedTables({
     clearTimeout(timeoutId.current);
     timeoutId.current = setTimeout(() => {
       filterSearchResults(search.toLowerCase());
+      // Table.tsx currently doesn't support sorting after filtering. So for now, we just
+      // remove the visual indicator of the sorted column until users sort again.
+      setColumnClicked('')
     }, 200);
 
     return () => {
