@@ -27,11 +27,13 @@ import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-public class ForwardIndexConfig {
+public class ForwardIndexConfig extends IndexConfig {
   public static final int DEFAULT_RAW_WRITER_VERSION = 2;
+  public static final ForwardIndexConfig DISABLED = new ForwardIndexConfig(false, null, null, null);
 
   @Nullable
   private final ChunkCompressionType _chunkCompressionType;
@@ -41,9 +43,11 @@ public class ForwardIndexConfig {
   public static final ForwardIndexConfig DEFAULT = new Builder().build();
 
   @JsonCreator
-  public ForwardIndexConfig(@Nullable @JsonProperty("chunkCompressionType") ChunkCompressionType chunkCompressionType,
+  public ForwardIndexConfig(@Nullable @JsonProperty("enabled") Boolean enabled,
+      @Nullable @JsonProperty("chunkCompressionType") ChunkCompressionType chunkCompressionType,
       @JsonProperty("deriveNumDocsPerChunk") Boolean deriveNumDocsPerChunk,
       @JsonProperty("rawIndexWriterVersion") Integer rawIndexWriterVersion) {
+    super(enabled != null && enabled);
     _chunkCompressionType = chunkCompressionType;
     _deriveNumDocsPerChunk = deriveNumDocsPerChunk != null && deriveNumDocsPerChunk;
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? DEFAULT_RAW_WRITER_VERSION : rawIndexWriterVersion;
@@ -124,7 +128,7 @@ public class ForwardIndexConfig {
     }
 
     public ForwardIndexConfig build() {
-      return new ForwardIndexConfig(_chunkCompressionType, _deriveNumDocsPerChunk, _rawIndexWriterVersion);
+      return new ForwardIndexConfig(true, _chunkCompressionType, _deriveNumDocsPerChunk, _rawIndexWriterVersion);
     }
   }
 

@@ -260,7 +260,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .build();
     RangeIndexConfig config = _fieldIndexConfigs.get(columnMetadata.getColumnName())
-        .getConfig(StandardIndexes.range()).getEnabledConfig();
+        .getConfig(StandardIndexes.range());
     return RangeIndexType.INSTANCE.createIndexCreator(context, config);
   }
 }

@@ -19,14 +19,25 @@
 
 package org.apache.pinot.segment.spi.index;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FSTType;
+import org.apache.pinot.spi.config.table.IndexConfig;
 
 
-public class FstIndexConfig {
+public class FstIndexConfig extends IndexConfig {
+  public static final FstIndexConfig DISABLED = new FstIndexConfig(false, null);
   private final FSTType _fstType;
 
-  public FstIndexConfig(@Nullable FSTType fstType) {
+  public FstIndexConfig(@JsonProperty("type") @Nullable FSTType fstType) {
+    this(true, fstType);
+  }
+
+  @JsonCreator
+  public FstIndexConfig(@JsonProperty("enabled") @Nullable Boolean enabled,
+      @JsonProperty("type") @Nullable FSTType fstType) {
+    super((enabled != null && enabled) || fstType != null);
     _fstType = fstType;
   }
 

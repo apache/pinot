@@ -41,10 +41,11 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.segment.spi.index.EmptyIndexConf;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -172,11 +173,12 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     // is explicitly disabled
     segmentGeneratorConfig.setSkipTimeValueCheck(true);
     _invertedIndexColumns = Arrays.asList("column6", "column7", "column11", "column17", "column18");
-    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), EmptyIndexConf.INSTANCE, _invertedIndexColumns);
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _invertedIndexColumns);
     segmentGeneratorConfig.setRawIndexCreationColumns(_noDictionaryColumns);
 
     _forwardIndexDisabledColumns = new ArrayList<>(Arrays.asList("column6", "column7"));
-    segmentGeneratorConfig.disableIndexOn(StandardIndexes.forward(), _forwardIndexDisabledColumns);
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED,
+        _forwardIndexDisabledColumns);
     RangeIndexConfig rangeIndexConfig = new RangeIndexConfig(RangeIndexType.DEFAULT_RANGE_INDEX_VERSION);
     segmentGeneratorConfig.setIndexOn(StandardIndexes.range(), rangeIndexConfig, "column6");
 

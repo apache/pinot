@@ -21,13 +21,11 @@ package org.apache.pinot.segment.spi.index;
 
 import com.google.common.collect.Sets;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -35,89 +33,49 @@ public class FieldIndexConfigsUtil {
   private FieldIndexConfigsUtil() {
   }
 
+  public static Map<String, FieldIndexConfigs> createIndexConfigsByColName(TableConfig tableConfig, Schema schema) {
+    return createIndexConfigsByColName(tableConfig, schema, IndexType::getDeserializer);
+  }
+
   public static Map<String, FieldIndexConfigs> createIndexConfigsByColName(
-      TableConfig tableConfig, Schema schema, boolean failIfUnrecognized) {
-    Map<String, FieldIndexConfigs> oldConf = translateOldConfig(tableConfig, schema);
-
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList == null) {
-      return oldConf;
+      TableConfig tableConfig, Schema schema, DeserializerProvider deserializerProvider) {
+    Map<String, FieldIndexConfigs.Builder> builderMap = new HashMap<>();
+    for (String columnName : schema.getColumnNames()) {
+      builderMap.put(columnName, new FieldIndexConfigs.Builder());
+    }
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      readConfig(builderMap, indexType, tableConfig, schema, deserializerProvider);
     }
 
-    Map<String, FieldIndexConfigs> newConf =
-        FieldIndexConfigs.readFieldIndexConfigByColumn(fieldConfigList, failIfUnrecognized, schema.getColumnNames());
-
-    return mergeConf(oldConf, newConf);
+    return builderMap.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().build()));
   }
 
-  private static Map<String, FieldIndexConfigs> translateOldConfig(TableConfig tableConfig, Schema schema) {
-    Map<String, FieldIndexConfigs> result = new HashMap<>();
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      String colName = fieldSpec.getName();
-      FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
-      for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
-        IndexDeclaration<?> conf = indexType.deserializeSpreadConf(tableConfig, schema, colName);
-        builder.addUnsafeDeclaration(indexType, conf);
-      }
-      result.put(colName, builder.build());
-    }
-    return result;
+  @FunctionalInterface
+  public interface DeserializerProvider {
+    <C extends IndexConfig> ColumnConfigDeserializer<C> get(IndexType<C, ?, ?> indexType);
   }
 
-  public static Map<String, FieldIndexConfigs> mergeConf(
-      Map<String, FieldIndexConfigs> oldConfMap, Map<String, FieldIndexConfigs> newConfMap) {
+  private static <C extends IndexConfig> void readConfig(
+      Map<String, FieldIndexConfigs.Builder> builderMap, IndexType<C, ?, ?> indexType,
+      TableConfig tableConfig, Schema schema, DeserializerProvider deserializerProvider) {
+    ColumnConfigDeserializer<C> deserializer = deserializerProvider.get(indexType);
+    Map<String, C> deserialize = deserializer.deserialize(tableConfig, schema);
 
-    if (oldConfMap.isEmpty()) {
-      return newConfMap;
-    }
-    if (newConfMap.isEmpty()) {
-      return oldConfMap;
-    }
-
-    Map<String, FieldIndexConfigs> merged = new HashMap<>();
-
-    Set<String> columns = Sets.union(oldConfMap.keySet(), newConfMap.keySet());
-
-    for (String column : columns) {
-      FieldIndexConfigs oldConf = oldConfMap.get(column);
-      FieldIndexConfigs newConf = newConfMap.get(column);
-
-      if (oldConf == null) {
-        if (newConf != null) {
-          merged.put(column, newConf);
-        }
-      } else if (newConf == null) {
-        merged.put(column, oldConf);
-      } else {
-        FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
-        for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
-          mergeConfig(builder, oldConf, newConf, indexType, column);
-        }
-        merged.put(column, builder.build());
-      }
-    }
-    return merged;
-  }
-
-  private static <C> void mergeConfig(FieldIndexConfigs.Builder builder, FieldIndexConfigs oldConf,
-      FieldIndexConfigs newConf, IndexType<C, ?, ?> indexType, String column) {
-    IndexDeclaration<C> oldIndexConf = oldConf.getConfig(indexType);
-    IndexDeclaration<C> newIndexConf = newConf.getConfig(indexType);
-    if (oldIndexConf.isDeclared()) {
-      if (newIndexConf.isDeclared()) {
-        throw new IllegalArgumentException("Column " + column + " contains both legacy and current configs for "
-            + "index " + indexType);
-      }
-      builder.addDeclaration(indexType, oldIndexConf);
-    } else if (newIndexConf.isDeclared()) {
-      builder.addDeclaration(indexType, newIndexConf);
+    for (Map.Entry<String, C> entry : deserialize.entrySet()) {
+      FieldIndexConfigs.Builder colBuilder =
+          builderMap.computeIfAbsent(entry.getKey(), key -> new FieldIndexConfigs.Builder());
+      colBuilder.addUnsafe(indexType, entry.getValue());
     }
   }
 
   public static Set<String> columnsWithIndexEnabled(IndexType<?, ?, ?> indexType,
       Map<String, FieldIndexConfigs> configByCol) {
     return configByCol.entrySet().stream()
-        .filter(e -> e.getValue().getConfig(indexType).isEnabled())
+        .filter(e -> {
+          IndexConfig config = e.getValue().getConfig(indexType);
+          return config != null && config.isEnabled();
+        })
         .map(Map.Entry::getKey)
         .collect(Collectors.toSet());
   }
@@ -127,10 +85,13 @@ public class FieldIndexConfigsUtil {
     return Sets.difference(allColumns, columnsWithIndexEnabled(indexType, configByCol));
   }
 
-  public static <C> Map<String, C> enableConfigByColumn(IndexType<C, ?, ?> indexType,
+  public static <C extends IndexConfig> Map<String, C> enableConfigByColumn(IndexType<C, ?, ?> indexType,
       Map<String, FieldIndexConfigs> configByCol) {
     return configByCol.entrySet().stream()
-        .filter(e -> e.getValue().getConfig(indexType).isEnabled())
-        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getConfig(indexType).getEnabledConfig()));
+        .filter(e -> {
+          C config = e.getValue().getConfig(indexType);
+          return config != null && config.isEnabled();
+        })
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getConfig(indexType)));
   }
 }

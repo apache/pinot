@@ -175,7 +175,7 @@ public class FSTIndexHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .build();
-    FstIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.fst()).getEnabledConfig();
+    FstIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.fst());
 
     try (TextIndexCreator fstIndexCreator = FstIndexType.INSTANCE.createIndexCreator(context, config);
         Dictionary dictionary = DictionaryIndexType.INSTANCE.read(segmentWriter, columnMetadata)) {

@@ -22,7 +22,6 @@ package org.apache.pinot.segment.local.segment.index.fst;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -37,9 +36,10 @@ import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
@@ -78,39 +78,34 @@ public class FstIndexType implements IndexType<FstIndexConfig, TextIndexReader, 
   }
 
   @Override
-  public Map<String, IndexDeclaration<FstIndexConfig>> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    Map<String, IndexDeclaration<FstIndexConfig>> result = new HashMap<>();
+  public Map<String, FstIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
+    Map<String, FstIndexConfig> result = new HashMap<>();
     Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
     for (String column : indexLoadingConfig.getAllKnownColumns()) {
       if (fstIndexColumns.contains(column)) {
         FstIndexConfig conf = new FstIndexConfig(indexLoadingConfig.getFSTIndexType());
-        result.put(column, IndexDeclaration.declared(conf));
+        result.put(column, conf);
       } else {
-        result.put(column, IndexDeclaration.notDeclared(this));
+        result.put(column, FstIndexConfig.DISABLED);
       }
     }
     return result;
   }
 
   @Override
-  public IndexDeclaration<FstIndexConfig> deserializeSpreadConf(TableConfig tableConfig, Schema schema, String column) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
-    FieldConfig fieldConfig = fieldConfigList.stream()
-        .filter(fc -> fc.getName().equals(column))
-        .findAny()
-        .orElse(null);
-    if (fieldConfig == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
-    if (!fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.FST)) {
-      return IndexDeclaration.notDeclared(this);
-    }
-    FSTType fstIndexType = tableConfig.getIndexingConfig().getFSTIndexType();
-    FstIndexConfig conf = new FstIndexConfig(fstIndexType);
-    return IndexDeclaration.declared(conf);
+  public FstIndexConfig getDefaultConfig() {
+    return FstIndexConfig.DISABLED;
+  }
+
+  @Override
+  public ColumnConfigDeserializer<FstIndexConfig> getDeserializer() {
+    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
+            FieldConfig.IndexType.FST,
+            (tableConfig, fieldConfig) -> {
+              FSTType fstIndexType = tableConfig.getIndexingConfig().getFSTIndexType();
+              return new FstIndexConfig(fstIndexType);
+            }));
   }
 
   @Override

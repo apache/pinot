@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public interface IndexReaderFactory<R extends IndexReader> {
@@ -36,7 +37,7 @@ public interface IndexReaderFactory<R extends IndexReader> {
   R read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
       throws IOException, IndexReaderConstraintException;
 
-  abstract class Default<C, R extends IndexReader> implements IndexReaderFactory<R> {
+  abstract class Default<C extends IndexConfig, R extends IndexReader> implements IndexReaderFactory<R> {
 
     protected abstract IndexType<C, R, ?> getIndexType();
 
@@ -48,15 +49,14 @@ public interface IndexReaderFactory<R extends IndexReader> {
         ColumnMetadata metadata)
         throws IOException, IndexReaderConstraintException {
       IndexType<C, R, ?> indexType = getIndexType();
-      IndexDeclaration<C> declaration;
+      C indexConf;
       if (fieldIndexConfigs == null) {
-        declaration = IndexDeclaration.notDeclared(indexType);
+        indexConf = getIndexType().getDefaultConfig();
       } else {
-        declaration = fieldIndexConfigs.getConfig(indexType);
+        indexConf = fieldIndexConfigs.getConfig(indexType);
       }
 
-      C indexConf = declaration.getConfigOrNull();
-      if (indexConf == null) { //it is either not enabled or the default value is null
+      if (indexConf == null || !indexConf.isEnabled()) { //it is either not enabled or the default value is null
         return null;
       }
 

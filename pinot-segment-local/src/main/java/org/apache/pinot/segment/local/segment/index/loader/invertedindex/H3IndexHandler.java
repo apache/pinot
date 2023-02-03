@@ -164,7 +164,7 @@ public class H3IndexHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .build();
-    H3IndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.h3()).getEnabledConfig();
+    H3IndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.h3());
 
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.INSTANCE.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
@@ -187,7 +187,7 @@ public class H3IndexHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .build();
-    H3IndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.h3()).getEnabledConfig();
+    H3IndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.h3());
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.getReader(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         GeoSpatialIndexCreator h3IndexCreator = StandardIndexes.h3().createIndexCreator(context, config)) {

@@ -28,20 +28,21 @@ import org.apache.pinot.segment.local.segment.index.readers.NullValueVectorReade
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
-import org.apache.pinot.segment.spi.index.EmptyIndexConf;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class NullValueIndexType implements IndexType<EmptyIndexConf, NullValueVectorReader, NullValueVectorCreator> {
+public class NullValueIndexType implements IndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
 
   public static final NullValueIndexType INSTANCE = new NullValueIndexType();
 
@@ -59,21 +60,31 @@ public class NullValueIndexType implements IndexType<EmptyIndexConf, NullValueVe
   }
 
   @Override
-  public Class<EmptyIndexConf> getIndexConfigClass() {
-    return EmptyIndexConf.class;
+  public Class<IndexConfig> getIndexConfigClass() {
+    return IndexConfig.class;
   }
 
   @Override
-  public IndexDeclaration<EmptyIndexConf> deserializeSpreadConf(TableConfig tableConfig, Schema schema, String column) {
-    return tableConfig.getIndexingConfig().isNullHandlingEnabled()
-        ? IndexDeclaration.declared(EmptyIndexConf.INSTANCE)
-        : IndexDeclaration.notDeclared(this);
-  }
-
-  @Override
-  public NullValueVectorCreator createIndexCreator(IndexCreationContext context, EmptyIndexConf indexConfig)
+  public NullValueVectorCreator createIndexCreator(IndexCreationContext context, IndexConfig indexConfig)
       throws Exception {
     return new NullValueVectorCreator(context.getIndexDir(), context.getFieldSpec().getName());
+  }
+
+  @Override
+  public IndexConfig getDefaultConfig() {
+    return IndexConfig.DISABLED;
+  }
+
+  @Override
+  public ColumnConfigDeserializer<IndexConfig> getDeserializer() {
+    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+        .withFallbackAlternative(
+            IndexConfigDeserializer.ifIndexingConfig(
+                IndexConfigDeserializer.alwaysCall((TableConfig tableConfig, Schema schema) ->
+                  tableConfig.getIndexingConfig().isNullHandlingEnabled()
+                      ? IndexConfig.ENABLED
+                      : IndexConfig.DISABLED))
+        );
   }
 
   public NullValueVectorCreator createIndexCreator(File indexDir, String columnName) {

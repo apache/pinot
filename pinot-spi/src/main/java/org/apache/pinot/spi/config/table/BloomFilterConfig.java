@@ -21,21 +21,27 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public class BloomFilterConfig extends BaseJsonConfig {
+public class BloomFilterConfig extends IndexConfig {
   public static final double DEFAULT_FPP = 0.05;
   private static final BloomFilterConfig DEFAULT = new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false);
+  public static final BloomFilterConfig DISABLED = new BloomFilterConfig(false, BloomFilterConfig.DEFAULT_FPP, 0,
+      false);
 
   private final double _fpp;
   private final int _maxSizeInBytes;
   private final boolean _loadOnHeap;
 
+  public BloomFilterConfig(double fpp, int maxSizeInBytes, boolean loadOnHeap) {
+    this(true, fpp, maxSizeInBytes, loadOnHeap);
+  }
+
   @JsonCreator
-  public BloomFilterConfig(@JsonProperty(value = "fpp") double fpp,
+  public BloomFilterConfig(@JsonProperty("enabled") Boolean enabled, @JsonProperty(value = "fpp") double fpp,
       @JsonProperty(value = "maxSizeInBytes") int maxSizeInBytes,
       @JsonProperty(value = "loadOnHeap") boolean loadOnHeap) {
+    super(enabled != null && enabled);
     if (fpp != 0.0) {
       Preconditions.checkArgument(fpp > 0.0 && fpp < 1.0, "Invalid fpp (false positive probability): %s", fpp);
       _fpp = fpp;

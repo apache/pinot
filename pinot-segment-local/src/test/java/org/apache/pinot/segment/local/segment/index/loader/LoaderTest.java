@@ -38,7 +38,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
-import org.apache.pinot.segment.spi.index.EmptyIndexConf;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
@@ -48,6 +48,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -396,9 +397,10 @@ public class LoaderTest {
     SegmentGeneratorConfig segmentGeneratorConfig =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, "testTable");
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
-    segmentGeneratorConfig.disableIndexOn(StandardIndexes.forward(), NO_FORWARD_INDEX_COL_NAME);
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED,
+        NO_FORWARD_INDEX_COL_NAME);
     if (enableInvertedIndex) {
-      segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), EmptyIndexConf.INSTANCE, NO_FORWARD_INDEX_COL_NAME);
+      segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, NO_FORWARD_INDEX_COL_NAME);
     }
     segmentGeneratorConfig.setSegmentVersion(segmentVersion);
     driver.init(segmentGeneratorConfig);

@@ -19,12 +19,26 @@
 
 package org.apache.pinot.segment.spi.index;
 
-public class RangeIndexConfig {
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.table.IndexConfig;
+
+
+public class RangeIndexConfig extends IndexConfig {
+  public static final RangeIndexConfig DISABLED = new RangeIndexConfig(false, null);
 
   private final int _version;
 
   public RangeIndexConfig(int version) {
-    _version = version;
+    this(true, version);
+  }
+
+  @JsonCreator
+  public RangeIndexConfig(@JsonProperty("enabled") Boolean enabled,
+      @JsonProperty("version") @Nullable Integer version) {
+    super(enabled != null && enabled && version != null);
+    _version = version != null ? version : 2;
   }
 
   public int getVersion() {

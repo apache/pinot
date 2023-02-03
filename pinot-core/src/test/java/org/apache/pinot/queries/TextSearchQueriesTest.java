@@ -220,7 +220,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
   private void addTextIndexProp(SegmentGeneratorConfig config, String colName, Map<String, String> propMap) {
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(colName);
-    TextIndexConfig textConfig = fieldIndexConfigs.getConfig(StandardIndexes.text()).getEnabledConfig();
+    TextIndexConfig textConfig = fieldIndexConfigs.getConfig(StandardIndexes.text());
 
     TextIndexConfig newTextConfig = new TextIndexConfigBuilder(textConfig)
         .withProperties(propMap)

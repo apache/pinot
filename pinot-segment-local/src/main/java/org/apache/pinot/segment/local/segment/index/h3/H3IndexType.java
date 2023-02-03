@@ -21,10 +21,8 @@ package org.apache.pinot.segment.local.segment.index.h3;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
@@ -35,8 +33,9 @@ import org.apache.pinot.segment.local.segment.index.readers.geospatial.Immutable
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -76,22 +75,21 @@ public class H3IndexType implements IndexType<H3IndexConfig, H3IndexReader, GeoS
   }
 
   @Override
-  public Map<String, IndexDeclaration<H3IndexConfig>> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    return indexLoadingConfig.getH3IndexConfigs().entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getKey, e -> IndexDeclaration.declared(e.getValue())));
+  public Map<String, H3IndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
+    return indexLoadingConfig.getH3IndexConfigs();
   }
 
   @Override
-  public IndexDeclaration<H3IndexConfig> deserializeSpreadConf(TableConfig tableConfig, Schema schema, String column) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
-    return fieldConfigList.stream()
-        .filter(fc -> fc.getName().equals(column) && fc.getIndexTypes().contains(FieldConfig.IndexType.H3))
-        .map(fc -> IndexDeclaration.declared(new H3IndexConfig(fc.getProperties())))
-        .findAny()
-        .orElse(IndexDeclaration.notDeclared(this));
+  public H3IndexConfig getDefaultConfig() {
+    return H3IndexConfig.DISABLED;
+  }
+
+  @Override
+  public ColumnConfigDeserializer<H3IndexConfig> getDeserializer() {
+    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
+            FieldConfig.IndexType.H3,
+            ((tableConfig, fieldConfig) -> new H3IndexConfig(fieldConfig.getProperties()))));
   }
 
   @Override

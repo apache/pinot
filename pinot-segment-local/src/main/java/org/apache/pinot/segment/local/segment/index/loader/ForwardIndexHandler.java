@@ -338,7 +338,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       // Get the new compression type.
       ChunkCompressionType newCompressionType = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward())
-          .getEnabledConfig()
           .getChunkCompressionType();
 
       // Note that default compression type (PASS_THROUGH for metric and LZ4 for dimension) is not considered if the
@@ -376,7 +375,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // wouldn't have computed the CHANGE_RAW_COMPRESSION_TYPE operation for this column as compressionType changes
     // are processed only if a valid compressionType is specified in fieldConfig.
     ChunkCompressionType newCompressionType = _fieldIndexConfigs.get(column)
-        .getConfig(StandardIndexes.forward()).getEnabledConfig().getChunkCompressionType();
+        .getConfig(StandardIndexes.forward()).getChunkCompressionType();
 
     if (isSingleValue) {
       rewriteRawSVForwardIndexForCompressionChange(column, existingColMetadata, indexDir, segmentWriter,
@@ -424,8 +423,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           .withLengthOfLongestEntry(lengthOfLongestEntry)
           .build();
 
-      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward())
-          .getEnabledConfig();
+      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
 
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         if (!reader.getStoredType().equals(creator.getValueType())) {
@@ -454,8 +452,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           .withLengthOfLongestEntry(lengthOfLongestEntry)
           .build();
 
-      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward())
-          .getEnabledConfig();
+      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
 
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         if (!reader.getStoredType().equals(creator.getValueType())) {
@@ -799,8 +796,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       }
       statsCollector.seal();
 
-      DictionaryIndexConfig dictConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.dictionary())
-          .getEnabledConfig();
+      DictionaryIndexConfig dictConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.dictionary());
 
       boolean useVarLength = dictConf.getUseVarLengthDictionary()
           || DictionaryIndexType.shouldUseVarLengthDictionary(reader.getStoredType(), statsCollector);
@@ -824,8 +820,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       // existingColMetadata has dictEnable=false. Overwrite the value.
       builder.withDictionary(true);
       IndexCreationContext context = builder.build();
-      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward())
-          .getEnabledConfig();
+      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
 
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         int numDocs = existingColMetadata.getTotalDocs();
@@ -914,8 +909,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       }
 
       IndexCreationContext context = builder.build();
-      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward())
-          .getEnabledConfig();
+      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
 
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         int numDocs = existingColMetadata.getTotalDocs();

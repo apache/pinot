@@ -186,7 +186,7 @@ public class TextIndexHandler extends BaseIndexHandler {
         .withIndexDir(segmentDirectory)
         .withTextCommitOnClose(true)
         .build();
-    TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text()).getEnabledConfig();
+    TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
 
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.INSTANCE.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();

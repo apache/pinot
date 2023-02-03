@@ -20,15 +20,19 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FSTType;
+import org.apache.pinot.spi.config.table.IndexConfig;
 
 
-// TODO(index-spi): add one subclass to be used by each FST type
-public class TextIndexConfig {
+public class TextIndexConfig extends IndexConfig {
+  public static final TextIndexConfig DISABLED = new TextIndexConfig(false, null, null, false, false,
+      Collections.emptyList(), Collections.emptyList());
   private final FSTType _fstType;
   @Nullable
   private final Object _rawValueForTextIndex;
@@ -38,9 +42,15 @@ public class TextIndexConfig {
   private final List<String> _stopWordsExclude;
 
   @JsonCreator
-  public TextIndexConfig(FSTType fstType, @Nullable Object rawValueForTextIndex, boolean enableQueryCache,
-      boolean useANDForMultiTermQueries, List<String> stopWordsInclude,
-      List<String> stopWordsExclude) {
+  public TextIndexConfig(
+      @JsonProperty("enabled") Boolean enabled,
+      @JsonProperty("fst") FSTType fstType,
+      @JsonProperty("rawValue") @Nullable Object rawValueForTextIndex,
+      @JsonProperty("queryCache") boolean enableQueryCache,
+      @JsonProperty("useANDForMultiTermQueries") boolean useANDForMultiTermQueries,
+      @JsonProperty("stopWordsInclude") List<String> stopWordsInclude,
+      @JsonProperty("stopWordsExclude") List<String> stopWordsExclude) {
+    super(enabled != null && enabled);
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
     _enableQueryCache = enableQueryCache;
@@ -102,7 +112,7 @@ public class TextIndexConfig {
     }
 
     public TextIndexConfig build() {
-      return new TextIndexConfig(_fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
+      return new TextIndexConfig(true, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
           _stopWordsInclude, _stopWordsExclude);
     }
 

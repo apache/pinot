@@ -37,8 +37,8 @@ import org.apache.commons.collections.Predicate;
 import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
-import org.apache.pinot.segment.spi.index.EmptyIndexConf;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -96,7 +96,7 @@ public class SegmentTestUtils {
     segmentGenSpec.setTableName(tableName);
     segmentGenSpec.setOutDir(outputDir.getAbsolutePath());
     segmentGenSpec.getSchema().getAllFieldSpecs()
-        .forEach(fs -> segmentGenSpec.setIndexOn(StandardIndexes.inverted(), EmptyIndexConf.INSTANCE, fs.getName()));
+        .forEach(fs -> segmentGenSpec.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, fs.getName()));
     return segmentGenSpec;
   }
 

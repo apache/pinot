@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -29,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -38,10 +38,10 @@ import org.apache.pinot.segment.local.segment.index.range.RangeIndexType;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
-import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -49,15 +49,20 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -66,6 +71,7 @@ import org.apache.pinot.spi.utils.TimestampIndexUtils;
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String READ_MODE_KEY = "readMode";
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexLoadingConfig.class);
 
   private InstanceDataManagerConfig _instanceDataManagerConfig = null;
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
@@ -241,11 +247,11 @@ public class IndexLoadingConfig {
           ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
     }
 
-    refreshIndexConfigsByColName(getAllKnownColumns());
+    refreshIndexConfigsByColName();
   }
 
-  public void refreshIndexConfigsByColName(Set<String> allColumns) {
-    _indexConfigsByColName = calculateIndexConfigsByColName(allColumns);
+  public void refreshIndexConfigsByColName() {
+    _indexConfigsByColName = calculateIndexConfigsByColName();
     _dirty = false;
   }
 
@@ -254,53 +260,52 @@ public class IndexLoadingConfig {
    * which is also heavily used by tests) and the one included in the TableConfig (in case the latter is not null).
    *
    * This method does not modify the result of {@link #getFieldIndexConfigByColName()} or
-   * {@link #getFieldIndexConfigByColName()}. To do so, call {@link #refreshIndexConfigsByColName(Set)}.
+   * {@link #getFieldIndexConfigByColName()}. To do so, call {@link #refreshIndexConfigsByColName()}.
    *
    * The main difference between this method and
-   * {@link FieldIndexConfigsUtil#createIndexConfigsByColName(TableConfig, Schema, boolean)} is that the former relays
+   * {@link FieldIndexConfigsUtil#createIndexConfigsByColName(TableConfig, Schema)} is that the former relays
    * on the TableConfig, while this method can be used even when the {@link IndexLoadingConfig} was configured by
    * calling the setter methods.
    */
-  public Map<String, FieldIndexConfigs> calculateIndexConfigsByColName(Set<String> allColumns) {
-    Map<String, FieldIndexConfigs> oldConf = translateOldConfig(allColumns);
-    if (_tableConfig == null) {
-      return oldConf;
+  public Map<String, FieldIndexConfigs> calculateIndexConfigsByColName() {
+    Schema schema;
+    if (_schema == null) {
+      schema = new Schema();
+      for (String column : getAllKnownColumns()) {
+        schema.addField(new DimensionFieldSpec(column, FieldSpec.DataType.STRING, true));
+      }
+    } else {
+      schema = _schema;
     }
-    List<FieldConfig> fieldConfigList = _tableConfig.getFieldConfigList();
-    if (fieldConfigList == null) {
-      return oldConf;
-    }
-    Map<String, FieldIndexConfigs> newConf =
-        FieldIndexConfigs.readFieldIndexConfigByColumn(fieldConfigList, true, allColumns);
-
-    return FieldIndexConfigsUtil.mergeConf(oldConf, newConf);
+    return FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, schema, this::getDeserializer);
   }
 
-  public Map<String, FieldIndexConfigs> translateOldConfig(Set<String> allColumns) {
-    Map<String, FieldIndexConfigs.Builder> builderMap = Maps.newHashMapWithExpectedSize(allColumns.size());
-    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
-      if (indexType instanceof ConfigurableFromIndexLoadingConfig) {
-        addToBuilder(builderMap, (ConfigurableFromIndexLoadingConfig<?>) indexType, allColumns);
-      }
-    }
-    return builderMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().build()));
-  }
+  private <C extends IndexConfig> ColumnConfigDeserializer<C> getDeserializer(IndexType<C, ?, ?> indexType) {
+    ColumnConfigDeserializer<C> deserializer;
 
-  private <C> void addToBuilder(Map<String, FieldIndexConfigs.Builder> builderMap,
-      ConfigurableFromIndexLoadingConfig<C> configurable, Set<String> allColumns) {
-    Map<String, IndexDeclaration<C>> configMap = configurable.fromIndexLoadingConfig(this);
-    @SuppressWarnings("unchecked")
-    IndexType<C, ?, ?> indexType = (IndexType<C, ?, ?>) configurable;
-    for (String column : allColumns) {
-      if (!configMap.containsKey(column)) {
-        configMap.put(column, IndexDeclaration.notDeclared(indexType));
+    ColumnConfigDeserializer<C> stdDeserializer = indexType.getDeserializer();
+    if (indexType instanceof ConfigurableFromIndexLoadingConfig) {
+      @SuppressWarnings("unchecked")
+      Map<String, C> fromIndexLoadingConfig =
+          ((ConfigurableFromIndexLoadingConfig<C>) indexType).fromIndexLoadingConfig(this);
+
+      if (_schema == null || _tableConfig == null) {
+        LOGGER.warn("Ignoring default deserializers given that there is no schema or table config.");
+        deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig);
+      } else {
+        deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig)
+            .withFallbackAlternative(stdDeserializer);
+      }
+    } else {
+      if (_schema == null || _tableConfig == null) {
+        LOGGER.warn("Ignoring default deserializers given that there is no schema or table config.");
+        deserializer = (tableConfig, schema) -> getAllKnownColumns().stream()
+            .collect(Collectors.toMap(Function.identity(), col -> indexType.getDefaultConfig()));
+      } else {
+        deserializer = stdDeserializer;
       }
     }
-    for (Map.Entry<String, IndexDeclaration<C>> entry : configMap.entrySet()) {
-      FieldIndexConfigs.Builder builder =
-          builderMap.computeIfAbsent(entry.getKey(), (key) -> new FieldIndexConfigs.Builder());
-      builder.addDeclaration(indexType, entry.getValue());
-    }
+    return deserializer;
   }
 
   /**
@@ -849,14 +854,14 @@ public class IndexLoadingConfig {
   @Nullable
   public FieldIndexConfigs getFieldIndexConfig(String columnName) {
     if (_indexConfigsByColName == null || _dirty) {
-      refreshIndexConfigsByColName(getAllKnownColumns());
+      refreshIndexConfigsByColName();
     }
     return _indexConfigsByColName.get(columnName);
   }
 
   public Map<String, FieldIndexConfigs> getFieldIndexConfigByColName() {
     if (_indexConfigsByColName == null || _dirty) {
-      refreshIndexConfigsByColName(getAllKnownColumns());
+      refreshIndexConfigsByColName();
     }
     return unmodifiable(_indexConfigsByColName);
   }

@@ -103,7 +103,7 @@ public abstract class BaseIndexHandler implements IndexHandler {
 
     FieldIndexConfigs fieldIndexConfig = _fieldIndexConfigs.get(columnName);
     boolean dictionaryEnabled = fieldIndexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();
-    ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward()).getEnabledConfig();
+    ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
 
     InvertedIndexAndDictionaryBasedForwardIndexCreator invertedIndexAndDictionaryBasedForwardIndexCreator =
         new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, dictionaryEnabled,

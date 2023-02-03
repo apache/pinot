@@ -34,9 +34,10 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -70,32 +71,25 @@ public class ForwardIndexType
   }
 
   @Override
-  public ForwardIndexConfig getDefaultConfig() {
-    return ForwardIndexConfig.DEFAULT;
-  }
-
-  @Override
   public Class<ForwardIndexConfig> getIndexConfigClass() {
     return ForwardIndexConfig.class;
   }
 
   @Override
-  public Map<String, IndexDeclaration<ForwardIndexConfig>> fromIndexLoadingConfig(
-      IndexLoadingConfig indexLoadingConfig) {
+  public Map<String, ForwardIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
     Set<String> disabledCols = indexLoadingConfig.getForwardIndexDisabledColumns();
-    Map<String, IndexDeclaration<ForwardIndexConfig>> result = new HashMap<>();
+    Map<String, ForwardIndexConfig> result = new HashMap<>();
     Set<String> allColumns = Sets.union(disabledCols, indexLoadingConfig.getAllKnownColumns());
     for (String column : allColumns) {
       ChunkCompressionType compressionType =
           indexLoadingConfig.getCompressionConfigs() != null
               ? indexLoadingConfig.getCompressionConfigs().get(column)
               : null;
-      Supplier<IndexDeclaration<ForwardIndexConfig>> defaultConfig = () -> {
+      Supplier<ForwardIndexConfig> defaultConfig = () -> {
         if (compressionType == null) {
-          return IndexDeclaration.notDeclared(ForwardIndexType.this);
+          return ForwardIndexConfig.DEFAULT;
         } else {
-          return IndexDeclaration.declared(
-              new ForwardIndexConfig.Builder().withCompressionType(compressionType).build());
+          return new ForwardIndexConfig.Builder().withCompressionType(compressionType).build();
         }
       };
       if (!disabledCols.contains(column)) {
@@ -126,46 +120,41 @@ public class ForwardIndexType
             }
           }
 
-          result.put(column, IndexDeclaration.declared(builder.build()));
+          result.put(column, builder.build());
         }
       } else {
-        result.put(column, IndexDeclaration.declaredDisabled());
+        result.put(column, ForwardIndexConfig.DISABLED);
       }
     }
     return result;
   }
 
-  private boolean isDisabled(Map<String, String> props) {
-    return Boolean.parseBoolean(
-        props.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
+  @Override
+  public ForwardIndexConfig getDefaultConfig() {
+    return ForwardIndexConfig.DEFAULT;
   }
 
   @Override
-  public IndexDeclaration<ForwardIndexConfig> deserializeSpreadConf(TableConfig tableConfig, Schema schema,
-      String column) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
+  public ColumnConfigDeserializer<ForwardIndexConfig> getDeserializer() {
+    // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
+    ColumnConfigDeserializer<ForwardIndexConfig> fromFieldConfig = IndexConfigDeserializer.fromCollection(
+        TableConfig::getFieldConfigList,
+        (accum, fieldConfig) -> {
+          Map<String, String> properties = fieldConfig.getProperties();
+          if (properties != null && isDisabled(properties)) {
+            accum.put(fieldConfig.getName(), ForwardIndexConfig.DISABLED);
+          } else if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
+            accum.put(fieldConfig.getName(), createConfigFromFieldConfig(fieldConfig));
+          }
+        }
+    );
+    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+        .withExclusiveAlternative(fromFieldConfig);
+  }
 
-    FieldConfig fieldConfig = fieldConfigList.stream()
-        .filter(fc -> fc.getName().equals(column))
-        .findAny()
-        .orElse(null);
-    if (fieldConfig == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
-
-    Map<String, String> props = fieldConfig.getProperties();
-    if (props != null && isDisabled(props)) {
-      return IndexDeclaration.declaredDisabled();
-    }
-
-    if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
-      return IndexDeclaration.declared(createConfigFromFieldConfig(fieldConfig));
-    } else {
-      return IndexDeclaration.notDeclared(this);
-    }
+  private boolean isDisabled(Map<String, String> props) {
+    return Boolean.parseBoolean(
+        props.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
   }
 
   private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig) {

@@ -19,13 +19,16 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
@@ -48,9 +51,10 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
@@ -91,51 +95,74 @@ public class DictionaryIndexType
     return DictionaryIndexConfig.class;
   }
 
-  @Nullable
   @Override
-  public DictionaryIndexConfig getDefaultConfig() {
-    return DictionaryIndexConfig.DEFAULT;
-  }
-
-  @Override
-  public Map<String, IndexDeclaration<DictionaryIndexConfig>> fromIndexLoadingConfig(
+  public Map<String, DictionaryIndexConfig> fromIndexLoadingConfig(
       IndexLoadingConfig indexLoadingConfig) {
-    Map<String, IndexDeclaration<DictionaryIndexConfig>> result = new HashMap<>();
+    Map<String, DictionaryIndexConfig> result = new HashMap<>();
     Set<String> noDictionaryColumns = indexLoadingConfig.getNoDictionaryColumns();
     Set<String> onHeapCols = indexLoadingConfig.getOnHeapDictionaryColumns();
     Set<String> varLengthCols = indexLoadingConfig.getVarLengthDictionaryColumns();
     for (String column : indexLoadingConfig.getAllKnownColumns()) {
-      if (!noDictionaryColumns.contains(column)) {
-        DictionaryIndexConfig conf =
-            new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column));
-        result.put(column, IndexDeclaration.declared(conf));
+      if (noDictionaryColumns.contains(column)) {
+        result.put(column, DictionaryIndexConfig.disabled());
       } else {
-        result.put(column, IndexDeclaration.declaredDisabled());
+        result.put(column, new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column)));
       }
     }
     return result;
   }
 
   @Override
-  public IndexDeclaration<DictionaryIndexConfig> deserializeSpreadConf(
-      TableConfig tableConfig, Schema schema, String column) {
-    IndexingConfig ic = tableConfig.getIndexingConfig();
-    boolean isNoDictionary = ic.getNoDictionaryColumns() != null && ic.getNoDictionaryColumns().contains(column);
-    if (isNoDictionary) {
-      return IndexDeclaration.declaredDisabled();
-    }
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      Optional<FieldConfig> fieldConfig = fieldConfigList.stream().filter(fc -> fc.getName().equals(column)).findAny();
-      if (fieldConfig.isPresent() && fieldConfig.get().getEncodingType() == FieldConfig.EncodingType.RAW) {
-        return IndexDeclaration.declaredDisabled();
-      }
-    }
-    boolean isOnHeap = ic.getOnHeapDictionaryColumns() != null && ic.getOnHeapDictionaryColumns().contains(column);
-    boolean isVarLength = ic.getVarLengthDictionaryColumns() != null
-        && ic.getVarLengthDictionaryColumns().contains(column);
+  public DictionaryIndexConfig getDefaultConfig() {
+    return DictionaryIndexConfig.DEFAULT;
+  }
 
-    return IndexDeclaration.declared(new DictionaryIndexConfig(isOnHeap, isVarLength));
+  @Override
+  public ColumnConfigDeserializer<DictionaryIndexConfig> getDeserializer() {
+    // reads tableConfig.indexingConfig.noDictionaryConfig
+    ColumnConfigDeserializer<DictionaryIndexConfig> fromNoDictConf = IndexConfigDeserializer.fromMap(
+        tableConfig -> tableConfig.getIndexingConfig() == null ? Collections.emptyMap()
+            : tableConfig.getIndexingConfig().getNoDictionaryConfig(),
+        (accum, col, value) -> accum.put(col, DictionaryIndexConfig.disabled()));
+
+    // reads tableConfig.indexingConfig.noDictionaryColumns
+    ColumnConfigDeserializer<DictionaryIndexConfig> fromNoDictCol = IndexConfigDeserializer.fromCollection(
+        tableConfig -> tableConfig.getIndexingConfig() == null ? Collections.emptyList()
+            : tableConfig.getIndexingConfig().getNoDictionaryColumns(),
+        (accum, noDictionaryCol) -> accum.put(noDictionaryCol, DictionaryIndexConfig.disabled()));
+
+    // reads tableConfig.fieldConfigList.encodingType
+    ColumnConfigDeserializer<DictionaryIndexConfig> fromFieldConfigList = IndexConfigDeserializer.fromCollection(
+        TableConfig::getFieldConfigList,
+        (accum, fieldConfig) -> {
+          if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
+            accum.put(fieldConfig.getName(), DictionaryIndexConfig.disabled());
+          }
+        });
+
+    // reads tableConfig.indexingConfig.onHeapDictionaryColumns and
+    // tableConfig.indexingConfig.varLengthDictionaryColumns
+    ColumnConfigDeserializer<DictionaryIndexConfig> fromIndexingConfig = (tableConfig, schema) -> {
+      IndexingConfig ic = tableConfig.getIndexingConfig();
+      if (ic == null) {
+        return Collections.emptyMap();
+      }
+      Set<String> onHeap = new HashSet<>(
+          ic.getOnHeapDictionaryColumns() == null ? Collections.emptyList() : ic.getOnHeapDictionaryColumns());
+      Set<String> varLength = new HashSet<>(
+          ic.getVarLengthDictionaryColumns() == null ? Collections.emptyList() : ic.getVarLengthDictionaryColumns()
+      );
+      Function<String, DictionaryIndexConfig> valueCalculator =
+          column -> new DictionaryIndexConfig(onHeap.contains(column), varLength.contains(column));
+      return Sets.union(onHeap, varLength).stream()
+          .collect(Collectors.toMap(Function.identity(), valueCalculator));
+    };
+
+    return fromNoDictConf
+        .withFallbackAlternative(fromNoDictCol)
+        .withFallbackAlternative(fromFieldConfigList)
+        .withFallbackAlternative(fromIndexingConfig)
+        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass()));
   }
 
   @Override

@@ -20,20 +20,33 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.table.IndexConfig;
 
 
-public class DictionaryIndexConfig {
+public class DictionaryIndexConfig extends IndexConfig {
 
-  public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig(false, false);
+  public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig(true, false, false);
+  public static final DictionaryIndexConfig DISABLED = new DictionaryIndexConfig(false, false, false);
 
   private final boolean _onHeap;
   private final boolean _useVarLengthDictionary;
 
+  public DictionaryIndexConfig(Boolean onHeap, @Nullable Boolean useVarLengthDictionary) {
+    this(true, onHeap, useVarLengthDictionary);
+  }
+
   @JsonCreator
-  public DictionaryIndexConfig(boolean onHeap, @Nullable Boolean useVarLengthDictionary) {
+  public DictionaryIndexConfig(@JsonProperty("enabled") Boolean enabled, @JsonProperty("onHeap") Boolean onHeap,
+      @JsonProperty("useVarLengthDictionary") @Nullable Boolean useVarLengthDictionary) {
+    super(enabled != null && enabled);
     _onHeap = onHeap;
     _useVarLengthDictionary = Boolean.TRUE.equals(useVarLengthDictionary);
+  }
+
+  public static DictionaryIndexConfig disabled() {
+    return DISABLED;
   }
 
   public boolean isOnHeap() {

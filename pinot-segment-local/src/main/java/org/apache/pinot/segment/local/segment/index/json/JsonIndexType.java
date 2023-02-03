@@ -21,9 +21,7 @@ package org.apache.pinot.segment.local.segment.index.json;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
@@ -34,8 +32,9 @@ import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIn
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
@@ -73,27 +72,28 @@ public class JsonIndexType implements IndexType<JsonIndexConfig, JsonIndexReader
   }
 
   @Override
-  public Map<String, IndexDeclaration<JsonIndexConfig>> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    return indexLoadingConfig.getJsonIndexConfigs().entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getKey, e -> IndexDeclaration.declared(e.getValue())));
+  public Map<String, JsonIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
+    return indexLoadingConfig.getJsonIndexConfigs();
   }
 
   @Override
-  public IndexDeclaration<JsonIndexConfig> deserializeSpreadConf(TableConfig tableConfig, Schema schema,
-      String column) {
-    Map<String, JsonIndexConfig> jsonFilterConfigs = tableConfig.getIndexingConfig().getJsonIndexConfigs();
+  public JsonIndexConfig getDefaultConfig() {
+    return JsonIndexConfig.DISABLED;
+  }
 
-    if (jsonFilterConfigs != null && jsonFilterConfigs.containsKey(column)) {
-      return IndexDeclaration.declared(jsonFilterConfigs.get(column));
-    }
-    List<String> jsonIndexColumns = tableConfig.getIndexingConfig().getJsonIndexColumns();
-    if (jsonIndexColumns == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
-    if (!jsonIndexColumns.contains(column)) {
-      return IndexDeclaration.declaredDisabled();
-    }
-    return IndexDeclaration.declared(new JsonIndexConfig());
+  @Override
+  public ColumnConfigDeserializer<JsonIndexConfig> getDeserializer() {
+    // reads tableConfig.indexingConfig.jsonIndexConfigs
+    ColumnConfigDeserializer<JsonIndexConfig> fromJsonIndexConf =
+        IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getJsonIndexConfigs());
+    // reads tableConfig.indexingConfig.jsonIndexColumns
+    ColumnConfigDeserializer<JsonIndexConfig> fromJsonIndexCols =
+        IndexConfigDeserializer.fromCollection(
+            tableConfig -> tableConfig.getIndexingConfig().getJsonIndexColumns(),
+            (accum, column) -> accum.put(column, new JsonIndexConfig()));
+    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+        .withExclusiveAlternative(
+            IndexConfigDeserializer.ifIndexingConfig(fromJsonIndexCols.withExclusiveAlternative(fromJsonIndexConf)));
   }
 
   @Override

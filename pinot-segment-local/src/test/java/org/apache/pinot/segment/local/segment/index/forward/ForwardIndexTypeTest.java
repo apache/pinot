@@ -28,7 +28,6 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -85,6 +84,11 @@ public class ForwardIndexTypeTest {
     public ConfTest() throws IOException {
     }
 
+    private ForwardIndexConfig deserialize(String column) {
+      return FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema).get(column)
+          .getConfig(ForwardIndexType.INSTANCE);
+    }
+
     @BeforeTest
     public void resetTableConfig()
         throws JsonProcessingException {
@@ -110,10 +114,8 @@ public class ForwardIndexTypeTest {
     public void oldConfNull()
         throws JsonProcessingException {
       _tableConfig.setIndexingConfig(null);
-      IndexDeclaration<ForwardIndexConfig> actual =
-          ForwardIndexType.INSTANCE.deserializeSpreadConf(_tableConfig, _schema, "dimInt");
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.notDeclared(ForwardIndexType.INSTANCE);
+      ForwardIndexConfig actual = deserialize("dimInt");
+      ForwardIndexConfig expected = ForwardIndexConfig.DEFAULT;
       assertEquals(actual, expected);
     }
 
@@ -123,10 +125,8 @@ public class ForwardIndexTypeTest {
       _tableConfig.setFieldConfigList(
           JsonUtils.stringToObject("[]", _fieldConfigListTypeRef)
       );
-      IndexDeclaration<ForwardIndexConfig> actual =
-          ForwardIndexType.INSTANCE.deserializeSpreadConf(_tableConfig, _schema, "dimInt");
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.notDeclared(ForwardIndexType.INSTANCE);
+      ForwardIndexConfig actual = deserialize("dimInt");
+      ForwardIndexConfig expected = ForwardIndexConfig.DEFAULT;
 
       assertEquals(actual, expected);
     }
@@ -143,10 +143,8 @@ public class ForwardIndexTypeTest {
                   + "    }\n"
                   + " }]", _fieldConfigListTypeRef)
       );
-      IndexDeclaration<ForwardIndexConfig> actual =
-          ForwardIndexType.INSTANCE.deserializeSpreadConf(_tableConfig, _schema, "dimInt");
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.declaredDisabled();
+      ForwardIndexConfig actual = deserialize("dimInt");
+      ForwardIndexConfig expected = ForwardIndexConfig.DISABLED;
 
       assertEquals(actual, expected);
     }
@@ -160,10 +158,8 @@ public class ForwardIndexTypeTest {
                   + "    \"name\": \"dimInt\""
                   + " }]", _fieldConfigListTypeRef)
       );
-      IndexDeclaration<ForwardIndexConfig> actual =
-          ForwardIndexType.INSTANCE.deserializeSpreadConf(_tableConfig, _schema, "dimInt");
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.notDeclared(ForwardIndexType.INSTANCE);
+      ForwardIndexConfig actual = deserialize("dimInt");
+      ForwardIndexConfig expected = ForwardIndexConfig.DEFAULT;
 
       assertEquals(actual, expected);
     }
@@ -178,10 +174,8 @@ public class ForwardIndexTypeTest {
                   + "    \"encodingType\": \"DICTIONARY\"\n"
                   + " }]", _fieldConfigListTypeRef)
       );
-      IndexDeclaration<ForwardIndexConfig> actual =
-          ForwardIndexType.INSTANCE.deserializeSpreadConf(_tableConfig, _schema, "dimInt");
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.notDeclared(ForwardIndexType.INSTANCE);
+      ForwardIndexConfig actual = deserialize("dimInt");
+      ForwardIndexConfig expected = ForwardIndexConfig.DEFAULT;
 
       assertEquals(actual, expected);
     }
@@ -196,14 +190,12 @@ public class ForwardIndexTypeTest {
                   + "    \"encodingType\": \"RAW\"\n"
                   + " }]", _fieldConfigListTypeRef)
       );
-      IndexDeclaration<ForwardIndexConfig> actual =
-          ForwardIndexType.INSTANCE.deserializeSpreadConf(_tableConfig, _schema, "dimInt");
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.declared(new ForwardIndexConfig.Builder()
-              .withCompressionType(null)
-              .withDeriveNumDocsPerChunk(false)
-              .withRawIndexWriterVersion(2)
-              .build());
+      ForwardIndexConfig actual = deserialize("dimInt");
+      ForwardIndexConfig expected = new ForwardIndexConfig.Builder()
+          .withCompressionType(null)
+          .withDeriveNumDocsPerChunk(false)
+          .withRawIndexWriterVersion(2)
+          .build();
 
       assertEquals(actual, expected);
     }
@@ -221,14 +213,12 @@ public class ForwardIndexTypeTest {
                   + "    \"compressionCodec\": " + valueJson + "\n"
                   + " }]", _fieldConfigListTypeRef)
       );
-      IndexDeclaration<ForwardIndexConfig> actual =
-          ForwardIndexType.INSTANCE.deserializeSpreadConf(_tableConfig, _schema, "dimInt");
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.declared(new ForwardIndexConfig.Builder()
-              .withCompressionType(compression == null ? null : ChunkCompressionType.valueOf(compression))
-              .withDeriveNumDocsPerChunk(false)
-              .withRawIndexWriterVersion(2)
-              .build());
+      ForwardIndexConfig actual = deserialize("dimInt");
+      ForwardIndexConfig expected = new ForwardIndexConfig.Builder()
+          .withCompressionType(compression == null ? null : ChunkCompressionType.valueOf(compression))
+          .withDeriveNumDocsPerChunk(false)
+          .withRawIndexWriterVersion(2)
+          .build();
 
       assertEquals(actual, expected);
     }
@@ -246,14 +236,12 @@ public class ForwardIndexTypeTest {
                   + "    }\n"
                   + " }]", _fieldConfigListTypeRef)
       );
-      IndexDeclaration<ForwardIndexConfig> actual =
-          ForwardIndexType.INSTANCE.deserializeSpreadConf(_tableConfig, _schema, "dimInt");
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.declared(new ForwardIndexConfig.Builder()
-              .withCompressionType(null)
-              .withDeriveNumDocsPerChunk(true)
-              .withRawIndexWriterVersion(2)
-              .build());
+      ForwardIndexConfig actual = deserialize("dimInt");
+      ForwardIndexConfig expected = new ForwardIndexConfig.Builder()
+          .withCompressionType(null)
+          .withDeriveNumDocsPerChunk(true)
+          .withRawIndexWriterVersion(2)
+          .build();
 
       assertEquals(actual, expected);
     }
@@ -271,14 +259,12 @@ public class ForwardIndexTypeTest {
                   + "    }\n"
                   + " }]", _fieldConfigListTypeRef)
       );
-      IndexDeclaration<ForwardIndexConfig> actual =
-          ForwardIndexType.INSTANCE.deserializeSpreadConf(_tableConfig, _schema, "dimInt");
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.declared(new ForwardIndexConfig.Builder()
-              .withCompressionType(null)
-              .withDeriveNumDocsPerChunk(false)
-              .withRawIndexWriterVersion(3)
-              .build());
+      ForwardIndexConfig actual = deserialize("dimInt");;
+      ForwardIndexConfig expected = new ForwardIndexConfig.Builder()
+          .withCompressionType(null)
+          .withDeriveNumDocsPerChunk(false)
+          .withRawIndexWriterVersion(3)
+          .build();
 
       assertEquals(actual, expected);
     }
@@ -296,11 +282,10 @@ public class ForwardIndexTypeTest {
                   + " }]", _fieldConfigListTypeRef)
       );
       Map<String, FieldIndexConfigs> confMap =
-          FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema, true);
-      IndexDeclaration<ForwardIndexConfig> actual =
+          FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema);
+      ForwardIndexConfig actual =
           confMap.get("dimInt").getConfig(ForwardIndexType.INSTANCE);
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.declaredDisabled();
+      ForwardIndexConfig expected = ForwardIndexConfig.DISABLED;
 
       assertEquals(actual, expected);
     }
@@ -316,11 +301,9 @@ public class ForwardIndexTypeTest {
                   + " }]", _fieldConfigListTypeRef)
       );
       Map<String, FieldIndexConfigs> confMap =
-          FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema, true);
-      IndexDeclaration<ForwardIndexConfig> actual =
-          confMap.get("dimInt").getConfig(ForwardIndexType.INSTANCE);
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.notDeclared(ForwardIndexType.INSTANCE);
+          FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema);
+      ForwardIndexConfig actual = confMap.get("dimInt").getConfig(ForwardIndexType.INSTANCE);
+      ForwardIndexConfig expected = ForwardIndexConfig.DEFAULT;
 
       assertEquals(actual, expected);
     }
@@ -343,15 +326,14 @@ public class ForwardIndexTypeTest {
                   + " }]", _fieldConfigListTypeRef)
       );
       Map<String, FieldIndexConfigs> confMap =
-          FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema, true);
-      IndexDeclaration<ForwardIndexConfig> actual =
+          FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema);
+      ForwardIndexConfig actual =
           confMap.get("dimInt").getConfig(ForwardIndexType.INSTANCE);
-      IndexDeclaration<ForwardIndexConfig> expected =
-          IndexDeclaration.declared(new ForwardIndexConfig.Builder()
-              .withCompressionType(compression == null ? null : ChunkCompressionType.valueOf(compression))
-              .withDeriveNumDocsPerChunk(true)
-              .withRawIndexWriterVersion(10)
-              .build());
+      ForwardIndexConfig expected = new ForwardIndexConfig.Builder()
+          .withCompressionType(compression == null ? null : ChunkCompressionType.valueOf(compression))
+          .withDeriveNumDocsPerChunk(true)
+          .withRawIndexWriterVersion(10)
+          .build();
 
       assertEquals(actual, expected);
     }

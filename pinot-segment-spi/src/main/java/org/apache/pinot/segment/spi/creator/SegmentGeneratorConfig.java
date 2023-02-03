@@ -39,10 +39,10 @@ import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -214,7 +214,7 @@ public class SegmentGeneratorConfig implements Serializable {
       _segmentTimeValueCheck = ingestionConfig.isSegmentTimeValueCheck();
     }
 
-    _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema, true);
+    _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {
@@ -302,40 +302,11 @@ public class SegmentGeneratorConfig implements Serializable {
     _rawIndexCreationColumns.addAll(rawIndexCreationColumns);
   }
 
-  public <C> void disableIndexOn(IndexType<C, ?, ?> indexType, List<String> columns) {
-    for (String column : columns) {
-      _indexConfigsByColName.compute(column, (key, old) -> {
-        FieldIndexConfigs.Builder builder;
-        if (old == null) {
-          builder = new FieldIndexConfigs.Builder();
-        } else if (!old.getConfig(indexType).isEnabled()) {
-          return old;
-        } else {
-          builder = new FieldIndexConfigs.Builder(old);
-        }
-        return builder.addDeclaration(indexType, IndexDeclaration.declaredDisabled())
-            .build();
-      });
-    }
+  public <C extends IndexConfig> void setIndexOn(IndexType<C, ?, ?> indexType, C config, String... columns) {
+    setIndexOn(indexType, config, Arrays.asList(columns));
   }
 
-  public <C> void disableIndexOn(IndexType<C, ?, ?> indexType, String... columns) {
-    disableIndexOn(indexType, Arrays.asList(columns));
-  }
-
-  public <C> void setIndexOn(IndexType<C, ?, ?> indexType, C config, String... columns) {
-    setIndexOn(indexType, IndexDeclaration.declared(config), columns);
-  }
-
-  public <C> void setIndexOn(IndexType<C, ?, ?> indexType, C config, @Nullable Iterable<String> columns) {
-    setIndexOn(indexType, IndexDeclaration.declared(config), columns);
-  }
-
-  public <C> void setIndexOn(IndexType<C, ?, ?> indexType, IndexDeclaration<C> declaration, String... columns) {
-    setIndexOn(indexType, declaration, Arrays.asList(columns));
-  }
-
-  public <C> void setIndexOn(IndexType<C, ?, ?> indexType, IndexDeclaration<C> declaration,
+  public <C extends IndexConfig> void setIndexOn(IndexType<C, ?, ?> indexType, C config,
       @Nullable Iterable<String> columns) {
     if (columns == null) {
       return;
@@ -348,7 +319,7 @@ public class SegmentGeneratorConfig implements Serializable {
         } else {
           builder = new FieldIndexConfigs.Builder(old);
         }
-        return builder.addDeclaration(indexType, declaration)
+        return builder.add(indexType, config)
             .build();
       });
     }

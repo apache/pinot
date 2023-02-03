@@ -22,6 +22,8 @@ package org.apache.pinot.segment.local.segment.index.text;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -38,8 +40,9 @@ import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
@@ -81,54 +84,57 @@ public class TextIndexType implements IndexType<TextIndexConfig, TextIndexReader
   }
 
   @Override
-  public Map<String, IndexDeclaration<TextIndexConfig>> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
+  public Map<String, TextIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
     Map<String, Map<String, String>> allColProps = indexLoadingConfig.getColumnProperties();
     return indexLoadingConfig.getTextIndexColumns().stream().collect(Collectors.toMap(
         Function.identity(),
-        colName -> IndexDeclaration.declared(new TextIndexConfigBuilder(indexLoadingConfig.getFSTIndexType())
+        colName -> new TextIndexConfigBuilder(indexLoadingConfig.getFSTIndexType())
             .withProperties(allColProps.get(colName))
             .build()
-        )
     ));
   }
 
   @Override
-  public IndexDeclaration<TextIndexConfig> deserializeSpreadConf(TableConfig tableConfig, Schema schema,
-      String column) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
-    // TODO(index-spi): This doesn't feel right, but it is here to keep backward compatibility.
-    //  If there are two text indexes in two different columns and one explicitly specifies LUCENE and the but the other
-    //  specifies native, both are created as native. No error is thrown and no log is shown.
-    FSTType fstType = FSTType.LUCENE;
-    for (FieldConfig fieldConfig : fieldConfigList) {
-      if (fieldConfig.getName().equals(column)) {
-        Map<String, String> properties = fieldConfig.getProperties();
-        if (TextIndexUtils.isFstTypeNative(properties)) {
-          fstType = FSTType.NATIVE;
-        }
-      }
-    }
-    FieldConfig fieldConfig = fieldConfigList.stream()
-        .filter(fc -> fc.getName().equals(column))
-        .findAny()
-        .orElse(null);
-    if (fieldConfig == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
-    if (!fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
-      return IndexDeclaration.notDeclared(this);
-    }
-    Map<String, String> properties = fieldConfig.getProperties();
-// TODO(index-spi): This is how the index type should be detected
-    FSTType actualFstType = TextIndexUtils.isFstTypeNative(properties) ? FSTType.NATIVE : FSTType.LUCENE;
-    if (actualFstType != fstType) {
-      LOGGER.warn("Column {} text index is specified as {}, but {} will be used to keep backward guarantees",
-          column, fstType, actualFstType);
-    }
-    return IndexDeclaration.declared(new TextIndexConfigBuilder(fstType).withProperties(properties).build());
+  public TextIndexConfig getDefaultConfig() {
+    return TextIndexConfig.DISABLED;
+  }
+
+  @Override
+  public ColumnConfigDeserializer<TextIndexConfig> getDeserializer() {
+    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+        .withExclusiveAlternative((tableConfig, schema) -> {
+          List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+          if (fieldConfigList == null) {
+            return Collections.emptyMap();
+          }
+          // TODO(index-spi): This doesn't feel right, but it is here to keep backward compatibility.
+          //  If there are two text indexes in two different columns and one explicitly specifies LUCENE and the but
+          //  the other specifies native, both are created as native. No error is thrown and no log is shown.
+          FSTType fstType = FSTType.LUCENE;
+          for (FieldConfig fieldConfig : fieldConfigList) {
+            if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
+              Map<String, String> properties = fieldConfig.getProperties();
+              if (TextIndexUtils.isFstTypeNative(properties)) {
+                fstType = FSTType.NATIVE;
+              }
+            }
+          }
+          Map<String, TextIndexConfig> result = new HashMap<>();
+          for (FieldConfig fieldConfig : fieldConfigList) {
+            if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
+              String column = fieldConfig.getName();
+              Map<String, String> properties = fieldConfig.getProperties();
+              // TODO(index-spi): This is how the index type should be detected
+              FSTType actualFstType = TextIndexUtils.isFstTypeNative(properties) ? FSTType.NATIVE : FSTType.LUCENE;
+              if (actualFstType != fstType) {
+                LOGGER.warn("Column {} text index is specified as {}, but {} will be used to keep backward guarantees",
+                    column, fstType, actualFstType);
+              }
+              result.put(column, new TextIndexConfigBuilder(fstType).withProperties(properties).build());
+            }
+          }
+          return result;
+        });
   }
 
   @Override
@@ -175,11 +181,10 @@ public class TextIndexType implements IndexType<TextIndexConfig, TextIndexReader
           // TODO: Support loading native text index from a PinotDataBuffer
           return new NativeTextIndexReader(metadata.getColumnName(), segmentDir);
         }
-        IndexDeclaration<TextIndexConfig> indexDeclaration = fieldIndexConfigs.getConfig(TextIndexType.INSTANCE);
-        if (!indexDeclaration.isEnabled()) {
+        TextIndexConfig indexConfig = fieldIndexConfigs.getConfig(TextIndexType.INSTANCE);
+        if (!indexConfig.isEnabled()) {
           return null;
         }
-        TextIndexConfig indexConfig = indexDeclaration.getEnabledConfig();
         return new LuceneTextIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
       }
     };

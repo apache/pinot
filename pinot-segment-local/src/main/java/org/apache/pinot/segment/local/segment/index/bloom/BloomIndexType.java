@@ -19,9 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.bloom;
 
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
 import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
@@ -32,8 +30,9 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -67,29 +66,28 @@ public class BloomIndexType
   }
 
   @Override
-  public Map<String, IndexDeclaration<BloomFilterConfig>> fromIndexLoadingConfig(
-      IndexLoadingConfig indexLoadingConfig) {
-    return indexLoadingConfig.getBloomFilterConfigs().entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getKey, e -> IndexDeclaration.declared(e.getValue())));
+  public Map<String, BloomFilterConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
+    return indexLoadingConfig.getBloomFilterConfigs();
   }
 
   @Override
-  public IndexDeclaration<BloomFilterConfig> deserializeSpreadConf(TableConfig tableConfig, Schema schema,
-      String column) {
-    Map<String, BloomFilterConfig> bloomFilterConfigs = tableConfig.getIndexingConfig().getBloomFilterConfigs();
-    List<String> bloomFilterColumns = tableConfig.getIndexingConfig().getBloomFilterColumns();
+  public BloomFilterConfig getDefaultConfig() {
+    return BloomFilterConfig.DISABLED;
+  }
 
-    if (bloomFilterColumns == null && bloomFilterConfigs == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
-
-    if (bloomFilterConfigs != null && bloomFilterConfigs.containsKey(column)) {
-      return IndexDeclaration.declared(bloomFilterConfigs.get(column));
-    }
-    if (bloomFilterColumns != null && bloomFilterColumns.contains(column)) {
-      return IndexDeclaration.declared(BloomFilterConfig.createDefault());
-    }
-    return IndexDeclaration.declaredDisabled();
+  @Override
+  public ColumnConfigDeserializer<BloomFilterConfig> getDeserializer() {
+    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+        .withExclusiveAlternative(
+            IndexConfigDeserializer.ifIndexingConfig(
+                    // reads tableConfig.indexingConfig.bloomFilterConfigs
+                IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterConfigs())
+                  .withExclusiveAlternative(// reads tableConfig.indexingConfig.bloomFilterColumns
+                      IndexConfigDeserializer.fromCollection(
+                          tableConfig -> tableConfig.getIndexingConfig().getBloomFilterColumns(),
+                          (accum, column) -> accum.put(column, BloomFilterConfig.createDefault())))
+            )
+        );
   }
 
   @Override

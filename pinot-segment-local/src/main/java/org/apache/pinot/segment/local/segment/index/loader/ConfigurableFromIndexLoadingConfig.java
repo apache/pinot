@@ -20,26 +20,26 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.util.Map;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
-import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
+import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 /**
  * This interface can be optionally implemented by {@link org.apache.pinot.segment.spi.index.IndexType index types} to
  * indicate that they can extract their configuration from an older {@link IndexLoadingConfig} object.
  */
-public interface ConfigurableFromIndexLoadingConfig<C> {
+public interface ConfigurableFromIndexLoadingConfig<C extends IndexConfig> {
+
 
   /**
-   * Returns a map where keys are the columns and values are the configs declared for these columns.
+   * Returns a {@link ColumnConfigDeserializer} that can be used to deserialize the index config.
+   *
+   * This deserializer is used with higher priority whenever the index configuration needs to be read from an
+   * {@link IndexLoadingConfig}.
    *
    * Sometimes {@link IndexLoadingConfig} is not completely configured and
-   * {@link IndexLoadingConfig#getAllKnownColumns()} does not return all columns in the table. In that case,
-   * implementations have to fill the map as much as they can and callers should complete the map, usually by adding
-   * new entries whose key is the missing column and the value is {@link IndexType#getDefaultConfig()}.
-   *
-   * @param indexLoadingConfig
-   * @return
+   * {@link IndexLoadingConfig#getAllKnownColumns()} does not return all columns in the table.
+   * Therefore the returned deserializer can be partial.
    */
-  Map<String, IndexDeclaration<C>> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig);
+  Map<String, C> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig);
 }

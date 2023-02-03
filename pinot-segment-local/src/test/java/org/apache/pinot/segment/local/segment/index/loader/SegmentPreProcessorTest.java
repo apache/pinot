@@ -51,7 +51,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
-import org.apache.pinot.segment.spi.index.EmptyIndexConf;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -65,6 +65,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -249,10 +250,10 @@ public class SegmentPreProcessorTest {
     SegmentGeneratorConfig segmentGeneratorConfig =
         SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, INDEX_DIR, "testTable", _tableConfig, _schema);
     segmentGeneratorConfig.setRawIndexCreationColumns(rawCols);
-    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), EmptyIndexConf.INSTANCE, COLUMN7_NAME);
+    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, COLUMN7_NAME);
     if (invertedIndexCols.size() > 0) {
       for (String col : invertedIndexCols) {
-        segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), EmptyIndexConf.INSTANCE, col);
+        segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, col);
       }
     }
     if (textIndexCols.size() > 0) {
@@ -264,8 +265,9 @@ public class SegmentPreProcessorTest {
       segmentGeneratorConfig.setIndexOn(StandardIndexes.range(), config, rangeIndexCols);
     }
     if (forwardIndexDisabledCols.size() > 0) {
-      segmentGeneratorConfig.disableIndexOn(StandardIndexes.forward(), forwardIndexDisabledCols);
-      segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), EmptyIndexConf.INSTANCE, forwardIndexDisabledCols);
+      segmentGeneratorConfig.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED,
+          forwardIndexDisabledCols);
+      segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, forwardIndexDisabledCols);
     }
 
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);

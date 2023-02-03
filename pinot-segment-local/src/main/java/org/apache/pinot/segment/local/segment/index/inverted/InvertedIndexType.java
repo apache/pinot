@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.inverted;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -36,9 +35,9 @@ import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexR
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
-import org.apache.pinot.segment.spi.index.EmptyIndexConf;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -50,14 +49,14 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
 public class InvertedIndexType
-    implements IndexType<EmptyIndexConf, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>,
-               ConfigurableFromIndexLoadingConfig<EmptyIndexConf> {
+    implements IndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>,
+               ConfigurableFromIndexLoadingConfig<IndexConfig> {
   public static final InvertedIndexType INSTANCE = new InvertedIndexType();
 
   private InvertedIndexType() {
@@ -74,28 +73,28 @@ public class InvertedIndexType
   }
 
   @Override
-  public Class<EmptyIndexConf> getIndexConfigClass() {
-    return EmptyIndexConf.class;
+  public Class<IndexConfig> getIndexConfigClass() {
+    return IndexConfig.class;
   }
 
   @Override
-  public Map<String, IndexDeclaration<EmptyIndexConf>> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
+  public Map<String, IndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
     return indexLoadingConfig.getInvertedIndexColumns().stream()
-        .collect(Collectors.toMap(Function.identity(), v -> IndexDeclaration.declared(EmptyIndexConf.getInstance())));
+        .collect(Collectors.toMap(Function.identity(), v -> IndexConfig.ENABLED));
   }
 
   @Override
-  public IndexDeclaration<EmptyIndexConf> deserializeSpreadConf(TableConfig tableConfig, Schema schema, String column) {
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-    if (invertedIndexColumns == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
+  public IndexConfig getDefaultConfig() {
+    return IndexConfig.DISABLED;
+  }
 
-    if (invertedIndexColumns.contains(column)) {
-      return IndexDeclaration.declared(EmptyIndexConf.getInstance());
-    }
-    return IndexDeclaration.declaredDisabled();
+  @Override
+  public ColumnConfigDeserializer<IndexConfig> getDeserializer() {
+    ColumnConfigDeserializer<IndexConfig> fromInvertedCols = IndexConfigDeserializer.fromCollection(
+        tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
+        (acum, column) -> acum.put(column, IndexConfig.ENABLED));
+    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+        .withExclusiveAlternative(IndexConfigDeserializer.ifIndexingConfig(fromInvertedCols));
   }
 
   public DictionaryBasedInvertedIndexCreator createIndexCreator(IndexCreationContext context)
@@ -111,7 +110,7 @@ public class InvertedIndexType
 
   @Override
   public DictionaryBasedInvertedIndexCreator createIndexCreator(IndexCreationContext context,
-      EmptyIndexConf indexConfig)
+      IndexConfig indexConfig)
       throws IOException {
     return createIndexCreator(context);
   }

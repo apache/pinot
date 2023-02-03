@@ -50,7 +50,6 @@ import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexCreator;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -59,6 +58,7 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -188,7 +188,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         DictionaryIndexType dictIdx = DictionaryIndexType.INSTANCE;
         // Index conf should be present if dictEnabledColumn is true. In case it doesn't, getConfig will throw an
         // exception
-        DictionaryIndexConfig dictConfig = fieldIndexConfigs.getConfig(dictIdx).getEnabledConfig();
+        DictionaryIndexConfig dictConfig = fieldIndexConfigs.getConfig(dictIdx);
+        if (!dictConfig.isEnabled()) {
+          throw new IllegalArgumentException("Dictionary index should be enabled");
+        }
         SegmentDictionaryCreator creator = dictIdx.createIndexCreator(context, dictConfig);
 
         try {
@@ -241,12 +244,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * This code needs to be in a specific method instead of inlined in the main loop in order to be able to use the
    * limited generic capabilities of Java.
    */
-  private <C> void tryCreateCreator(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
+  private <C extends IndexConfig> void tryCreateCreator(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
       IndexType<C, ?, ?> index, IndexCreationContext.Common context, FieldIndexConfigs fieldIndexConfigs)
       throws Exception {
-    IndexDeclaration<C> declaration = fieldIndexConfigs.getConfig(index);
+    C declaration = fieldIndexConfigs.getConfig(index);
     if (declaration.isEnabled() && index.shouldBeCreated(context, fieldIndexConfigs)) {
-      creatorsByIndex.put(index, index.createIndexCreator(context, declaration.getEnabledConfig()));
+      creatorsByIndex.put(index, index.createIndexCreator(context, declaration));
     }
   }
 
@@ -418,12 +421,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (dictEnabledColumn) {
       return null;
     }
-    IndexDeclaration<TextIndexConfig> textDeclaration = configs.getConfig(StandardIndexes.text());
+    TextIndexConfig textDeclaration = configs.getConfig(StandardIndexes.text());
     if (!textDeclaration.isEnabled()) {
       return null;
     }
 
-    Object alternativeValue = textDeclaration.getEnabledConfig().getRawValueForTextIndex();
+    Object alternativeValue = textDeclaration.getRawValueForTextIndex();
 
     if (alternativeValue == null) {
       return null;

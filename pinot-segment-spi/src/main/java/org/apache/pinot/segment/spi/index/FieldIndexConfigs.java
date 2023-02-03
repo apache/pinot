@@ -22,58 +22,43 @@ package org.apache.pinot.segment.spi.index;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 /**
  * FieldIndexConfigs are a map like structure that relates index types with their configuration, providing a type safe
  * interface.
  *
- * This class can be serialized into a JSON object whose keys are the index type ids using Jackson, but to be
- * deserialized it is necessary to
- * call {@link FieldIndexConfigs#deserializeJsonNode(JsonNode, boolean)}. A custom Jackson deserializer could be
- * provided if needed.
+ * This class can be serialized into a JSON object whose keys are the index type ids using Jackson, but cannot be
+ * serialized back. A custom Jackson deserializer could be provided if needed.
  */
 public class FieldIndexConfigs {
 
-  private final Map<IndexType, IndexDeclaration<?>> _configMap;
   public static final FieldIndexConfigs EMPTY = new FieldIndexConfigs(new HashMap<>());
 
-  private FieldIndexConfigs(Map<IndexType, IndexDeclaration<?>> configMap) {
+  private final Map<IndexType, IndexConfig> _configMap;
+
+  private FieldIndexConfigs(Map<IndexType, IndexConfig> configMap) {
     _configMap = Collections.unmodifiableMap(configMap);
   }
 
-
   /**
-   * The method most of the code should call to know how is configured a given index.
-   *
-   * @param indexType the type of the index we are interested in.
-   * @return How the index has been configured, which can be {@link IndexDeclaration#isDeclared() not declared},
-   * {@link IndexDeclaration#isEnabled()} not enabled} or an actual configuration object (which can be obtained with
-   * {@link IndexDeclaration#getEnabledConfig()}.
+   * Returns the configuration associated with the given index type, which will be null if there is no configuration for
+   * that index type.
    */
   @JsonIgnore
-  public <C, I extends IndexType<C, ?, ?>> IndexDeclaration<C> getConfig(I indexType) {
-    @SuppressWarnings("unchecked")
-    IndexDeclaration<C> config = (IndexDeclaration<C>) _configMap.get(indexType);
+  public <C extends IndexConfig, I extends IndexType<C, ?, ?>> C getConfig(I indexType) {
+    IndexConfig config = _configMap.get(indexType);
     if (config == null) {
-      return IndexDeclaration.notDeclared(indexType);
+      return indexType.getDefaultConfig();
     }
-    return config;
+    return (C) config;
   }
 
   /*
@@ -82,41 +67,16 @@ public class FieldIndexConfigs {
   in the JSON object.
    */
   @JsonAnyGetter
-  public Map<String, Object> unwrapIndexes() {
-    Function<Map.Entry<IndexType, IndexDeclaration<?>>, JsonNode> serializer =
-        entry -> entry.getKey().serialize(entry.getValue().getEnabledConfig());
+  public Map<String, JsonNode> unwrapIndexes() {
+    Function<Map.Entry<IndexType, IndexConfig>, JsonNode> serializer =
+        entry -> entry.getKey().serialize(entry.getValue());
     return _configMap.entrySet().stream()
-        .filter(e -> e.getValue().isDeclared())
+        .filter(e -> e.getValue() != null)
         .collect(Collectors.toMap(entry -> entry.getKey().getId(), serializer));
   }
 
-  public static FieldIndexConfigs deserializeJsonNode(JsonNode node, boolean failIfUnrecognized)
-      throws UnrecognizedIndexException, IOException {
-    Iterator<Map.Entry<String, JsonNode>> it = node.fields();
-
-    FieldIndexConfigs.Builder builder = new Builder();
-    while (it.hasNext()) {
-      Map.Entry<String, JsonNode> entry = it.next();
-      String indexId = entry.getKey();
-
-      Optional<IndexType<?, ?, ?>> opt = IndexService.getInstance().getIndexTypeById(indexId);
-      if (!opt.isPresent()) {
-        if (failIfUnrecognized) {
-          throw new UnrecognizedIndexException(indexId);
-        } else {
-          continue;
-        }
-      }
-      IndexType<?, ?, ?> indexType = opt.get();
-      JsonNode indexNode = entry.getValue();
-      Object deserialized = indexType.deserialize(indexNode);
-      builder.addUnsafe(indexType, deserialized);
-    }
-    return builder.build();
-  }
-
   public static class Builder {
-    private final Map<IndexType, IndexDeclaration<?>> _configMap;
+    private final Map<IndexType, IndexConfig> _configMap;
 
     public Builder() {
       _configMap = new HashMap<>();
@@ -126,33 +86,13 @@ public class FieldIndexConfigs {
       _configMap = new HashMap<>(other._configMap);
     }
 
-    public <C, I extends IndexType<C, ?, ?>> Builder add(I indexType, @Nullable C config) {
-      _configMap.put(indexType, IndexDeclaration.declared(config));
+    public <C extends IndexConfig, I extends IndexType<C, ?, ?>> Builder add(I indexType, @Nullable C config) {
+      _configMap.put(indexType, config);
       return this;
     }
 
-    public <C, I extends IndexType<C, ?, ?>> Builder addDeclaration(I indexType, IndexDeclaration<C> declaration) {
-      if (!declaration.isDeclared()) {
-        undeclare(indexType);
-      } else {
-        _configMap.put(indexType, declaration);
-      }
-      return this;
-    }
-
-    public Builder addUnsafe(IndexType<?, ?, ?> indexType, @Nullable Object config) {
-      Preconditions.checkArgument(!(config instanceof IndexDeclaration), "Index declarations cannot be "
-          + "added as values");
-      _configMap.put(indexType, IndexDeclaration.declared(config));
-      return this;
-    }
-
-    public Builder addUnsafeDeclaration(IndexType<?, ?, ?> indexType, @Nullable IndexDeclaration<?> config) {
-      if (!config.isDeclared()) {
-        undeclare(indexType);
-      } else {
-        _configMap.put(indexType, config);
-      }
+    public Builder addUnsafe(IndexType<?, ?, ?> indexType, @Nullable IndexConfig config) {
+      _configMap.put(indexType, config);
       return this;
     }
 
@@ -164,27 +104,6 @@ public class FieldIndexConfigs {
     public FieldIndexConfigs build() {
       return new FieldIndexConfigs(_configMap);
     }
-  }
-
-  public static Map<String, FieldIndexConfigs> readFieldIndexConfigByColumn(Collection<FieldConfig> fieldConfigs,
-      boolean failIfUnrecognized, Set<String> allColumns) {
-    Map<String, FieldIndexConfigs> indexConfigsByColName = Maps.newHashMapWithExpectedSize(fieldConfigs.size());
-    for (FieldConfig fieldConfig : fieldConfigs) {
-      JsonNode indexes = fieldConfig.getIndexes();
-      FieldIndexConfigs configs;
-      try {
-        configs = FieldIndexConfigs.deserializeJsonNode(indexes, failIfUnrecognized);
-      } catch (IOException e) {
-        throw new UncheckedIOException("Error deserializing index config of " + fieldConfig.getName() + " field", e);
-      }
-      indexConfigsByColName.put(fieldConfig.getName(), configs);
-    }
-    for (String column : allColumns) {
-      if (!indexConfigsByColName.containsKey(column)) {
-        indexConfigsByColName.put(column, FieldIndexConfigs.EMPTY);
-      }
-    }
-    return indexConfigsByColName;
   }
 
   public static class UnrecognizedIndexException extends RuntimeException {

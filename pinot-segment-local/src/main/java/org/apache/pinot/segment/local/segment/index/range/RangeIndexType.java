@@ -19,8 +19,9 @@
 
 package org.apache.pinot.segment.local.segment.index.range;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -36,8 +37,9 @@ import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReaderImpl
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexDeclaration;
+import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
@@ -50,7 +52,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class RangeIndexType implements IndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator>,
@@ -82,47 +83,41 @@ public class RangeIndexType implements IndexType<RangeIndexConfig, RangeIndexRea
     return RangeIndexConfig.class;
   }
 
-  @Nullable
   @Override
-  public RangeIndexConfig deserialize(JsonNode node)
-      throws IOException {
-    if (node.isBoolean()) {
-      if (node.booleanValue()) {
-        return getDefaultConfig();
-      } else {
-        return null;
-      }
-    }
-    if (node.isInt()) {
-      return new RangeIndexConfig(node.asInt());
-    }
-    return JsonUtils.jsonNodeToObject(node, getIndexConfigClass());
-  }
-
-  @Override
-  public Map<String, IndexDeclaration<RangeIndexConfig>> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
+  public Map<String, RangeIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
     int rangeVersion = indexLoadingConfig.getRangeIndexVersion();
     return indexLoadingConfig.getRangeIndexColumns().stream()
         .collect(Collectors.toMap(
             Function.identity(),
-            c -> IndexDeclaration.declared(new RangeIndexConfig(rangeVersion))));
+            c -> new RangeIndexConfig(rangeVersion)));
   }
 
   @Override
-  public IndexDeclaration<RangeIndexConfig> deserializeSpreadConf(TableConfig tableConfig, Schema schema,
-      String column) {
-    int rangeVersion = tableConfig.getIndexingConfig().getRangeIndexVersion();
-    if (rangeVersion == 0) {
-      rangeVersion = DEFAULT_RANGE_INDEX_VERSION;
-    }
-    List<String> rangeIndexColumns = tableConfig.getIndexingConfig().getRangeIndexColumns();
-    if (rangeIndexColumns == null) {
-      return IndexDeclaration.notDeclared(this);
-    }
-    if (!rangeIndexColumns.contains(column)) {
-      return IndexDeclaration.declaredDisabled();
-    }
-    return IndexDeclaration.declared(new RangeIndexConfig(rangeVersion));
+  public RangeIndexConfig getDefaultConfig() {
+    return RangeIndexConfig.DISABLED;
+  }
+
+  @Override
+  public ColumnConfigDeserializer<RangeIndexConfig> getDeserializer() {
+    return IndexConfigDeserializer.fromIndexes(getId(), getIndexConfigClass())
+        .withExclusiveAlternative((tableConfig, schema) -> {
+          if (tableConfig.getIndexingConfig() == null) {
+            return Collections.emptyMap();
+          }
+          List<String> rangeIndexColumns = tableConfig.getIndexingConfig().getRangeIndexColumns();
+          if (rangeIndexColumns == null) {
+            return Collections.emptyMap();
+          }
+          int rangeVersion = tableConfig.getIndexingConfig().getRangeIndexVersion();
+          if (rangeVersion == 0) {
+            rangeVersion = DEFAULT_RANGE_INDEX_VERSION;
+          }
+          Map<String, RangeIndexConfig> result = new HashMap<>();
+          for (String col : rangeIndexColumns) {
+            result.put(col, new RangeIndexConfig(rangeVersion));
+          }
+          return result;
+        });
   }
 
   @Override

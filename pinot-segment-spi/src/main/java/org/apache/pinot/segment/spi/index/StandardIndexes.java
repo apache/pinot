@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 
 
@@ -54,8 +55,8 @@ public class StandardIndexes {
         IndexService.getInstance().getIndexTypeByIdOrThrow("dictionary");
   }
 
-  public static IndexType<EmptyIndexConf, NullValueVectorReader, ?> nullValueVector() {
-    return (IndexType<EmptyIndexConf, NullValueVectorReader, ?>)
+  public static IndexType<IndexConfig, NullValueVectorReader, ?> nullValueVector() {
+    return (IndexType<IndexConfig, NullValueVectorReader, ?>)
         IndexService.getInstance().getIndexTypeByIdOrThrow("nullable");
   }
 
@@ -69,8 +70,8 @@ public class StandardIndexes {
         IndexService.getInstance().getIndexTypeByIdOrThrow("fst");
   }
 
-  public static IndexType<EmptyIndexConf, InvertedIndexReader, DictionaryBasedInvertedIndexCreator> inverted() {
-    return (IndexType<EmptyIndexConf, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>)
+  public static IndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator> inverted() {
+    return (IndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>)
         IndexService.getInstance().getIndexTypeByIdOrThrow("inverted");
   }
 
