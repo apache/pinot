@@ -98,7 +98,6 @@ public class GrpcSendingMailbox implements SendingMailbox<TransferableBlock> {
       Mailbox.MailboxContent.Builder builder = Mailbox.MailboxContent.newBuilder().setMailboxId(_mailboxId)
           .setPayload(ByteString.copyFrom(dataBlock.toBytes()));
       if (dataBlock instanceof MetadataBlock) {
-        builder.putAllMetadata(((MetadataBlock) dataBlock).getStats());
         builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
       }
       return builder.build();
