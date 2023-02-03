@@ -74,7 +74,7 @@ public class SegmentCommitterFactory {
 
     // We seem to allow the server instance to come up without a valid segment store uri. Hence, this check is needed.
 
-    if (peerSegmentDownloadScheme != null || (StringUtils.isEmpty(segmentStoreUri) && uploadToFs)) {
+    if (peerSegmentDownloadScheme != null || (!StringUtils.isEmpty(segmentStoreUri) && uploadToFs)) {
       // TODO: peer scheme non-null check exists for backwards compatibility. remove check once users have migrated
       segmentUploader = new PinotFSSegmentUploader(segmentStoreUri,
           PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
