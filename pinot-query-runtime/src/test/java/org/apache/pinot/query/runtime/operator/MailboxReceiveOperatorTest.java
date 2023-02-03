@@ -90,7 +90,7 @@ public class MailboxReceiveOperatorTest {
     // longer timeout doesn't result in error.
     receiveOp =
         new MailboxReceiveOperator(_mailboxService, new ArrayList<>(), RelDistribution.Type.SINGLETON, _testAddr, 456,
-            789, (long) (System.nanoTime() + (10 * 1e9)));
+            789, System.nanoTime() + TimeUnit.SECONDS.toNanos(10));
     Thread.sleep(200L);
     mailbox = receiveOp.nextBlock();
     Assert.assertFalse(mailbox.isErrorBlock());
@@ -110,7 +110,7 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(123);
 
     MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.SINGLETON, _testAddr, 456, 789, System.nanoTime() + 10000000);
+        RelDistribution.Type.SINGLETON, _testAddr, 456, 789, System.nanoTime() + TimeUnit.SECONDS.toNanos(10));
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RANGE_DISTRIBUTED.*")
@@ -125,7 +125,7 @@ public class MailboxReceiveOperatorTest {
     Mockito.when(_server2.getQueryMailboxPort()).thenReturn(123);
 
     MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
-        RelDistribution.Type.RANGE_DISTRIBUTED, _testAddr, 456, 789, (long) (System.nanoTime() + (10 * 1e9)));
+        RelDistribution.Type.RANGE_DISTRIBUTED, _testAddr, 456, 789, System.nanoTime() + TimeUnit.SECONDS.toNanos(10));
   }
 
   @Test
@@ -151,7 +151,7 @@ public class MailboxReceiveOperatorTest {
 
     MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(_mailboxService, ImmutableList.of(_server1, _server2),
         RelDistribution.Type.SINGLETON, toAddress, jobId, stageId,
-        (long) (System.nanoTime() + TimeUnit.SECONDS.toNanos(10)));
+        System.nanoTime() + TimeUnit.SECONDS.toNanos(10));
 
     // Receive end of stream block directly when there is no match.
     Assert.assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
