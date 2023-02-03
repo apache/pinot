@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager.offline;
 import com.google.common.cache.LoadingCache;
 import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -32,6 +33,8 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -72,6 +75,15 @@ public class TableDataManagerProvider {
         }
         break;
       case REALTIME:
+        if (tableDataManagerConfig.getTableConfig().getIndexingConfig() != null
+            && tableDataManagerConfig.getTableConfig().getIndexingConfig().getStreamConfigs() != null
+            && Boolean.parseBoolean(tableDataManagerConfig.getTableConfig().getIndexingConfig()
+            .getStreamConfigs().get(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE))
+            && StringUtils.isEmpty(tableDataManagerConfig.getInstanceDataManagerConfig().getSegmentStoreUri())) {
+          throw new IllegalStateException(String.format("Table has enabled %s config. But the server has not "
+              + "configured the segmentstore uri. Configure the server config %s",
+              StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE, CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI));
+        }
         tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToServeQueries);
         break;
       default:
