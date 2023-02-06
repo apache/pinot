@@ -31,14 +31,14 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
   // TODO: Move to OperatorContext class.
-  private OperatorStats _operatorStats;
+  private final OperatorStats _operatorStats;
 
   public MultiStageOperator(long requestId, int stageId) {
     _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
   }
 
   @Override
-  public final TransferableBlock nextBlock() {
+  public TransferableBlock nextBlock() {
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       throw new EarlyTerminationException("Interrupted while processing next block");
     }
@@ -47,6 +47,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       TransferableBlock nextBlock = getNextBlock();
       _operatorStats.recordOutput(1, nextBlock.getNumRows());
       _operatorStats.endTimer();
+      // TODO: move this to centralized reporting in broker
       if (nextBlock.isEndOfStreamBlock()) {
         LOGGER.info("Recorded operator stats: " + _operatorStats);
       }
