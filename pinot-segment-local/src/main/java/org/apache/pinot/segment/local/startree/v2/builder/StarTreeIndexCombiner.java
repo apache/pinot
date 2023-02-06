@@ -24,8 +24,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -54,7 +54,7 @@ public class StarTreeIndexCombiner implements Closeable {
    */
   public Map<IndexKey, IndexValue> combine(StarTreeV2BuilderConfig builderConfig, File starTreeIndexDir)
       throws IOException {
-    Map<IndexKey, IndexValue> indexMap = new HashMap<>();
+    Map<IndexKey, IndexValue> indexMap = new TreeMap<>();
 
     // Write star-tree index
     File starTreeIndexFile = new File(starTreeIndexDir, StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME);

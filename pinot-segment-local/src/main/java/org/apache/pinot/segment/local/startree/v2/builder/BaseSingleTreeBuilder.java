@@ -28,6 +28,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -131,7 +132,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
           "Dimension: " + dimension + " does not have dictionary");
     }
 
-    Set<AggregationFunctionColumnPair> functionColumnPairs = builderConfig.getFunctionColumnPairs();
+    Set<AggregationFunctionColumnPair> functionColumnPairs = new TreeSet<>(builderConfig.getFunctionColumnPairs());
     _numMetrics = functionColumnPairs.size();
     _metrics = new String[_numMetrics];
     _functionColumnPairs = new AggregationFunctionColumnPair[_numMetrics];

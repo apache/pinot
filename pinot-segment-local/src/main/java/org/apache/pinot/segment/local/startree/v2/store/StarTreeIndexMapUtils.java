@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
-
 
 /**
  * The {@code StarTreeIndexMapUtils} class is a utility class to store/load star-tree index map to/from file.
@@ -81,7 +81,7 @@ public class StarTreeIndexMapUtils {
   /**
    * Key of the index map.
    */
-  public static class IndexKey {
+  public static class IndexKey implements Comparable<IndexKey> {
     public final IndexType _indexType;
     // For star-tree index, column will be null
     public final String _column;
@@ -111,6 +111,14 @@ public class StarTreeIndexMapUtils {
       } else {
         return false;
       }
+    }
+
+    @Override
+    public int compareTo(IndexKey other) {
+      return Comparator
+          .comparing((IndexKey i) -> i._column, Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing((IndexKey i) -> i._indexType, Comparator.nullsLast(Comparator.naturalOrder()))
+          .compare(this, other);
     }
   }
 
