@@ -54,6 +54,8 @@ public class PinotFSSegmentUploader implements SegmentUploader {
 
   public URI uploadSegment(File segmentFile, LLCSegmentName segmentName) {
     if (_segmentStoreUriStr == null || _segmentStoreUriStr.isEmpty()) {
+      LOGGER.error("Missing segment store uri. Failed to upload segment file {} for {}.", segmentFile.getName(),
+          segmentName.getSegmentName());
       return null;
     }
     Callable<URI> uploadTask = () -> {

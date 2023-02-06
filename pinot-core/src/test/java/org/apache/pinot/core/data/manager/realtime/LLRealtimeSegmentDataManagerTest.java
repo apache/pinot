@@ -841,6 +841,7 @@ public class LLRealtimeSegmentDataManagerTest {
     when(tableDataManagerConfig.getTableName()).thenReturn(REALTIME_TABLE_NAME);
     when(tableDataManagerConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
+    when(tableDataManagerConfig.getTableConfig()).thenReturn(tableConfig);
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getMaxParallelSegmentBuilds()).thenReturn(4);
     when(instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit()).thenReturn(-1L);
