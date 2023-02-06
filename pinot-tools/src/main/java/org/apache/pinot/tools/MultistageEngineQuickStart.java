@@ -36,6 +36,13 @@ public class MultistageEngineQuickStart extends Quickstart {
       "examples/batch/ssb/lineorder",
       "examples/batch/ssb/part",
       "examples/batch/ssb/supplier",
+      "examples/batch/airlineStats",
+      "examples/batch/baseballStats",
+      "examples/batch/dimBaseballTeams",
+      "examples/batch/starbucksStores",
+      "examples/batch/githubEvents",
+      "examples/batch/githubComplexTypeEvents",
+      "examples/batch/billing",
   };
 
   @Override
@@ -81,9 +88,7 @@ public class MultistageEngineQuickStart extends Quickstart {
 
   @Override
   public String[] getDefaultBatchTableDirectories() {
-    List<String> tableDirs = new ArrayList<>(Arrays.asList(MULTI_STAGE_TABLE_DIRECTORIES));
-    tableDirs.addAll(Arrays.asList(DEFAULT_OFFLINE_TABLE_DIRECTORIES));
-    return tableDirs.toArray(new String[]{});
+    return MULTI_STAGE_TABLE_DIRECTORIES;
   }
 
   @Override

@@ -81,6 +81,7 @@ public class MailboxSendOperator extends MultiStageOperator {
       MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, long jobId, int stageId) {
+    super(jobId, stageId);
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
 
     List<MailboxIdentifier> receivingMailboxes;
@@ -124,8 +125,6 @@ public class MailboxSendOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    _dataTableBlockBaseOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
