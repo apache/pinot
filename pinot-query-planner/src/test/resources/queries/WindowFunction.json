@@ -1087,6 +1087,36 @@
           "\n              LogicalTableScan(table=[[b]])",
           "\n"
         ]
+      },
+      {
+        "description": "Window function with GROUP BY example with aggregation used within ORDER BY clause in OVER",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, COUNT(*), AVG(a.col3) OVER(ORDER BY COUNT(*) desc, a.col1 asc) from a GROUP BY a.col1, a.col3",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], EXPR$1=[$2], EXPR$2=[CAST(/($3, $4)):INTEGER NOT NULL])",
+          "\n  LogicalWindow(window#0=[window(order by [2 DESC, 1] aggs [SUM($0), COUNT($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash], collation=[[2 DESC, 1]])",
+          "\n      LogicalAggregate(group=[{0, 1}], EXPR$1=[$SUM0($2)])",
+          "\n        LogicalExchange(distribution=[hash[0, 1]])",
+          "\n          LogicalAggregate(group=[{1, 2}], EXPR$1=[COUNT()])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Window function with GROUP BY example with aggregation used within ORDER BY clause in OVER with PARTITION BY",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, COUNT(*), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY COUNT(*) desc, a.col1 asc) from a GROUP BY a.col1, a.col3",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], EXPR$1=[$2], $2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [2 DESC, 1] aggs [MAX($0)])])",
+          "\n    LogicalSortExchange(distribution=[hash[1]], collation=[[2 DESC, 1]])",
+          "\n      LogicalAggregate(group=[{0, 1}], EXPR$1=[$SUM0($2)])",
+          "\n        LogicalExchange(distribution=[hash[0, 1]])",
+          "\n          LogicalAggregate(group=[{1, 2}], EXPR$1=[COUNT()])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
       }
     ]
   },
