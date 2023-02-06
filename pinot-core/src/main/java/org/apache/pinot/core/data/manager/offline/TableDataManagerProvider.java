@@ -79,8 +79,7 @@ public class TableDataManagerProvider {
       case REALTIME:
         Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(
             tableDataManagerConfig.getTableConfig());
-        if (Boolean.parseBoolean(streamConfigMap.getOrDefault(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE,
-            "false"))
+        if (Boolean.parseBoolean(streamConfigMap.get(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE))
             && StringUtils.isEmpty(tableDataManagerConfig.getInstanceDataManagerConfig().getSegmentStoreUri())) {
           throw new IllegalStateException(String.format("Table has enabled %s config. But the server has not "
               + "configured the segmentstore uri. Configure the server config %s",
