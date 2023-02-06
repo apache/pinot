@@ -45,7 +45,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       _operatorStats.startTimer();
       TransferableBlock nextBlock = getNextBlock();
-      _operatorStats.recordOutput(1, nextBlock.getNumRows());
+      _operatorStats.recordRow(1, nextBlock.getNumRows());
       _operatorStats.endTimer();
       // TODO: move this to centralized reporting in broker
       if (nextBlock.isEndOfStreamBlock()) {
