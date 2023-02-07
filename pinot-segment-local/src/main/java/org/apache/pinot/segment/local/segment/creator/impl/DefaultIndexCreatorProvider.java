@@ -76,6 +76,10 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       throws Exception {
     if (!context.hasDictionary()) {
       // Dictionary disabled columns
+      if (context.forwardIndexDisabled()) {
+        // Forward index disabled columns
+        return new NoOpForwardIndexCreator(context.getFieldSpec().isSingleValueField());
+      }
       boolean deriveNumDocsPerChunk =
           shouldDeriveNumDocsPerChunk(context.getFieldSpec().getName(), context.getColumnProperties());
       int writerVersion = getRawIndexWriterVersion(context.getFieldSpec().getName(), context.getColumnProperties());

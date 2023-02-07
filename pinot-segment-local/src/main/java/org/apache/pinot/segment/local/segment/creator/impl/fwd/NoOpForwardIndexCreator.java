@@ -19,12 +19,13 @@
 package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Forward index creator for dictionary-encoded single and multi-value columns with forward index disabled.
+ * Forward index creator for dictionary-encoded and raw single and multi-value columns with forward index disabled.
  * This is a no-op.
  */
 public class NoOpForwardIndexCreator implements ForwardIndexCreator {
@@ -55,6 +56,58 @@ public class NoOpForwardIndexCreator implements ForwardIndexCreator {
 
   @Override
   public void putDictIdMV(int[] dictIds) {
+  }
+
+  @Override
+  public void putInt(int value) {
+  }
+
+  @Override
+  public void putLong(long value) {
+  }
+
+  @Override
+  public void putFloat(float value) {
+  }
+
+  @Override
+  public void putDouble(double value) {
+  }
+
+  @Override
+  public void putBigDecimal(BigDecimal value) {
+  }
+
+  @Override
+  public void putString(String value) {
+  }
+
+  @Override
+  public void putBytes(byte[] value) {
+  }
+
+  @Override
+  public void putIntMV(int[] values) {
+  }
+
+  @Override
+  public void putLongMV(long[] values) {
+  }
+
+  @Override
+  public void putFloatMV(float[] values) {
+  }
+
+  @Override
+  public void putDoubleMV(double[] values) {
+  }
+
+  @Override
+  public void putStringMV(String[] values) {
+  }
+
+  @Override
+  public void putBytesMV(byte[][] values) {
   }
 
   @Override
