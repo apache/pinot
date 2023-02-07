@@ -54,16 +54,13 @@ public class FilterOperator extends MultiStageOperator {
   private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  // TODO: Move to OperatorContext class.
-  private OperatorStats _operatorStats;
-
   public FilterOperator(MultiStageOperator upstreamOperator, DataSchema dataSchema, RexExpression filter,
       long requestId, int stageId) {
+    super(requestId, stageId);
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);
     _upstreamErrorBlock = null;
-    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -74,23 +71,16 @@ public class FilterOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    _upstreamOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     try {
-      _operatorStats.endTimer();
       TransferableBlock block = _upstreamOperator.nextBlock();
-      _operatorStats.startTimer();
       return transform(block);
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
-    } finally {
-      _operatorStats.endTimer();
     }
   }
 
@@ -113,8 +103,6 @@ public class FilterOperator extends MultiStageOperator {
         resultRows.add(row);
       }
     }
-    _operatorStats.recordInput(1, container.size());
-    _operatorStats.recordOutput(1, resultRows.size());
     return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW);
   }
 }

@@ -76,9 +76,6 @@ public class AggregateOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _hasReturnedAggregateBlock;
 
-  // TODO: Move to OperatorContext class.
-  private OperatorStats _operatorStats;
-
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
   // aggCalls has to be a list of FunctionCall and cannot be null
   // groupSet has to be a list of InputRef and cannot be null
@@ -93,6 +90,7 @@ public class AggregateOperator extends MultiStageOperator {
   AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
       List<RexExpression> groupSet, DataSchema inputSchema,
       Map<String, Function<DataSchema.ColumnDataType, Merger>> mergers, long requestId, int stageId) {
+    super(requestId, stageId);
     _inputOperator = inputOperator;
     _groupSet = groupSet;
     _upstreamErrorBlock = null;
@@ -114,7 +112,6 @@ public class AggregateOperator extends MultiStageOperator {
     _resultSchema = dataSchema;
     _readyToConstruct = false;
     _hasReturnedAggregateBlock = false;
-    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -125,15 +122,11 @@ public class AggregateOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    // TODO: move to close call;
-    _inputOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     try {
       if (!_readyToConstruct && !consumeInputBlocks()) {
         return TransferableBlockUtils.getNoOpTransferableBlock();
@@ -151,8 +144,6 @@ public class AggregateOperator extends MultiStageOperator {
       }
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
-    } finally {
-      _operatorStats.endTimer();
     }
   }
 
@@ -175,7 +166,6 @@ public class AggregateOperator extends MultiStageOperator {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } else {
-      _operatorStats.recordOutput(1, rows.size());
       return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
     }
   }
@@ -195,9 +185,7 @@ public class AggregateOperator extends MultiStageOperator {
    * @return whether or not the operator is ready to move on (EOS or ERROR)
    */
   private boolean consumeInputBlocks() {
-    _operatorStats.endTimer();
     TransferableBlock block = _inputOperator.nextBlock();
-    _operatorStats.startTimer();
     while (!block.isNoOpBlock()) {
       // setting upstream error block
       if (block.isErrorBlock()) {
@@ -216,10 +204,7 @@ public class AggregateOperator extends MultiStageOperator {
           _accumulators[i].accumulate(key, row);
         }
       }
-      _operatorStats.recordInput(1, container.size());
-      _operatorStats.endTimer();
       block = _inputOperator.nextBlock();
-      _operatorStats.startTimer();
     }
     return false;
   }

@@ -50,7 +50,6 @@ public class SortOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
-  private OperatorStats _operatorStats;
 
   public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
@@ -63,6 +62,7 @@ public class SortOperator extends MultiStageOperator {
   SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
       int defaultHolderCapacity, long requestId, int stageId) {
+    super(requestId, stageId);
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
     _offset = Math.max(offset, 0);
@@ -72,7 +72,6 @@ public class SortOperator extends MultiStageOperator {
     _numRowsToKeep = _fetch > 0 ? _fetch + _offset : defaultHolderCapacity;
     _rows = new PriorityQueue<>(_numRowsToKeep,
         new SortComparator(collationKeys, collationDirections, dataSchema, false));
-    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -87,27 +86,21 @@ public class SortOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    _upstreamOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     try {
       consumeInputBlocks();
       return produceSortedBlock();
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
-    } finally {
-      _operatorStats.endTimer();
     }
   }
 
   private TransferableBlock produceSortedBlock() {
     if (_upstreamErrorBlock != null) {
-      LOGGER.error("OperatorStats:" + _operatorStats);
       return _upstreamErrorBlock;
     } else if (!_readyToConstruct) {
       return TransferableBlockUtils.getNoOpTransferableBlock();
@@ -119,7 +112,6 @@ public class SortOperator extends MultiStageOperator {
         Object[] row = _rows.poll();
         rows.addFirst(row);
       }
-      _operatorStats.recordOutput(1, rows.size());
       _isSortedBlockConstructed = true;
       if (rows.size() == 0) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
@@ -133,9 +125,7 @@ public class SortOperator extends MultiStageOperator {
 
   private void consumeInputBlocks() {
     if (!_isSortedBlockConstructed) {
-      _operatorStats.endTimer();
       TransferableBlock block = _upstreamOperator.nextBlock();
-      _operatorStats.startTimer();
       while (!block.isNoOpBlock()) {
         // setting upstream error block
         if (block.isErrorBlock()) {
@@ -150,10 +140,7 @@ public class SortOperator extends MultiStageOperator {
         for (Object[] row : container) {
           SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
         }
-        _operatorStats.endTimer();
         block = _upstreamOperator.nextBlock();
-        _operatorStats.startTimer();
-        _operatorStats.recordInput(1, container.size());
       }
     }
   }
