@@ -516,7 +516,7 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(
       value = "Resets a segment by first disabling it, waiting for external view to stabilize, and finally enabling "
-          + "it again", notes = "Resets a segment by disabling and then enabling the segment")
+          + "it again", notes = "Resets a segment by disabling and then enabling it")
   public SuccessResponse resetSegment(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
@@ -542,6 +542,41 @@ public class PinotSegmentRestletResource {
   }
 
   /**
+   * Resets segments with Error EV of the given table
+   * This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to
+   * ONLINE/CONSUMING state,
+   * thus effective in resetting segments or consumers in error states.
+   */
+  @POST
+  @Path("segments/{tableNameWithType}/resetErrorEvSegments")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.UPDATE)
+  @ApiOperation(
+      value = "Resets segments with Error EV of the table, by first disabling them, waiting for external view to "
+          + "stabilize, and finally enabling them", notes = "Resets segments by disabling and then enabling them")
+  public SuccessResponse resetErrorEvSegments(
+      @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
+      String tableNameWithType,
+      @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
+      String targetInstance) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    try {
+      Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
+      _pinotHelixResourceManager.resetErrorEvSegments(tableNameWithType, targetInstance);
+      return new SuccessResponse(
+          String.format("Successfully reset segments with Error EV of table: %s", tableNameWithType));
+    } catch (IllegalStateException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to reset segments with Error EV in table: %s. %s", tableNameWithType, e.getMessage()),
+          Status.NOT_FOUND);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to reset segments with Error EV in table: %s. %s", tableNameWithType, e.getMessage()),
+          Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  /**
    * Resets all segments of the given table
    * This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to
    * ONLINE/CONSUMING state,
@@ -553,7 +588,7 @@ public class PinotSegmentRestletResource {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(
       value = "Resets all segments of the table, by first disabling them, waiting for external view to stabilize, and"
-          + " finally enabling the segments", notes = "Resets a segment by disabling and then enabling a segment")
+          + " finally enabling them", notes = "Resets segments by disabling and then enabling them")
   public SuccessResponse resetAllSegments(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,

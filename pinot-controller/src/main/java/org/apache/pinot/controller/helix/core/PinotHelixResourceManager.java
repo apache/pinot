@@ -2410,8 +2410,7 @@ public class PinotHelixResourceManager {
   /**
    * Resets a segment. This operation invoke resetPartition via state transition message.
    */
-  public void resetSegment(String tableNameWithType, String segmentName, @Nullable String targetInstance)
-      throws InterruptedException, TimeoutException {
+  public void resetSegment(String tableNameWithType, String segmentName, @Nullable String targetInstance) {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
     ExternalView externalView = getTableExternalView(tableNameWithType);
@@ -2421,7 +2420,7 @@ public class PinotHelixResourceManager {
 
     for (String instance : instanceSet) {
       if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
-        LOGGER.info("Skipping reset for segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
+        LOGGER.info("Skipping resetting for segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
             instance);
       } else {
         LOGGER.info("Resetting segment: {} of table: {} on instance: {}", segmentName, tableNameWithType, instance);
@@ -2431,10 +2430,40 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Resets segments with Error EV of a table. This operation invoke resetPartition via state transition message.
+   */
+  public void resetErrorEvSegments(String tableNameWithType, @Nullable String targetInstance) {
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
+
+    Map<String, Set<String>> instanceToResetSegmentsMap = new HashMap<>();
+    for (String segmentName : idealState.getPartitionSet()) {
+      Set<String> instanceSet = parseInstanceSet(idealState, segmentName, targetInstance);
+      Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+      for (String instance : instanceSet) {
+        if (externalViewStateMap != null && SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
+          instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
+        }
+      }
+    }
+
+    if (instanceToResetSegmentsMap.isEmpty()) {
+      LOGGER.info("Skipping resetting segments with Error EV of table: {} because no segment has Error EV",
+          tableNameWithType);
+    }
+
+    LOGGER.info("Resetting segments with Error EV: {} of table: {}", instanceToResetSegmentsMap, tableNameWithType);
+    for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
+      resetPartitionAllState(entry.getKey(), tableNameWithType, entry.getValue());
+    }
+  }
+
+  /**
    * Resets all segments of a table. This operation invoke resetPartition via state transition message.
    */
-  public void resetAllSegments(String tableNameWithType, @Nullable String targetInstance)
-      throws InterruptedException, TimeoutException {
+  public void resetAllSegments(String tableNameWithType, @Nullable String targetInstance) {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
     ExternalView externalView = getTableExternalView(tableNameWithType);
