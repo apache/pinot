@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -44,7 +45,8 @@ public class SortOperator extends MultiStageOperator {
   private final int _fetch;
   private final int _offset;
   private final DataSchema _dataSchema;
-  private final PriorityQueue<Object[]> _rows;
+  private final PriorityQueue<Object[]> _priorityQueue;
+  private final ArrayList<Object[]> _rows;
   private final int _numRowsToKeep;
 
   private boolean _readyToConstruct;
@@ -70,8 +72,15 @@ public class SortOperator extends MultiStageOperator {
     _upstreamErrorBlock = null;
     _isSortedBlockConstructed = false;
     _numRowsToKeep = _fetch > 0 ? _fetch + _offset : defaultHolderCapacity;
-    _rows = new PriorityQueue<>(_numRowsToKeep,
-        new SortComparator(collationKeys, collationDirections, dataSchema, false));
+    // When there's no collationKeys, the SortOperator is a simple selection with row trim on limit & offset
+    if (collationKeys.isEmpty()) {
+      _priorityQueue = null;
+      _rows = new ArrayList<>();
+    } else {
+      _priorityQueue = new PriorityQueue<>(_numRowsToKeep,
+          new SortComparator(collationKeys, collationDirections, dataSchema, false));
+      _rows = null;
+    }
   }
 
   @Override
@@ -107,16 +116,25 @@ public class SortOperator extends MultiStageOperator {
     }
 
     if (!_isSortedBlockConstructed) {
-      LinkedList<Object[]> rows = new LinkedList<>();
-      while (_rows.size() > _offset) {
-        Object[] row = _rows.poll();
-        rows.addFirst(row);
-      }
       _isSortedBlockConstructed = true;
-      if (rows.size() == 0) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      if (_priorityQueue == null) {
+        if (_rows.size() > _offset) {
+          List<Object[]> row = _rows.subList(_offset, _rows.size());
+          return new TransferableBlock(row, _dataSchema, DataBlock.Type.ROW);
+        } else {
+          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        }
       } else {
-        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
+        LinkedList<Object[]> rows = new LinkedList<>();
+        while (_priorityQueue.size() > _offset) {
+          Object[] row = _priorityQueue.poll();
+          rows.addFirst(row);
+        }
+        if (rows.size() == 0) {
+          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        } else {
+          return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
+        }
       }
     } else {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
@@ -137,8 +155,19 @@ public class SortOperator extends MultiStageOperator {
         }
 
         List<Object[]> container = block.getContainer();
-        for (Object[] row : container) {
-          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        if (_priorityQueue == null) {
+          // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
+          if (_rows.size() <= _numRowsToKeep) {
+            if (_rows.size() + container.size() <= _numRowsToKeep) {
+              _rows.addAll(container);
+            } else {
+              _rows.addAll(container.subList(0, _numRowsToKeep - _rows.size()));
+            }
+          }
+        } else {
+          for (Object[] row : container) {
+            SelectionOperatorUtils.addToPriorityQueue(row, _priorityQueue, _numRowsToKeep);
+          }
         }
         block = _upstreamOperator.nextBlock();
       }
