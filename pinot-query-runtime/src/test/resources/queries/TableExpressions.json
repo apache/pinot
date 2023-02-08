@@ -101,6 +101,12 @@
       { "sql": "SELECT strCol FROM {tbl1} GROUP BY strCol, intCol" },
       { "sql": "SELECT strCol, intCol FROM {tbl1} GROUP BY strCol, intCol" },
       { "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol > b.strCol1" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.intCol = b.intCol WHERE a.strCol > b.strCol1" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.intCol = b.intCol AND a.strCol > b.strCol1" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol BETWEEN b.strCol1 AND b.strCol2" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.intCol = b.intCol WHERE a.strCol BETWEEN b.strCol1 AND b.strCol2" },
+      { "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b ON a.intCol = b.intCol AND a.strCol BETWEEN b.strCol1 AND b.strCol2" },
       { "sql": "SELECT strCol, b.strCol2, (sum(a.intCol) * b.intCol) AS colAlias FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol = b.strCol1 GROUP BY strCol, b.strCol2, b.intCol" },
       { "sql": "SELECT MOD(b.intCol, 2), sum(a.intCol) AS colAlias FROM {tbl1} a INNER JOIN {tbl2} b ON a.strCol = b.strCol1 GROUP BY MOD(b.intCol, 2)" },
       { "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol HAVING SUM(intCol) > 3" },
@@ -115,6 +121,16 @@
         "ignored": true,
         "comment": "correlation is not supported. SOME is only supported if expand = false",
         "sql": "SELECT strCol, SUM(intCol) FROM {tbl1} GROUP BY strCol HAVING AVG(intCol) >= ANY (SELECT AVG(intCol) FROM {tbl1} GROUP BY strCol)"
+      },
+      {
+        "ignored": true,
+        "comments": "where clause inequality join condition is not supported",
+        "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b WHERE a.intCol > b.intCol"
+      },
+      {
+        "ignored": true,
+        "comments": "where clause inequality join condition is not supported yet",
+        "sql": "SELECT b.intCol, a.intCol FROM {tbl1} a INNER JOIN {tbl2} b WHERE a.strCol BETWEEN b.strCol1 AND b.strCol2"
       }
     ]
   }
