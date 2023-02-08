@@ -72,13 +72,15 @@ public class SortOperator extends MultiStageOperator {
     _upstreamErrorBlock = null;
     _isSortedBlockConstructed = false;
     _numRowsToKeep = _fetch > 0 ? _fetch + _offset : defaultHolderCapacity;
+    // When there's no collationKeys, the SortOperator is a simple selection with row trim on limit & offset
     if (collationKeys.isEmpty()) {
       _priorityQueue = null;
+      _rows = new ArrayList<>();
     } else {
       _priorityQueue = new PriorityQueue<>(_numRowsToKeep,
           new SortComparator(collationKeys, collationDirections, dataSchema, false));
+      _rows = null;
     }
-    _rows = new ArrayList<>();
   }
 
   @Override
@@ -117,7 +119,7 @@ public class SortOperator extends MultiStageOperator {
       _isSortedBlockConstructed = true;
       if (_priorityQueue == null) {
         if (_rows.size() > _offset) {
-          List<Object[]> row = _rows.subList(_offset, Math.min(_numRowsToKeep, _rows.size()));
+          List<Object[]> row = _rows.subList(_offset, _rows.size());
           return new TransferableBlock(row, _dataSchema, DataBlock.Type.ROW);
         } else {
           return TransferableBlockUtils.getEndOfStreamTransferableBlock();
@@ -156,7 +158,11 @@ public class SortOperator extends MultiStageOperator {
         if (_priorityQueue == null) {
           // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
           if (_rows.size() <= _numRowsToKeep) {
-            _rows.addAll(container);
+            if (_rows.size() + container.size() <= _numRowsToKeep) {
+              _rows.addAll(container);
+            } else {
+              _rows.addAll(container.subList(0, _numRowsToKeep - _rows.size()));
+            }
           }
         } else {
           for (Object[] row : container) {
