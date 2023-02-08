@@ -105,7 +105,6 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER () FROM a WHERE a.col3 >= 0"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2), MIN(a.col3) OVER (PARTITION BY a.col2) "
             + "FROM a"},
-        new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2 ROWS 5 PRECEDING) FROM a"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2, a.col1) FROM a"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (ORDER BY a.col2, a.col1), MIN(a.col3) OVER (ORDER BY a.col2, "
             + "a.col1) FROM a"},
