@@ -27,10 +27,7 @@ import org.slf4j.LoggerFactory;
 public abstract class MetadataEventNotifierFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(MetadataEventNotifierFactory.class);
   public static final String METADATA_EVENT_CLASS_CONFIG = "factory.class";
-
-  protected static PinotHelixResourceManager _pinotHelixResourceManager;
-
-  public abstract void init(PinotConfiguration configuration);
+  public abstract void init(PinotConfiguration configuration, PinotHelixResourceManager pinotHelixResourceManager);
 
   public abstract MetadataEventNotifier create();
 
@@ -40,12 +37,11 @@ public abstract class MetadataEventNotifierFactory {
 
     String metadataEventNotifierClassName =
         configuration.getProperty(METADATA_EVENT_CLASS_CONFIG, DefaultMetadataEventNotifierFactory.class.getName());
-    _pinotHelixResourceManager = helixResourceManager;
     try {
       LOGGER.info("Instantiating metadata event notifier factory class {}", metadataEventNotifierClassName);
       metadataEventNotifierFactory =
           (MetadataEventNotifierFactory) Class.forName(metadataEventNotifierClassName).newInstance();
-      metadataEventNotifierFactory.init(configuration);
+      metadataEventNotifierFactory.init(configuration, helixResourceManager);
       return metadataEventNotifierFactory;
     } catch (Exception e) {
       throw new RuntimeException(e);
