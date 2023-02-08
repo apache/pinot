@@ -89,6 +89,7 @@ public class QueryDispatcher {
   public int submit(long requestId, QueryPlan queryPlan, long deadlineNanos, Map<String, String> queryOptions)
       throws Exception {
     int reduceStageId = -1;
+    // The deadline passed here is used for entire query.
     Deadline deadline = Deadline.after(deadlineNanos - System.nanoTime(), TimeUnit.NANOSECONDS);
     for (Map.Entry<Integer, StageMetadata> stage : queryPlan.getStageMetadataMap().entrySet()) {
       int stageId = stage.getKey();
