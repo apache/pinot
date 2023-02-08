@@ -201,6 +201,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), "0")));
     brokerResponse.setTotalDocs(
         Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.TOTAL_DOCS.getName(), "0")));
+    brokerResponse.setNumSegmentsQueried(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName(), "0")));
+    brokerResponse.setNumSegmentsProcessed(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), "0")));
+    brokerResponse.setNumSegmentsMatched(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED.getName(), "0")));
+    brokerResponse.setNumConsumingSegmentsQueried(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), "0")));
   }
 
   private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {
