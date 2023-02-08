@@ -77,11 +77,10 @@ public class RetentionManagerTest {
       segmentsZKMetadata.add(segmentZKMetadata);
     }
     final TableConfig tableConfig = createOfflineTableConfig();
-    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
-    setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager);
-
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
 
     when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
@@ -98,7 +97,7 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
-    verify(deletionManager, times(1)).removeAgedDeletedSegments();
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
 
     // Verify that the deleteSegments method is actually called.
     verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
@@ -161,7 +160,7 @@ public class RetentionManagerTest {
   }
 
   private void setupPinotHelixResourceManager(TableConfig tableConfig, final List<String> removedSegments,
-      PinotHelixResourceManager resourceManager) {
+      PinotHelixResourceManager resourceManager, LeadControllerManager leadControllerManager) {
     final String tableNameWithType = tableConfig.getTableName();
     when(resourceManager.getAllTables()).thenReturn(Collections.singletonList(tableNameWithType));
 
@@ -177,7 +176,7 @@ public class RetentionManagerTest {
           throws Throwable {
         return null;
       }
-    }).when(deletionManager).removeAgedDeletedSegments();
+    }).when(deletionManager).removeAgedDeletedSegments(leadControllerManager);
     when(resourceManager.getSegmentDeletionManager()).thenReturn(deletionManager);
 
     // If and when PinotHelixResourceManager.deleteSegments() is invoked, make sure that the segments deleted
@@ -210,12 +209,11 @@ public class RetentionManagerTest {
 
     TableConfig tableConfig = createRealtimeTableConfig1(replicaCount);
     List<String> removedSegments = new ArrayList<>();
-    PinotHelixResourceManager pinotHelixResourceManager =
-        setupSegmentMetadata(tableConfig, now, initialNumSegments, removedSegments);
-    setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager);
-
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    PinotHelixResourceManager pinotHelixResourceManager =
+        setupSegmentMetadata(tableConfig, now, initialNumSegments, removedSegments);
+    setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
 
     ControllerConf conf = new ControllerConf();
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
@@ -229,7 +227,7 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
-    verify(deletionManager, times(1)).removeAgedDeletedSegments();
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
 
     // Verify that the deleteSegments method is actually called.
     verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
