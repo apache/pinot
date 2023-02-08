@@ -99,7 +99,12 @@ public class TransformOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
 
-    if (TransferableBlockUtils.isEndOfStream(block) || TransferableBlockUtils.isNoOpBlock(block)) {
+    if (TransferableBlockUtils.isEndOfStream(block)) {
+      _operatorStats.recordExecutionStats(block.getResultMetadata());
+      return block;
+    }
+
+    if (TransferableBlockUtils.isNoOpBlock(block)) {
       return block;
     }
 

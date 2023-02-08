@@ -24,12 +24,10 @@ import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -38,7 +36,6 @@ import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +43,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This {@code MailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
- * {@link BaseOperator#getNextBlock()} API.
+ * {@link MultiStageOperator#getNextBlock()}()} API.
  *
  *  MailboxReceiveOperator receives mailbox from mailboxService from sendingStageInstances.
  *  We use sendingStageInstance to deduce mailboxId and fetch the content from mailboxService.
@@ -145,8 +142,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     int startingIdx = _serverIdx;
     int openMailboxCount = 0;
     int eosMailboxCount = 0;
-    List<Map<String, String>> metadataList = new ArrayList<>();
-
+    _operatorStats.clearExecutionStats();
     // For all non-singleton distribution, we poll from every instance to check mailbox content.
     // TODO: Fix wasted CPU cycles on waiting for servers that are not supposed to give content.
     for (int i = 0; i < _sendingMailbox.size(); i++) {
@@ -169,7 +165,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
               return block;
             } else {
               if (!block.getResultMetadata().isEmpty()) {
-                metadataList.add(block.getResultMetadata());
+                _operatorStats.recordExecutionStats(block.getResultMetadata());
               }
               eosMailboxCount++;
             }
@@ -188,7 +184,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     // are not yet exhausted and we should wait for more data to be available
     TransferableBlock block =
         openMailboxCount > 0 && openMailboxCount > eosMailboxCount ? TransferableBlockUtils.getNoOpTransferableBlock()
-            : TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorUtils.aggregateMetadata(metadataList));
+            : TransferableBlockUtils.getEndOfStreamTransferableBlock();
     return block;
   }
 }

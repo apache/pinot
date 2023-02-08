@@ -39,7 +39,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +78,6 @@ public class HashJoinOperator extends MultiStageOperator {
   private final int _resultRowSize;
   private final List<TransformOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
-  private List<Map<String, String>> _metadataList;
 
   // Used by non-inner join.
   // Needed to indicate we have finished processing all results after returning last block.
@@ -119,7 +117,6 @@ public class HashJoinOperator extends MultiStageOperator {
       _matchedRightRows = null;
     }
     _upstreamErrorBlock = null;
-    _metadataList = new ArrayList<>();
   }
 
   // TODO: Separate left and right table operator.
@@ -138,7 +135,7 @@ public class HashJoinOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock() {
     try {
       if (_isTerminated) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorUtils.aggregateMetadata(_metadataList));
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
       if (!_isHashTableBuilt) {
         // Build JOIN hash table
@@ -165,7 +162,7 @@ public class HashJoinOperator extends MultiStageOperator {
         return;
       }
       if (TransferableBlockUtils.isEndOfStream(rightBlock)) {
-        _metadataList.add(rightBlock.getResultMetadata());
+        _operatorStats.recordExecutionStats(rightBlock.getResultMetadata());
         _isHashTableBuilt = true;
         return;
       }
@@ -188,11 +185,11 @@ public class HashJoinOperator extends MultiStageOperator {
     }
     if (leftBlock.isNoOpBlock() || (leftBlock.isSuccessfulEndOfStreamBlock() && !needUnmatchedRightRows())) {
       if (!leftBlock.getResultMetadata().isEmpty()) {
-        _metadataList.add(leftBlock.getResultMetadata());
+        _operatorStats.recordExecutionStats(leftBlock.getResultMetadata());
       }
 
       if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorUtils.aggregateMetadata(_metadataList));
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
 
       return leftBlock;
@@ -213,7 +210,7 @@ public class HashJoinOperator extends MultiStageOperator {
           }
         }
       }
-      _metadataList.add(leftBlock.getResultMetadata());
+      _operatorStats.recordExecutionStats(leftBlock.getResultMetadata());
       _isTerminated = true;
       return new TransferableBlock(returnRows, _resultSchema, DataBlock.Type.ROW);
     }

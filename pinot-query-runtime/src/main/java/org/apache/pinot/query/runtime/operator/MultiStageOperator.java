@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -31,7 +32,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
   // TODO: Move to OperatorContext class.
-  private final OperatorStats _operatorStats;
+  protected final OperatorStats _operatorStats;
 
   public MultiStageOperator(long requestId, int stageId) {
     _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
@@ -49,7 +50,8 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       _operatorStats.endTimer();
       // TODO: move this to centralized reporting in broker
       if (nextBlock.isEndOfStreamBlock()) {
-        LOGGER.info("Recorded operator stats: " + _operatorStats);
+        LOGGER.warn("Recorded operator stats: " + _operatorStats);
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_operatorStats.getExecutionStats());
       }
       return nextBlock;
     }

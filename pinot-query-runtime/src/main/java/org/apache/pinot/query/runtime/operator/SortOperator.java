@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -53,7 +52,6 @@ public class SortOperator extends MultiStageOperator {
   private boolean _readyToConstruct;
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
-  private Map<String, String> _metadata;
 
   public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
       List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
@@ -139,7 +137,7 @@ public class SortOperator extends MultiStageOperator {
         }
       }
     } else {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_metadata);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
   }
 
@@ -153,7 +151,7 @@ public class SortOperator extends MultiStageOperator {
           return;
         } else if (TransferableBlockUtils.isEndOfStream(block)) {
           _readyToConstruct = true;
-          _metadata = block.getResultMetadata();
+          _operatorStats.recordExecutionStats(block.getResultMetadata());
           return;
         }
 
