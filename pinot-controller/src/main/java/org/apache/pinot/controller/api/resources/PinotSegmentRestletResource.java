@@ -542,7 +542,7 @@ public class PinotSegmentRestletResource {
   }
 
   /**
-   * Resets all segments or segments with Error external view of the given table
+   * Resets all segments or segments with Error state of the given table
    * This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to
    * ONLINE/CONSUMING state,
    * thus effective in resetting segments or consumers in error states.
@@ -552,20 +552,20 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(
-      value = "Resets all segments (when errorEVSegmentsOnly = false) or segments with Error external view (when "
-          + "errorEVSegmentsOnly = true) of the table, by first disabling them, waiting for external view to stabilize,"
+      value = "Resets all segments (when errorSegmentsOnly = false) or segments with Error state (when "
+          + "errorSegmentsOnly = true) of the table, by first disabling them, waiting for external view to stabilize,"
           + " and finally enabling them", notes = "Resets segments by disabling and then enabling them")
-  public SuccessResponse resetAllSegments(
+  public SuccessResponse resetSegments(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
       @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
           String targetInstance,
-      @ApiParam(value = "Whether to reset only segments with error external view") @QueryParam("errorEVSegmentsOnly")
-      @DefaultValue("false") boolean errorEVSegmentsOnly) {
+      @ApiParam(value = "Whether to reset only segments with error state") @QueryParam("errorSegmentsOnly")
+      @DefaultValue("false") boolean errorSegmentsOnly) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
-      _pinotHelixResourceManager.resetSegments(tableNameWithType, targetInstance, errorEVSegmentsOnly);
+      _pinotHelixResourceManager.resetSegments(tableNameWithType, targetInstance, errorSegmentsOnly);
       return new SuccessResponse(String.format("Successfully reset segments of table: %s", tableNameWithType));
     } catch (IllegalStateException e) {
       throw new ControllerApplicationException(LOGGER,

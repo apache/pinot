@@ -2430,10 +2430,10 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Resets all segments or segments with Error external view of a table. This operation invoke resetPartition via state
+   * Resets all segments or segments with Error state of a table. This operation invoke resetPartition via state
    * transition message.
    */
-  public void resetSegments(String tableNameWithType, @Nullable String targetInstance, boolean errorEVSegmentsOnly) {
+  public void resetSegments(String tableNameWithType, @Nullable String targetInstance, boolean errorSegmentsOnly) {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
     ExternalView externalView = getTableExternalView(tableNameWithType);
@@ -2446,7 +2446,7 @@ public class PinotHelixResourceManager {
       Set<String> instanceSet = parseInstanceSet(idealState, segmentName, targetInstance);
       Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
       for (String instance : instanceSet) {
-        if (errorEVSegmentsOnly) {
+        if (errorSegmentsOnly) {
           if (externalViewStateMap != null && SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
             instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
           }
@@ -2465,15 +2465,13 @@ public class PinotHelixResourceManager {
       return;
     }
 
-    LOGGER.info("Resetting segments of table: {}", tableNameWithType);
+    LOGGER.info("Resetting segments: {} of table: {}", instanceToResetSegmentsMap, tableNameWithType);
     for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
       resetPartitionAllState(entry.getKey(), tableNameWithType, entry.getValue());
     }
 
-    if (!instanceToSkippedSegmentsMap.isEmpty()) {
-      LOGGER.info("Reset segments for table {} finished. With the following segments skipped: {}", tableNameWithType,
-          instanceToSkippedSegmentsMap);
-    }
+    LOGGER.info("Reset segments for table {} finished. With the following segments skipped: {}", tableNameWithType,
+        instanceToSkippedSegmentsMap);
   }
 
   private static Set<String> parseInstanceSet(IdealState idealState, String segmentName,
