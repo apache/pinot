@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.logical;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -97,6 +98,14 @@ public interface RexExpression {
       default:
         return value;
     }
+  }
+
+  static List<RexExpression> toRexInputRefs(Iterable<Integer> bitset) {
+    List<RexExpression> rexInputRefList = new ArrayList<>();
+    for (int index : bitset) {
+      rexInputRefList.add(new RexExpression.InputRef(index));
+    }
+    return rexInputRefList;
   }
 
   class InputRef implements RexExpression {
