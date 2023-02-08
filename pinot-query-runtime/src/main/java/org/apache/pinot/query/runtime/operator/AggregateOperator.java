@@ -39,6 +39,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +73,7 @@ public class AggregateOperator extends MultiStageOperator {
   private final Accumulator[] _accumulators;
   private final Map<Key, Object[]> _groupByKeyHolder;
   private TransferableBlock _upstreamErrorBlock;
+  private List<Map<String, String>> _metadataList;
 
   private boolean _readyToConstruct;
   private boolean _hasReturnedAggregateBlock;
@@ -112,6 +114,7 @@ public class AggregateOperator extends MultiStageOperator {
     _resultSchema = dataSchema;
     _readyToConstruct = false;
     _hasReturnedAggregateBlock = false;
+    _metadataList = new ArrayList<>();
   }
 
   @Override
@@ -140,7 +143,7 @@ public class AggregateOperator extends MultiStageOperator {
         return produceAggregatedBlock();
       } else {
         // TODO: Move to close call.
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorUtils.aggregateMetadata(_metadataList));
       }
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
@@ -158,12 +161,13 @@ public class AggregateOperator extends MultiStageOperator {
       }
       rows.add(row);
     }
+
     _hasReturnedAggregateBlock = true;
     if (rows.size() == 0) {
       if (_groupSet.size() == 0) {
         return constructEmptyAggResultBlock();
       } else {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorUtils.aggregateMetadata(_metadataList));
       }
     } else {
       return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
@@ -193,6 +197,7 @@ public class AggregateOperator extends MultiStageOperator {
         return true;
       } else if (block.isEndOfStreamBlock()) {
         _readyToConstruct = true;
+        _metadataList.add(block.getResultMetadata());
         return true;
       }
 

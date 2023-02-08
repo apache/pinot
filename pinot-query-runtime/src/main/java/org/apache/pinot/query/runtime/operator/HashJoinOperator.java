@@ -41,6 +41,7 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 
 /**
@@ -78,6 +79,7 @@ public class HashJoinOperator extends MultiStageOperator {
   private final int _resultRowSize;
   private final List<TransformOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
+  private List<Map<String, String>> _metadataList;
 
   // Used by non-inner join.
   // Needed to indicate we have finished processing all results after returning last block.
@@ -117,6 +119,7 @@ public class HashJoinOperator extends MultiStageOperator {
       _matchedRightRows = null;
     }
     _upstreamErrorBlock = null;
+    _metadataList = new ArrayList<>();
   }
 
   // TODO: Separate left and right table operator.
@@ -135,7 +138,7 @@ public class HashJoinOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock() {
     try {
       if (_isTerminated) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorUtils.aggregateMetadata(_metadataList));
       }
       if (!_isHashTableBuilt) {
         // Build JOIN hash table
@@ -162,6 +165,7 @@ public class HashJoinOperator extends MultiStageOperator {
         return;
       }
       if (TransferableBlockUtils.isEndOfStream(rightBlock)) {
+        _metadataList.add(rightBlock.getResultMetadata());
         _isHashTableBuilt = true;
         return;
       }
@@ -183,6 +187,14 @@ public class HashJoinOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
     if (leftBlock.isNoOpBlock() || (leftBlock.isSuccessfulEndOfStreamBlock() && !needUnmatchedRightRows())) {
+      if (!leftBlock.getResultMetadata().isEmpty()) {
+        _metadataList.add(leftBlock.getResultMetadata());
+      }
+
+      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorUtils.aggregateMetadata(_metadataList));
+      }
+
       return leftBlock;
     }
     // TODO: Moved to a different function.
@@ -201,6 +213,7 @@ public class HashJoinOperator extends MultiStageOperator {
           }
         }
       }
+      _metadataList.add(leftBlock.getResultMetadata());
       _isTerminated = true;
       return new TransferableBlock(returnRows, _resultSchema, DataBlock.Type.ROW);
     }

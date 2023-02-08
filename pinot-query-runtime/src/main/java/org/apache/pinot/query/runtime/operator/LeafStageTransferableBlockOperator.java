@@ -25,7 +25,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -42,6 +44,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 
 /**
@@ -65,6 +68,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private final List<InstanceResponseBlock> _baseResultBlock;
   private final DataSchema _desiredDataSchema;
   private int _currentIndex;
+  private final Map<String, String> _metadata;
 
   public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
       long requestId, int stageId) {
@@ -73,6 +77,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     _desiredDataSchema = dataSchema;
     _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
     _currentIndex = 0;
+    _metadata = OperatorUtils.aggregateMetadata(
+        _baseResultBlock.stream().map(InstanceResponseBlock::getResponseMetadata).collect(Collectors.toList()));
   }
 
   @Override
@@ -104,7 +110,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         }
       } else {
         _currentIndex = -1;
-        return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+        return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(_metadata));
       }
     }
   }
@@ -320,4 +326,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     }
     return true;
   }
+
+
 }

@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
@@ -37,6 +38,7 @@ import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -143,6 +145,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     int startingIdx = _serverIdx;
     int openMailboxCount = 0;
     int eosMailboxCount = 0;
+    List<Map<String, String>> metadataList = new ArrayList<>();
 
     // For all non-singleton distribution, we poll from every instance to check mailbox content.
     // TODO: Fix wasted CPU cycles on waiting for servers that are not supposed to give content.
@@ -165,6 +168,9 @@ public class MailboxReceiveOperator extends MultiStageOperator {
             if (!block.isEndOfStreamBlock()) {
               return block;
             } else {
+              if (!block.getResultMetadata().isEmpty()) {
+                metadataList.add(block.getResultMetadata());
+              }
               eosMailboxCount++;
             }
           }
@@ -182,7 +188,7 @@ public class MailboxReceiveOperator extends MultiStageOperator {
     // are not yet exhausted and we should wait for more data to be available
     TransferableBlock block =
         openMailboxCount > 0 && openMailboxCount > eosMailboxCount ? TransferableBlockUtils.getNoOpTransferableBlock()
-            : TransferableBlockUtils.getEndOfStreamTransferableBlock();
+            : TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorUtils.aggregateMetadata(metadataList));
     return block;
   }
 }

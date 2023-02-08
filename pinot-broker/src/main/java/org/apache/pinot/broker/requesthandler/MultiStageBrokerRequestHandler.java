@@ -20,6 +20,7 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +32,7 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -165,9 +167,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     ResultTable queryResults;
+    Map<String, String> stats = new HashMap<>();
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, queryTimeoutMs,
-          sqlNodeAndOptions.getOptions());
+          sqlNodeAndOptions.getOptions(), stats);
     } catch (Exception e) {
       LOGGER.info("query execution failed", e);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
@@ -181,9 +184,23 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
+
+    attachMetadataToResponse(stats, brokerResponse);
+
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
     return brokerResponse;
+  }
+
+  private void attachMetadataToResponse(Map<String, String> stats, BrokerResponseNative brokerResponse) {
+    brokerResponse.setNumDocsScanned(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_DOCS_SCANNED.getName(), "0")));
+    brokerResponse.setNumEntriesScannedInFilter(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName(), "0")));
+    brokerResponse.setNumEntriesScannedPostFilter(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), "0")));
+    brokerResponse.setTotalDocs(
+        Long.parseLong(stats.getOrDefault(DataTable.MetadataKey.TOTAL_DOCS.getName(), "0")));
   }
 
   private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {

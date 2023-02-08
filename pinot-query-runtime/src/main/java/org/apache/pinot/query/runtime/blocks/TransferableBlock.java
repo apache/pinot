@@ -19,7 +19,9 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -44,6 +46,7 @@ public class TransferableBlock implements Block {
   private final DataBlock.Type _type;
   private final DataSchema _dataSchema;
   private final int _numRows;
+  private final Map<String, String> _metadata;
 
   private DataBlock _dataBlock;
   private List<Object[]> _container;
@@ -55,10 +58,16 @@ public class TransferableBlock implements Block {
   @VisibleForTesting
   TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType,
       boolean isErrorBlock) {
+    this(container, dataSchema, containerType, false, new HashMap<>());
+  }
+
+  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType,
+      boolean isErrorBlock, Map<String, String> metadata) {
     _container = container;
     _dataSchema = dataSchema;
     _type = containerType;
     _numRows = _container.size();
+    _metadata = metadata;
   }
 
   public TransferableBlock(DataBlock dataBlock) {
@@ -67,6 +76,14 @@ public class TransferableBlock implements Block {
     _type = dataBlock instanceof ColumnarDataBlock ? DataBlock.Type.COLUMNAR
         : dataBlock instanceof RowDataBlock ? DataBlock.Type.ROW : DataBlock.Type.METADATA;
     _numRows = _dataBlock.getNumberOfRows();
+    _metadata = new HashMap<>();
+  }
+
+  public Map<String, String> getResultMetadata() {
+    if (isSuccessfulEndOfStreamBlock()) {
+      return ((MetadataBlock) _dataBlock).getStats();
+    }
+    return new HashMap<>();
   }
 
   public int getNumRows() {

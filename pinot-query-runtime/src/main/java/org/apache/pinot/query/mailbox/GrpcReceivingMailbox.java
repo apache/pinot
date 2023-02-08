@@ -131,7 +131,7 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
     }
 
     if (mailboxContent.getMetadataOrDefault(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "false").equals("true")) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(mailboxContent.getMetadataMap());
     }
 
     return null;
