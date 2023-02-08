@@ -24,10 +24,9 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -88,26 +87,26 @@ public class StarTreeIndexReaderTest {
         Collections.singleton(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "dimX")));
     when(_segmentMetadata.getStarTreeV2MetadataList()).thenReturn(Arrays.asList(stMeta1, stMeta2));
     // Mock the offset/sizes for the index buffers.
-    List<Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> indexMaps = new ArrayList<>();
-    Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue> indexMap = new HashMap<>();
-    indexMap.put(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.STAR_TREE, null),
-        new StarTreeIndexMapUtils.IndexValue(0, 1));
-    indexMap.put(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "dim0"),
-        new StarTreeIndexMapUtils.IndexValue(1, 1));
-    indexMap.put(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "dim1"),
-        new StarTreeIndexMapUtils.IndexValue(2, 1));
-    indexMap.put(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "count__*"),
-        new StarTreeIndexMapUtils.IndexValue(3, 1));
+    List<List<Pair<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>>> indexMaps = new ArrayList<>();
+    List<Pair<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> indexMap = new ArrayList<>();
+    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.STAR_TREE, null),
+        new StarTreeIndexMapUtils.IndexValue(0, 1)));
+    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "dim0"),
+        new StarTreeIndexMapUtils.IndexValue(1, 1)));
+    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "dim1"),
+        new StarTreeIndexMapUtils.IndexValue(2, 1)));
+    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "count__*"),
+        new StarTreeIndexMapUtils.IndexValue(3, 1)));
     indexMaps.add(indexMap);
-    indexMap = new HashMap<>();
-    indexMap.put(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.STAR_TREE, null),
-        new StarTreeIndexMapUtils.IndexValue(10, 3));
-    indexMap.put(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "dimX"),
-        new StarTreeIndexMapUtils.IndexValue(13, 3));
-    indexMap.put(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "dimY"),
-        new StarTreeIndexMapUtils.IndexValue(16, 3));
-    indexMap.put(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "sum__dimX"),
-        new StarTreeIndexMapUtils.IndexValue(19, 3));
+    indexMap = new ArrayList<>();
+    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.STAR_TREE, null),
+        new StarTreeIndexMapUtils.IndexValue(10, 3)));
+    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "dimX"),
+        new StarTreeIndexMapUtils.IndexValue(13, 3)));
+    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "dimY"),
+        new StarTreeIndexMapUtils.IndexValue(16, 3)));
+    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "sum__dimX"),
+        new StarTreeIndexMapUtils.IndexValue(19, 3)));
     indexMaps.add(indexMap);
     File indexMapFile = new File(TEMP_DIR, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
     StarTreeIndexMapUtils.storeToFile(indexMaps, indexMapFile);

@@ -90,9 +90,8 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
 
   @Override
   public int compareTo(AggregationFunctionColumnPair other) {
-    return Comparator.comparing((AggregationFunctionColumnPair o) -> o._column,
-            Comparator.nullsLast(Comparator.naturalOrder()))
-        .thenComparing((AggregationFunctionColumnPair o) -> o._functionType,
-            Comparator.nullsLast(Comparator.naturalOrder())).compare(this, other);
+    return Comparator.comparing((AggregationFunctionColumnPair o) -> o._column)
+        .thenComparing((AggregationFunctionColumnPair o) -> o._functionType)
+        .compare(this, other);
   }
 }

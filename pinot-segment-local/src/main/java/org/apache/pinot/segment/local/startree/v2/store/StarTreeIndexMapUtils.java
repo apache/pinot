@@ -31,6 +31,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 
 /**
@@ -117,7 +118,7 @@ public class StarTreeIndexMapUtils {
     public int compareTo(IndexKey other) {
       return Comparator
           .comparing((IndexKey i) -> i._column, Comparator.nullsLast(Comparator.naturalOrder()))
-          .thenComparing((IndexKey i) -> i._indexType, Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing((IndexKey i) -> i._indexType)
           .compare(this, other);
     }
   }
@@ -146,14 +147,14 @@ public class StarTreeIndexMapUtils {
   /**
    * Stores the index maps for multiple star-trees into a file.
    */
-  public static void storeToFile(List<Map<IndexKey, IndexValue>> indexMaps, File indexMapFile) {
+  public static void storeToFile(List<List<Pair<IndexKey, IndexValue>>> indexMaps, File indexMapFile) {
     Preconditions.checkState(!indexMapFile.exists(), "Star-tree index map file already exists");
 
     PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(indexMapFile);
     int numStarTrees = indexMaps.size();
     for (int i = 0; i < numStarTrees; i++) {
-      Map<IndexKey, IndexValue> indexMap = indexMaps.get(i);
-      for (Map.Entry<IndexKey, IndexValue> entry : indexMap.entrySet()) {
+      List<Pair<IndexKey, IndexValue>> indexMap = indexMaps.get(i);
+      for (Pair<IndexKey, IndexValue> entry : indexMap) {
         IndexKey key = entry.getKey();
         IndexValue value = entry.getValue();
         configuration.addProperty(key.getPropertyName(i, OFFSET_SUFFIX), value._offset);
