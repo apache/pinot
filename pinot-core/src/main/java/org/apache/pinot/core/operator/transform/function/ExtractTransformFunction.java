@@ -48,8 +48,8 @@ public class ExtractTransformFunction extends BaseTransformFunction {
     if (arguments.size() != 2) {
       throw new IllegalArgumentException("Exactly 2 arguments are required for EXTRACT transform function");
     }
-
-    _field = Field.valueOf(((LiteralTransformFunction) arguments.get(0)).getLiteral());
+    // TODO: Handle null literal
+    _field = Field.valueOf(((LiteralTransformFunction) arguments.get(0)).getLiteral().toString());
     _mainTransformFunction = arguments.get(1);
   }
 

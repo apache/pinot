@@ -91,7 +91,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     for (int i = 0; i < numArguments; i++) {
       TransformFunction transformFunction = arguments.get(i);
       if (transformFunction instanceof LiteralTransformFunction) {
-        String literal = ((LiteralTransformFunction) transformFunction).getLiteral();
+        // TODO: Handle null literal
+        String literal = ((LiteralTransformFunction) transformFunction).getLiteral().toString();
         _arguments[i] = parameterTypes[i].convert(literal, PinotDataType.STRING);
       } else {
         _nonLiteralIndices[_numNonLiteralArguments] = i;

@@ -120,6 +120,9 @@ public class RequestUtils {
         case BOOLEAN:
           literal.setBoolValue(node.booleanValue());
           break;
+        case NULL:
+          literal.setNullValue(true);
+          break;
         default:
           literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
           break;

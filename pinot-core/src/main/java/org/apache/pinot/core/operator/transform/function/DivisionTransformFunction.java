@@ -69,9 +69,10 @@ public class DivisionTransformFunction extends BaseTransformFunction {
       if (argument instanceof LiteralTransformFunction) {
         LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) argument;
         if (_resultDataType == DataType.BIG_DECIMAL) {
-          _bigDecimalLiterals[i] = new BigDecimal(literalTransformFunction.getLiteral());
+          _bigDecimalLiterals[i] = new BigDecimal(literalTransformFunction.getLiteral().toString());
         } else {
-          _doubleLiterals[i] = Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
+          // TODO: Handle null literal
+          _doubleLiterals[i] = Double.parseDouble(((LiteralTransformFunction) argument).getLiteral().toString());
         }
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {

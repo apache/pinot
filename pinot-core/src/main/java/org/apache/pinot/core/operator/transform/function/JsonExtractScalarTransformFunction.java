@@ -96,8 +96,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
               + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
-    _jsonPathString = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
-    String resultsType = ((LiteralTransformFunction) arguments.get(2)).getLiteral().toUpperCase();
+    // TODO: Handle null literal
+    _jsonPathString = ((LiteralTransformFunction) arguments.get(1)).getLiteral().toString();
+    String resultsType = ((LiteralTransformFunction) arguments.get(2)).getLiteral().toString().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
     DataType dataType;
     try {
@@ -109,7 +110,8 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
               + "/DOUBLE_ARRAY/STRING_ARRAY", resultsType));
     }
     if (arguments.size() == 4) {
-      _defaultValue = dataType.convert(((LiteralTransformFunction) arguments.get(3)).getLiteral());
+      // TODO: Handle null literal
+      _defaultValue = dataType.convert(((LiteralTransformFunction) arguments.get(3)).getLiteral().toString());
     }
     _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
     try {

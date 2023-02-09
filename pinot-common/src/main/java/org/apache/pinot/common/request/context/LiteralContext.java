@@ -18,10 +18,17 @@
  */
 package org.apache.pinot.common.request.context;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.sql.Timestamp;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.type.DataTypeFactory;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -37,48 +44,72 @@ public class LiteralContext {
   private FieldSpec.DataType _type;
   private Object _value;
 
-  // TODO: Support all data types.
-  private static FieldSpec.DataType convertThriftTypeToDataType(Literal._Fields fields) {
-    switch (fields) {
-      case LONG_VALUE:
+  // TODO: Deprecate the usage case for this function.
+  @VisibleForTesting
+  public static FieldSpec.DataType inferLiteralDataType(String literal) {
+    // Try to interpret the literal as number
+    try {
+      Number number = NumberUtils.createNumber(literal);
+      if (number instanceof Integer) {
+        return FieldSpec.DataType.INT;
+      } else if (number instanceof Long) {
         return FieldSpec.DataType.LONG;
-      case BOOL_VALUE:
-        return FieldSpec.DataType.BOOLEAN;
-      case DOUBLE_VALUE:
+      } else if (number instanceof Float) {
+        return FieldSpec.DataType.FLOAT;
+      } else if (number instanceof Double) {
         return FieldSpec.DataType.DOUBLE;
-      case STRING_VALUE:
+      } else if (number instanceof BigDecimal | number instanceof BigInteger) {
+        return FieldSpec.DataType.BIG_DECIMAL;
+      } else {
         return FieldSpec.DataType.STRING;
-      default:
-        throw new UnsupportedOperationException("Unsupported literal type:" + fields);
+      }
+    } catch (Exception e) {
+      // Ignored
     }
-  }
 
-  private static Class<?> convertDataTypeToJavaType(FieldSpec.DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return Integer.class;
-      case LONG:
-        return Long.class;
-      case BOOLEAN:
-        return Boolean.class;
-      case FLOAT:
-        return Float.class;
-      case DOUBLE:
-        return Double.class;
-      case STRING:
-        return String.class;
-      default:
-        throw new UnsupportedOperationException("Unsupported dataType:" + dataType);
+    // Try to interpret the literal as TIMESTAMP
+    try {
+      Timestamp.valueOf(literal);
+      return FieldSpec.DataType.TIMESTAMP;
+    } catch (Exception e) {
+      // Ignored
     }
+
+    return FieldSpec.DataType.STRING;
   }
 
   public LiteralContext(Literal literal) {
-    _type = convertThriftTypeToDataType(literal.getSetField());
-    _value = literal.getFieldValue();
+    Preconditions.checkState(literal.getFieldValue() != null,
+        "Field value cannot be null for field:" + literal.getSetField());
+    _type = DataTypeFactory.createDataType(literal.getSetField());
+    if(_type == FieldSpec.DataType.NULL){
+      _value = NullSentinel.INSTANCE;
+    } else {
+      _value = literal.getFieldValue();
+    }
   }
 
   public FieldSpec.DataType getType() {
-    return _type;
+    if (_type == FieldSpec.DataType.BOOLEAN || _type == FieldSpec.DataType.NULL) {
+      return _type;
+    }
+    return inferLiteralDataType(_value.toString());
+  }
+
+  // TODO: Avoid passing in inferred data type when we have the right data type in place.
+  public BigDecimal getBigDecimalValue(FieldSpec.DataType dataType) {
+    if (dataType == FieldSpec.DataType.BOOLEAN) {
+      return PinotDataType.BOOLEAN.toBigDecimal(_value);
+    }
+    if (dataType.isNumeric()) {
+      return new BigDecimal(_value.toString());
+    }
+    if (dataType == FieldSpec.DataType.TIMESTAMP) {
+      // inferLiteralDataType successfully interpreted the literal as TIMESTAMP. _bigDecimalLiteral is populated and
+      // assigned to _longLiteral.
+      return PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(_value.toString()));
+    }
+    return BigDecimal.ZERO;
   }
 
   @Nullable
@@ -86,18 +117,18 @@ public class LiteralContext {
     return _value;
   }
 
+  // This ctor is only used for special handling in subquery.
   public LiteralContext(FieldSpec.DataType type, Object value) {
-    Preconditions.checkArgument(convertDataTypeToJavaType(type) == value.getClass(),
-        "Unmatched data type: " + type + " java type: " + value.getClass());
     _type = type;
-    _value = value;
+    if(type == FieldSpec.DataType.NULL){
+      _value = NullSentinel.INSTANCE;
+    } else {
+      _value = value;
+    }
   }
 
   @Override
   public int hashCode() {
-    if (_value == null) {
-      return 31 * _type.hashCode();
-    }
     return 31 * _value.hashCode();
   }
 
@@ -115,9 +146,6 @@ public class LiteralContext {
 
   @Override
   public String toString() {
-    if (_value == null) {
-      return "null";
-    }
     // TODO: print out the type.
     return '\'' + _value.toString() + '\'';
   }

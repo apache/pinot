@@ -91,7 +91,8 @@ public class GroovyTransformFunction extends BaseTransformFunction {
     TransformFunction returnValueMetadata = arguments.get(0);
     Preconditions.checkState(returnValueMetadata instanceof LiteralTransformFunction,
         "First argument of GROOVY transform function must be a literal, representing a json string");
-    String returnValueMetadataStr = ((LiteralTransformFunction) returnValueMetadata).getLiteral();
+    // TODO: Handle null literal
+    String returnValueMetadataStr = ((LiteralTransformFunction) returnValueMetadata).getLiteral().toString();
     try {
       JsonNode returnValueMetadataJson = JsonUtils.stringToJsonNode(returnValueMetadataStr);
       Preconditions.checkState(returnValueMetadataJson.hasNonNull(RETURN_TYPE_KEY),
