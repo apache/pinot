@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
@@ -79,6 +80,36 @@ public class InstanceAssignmentDriver {
             assignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions);
     InstancePartitions instancePartitions = new InstancePartitions(
         instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)));
+    instancePartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);
+    return instancePartitions;
+  }
+
+  // TODO (saurabh) : Move commons
+  public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
+      @Nullable InstancePartitions existingInstancePartitions, InstanceAssignmentConfig instanceAssignmentConfig) {
+    String tableNameWithType = _tableConfig.getTableName();
+    LOGGER.info("Starting {} instance assignment for table: {}", tierName, tableNameWithType);
+
+    InstanceTagPoolSelector tagPoolSelector =
+        new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType);
+    Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = tagPoolSelector.selectInstances(instanceConfigs);
+
+    InstanceConstraintConfig constraintConfig = instanceAssignmentConfig.getConstraintConfig();
+    List<InstanceConstraintApplier> constraintAppliers = new ArrayList<>();
+    if (constraintConfig == null) {
+      LOGGER.info("No instance constraint is configured, using default hash-based-rotate instance constraint");
+      constraintAppliers.add(new HashBasedRotateInstanceConstraintApplier(tableNameWithType));
+    }
+    // TODO: support more constraints
+    for (InstanceConstraintApplier constraintApplier : constraintAppliers) {
+      poolToInstanceConfigsMap = constraintApplier.applyConstraint(poolToInstanceConfigsMap);
+    }
+
+    InstancePartitionSelector instancePartitionSelector =
+        InstancePartitionSelectorFactory.getInstance(instanceAssignmentConfig.getPartitionSelector(),
+            instanceAssignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions);
+    InstancePartitions instancePartitions =
+        new InstancePartitions(InstancePartitionsUtils.getInstancePartitonNameForTier(tableNameWithType, tierName));
     instancePartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);
     return instancePartitions;
   }

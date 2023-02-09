@@ -93,6 +93,11 @@ public class InstancePartitionsUtils {
     return znRecord != null ? InstancePartitions.fromZNRecord(znRecord) : null;
   }
 
+  public static String getInstancePartitonNameForTier(String tableName, String tierName) {
+    return TableNameBuilder.extractRawTableName(tableName) + TYPE_SUFFIX_SEPARATOR + tierName;
+  }
+
+
   /**
    * Gets the instance partitions with the given name, and returns a re-named copy of the same.
    * This method is useful when we use a table with instancePartitionsMap since in that case

@@ -633,30 +633,30 @@ public class TableConfigUtilsTest {
     // 1 tier configs
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null))).build();
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null))).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     // 2 tier configs, case insensitive check
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "30d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier2_tag_OFFLINE", null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier2_tag_OFFLINE", null, null, null))).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     //realtime table
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
         .setTierConfigList(Lists.newArrayList(
             new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE", null, null),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE", null, null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "40d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null, null))).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     // tier name empty
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null))).build();
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to empty tier name");
@@ -667,9 +667,9 @@ public class TableConfigUtilsTest {
     // tier name repeats
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("sameTierName", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null),
             new TierConfig("sameTierName", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "100d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to duplicate tier name");
@@ -680,9 +680,9 @@ public class TableConfigUtilsTest {
     // segmentSelectorType invalid
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null),
             new TierConfig("tier2", "unsupportedSegmentSelector", "40d", null, TierFactory.PINOT_SERVER_STORAGE_TYPE,
-                "tier2_tag_OFFLINE", null, null))).build();
+                "tier2_tag_OFFLINE", null, null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to invalid segmentSelectorType");
@@ -693,9 +693,9 @@ public class TableConfigUtilsTest {
     // segmentAge not provided for TIME segmentSelectorType
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, null, null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to missing segmentAge");
@@ -706,9 +706,9 @@ public class TableConfigUtilsTest {
     // segmentAge invalid
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "3600", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null, null))).build();
 
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -720,25 +720,25 @@ public class TableConfigUtilsTest {
     // fixedSegmentSelector
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null))).build();
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null))).build();
     TableConfigUtils.validate(tableConfig, schema);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, "30d", Lists.newArrayList(),
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null))).build();
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null))).build();
     TableConfigUtils.validate(tableConfig, schema);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(
             new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null))).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     // storageType invalid
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(
             new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null, "unsupportedStorageType",
-                "tier1_tag_OFFLINE", null, null),
+                "tier1_tag_OFFLINE", null, null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null, null))).build();
 
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -750,9 +750,9 @@ public class TableConfigUtilsTest {
     // serverTag not provided for PINOT_SERVER storageType
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, null, null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, null, null, null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to ");
@@ -763,9 +763,9 @@ public class TableConfigUtilsTest {
     // serverTag invalid
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTierConfigList(
         Lists.newArrayList(new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag", null, null),
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag", null, null, null),
             new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d", null,
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null, null))).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should have failed due to invalid server tag");

@@ -147,6 +147,7 @@ import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
@@ -1734,10 +1735,10 @@ public class PinotHelixResourceManager {
       }
     }
 
+    InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
+    List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
     if (!instancePartitionsTypesToAssign.isEmpty()) {
       LOGGER.info("Assigning {} instances to table: {}", instancePartitionsTypesToAssign, tableNameWithType);
-      InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
-      List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypesToAssign) {
         boolean hasPreConfiguredInstancePartitions =
             TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
@@ -1754,6 +1755,21 @@ public class PinotHelixResourceManager {
           LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
               referenceInstancePartitionsName);
           InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+        }
+      }
+    }
+
+    // Process and persist tier config instancePartitions
+    if (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())) {
+      for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
+        if (tierConfig.getInstanceAssignmentConfig() != null) {
+          if (override || InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
+              InstancePartitionsUtils.getInstancePartitonNameForTier(tableNameWithType, tierConfig.getName())) == null) {
+            InstancePartitions instancePartitions =
+                instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
+                    tierConfig.getInstanceAssignmentConfig());
+            InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+          }
         }
       }
     }

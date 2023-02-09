@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 
 
 /**
@@ -55,6 +56,9 @@ public class TierConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Properties for the tier backend")
   private final Map<String, String> _tierBackendProperties;
 
+  @JsonPropertyDescription("The backend FS to use for this tier. Default is 'local'.")
+  private final InstanceAssignmentConfig _instanceAssignmentConfig;
+
   // TODO: only "serverTag" is supported currently. In next iteration, "InstanceAssignmentConfig
   //  _instanceAssignmentConfig" will be added
   //  here
@@ -66,7 +70,8 @@ public class TierConfig extends BaseJsonConfig {
       @JsonProperty(value = "storageType", required = true) String storageType,
       @JsonProperty("serverTag") @Nullable String serverTag,
       @JsonProperty("tierBackend") @Nullable String tierBackend,
-      @JsonProperty("tierBackendProperties") @Nullable Map<String, String> tierBackendProperties) {
+      @JsonProperty("tierBackendProperties") @Nullable Map<String, String> tierBackendProperties,
+      @JsonProperty("instanceAssignmentConfig") @Nullable InstanceAssignmentConfig instanceAssignmentConfig) {
     Preconditions.checkArgument(name != null, "Must provide non-null 'name' in tierConfig");
     Preconditions
         .checkArgument(segmentSelectorType != null, "Must provide non-null 'segmentSelectorType' in tierConfig");
@@ -79,6 +84,7 @@ public class TierConfig extends BaseJsonConfig {
     _serverTag = serverTag;
     _tierBackend = tierBackend;
     _tierBackendProperties = tierBackendProperties;
+    _instanceAssignmentConfig = instanceAssignmentConfig;
   }
 
   public String getName() {
@@ -115,5 +121,10 @@ public class TierConfig extends BaseJsonConfig {
   @Nullable
   public Map<String, String> getTierBackendProperties() {
     return _tierBackendProperties;
+  }
+
+  @Nullable
+  public InstanceAssignmentConfig getInstanceAssignmentConfig() {
+    return _instanceAssignmentConfig;
   }
 }

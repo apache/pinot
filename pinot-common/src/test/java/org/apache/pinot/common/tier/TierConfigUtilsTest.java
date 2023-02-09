@@ -53,18 +53,18 @@ public class TierConfigUtilsTest {
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(
         Lists.newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null))).build();
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null, null))).build();
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(
         Lists.newArrayList(
             new TierConfig("myTier", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, "10d", Lists.newArrayList("seg0", "seg1"),
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null, null))).build();
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(
         Lists.newArrayList(new TierConfig("myTier", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null))).build();
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null, null))).build();
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").build();
@@ -80,13 +80,13 @@ public class TierConfigUtilsTest {
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(
         Lists.newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null))).build();
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null, null))).build();
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(
         Lists.newArrayList(
             new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0", "seg1"),
-                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null))).build();
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null, null))).build();
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
   }
 
@@ -96,7 +96,7 @@ public class TierConfigUtilsTest {
   @Test
   public void testGetTier() {
     TierConfig tierConfig = new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-        TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null);
+        TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE", null, null, null);
     Tier tier = TierFactory.getTier(tierConfig, null);
     Assert.assertEquals(tier.getName(), "tier1");
     Assert.assertTrue(tier.getSegmentSelector() instanceof TimeBasedTierSegmentSelector);
@@ -109,7 +109,7 @@ public class TierConfigUtilsTest {
 
     tierConfig = new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null,
         Lists.newArrayList("segment1", "segment2", "segment3"), TierFactory.PINOT_SERVER_STORAGE_TYPE,
-        "tier1_tag_OFFLINE", null, null);
+        "tier1_tag_OFFLINE", null, null, null);
     tier = TierFactory.getTier(tierConfig, null);
     Assert.assertEquals(tier.getName(), "tier1");
     Assert.assertTrue(tier.getSegmentSelector() instanceof FixedTierSegmentSelector);
@@ -119,7 +119,7 @@ public class TierConfigUtilsTest {
 
     tierConfig = new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null,
         null, TierFactory.PINOT_SERVER_STORAGE_TYPE,
-        "tier1_tag_OFFLINE", null, null);
+        "tier1_tag_OFFLINE", null, null, null);
     tier = TierFactory.getTier(tierConfig, null);
     Assert.assertEquals(tier.getName(), "tier1");
     Assert.assertTrue(tier.getSegmentSelector() instanceof FixedTierSegmentSelector);
@@ -128,7 +128,7 @@ public class TierConfigUtilsTest {
 
     tierConfig =
         new TierConfig("tier1", "unknown", "30d", null, TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier1_tag_OFFLINE",
-            null, null);
+            null, null, null);
     try {
       TierFactory.getTier(tierConfig, null);
       Assert.fail("Should have failed due to unsupported segmentSelectorType");
@@ -138,7 +138,7 @@ public class TierConfigUtilsTest {
 
     tierConfig =
         new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null, "unknown", "tier1_tag_OFFLINE",
-            null, null);
+            null, null, null);
     try {
       TierFactory.getTier(tierConfig, null);
       Assert.fail("Should've failed due to unsupported storageType");
@@ -199,7 +199,7 @@ public class TierConfigUtilsTest {
     }
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
         .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null))).build();
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null, null))).build();
     try {
       TierConfigUtils.getDataDirForTier(tableConfig, "tier1");
     } catch (Exception e) {
@@ -221,7 +221,7 @@ public class TierConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
         .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null,
-            Collections.singletonMap("dataDir", "/foo/bar")))).build();
+            Collections.singletonMap("dataDir", "/foo/bar"), null))).build();
     dataDir = TierConfigUtils.getDataDirForTier(tableConfig, "myTier", instanceTierConfigs);
     Assert.assertEquals(dataDir, "/foo/bar");
   }

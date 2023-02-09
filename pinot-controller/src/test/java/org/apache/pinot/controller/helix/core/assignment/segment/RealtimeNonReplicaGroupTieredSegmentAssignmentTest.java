@@ -113,11 +113,11 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
 
     List<TierConfig> tierConfigList = Lists.newArrayList(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME, null, null),
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME, null, null, null),
         new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "20d", null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME, null, null),
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME, null, null, null),
         new TierConfig(TIER_C_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME, null, null));
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME, null, null, null));
 
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig tableConfig =

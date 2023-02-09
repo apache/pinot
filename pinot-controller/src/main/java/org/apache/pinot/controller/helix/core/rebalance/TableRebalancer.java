@@ -546,6 +546,12 @@ public class TableRebalancer {
    *  Then we'll be able to support replica group assignment while creating InstancePartitions for tiers
    */
   private InstancePartitions getInstancePartitionsForTier(Tier tier, String tableNameWithType) {
+    InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
+        _helixManager.getHelixPropertyStore(), tier.getName());
+    if (instancePartitions != null) {
+      return instancePartitions;
+    }
+
     PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
     return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType,
         tier.getName(), storage.getServerTag());
