@@ -190,7 +190,7 @@ public class AggregateOperatorTest {
 
     AggregateOperator.Merger merger = Mockito.mock(AggregateOperator.Merger.class);
     Mockito.when(merger.merge(Mockito.any(), Mockito.any())).thenReturn(12d);
-    Mockito.when(merger.initialize(Mockito.any())).thenReturn(1d);
+    Mockito.when(merger.initialize(Mockito.any(), Mockito.any())).thenReturn(1d);
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(_input, outSchema, calls, group, inSchema, ImmutableMap.of("SUM", cdt -> merger), 1, 2);
@@ -201,7 +201,7 @@ public class AggregateOperatorTest {
     // Then:
     // should call merger twice, one from second row in first block and two from the first row
     // in second block
-    Mockito.verify(merger, Mockito.times(1)).initialize(Mockito.any());
+    Mockito.verify(merger, Mockito.times(1)).initialize(Mockito.any(), Mockito.any());
     Mockito.verify(merger, Mockito.times(2)).merge(Mockito.any(), Mockito.any());
     Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, 12d},
         "Expected two columns (group by key, agg value)");

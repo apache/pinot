@@ -21,9 +21,7 @@
     },
     "queries": [
       {
-        "ignored": true,
         "psql": "4.2.7",
-        "comments": "result error:average doesn't work because we round up but h2 round down for integer",
         "description": "average int",
         "sql": "SELECT avg(int_col) FROM {tbl}"
       },
@@ -140,6 +138,34 @@
         "comment": "issue with converting data types:  Unexpected RelDataTypeField: ANY for column: EXPR$0",
         "description": "sum with inner function",
         "sql": "SELECT sum(pow(int_col, 2)) FROM {tbl}"
+      },
+      {
+        "ignored": true,
+        "comment": "sum empty returns [0] instead of [null] at the moment",
+        "description": "sum empty input after filter",
+        "sql": "SELECT sum(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "count empty input after filter",
+        "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "count empty input after filter",
+        "sql": "SELECT count(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "ignored": true,
+        "comment": "sum empty returns [0] instead of [null] at the moment",
+        "description": "sum empty input after filter with subquery",
+        "sql": "SELECT sum(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "description": "count empty input after filter with sub-query",
+        "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "description": "count empty input after filter with sub-query",
+        "sql": "SELECT count(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       }
     ]
   },
@@ -173,16 +199,13 @@
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
         "description": "aggregate int column and filter by int column",
-        "comments": "rounding error",
-        "sql": "SELECT sum(1 /int_col) FROM {tbl} WHERE int_col > 0"
+        "sql": "SELECT sum(1 / int_col) FROM {tbl} WHERE int_col > 0"
       },
       {
         "psql": "4.2.7",
         "description": "aggregate double column and filter by double column",
-        "comments": "rounding error",
-        "sql": "SELECT sum(1 /double_col) FROM {tbl} WHERE double_col < 1"
+        "sql": "SELECT sum(1 / double_col) FROM {tbl} WHERE double_col < 1"
       },
       {
         "psql": "4.2.7",

@@ -19,15 +19,45 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
-import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.trace.InvocationScope;
+import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.LoggerFactory;
 
 
-public abstract class MultiStageOperator extends BaseOperator<TransferableBlock> implements AutoCloseable {
+public abstract class MultiStageOperator implements Operator<TransferableBlock>, AutoCloseable {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
-  // TODO: use the API public List<? extends Operator> getChildOperators() to merge two APIs.
+  // TODO: Move to OperatorContext class.
+  private final OperatorStats _operatorStats;
+
+  public MultiStageOperator(long requestId, int stageId) {
+    _operatorStats = new OperatorStats(requestId, stageId, toExplainString());
+  }
+
+  @Override
+  public TransferableBlock nextBlock() {
+    if (Tracing.ThreadAccountantOps.isInterrupted()) {
+      throw new EarlyTerminationException("Interrupted while processing next block");
+    }
+    try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
+      _operatorStats.startTimer();
+      TransferableBlock nextBlock = getNextBlock();
+      _operatorStats.recordRow(1, nextBlock.getNumRows());
+      _operatorStats.endTimer();
+      // TODO: move this to centralized reporting in broker
+      if (nextBlock.isEndOfStreamBlock()) {
+        LOGGER.info("Recorded operator stats: " + _operatorStats);
+      }
+      return nextBlock;
+    }
+  }
+
+  // Make it protected because we should always call nextBlock()
+  protected abstract TransferableBlock getNextBlock();
+
   @Override
   public List<MultiStageOperator> getChildOperators() {
     throw new UnsupportedOperationException();
@@ -41,8 +71,19 @@ public abstract class MultiStageOperator extends BaseOperator<TransferableBlock>
       try {
         op.close();
       } catch (Exception e) {
-        LOGGER.error("Failed to close operator:" + op);
+        LOGGER.error("Failed to close operator: " + op + " with exception:" + e);
         // Continue processing because even one operator failed to be close, we should still close the rest.
+      }
+    }
+  }
+
+  public void cancel(Throwable e) {
+    for (MultiStageOperator op : getChildOperators()) {
+      try {
+        op.cancel(e);
+      } catch (Exception e2) {
+        LOGGER.error("Failed to cancel operator:" + op + "with error:" + e + " with exception:" + e2);
+        // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
       }
     }
   }

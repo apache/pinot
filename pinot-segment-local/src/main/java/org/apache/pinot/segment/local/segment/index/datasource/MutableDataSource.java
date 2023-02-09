@@ -48,14 +48,14 @@ public class MutableDataSource extends BaseDataSource {
       @Nullable InvertedIndexReader invertedIndex, @Nullable RangeIndexReader rangeIndex,
       @Nullable TextIndexReader textIndex, @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex,
       @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
-      @Nullable NullValueVectorReader nullValueVector) {
+      @Nullable NullValueVectorReader nullValueVector, int maxRowLengthInBytes) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, cardinality,
-            partitionFunction,
-            partitions, minValue, maxValue),
+            partitionFunction, partitions, minValue, maxValue, maxRowLengthInBytes),
         new ColumnIndexContainer.FromMap.Builder()
             .with(StandardIndexes.forward(), forwardIndex)
             .with(StandardIndexes.dictionary(), dictionary)
-            .with(StandardIndexes.inverted(), invertedIndex)
+            .with(StandardIndexes.inverted(),
+        invertedIndex)
             .with(StandardIndexes.range(), rangeIndex)
             .with(StandardIndexes.text(), textIndex)
             .with(StandardIndexes.fst(), fstIndex)
@@ -76,10 +76,11 @@ public class MutableDataSource extends BaseDataSource {
     final Set<Integer> _partitions;
     final Comparable _minValue;
     final Comparable _maxValue;
+    final int _maxRowLengthInBytes;
 
     MutableDataSourceMetadata(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
         int cardinality, @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions,
-        @Nullable Comparable minValue, @Nullable Comparable maxValue) {
+        @Nullable Comparable minValue, @Nullable Comparable maxValue, int maxRowLengthInBytes) {
       _fieldSpec = fieldSpec;
       _numDocs = numDocs;
       _numValues = numValues;
@@ -94,6 +95,7 @@ public class MutableDataSource extends BaseDataSource {
       _minValue = minValue;
       _maxValue = maxValue;
       _cardinality = cardinality;
+      _maxRowLengthInBytes = maxRowLengthInBytes;
     }
 
     @Override
@@ -128,7 +130,6 @@ public class MutableDataSource extends BaseDataSource {
       return _minValue;
     }
 
-    @Nullable
     @Override
     public Comparable getMaxValue() {
       return _maxValue;
@@ -149,6 +150,11 @@ public class MutableDataSource extends BaseDataSource {
     @Override
     public int getCardinality() {
       return _cardinality;
+    }
+
+    @Override
+    public int getMaxRowLengthInBytes() {
+      return _maxRowLengthInBytes;
     }
   }
 }

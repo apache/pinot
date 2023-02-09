@@ -21,10 +21,10 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -56,7 +56,7 @@ public class StarTreeV2BuilderConfig {
 
     Set<String> skipStarNodeCreationForDimensions;
     if (indexConfig.getSkipStarNodeCreationForDimensions() != null) {
-      skipStarNodeCreationForDimensions = new HashSet<>(indexConfig.getSkipStarNodeCreationForDimensions());
+      skipStarNodeCreationForDimensions = new TreeSet<>(indexConfig.getSkipStarNodeCreationForDimensions());
       Preconditions.checkArgument(dimensionsSplitOrder.containsAll(skipStarNodeCreationForDimensions),
           "Can not skip star-node creation for dimensions not in the split order, dimensionsSplitOrder: %s, "
               + "skipStarNodeCreationForDimensions: %s",
@@ -65,7 +65,7 @@ public class StarTreeV2BuilderConfig {
       skipStarNodeCreationForDimensions = Collections.emptySet();
     }
 
-    Set<AggregationFunctionColumnPair> functionColumnPairs = new HashSet<>();
+    Set<AggregationFunctionColumnPair> functionColumnPairs = new TreeSet<>();
     for (String functionColumnPair : indexConfig.getFunctionColumnPairs()) {
       functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName(functionColumnPair));
     }
@@ -145,7 +145,7 @@ public class StarTreeV2BuilderConfig {
     }
     Preconditions.checkState(!dimensionsSplitOrder.isEmpty(), "No qualified dimension found for star-tree split order");
 
-    Set<AggregationFunctionColumnPair> functionColumnPairs = new HashSet<>();
+    Set<AggregationFunctionColumnPair> functionColumnPairs = new TreeSet<>();
     functionColumnPairs.add(AggregationFunctionColumnPair.COUNT_STAR);
     for (String numericMetric : numericMetrics) {
       functionColumnPairs.add(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, numericMetric));

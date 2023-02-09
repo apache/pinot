@@ -78,4 +78,10 @@ public abstract class DefaultPostOrderTraversalVisitor<T, C> implements StageNod
   public T visitValue(ValueNode node, C context) {
     return process(node, context);
   }
+
+  @Override
+  public T visitWindow(WindowNode node, C context) {
+    node.getInputs().get(0).visit(this, context);
+    return process(node, context);
+  }
 }

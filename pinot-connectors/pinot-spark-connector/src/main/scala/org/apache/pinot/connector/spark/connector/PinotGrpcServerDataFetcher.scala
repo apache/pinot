@@ -25,6 +25,7 @@ import org.apache.pinot.common.proto.Server.ServerRequest
 import org.apache.pinot.connector.spark.utils.Logging
 import org.apache.pinot.spi.config.table.TableType
 
+import java.io.Closeable
 import scala.collection.JavaConverters._
 
 /**
@@ -32,7 +33,7 @@ import scala.collection.JavaConverters._
  * Eg: offline-server1: segment1, segment2, segment3
  */
 private[pinot] class PinotGrpcServerDataFetcher(pinotSplit: PinotSplit)
-  extends Logging {
+  extends Logging with Closeable {
 
   private val channel = ManagedChannelBuilder
     .forAddress(pinotSplit.serverAndSegments.serverHost, pinotSplit.serverAndSegments.serverGrpcPort)
@@ -41,8 +42,7 @@ private[pinot] class PinotGrpcServerDataFetcher(pinotSplit: PinotSplit)
     .asInstanceOf[ManagedChannelBuilder[_]].build()
   private val pinotServerBlockingStub = PinotQueryServerGrpc.newBlockingStub(channel)
 
-  def fetchData(): List[DataTable] = {
-    val requestStartTime = System.nanoTime()
+  def fetchData(): Iterator[DataTable] = {
     val request = ServerRequest.newBuilder()
       .putMetadata("enableStreaming", "true")
       .addAllSegments(pinotSplit.serverAndSegments.segments.asJava)
@@ -56,20 +56,23 @@ private[pinot] class PinotGrpcServerDataFetcher(pinotSplit: PinotSplit)
       )
       .build()
     val serverResponse = pinotServerBlockingStub.submit(request)
-    logInfo(s"Pinot server total response time in millis: ${System.nanoTime() - requestStartTime}")
-
     try {
       val dataTables = for {
-        serverResponse <- serverResponse.asScala.toList
+        serverResponse <- serverResponse.asScala
         if serverResponse.getMetadataMap.get("responseType") == "data"
       } yield DataTableFactory.getDataTable(serverResponse.getPayload.toByteArray)
 
       dataTables.filter(_.getNumberOfRows > 0)
+
     } catch {
       case e: io.grpc.StatusRuntimeException =>
         logError(s"Caught exception when reading data from ${pinotSplit.serverAndSegments.serverHost}:${pinotSplit.serverAndSegments.serverGrpcPort}: ${e}")
         throw e
-    } finally {
+    }
+  }
+
+  def close(): Unit = {
+    if (!channel.isShutdown) {
       channel.shutdown()
       logInfo("Pinot server connection closed")
     }

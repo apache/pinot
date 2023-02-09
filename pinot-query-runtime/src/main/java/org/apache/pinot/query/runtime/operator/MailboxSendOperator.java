@@ -55,7 +55,6 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   private final MultiStageOperator _dataTableBlockBaseOperator;
   private final BlockExchange _exchange;
-  private OperatorStats _operatorStats;
 
   @VisibleForTesting
   interface BlockExchangeFactory {
@@ -81,6 +80,7 @@ public class MailboxSendOperator extends MultiStageOperator {
       MultiStageOperator dataTableBlockBaseOperator, List<VirtualServer> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
       MailboxIdGenerator mailboxIdGenerator, BlockExchangeFactory blockExchangeFactory, long jobId, int stageId) {
+    super(jobId, stageId);
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
 
     List<MailboxIdentifier> receivingMailboxes;
@@ -113,41 +113,30 @@ public class MailboxSendOperator extends MultiStageOperator {
 
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(exchangeType),
         String.format("Exchange type '%s' is not supported yet", exchangeType));
-    _operatorStats = new OperatorStats(jobId, stageId, EXPLAIN_NAME);
   }
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of();
+    return ImmutableList.of(_dataTableBlockBaseOperator);
   }
 
   @Nullable
   @Override
   public String toExplainString() {
-    _dataTableBlockBaseOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     TransferableBlock transferableBlock;
     try {
-      _operatorStats.endTimer();
       transferableBlock = _dataTableBlockBaseOperator.nextBlock();
-      _operatorStats.startTimer();
       while (!transferableBlock.isNoOpBlock()) {
         _exchange.send(transferableBlock);
-        _operatorStats.recordInput(1, transferableBlock.getNumRows());
-        // The # of output block is not accurate because we may do a split in exchange send.
-        _operatorStats.recordOutput(1, transferableBlock.getNumRows());
         if (transferableBlock.isEndOfStreamBlock()) {
           return transferableBlock;
         }
-        _operatorStats.endTimer();
         transferableBlock = _dataTableBlockBaseOperator.nextBlock();
-        _operatorStats.startTimer();
       }
     } catch (final Exception e) {
       // ideally, MailboxSendOperator doesn't ever throw an exception because
@@ -159,8 +148,6 @@ public class MailboxSendOperator extends MultiStageOperator {
       } catch (Exception e2) {
         LOGGER.error("Exception while sending block to mailbox.", e2);
       }
-    } finally {
-      _operatorStats.endTimer();
     }
     return transferableBlock;
   }
