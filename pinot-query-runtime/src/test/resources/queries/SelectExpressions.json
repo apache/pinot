@@ -53,11 +53,7 @@
       { "sql": "SELECT intCol, intCol, doubleCol, strCol, strCol FROM {tbl1}" },
       { "sql": "SELECT {tbl1}.intCol, {tbl1}.intCol, {tbl1}.doubleCol, {tbl2}.strCol, {tbl2}.strCol FROM {tbl1}, {tbl2} WHERE {tbl1}.intCol = {tbl2}.intCol" },
       { "sql": "SELECT {tbl2}.intCol, {tbl2}.intCol FROM {tbl1}, {tbl2} WHERE {tbl1}.intCol = {tbl2}.intCol AND {tbl1}.intCol < 100 ORDER BY {tbl1}.doubleCol" },
-      {
-        "ignored": true,
-        "comment": "select intCol, intCol without aliasing one of them is not supported.",
-        "sql": "SELECT intCol, intCol FROM {tbl1} WHERE intCol < 100"
-      }
+      { "sql": "SELECT intCol, intCol FROM {tbl1} WHERE intCol < 100"}
     ]
   }
 }

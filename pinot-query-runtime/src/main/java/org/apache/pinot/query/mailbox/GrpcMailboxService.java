@@ -19,9 +19,14 @@
 package org.apache.pinot.query.mailbox;
 
 import io.grpc.ManagedChannel;
+import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
+import org.apache.pinot.common.proto.Mailbox;
+import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
+import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -51,8 +56,6 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
 
   // maintaining a list of registered mailboxes.
   private final ConcurrentHashMap<String, ReceivingMailbox<TransferableBlock>> _receivingMailboxMap =
-      new ConcurrentHashMap<>();
-  private final ConcurrentHashMap<String, SendingMailbox<TransferableBlock>> _sendingMailboxMap =
       new ConcurrentHashMap<>();
   private final Consumer<MailboxIdentifier> _gotMailCallback;
 
@@ -89,7 +92,13 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * @param mailboxId the id of the mailbox.
    */
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
-    return _sendingMailboxMap.computeIfAbsent(mailboxId.toString(), (mId) -> new GrpcSendingMailbox(mId, this));
+    ManagedChannel channel = getChannel(mailboxId.toString());
+    PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
+    CountDownLatch latch = new CountDownLatch(1);
+    StreamObserver<Mailbox.MailboxContent> mailboxContentStreamObserver =
+        stub.open(new MailboxStatusStreamObserver(latch));
+    GrpcSendingMailbox mailbox = new GrpcSendingMailbox(mailboxId.toString(), mailboxContentStreamObserver, latch);
+    return mailbox;
   }
 
   /**
@@ -97,8 +106,8 @@ public class GrpcMailboxService implements MailboxService<TransferableBlock> {
    * @param mailboxId the id of the mailbox.
    */
   public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
-    return _receivingMailboxMap.computeIfAbsent(
-        mailboxId.toString(), (mId) -> new GrpcReceivingMailbox(mId, this, _gotMailCallback));
+    return _receivingMailboxMap.computeIfAbsent(mailboxId.toString(),
+        (mId) -> new GrpcReceivingMailbox(mId, _gotMailCallback));
   }
 
   public ManagedChannel getChannel(String mailboxId) {

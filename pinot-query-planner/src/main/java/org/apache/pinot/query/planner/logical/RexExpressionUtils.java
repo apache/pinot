@@ -91,7 +91,7 @@ public class RexExpressionUtils {
 
   public static Integer getValueAsInt(RexNode in) {
     if (in == null) {
-      return 0;
+      return -1;
     }
 
     Preconditions.checkArgument(in instanceof RexLiteral, "expected literal, got " + in);

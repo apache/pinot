@@ -66,16 +66,13 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private final DataSchema _desiredDataSchema;
   private int _currentIndex;
 
-  // TODO: Move to OperatorContext class.
-  private OperatorStats _operatorStats;
-
   public LeafStageTransferableBlockOperator(List<InstanceResponseBlock> baseResultBlock, DataSchema dataSchema,
       long requestId, int stageId) {
+    super(requestId, stageId);
     _baseResultBlock = baseResultBlock;
     _desiredDataSchema = dataSchema;
     _errorBlock = baseResultBlock.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
     _currentIndex = 0;
-    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -86,39 +83,29 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    try {
-      _operatorStats.startTimer();
-      if (_currentIndex < 0) {
-        throw new RuntimeException("Leaf transfer terminated. next block should no longer be called.");
-      }
-      if (_errorBlock != null) {
-        _currentIndex = -1;
-        return new TransferableBlock(DataBlockUtils.getErrorDataBlock(_errorBlock.getExceptions()));
-      } else {
-        if (_currentIndex < _baseResultBlock.size()) {
-          InstanceResponseBlock responseBlock = _baseResultBlock.get(_currentIndex++);
-          if (responseBlock.getResultsBlock() != null && responseBlock.getResultsBlock().getNumRows() > 0) {
-            _operatorStats.recordInput(1, responseBlock.getResultsBlock().getNumRows());
-            _operatorStats.recordOutput(1, responseBlock.getResultsBlock().getNumRows());
-            return composeTransferableBlock(responseBlock, _desiredDataSchema);
-          } else {
-            _operatorStats.recordInput(1, responseBlock.getResultsBlock().getNumRows());
-            _operatorStats.recordOutput(1, responseBlock.getResultsBlock().getNumRows());
-            return new TransferableBlock(Collections.emptyList(), _desiredDataSchema, DataBlock.Type.ROW);
-          }
+    if (_currentIndex < 0) {
+      throw new RuntimeException("Leaf transfer terminated. next block should no longer be called.");
+    }
+    if (_errorBlock != null) {
+      _currentIndex = -1;
+      return new TransferableBlock(DataBlockUtils.getErrorDataBlock(_errorBlock.getExceptions()));
+    } else {
+      if (_currentIndex < _baseResultBlock.size()) {
+        InstanceResponseBlock responseBlock = _baseResultBlock.get(_currentIndex++);
+        if (responseBlock.getResultsBlock() != null && responseBlock.getResultsBlock().getNumRows() > 0) {
+          return composeTransferableBlock(responseBlock, _desiredDataSchema);
         } else {
-          _currentIndex = -1;
-          return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+          return new TransferableBlock(Collections.emptyList(), _desiredDataSchema, DataBlock.Type.ROW);
         }
+      } else {
+        _currentIndex = -1;
+        return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
       }
-    } finally {
-      _operatorStats.endTimer();
     }
   }
 

@@ -31,6 +31,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.routing.VirtualServer;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
@@ -85,6 +86,12 @@ public class PhysicalPlanVisitor implements StageNodeVisitor<MultiStageOperator,
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
     return new AggregateOperator(nextOperator, node.getDataSchema(), node.getAggCalls(),
         node.getGroupSet(), node.getInputs().get(0).getDataSchema(), context._requestId, context._stageId);
+  }
+
+  @Override
+  public MultiStageOperator visitWindow(WindowNode node, PlanRequestContext context) {
+    MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
+    throw new UnsupportedOperationException("Window not yet supported!");
   }
 
   @Override

@@ -155,7 +155,7 @@
     <netty.version>4.1.79.Final</netty.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.16.1</jts.version>
-    <h3.version>4.0.0</h3.version>
+    <h3.version>4.1.1</h3.version>
     <jmh.version>1.26</jmh.version>
     <audienceannotations.version>0.13.0</audienceannotations.version>
 

@@ -18,14 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
-import com.google.common.collect.Iterators;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -41,25 +36,26 @@ class HashExchange extends BlockExchange {
   // TODO: ensure that server instance list is sorted using same function in sender.
   private final KeySelector<Object[], Object[]> _keySelector;
 
-  HashExchange(MailboxService<TransferableBlock> mailbox, List<MailboxIdentifier> destinations,
-      KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
-    super(mailbox, destinations, splitter);
+  HashExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, KeySelector<Object[], Object[]> selector,
+      BlockSplitter splitter) {
+    super(sendingMailboxes, splitter);
     _keySelector = selector;
   }
 
   @Override
-  protected Iterator<RoutedBlock> route(List<MailboxIdentifier> destinations, TransferableBlock block) {
-    Map<Integer, List<Object[]>> destIdxToRows = new HashMap<>();
-
+  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block) {
+    List<Object[]>[] destIdxToRows = new List[destinations.size()];
     for (Object[] row : block.getContainer()) {
       int partition = _keySelector.computeHash(row) % destinations.size();
-      destIdxToRows.computeIfAbsent(partition, k -> new ArrayList<>()).add(row);
+      if (destIdxToRows[partition] == null) {
+        destIdxToRows[partition] = new ArrayList<>();
+      }
+      destIdxToRows[partition].add(row);
     }
-
-    return Iterators.transform(
-        destIdxToRows.entrySet().iterator(),
-        partitionAndBlock -> new RoutedBlock(
-            destinations.get(partitionAndBlock.getKey()),
-            new TransferableBlock(partitionAndBlock.getValue(), block.getDataSchema(), block.getType())));
+    for (int i = 0; i < destinations.size(); i++) {
+      if (destIdxToRows[i] != null) {
+        sendBlock(destinations.get(i), new TransferableBlock(destIdxToRows[i], block.getDataSchema(), block.getType()));
+      }
+    }
   }
 }

@@ -54,4 +54,6 @@ public interface StageNodeVisitor<T, C> {
   T visitTableScan(TableScanNode node, C context);
 
   T visitValue(ValueNode node, C context);
+
+  T visitWindow(WindowNode node, C context);
 }
