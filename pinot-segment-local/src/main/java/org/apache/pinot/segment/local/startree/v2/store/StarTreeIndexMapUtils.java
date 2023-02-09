@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +31,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
-
 
 /**
  * The {@code StarTreeIndexMapUtils} class is a utility class to store/load star-tree index map to/from file.
@@ -81,7 +82,7 @@ public class StarTreeIndexMapUtils {
   /**
    * Key of the index map.
    */
-  public static class IndexKey {
+  public static class IndexKey implements Comparable<IndexKey> {
     public final IndexType _indexType;
     // For star-tree index, column will be null
     public final String _column;
@@ -112,6 +113,14 @@ public class StarTreeIndexMapUtils {
         return false;
       }
     }
+
+    @Override
+    public int compareTo(IndexKey other) {
+      return Comparator
+          .comparing((IndexKey i) -> i._column, Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing((IndexKey i) -> i._indexType)
+          .compare(this, other);
+    }
   }
 
   /**
@@ -138,14 +147,14 @@ public class StarTreeIndexMapUtils {
   /**
    * Stores the index maps for multiple star-trees into a file.
    */
-  public static void storeToFile(List<Map<IndexKey, IndexValue>> indexMaps, File indexMapFile) {
+  public static void storeToFile(List<List<Pair<IndexKey, IndexValue>>> indexMaps, File indexMapFile) {
     Preconditions.checkState(!indexMapFile.exists(), "Star-tree index map file already exists");
 
     PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(indexMapFile);
     int numStarTrees = indexMaps.size();
     for (int i = 0; i < numStarTrees; i++) {
-      Map<IndexKey, IndexValue> indexMap = indexMaps.get(i);
-      for (Map.Entry<IndexKey, IndexValue> entry : indexMap.entrySet()) {
+      List<Pair<IndexKey, IndexValue>> indexMap = indexMaps.get(i);
+      for (Pair<IndexKey, IndexValue> entry : indexMap) {
         IndexKey key = entry.getKey();
         IndexValue value = entry.getValue();
         configuration.addProperty(key.getPropertyName(i, OFFSET_SUFFIX), value._offset);

@@ -23,9 +23,11 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.sources.v2.reader.InputPartitionReader
 import org.apache.spark.sql.types.StructType
 
+import java.io.Closeable
+
 /**
  * Actual data reader on spark worker side.
- * Represents a spark partition, and is receive data from specified pinot server-segment list.
+ * Represents a spark partition, and receives data from specified pinot server-segment list.
  */
 class PinotInputPartitionReader(
     schema: StructType,
@@ -33,7 +35,8 @@ class PinotInputPartitionReader(
     pinotSplit: PinotSplit,
     dataSourceOptions: PinotDataSourceReadOptions)
   extends InputPartitionReader[InternalRow] {
-  private val responseIterator: Iterator[InternalRow] = fetchDataAndConvertToInternalRows()
+
+  private val (responseIterator: Iterator[InternalRow], source: Closeable) = getIteratorAndSource()
   private[this] var currentRow: InternalRow = _
 
   override def next(): Boolean = {
@@ -48,18 +51,22 @@ class PinotInputPartitionReader(
     currentRow
   }
 
-  override def close(): Unit = {}
+  override def close(): Unit = {
+    source.close()
+  }
 
-  private def fetchDataAndConvertToInternalRows(): Iterator[InternalRow] = {
-    if (dataSourceOptions.useGrpcServer)
-      PinotGrpcServerDataFetcher(pinotSplit)
+  private def getIteratorAndSource(): (Iterator[InternalRow], Closeable) = {
+    if (dataSourceOptions.useGrpcServer) {
+      val dataFetcher = PinotGrpcServerDataFetcher(pinotSplit)
+      val iterable = dataFetcher.fetchData()
+        .flatMap(PinotUtils.pinotDataTableToInternalRows(_, schema))
+      (iterable, dataFetcher)
+    } else {
+      (PinotServerDataFetcher(partitionId, pinotSplit, dataSourceOptions)
         .fetchData()
         .flatMap(PinotUtils.pinotDataTableToInternalRows(_, schema))
-        .toIterator
-    else
-      PinotServerDataFetcher(partitionId, pinotSplit, dataSourceOptions)
-        .fetchData()
-        .flatMap(PinotUtils.pinotDataTableToInternalRows(_, schema))
-        .toIterator
+        .toIterator,
+        () => {})
+    }
   }
 }

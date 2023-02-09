@@ -19,13 +19,10 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Iterators;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.function.IntFunction;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -39,21 +36,20 @@ class RandomExchange extends BlockExchange {
 
   private final IntFunction<Integer> _rand;
 
-  RandomExchange(MailboxService<TransferableBlock> mailbox, List<MailboxIdentifier> destinations,
-      BlockSplitter splitter) {
-    this(mailbox, destinations, RANDOM::nextInt, splitter);
+  RandomExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, BlockSplitter splitter) {
+    this(sendingMailboxes, RANDOM::nextInt, splitter);
   }
 
   @VisibleForTesting
-  RandomExchange(MailboxService<TransferableBlock> mailbox, List<MailboxIdentifier> destinations,
-      IntFunction<Integer> rand, BlockSplitter splitter) {
-    super(mailbox, destinations, splitter);
+  RandomExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, IntFunction<Integer> rand,
+      BlockSplitter splitter) {
+    super(sendingMailboxes, splitter);
     _rand = rand;
   }
 
   @Override
-  protected Iterator<RoutedBlock> route(List<MailboxIdentifier> destinations, TransferableBlock block) {
+  protected void route(List<SendingMailbox<TransferableBlock>> destinations, TransferableBlock block) {
     int destinationIdx = _rand.apply(destinations.size());
-    return Iterators.singletonIterator(new RoutedBlock(destinations.get(destinationIdx), block));
+    sendBlock(destinations.get(destinationIdx), block);
   }
 }

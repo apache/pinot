@@ -37,6 +37,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.planner.stage.WindowNode;
 
 
 /**
@@ -71,6 +72,11 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
     Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
     List<RexExpression> groupSet = node.getGroupSet();
     return deriveNewPartitionKeysFromRexExpressions(groupSet, oldPartitionKeys);
+  }
+
+  @Override
+  public Set<Integer> visitWindow(WindowNode node, Void context) {
+    throw new UnsupportedOperationException("Window not yet supported!");
   }
 
   @Override
