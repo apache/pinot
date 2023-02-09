@@ -33,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <npm.script>build</npm.script>
+    <npm.script>build-ci</npm.script>
   </properties>
   <dependencies>
     <dependency>
@@ -235,13 +235,13 @@
             </configuration>
           </execution>
           <execution>
-            <id>npm install</id>
+            <id>npm ci</id>
             <goals>
               <goal>npm</goal>
             </goals>
             <phase>generate-resources</phase>
             <configuration>
-              <arguments>install</arguments>
+              <arguments>ci</arguments>
             </configuration>
           </execution>
           <execution>

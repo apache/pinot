@@ -18,12 +18,8 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Iterators;
-import java.util.Iterator;
 import java.util.List;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
@@ -34,13 +30,14 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  */
 class SingletonExchange extends BlockExchange {
 
-  SingletonExchange(MailboxService<TransferableBlock> mailbox, List<MailboxIdentifier> destinations,
-      BlockSplitter splitter) {
-    super(mailbox, destinations, splitter);
+  SingletonExchange(List<SendingMailbox<TransferableBlock>> sendingMailboxes, BlockSplitter splitter) {
+    super(sendingMailboxes, splitter);
   }
 
   @Override
-  protected Iterator<RoutedBlock> route(List<MailboxIdentifier> destinations, TransferableBlock block) {
-    return Iterators.singletonIterator(new RoutedBlock(Iterables.getOnlyElement(destinations), block));
+  protected void route(List<SendingMailbox<TransferableBlock>> mailbox, TransferableBlock block) {
+    for (SendingMailbox sendingMailbox : mailbox) {
+      sendBlock(sendingMailbox, block);
+    }
   }
 }

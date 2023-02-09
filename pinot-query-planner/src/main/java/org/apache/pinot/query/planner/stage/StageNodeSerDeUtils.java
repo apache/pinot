@@ -83,6 +83,8 @@ public final class StageNodeSerDeUtils {
         return new MailboxReceiveNode(stageId);
       case "ValueNode":
         return new ValueNode(stageId);
+      case "WindowNode":
+        return new WindowNode(stageId);
       default:
         throw new IllegalArgumentException("Unknown node name: " + nodeName);
     }

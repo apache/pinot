@@ -32,13 +32,18 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   private final int _mailboxPort;
   private final Consumer<MailboxIdentifier> _receivedMailContentCallback;
 
-  private final ConcurrentHashMap<String, InMemoryMailboxState> _mailboxStateMap = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, ReceivingMailbox> _receivingMailbox = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, BlockingQueue> _mailboxQueue = new ConcurrentHashMap<>();
 
   public InMemoryMailboxService(String hostname, int mailboxPort,
       Consumer<MailboxIdentifier> receivedMailContentCallback) {
     _hostname = hostname;
     _mailboxPort = mailboxPort;
     _receivedMailContentCallback = receivedMailContentCallback;
+  }
+
+  public Consumer<MailboxIdentifier> getReceivedMailContentCallback() {
+    return _receivedMailContentCallback;
   }
 
   @Override
@@ -62,24 +67,6 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
   public SendingMailbox<TransferableBlock> getSendingMailbox(MailboxIdentifier mailboxId) {
     Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
     String mId = mailboxId.toString();
-    return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._sendingMailbox;
-  }
-
-  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
-    Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
-    String mId = mailboxId.toString();
-    return _mailboxStateMap.computeIfAbsent(mId, this::newMailboxState)._receivingMailbox;
-  }
-
-  InMemoryMailboxState newMailboxState(String mailboxId) {
-    BlockingQueue<TransferableBlock> queue = createDefaultChannel();
-    return new InMemoryMailboxState(
-        new InMemorySendingMailbox(mailboxId, queue, _receivedMailContentCallback),
-        new InMemoryReceivingMailbox(mailboxId, queue),
-        queue);
-  }
-
-  private BlockingQueue<TransferableBlock> createDefaultChannel() {
     // for now, we use an unbounded blocking queue as the means of communication between
     // in memory mailboxes - the reason for this is that unless we implement flow control,
     // blocks will sit in memory either way (blocking the sender from sending doesn't prevent
@@ -88,19 +75,14 @@ public class InMemoryMailboxService implements MailboxService<TransferableBlock>
     // threads (most importantly, the receiving thread) from running - which can cause unnecessary
     // failure situations
     // TODO: when we implement flow control, we should swap this out with a bounded abstraction
-    return new LinkedBlockingQueue<>();
+    return new InMemorySendingMailbox(mailboxId.toString(),
+        _mailboxQueue.computeIfAbsent(mId, id -> new LinkedBlockingQueue<>()), getReceivedMailContentCallback());
   }
 
-  static class InMemoryMailboxState {
-    ReceivingMailbox<TransferableBlock> _receivingMailbox;
-    SendingMailbox<TransferableBlock> _sendingMailbox;
-    BlockingQueue<TransferableBlock> _queue;
-
-    InMemoryMailboxState(SendingMailbox<TransferableBlock> sendingMailbox,
-        ReceivingMailbox<TransferableBlock> receivingMailbox, BlockingQueue<TransferableBlock> queue) {
-      _receivingMailbox = receivingMailbox;
-      _sendingMailbox = sendingMailbox;
-      _queue = queue;
-    }
+  public ReceivingMailbox<TransferableBlock> getReceivingMailbox(MailboxIdentifier mailboxId) {
+    Preconditions.checkState(mailboxId.isLocal(), "Cannot use in-memory mailbox service for non-local transport");
+    String mId = mailboxId.toString();
+    BlockingQueue mailboxQueue = _mailboxQueue.computeIfAbsent(mId, id -> new LinkedBlockingQueue<>());
+    return _receivingMailbox.computeIfAbsent(mId, id -> new InMemoryReceivingMailbox(mId, mailboxQueue));
   }
 }

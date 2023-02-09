@@ -657,7 +657,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
         totalBytesRead += bytesRead;
       }
       // Call flush on ADLS Gen 2
-      fileClient.flush(totalBytesRead);
+      fileClient.flush(totalBytesRead, true);
 
       return true;
     } catch (DataLakeStorageException | NoSuchAlgorithmException e) {

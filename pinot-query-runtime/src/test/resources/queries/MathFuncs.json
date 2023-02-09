@@ -200,14 +200,10 @@
     },
     "queries": [
       {
-        "ignored": true,
-        "comment": "should round on the integer but we return a floating point",
         "description": "test divide on integer columns",
         "sql": "SELECT intCol / longCol FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comment": "should round on the integer but we return a floating point",
         "description": "test divide on int literal with columns",
         "sql": "SELECT intCol / 10 FROM {numTbl}"
       },
@@ -216,8 +212,6 @@
         "sql": "SELECT intCol / 1.2 FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comment": "should round on the integer but we return a floating point",
         "description": "test divide on literals",
         "sql": "SELECT 3 / 5 FROM {numTbl}"
       },
@@ -244,9 +238,7 @@
         "sql": "SELECT intCol / doubleCol FROM {numTbl}"
       },
       {
-        "ignored": true,
         "description": "test divide on overflow",
-        "comment": "somehow there is value diff",
         "sql": "SELECT floatCol / 1e-15 FROM {numTbl}"
       }
     ]
@@ -270,8 +262,6 @@
     },
     "queries": [
       {
-        "ignored": true,
-        "comment": "we are returning -0.0 for some reason",
         "description": "test mod on integer columns",
         "sql": "SELECT intCol % longCol FROM {numTbl}"
       },
@@ -469,8 +459,6 @@
         "sql": "SELECT doubleCol + 1e250 FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comments": "Pinot hoist type to double but H2 doesn't",
         "description": "test addition on floatCol plus large decimal to convert to double",
         "sql": "SELECT floatCol + 1e50 FROM {numTbl}"
       },
@@ -487,8 +475,6 @@
         "sql": "SELECT doubleCol - 1e250 FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comments": "Pinot hoist type to double but H2 doesn't",
         "description": "test on floatCol plus large decimal to convert to double",
         "sql": "SELECT floatCol - 1e50 FROM {numTbl}"
       },
@@ -505,8 +491,6 @@
         "sql": "SELECT doubleCol * 1e50 FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comments": "Pinot hoist type to double but H2 doesn't",
         "description": "test on floatCol plus large decimal to convert to double",
         "sql": "SELECT floatCol * 1e50 FROM {numTbl}"
       },
