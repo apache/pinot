@@ -22,8 +22,11 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.math.BigDecimal;
 import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.BaseInPredicate;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -70,7 +73,8 @@ public class PredicateUtils {
   /**
    * Returns a dictionary id set of the values in the given IN/NOT_IN predicate.
    */
-  public static IntSet getDictIdSet(BaseInPredicate inPredicate, Dictionary dictionary, DataType dataType) {
+  public static IntSet getDictIdSet(BaseInPredicate inPredicate, Dictionary dictionary, DataType dataType,
+      @Nullable BloomFilterReader bloomFilter) {
     List<String> values = inPredicate.getValues();
     int hashSetSize = Integer.min(HashUtil.getMinHashSetSize(values.size()), MAX_INITIAL_DICT_ID_SET_SIZE);
     IntSet dictIdSet = new IntOpenHashSet(hashSetSize);
@@ -139,10 +143,23 @@ public class PredicateUtils {
         }
         break;
       case STRING:
-        for (String value : values) {
-          int dictId = dictionary.indexOf(value);
-          if (dictId >= 0) {
-            dictIdSet.add(dictId);
+        if (values.size() > RequestContextUtils.THRESHOLD_OF_LARGE_IN_CLAUSE_VALUES && bloomFilter != null) {
+          for (String value : values) {
+            if (bloomFilter.mightContain(value)) {
+              int dictId = dictionary.indexOf(value);
+              if (dictId >= 0) {
+                dictIdSet.add(dictId);
+              }
+            }
+          }
+        } else if (values.size() > RequestContextUtils.THRESHOLD_OF_LARGE_IN_CLAUSE_VALUES && dictionary.isSorted()) {
+          dictionary.getDictIds(values, dictIdSet);
+        } else {
+          for (String value : values) {
+            int dictId = dictionary.indexOf(value);
+            if (dictId >= 0) {
+              dictIdSet.add(dictId);
+            }
           }
         }
         break;

@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -56,7 +57,21 @@ public class NotInPredicateEvaluatorFactory {
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(NotInPredicate notInPredicate,
       Dictionary dictionary, DataType dataType) {
-    return new DictionaryBasedNotInPredicateEvaluator(notInPredicate, dictionary, dataType);
+    return new DictionaryBasedNotInPredicateEvaluator(notInPredicate, dictionary, dataType, null);
+  }
+
+  /**
+   * Create a new instance of dictionary based NOT_IN predicate evaluator.
+   *
+   * @param notInPredicate NOT_IN predicate to evaluate
+   * @param dictionary Dictionary for the column
+   * @param dataType Data type for the column
+   * @param bloomFilter bloomFilter for the column
+   * @return Dictionary based NOT_IN predicate evaluator
+   */
+  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(NotInPredicate notInPredicate,
+      Dictionary dictionary, DataType dataType, BloomFilterReader bloomFilter) {
+    return new DictionaryBasedNotInPredicateEvaluator(notInPredicate, dictionary, dataType, bloomFilter);
   }
 
   /**
@@ -157,9 +172,10 @@ public class NotInPredicateEvaluatorFactory {
     int[] _matchingDictIds;
     int[] _nonMatchingDictIds;
 
-    DictionaryBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Dictionary dictionary, DataType dataType) {
+    DictionaryBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Dictionary dictionary, DataType dataType,
+        BloomFilterReader bloomFilter) {
       super(notInPredicate);
-      _nonMatchingDictIdSet = PredicateUtils.getDictIdSet(notInPredicate, dictionary, dataType);
+      _nonMatchingDictIdSet = PredicateUtils.getDictIdSet(notInPredicate, dictionary, dataType, bloomFilter);
       _numNonMatchingDictIds = _nonMatchingDictIdSet.size();
       if (_numNonMatchingDictIds == 0) {
         _alwaysTrue = true;

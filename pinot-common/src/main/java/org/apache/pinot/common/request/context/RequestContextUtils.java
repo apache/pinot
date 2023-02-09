@@ -48,6 +48,9 @@ public class RequestContextUtils {
   private RequestContextUtils() {
   }
 
+  // Threshold of number of values in IN/NOT_IN clause to use bloomFilter or MergeSort.
+  public static final int THRESHOLD_OF_LARGE_IN_CLAUSE_VALUES = 1000;
+
   /**
    * Converts the given string expression into an {@link ExpressionContext}.
    */
@@ -297,11 +300,17 @@ public class RequestContextUtils {
         for (int i = 1; i < numOperands; i++) {
           values.add(getStringValue(operands.get(i)));
         }
+        if (numOperands > THRESHOLD_OF_LARGE_IN_CLAUSE_VALUES) {
+          Collections.sort(values);
+        }
         return new FilterContext(FilterContext.Type.PREDICATE, null, new InPredicate(operands.get(0), values));
       case NOT_IN:
         values = new ArrayList<>(numOperands - 1);
         for (int i = 1; i < numOperands; i++) {
           values.add(getStringValue(operands.get(i)));
+        }
+        if (numOperands > THRESHOLD_OF_LARGE_IN_CLAUSE_VALUES) {
+          Collections.sort(values);
         }
         return new FilterContext(FilterContext.Type.PREDICATE, null, new NotInPredicate(operands.get(0), values));
       case GREATER_THAN:

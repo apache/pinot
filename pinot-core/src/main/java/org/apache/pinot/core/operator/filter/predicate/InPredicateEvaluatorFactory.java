@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -56,7 +57,21 @@ public class InPredicateEvaluatorFactory {
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(InPredicate inPredicate,
       Dictionary dictionary, DataType dataType) {
-    return new DictionaryBasedInPredicateEvaluator(inPredicate, dictionary, dataType);
+    return new DictionaryBasedInPredicateEvaluator(inPredicate, dictionary, dataType, null);
+  }
+
+  /**
+   * Create a new instance of dictionary based IN predicate evaluator.
+   *
+   * @param inPredicate IN predicate to evaluate
+   * @param dictionary Dictionary for the column
+   * @param dataType Data type for the column
+   * @param bloomFilter bloomFilter for the column
+   * @return Dictionary based IN predicate evaluator
+   */
+  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(InPredicate inPredicate,
+      Dictionary dictionary, DataType dataType, BloomFilterReader bloomFilter) {
+    return new DictionaryBasedInPredicateEvaluator(inPredicate, dictionary, dataType, bloomFilter);
   }
 
   /**
@@ -155,9 +170,10 @@ public class InPredicateEvaluatorFactory {
     final int _numMatchingDictIds;
     int[] _matchingDictIds;
 
-    DictionaryBasedInPredicateEvaluator(InPredicate inPredicate, Dictionary dictionary, DataType dataType) {
+    DictionaryBasedInPredicateEvaluator(InPredicate inPredicate, Dictionary dictionary, DataType dataType,
+        BloomFilterReader bloomFilter) {
       super(inPredicate);
-      _matchingDictIdSet = PredicateUtils.getDictIdSet(inPredicate, dictionary, dataType);
+      _matchingDictIdSet = PredicateUtils.getDictIdSet(inPredicate, dictionary, dataType, bloomFilter);
       _numMatchingDictIds = _matchingDictIdSet.size();
       if (_numMatchingDictIds == 0) {
         _alwaysFalse = true;

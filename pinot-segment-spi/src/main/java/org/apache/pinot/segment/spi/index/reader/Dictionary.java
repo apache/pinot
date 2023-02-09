@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.Closeable;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -241,5 +242,9 @@ public interface Dictionary extends Closeable {
     for (int i = 0; i < length; i++) {
       outValues[i] = getBytesValue(dictIds[i]);
     }
+  }
+
+  default void getDictIds(List<String> strings, IntSet dictIds) {
+    throw new UnsupportedOperationException();
   }
 }

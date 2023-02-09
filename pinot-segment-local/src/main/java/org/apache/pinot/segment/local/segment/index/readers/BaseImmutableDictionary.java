@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.ValueReader;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
@@ -36,6 +38,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 @SuppressWarnings("rawtypes")
 public abstract class BaseImmutableDictionary implements Dictionary {
+  private static final int SPARSE_THRESHOLD = 1000;
   private final ValueReader _valueReader;
   private final int _length;
   private final int _numBytesPerValue;
@@ -278,5 +281,39 @@ public abstract class BaseImmutableDictionary implements Dictionary {
 
   protected byte[] getBuffer() {
     return new byte[_numBytesPerValue];
+  }
+
+  public void getDictIds(List<String> values, IntSet dictIds) {
+    if (length() / values.size() > SPARSE_THRESHOLD) {
+      for (String value : values) {
+        int dictId = indexOf(value);
+        if (dictId >= 0) {
+          dictIds.add(dictId);
+        }
+      }
+    } else {
+      int valueIdx = 0;
+      int dictIdx = 0;
+      byte[] utf8 = null;
+      boolean needNewUtf8 = true;
+      while (valueIdx < values.size() && dictIdx < length()) {
+        if (needNewUtf8) {
+          utf8 = values.get(valueIdx).getBytes(StandardCharsets.UTF_8);
+        }
+        int comparison = _valueReader.compareUtf8Bytes(dictIdx, _numBytesPerValue, utf8);
+        if (comparison == 0) {
+          dictIds.add(dictIdx);
+          dictIdx++;
+          valueIdx++;
+          needNewUtf8 = true;
+        } else if (comparison > 0) {
+          valueIdx++;
+          needNewUtf8 = true;
+        } else {
+          dictIdx++;
+          needNewUtf8 = false;
+        }
+      }
+    }
   }
 }
