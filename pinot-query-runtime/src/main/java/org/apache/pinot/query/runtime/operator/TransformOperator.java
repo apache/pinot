@@ -53,10 +53,10 @@ public class TransformOperator extends MultiStageOperator {
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
-  private OperatorStats _operatorStats;
 
   public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema,
       List<RexExpression> transforms, DataSchema upstreamDataSchema, long requestId, int stageId) {
+    super(requestId, stageId);
     Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
     Preconditions.checkState(resultSchema.size() == transforms.size(),
         "result schema size:" + resultSchema.size() + " doesn't match transform operand size:" + transforms.size());
@@ -67,7 +67,6 @@ public class TransformOperator extends MultiStageOperator {
       _transformOperandsList.add(TransformOperand.toTransformOperand(rexExpression, upstreamDataSchema));
     }
     _resultSchema = resultSchema;
-    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -78,23 +77,16 @@ public class TransformOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    _upstreamOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     try {
-      _operatorStats.endTimer();
       TransferableBlock block = _upstreamOperator.nextBlock();
-      _operatorStats.startTimer();
       return transform(block);
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
-    } finally {
-      _operatorStats.endTimer();
     }
   }
 
@@ -121,8 +113,6 @@ public class TransformOperator extends MultiStageOperator {
       }
       resultRows.add(resultRow);
     }
-    _operatorStats.recordInput(1, container.size());
-    _operatorStats.recordOutput(1, resultRows.size());
     return new TransferableBlock(resultRows, _resultSchema, DataBlock.Type.ROW);
   }
 }

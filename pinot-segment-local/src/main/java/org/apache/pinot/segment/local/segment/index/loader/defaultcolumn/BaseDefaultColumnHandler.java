@@ -136,6 +136,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   @Override
   public boolean needUpdateDefaultColumns() {
     Map<String, DefaultColumnAction> defaultColumnActionMap = computeDefaultColumnActionMap();
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Need to update default columns with actionMap: {}", defaultColumnActionMap);
+    }
     return !defaultColumnActionMap.isEmpty();
   }
 
@@ -147,6 +150,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       throws Exception {
     // Compute the action needed for each column.
     Map<String, DefaultColumnAction> defaultColumnActionMap = computeDefaultColumnActionMap();
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Update default columns with actionMap: {}", defaultColumnActionMap);
+    }
     if (defaultColumnActionMap.isEmpty()) {
       return;
     }

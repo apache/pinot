@@ -25,6 +25,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.query.planner.hints.PinotRelationalHints;
+import org.apache.pinot.query.planner.stage.AggregateNode;
+import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.routing.VirtualServer;
@@ -54,17 +57,30 @@ public class StageMetadata implements Serializable {
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
 
+  // whether a stage requires singleton instance to execute, e.g. stage contains global reduce (sort/agg) operator.
+  private boolean _requiresSingletonInstance;
 
   public StageMetadata() {
     _scannedTables = new ArrayList<>();
     _serverInstances = new ArrayList<>();
     _serverInstanceToSegmentsMap = new HashMap<>();
     _timeBoundaryInfo = null;
+    _requiresSingletonInstance = false;
   }
 
   public void attach(StageNode stageNode) {
     if (stageNode instanceof TableScanNode) {
       _scannedTables.add(((TableScanNode) stageNode).getTableName());
+    }
+    if (stageNode instanceof AggregateNode) {
+      AggregateNode aggNode = (AggregateNode) stageNode;
+      _requiresSingletonInstance = _requiresSingletonInstance || (aggNode.getGroupSet().size() == 0
+          && aggNode.getRelHints().contains(PinotRelationalHints.AGG_INTERMEDIATE_STAGE));
+    }
+    if (stageNode instanceof SortNode) {
+      SortNode sortNode = (SortNode) stageNode;
+      _requiresSingletonInstance = _requiresSingletonInstance || (sortNode.getCollationKeys().size() > 0
+          && sortNode.getOffset() != -1);
     }
   }
 
@@ -95,6 +111,10 @@ public class StageMetadata implements Serializable {
 
   public TimeBoundaryInfo getTimeBoundaryInfo() {
     return _timeBoundaryInfo;
+  }
+
+  public boolean isRequiresSingletonInstance() {
+    return _requiresSingletonInstance;
   }
 
   public void setTimeBoundaryInfo(TimeBoundaryInfo timeBoundaryInfo) {
