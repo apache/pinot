@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 public abstract class MetadataEventNotifierFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(MetadataEventNotifierFactory.class);
   public static final String METADATA_EVENT_CLASS_CONFIG = "factory.class";
+
   public abstract void init(PinotConfiguration configuration, PinotHelixResourceManager pinotHelixResourceManager);
 
   public abstract MetadataEventNotifier create();

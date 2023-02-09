@@ -28,6 +28,7 @@ public class DefaultMetadataEventNotifierFactory extends MetadataEventNotifierFa
   public void init(PinotConfiguration configuration, PinotHelixResourceManager pinotHelixResourceManager) {
   }
 
+  @Override
   public MetadataEventNotifier create() {
     return new DefaultMetadataEventNotifier();
   }
