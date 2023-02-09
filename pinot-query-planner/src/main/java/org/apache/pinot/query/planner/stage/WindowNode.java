@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.stage;
 
 import com.clearspring.analytics.util.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -33,21 +34,21 @@ import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 public class WindowNode extends AbstractStageNode {
   @ProtoProperties
-  public List<RexExpression> _groupSet;
+  private List<RexExpression> _groupSet;
   @ProtoProperties
-  public List<RexExpression> _orderSet;
+  private List<RexExpression> _orderSet;
   @ProtoProperties
-  public List<RelFieldCollation.Direction> _orderSetDirection;
+  private List<RelFieldCollation.Direction> _orderSetDirection;
   @ProtoProperties
-  public List<RelFieldCollation.NullDirection> _orderSetNullDirection;
+  private List<RelFieldCollation.NullDirection> _orderSetNullDirection;
   @ProtoProperties
-  public List<RexExpression> _aggCalls;
+  private List<RexExpression> _aggCalls;
   @ProtoProperties
-  public int _lowerBound;
+  private int _lowerBound;
   @ProtoProperties
-  public int _upperBound;
+  private int _upperBound;
   @ProtoProperties
-  public boolean _isRows;
+  private boolean _isRows;
   @ProtoProperties
   private List<RexExpression> _constants;
 
@@ -62,7 +63,7 @@ public class WindowNode extends AbstractStageNode {
         String.format("Only a single window group is allowed! Number of window groups: %d", windowGroups.size()));
     Window.Group windowGroup = windowGroups.get(0);
 
-    _groupSet = windowGroup.keys == null ? new ArrayList<>() : RexExpression.toRexInputRefs(windowGroup.keys);
+    _groupSet = windowGroup.keys == null ? Collections.emptyList() : RexExpression.toRexInputRefs(windowGroup.keys);
     List<RelFieldCollation> relFieldCollations = windowGroup.orderKeys == null ? new ArrayList<>()
         : windowGroup.orderKeys.getFieldCollations();
     _orderSet = new ArrayList<>(relFieldCollations.size());

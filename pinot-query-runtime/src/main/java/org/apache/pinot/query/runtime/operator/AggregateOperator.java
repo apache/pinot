@@ -233,11 +233,6 @@ public class AggregateOperator extends MultiStageOperator {
     return Math.max(((Number) left).doubleValue(), ((Number) right).doubleValue());
   }
 
-  private static Object mergeCount(Object left, Object ignored) {
-    // TODO: COUNT(*) doesn't need to parse right object until we support NULL
-    return ((Number) left).doubleValue() + 1;
-  }
-
   private static Boolean mergeBoolAnd(Object left, Object right) {
     return ((Boolean) left) && ((Boolean) right);
   }
@@ -308,6 +303,20 @@ public class AggregateOperator extends MultiStageOperator {
     }
   }
 
+  private static class MergeCounts implements Merger {
+
+    @Override
+    public Object initialize(Object other, DataSchema.ColumnDataType dataType) {
+      return other == null ? 0 : 1;
+    }
+
+    @Override
+    public Object merge(Object left, Object ignored) {
+      // TODO: COUNT(*) doesn't need to parse right object until we support NULL
+      return ((Number) left).doubleValue() + 1;
+    }
+  }
+
   interface Merger {
     /**
      * Initializes the merger based on the first input
@@ -330,7 +339,7 @@ public class AggregateOperator extends MultiStageOperator {
             .put("$SUM0", cdt -> AggregateOperator::mergeSum).put("MIN", cdt -> AggregateOperator::mergeMin)
             .put("$MIN", cdt -> AggregateOperator::mergeMin).put("$MIN0", cdt -> AggregateOperator::mergeMin)
             .put("MAX", cdt -> AggregateOperator::mergeMax).put("$MAX", cdt -> AggregateOperator::mergeMax)
-            .put("$MAX0", cdt -> AggregateOperator::mergeMax).put("COUNT", cdt -> AggregateOperator::mergeCount)
+            .put("$MAX0", cdt -> AggregateOperator::mergeMax).put("COUNT", cdt -> new MergeCounts())
             .put("BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
             .put("$BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
             .put("$BOOL_AND0", cdt -> AggregateOperator::mergeBoolAnd)

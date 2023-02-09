@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
+import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.routing.VirtualServer;
 
 
@@ -80,6 +81,12 @@ public class StageMetadata implements Serializable {
       SortNode sortNode = (SortNode) stageNode;
       _requiresSingletonInstance = _requiresSingletonInstance || (sortNode.getCollationKeys().size() > 0
           && sortNode.getOffset() != -1);
+    }
+    if (stageNode instanceof WindowNode) {
+      WindowNode windowNode = (WindowNode) stageNode;
+      // Empty OVER() and OVER(ORDER BY) need to be processed on a singleton node. OVER() with PARTITION BY can be
+      // distributed as no global ordering is required across partitions.
+      _requiresSingletonInstance = _requiresSingletonInstance || (windowNode.getGroupSet().size() == 0);
     }
   }
 

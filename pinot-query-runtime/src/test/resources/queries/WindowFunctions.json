@@ -1,0 +1,1162 @@
+{
+  "empty_over_window_function_aggregations": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [3, 100, "c", true],
+          [100, 1, "b", false],
+          [42, 50.5, "e", true],
+          [42, 42, "d", false],
+          [42, 75, "a", true],
+          [42, 42, "a", false],
+          [42, 50.5, "a", true],
+          [42, 42, "e", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [150, 1.53, "h", false],
+          [3, 100, "g", true],
+          [2, 400, "c", false]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Single empty OVER() sum",
+        "sql": "SELECT SUM(int_col) OVER() FROM {tbl}",
+        "outputs": [
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768],
+          [768]
+        ]
+      },
+      {
+        "description": "Single empty OVER() sum with select columns",
+        "sql": "SELECT string_col, SUM(int_col) OVER(), int_col FROM {tbl}",
+        "outputs": [
+          ["a", 768, 2],
+          ["a", 768, 2],
+          ["b", 768, 3],
+          ["c", 768, 3],
+          ["b", 768, 100],
+          ["e", 768, 42],
+          ["d", 768, 42],
+          ["a", 768, 42],
+          ["a", 768, 42],
+          ["a", 768, 42],
+          ["e", 768, 42],
+          ["c", 768, 101],
+          ["c", 768, 150],
+          ["h", 768, 150],
+          ["g", 768, 3],
+          ["c", 768, 2]
+        ]
+      },
+      {
+        "description": "Single empty OVER() max with select columns with alias",
+        "sql": "SELECT string_col AS str, MAX(double_col) OVER() AS max, int_col FROM {tbl}",
+        "outputs": [
+          ["a", 400, 2],
+          ["a", 400, 2],
+          ["b", 400, 3],
+          ["c", 400, 3],
+          ["b", 400, 100],
+          ["e", 400, 42],
+          ["d", 400, 42],
+          ["a", 400, 42],
+          ["a", 400, 42],
+          ["a", 400, 42],
+          ["e", 400, 42],
+          ["c", 400, 101],
+          ["c", 400, 150],
+          ["h", 400, 150],
+          ["g", 400, 3],
+          ["c", 400, 2]
+        ]
+      },
+      {
+        "description": "Single empty OVER() min with select columns and default frame",
+        "sql": "SELECT bool_col, MIN(int_col) OVER(ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING), double_col FROM {tbl}",
+        "comments": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
+        "outputs": [
+          [true, 2, 300],
+          [true, 2, 400],
+          [false, 2, 100],
+          [true, 2, 100],
+          [false, 2, 1],
+          [true, 2, 50.5],
+          [false, 2, 42],
+          [true, 2, 75],
+          [false, 2, 42],
+          [true, 2, 50.5],
+          [false, 2, 42],
+          [false, 2, 1.01],
+          [false, 2, 1.5],
+          [false, 2, 1.53],
+          [true, 2, 100],
+          [false, 2, 400]
+        ]
+      },
+      {
+        "description": "Single empty OVER() avg with select col with global order by",
+        "sql": "SELECT string_col, AVG(double_col) OVER() FROM {tbl} ORDER BY string_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 106.69],
+          ["a", 106.69],
+          ["a", 106.69],
+          ["a", 106.69],
+          ["a", 106.69],
+          ["b", 106.69],
+          ["b", 106.69],
+          ["c", 106.69],
+          ["c", 106.69],
+          ["c", 106.69],
+          ["c", 106.69],
+          ["d", 106.69],
+          ["e", 106.69],
+          ["e", 106.69],
+          ["g", 106.69],
+          ["h", 106.69]
+        ]
+      },
+      {
+        "description": "Single empty OVER() count with select col with global order by with LIMIT",
+        "sql": "SELECT string_col, COUNT(int_col) OVER() FROM {tbl} ORDER BY string_col LIMIT 5",
+        "comments": "Cannot use LIMIT without ORDER BY since the results can change and we cannot verify exact row outputs",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 16],
+          ["a", 16],
+          ["a", 16],
+          ["a", 16],
+          ["a", 16]
+        ]
+      },
+      {
+        "description": "Single empty OVER() and transform col",
+        "sql": "SELECT CONCAT(string_col, bool_col, '-'), AVG(int_col) OVER() FROM {tbl}",
+        "outputs": [
+          ["a-true", 48],
+          ["a-true", 48],
+          ["a-true", 48],
+          ["a-false", 48],
+          ["a-true", 48],
+          ["b-false", 48],
+          ["b-false", 48],
+          ["c-true", 48],
+          ["c-false", 48],
+          ["c-false", 48],
+          ["c-false", 48],
+          ["d-false", 48],
+          ["e-true", 48],
+          ["e-false", 48],
+          ["g-true", 48],
+          ["h-false", 48]
+        ]
+      },
+      {
+        "description": "Single empty OVER() with select col and filter",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER() FROM {tbl} WHERE string_col = 'a' AND bool_col = false",
+        "outputs": [
+          ["a", 1]
+        ]
+      },
+      {
+        "description": "Single empty OVER() with select col and filter",
+        "sql": "SELECT double_col, SUM(int_col) OVER() FROM {tbl} WHERE string_col IN ('b', 'c')",
+        "outputs": [
+          [100, 359],
+          [1, 359],
+          [100, 359],
+          [1.01, 359],
+          [1.5, 359],
+          [400, 359]
+        ]
+      },
+      {
+        "description": "Single empty OVER() with select transform and filter",
+        "sql": "SELECT CONCAT(string_col, bool_col, '-'), MAX(int_col) OVER() FROM {tbl} where int_col < 50 OR double_col = 1.01",
+        "outputs": [
+          ["a-true", 101],
+          ["a-true", 101],
+          ["a-true", 101],
+          ["a-false", 101],
+          ["a-true", 101],
+          ["b-false", 101],
+          ["c-true", 101],
+          ["c-false", 101],
+          ["c-false", 101],
+          ["d-false", 101],
+          ["e-true", 101],
+          ["e-false", 101],
+          ["g-true", 101]
+        ]
+      },
+      {
+        "description": "Single empty OVER() with group by",
+        "sql": "SELECT MAX({tbl}.int_col) OVER() FROM {tbl} GROUP BY int_col",
+        "outputs": [
+          [150],
+          [150],
+          [150],
+          [150],
+          [150],
+          [150]
+        ]
+      },
+      {
+        "description": "Single empty OVER() with select col and group by",
+        "sql": "SELECT string_col, MIN({tbl}.int_col) OVER() FROM {tbl} GROUP BY string_col, int_col",
+        "outputs": [
+          ["a", 2],
+          ["a", 2],
+          ["b", 2],
+          ["b", 2],
+          ["e", 2],
+          ["h", 2],
+          ["g", 2],
+          ["d", 2],
+          ["c", 2],
+          ["c", 2],
+          ["c", 2],
+          ["c", 2]
+        ]
+      },
+      {
+        "description": "Single empty OVER() with agg col and group by",
+        "sql": "SELECT SUM(int_col), SUM({tbl}.int_col) OVER() FROM {tbl} GROUP BY int_col",
+        "outputs": [
+          [6, 398],
+          [9, 398],
+          [100, 398],
+          [300, 398],
+          [252, 398],
+          [101, 398]
+        ]
+      },
+      {
+        "description": "Single empty OVER() with select col, agg col and group by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER() FROM {tbl} GROUP BY int_col",
+        "outputs": [
+          [2, 6, 398],
+          [3, 9, 398],
+          [100, 100, 398],
+          [150, 300, 398],
+          [42, 252, 398],
+          [101, 101, 398]
+        ]
+      },
+      {
+        "description": "Single empty OVER() with select col, agg col and group by with global order by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER() FROM {tbl} GROUP BY int_col ORDER BY int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [2, 6, 398],
+          [3, 9, 398],
+          [42, 252, 398],
+          [100, 100, 398],
+          [101, 101, 398],
+          [150, 300, 398]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s",
+        "sql": "SELECT SUM(int_col) OVER(), COUNT(string_col) OVER() FROM {tbl}",
+        "outputs": [
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16],
+          [768, 16]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select columns",
+        "sql": "SELECT string_col, SUM(int_col) OVER(), int_col, MAX(double_col) OVER() FROM {tbl}",
+        "outputs": [
+          ["a", 768, 2, 400],
+          ["a", 768, 2, 400],
+          ["b", 768, 3, 400],
+          ["c", 768, 3, 400],
+          ["b", 768, 100, 400],
+          ["e", 768, 42, 400],
+          ["d", 768, 42, 400],
+          ["a", 768, 42, 400],
+          ["a", 768, 42, 400],
+          ["a", 768, 42, 400],
+          ["e", 768, 42, 400],
+          ["c", 768, 101, 400],
+          ["c", 768, 150, 400],
+          ["h", 768, 150, 400],
+          ["g", 768, 3, 400],
+          ["c", 768, 2, 400]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select columns with alias",
+        "sql": "SELECT string_col AS str, MAX(double_col) OVER() AS max, int_col, SUM(int_col) OVER() AS sum FROM {tbl}",
+        "outputs": [
+          ["a", 400, 2, 768],
+          ["a", 400, 2, 768],
+          ["b", 400, 3, 768],
+          ["c", 400, 3, 768],
+          ["b", 400, 100, 768],
+          ["e", 400, 42, 768],
+          ["d", 400, 42, 768],
+          ["a", 400, 42, 768],
+          ["a", 400, 42, 768],
+          ["a", 400, 42, 768],
+          ["e", 400, 42, 768],
+          ["c", 400, 101, 768],
+          ["c", 400, 150, 768],
+          ["h", 400, 150, 768],
+          ["g", 400, 3, 768],
+          ["c", 400, 2, 768]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER() with select columns and default frame on one but not the other",
+        "sql": "SELECT bool_col, MIN(int_col) OVER(ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING), double_col, AVG(double_col) OVER() FROM {tbl}",
+        "comments": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
+        "outputs": [
+          [true, 2, 300, 106.69],
+          [true, 2, 400, 106.69],
+          [false, 2, 100, 106.69],
+          [true, 2, 100, 106.69],
+          [false, 2, 1, 106.69],
+          [true, 2, 50.5, 106.69],
+          [false, 2, 42, 106.69],
+          [true, 2, 75, 106.69],
+          [false, 2, 42, 106.69],
+          [true, 2, 50.5, 106.69],
+          [false, 2, 42, 106.69],
+          [false, 2, 1.01, 106.69],
+          [false, 2, 1.5, 106.69],
+          [false, 2, 1.53, 106.69],
+          [true, 2, 100, 106.69],
+          [false, 2, 400, 106.69]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col with global order by",
+        "sql": "SELECT string_col, AVG(double_col) OVER(), COUNT(string_col) OVER() FROM {tbl} ORDER BY string_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 106.69, 16],
+          ["a", 106.69, 16],
+          ["a", 106.69, 16],
+          ["a", 106.69, 16],
+          ["a", 106.69, 16],
+          ["b", 106.69, 16],
+          ["b", 106.69, 16],
+          ["c", 106.69, 16],
+          ["c", 106.69, 16],
+          ["c", 106.69, 16],
+          ["c", 106.69, 16],
+          ["d", 106.69, 16],
+          ["e", 106.69, 16],
+          ["e", 106.69, 16],
+          ["g", 106.69, 16],
+          ["h", 106.69, 16]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col with global order by with LIMIT",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(), AVG(int_col) OVER() FROM {tbl} ORDER BY string_col LIMIT 5",
+        "comments": "Cannot use LIMIT without ORDER BY since the results can change and we cannot verify exact row outputs",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 16, 48],
+          ["a", 16, 48],
+          ["a", 16, 48],
+          ["a", 16, 48],
+          ["a", 16, 48]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s and transform col",
+        "sql": "SELECT UPPER(CONCAT(string_col, bool_col, '-')), AVG(int_col) OVER(), MIN(double_col) OVER() FROM {tbl}",
+        "outputs": [
+          ["A-TRUE", 48, 1],
+          ["A-TRUE", 48, 1],
+          ["A-TRUE", 48, 1],
+          ["A-FALSE", 48, 1],
+          ["A-TRUE", 48, 1],
+          ["B-FALSE", 48, 1],
+          ["B-FALSE", 48, 1],
+          ["C-TRUE", 48, 1],
+          ["C-FALSE", 48, 1],
+          ["C-FALSE", 48, 1],
+          ["C-FALSE", 48, 1],
+          ["D-FALSE", 48, 1],
+          ["E-TRUE", 48, 1],
+          ["E-FALSE", 48, 1],
+          ["G-TRUE", 48, 1],
+          ["H-FALSE", 48, 1]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col and filter",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(), MIN(double_col) OVER() FROM {tbl} WHERE string_col = 'a' AND bool_col != false",
+        "outputs": [
+          ["a", 4, 50.5],
+          ["a", 4, 50.5],
+          ["a", 4, 50.5],
+          ["a", 4, 50.5]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col and filter",
+        "sql": "SELECT double_col, SUM(int_col) OVER(), AVG(double_col) OVER() FROM {tbl} WHERE string_col NOT IN ('a', 'd', 'e', 'g', 'h')",
+        "outputs": [
+          [100, 359, 100.585],
+          [1, 359, 100.585],
+          [100, 359, 100.585],
+          [1.01, 359, 100.585],
+          [1.5, 359, 100.585],
+          [400, 359, 100.585]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER() with select transform and filter",
+        "sql": "SELECT LENGTH(CONCAT(string_col, bool_col, '-')), MAX(int_col) OVER(), COUNT(double_col) OVER() FROM {tbl} where int_col < 50 OR double_col = 1.01",
+        "outputs": [
+          [6, 101, 13],
+          [6, 101, 13],
+          [6, 101, 13],
+          [7, 101, 13],
+          [6, 101, 13],
+          [7, 101, 13],
+          [6, 101, 13],
+          [7, 101, 13],
+          [7, 101, 13],
+          [7, 101, 13],
+          [6, 101, 13],
+          [7, 101, 13],
+          [6, 101, 13]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with group by",
+        "sql": "SELECT MAX({tbl}.double_col) OVER(), COUNT({tbl}.double_col) OVER() FROM {tbl} GROUP BY double_col",
+        "outputs": [
+          [400, 10],
+          [400, 10],
+          [400, 10],
+          [400, 10],
+          [400, 10],
+          [400, 10],
+          [400, 10],
+          [400, 10],
+          [400, 10],
+          [400, 10]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col and group by",
+        "sql": "SELECT string_col, MIN({tbl}.double_col) OVER(), SUM({tbl}.double_col) OVER() FROM {tbl} GROUP BY string_col, double_col",
+        "outputs": [
+          ["a", 1, 1707.04],
+          ["a", 1, 1707.04],
+          ["a", 1, 1707.04],
+          ["a", 1, 1707.04],
+          ["a", 1, 1707.04],
+          ["b", 1, 1707.04],
+          ["b", 1, 1707.04],
+          ["e", 1, 1707.04],
+          ["e", 1, 1707.04],
+          ["d", 1, 1707.04],
+          ["h", 1, 1707.04],
+          ["g", 1, 1707.04],
+          ["c", 1, 1707.04],
+          ["c", 1, 1707.04],
+          ["c", 1, 1707.04],
+          ["c", 1, 1707.04]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with agg col and group by",
+        "sql": "SELECT SUM(double_col), SUM({tbl}.double_col) OVER(), AVG({tbl}.double_col) OVER() FROM {tbl} GROUP BY double_col",
+        "outputs": [
+          [300, 972.54, 97.25399999999999],
+          [800, 972.54, 97.25399999999999],
+          [101, 972.54, 97.25399999999999],
+          [1, 972.54, 97.25399999999999],
+          [1.5, 972.54, 97.25399999999999],
+          [1.53, 972.54, 97.25399999999999],
+          [1.01, 972.54, 97.25399999999999],
+          [75, 972.54, 97.25399999999999],
+          [300, 972.54, 97.25399999999999],
+          [126, 972.54, 97.25399999999999]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col, agg col and group by",
+        "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(), AVG({tbl}.double_col) OVER() FROM {tbl} GROUP BY double_col",
+        "outputs": [
+          [300, 300, 972.54, 97.25399999999999],
+          [400, 800, 972.54, 97.25399999999999],
+          [50.5, 101, 972.54, 97.25399999999999],
+          [1, 1, 972.54, 97.25399999999999],
+          [1.5, 1.5, 972.54, 97.25399999999999],
+          [1.53, 1.53, 972.54, 97.25399999999999],
+          [1.01, 1.01, 972.54, 97.25399999999999],
+          [75, 75, 972.54, 97.25399999999999],
+          [100, 300, 972.54, 97.25399999999999],
+          [42, 126, 972.54, 97.25399999999999]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER() with select col, agg col and group by with global order by",
+        "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(), AVG({tbl}.double_col) OVER() FROM {tbl} GROUP BY double_col ORDER BY double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [1, 1, 972.54, 97.25399999999999],
+          [1.01, 1.01, 972.54, 97.25399999999999],
+          [1.5, 1.5, 972.54, 97.25399999999999],
+          [1.53, 1.53, 972.54, 97.25399999999999],
+          [42, 126, 972.54, 97.25399999999999],
+          [50.5, 101, 972.54, 97.25399999999999],
+          [75, 75, 972.54, 97.25399999999999],
+          [100, 300, 972.54, 97.25399999999999],
+          [300, 300, 972.54, 97.25399999999999],
+          [400, 800, 972.54, 97.25399999999999]
+        ]
+      }
+    ]
+  },
+  "partition_by_only_window_function_aggregations": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [3, 100, "c", true],
+          [100, 1, "b", false],
+          [42, 50.5, "e", true],
+          [42, 42, "d", false],
+          [42, 75, "a", true],
+          [42, 42, "a", false],
+          [42, 50.5, "a", true],
+          [42, 42, "e", false],
+          [-101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [150, -1.53, "h", false],
+          [3, 100, "g", true],
+          [2, 400, "c", false]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Single OVER(PARTITION BY) sum",
+        "sql": "SELECT SUM(int_col) OVER(PARTITION BY string_col) FROM {tbl}",
+        "outputs": [
+          [150],
+          [3],
+          [42],
+          [84],
+          [84],
+          [103],
+          [103],
+          [130],
+          [130],
+          [130],
+          [130],
+          [130],
+          [54],
+          [54],
+          [54],
+          [54]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) sum with select columns",
+        "sql": "SELECT string_col, SUM(int_col) OVER(PARTITION BY string_col), int_col FROM {tbl}",
+        "outputs": [
+          ["a", 130, 2],
+          ["a", 130, 2],
+          ["a", 130, 42],
+          ["a", 130, 42],
+          ["a", 130, 42],
+          ["b", 103, 3],
+          ["b", 103, 100],
+          ["e", 84, 42],
+          ["e", 84, 42],
+          ["d", 42, 42],
+          ["h", 150, 150],
+          ["g", 3, 3],
+          ["c", 54, -101],
+          ["c", 54, 150],
+          ["c", 54, 3],
+          ["c", 54, 2]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) max with select columns with alias",
+        "sql": "SELECT string_col AS str, MAX(double_col) OVER(PARTITION BY string_col) AS max, int_col FROM {tbl}",
+        "outputs": [
+          ["a", 400, 2],
+          ["a", 400, 2],
+          ["a", 400, 42],
+          ["a", 400, 42],
+          ["a", 400, 42],
+          ["b", 100, 3],
+          ["b", 100, 100],
+          ["e", 50.5, 42],
+          ["e", 50.5, 42],
+          ["d", 42, 42],
+          ["c", 400, -101],
+          ["c", 400, 150],
+          ["c", 400, 3],
+          ["c", 400, 2],
+          ["h", -1.53, 150],
+          ["g", 100, 3]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) min with select columns and default frame",
+        "sql": "SELECT bool_col, MIN(int_col) OVER(PARTITION BY bool_col ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING), double_col FROM {tbl}",
+        "comments": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
+        "outputs": [
+          [true, 2, 300],
+          [true, 2, 400],
+          [true, 2, 100],
+          [true, 2, 50.5],
+          [true, 2, 75],
+          [true, 2, 50.5],
+          [true, 2, 100],
+          [false, -101, 100],
+          [false, -101, 1],
+          [false, -101, 42],
+          [false, -101, 42],
+          [false, -101, 42],
+          [false, -101, 1.01],
+          [false, -101, 1.5],
+          [false, -101, -1.53],
+          [false, -101, 400]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) avg with select col with global order by",
+        "sql": "SELECT string_col, AVG(double_col) OVER(PARTITION BY string_col) FROM {tbl} ORDER BY string_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 173.5],
+          ["a", 173.5],
+          ["a", 173.5],
+          ["a", 173.5],
+          ["a", 173.5],
+          ["b", 50.5],
+          ["b", 50.5],
+          ["c", 125.6275],
+          ["c", 125.6275],
+          ["c", 125.6275],
+          ["c", 125.6275],
+          ["d", 42],
+          ["e", 46.25],
+          ["e", 46.25],
+          ["g", 100],
+          ["h", -1.53]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY (2 keys)) avg with select col with global order by",
+        "sql": "SELECT string_col, bool_col, AVG(double_col) OVER(PARTITION BY string_col, bool_col) FROM {tbl} ORDER BY string_col, bool_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", false, 42],
+          ["a", true, 206.375],
+          ["a", true, 206.375],
+          ["a", true, 206.375],
+          ["a", true, 206.375],
+          ["b", false, 50.5],
+          ["b", false, 50.5],
+          ["c", false, 134.17],
+          ["c", false, 134.17],
+          ["c", false, 134.17],
+          ["c", true, 100],
+          ["d", false, 42],
+          ["e", false, 42],
+          ["e", true, 50.5],
+          ["g", true, 100],
+          ["h", false, -1.53]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) count with select col with global order by with LIMIT",
+        "sql": "SELECT string_col, COUNT(int_col) OVER(PARTITION BY string_col) FROM {tbl} ORDER BY string_col LIMIT 6",
+        "comments": "Cannot use LIMIT without ORDER BY since the results can change and we cannot verify exact row outputs",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 5],
+          ["a", 5],
+          ["a", 5],
+          ["a", 5],
+          ["a", 5],
+          ["b", 2]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) and transform col",
+        "sql": "SELECT CONCAT(string_col, bool_col, '-'), AVG(int_col) OVER(PARTITION BY string_col) FROM {tbl}",
+        "outputs": [
+          ["a-true", 26],
+          ["a-true", 26],
+          ["a-true", 26],
+          ["a-false", 26],
+          ["a-true", 26],
+          ["b-false", 51.5],
+          ["b-false", 51.5],
+          ["c-true", 13.5],
+          ["c-false", 13.5],
+          ["c-false", 13.5],
+          ["c-false", 13.5],
+          ["d-false", 42],
+          ["e-true", 42],
+          ["e-false", 42],
+          ["g-true", 3],
+          ["h-false", 150]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with select col and filter",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col) FROM {tbl} WHERE string_col = 'a' AND bool_col = false",
+        "outputs": [
+          ["a", 1]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with select col and filter",
+        "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col) FROM {tbl} WHERE string_col IN ('b', 'c')",
+        "outputs": [
+          [100, 103],
+          [1, 103],
+          [100, 3],
+          [1.01, 51],
+          [1.5, 51],
+          [400, 51]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with select transform and filter",
+        "sql": "SELECT CONCAT(string_col, bool_col, '-'), MAX(int_col) OVER(PARTITION BY string_col, int_col) FROM {tbl} where int_col < 50 OR double_col = 1",
+        "outputs": [
+          ["a-true", 2],
+          ["a-true", 2],
+          ["a-true", 42],
+          ["a-false", 42],
+          ["a-true", 42],
+          ["b-false", 3],
+          ["b-false", 100],
+          ["c-true", 3],
+          ["c-false", 2],
+          ["c-false", -101],
+          ["d-false", 42],
+          ["e-true", 42],
+          ["e-false", 42],
+          ["g-true", 3]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with group by",
+        "sql": "SELECT MAX({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col) FROM {tbl} GROUP BY string_col, int_col",
+        "outputs": [
+          [42],
+          [42],
+          [100],
+          [100],
+          [150],
+          [150],
+          [150],
+          [150],
+          [42],
+          [42],
+          [3],
+          [150]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with select col and group by",
+        "sql": "SELECT string_col, MIN({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col) FROM {tbl} GROUP BY string_col, int_col",
+        "outputs": [
+          ["a", 2],
+          ["a", 2],
+          ["b", 3],
+          ["b", 3],
+          ["c", -101],
+          ["c", -101],
+          ["c", -101],
+          ["c", -101],
+          ["d", 42],
+          ["e", 42],
+          ["g", 3],
+          ["h", 150]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with agg col and group by",
+        "sql": "SELECT SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col) FROM {tbl} GROUP BY int_col",
+        "outputs": [
+          [6, 2],
+          [9, 3],
+          [100, 100],
+          [300, 150],
+          [252, 42],
+          [-101, -101]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with select col, agg col and group by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col) FROM {tbl} GROUP BY int_col",
+        "outputs": [
+          [2, 6, 2],
+          [3, 9, 3],
+          [100, 100, 100],
+          [150, 300, 150],
+          [42, 252, 42],
+          [-101, -101, -101]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY) with select col, agg col and group by with global order by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col) FROM {tbl} GROUP BY int_col ORDER BY int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [-101, -101, -101],
+          [2, 6, 2],
+          [3, 9, 3],
+          [42, 252, 42],
+          [100, 100, 100],
+          [150, 300, 150]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s",
+        "sql": "SELECT SUM(int_col) OVER(PARTITION BY string_col), COUNT(string_col) OVER(PARTITION BY string_col) FROM {tbl}",
+        "outputs": [
+          [150, 1],
+          [3, 1],
+          [42, 1],
+          [84, 2],
+          [84, 2],
+          [103, 2],
+          [103, 2],
+          [130, 5],
+          [130, 5],
+          [130, 5],
+          [130, 5],
+          [130, 5],
+          [54, 4],
+          [54, 4],
+          [54, 4],
+          [54, 4]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with select columns",
+        "sql": "SELECT string_col, SUM(int_col) OVER(PARTITION BY string_col), int_col, MAX(double_col) OVER(PARTITION BY string_col) FROM {tbl}",
+        "outputs": [
+          ["a", 130, 2, 400],
+          ["a", 130, 2, 400],
+          ["a", 130, 42, 400],
+          ["a", 130, 42, 400],
+          ["a", 130, 42, 400],
+          ["b", 103, 3, 100],
+          ["b", 103, 100, 100],
+          ["d", 42, 42, 42],
+          ["e", 84, 42, 50.5],
+          ["e", 84, 42, 50.5],
+          ["h", 150, 150, -1.53],
+          ["g", 3, 3, 100],
+          ["c", 54, -101, 400],
+          ["c", 54, 150, 400],
+          ["c", 54, 3, 400],
+          ["c", 54, 2, 400]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with select columns with alias",
+        "sql": "SELECT string_col AS str, MAX(double_col) OVER(PARTITION BY string_col) AS max, int_col, MIN(int_col) OVER(PARTITION BY string_col) AS sum FROM {tbl}",
+        "outputs": [
+          ["a", 400, 2, 2],
+          ["a", 400, 2, 2],
+          ["a", 400, 42, 2],
+          ["a", 400, 42, 2],
+          ["a", 400, 42, 2],
+          ["b", 100, 3, 3],
+          ["b", 100, 100, 3],
+          ["d", 42, 42, 42],
+          ["e", 50.5, 42, 42],
+          ["e", 50.5, 42, 42],
+          ["h", -1.53, 150, 150],
+          ["g", 100, 3, 3],
+          ["c", 400, -101, -101],
+          ["c", 400, 150, -101],
+          ["c", 400, 3, -101],
+          ["c", 400, 2, -101]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with select columns and default frame on one but not the other",
+        "sql": "SELECT bool_col, MIN(int_col) OVER(PARTITION BY bool_col ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING), double_col, AVG(double_col) OVER(PARTITION BY bool_col) FROM {tbl}",
+        "comments": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
+        "outputs": [
+          [true, 2, 300, 153.714286],
+          [true, 2, 400, 153.714286],
+          [true, 2, 100, 153.714286],
+          [true, 2, 50.5, 153.714286],
+          [true, 2, 75, 153.714286],
+          [true, 2, 50.5, 153.714286],
+          [true, 2, 100, 153.714286],
+          [false, -101, 100, 69.7755556],
+          [false, -101, 1, 69.7755556],
+          [false, -101, 42, 69.7755556],
+          [false, -101, 42, 69.7755556],
+          [false, -101, 42, 69.7755556],
+          [false, -101, 1.01, 69.7755556],
+          [false, -101, 1.5, 69.7755556],
+          [false, -101, -1.53, 69.7755556],
+          [false, -101, 400, 69.7755556]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with select col with global order by",
+        "sql": "SELECT string_col, AVG(double_col) OVER(PARTITION BY string_col), COUNT(string_col) OVER(PARTITION BY string_col) FROM {tbl} ORDER BY string_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 173.5, 5],
+          ["a", 173.5, 5],
+          ["a", 173.5, 5],
+          ["a", 173.5, 5],
+          ["a", 173.5, 5],
+          ["b", 50.5, 2],
+          ["b", 50.5, 2],
+          ["c", 125.6275, 4],
+          ["c", 125.6275, 4],
+          ["c", 125.6275, 4],
+          ["c", 125.6275, 4],
+          ["d", 42, 1],
+          ["e", 46.25, 2],
+          ["e", 46.25, 2],
+          ["g", 100, 1],
+          ["h", -1.53, 1]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY (2 keys))s avg with select col with global order by",
+        "sql": "SELECT string_col, bool_col, AVG(double_col) OVER(PARTITION BY string_col, bool_col), COUNT(string_col) OVER(PARTITION BY bool_col, string_col) FROM {tbl} ORDER BY string_col, bool_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", false, 42, 1],
+          ["a", true, 206.375, 4],
+          ["a", true, 206.375, 4],
+          ["a", true, 206.375, 4],
+          ["a", true, 206.375, 4],
+          ["b", false, 50.5, 2],
+          ["b", false, 50.5, 2],
+          ["c", false, 134.17, 3],
+          ["c", false, 134.17, 3],
+          ["c", false, 134.17, 3],
+          ["c", true, 100, 1],
+          ["d", false, 42, 1],
+          ["e", false, 42, 1],
+          ["e", true, 50.5, 1],
+          ["g", true, 100, 1],
+          ["h", false, -1.53, 1]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with select col with global order by with LIMIT",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col), AVG(int_col) OVER(PARTITION BY string_col) FROM {tbl} ORDER BY string_col LIMIT 6",
+        "comments": "Cannot use LIMIT without ORDER BY since the results can change and we cannot verify exact row outputs",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 5, 26],
+          ["a", 5, 26],
+          ["a", 5, 26],
+          ["a", 5, 26],
+          ["a", 5, 26],
+          ["b", 2, 51.5]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s and transform col",
+        "sql": "SELECT UPPER(CONCAT(string_col, bool_col, '-')), AVG(int_col) OVER(PARTITION BY string_col), MIN(double_col) OVER(PARTITION BY string_col) FROM {tbl}",
+        "outputs": [
+          ["A-TRUE", 26, 42],
+          ["A-TRUE", 26, 42],
+          ["A-TRUE", 26, 42],
+          ["A-FALSE", 26, 42],
+          ["A-TRUE", 26, 42],
+          ["B-FALSE", 51.5, 1],
+          ["B-FALSE", 51.5, 1],
+          ["C-TRUE", 13.5, 1.01],
+          ["C-FALSE", 13.5, 1.01],
+          ["C-FALSE", 13.5, 1.01],
+          ["C-FALSE", 13.5, 1.01],
+          ["D-FALSE", 42, 42],
+          ["E-TRUE", 42, 42],
+          ["E-FALSE", 42, 42],
+          ["G-TRUE", 3, 100],
+          ["H-FALSE", 150, -1.53]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with select col and filter",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col), MIN(double_col) OVER(PARTITION BY string_col) FROM {tbl} WHERE string_col = 'a' AND bool_col != false",
+        "outputs": [
+          ["a", 4, 50.5],
+          ["a", 4, 50.5],
+          ["a", 4, 50.5],
+          ["a", 4, 50.5]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with select col and filter",
+        "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col), AVG(double_col) OVER(PARTITION BY bool_col, string_col) FROM {tbl} WHERE string_col NOT IN ('a', 'd', 'e', 'g', 'h')",
+        "outputs": [
+          [100, 103, 50.5],
+          [1, 103, 50.5],
+          [100, 3, 100],
+          [1.01, 51, 134.17],
+          [1.5, 51, 134.17],
+          [400, 51, 134.17]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with select transform and filter",
+        "sql": "SELECT LENGTH(CONCAT(string_col, bool_col, '-')), MAX(int_col) OVER(PARTITION BY string_col, int_col), COUNT(double_col) OVER(PARTITION BY string_col, int_col) FROM {tbl} where int_col < 50 OR double_col = 1",
+        "outputs": [
+          [6, 2, 2],
+          [6, 2, 2],
+          [6, 42, 3],
+          [7, 42, 3],
+          [6, 42, 3],
+          [7, 3, 1],
+          [7, 100, 1],
+          [6, 3, 1],
+          [7, 2, 1],
+          [7, -101, 1],
+          [7, 42, 1],
+          [6, 42, 2],
+          [7, 42, 2],
+          [6, 3, 1]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with group by",
+        "sql": "SELECT MAX({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col), COUNT({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col) FROM {tbl} GROUP BY string_col, int_col",
+        "outputs": [
+          [42, 2],
+          [42, 2],
+          [100, 2],
+          [100, 2],
+          [150, 4],
+          [150, 4],
+          [150, 4],
+          [150, 4],
+          [42, 1],
+          [42, 1],
+          [3, 1],
+          [150, 1]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY)s with select col and group by",
+        "sql": "SELECT string_col, MIN({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col) FROM {tbl} GROUP BY string_col, int_col",
+        "outputs": [
+          ["a", 2, 44],
+          ["a", 2, 44],
+          ["b", 3, 103],
+          ["b", 3, 103],
+          ["c", -101, 54],
+          ["c", -101, 54],
+          ["c", -101, 54],
+          ["c", -101, 54],
+          ["d", 42, 42],
+          ["e", 42, 42],
+          ["g", 3, 3],
+          ["h", 150, 150]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with agg col and group by",
+        "sql": "SELECT SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col), AVG({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col) FROM {tbl} GROUP BY int_col",
+        "outputs": [
+          [6, 2, 2],
+          [9, 3, 3],
+          [100, 100, 100],
+          [300, 150, 150],
+          [252, 42, 42],
+          [-101, -101, -101]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER()s with select col, agg col and group by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col), AVG({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col) FROM {tbl} GROUP BY int_col",
+        "outputs": [
+          [2, 6, 2, 2],
+          [3, 9, 3, 3],
+          [100, 100, 100, 100],
+          [150, 300, 150, 150],
+          [42, 252, 42, 42],
+          [-101, -101, -101, -101]
+        ]
+      },
+      {
+        "description": "Multiple empty OVER() with select col, agg col and group by with global order by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col), AVG({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col) FROM {tbl} GROUP BY int_col ORDER BY int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [-101, -101, -101, -101],
+          [2, 6, 2, 2],
+          [3, 9, 3, 3],
+          [42, 252, 42, 42],
+          [100, 100, 100, 100],
+          [150, 300, 150, 150]
+        ]
+      }
+    ]
+  }
+}

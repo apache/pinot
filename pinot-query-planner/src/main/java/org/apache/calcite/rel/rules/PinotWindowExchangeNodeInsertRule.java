@@ -22,10 +22,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalExchange;
@@ -160,6 +162,19 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       Set<Integer> partitionByKeyList = new HashSet<>(windowGroup.keys.toList());
       Set<Integer> orderByKeyList = new HashSet<>(windowGroup.orderKeys.getKeys());
       isPartitionByOnly = partitionByKeyList.equals(orderByKeyList);
+      if (isPartitionByOnly) {
+        // Check the direction and null direction to ensure default ordering on the order by keys, which are:
+        // Direction: ASC
+        // Null Direction: LAST
+        List<RelFieldCollation> fieldCollations = windowGroup.orderKeys.getFieldCollations();
+        for (RelFieldCollation fieldCollation : fieldCollations) {
+          if (fieldCollation.direction == RelFieldCollation.Direction.DESCENDING
+              || fieldCollation.nullDirection == RelFieldCollation.NullDirection.FIRST) {
+            isPartitionByOnly = false;
+            break;
+          }
+        }
+      }
     }
     return isPartitionByOnly;
   }
