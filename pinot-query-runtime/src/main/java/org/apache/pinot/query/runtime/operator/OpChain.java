@@ -31,7 +31,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  * by send/receive stages.
  */
 public class OpChain implements AutoCloseable {
-
   private final MultiStageOperator _root;
   private final Set<MailboxIdentifier> _receivingMailbox;
   private final OpChainStats _stats;
@@ -62,8 +61,19 @@ public class OpChain implements AutoCloseable {
     return "OpChain{" + _id + "}";
   }
 
+  /**
+   * close() is called when we finish execution successfully.
+   */
   @Override
   public void close() {
     _root.close();
+  }
+
+  /**
+   * cancel() is called when execution runs into error.
+   * @param e
+   */
+  public void cancel(Throwable e) {
+    _root.cancel(e);
   }
 }

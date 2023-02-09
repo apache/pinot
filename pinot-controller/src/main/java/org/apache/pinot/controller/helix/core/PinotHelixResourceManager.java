@@ -2410,8 +2410,7 @@ public class PinotHelixResourceManager {
   /**
    * Resets a segment. This operation invoke resetPartition via state transition message.
    */
-  public void resetSegment(String tableNameWithType, String segmentName, @Nullable String targetInstance)
-      throws InterruptedException, TimeoutException {
+  public void resetSegment(String tableNameWithType, String segmentName, @Nullable String targetInstance) {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
     ExternalView externalView = getTableExternalView(tableNameWithType);
@@ -2421,7 +2420,7 @@ public class PinotHelixResourceManager {
 
     for (String instance : instanceSet) {
       if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
-        LOGGER.info("Skipping reset for segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
+        LOGGER.info("Skipping resetting for segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
             instance);
       } else {
         LOGGER.info("Resetting segment: {} of table: {} on instance: {}", segmentName, tableNameWithType, instance);
@@ -2431,10 +2430,10 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Resets all segments of a table. This operation invoke resetPartition via state transition message.
+   * Resets all segments or segments with Error state of a table. This operation invoke resetPartition via state
+   * transition message.
    */
-  public void resetAllSegments(String tableNameWithType, @Nullable String targetInstance)
-      throws InterruptedException, TimeoutException {
+  public void resetSegments(String tableNameWithType, @Nullable String targetInstance, boolean errorSegmentsOnly) {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
     ExternalView externalView = getTableExternalView(tableNameWithType);
@@ -2447,15 +2446,26 @@ public class PinotHelixResourceManager {
       Set<String> instanceSet = parseInstanceSet(idealState, segmentName, targetInstance);
       Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
       for (String instance : instanceSet) {
-        if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
-          instanceToSkippedSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
+        if (errorSegmentsOnly) {
+          if (externalViewStateMap != null && SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
+            instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
+          }
         } else {
-          instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
+          if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
+            instanceToSkippedSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
+          } else {
+            instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
+          }
         }
       }
     }
 
-    LOGGER.info("Resetting all segments of table: {}", tableNameWithType);
+    if (instanceToResetSegmentsMap.isEmpty()) {
+      LOGGER.info("No segments to reset for table: {}", tableNameWithType);
+      return;
+    }
+
+    LOGGER.info("Resetting segments: {} of table: {}", instanceToResetSegmentsMap, tableNameWithType);
     for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
       resetPartitionAllState(entry.getKey(), tableNameWithType, entry.getValue());
     }

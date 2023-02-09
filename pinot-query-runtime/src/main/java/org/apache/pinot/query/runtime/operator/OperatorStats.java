@@ -31,12 +31,8 @@ public class OperatorStats {
 
   private final String _operatorType;
 
-  private int _numInputBlock = 0;
-  private int _numInputRows = 0;
-
-  private int _numOutputBlock = 0;
-
-  private int _numOutputRows = 0;
+  private int _numBlock = 0;
+  private int _numRows = 0;
 
   public OperatorStats(long requestId, int stageId, String operatorType) {
     _stageId = stageId;
@@ -56,23 +52,16 @@ public class OperatorStats {
     }
   }
 
-  public void recordInput(int numBlock, int numRows) {
-    _numInputBlock += numBlock;
-    _numInputRows += numRows;
-  }
-
-  public void recordOutput(int numBlock, int numRows) {
-    _numOutputBlock += numBlock;
-    _numOutputRows += numRows;
+  public void recordRow(int numBlock, int numRows) {
+    _numBlock += numBlock;
+    _numRows += numRows;
   }
 
   // TODO: Return the string as a JSON string.
   @Override
   public String toString() {
     return String.format(
-        "OperatorStats[type: %s, requestId: %s, stageId %s] ExecutionWallTime: %sms, InputRows: %s, InputBlock: "
-            + "%s, OutputRows: %s, OutputBlock: %s", _operatorType, _requestId, _stageId,
-        _executeStopwatch.elapsed(TimeUnit.MILLISECONDS), _numInputRows, _numInputBlock, _numOutputRows,
-        _numOutputBlock);
+        "OperatorStats[requestId: %s, stageId %s, type: %s] ExecutionWallTime: %sms, No. Rows: %s, No. Block: %s",
+        _requestId, _stageId, _operatorType, _executeStopwatch.elapsed(TimeUnit.MILLISECONDS), _numRows, _numBlock);
   }
 }

@@ -37,11 +37,7 @@
       {"sql": "SET stageParallelism=2; SELECT {l}.key, {l}.lval, {r}.rval FROM {l} JOIN {r} ON {l}.key = {r}.key"},
       {"sql": "SET stageParallelism=2; SELECT {l}.key, SUM({l}.lval + {r}.rval) FROM {l} JOIN {r} ON {l}.key = {r}.key GROUP BY {l}.key"},
       {"sql": "SET stageParallelism=2; SELECT * FROM {l} WHERE lval NOT IN (SELECT rval FROM {r} WHERE rval > 2)"},
-      {
-        "description": "current stage parallelism doesn't work with broadcast join",
-        "sql": "SET stageParallelism=2; SELECT * FROM {l}, {r}",
-        "expectedException": ".*Cannot issue query with stageParallelism > 1 for queries that use SINGLETON exchange.*"
-      }
+      {"sql": "SET stageParallelism=2; SELECT * FROM {l}, {r}"}
     ]
   }
 }

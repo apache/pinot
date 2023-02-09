@@ -21,12 +21,13 @@ package org.apache.pinot.query.runtime.operator.exchange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import java.util.Iterator;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -37,19 +38,22 @@ import org.testng.annotations.Test;
 
 
 public class HashExchangeTest {
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1", "0@host:1", "0@host:1");
-  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1", "0@host:1", "0@host:2");
+  @Mock
+  private SendingMailbox<TransferableBlock> _mailbox1;
+  @Mock
+  private SendingMailbox<TransferableBlock> _mailbox2;
 
   private AutoCloseable _mocks;
 
   @Mock
   TransferableBlock _block;
-  @Mock
-  MailboxService<TransferableBlock> _mailboxService;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    Mockito.when(_block.getType()).thenReturn(DataBlock.Type.ROW);
+    Mockito.when(_block.getDataSchema()).thenReturn(
+        new DataSchema(new String[]{"col1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
   }
 
   @AfterMethod
@@ -62,29 +66,21 @@ public class HashExchangeTest {
   public void shouldSplitAndRouteBlocksBasedOnPartitionKey() {
     // Given:
     TestSelector selector = new TestSelector(Iterators.forArray(2, 0, 1));
-    Mockito.when(_block.getContainer()).thenReturn(ImmutableList.of(
-        new Object[]{0},
-        new Object[]{1},
-        new Object[]{2}
-    ));
-    ImmutableList<MailboxIdentifier> destinations = ImmutableList.of(MAILBOX_1, MAILBOX_2);
+    Mockito.when(_block.getContainer()).thenReturn(ImmutableList.of(new Object[]{0}, new Object[]{1}, new Object[]{2}));
+    ImmutableList<SendingMailbox<TransferableBlock>> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 
     // When:
-    Iterator<BlockExchange.RoutedBlock> route =
-        new HashExchange(_mailboxService, destinations, selector, TransferableBlockUtils::splitBlock)
-            .route(destinations, _block);
+    new HashExchange(destinations, selector, TransferableBlockUtils::splitBlock).route(destinations, _block);
 
     // Then:
-    BlockExchange.RoutedBlock block1 = route.next();
-    Assert.assertEquals(block1._destination, MAILBOX_1);
-    Assert.assertEquals(block1._block.getContainer().get(0), new Object[]{0});
-    Assert.assertEquals(block1._block.getContainer().get(1), new Object[]{1});
+    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
 
-    BlockExchange.RoutedBlock block2 = route.next();
-    Assert.assertEquals(block2._destination, MAILBOX_2);
-    Assert.assertEquals(block2._block.getContainer().get(0), new Object[]{2});
+    Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
+    Assert.assertEquals(captor.getValue().getContainer().get(0), new Object[]{0});
+    Assert.assertEquals(captor.getValue().getContainer().get(1), new Object[]{1});
 
-    Assert.assertFalse(route.hasNext());
+    Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture());
+    Assert.assertEquals(captor.getValue().getContainer().get(0), new Object[]{2});
   }
 
   private static class TestSelector implements KeySelector<Object[], Object[]> {

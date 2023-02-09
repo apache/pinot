@@ -48,6 +48,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.StageNodeVisitor;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.planner.stage.WindowNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
@@ -162,6 +163,11 @@ public class ServerRequestPlanVisitor implements StageNodeVisitor<Void, ServerPl
         CalciteRexExpressionParser.addSelectList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
             context.getPinotQuery()));
     return _aVoid;
+  }
+
+  @Override
+  public Void visitWindow(WindowNode node, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("Window not yet supported!");
   }
 
   @Override

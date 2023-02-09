@@ -40,7 +40,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
  */
 public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock> {
   private static final long DEFAULT_MAILBOX_INIT_TIMEOUT = 100L;
-  private final GrpcMailboxService _mailboxService;
   private final String _mailboxId;
   private Consumer<MailboxIdentifier> _gotMailCallback;
   private final CountDownLatch _initializationLatch;
@@ -48,9 +47,7 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
 
   private MailboxContentStreamObserver _contentStreamObserver;
 
-  public GrpcReceivingMailbox(String mailboxId, GrpcMailboxService mailboxService,
-      Consumer<MailboxIdentifier> gotMailCallback) {
-    _mailboxService = mailboxService;
+  public GrpcReceivingMailbox(String mailboxId, Consumer<MailboxIdentifier> gotMailCallback) {
     _mailboxId = mailboxId;
     _gotMailCallback = gotMailCallback;
     _initializationLatch = new CountDownLatch(1);
@@ -92,6 +89,10 @@ public class GrpcReceivingMailbox implements ReceivingMailbox<TransferableBlock>
   @Override
   public boolean isClosed() {
     return isInitialized() && _contentStreamObserver.isCompleted();
+  }
+
+  @Override
+  public void cancel(Throwable e) {
   }
 
   private boolean waitForInitialize()
