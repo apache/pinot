@@ -35,7 +35,7 @@
   <url>https://pinot.apache.org</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <aws.sdk.version>2.14.28</aws.sdk.version>
+    <aws.sdk.version>2.19.33</aws.sdk.version>
     <http.client.version>4.5.13</http.client.version>
     <http.core.version>4.4.13</http.core.version>
     <s3mock.version>2.1.19</s3mock.version>
@@ -135,6 +135,48 @@
           <artifactId>httpclient</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <!-- amazon transfer manager for multi-part upload -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3-transfer-manager</artifactId>
+      <version>${aws.sdk.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-to-slf4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-codec</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-buffer</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-transport</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpcore</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpclient</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk.crt</groupId>
+      <artifactId>aws-crt</artifactId>
+      <version>0.21.7</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>

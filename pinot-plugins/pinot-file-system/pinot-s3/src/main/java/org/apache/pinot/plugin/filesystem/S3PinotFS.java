@@ -50,6 +50,8 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
@@ -72,6 +74,8 @@ import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider;
 import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
+import software.amazon.awssdk.transfer.s3.S3TransferManager;
+import software.amazon.awssdk.transfer.s3.model.UploadFileRequest;
 
 
 /**
@@ -83,10 +87,13 @@ public class S3PinotFS extends BasePinotFS {
   private static final String DELIMITER = "/";
   public static final String S3_SCHEME = "s3://";
   private S3Client _s3Client;
+
   private boolean _disableAcl;
   private ServerSideEncryption _serverSideEncryption = null;
   private String _ssekmsKeyId;
   private String _ssekmsEncryptionContext;
+  private long _minObjectSizeToUseMultiPartClient;
+  private MultiPartClient _multiPartClient;
 
   @Override
   public void init(PinotConfiguration config) {
@@ -95,36 +102,8 @@ public class S3PinotFS extends BasePinotFS {
 
     _disableAcl = s3Config.getDisableAcl();
     setServerSideEncryption(s3Config.getServerSideEncryption(), s3Config);
-
-    AwsCredentialsProvider awsCredentialsProvider;
     try {
-      if (StringUtils.isNotEmpty(s3Config.getAccessKey()) && StringUtils.isNotEmpty(s3Config.getSecretKey())) {
-        AwsBasicCredentials awsBasicCredentials =
-            AwsBasicCredentials.create(s3Config.getAccessKey(), s3Config.getSecretKey());
-        awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
-      } else {
-        awsCredentialsProvider = DefaultCredentialsProvider.create();
-      }
-
-      // IAM Role based access
-      if (s3Config.isIamRoleBasedAccess()) {
-        AssumeRoleRequest.Builder assumeRoleRequestBuilder =
-            AssumeRoleRequest.builder().roleArn(s3Config.getRoleArn()).roleSessionName(s3Config.getRoleSessionName())
-                .durationSeconds(s3Config.getSessionDurationSeconds());
-        AssumeRoleRequest assumeRoleRequest;
-        if (StringUtils.isNotEmpty(s3Config.getExternalId())) {
-          assumeRoleRequest = assumeRoleRequestBuilder.externalId(s3Config.getExternalId()).build();
-        } else {
-          assumeRoleRequest = assumeRoleRequestBuilder.build();
-        }
-        StsClient stsClient =
-            StsClient.builder().region(Region.of(s3Config.getRegion())).credentialsProvider(awsCredentialsProvider)
-                .build();
-        awsCredentialsProvider =
-            StsAssumeRoleCredentialsProvider.builder().stsClient(stsClient).refreshRequest(assumeRoleRequest)
-                .asyncCredentialUpdateEnabled(s3Config.isAsyncSessionUpdateEnabled()).build();
-      }
-
+      AwsCredentialsProvider awsCredentialsProvider = getAWSCredentialsProvider(s3Config);
       S3ClientBuilder s3ClientBuilder =
           S3Client.builder().region(Region.of(s3Config.getRegion())).credentialsProvider(awsCredentialsProvider);
       if (StringUtils.isNotEmpty(s3Config.getEndpoint())) {
@@ -135,6 +114,7 @@ public class S3PinotFS extends BasePinotFS {
         }
       }
       _s3Client = s3ClientBuilder.build();
+      createMultiPartClient(s3Config);
     } catch (S3Exception e) {
       throw new RuntimeException("Could not initialize S3PinotFS", e);
     }
@@ -157,7 +137,48 @@ public class S3PinotFS extends BasePinotFS {
    */
   public void init(S3Client s3Client, String serverSideEncryption, PinotConfiguration serverSideEncryptionConfig) {
     _s3Client = s3Client;
-    setServerSideEncryption(serverSideEncryption, new S3Config(serverSideEncryptionConfig));
+    S3Config s3Config = new S3Config(serverSideEncryptionConfig);
+    setServerSideEncryption(serverSideEncryption, s3Config);
+    createMultiPartClient(s3Config);
+  }
+
+  private void createMultiPartClient(S3Config s3Config) {
+    _minObjectSizeToUseMultiPartClient = s3Config.getMinObjectSizeToUseMultiPartClient();
+    if (_minObjectSizeToUseMultiPartClient > 0) {
+      _multiPartClient = new MultiPartClient(s3Config, getAWSCredentialsProvider(s3Config));
+      LOGGER.info("Created multi-part client to upload objects larger than threshold: {}",
+          _minObjectSizeToUseMultiPartClient);
+    }
+  }
+
+  private static AwsCredentialsProvider getAWSCredentialsProvider(S3Config s3Config) {
+    AwsCredentialsProvider awsCredentialsProvider;
+    if (StringUtils.isNotEmpty(s3Config.getAccessKey()) && StringUtils.isNotEmpty(s3Config.getSecretKey())) {
+      AwsBasicCredentials awsBasicCredentials =
+          AwsBasicCredentials.create(s3Config.getAccessKey(), s3Config.getSecretKey());
+      awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
+    } else {
+      awsCredentialsProvider = DefaultCredentialsProvider.create();
+    }
+    // IAM Role based access
+    if (s3Config.isIamRoleBasedAccess()) {
+      AssumeRoleRequest.Builder assumeRoleRequestBuilder =
+          AssumeRoleRequest.builder().roleArn(s3Config.getRoleArn()).roleSessionName(s3Config.getRoleSessionName())
+              .durationSeconds(s3Config.getSessionDurationSeconds());
+      AssumeRoleRequest assumeRoleRequest;
+      if (StringUtils.isNotEmpty(s3Config.getExternalId())) {
+        assumeRoleRequest = assumeRoleRequestBuilder.externalId(s3Config.getExternalId()).build();
+      } else {
+        assumeRoleRequest = assumeRoleRequestBuilder.build();
+      }
+      StsClient stsClient =
+          StsClient.builder().region(Region.of(s3Config.getRegion())).credentialsProvider(awsCredentialsProvider)
+              .build();
+      awsCredentialsProvider =
+          StsAssumeRoleCredentialsProvider.builder().stsClient(stsClient).refreshRequest(assumeRoleRequest)
+              .asyncCredentialUpdateEnabled(s3Config.isAsyncSessionUpdateEnabled()).build();
+    }
+    return awsCredentialsProvider;
   }
 
   private void setServerSideEncryption(@Nullable String serverSideEncryption, S3Config s3Config) {
@@ -551,11 +572,16 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri)
       throws Exception {
-    LOGGER.info("Copy {} from local to {}", srcFile.getAbsolutePath(), dstUri);
     URI base = getBase(dstUri);
     String prefix = sanitizePath(base.relativize(dstUri).getPath());
     PutObjectRequest putObjectRequest = generatePutObjectRequest(dstUri, prefix);
-    _s3Client.putObject(putObjectRequest, srcFile.toPath());
+    if (_multiPartClient != null && srcFile.length() > _minObjectSizeToUseMultiPartClient) {
+      LOGGER.info("Copy {} from local to {} in multi parts", srcFile.getAbsolutePath(), dstUri);
+      _multiPartClient.putObject(putObjectRequest, srcFile);
+    } else {
+      LOGGER.info("Copy {} from local to {}", srcFile.getAbsolutePath(), dstUri);
+      _s3Client.putObject(putObjectRequest, srcFile.toPath());
+    }
   }
 
   @Override
@@ -662,7 +688,40 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public void close()
       throws IOException {
+    if (_multiPartClient != null) {
+      _multiPartClient.close();
+    }
     _s3Client.close();
     super.close();
+  }
+
+  private static class MultiPartClient {
+    private final S3AsyncClient _s3AsyncClient;
+    private final S3TransferManager _transferManager;
+
+    public MultiPartClient(S3Config s3Config, AwsCredentialsProvider awsCredentialsProvider) {
+      S3AsyncClientBuilder s3ClientBuilder =
+          S3AsyncClient.builder().region(Region.of(s3Config.getRegion())).credentialsProvider(awsCredentialsProvider);
+      if (StringUtils.isNotEmpty(s3Config.getEndpoint())) {
+        try {
+          s3ClientBuilder.endpointOverride(new URI(s3Config.getEndpoint()));
+        } catch (URISyntaxException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      _s3AsyncClient = s3ClientBuilder.build();
+      _transferManager = S3TransferManager.builder().s3Client(_s3AsyncClient).build();
+    }
+
+    public void close() {
+      _transferManager.close();
+      _s3AsyncClient.close();
+    }
+
+    public void putObject(PutObjectRequest putObjectRequest, File srcFile) {
+      UploadFileRequest uploadFileRequest =
+          UploadFileRequest.builder().putObjectRequest(putObjectRequest).source(srcFile).build();
+      _transferManager.uploadFile(uploadFileRequest).completionFuture().join();
+    }
   }
 }

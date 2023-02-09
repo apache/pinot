@@ -22,6 +22,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.util.UUID;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 
 
 /**
@@ -49,6 +50,7 @@ public class S3Config {
   public static final String EXTERNAL_ID = "externalId";
   public static final String SESSION_DURATION_SECONDS = "sessionDurationSeconds";
   public static final String ASYNC_SESSION_UPDATED_ENABLED = "asyncSessionUpdateEnabled";
+  public static final String MIN_OBJECT_SIZE_TO_USE_MULTI_PART_CLIENT = "minObjectSizeToUseMultiPartClient";
   public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
   public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";
   public static final String DEFAULT_ASYNC_SESSION_UPDATED_ENABLED = "true";
@@ -69,6 +71,7 @@ public class S3Config {
   private String _externalId;
   private int _sessionDurationSeconds;
   private boolean _asyncSessionUpdateEnabled;
+  private final long _minObjectSizeToUseMultiPartClient;
 
   public S3Config(PinotConfiguration pinotConfig) {
     _disableAcl = pinotConfig.getProperty(DISABLE_ACL_CONFIG_KEY, DEFAULT_DISABLE_ACL);
@@ -91,7 +94,9 @@ public class S3Config {
         Integer.parseInt(pinotConfig.getProperty(SESSION_DURATION_SECONDS, DEFAULT_SESSION_DURATION_SECONDS));
     _asyncSessionUpdateEnabled = Boolean.parseBoolean(
         pinotConfig.getProperty(ASYNC_SESSION_UPDATED_ENABLED, DEFAULT_ASYNC_SESSION_UPDATED_ENABLED));
-
+    // 0 disables multipart client.
+    _minObjectSizeToUseMultiPartClient =
+        DataSizeUtils.toBytes(pinotConfig.getProperty(MIN_OBJECT_SIZE_TO_USE_MULTI_PART_CLIENT, "0"));
     if (_iamRoleBasedAccess) {
       Preconditions.checkNotNull(_roleArn, "Must provide 'roleArn' if iamRoleBasedAccess is enabled");
     }
@@ -151,5 +156,9 @@ public class S3Config {
 
   public boolean isAsyncSessionUpdateEnabled() {
     return _asyncSessionUpdateEnabled;
+  }
+
+  public long getMinObjectSizeToUseMultiPartClient() {
+    return _minObjectSizeToUseMultiPartClient;
   }
 }
