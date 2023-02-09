@@ -42,8 +42,6 @@ import static org.testng.Assert.*;
 
 public class ForwardIndexTypeTest {
 
-
-
   @DataProvider(name = "allChunkCompressionType")
   public static Object[][] allChunkCompressionType() {
     return new String[][] {
@@ -280,6 +278,29 @@ public class ForwardIndexTypeTest {
                   + "      \"forward\": null"
                   + "    }\n"
                   + " }]", _fieldConfigListTypeRef)
+      );
+      Map<String, FieldIndexConfigs> confMap =
+          FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema);
+      ForwardIndexConfig actual =
+          confMap.get("dimInt").getConfig(ForwardIndexType.INSTANCE);
+      ForwardIndexConfig expected = ForwardIndexConfig.DISABLED;
+
+      assertEquals(actual, expected);
+    }
+
+    @Test
+    public void newConfigDisabled2()
+        throws IOException {
+      _tableConfig.setFieldConfigList(
+          JsonUtils.stringToObject(""
+              + " [{\n"
+              + "    \"name\": \"dimInt\",\n"
+              + "    \"indexes\" : {\n"
+              + "      \"forward\": {\n"
+              + "          \"enabled\": false\n"
+              + "       }\n"
+              + "    }\n"
+              + " }]", _fieldConfigListTypeRef)
       );
       Map<String, FieldIndexConfigs> confMap =
           FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema);
