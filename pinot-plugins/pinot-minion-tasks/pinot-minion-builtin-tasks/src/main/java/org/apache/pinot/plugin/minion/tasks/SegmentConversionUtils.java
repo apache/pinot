@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.clearspring.analytics.util.Preconditions;
 import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.net.URI;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
@@ -59,6 +63,39 @@ public class SegmentConversionUtils {
   private static final double DEFAULT_RETRY_SCALE_FACTOR = 2.0;
 
   private SegmentConversionUtils() {
+  }
+
+  /**
+   * Checks whether the given list of segments all exist or not
+   * @param tableNameWithType a table name with type
+   * @param controllerBaseURI the controller base URI
+   * @param segmentNames a list of segments to check
+   * @param authProvider a {@link AuthProvider}
+   * @return
+   * @throws Exception when there are exceptions checking whether the given list of segments all exist or not
+   */
+  public static Set<String> nonExistentSegments(String tableNameWithType, URI controllerBaseURI,
+      List<String> segmentNames, @Nullable AuthProvider authProvider)
+      throws Exception {
+    Preconditions.checkArgument(!CollectionUtils.isEmpty(segmentNames),
+        "the provided list of segment names is empty");
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    SSLContext sslContext = MinionContext.getInstance().getSSLContext();
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
+      Map<String, List<String>> tableTypeToSegmentNames =
+          fileUploadDownloadClient.getSegments(controllerBaseURI, rawTableName, tableType, true, authProvider);
+      if (tableTypeToSegmentNames != null && !segmentNames.isEmpty()) {
+        List<String> allSegmentNameList = tableTypeToSegmentNames.get(tableType.toString());
+        if (!CollectionUtils.isEmpty(allSegmentNameList)) {
+          Set<String> allSegmentNameSet = new HashSet<>(allSegmentNameList);
+          Set<String> nonExistentSegmentNames = new HashSet<>(segmentNames);
+          nonExistentSegmentNames.removeAll(allSegmentNameSet);
+          return nonExistentSegmentNames;
+        }
+      }
+      return new HashSet<>(segmentNames);
+    }
   }
 
   public static void uploadSegment(Map<String, String> configs, List<Header> httpHeaders,
