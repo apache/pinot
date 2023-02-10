@@ -357,12 +357,12 @@ public class S3PinotFSTest {
     File fileToCopy = new File(getClass().getClassLoader().getResource(fileName).getFile());
 
     // input file size is 20
-    _s3PinotFS.setMultiPartUploadConfigs(1, 3, 2);
+    _s3PinotFS.setMultiPartUploadConfigs(1, 3);
     try {
       _s3PinotFS.copyFromLocalFile(fileToCopy, URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)));
     } finally {
       // disable multipart upload again for the other UT cases.
-      _s3PinotFS.setMultiPartUploadConfigs(-1, 128 * 1024 * 1024, 10000);
+      _s3PinotFS.setMultiPartUploadConfigs(-1, 128 * 1024 * 1024);
     }
 
     HeadObjectResponse headObjectResponse = _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, fileName));

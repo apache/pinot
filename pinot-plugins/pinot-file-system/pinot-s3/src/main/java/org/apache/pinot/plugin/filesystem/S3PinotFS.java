@@ -100,7 +100,6 @@ public class S3PinotFS extends BasePinotFS {
   private String _ssekmsEncryptionContext;
   private long _minObjectSizeToUploadInParts;
   private long _multiPartUploadPartSize;
-  private int _multiPartUploadMaxPartNumAllowed;
 
   @Override
   public void init(PinotConfiguration config) {
@@ -162,7 +161,7 @@ public class S3PinotFS extends BasePinotFS {
    */
   public void init(S3Client s3Client) {
     _s3Client = s3Client;
-    setMultiPartUploadConfigs(-1, -1, -1);
+    setMultiPartUploadConfigs(-1, -1);
   }
 
   /**
@@ -596,10 +595,11 @@ public class S3PinotFS extends BasePinotFS {
       // The default configs can upload a single file of 1TB, so the if-branch should rarely happen.
       int partNum = 1;
       long partSizeToUse = _multiPartUploadPartSize;
-      if (partSizeToUse * _multiPartUploadMaxPartNumAllowed < fileSize) {
-        partSizeToUse = (fileSize + _multiPartUploadPartSize) / _multiPartUploadMaxPartNumAllowed;
+      if (partSizeToUse * S3Config.MULTI_PART_UPLOAD_MAX_PART_NUM < fileSize) {
+        partSizeToUse =
+            (fileSize + S3Config.MULTI_PART_UPLOAD_MAX_PART_NUM - 1) / S3Config.MULTI_PART_UPLOAD_MAX_PART_NUM;
         LOGGER.info("Increased part size from {} to {} for large file size {} due to max allowed uploads {}",
-            _multiPartUploadPartSize, partSizeToUse, fileSize, _multiPartUploadMaxPartNumAllowed);
+            _multiPartUploadPartSize, partSizeToUse, fileSize, S3Config.MULTI_PART_UPLOAD_MAX_PART_NUM);
       }
       List<CompletedPart> parts = new ArrayList<>();
       while (totalUploaded < srcFile.length()) {
@@ -627,16 +627,13 @@ public class S3PinotFS extends BasePinotFS {
   }
 
   private void setMultiPartUploadConfigs(S3Config s3Config) {
-    setMultiPartUploadConfigs(s3Config.getMinObjectSizeForMultiPartUpload(), s3Config.getMultiPartUploadPartSize(),
-        s3Config.getMultiPartUploadMaxPartNumAllowed());
+    setMultiPartUploadConfigs(s3Config.getMinObjectSizeForMultiPartUpload(), s3Config.getMultiPartUploadPartSize());
   }
 
   @VisibleForTesting
-  void setMultiPartUploadConfigs(long minObjectSizeToUploadInParts, long multiPartUploadPartSize,
-      int multiPartUploadMaxPartNumAllowed) {
+  void setMultiPartUploadConfigs(long minObjectSizeToUploadInParts, long multiPartUploadPartSize) {
     _minObjectSizeToUploadInParts = minObjectSizeToUploadInParts;
     _multiPartUploadPartSize = multiPartUploadPartSize;
-    _multiPartUploadMaxPartNumAllowed = multiPartUploadMaxPartNumAllowed;
   }
 
   @Override
