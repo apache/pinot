@@ -55,10 +55,10 @@ public class CPUMemThreadLevelAccountingObjects {
     @Override
     public String toString() {
       TaskEntry taskEntry = _currentThreadTaskStatus.get();
-      return "ThreadEntry{" +
-          "_currentThreadTaskStatus=" + (taskEntry == null? "idle" : taskEntry.toString()) +
-          ", _errorStatus=" + _errorStatus +
-          '}';
+      return "ThreadEntry{"
+          + "_currentThreadTaskStatus=" + (taskEntry == null ? "idle" : taskEntry.toString())
+          + ", _errorStatus=" + _errorStatus
+          + '}';
     }
 
     /**
