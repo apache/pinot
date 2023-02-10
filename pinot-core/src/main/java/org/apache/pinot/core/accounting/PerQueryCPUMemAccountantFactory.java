@@ -774,6 +774,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           LOGGER.error("Query {} got picked because using {} ns of cpu time, actual kill committed {}",
               maxUsageTuple._allocatedBytes, maxUsageTuple._queryId, _oomKillQueryEnabled);
         }
+        LOGGER.error("Current task status recorded is {}", _threadEntriesMap);
         LOGGER.error("Query aggregation results {} for the previous kill.", _aggregatedUsagePerActiveQuery.toString());
       }
 
@@ -789,6 +790,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             interruptRunnerThread(value.getAnchorThread());
           }
         }
+        LOGGER.error("Current task status recorded is {}", _threadEntriesMap);
       }
 
       private void interruptRunnerThread(Thread thread) {
