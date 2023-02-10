@@ -3250,15 +3250,14 @@ public class PinotHelixResourceManager {
     Set<String> unavailableSegmentsInFrom = Sets.difference(new HashSet<>(segmentsFrom), segmentsForTable);
     Preconditions.checkArgument(unavailableSegmentsInFrom.isEmpty(), String.format(
         "'%s' from 'segmentsFrom' are unavailable in the table. (tableName = '%s', segmentsFrom = '%s', "
-            + "segmentsTo = '%s', segmentsFromTable = '%s')", unavailableSegmentsInFrom, tableNameWithType,
-        segmentsFrom, segmentsTo, segmentsForTable));
+            + "segmentsTo = '%s')", unavailableSegmentsInFrom, tableNameWithType, segmentsFrom, segmentsTo));
 
     // Check that all the segments from 'segmentTo' does not exist in the table.
     Set<String> availableSegmentsInTo = Sets.intersection(new HashSet<>(segmentsTo), segmentsForTable);
     Preconditions.checkArgument(availableSegmentsInTo.isEmpty(), String.format(
         "'%s' from 'segmentsTo' should not be available in the table at this point. (tableName = '%s', "
-            + "segmentsFrom = '%s', segmentsTo = '%s', segmentsFromTable = '%s')", availableSegmentsInTo,
-        tableNameWithType, segmentsFrom, segmentsTo, segmentsForTable));
+            + "segmentsFrom = '%s', segmentsTo = '%s')", availableSegmentsInTo, tableNameWithType, segmentsFrom,
+        segmentsTo));
 
     try {
       DEFAULT_RETRY_POLICY.attempt(() -> {
