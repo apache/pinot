@@ -25,10 +25,13 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
@@ -154,25 +157,35 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   @Override
   public List<SegmentConversionResult> executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
-    preProcess(pinotTaskConfig);
-    _pinotTaskConfig = pinotTaskConfig;
-    _eventObserver = MinionEventObservers.getInstance().getMinionEventObserver(pinotTaskConfig.getTaskId());
-    String taskType = pinotTaskConfig.getTaskType();
+    // check whether all segments to process exist in the table, if not, terminate early to avoid wasting computing
+    // resources
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
-    String downloadURLString = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
-    String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
+    Set<String> segmentNamesForTable = SegmentConversionUtils.getSegmentNamesForTable(tableNameWithType,
+        FileUploadDownloadClient.extractBaseURI(new URI(uploadURL)), authProvider);
+    Set<String> nonExistingSegmentNames =
+        new HashSet<>(Arrays.asList(inputSegmentNames.split(MinionConstants.SEGMENT_NAME_SEPARATOR)));
+    nonExistingSegmentNames.removeAll(segmentNamesForTable);
+    if (!CollectionUtils.isEmpty(nonExistingSegmentNames)) {
+      throw new RuntimeException(String.format("table: %s does have the following segments to process: %s",
+          tableNameWithType, nonExistingSegmentNames));
+    }
 
+    preProcess(pinotTaskConfig);
+
+    _pinotTaskConfig = pinotTaskConfig;
+    _eventObserver = MinionEventObservers.getInstance().getMinionEventObserver(pinotTaskConfig.getTaskId());
+    String taskType = pinotTaskConfig.getTaskType();
+    String downloadURLString = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
+    String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
     LOGGER.info("Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}", taskType,
         tableNameWithType, inputSegmentNames, downloadURLString, uploadURL);
-
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs());
     String crypterName = getTableConfig(tableNameWithType).getValidationConfig().getCrypterClassName();
-
     try {
       List<File> inputSegmentDirs = new ArrayList<>();
       for (int i = 0; i < downloadURLs.length; i++) {
