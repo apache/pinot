@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
-import com.clearspring.analytics.util.Preconditions;
 import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.net.URI;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,35 +66,29 @@ public class SegmentConversionUtils {
   }
 
   /**
-   * Extract non-existent segments from the given list of segments
+   * Gets segment names for the given table
    * @param tableNameWithType a table name with type
    * @param controllerBaseURI the controller base URI
-   * @param segmentNames a list of segments to check
    * @param authProvider a {@link AuthProvider}
-   * @return a set of non-existent segment names
-   * @throws Exception when there are exceptions checking whether the given list of segments all exist or not
+   * @return a set of segment names
+   * @throws Exception when there are exceptions getting segment names for the given table
    */
-  public static Set<String> extractNonExistentSegments(String tableNameWithType, URI controllerBaseURI,
-      List<String> segmentNames, @Nullable AuthProvider authProvider)
+  public static Set<String> getSegmentNamesForTable(String tableNameWithType, URI controllerBaseURI,
+      @Nullable AuthProvider authProvider)
       throws Exception {
-    Preconditions.checkArgument(!CollectionUtils.isEmpty(segmentNames),
-        "the provided list of segment names is empty");
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       Map<String, List<String>> tableTypeToSegmentNames =
           fileUploadDownloadClient.getSegments(controllerBaseURI, rawTableName, tableType, true, authProvider);
-      if (tableTypeToSegmentNames != null && !segmentNames.isEmpty()) {
+      if (tableTypeToSegmentNames != null && !tableTypeToSegmentNames.isEmpty()) {
         List<String> allSegmentNameList = tableTypeToSegmentNames.get(tableType.toString());
         if (!CollectionUtils.isEmpty(allSegmentNameList)) {
-          Set<String> allSegmentNameSet = new HashSet<>(allSegmentNameList);
-          Set<String> nonExistentSegmentNames = new HashSet<>(segmentNames);
-          nonExistentSegmentNames.removeAll(allSegmentNameSet);
-          return nonExistentSegmentNames;
+          return new HashSet<>(allSegmentNameList);
         }
       }
-      return new HashSet<>(segmentNames);
+      return Collections.emptySet();
     }
   }
 

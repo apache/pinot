@@ -25,6 +25,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -163,12 +164,14 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
-    Set<String> nonExistentSegmentNames = SegmentConversionUtils.extractNonExistentSegments(tableNameWithType,
-        FileUploadDownloadClient.extractBaseURI(new URI(uploadURL)),
-        Arrays.asList(inputSegmentNames.split(MinionConstants.SEGMENT_NAME_SEPARATOR)), authProvider);
-    if (!CollectionUtils.isEmpty(nonExistentSegmentNames)) {
-      throw new RuntimeException(String.format("Segments to process: %s do not exist in table: %s",
-          nonExistentSegmentNames, tableNameWithType));
+    Set<String> segmentNamesForTable = SegmentConversionUtils.getSegmentNamesForTable(tableNameWithType,
+        FileUploadDownloadClient.extractBaseURI(new URI(uploadURL)), authProvider);
+    Set<String> nonExistingSegmentNames =
+        new HashSet<>(Arrays.asList(inputSegmentNames.split(MinionConstants.SEGMENT_NAME_SEPARATOR)));
+    nonExistingSegmentNames.removeAll(segmentNamesForTable);
+    if (!CollectionUtils.isEmpty(nonExistingSegmentNames)) {
+      throw new RuntimeException(String.format("table: %s does have the following segments to process: %s",
+          tableNameWithType, nonExistingSegmentNames));
     }
 
     preProcess(pinotTaskConfig);

@@ -68,32 +68,9 @@ public class SegmentConversionUtilsTest {
   public void testNonExistentSegments()
       throws Exception {
     Assert.assertEquals(
-        SegmentConversionUtils.extractNonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
-        FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT),
-            ImmutableList.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_3), null),
-        ImmutableSet.of(TEST_TABLE_SEGMENT_3));
-    Assert.assertEquals(
-        SegmentConversionUtils.extractNonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
-            FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT),
-            ImmutableList.of(TEST_TABLE_SEGMENT_3), null),
-        ImmutableSet.of(TEST_TABLE_SEGMENT_3));
-    Assert.assertTrue(
-        SegmentConversionUtils.extractNonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
-            FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT),
-            ImmutableList.of(TEST_TABLE_SEGMENT_1), null).isEmpty());
-    Assert.assertTrue(
-        SegmentConversionUtils.extractNonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
-            FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT),
-            ImmutableList.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_2), null).isEmpty());
-  }
-
-  @Test
-  public void testNonExistentSegmentsThrowsWhenTheSegmentNameListIsEmpty()
-      throws Exception {
-    Assert.assertThrows(IllegalArgumentException.class, () ->
-        SegmentConversionUtils.extractNonExistentSegments(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
-        FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT),
-            ImmutableList.of(), null));
+        SegmentConversionUtils.getSegmentNamesForTable(TEST_TABLE_WITHOUT_TYPE + "_" + TEST_TABLE_TYPE,
+        FileUploadDownloadClient.getURI(TEST_SCHEME, TEST_HOST, TEST_PORT), null),
+        ImmutableSet.of(TEST_TABLE_SEGMENT_1, TEST_TABLE_SEGMENT_2));
   }
 
   @AfterClass
